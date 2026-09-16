@@ -70,7 +70,7 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 * **Acceptance Criteria**:
   - Edge Function endpoints satisfy `IDeriveService` shared contracts.
   - Prompt context includes user's active prescriptions, Differin schedule, and reaction history.
-  - Emergency safety classifier executes with 100% precision on acute symptoms.
+  - All mandatory emergency/red-flag fixtures escalate correctly; no known mandatory-escalation fixture is missed; the classifier remains conservative under uncertainty.
   - Ingredient signals update confidence based on multi-product overlap and tolerated exposure discounting.
 
 ### S4: Founder Operations Console

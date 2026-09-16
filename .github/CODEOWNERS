@@ -1,8 +1,10 @@
 # Derive CODEOWNERS
-# 
+#
 # Kanuj handle: @KanujVerma
-# Sami handle: [PENDING SAMI GITHUB USERNAME]
-# Follow-up: Add Sami's GitHub username to platform/backend paths once invited as a repository collaborator.
+# Sami handle: @SamiAhmadBeg
+# Collaborator invite for @SamiAhmadBeg is pending acceptance.
+# CODEOWNERS reviews are documentation/notification only — main is not configured
+# to require human approval on every ordinary PR.
 
 # Default fallback
 * @KanujVerma
@@ -14,17 +16,21 @@ src/constants/theme.ts @KanujVerma
 src/services/mock/ @KanujVerma
 assets/ @KanujVerma
 
-# Sami Lane: Platform + Intelligence + Operations (Pending Sami handle)
-supabase/ @KanujVerma
-admin/ @KanujVerma
-src/services/remote/ @KanujVerma
-src/services/ai-workflows/ @KanujVerma
+# Sami Lane: Platform + Intelligence + Operations
+supabase/ @SamiAhmadBeg
+admin/ @SamiAhmadBeg
+src/services/remote/ @SamiAhmadBeg
+src/services/ai-workflows/ @SamiAhmadBeg
 
-# Shared Territory (Requires mutual founder review)
-src/contracts/ @KanujVerma
-src/domain/ @KanujVerma
-src/types/schema.ts @KanujVerma
-package.json @KanujVerma
-package-lock.json @KanujVerma
-tsconfig.json @KanujVerma
-.github/ @KanujVerma
+# Inert client Gemini stub; live Gemini is server-side (Sami)
+src/services/gemini.ts @SamiAhmadBeg @KanujVerma
+
+# Shared Territory (requires both founders)
+src/contracts/ @KanujVerma @SamiAhmadBeg
+src/domain/ @KanujVerma @SamiAhmadBeg
+src/types/schema.ts @KanujVerma @SamiAhmadBeg
+package.json @KanujVerma @SamiAhmadBeg
+package-lock.json @KanujVerma @SamiAhmadBeg
+tsconfig.json @KanujVerma @SamiAhmadBeg
+.env.example @KanujVerma @SamiAhmadBeg
+.github/ @KanujVerma @SamiAhmadBeg

@@ -36,7 +36,7 @@ npx expo start
 
 ## 2. Tech Stack
 
-- **Mobile Client**: Expo SDK 53/54, React Native 0.81, TypeScript (strict mode), Expo Router (file-based navigation in `app/`), Zustand state stores.
+- **Mobile Client**: Expo SDK 57, React Native 0.86, TypeScript (strict mode), Expo Router (file-based navigation in `app/`), Zustand state stores.
 - **Visual Design**: Direction A Mineral (Warm Ivory `#F6F3EC`, Elevated Surface `#FFFEFB`, Architectural Charcoal `#171A18`, Mineral Green `#345447`).
 - **Platform / Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Edge Functions, Private Storage).
 - **Intelligence**: Server-side Google Gemini 2.5 Flash via structured JSON schemas, coupled with deterministic safety circuit breakers.
