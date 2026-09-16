@@ -40,6 +40,9 @@ import {
   evidenceAnecdotalLemonExtract,
   type SkinPhenotypeProfile,
   type ProvenancedValue,
+  type EvidenceApplicabilityContext,
+  type ProductWhiteCastObservation,
+  type SunResponse,
 } from '../src/phenotype/index.ts';
 
 // ========================================================
@@ -911,6 +914,25 @@ test('Phenotype: Provenance is preserved and categorical confidence is modeled',
   assert.ok(provVal.observedAt);
 });
 
+test('Phenotype: SunResponse is behavior-only and strictly decoupled from pigmentation depth', () => {
+  // Arthur fixture uses behavioral self-reported sun response
+  assert.equal(arthurPhenotypeProfile.sunResponse?.value, 'sometimes_burns_tans');
+  assert.equal(arthurPhenotypeProfile.sunResponse?.source, 'self_reported');
+  assert.equal(arthurPhenotypeProfile.sunResponse?.userConfirmed, true);
+
+  // Behavioral values only, no pigmentation mixing
+  const behavioralValues: SunResponse[] = [
+    'burns_easily',
+    'burns_then_tans',
+    'sometimes_burns_tans',
+    'rarely_burns_tans_easily',
+    'not_sure',
+  ];
+  for (const val of behavioralValues) {
+    assert.ok(!/pigment|skin|tone|fair|deep|dark|white|brown|black/i.test(val));
+  }
+});
+
 test('Phenotype: Member confirmation strictly outranks unconfirmed photo estimate', () => {
   // Member confirmed truth
   const confirmedDepth: ProvenancedValue<'medium'> = {
@@ -965,30 +987,59 @@ test('Phenotype: Onboarding store captures PIH adaptive answer with verified pro
 // 13. EVIDENCE GRADE POLICY & ROUTINE INFLUENCE RULES
 // ========================================================
 
-test('Evidence Policy: Grade A/B evidence is eligible when member applicability matches', () => {
-  // Melasma Visible Light RCT (Grade A) applies to Arthur (medium depth, sometimes PIH)
-  const arthurDecision = canInfluenceRoutine(evidenceVisibleLightMelasmaRCT, arthurPhenotypeProfile);
+test('Evidence Policy: Grade A/B evidence is eligible when all applicability criteria and context match', () => {
+  // Full context matching Melasma RCT (requiresIronOxides: true, requiresPhotoprotection: true)
+  const validContext: EvidenceApplicabilityContext = {
+    productHasIronOxides: true,
+    photoprotectionRelevant: true,
+  };
+
+  // Melasma Visible Light RCT (Grade A) applies to Arthur with valid context
+  const arthurDecision = canInfluenceRoutine(evidenceVisibleLightMelasmaRCT, arthurPhenotypeProfile, validContext);
   assert.equal(arthurDecision.allowed, true);
   assert.equal(arthurDecision.evidenceGrade, 'A');
   assert.equal(arthurDecision.applicableToMember, true);
 
-  // AAD Dark Spots / Photoprotection guidance (Grade B) applies to Arthur
-  const aadDecision = canInfluenceRoutine(evidenceAadPihGuidance, arthurPhenotypeProfile);
+  // AAD Dark Spots guidance (Grade B) with photoprotection context
+  const aadDecision = canInfluenceRoutine(evidenceAadPihGuidance, arthurPhenotypeProfile, validContext);
   assert.equal(aadDecision.allowed, true);
   assert.equal(aadDecision.evidenceGrade, 'B');
 });
 
-test('Evidence Policy: Grade A/B evidence does not influence routine when applicability criteria do not match', () => {
-  // Create profile without PIH tendency and with very_light depth
-  const nonApplicableProfile: SkinPhenotypeProfile = {
-    pigmentationFamily: createProvenancedValue('very_light', 'self_reported', 'high', true),
-    pihTendency: createProvenancedValue('rarely', 'self_reported', 'high', true),
+test('Evidence Policy: Grade A evidence is BLOCKED when required product context is missing or mismatched (fail closed)', () => {
+  // Context missing required iron oxides (Melasma RCT requires requiresIronOxides: true)
+  const mismatchedContext: EvidenceApplicabilityContext = {
+    productHasIronOxides: false,
+    photoprotectionRelevant: true,
   };
 
-  const decision = canInfluenceRoutine(evidenceVisibleLightMelasmaRCT, nonApplicableProfile);
+  const decisionMismatched = canInfluenceRoutine(evidenceVisibleLightMelasmaRCT, arthurPhenotypeProfile, mismatchedContext);
+  assert.equal(decisionMismatched.allowed, false);
+  assert.equal(decisionMismatched.applicableToMember, false);
+  assert.match(decisionMismatched.reason, /does not match member applicability criteria or required product context/i);
+
+  // Completely missing context fails closed
+  const decisionNoContext = canInfluenceRoutine(evidenceVisibleLightMelasmaRCT, arthurPhenotypeProfile, undefined);
+  assert.equal(decisionNoContext.allowed, false);
+  assert.equal(decisionNoContext.applicableToMember, false);
+});
+
+test('Evidence Policy: directRoutineInfluenceAllowed === false hard-blocks routine changes regardless of grade', () => {
+  // Synthetic Grade A trial explicitly marked with directRoutineInfluenceAllowed: false
+  const blockedGradeATrial = {
+    ...evidenceVisibleLightMelasmaRCT,
+    id: 'ev_grade_a_informational_only',
+    directRoutineInfluenceAllowed: false,
+  };
+
+  const validContext: EvidenceApplicabilityContext = {
+    productHasIronOxides: true,
+    photoprotectionRelevant: true,
+  };
+
+  const decision = canInfluenceRoutine(blockedGradeATrial, arthurPhenotypeProfile, validContext);
   assert.equal(decision.allowed, false);
-  assert.equal(decision.applicableToMember, false);
-  assert.match(decision.reason, /does not match member applicability/i);
+  assert.match(decision.reason, /explicitly disallowed/i);
 });
 
 test('Evidence Policy: Grade C observational evidence cannot silently modify active routine steps', () => {
@@ -1029,12 +1080,22 @@ test('Tint Compatibility: Unconfirmed or missing shade requires confirmation bef
   assert.equal(missingResult.status, 'needs_confirmation');
 });
 
-test('Tint Compatibility: Confirmed shade evaluates categorically and identifies iron oxide benefit', () => {
-  // Arthur has confirmed medium depth with neutral undertone
+test('Tint Compatibility: Confirmed shade evaluates categorically and identifies iron oxide benefit only with relevant PIH signal', () => {
+  // Arthur has confirmed medium depth with neutral undertone AND confirmed PIH tendency ('sometimes')
   const matchResult = evaluateTintCompatibility(mockTintedMineralSunscreen, arthurPhenotypeProfile);
   assert.equal(matchResult.status, 'likely_match');
   assert.equal(matchResult.requiresConfirmation, false);
   assert.equal(matchResult.ironOxideBenefitIdentified, true);
+
+  // Member with medium depth but NO PIH tendency ('rarely') does NOT trigger iron oxide benefit
+  // (proves pigmentation depth alone is NOT a treatment trigger)
+  const profileWithoutPih: SkinPhenotypeProfile = {
+    ...arthurPhenotypeProfile,
+    pihTendency: createProvenancedValue('rarely', 'self_reported', 'high', true),
+  };
+  const resultWithoutPih = evaluateTintCompatibility(mockTintedMineralSunscreen, profileWithoutPih);
+  assert.equal(resultWithoutPih.status, 'likely_match');
+  assert.equal(resultWithoutPih.ironOxideBenefitIdentified, false);
 
   // Fair tinted sunscreen on medium depth is an unlikely match
   const fairResult = evaluateTintCompatibility(mockFairTintedSunscreen, arthurPhenotypeProfile);
@@ -1042,23 +1103,25 @@ test('Tint Compatibility: Confirmed shade evaluates categorically and identifies
   assert.equal(fairResult.requiresConfirmation, false);
 });
 
-test('White Cast Assessment: Mineral formulas evaluate cast risk without arbitrary scores', () => {
-  const untintedRisk = evaluateWhiteCastRisk(mockUntintedPhysicalSunscreen, arthurPhenotypeProfile);
-  assert.ok(untintedRisk.castRisk === 'moderate' || untintedRisk.castRisk === 'high');
-  assert.match(untintedRisk.rationale, /mineral.*cast/i);
+test('White Cast Assessment: Evaluates based on verified product observations without pseudo-scientific formulas', () => {
+  // Known noticeable cast observation
+  const observedRisk = evaluateWhiteCastRisk(mockUntintedPhysicalSunscreen, arthurPhenotypeProfile);
+  assert.equal(observedRisk.castRisk, 'moderate');
+  assert.match(observedRisk.rationale, /noticeable cast/i);
 
-  // Tinted formulation with iron oxides eliminates white cast risk
-  const tintedRisk = evaluateWhiteCastRisk(
-    {
-      mineralFilters: ['zinc_oxide'],
-      nanoParticle: false,
-      tinted: true,
-      estimatedCastLevel: 'none',
-    },
-    arthurPhenotypeProfile
-  );
-  assert.equal(tintedRisk.castRisk, 'none');
-  assert.match(tintedRisk.rationale, /iron oxides/i);
+  // Known zero cast observation
+  const zeroCastObs: ProductWhiteCastObservation = {
+    reportedCastLevel: 'none',
+    source: 'catalog_verified',
+    confidence: 'high',
+  };
+  const zeroRisk = evaluateWhiteCastRisk(zeroCastObs, arthurPhenotypeProfile);
+  assert.equal(zeroRisk.castRisk, 'none');
+
+  // Unverified product observation fails closed to 'unverified'
+  const unverifiedRisk = evaluateWhiteCastRisk(undefined, arthurPhenotypeProfile);
+  assert.equal(unverifiedRisk.castRisk, 'unverified');
+  assert.match(unverifiedRisk.rationale, /no verified/i);
 });
 
 // ========================================================
@@ -1075,4 +1138,3 @@ test('Safety & Privacy: Zero race, ethnicity, or ancestry classifiers in phenoty
   const serialized = JSON.stringify(arthurPhenotypeProfile);
   assert.equal(/caucasian|black|hispanic|asian|african/i.test(serialized), false);
 });
-

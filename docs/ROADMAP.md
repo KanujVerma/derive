@@ -103,14 +103,14 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Ingredient signals update confidence based on multi-product overlap and tolerated exposure discounting.
 
 ### S4: Founder Operations Console
-* **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta customers (personalized all-in monthly pricing; baseline ~$49–$129/mo). Routine review queue, refill replenishment status updater, product formula auditor, and internal clinical notes.
+* **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta customers (personalized all-in monthly pricing derived dynamically from active routine; commercial terms pending founder alignment). Routine review queue, refill replenishment status updater, product formula auditor, and internal clinical notes.
 * **Acceptance Criteria**:
   - Founders can review, edit, and publish routine proposals before member notification.
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
 ### S5: Commerce & Remote Service Integration
-* **Scope**: Stripe checkout / customer portal integration for Founding Beta memberships (personalized all-in monthly pricing; baseline ~$49–$129/mo), webhook listeners for subscription lifecycle, and `RemoteDeriveService` client adapter implementation.
+* **Scope**: Stripe checkout / customer portal integration for Founding Beta memberships (personalized all-in monthly pricing derived dynamically from active routine; commercial terms pending founder alignment), webhook listeners for subscription lifecycle, and `RemoteDeriveService` client adapter implementation.
 * **Acceptance Criteria**:
   - Stripe webhook maps customer email to Supabase member record.
   - `RemoteDeriveService` passes the full test suite against live Supabase Edge Functions.

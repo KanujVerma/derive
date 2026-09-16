@@ -139,7 +139,7 @@ Derive models observable skin attributes to deliver nuanced, safe routine recomm
 ### 1. Observable Phenotype Attributes
 * **Pigmentation Family**: `very_light`, `light`, `light_medium`, `medium`, `medium_deep`, `deep`, `very_deep`, `unknown`.
 * **Undertone**: `cool`, `neutral`, `warm`, `olive`, `unknown`.
-* **Sun Response**: Sun sensitivity spectrum from `burns_easily_never_tans` to `never_burns_deeply_pigmented`.
+* **Sun Response**: Self-reported sun behavior (`burns_easily`, `burns_then_tans`, `sometimes_burns_tans`, `rarely_burns_tans_easily`, `not_sure`), strictly decoupled from pigmentation depth.
 * **PIH Tendency**: Tendency for inflammatory lesions or acne to resolve with persistent hyperpigmentation (`rarely`, `sometimes`, `often`, `unknown`).
 * **White Cast Concern**: Mineral sunscreen cast sensitivity (`none`, `slight`, `moderate`, `severe`).
 * **Razor Bump History**: History of pseudofolliculitis barbae (`none`, `occasional`, `frequent`).
@@ -151,9 +151,9 @@ To preserve intake completion under 4 minutes, Derive does NOT include a general
 - **Trigger**: Adaptively shown when `breakouts` or `dark_spots` goals are selected.
 - **Choices**: `Rarely`, `Sometimes`, `Often`, `Not sure`.
 - **Storage**: Provenanced as `source: 'self_reported'`, `confidence: 'high'`, `userConfirmed: true`.
-- **Reasoning Impact**: Signals Derive to avoid aggressive multi-active irritation stacking, recommend barrier-strengthening ingredients (e.g. Niacinamide, Azelaic acid), and prioritize visible-light photoprotection.
+- **Reasoning Impact**: Signals Derive to avoid unnecessary irritation, avoid stacking multiple irritating active changes simultaneously, prioritize adherence-friendly photoprotection, track persistent dark marks distinctly from active breakouts, and evaluate product fit without automatically prescribing specific ingredients.
 
 ### 3. Categorical Tint Compatibility & White Cast Assessment
 - **Categorical Matching**: Evaluates product shade compatibility without arbitrary numeric match scores (`likely_match`, `possible_match`, `needs_confirmation`, `unlikely_match`).
 - **Confirmation Invariant**: If a member's pigmentation depth is unconfirmed or derived from an unverified camera estimate, tint evaluation returns `needs_confirmation`.
-- **Iron Oxide Photoprotection**: Detects iron oxide pigments blocking visible light / HEV to safeguard against hyperpigmentation relapse in deeper or PIH-prone skin (*Castanedo-Cazares et al. 2014*).
+- **Iron Oxide Photoprotection**: Identifies iron oxide photoprotection benefits against visible light when the member has a confirmed post-inflammatory hyperpigmentation signal (*Castanedo-Cazares et al. 2014*); never inferred from pigmentation depth alone.

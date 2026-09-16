@@ -2,27 +2,27 @@ import type {
   EvidenceGrade,
   ResearchEvidence,
   SkinPhenotypeProfile,
+  EvidenceApplicabilityContext,
 } from './types.ts';
 
 /**
- * Evaluates whether a piece of research evidence applies to a specific member's phenotype profile.
+ * Evaluates whether a piece of research evidence applies to a specific member's phenotype profile
+ * and product/recommendation context.
  *
  * Evidence strength (Grade A/B/C/D) is strictly orthogonal to member applicability.
- * A high-grade study on a specific population or condition does not universally apply
- * unless the member's confirmed context matches the study's applicability scope.
+ * A high-grade study on a specific formulation or condition does not apply unless ALL
+ * declared applicability constraints match (failing closed if context is missing).
  */
 export function isEvidenceApplicable(
   evidence: ResearchEvidence,
-  profile?: SkinPhenotypeProfile
+  profile?: SkinPhenotypeProfile,
+  context?: EvidenceApplicabilityContext
 ): boolean {
-  if (!profile) {
-    return false;
-  }
-
   const { applicability } = evidence;
 
   // Check target pigmentation families if specified
   if (applicability.targetPigmentationFamilies && applicability.targetPigmentationFamilies.length > 0) {
+    if (!profile) return false;
     const memberPigmentation = profile.pigmentationFamily?.value;
     if (!memberPigmentation || memberPigmentation === 'unknown') {
       return false;
@@ -34,11 +34,26 @@ export function isEvidenceApplicable(
 
   // Check PIH tendency if specified
   if (applicability.pihTendencyApplies && applicability.pihTendencyApplies.length > 0) {
+    if (!profile) return false;
     const memberPih = profile.pihTendency?.value;
     if (!memberPih || memberPih === 'unknown') {
       return false;
     }
     if (!applicability.pihTendencyApplies.includes(memberPih)) {
+      return false;
+    }
+  }
+
+  // Check iron oxides requirement if specified (fails closed if context missing)
+  if (applicability.requiresIronOxides === true) {
+    if (!context || context.productHasIronOxides !== true) {
+      return false;
+    }
+  }
+
+  // Check photoprotection requirement if specified (fails closed if context missing)
+  if (applicability.requiresPhotoprotection === true) {
+    if (!context || context.photoprotectionRelevant !== true) {
       return false;
     }
   }
@@ -56,8 +71,9 @@ export interface RoutineInfluenceDecision {
 /**
  * Enforces the Derive Evidence Policy:
  *
+ * - directRoutineInfluenceAllowed === false: Hard-blocks direct routine influence regardless of grade.
  * - Grade A / B: High-quality or robust evidence. Eligible to influence routine decisions
- *   ONLY IF member applicability matches.
+ *   ONLY IF directRoutineInfluenceAllowed is true AND all member applicability criteria match.
  * - Grade C: Observational, small trial, or mechanistic evidence. Can inform educational
  *   notes or Ask context, but CANNOT silently modify active routines or force product swaps.
  * - Grade D: Preliminary, in-vitro, or anecdotal evidence. Cannot drive product behavior
@@ -67,9 +83,10 @@ export interface RoutineInfluenceDecision {
  */
 export function canInfluenceRoutine(
   evidence: ResearchEvidence,
-  profile?: SkinPhenotypeProfile
+  profile?: SkinPhenotypeProfile,
+  context?: EvidenceApplicabilityContext
 ): RoutineInfluenceDecision {
-  const applicable = isEvidenceApplicable(evidence, profile);
+  const applicable = isEvidenceApplicable(evidence, profile, context);
 
   if (evidence.grade === 'D') {
     return {
@@ -89,11 +106,21 @@ export function canInfluenceRoutine(
     };
   }
 
-  // Grades A and B require explicit member applicability
+  // Hard-block: directRoutineInfluenceAllowed === false prevents routine changes regardless of study grade
+  if (!evidence.directRoutineInfluenceAllowed) {
+    return {
+      allowed: false,
+      reason: 'Direct routine influence is explicitly disallowed for this evidence item.',
+      evidenceGrade: evidence.grade,
+      applicableToMember: applicable,
+    };
+  }
+
+  // Grades A and B require all applicability constraints to match
   if (!applicable) {
     return {
       allowed: false,
-      reason: `Grade ${evidence.grade} evidence is methodologically robust but does not match member applicability criteria.`,
+      reason: `Grade ${evidence.grade} evidence is methodologically robust but does not match member applicability criteria or required product context.`,
       evidenceGrade: evidence.grade,
       applicableToMember: false,
     };
@@ -101,7 +128,7 @@ export function canInfluenceRoutine(
 
   return {
     allowed: true,
-    reason: `Grade ${evidence.grade} evidence is methodologically sound and applicable to member context.`,
+    reason: `Grade ${evidence.grade} evidence is methodologically sound and all applicability criteria match.`,
     evidenceGrade: evidence.grade,
     applicableToMember: true,
   };

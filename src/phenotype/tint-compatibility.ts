@@ -4,6 +4,7 @@ import type {
   TintCompatibilityResult,
   TintMetadata,
   WhiteCastProfile,
+  ProductWhiteCastObservation,
 } from './types.ts';
 
 const PIGMENTATION_ORDER: PigmentationFamily[] = [
@@ -22,6 +23,10 @@ const PIGMENTATION_ORDER: PigmentationFamily[] = [
  * Invariant: Never computes arbitrary numerical match scores (e.g. 84%).
  * Categorical matching only. If member's shade family is unconfirmed or estimated,
  * returns 'needs_confirmation' rather than assuming certainty.
+ *
+ * Treatment benefit (e.g. iron oxides blocking visible light) is ONLY identified when
+ * the member has a relevant confirmed signal (e.g. reported PIH tendency), NEVER from
+ * pigmentation depth alone.
  */
 export function evaluateTintCompatibility(
   productTint?: TintMetadata,
@@ -43,7 +48,12 @@ export function evaluateTintCompatibility(
       status: 'needs_confirmation',
       rationale: 'Member skin-tone family is not yet confirmed. Member confirmation required before verifying shade match.',
       requiresConfirmation: true,
-      ironOxideBenefitIdentified: productTint.ironOxides,
+      ironOxideBenefitIdentified: Boolean(
+        productTint.ironOxides && (
+          profile?.pihTendency?.value === 'sometimes' ||
+          profile?.pihTendency?.value === 'often'
+        )
+      ),
     };
   }
 
@@ -53,10 +63,12 @@ export function evaluateTintCompatibility(
   const memberIndex = PIGMENTATION_ORDER.indexOf(memberVal);
   const productIndex = PIGMENTATION_ORDER.indexOf(productVal);
 
-  const ironBenefit = productTint.ironOxides && (
-    profile?.pihTendency?.value === 'sometimes' ||
-    profile?.pihTendency?.value === 'often' ||
-    memberIndex >= 3 // medium to very deep
+  // Relevant signal: PIH tendency (never pigmentation depth alone)
+  const ironBenefit = Boolean(
+    productTint.ironOxides && (
+      profile?.pihTendency?.value === 'sometimes' ||
+      profile?.pihTendency?.value === 'often'
+    )
   );
 
   // Exact shade family match
@@ -99,48 +111,62 @@ export function evaluateTintCompatibility(
 }
 
 /**
- * Assesses white-cast risk for sunscreen formulations based on mineral filter composition and tinting.
+ * Assesses white-cast friction based on catalog-verified or member-observed product data,
+ * evaluated against the member's reported white-cast concern.
+ *
+ * Avoids pseudo-scientific formula-only predictions (e.g. non-nano = instant cast).
  */
 export function evaluateWhiteCastRisk(
-  profile: WhiteCastProfile,
+  observation?: WhiteCastProfile | ProductWhiteCastObservation,
   memberProfile?: SkinPhenotypeProfile
 ): {
-  castRisk: 'none' | 'low' | 'moderate' | 'high';
+  castRisk: 'none' | 'low' | 'moderate' | 'high' | 'unverified';
   rationale: string;
 } {
-  // Tinted formulations with iron oxides mask white cast
-  if (profile.tinted) {
+  if (!observation) {
+    return {
+      castRisk: 'unverified',
+      rationale: 'No verified product white-cast observation available.',
+    };
+  }
+
+  const castLevel = observation.reportedCastLevel;
+  const memberConcern = memberProfile?.whiteCastConcern?.value;
+
+  if (castLevel === 'unverified') {
+    return {
+      castRisk: 'unverified',
+      rationale: 'Product white-cast characteristics have not been catalog-verified.',
+    };
+  }
+
+  if (castLevel === 'none') {
     return {
       castRisk: 'none',
-      rationale: 'Tinted formulation with iron oxides neutralizes mineral sunscreen white cast.',
+      rationale: 'Verified product testing indicates no discernible white cast.',
     };
   }
 
-  // Non-mineral (chemical) filters have minimal cast risk
-  if (profile.mineralFilters.length === 0) {
+  if (castLevel === 'minimal') {
     return {
-      castRisk: 'none',
-      rationale: 'Organic (chemical) UV filters leave no mineral white cast.',
+      castRisk: 'low',
+      rationale: 'Verified product observation reports minimal cast that blends out cleanly.',
     };
   }
 
-  const memberDepth = memberProfile?.pigmentationFamily?.value;
-  const isDeeperTone = memberDepth === 'medium_deep' || memberDepth === 'deep' || memberDepth === 'very_deep';
-
-  if (profile.nanoParticle) {
+  if (castLevel === 'noticeable') {
+    const isConcerned = memberConcern === 'moderate' || memberConcern === 'severe';
     return {
-      castRisk: isDeeperTone ? 'moderate' : 'low',
-      rationale: isDeeperTone
-        ? 'Micronized mineral filters reduce cast, but may appear slightly ash on deeper skin tones.'
-        : 'Micronized mineral filters blend clearly on light to medium skin tones.',
+      castRisk: isConcerned ? 'high' : 'moderate',
+      rationale: isConcerned
+        ? 'Reported noticeable cast may present friction given member concern regarding sunscreen cast.'
+        : 'Reported noticeable cast upon application; typically requires thorough blending.',
     };
   }
 
-  // Non-nano untinted mineral
+  // Marked cast
   return {
-    castRisk: isDeeperTone ? 'high' : 'moderate',
-    rationale: isDeeperTone
-      ? 'Untinted non-nano mineral zinc/titanium leaves a noticeable chalky or purple/white cast on deeper skin.'
-      : 'Untinted non-nano mineral sunscreen leaves a visible cast and requires thorough rubbing to sheer out.',
+    castRisk: 'high',
+    rationale: 'Verified product observation reports marked cast on application.',
   };
 }

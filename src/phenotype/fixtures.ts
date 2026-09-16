@@ -15,7 +15,7 @@ import { createProvenancedValue } from './profile.ts';
 export const arthurPhenotypeProfile: SkinPhenotypeProfile = {
   pigmentationFamily: createProvenancedValue('medium', 'self_reported', 'high', true),
   undertone: createProvenancedValue('neutral', 'self_reported', 'medium', true),
-  sunResponse: createProvenancedValue('burns_moderately_tans_gradually', 'self_reported', 'high', true),
+  sunResponse: createProvenancedValue('sometimes_burns_tans', 'self_reported', 'high', true),
   pihTendency: createProvenancedValue('sometimes', 'self_reported', 'high', true),
   whiteCastConcern: createProvenancedValue('slight', 'self_reported', 'medium', true),
   razorBumpHistory: createProvenancedValue('occasional', 'self_reported', 'medium', true),
@@ -38,21 +38,32 @@ export const mockTintedMineralSunscreen: TintMetadata = {
   shadeFamily: 'medium',
   undertoneCompatibility: ['neutral', 'warm'],
   ironOxides: true, // Visible light / HEV photoprotection benefit
-  whiteCastRisk: 'none',
+  whiteCastObservation: {
+    reportedCastLevel: 'none',
+    source: 'catalog_verified',
+    confidence: 'high',
+  },
 };
 
 export const mockFairTintedSunscreen: TintMetadata = {
   shadeFamily: 'light',
   undertoneCompatibility: ['cool', 'neutral'],
   ironOxides: true,
-  whiteCastRisk: 'none',
+  whiteCastObservation: {
+    reportedCastLevel: 'none',
+    source: 'catalog_verified',
+    confidence: 'high',
+  },
 };
 
 export const mockUntintedPhysicalSunscreen: WhiteCastProfile = {
-  mineralFilters: ['zinc_oxide', 'titanium_dioxide'],
-  nanoParticle: false,
+  reportedCastLevel: 'noticeable',
   tinted: false,
-  estimatedCastLevel: 'marked',
+  provenance: {
+    reportedCastLevel: 'noticeable',
+    source: 'member_observation',
+    confidence: 'medium',
+  },
 };
 
 /**

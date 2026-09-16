@@ -44,7 +44,7 @@ High-signal findings synthesized from founder research, customer discovery conve
 ## 3. Core Hypotheses & Customer Discovery Principles
 
 * **[HYPOTHESIS 1 - Month-Two Renewal & Personalized Value]**:
-  Members renew in Month 2 not because they use the app every day, but because they experienced zero breakouts/barrier crashes, have their exact product refills handled automatically, and pay an all-in personalized monthly rate (~$49–$129/mo, e.g. Arthur at $96/mo) that eliminates guesswork.
+  Members renew in Month 2 not because they use the app every day, but because they experienced zero breakouts/barrier crashes, have their exact product refills handled automatically, and pay an all-in personalized monthly rate derived from their routine (e.g. Arthur's demo fixture at $96/mo as an illustrative example, not a pricing commitment) that eliminates guesswork.
 * **[HYPOTHESIS 2 - Behavioral Observation > Self-Diagnosis]**:
   Customers are notoriously inaccurate when asked "What is your Fitzpatrick skin type?" or "Is your skin barrier compromised?". They are highly accurate when asked: *"By midday, how does your face feel?"* and *"Does your face sting when you wash it?"*.
 * **[HYPOTHESIS 3 - Defensibility via Longitudinal Data]**:

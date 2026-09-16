@@ -3,9 +3,9 @@
 ## A. What Derive Is
 Derive is a **managed skincare service** ("Your skincare, handled").
 It is:
-- A personalized, set-it-and-forget-it care service for 10 initial Founding Beta members (personalized all-in monthly pricing; baseline ~$49–$129/mo derived dynamically from active routine consumption).
+- A personalized, set-it-and-forget-it care service for 10 initial Founding Beta members (personalized all-in monthly pricing derived dynamically from active routine consumption; Arthur demo fixture at $96/mo is an illustrative example, not a pricing commitment).
 - Grounded in persistent customer history, active schedules, and observed skin tolerance over time.
-- Supported by manual founder operations and human verification before routine publication.
+- Supported by manual founder operations and a manual final quality check for the initial beta routine before activation.
 
 It is **NOT**:
 - An "AI dermatologist" or clinical diagnostic device.
@@ -52,6 +52,14 @@ Future agents and founders are authorized and expected to challenge architectura
   5. **Dermatological & cosmetic research evidence**
   6. **Intuition**
 
+### ARCHITECTURE_CHALLENGE Packet Format
+When raising an architectural challenge, return a concise packet:
+- **Discovered Evidence**: Specific tests, code, runtime behavior, or research invalidating the assumption.
+- **Why Decision Needed**: Concrete conflict or architectural risk.
+- **Viable Options**: 2–3 viable engineering paths with tradeoffs.
+- **Recommended Option**: Strongly supported recommendation if one is clearly superior.
+- **Exact Question Needed**: The focused question requiring founder/orchestrator decision.
+
 ## F. Safety, Privacy & Phenotype Invariants
 - **Cosmetic Skincare Only**: Never diagnose conditions (e.g. eczema, melanoma, cystic acne infection).
 - **Clinical Circuit Breaker**: Immediate escalation to in-person medical care upon detecting emergency symptoms (facial swelling, respiratory distress, blistering rash with oozing).
@@ -59,7 +67,7 @@ Future agents and founders are authorized and expected to challenge architectura
 - **Confirmation Invariant**: Explicit member confirmation strictly outranks unconfirmed estimates (`setOrConfirmPhenotypeValue`). Unconfirmed estimates cannot overwrite confirmed truth.
 - **Evidence vs. Applicability**: Methodological strength (Grade A/B/C/D) is distinct from member applicability. Grade C/D population claims cannot silently alter active routines.
 - **Zero Raw Audio Storage**: Voice dictation transcribes client-side via speech recognition; no raw audio is recorded, stored, or transmitted.
-- **Private Health Data**: Skin photos and reaction notes are treated as private medical context; never upload to public storage buckets or log in telemetry.
+- **Sensitive Skincare Data**: Skin photos and reaction notes are treated as private, sensitive consumer skincare data; never upload to public storage buckets or log in telemetry.
 - **Telemetry Boundaries**: Session replay is strictly OFF (`disable_session_recording: true`). Only allowlisted interaction and navigation events are tracked.
 - **No Secrets in Code**: API keys, Supabase service roles, and private tokens belong exclusively in uncommitted `.env` files. Gemini credentials are server/Supabase secrets only — never `EXPO_PUBLIC_*` client variables.
 
@@ -73,8 +81,11 @@ Every substantial agent run on either founder's machine must begin and finish wi
    - Read `docs/ROADMAP.md`
    - Read `docs/OWNERSHIP.md`
    - Inspect local git state: `git status --short`, `git diff --stat`
-   - Fetch remote: `git fetch origin` and compare local vs remote without discarding local work.
-2. **Durable Context Ledger Sync**:
+   - Fetch remote: `git fetch origin`
+2. **Automatic Remote Reconciliation**:
+   - **Clean & Behind**: If working tree is clean, current branch has no unpushed local commits, and local branch is only behind `origin/main`, fast-forward safely using ff-only behavior (`git merge --ff-only origin/main`) before beginning work.
+   - **Diverged or Dirty**: If local has uncommitted work, unpushed commits, or local and remote diverged, NEVER reset or overwrite. Stop, report the state, and reconcile explicitly before shared work.
+3. **Durable Context Ledger Sync**:
    - If changing product semantics, architecture, shared contracts, safety rules, or pricing, the agent MUST update `docs/CONTEXT_SYNC.md` and relevant domain docs before completing.
    - Record decision status explicitly: `PROPOSED`, `APPROVED`, or `IMPLEMENTED`.
    - If unable to directly write to the founder Drive brief, emit `DRIVE_SYNC_PAYLOAD` in the completion report.

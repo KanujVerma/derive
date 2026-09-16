@@ -40,14 +40,16 @@ export type Undertone =
   | 'olive'
   | 'unknown';
 
+/**
+ * Self-reported sun behavior only.
+ * Strictly decoupled from pigmentation depth.
+ */
 export type SunResponse =
-  | 'burns_easily_never_tans'
-  | 'burns_easily_tans_minimally'
-  | 'burns_moderately_tans_gradually'
-  | 'burns_minimally_tans_well'
-  | 'rarely_burns_tans_profusely'
-  | 'never_burns_deeply_pigmented'
-  | 'unknown';
+  | 'burns_easily'
+  | 'burns_then_tans'
+  | 'sometimes_burns_tans'
+  | 'rarely_burns_tans_easily'
+  | 'not_sure';
 
 export type PihTendency =
   | 'rarely'
@@ -114,18 +116,36 @@ export interface ResearchEvidence {
   directRoutineInfluenceAllowed: boolean;
 }
 
+/**
+ * Recommendation / evaluation context for research applicability
+ */
+export interface EvidenceApplicabilityContext {
+  productHasIronOxides?: boolean;
+  photoprotectionRelevant?: boolean;
+}
+
+/**
+ * Grounded product white cast observation.
+ * Sourced strictly from catalog verification, member history, or formula analysis,
+ * not speculative formula-category predictions.
+ */
+export interface ProductWhiteCastObservation {
+  reportedCastLevel: 'none' | 'minimal' | 'noticeable' | 'marked' | 'unverified';
+  source: 'catalog_verified' | 'member_observation' | 'formula_note';
+  confidence: ConfidenceLevel;
+}
+
 export interface TintMetadata {
   shadeFamily: PigmentationFamily;
   undertoneCompatibility: Undertone[];
   ironOxides: boolean; // Photoprotective against High-Energy Visible (HEV) / blue light
-  whiteCastRisk: 'none' | 'low' | 'moderate' | 'high';
+  whiteCastObservation?: ProductWhiteCastObservation;
 }
 
 export interface WhiteCastProfile {
-  mineralFilters: ('zinc_oxide' | 'titanium_dioxide')[];
-  nanoParticle: boolean;
+  reportedCastLevel: 'none' | 'minimal' | 'noticeable' | 'marked' | 'unverified';
   tinted: boolean;
-  estimatedCastLevel: 'none' | 'low' | 'moderate' | 'marked';
+  provenance: ProductWhiteCastObservation;
 }
 
 export type TintCompatibilityStatus =

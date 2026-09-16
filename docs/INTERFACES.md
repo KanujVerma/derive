@@ -112,47 +112,28 @@ Live Gemini invocation happens only behind `RemoteDeriveService` on the server. 
 
 ---
 
-## 7. Proposed Backend Extensions (For Sami Review)
+## 7. Semantic Requirements for Backend Evolution (For Sami Review)
 
-The following types and fields are currently prototyped in client-only modules (`src/phenotype/` and `src/pricing/`). They are proposed for future backend schema integration:
+The following semantic requirements emerge from the client prototypes (`src/phenotype/` and `src/pricing/`). They are documented here to inform backend architecture without prescribing database schemas, table layouts, or specific column designs.
 
-### A. OnboardingPayload Extension
-```typescript
-// Proposed addition to OnboardingPayload in src/contracts/DeriveService.ts:
-export interface OnboardingPayload {
-  // ... existing fields ...
-  pihTendency?: 'rarely' | 'sometimes' | 'often' | 'unknown';
-}
-```
+### A. Phenotype & PIH Signal Semantics
+The backend must preserve full evidence provenance for any captured phenotype signal, rather than flattening it to an unprovenanced string:
+- **Core Signal**: Adaptive question on post-inflammatory hyperpigmentation (persistent dark marks after breakouts or irritation).
+- **Required Provenance Fields**:
+  - `value`: Categorical answer (`rarely`, `sometimes`, `often`, `unknown`).
+  - `source`: Evidence origin (`self_reported`, `photo_estimate`, `observed_history`, `derived_from_history`, `external_context`).
+  - `confidence`: Categorical confidence (`low`, `medium`, `high`).
+  - `userConfirmed`: Boolean invariant ensuring member-confirmed values outrank estimates.
+  - `observedAt`: ISO timestamp of observation/confirmation.
+- **Storage Decision**: Sami may persist this via JSONB attributes, relational fact tables, event ledgers, or dedicated profile columns as best fits backend normalization and RLS performance.
 
-### B. SkinProfile Phenotype Provenance Model
-```typescript
-// Proposed table or JSONB column on customer_profiles / skin_profiles:
-export interface ProvenancedValue<T> {
-  value: T;
-  source: 'self_reported' | 'photo_estimate' | 'observed_history' | 'derived_from_history' | 'external_context';
-  confidence: 'low' | 'medium' | 'high';
-  userConfirmed: boolean;
-  observedAt?: string;
-}
-
-export interface SkinPhenotypeRecord {
-  pigmentation_family?: ProvenancedValue<PigmentationFamily>;
-  undertone?: ProvenancedValue<Undertone>;
-  sun_response?: ProvenancedValue<SunResponse>;
-  pih_tendency?: ProvenancedValue<PihTendency>;
-  white_cast_concern?: ProvenancedValue<WhiteCastConcern>;
-  razor_bump_history?: ProvenancedValue<RazorBumpHistory>;
-  hair_curl_pattern?: ProvenancedValue<HairCurlPattern>;
-}
-```
-
-### C. Customer Profile Pricing Attributes
-```typescript
-// Proposed additions to CustomerProfile:
-export interface CustomerProfile {
-  // ... existing fields ...
-  monthlyPlanPriceCents: number; // e.g. 9600 for Arthur's $96/mo plan
-  planPricingStatus: 'provisional_draft' | 'active_approved';
-}
-```
+### B. Personalized Pricing Semantics
+Pricing is dynamic, versioned relative to routine and subscription lifecycle, and requires versioned state tracking rather than a static single profile column:
+- **Semantic State Requirements**:
+  - **Draft Estimate**: Computed during onboarding and displayed under quiet review before first plan publication.
+  - **Active Agreed Price**: The monthly amount currently authorized and active.
+  - **Proposed Changed Price**: Generated when a routine adjustment or product swap changes steady-state consumption.
+  - **Routine Version Linkage**: Exact association between the pricing snapshot and the canonical routine version.
+  - **Approval State**: Explicit member confirmation state (`pending_approval`, `approved`, `rejected`) for any price increase.
+  - **Effective Timing & History**: Activation timestamp, scheduled change dates, and historical audit ledger.
+- **Storage Decision**: The database representation (e.g. subscription versioning table, routine-linked pricing snapshot, or ledger entity) belongs to backend architecture review.

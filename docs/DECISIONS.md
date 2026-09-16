@@ -61,7 +61,7 @@ Key technical and product decisions accepted for Derive V1.
 * **Rationale**: Eliminates user confusion over scanner modes, deletes redundant camera code in the Ask tab, and cleanly decouples an ingredient's objective cosmetic quality from whether it is safe and beneficial for this user's current skin barrier and prescription schedule.
 
 ### ADR-15: [PROVISIONAL · PENDING COFOUNDER REVIEW] Personalized All-In Monthly Pricing Architecture & Price Stability Contract
-* **Status**: PROVISIONAL / PENDING COFOUNDER REVIEW (Prototyped in client/mock layer by Kanuj; not yet reviewed or accepted by Sami; not an accepted ADR).
+* **Status**: PROVISIONAL / PENDING COFOUNDER BUSINESS REVIEW (Prototyped in client/mock layer by Kanuj; not yet reviewed or accepted by Sami; Arthur's $96/mo is an illustrative deterministic demo fixture, not a commercial pricing commitment; final economics, ranges, and commercial structure pending founder alignment).
 * **Proposal**: Explore transitioning away from universal flat-rate $129/month assumptions toward a personalized, all-in monthly plan pricing model computed from the member's active routine:
   `monthlyPlanPriceCents = PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS ($39/mo) + normalizedProductConsumptionCents + PROVISIONAL_DEMO_OPERATIONS_RISK_CENTS ($5/mo)`.
   Product consumption is normalized to a 30-day rate via `Math.round(retailPriceCents * 30 / estimatedLifespanDays)`.
@@ -86,8 +86,8 @@ Key technical and product decisions accepted for Derive V1.
 
 
 ### ADR-17: [PROVISIONAL · CLIENT PROTOTYPE] Phenotype-Aware, Never Race-Aware Skin Modeling
-* **Status**: PROVISIONAL / CLIENT PROTOTYPE (Implemented in `src/phenotype/` by Kanuj; backend schema unchanged; pending Sami platform review).
-* **Decision**: Ground skin modeling exclusively in observable cutaneous attributes and response mechanics (`PigmentationFamily`, `Undertone`, `SunResponse`, `PihTendency`, `WhiteCastConcern`, `RazorBumpHistory`, `HairCurlPattern`).
+* **Status**: PROVISIONAL CLIENT ARCHITECTURE IMPLEMENTED, backend adoption pending (Implemented in `src/phenotype/` by Kanuj; backend schema unchanged; pending Sami platform review).
+* **Decision**: Ground skin modeling exclusively in observable cutaneous attributes and response mechanics (`PigmentationFamily`, `Undertone`, `SunResponse` (behavior-only: burns_easily, burns_then_tans, etc.), `PihTendency`, `WhiteCastConcern`, `RazorBumpHistory`, `HairCurlPattern`).
 * **Hard Prohibitions**: Zero race classifiers, zero ethnicity classifiers, zero ancestry inference, zero demographic recommendation rules (e.g. "Black -> product X"), and zero Fitzpatrick-as-race mappings.
 * **Confirmation Invariant**: Every phenotype attribute carries explicit provenance (`ProvenancedValue<T>`) with categorical confidence (`low` | `medium` | `high`). Explicit member confirmation strictly outranks unconfirmed photo estimates (`setOrConfirmPhenotypeValue`). Stale estimates cannot overwrite confirmed truth.
 * **V1 Onboarding Invariant**: Normal V1 onboarding funnels only collect one single new adaptive phenotype signal: *"Do breakouts or irritation usually leave dark marks that stick around?"* (shown only when `breakouts` or `dark_spots` goals are selected). Shade depth, undertone, sunscreen white cast, and shaving habits are collected contextually (e.g. during tinted sunscreen evaluation or shaving questions) rather than lengthening onboarding.
@@ -95,7 +95,8 @@ Key technical and product decisions accepted for Derive V1.
 ### ADR-18: Research Evidence Grading & Member Applicability Policy
 * **Decision**: Decouple scientific evidence quality from individual member applicability.
 * **Evidence Hierarchy**:
-  - **Grade A / B**: High-quality RCTs, systematic reviews, or robust cohort studies. Eligible to influence routine decisions ONLY IF member applicability matches.
+  - **Grade A / B**: High-quality RCTs, systematic reviews, or robust cohort studies. Eligible to influence routine decisions ONLY IF `directRoutineInfluenceAllowed` is true and all member applicability criteria and required product context (`EvidenceApplicabilityContext`) match (failing closed if context is missing).
+  - **Direct Influence Hard-Block**: If `directRoutineInfluenceAllowed` is false, routine changes are blocked regardless of methodological grade.
   - **Grade C**: Small trials, observational studies (e.g. dairy-acne meta-analyses), or mechanistic research. Can inform educational context in Ask or research cards, but CANNOT silently modify active routines or force product swaps.
   - **Grade D**: Preliminary in-vitro data or anecdotal reports. Excluded from driving any routine or product behavior.
 * **Non-Causal Rule**: Observational population correlations must never be converted into automated individual interventions or prescriptive dietary rules.
@@ -103,4 +104,5 @@ Key technical and product decisions accepted for Derive V1.
 ### ADR-19: Categorical Tint Compatibility & Mineral White-Cast Assessment
 * **Decision**: Evaluate tinted formulations (e.g. tinted mineral sunscreens) using categorical matching (`likely_match`, `possible_match`, `needs_confirmation`, `unlikely_match`) rather than fake numeric percentages.
 * **Confirmation Requirement**: If a member's pigmentation depth is unconfirmed or estimated, tint evaluation returns `needs_confirmation` before claiming compatibility.
-* **Iron Oxide Photoprotection**: Detect and highlight iron-oxide benefits (HEV / visible light blocking) for members with confirmed post-inflammatory hyperpigmentation tendencies or deeper pigmentation.
+* **Iron Oxide Photoprotection**: Detect and highlight iron-oxide benefits (HEV / visible light blocking) ONLY when a member has confirmed post-inflammatory hyperpigmentation tendency (sometimes or often); never infer treatment benefits from pigmentation depth alone.
+* **White Cast Assessment**: Assesses white-cast friction using verified catalog or member observation matched against member cast concern; strictly avoids speculative formula-only prediction algorithms.
