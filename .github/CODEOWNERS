@@ -1,0 +1,30 @@
+# Derive CODEOWNERS
+# 
+# Kanuj handle: @KanujVerma
+# Sami handle: [PENDING SAMI GITHUB USERNAME]
+# Follow-up: Add Sami's GitHub username to platform/backend paths once invited as a repository collaborator.
+
+# Default fallback
+* @KanujVerma
+
+# Kanuj Lane: Customer Experience + Mobile
+app/ @KanujVerma
+src/components/ @KanujVerma
+src/constants/theme.ts @KanujVerma
+src/services/mock/ @KanujVerma
+assets/ @KanujVerma
+
+# Sami Lane: Platform + Intelligence + Operations (Pending Sami handle)
+supabase/ @KanujVerma
+admin/ @KanujVerma
+src/services/remote/ @KanujVerma
+src/services/ai-workflows/ @KanujVerma
+
+# Shared Territory (Requires mutual founder review)
+src/contracts/ @KanujVerma
+src/domain/ @KanujVerma
+src/types/schema.ts @KanujVerma
+package.json @KanujVerma
+package-lock.json @KanujVerma
+tsconfig.json @KanujVerma
+.github/ @KanujVerma
