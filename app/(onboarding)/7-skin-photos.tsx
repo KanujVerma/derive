@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -15,9 +14,42 @@ import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { CameraCapture } from '@/src/components/ui/CameraCapture';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
-import { VoiceInputButton } from '@/src/components/ui/VoiceInputButton';
+import { VoiceTextArea } from '@/src/components/ui/VoiceTextArea';
+import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 
-type Angle = 'front' | 'left' | 'right';
+type AngleKey = 'front' | 'left' | 'right';
+
+interface AngleConfig {
+  key: AngleKey;
+  title: string;
+  stepNum: number;
+  instruction: string;
+  subtext: string;
+}
+
+const ANGLES: AngleConfig[] = [
+  {
+    key: 'front',
+    title: 'Front View',
+    stepNum: 1,
+    instruction: 'Look straight ahead in clear, even light',
+    subtext: 'Keeps focus on forehead, nose, and chin texture',
+  },
+  {
+    key: 'left',
+    title: 'Left Profile',
+    stepNum: 2,
+    instruction: 'Turn head slightly to show your left cheek',
+    subtext: 'Captures side cheek and jawline clarity',
+  },
+  {
+    key: 'right',
+    title: 'Right Profile',
+    stepNum: 3,
+    instruction: 'Turn head slightly to show your right cheek',
+    subtext: 'Captures symmetry and barrier resilience',
+  },
+];
 
 export default function SkinPhotosScreen() {
   const router = useRouter();
@@ -30,45 +62,59 @@ export default function SkinPhotosScreen() {
     setSkinPhotos,
   } = useOnboardingStore();
 
-  const [activeCameraAngle, setActiveCameraAngle] = useState<Angle | null>(null);
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(() => {
+    if (!frontPhotoUri) return 0;
+    if (!leftPhotoUri) return 1;
+    if (!rightPhotoUri) return 2;
+    return 0;
+  });
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
-  const handleCapturePhoto = (uri: string) => {
-    if (activeCameraAngle === 'front') setSkinPhotos({ front: uri });
-    if (activeCameraAngle === 'left') setSkinPhotos({ left: uri });
-    if (activeCameraAngle === 'right') setSkinPhotos({ right: uri });
-    setActiveCameraAngle(null);
+  const currentAngle = ANGLES[currentStepIndex];
+
+  const getPhotoUri = (key: AngleKey): string | null => {
+    switch (key) {
+      case 'front':
+        return frontPhotoUri;
+      case 'left':
+        return leftPhotoUri;
+      case 'right':
+        return rightPhotoUri;
+    }
   };
 
-  const angles: Array<{ key: Angle; label: string; uri: string | null; prompt: string }> = [
-    {
-      key: 'front',
-      label: 'Front View',
-      uri: frontPhotoUri,
-      prompt: 'Center your full face looking straight ahead',
-    },
-    {
-      key: 'left',
-      label: 'Left Profile',
-      uri: leftPhotoUri,
-      prompt: 'Turn your head slightly to the right to capture left cheek',
-    },
-    {
-      key: 'right',
-      label: 'Right Profile',
-      uri: rightPhotoUri,
-      prompt: 'Turn your head slightly to the left to capture right cheek',
-    },
-  ];
+  const currentUri = getPhotoUri(currentAngle.key);
+  const allCaptured = !!(frontPhotoUri && leftPhotoUri && rightPhotoUri);
 
-  if (activeCameraAngle) {
-    const currentAngle = angles.find((a) => a.key === activeCameraAngle);
+  const handleCapture = (uri: string) => {
+    setIsCameraActive(false);
+    if (currentAngle.key === 'front') setSkinPhotos({ front: uri });
+    if (currentAngle.key === 'left') setSkinPhotos({ left: uri });
+    if (currentAngle.key === 'right') setSkinPhotos({ right: uri });
+
+    // Auto-advance to next uncaptured angle
+    if (currentStepIndex < 2) {
+      setCurrentStepIndex(currentStepIndex + 1);
+    }
+  };
+
+  const handleSelectAngleStep = (index: number) => {
+    Haptics.selectionAsync();
+    setCurrentStepIndex(index);
+  };
+
+  const handleContinue = () => {
+    router.push('/(onboarding)/9-clarification');
+  };
+
+  if (isCameraActive) {
     return (
       <CameraCapture
         type="face"
-        instruction={currentAngle?.prompt || 'Center your face in the oval'}
-        subtext="Good even light • No filters • Clean skin if practical"
-        onCapture={handleCapturePhoto}
-        onCancel={() => setActiveCameraAngle(null)}
+        instruction={currentAngle.instruction}
+        subtext="Good even lighting • No filters"
+        onCapture={handleCapture}
+        onCancel={() => setIsCameraActive(false)}
       />
     );
   }
@@ -79,100 +125,141 @@ export default function SkinPhotosScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.questionTitle}>Guided Skin Photos</Text>
+        <Text style={styles.questionTitle}>Baseline Skin Photos</Text>
         <Text style={styles.questionSubtitle}>
-          Three quick baseline photos help Derive understand visible redness, texture, and compare your progress over time.
+          Three guided angles help Derive track visible redness, texture, and visible changes over time.
         </Text>
+
+        {/* STEP PROGRESS TRACKER: Front → Left → Right */}
+        <View style={styles.stepTracker}>
+          {ANGLES.map((angle, idx) => {
+            const uri = getPhotoUri(angle.key);
+            const isSelected = idx === currentStepIndex;
+            const isDone = !!uri;
+
+            return (
+              <TouchableOpacity
+                key={angle.key}
+                onPress={() => handleSelectAngleStep(idx)}
+                activeOpacity={0.7}
+                style={[
+                  styles.stepPill,
+                  isSelected && styles.stepPillSelected,
+                  isDone && !isSelected && styles.stepPillDone,
+                ]}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`${angle.title}, step ${angle.stepNum} of 3, ${isDone ? 'completed' : 'pending'}`}
+              >
+                {isDone ? (
+                  <Icon
+                    name="check"
+                    size={12}
+                    color={isSelected ? colors.inkInverse : colors.brand}
+                  />
+                ) : (
+                  <Text
+                    style={[
+                      styles.stepPillNum,
+                      isSelected && styles.stepPillNumSelected,
+                    ]}
+                  >
+                    {angle.stepNum}
+                  </Text>
+                )}
+                <Text
+                  style={[
+                    styles.stepPillLabel,
+                    isSelected && styles.stepPillLabelSelected,
+                    isDone && !isSelected && styles.stepPillLabelDone,
+                  ]}
+                >
+                  {angle.title}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* CURRENT ANGLE FOCUS CARD */}
+        <View style={styles.currentCard}>
+          <View style={styles.currentCardHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.currentStepBadge}>
+                STEP {currentAngle.stepNum} OF 3
+              </Text>
+              <Text style={styles.currentAngleTitle}>{currentAngle.title}</Text>
+              <Text style={styles.currentAngleInstruction}>
+                {currentAngle.instruction}
+              </Text>
+            </View>
+          </View>
+
+          {/* PREVIEW OR VIEWPORT */}
+          {currentUri ? (
+            <View style={styles.previewContainer}>
+              <Image source={{ uri: currentUri }} style={styles.capturedImage} />
+              <View style={styles.capturedOverlay}>
+                <Button
+                  label="Retake"
+                  variant="outline"
+                  size="small"
+                  icon={<Icon name="camera" size={14} color={colors.ink} />}
+                  onPress={() => setIsCameraActive(true)}
+                  style={styles.retakeButton}
+                />
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setIsCameraActive(true);
+              }}
+              activeOpacity={0.8}
+              style={styles.cameraPlaceholder}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`Open camera for ${currentAngle.title}`}
+            >
+              <View style={styles.cameraCircle}>
+                <Icon name="camera" size={28} color={colors.brand} />
+              </View>
+              <Text style={styles.cameraPromptTitle}>Take {currentAngle.title}</Text>
+              <Text style={styles.cameraPromptSub}>{currentAngle.subtext}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* OPTIONAL CONTEXT NOTE WITH VOICE */}
+        <VoiceTextArea
+          label="Anything unusual about these photos? (Optional)"
+          value={photoContextNote}
+          onChangeText={setPhotoContextNote}
+          placeholder="e.g. slight flaking around nose from sun yesterday..."
+          context="photo_note"
+          minHeight={80}
+        />
 
         {/* PRIVACY GUARANTEE */}
         <View style={styles.privacyCard}>
-          <View style={styles.lockIconContainer}>
-            <Icon name="lock" size={18} color={colors.brand} />
-          </View>
+          <Icon name="lock" size={18} color={colors.brand} />
           <View style={{ flex: 1 }}>
             <Text style={styles.privacyTitle}>Private & Protected</Text>
             <Text style={styles.privacyText}>
-              Your photos are securely stored with encryption. They are never shared publicly or used for advertising.
+              Your photos are stored with end-to-end encryption. They are treated as private medical context and never used for public marketing.
             </Text>
           </View>
-        </View>
-
-        {/* 3 PHOTO ANGLE CARDS */}
-        <View style={styles.anglesRow}>
-          {angles.map((item) => (
-            <TouchableOpacity
-              key={item.key}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveCameraAngle(item.key);
-              }}
-              activeOpacity={0.8}
-              style={[styles.angleCard, item.uri && styles.angleCardCaptured]}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel={`Capture ${item.label}`}
-            >
-              {item.uri ? (
-                <Image source={{ uri: item.uri }} style={styles.thumbnail} />
-              ) : (
-                <View style={styles.placeholderContainer}>
-                  <Icon name="camera" size={24} color={colors.inkMuted} />
-                  <Text style={styles.captureCta}>Take Photo</Text>
-                </View>
-              )}
-              <View style={styles.angleLabelContainer}>
-                <Text style={styles.angleLabel}>{item.label}</Text>
-                {item.uri && <Icon name="check" size={14} color={colors.brand} />}
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* OPTIONAL PHOTO CONTEXT NOTE */}
-        <View style={styles.contextCard}>
-          <View style={styles.contextHeaderRow}>
-            <Text style={styles.contextTitle}>
-              Anything unusual about these photos? (Optional)
-            </Text>
-            <VoiceInputButton
-              context="photo_note"
-              size={32}
-              onTranscript={(transcribed) => {
-                setPhotoContextNote(
-                  photoContextNote ? `${photoContextNote} ${transcribed}` : transcribed
-                );
-              }}
-            />
-          </View>
-          <TextInput
-            style={styles.contextInput}
-            value={photoContextNote}
-            onChangeText={setPhotoContextNote}
-            placeholder="e.g., warm bathroom light, active flare-up started yesterday, skin feels unusually tight..."
-            placeholderTextColor={colors.inkSubtle}
-            multiline
-            numberOfLines={3}
-          />
         </View>
       </ScrollView>
 
-      <View style={styles.bottomBar}>
-        <Button
-          label="Continue to Review"
-          variant="primary"
-          size="large"
-          onPress={() => router.push('/(onboarding)/10-summary')}
-        />
-        <Button
-          label="Skip photos for now"
-          variant="ghost"
-          size="medium"
-          onPress={() => router.push('/(onboarding)/10-summary')}
-          style={{ marginTop: spacing.xs }}
-        />
-      </View>
+      <StickyActionFooter
+        ctaLabel={allCaptured ? 'Continue to Review' : 'Continue'}
+        onPressCta={handleContinue}
+        secondaryLabel="Skip photos for now"
+        onPressSecondary={handleContinue}
+      />
     </View>
-
   );
 }
 
@@ -184,11 +271,12 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xxl + 40,
+    paddingBottom: spacing.xxl + 100,
   },
   questionTitle: {
+    fontFamily: typography.fontFamilies.serif,
     fontSize: typography.sizes.screenTitle,
-    fontWeight: typography.weights.bold,
+    lineHeight: typography.lineHeights.screenTitle,
     color: colors.ink,
     marginBottom: spacing.xxs,
   },
@@ -196,129 +284,151 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyRegular,
     color: colors.inkMuted,
     lineHeight: typography.lineHeights.bodyRegular,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
-  privacyCard: {
+  stepTracker: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  stepPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: radii.full,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: spacing.xl,
-    gap: spacing.sm,
-    ...shadows.subtle,
+    backgroundColor: colors.surface,
   },
-  lockIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.full,
+  stepPillSelected: {
+    backgroundColor: colors.brand,
+    borderColor: colors.brand,
+  },
+  stepPillDone: {
+    borderColor: colors.brandLight,
+    backgroundColor: colors.brandLight,
+  },
+  stepPillNum: {
+    fontSize: typography.sizes.micro,
+    fontWeight: typography.weights.bold,
+    color: colors.inkMuted,
+  },
+  stepPillNumSelected: {
+    color: colors.inkInverse,
+  },
+  stepPillLabel: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.medium,
+    color: colors.ink,
+  },
+  stepPillLabelSelected: {
+    color: colors.inkInverse,
+    fontWeight: typography.weights.bold,
+  },
+  stepPillLabelDone: {
+    color: colors.brand,
+  },
+  currentCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  currentCardHeader: {
+    marginBottom: spacing.md,
+  },
+  currentStepBadge: {
+    fontSize: typography.sizes.micro,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.8,
+    color: colors.brand,
+    marginBottom: 2,
+  },
+  currentAngleTitle: {
+    fontSize: typography.sizes.sectionTitle,
+    fontWeight: typography.weights.bold,
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  currentAngleInstruction: {
+    fontSize: typography.sizes.bodyRegular,
+    color: colors.inkMuted,
+    lineHeight: typography.lineHeights.bodyRegular,
+  },
+  previewContainer: {
+    position: 'relative',
+    height: 220,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+  },
+  capturedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  capturedOverlay: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    right: spacing.sm,
+  },
+  retakeButton: {
+    backgroundColor: 'rgba(255, 254, 251, 0.92)',
+  },
+  cameraPlaceholder: {
+    height: 180,
+    backgroundColor: colors.canvas,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  cameraCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: colors.brandLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    marginBottom: spacing.sm,
   },
-
-  privacyTitle: {
+  cameraPromptTitle: {
     fontSize: typography.sizes.bodyRegular,
-    fontWeight: typography.weights.bold,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+    marginBottom: 2,
+  },
+  cameraPromptSub: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    textAlign: 'center',
+  },
+  privacyCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  privacyTitle: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.semibold,
     color: colors.ink,
     marginBottom: 2,
   },
   privacyText: {
-    fontSize: typography.sizes.caption,
+    fontSize: typography.sizes.micro,
     color: colors.inkMuted,
     lineHeight: typography.lineHeights.caption,
-  },
-  anglesRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  angleCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    aspectRatio: 0.75,
-    overflow: 'hidden',
-    justifyContent: 'space-between',
-    ...shadows.card,
-  },
-  angleCardCaptured: {
-    borderColor: colors.brand,
-  },
-  placeholderContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xs,
-  },
-  cameraGlyph: {
-    fontSize: 28,
-    marginBottom: 4,
-  },
-  captureCta: {
-    fontSize: typography.sizes.micro,
-    color: colors.brand,
-    fontWeight: typography.weights.bold,
-  },
-  thumbnail: {
-    width: '100%',
-    flex: 1,
-    resizeMode: 'cover',
-  },
-  angleLabelContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 6,
-  },
-  angleLabel: {
-    fontSize: typography.sizes.micro,
-    fontWeight: typography.weights.bold,
-    color: colors.ink,
-  },
-  checkedCheck: {
-    fontSize: 12,
-    color: colors.brand,
-    fontWeight: typography.weights.bold,
-  },
-  bottomBar: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.canvas,
-  },
-  contextCard: {
-    marginTop: spacing.xl,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  contextHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  contextTitle: {
-    flex: 1,
-    fontSize: typography.sizes.caption,
-    fontWeight: typography.weights.semibold,
-    color: colors.ink,
-  },
-  contextInput: {
-    fontSize: typography.sizes.bodyRegular,
-    color: colors.ink,
-    minHeight: 64,
-    textAlignVertical: 'top',
-    paddingTop: spacing.xs,
   },
 });

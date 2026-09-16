@@ -28,7 +28,9 @@ export type IconName =
   | 'search'
   | 'bottle'
   | 'scan'
-  | 'mic';
+  | 'mic'
+  | 'down'
+  | 'up';
 
 interface IconConfig {
   sfSymbol: SFSymbol;
@@ -60,6 +62,8 @@ const ICON_MAP: Record<IconName, IconConfig> = {
   bottle: { sfSymbol: 'cross.vial', ionicon: 'flask-outline' },
   scan: { sfSymbol: 'viewfinder', ionicon: 'scan-outline' },
   mic: { sfSymbol: 'mic.fill', ionicon: 'mic-outline' },
+  down: { sfSymbol: 'chevron.down', ionicon: 'chevron-down' },
+  up: { sfSymbol: 'chevron.up', ionicon: 'chevron-up' },
 };
 
 interface IconProps {

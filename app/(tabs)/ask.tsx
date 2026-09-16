@@ -17,10 +17,8 @@ import { askDeriveAdvisor } from '@/src/services/ai-workflows/chat-advisor';
 import { ChatBubble } from '@/src/components/chat/ChatBubble';
 import { GlassComposer } from '@/src/components/chat/GlassComposer';
 import { Icon } from '@/src/components/ui/Icon';
-import { CameraCapture } from '@/src/components/ui/CameraCapture';
 import { analytics } from '@/src/services/analytics';
-
-import { useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const STARTER_PROMPTS = [
   'Do I use Differin tonight?',
@@ -31,6 +29,7 @@ const STARTER_PROMPTS = [
 ];
 
 export default function AskScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     initialQuery?: string;
@@ -42,7 +41,6 @@ export default function AskScreen() {
   const { routine } = useRoutineStore();
   const flatListRef = useRef<FlatList>(null);
   const [loading, setLoading] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeScanContext, setActiveScanContext] = useState<{
     productName: string;
@@ -125,28 +123,11 @@ export default function AskScreen() {
     Haptics.selectionAsync();
     if (prompt === 'Scan a product') {
       analytics.track('product_scan_started', { entryPoint: 'starter_pill' });
-      setShowCamera(true);
+      router.push('/(tabs)/scan');
     } else {
       handleSendMessage(prompt);
     }
   };
-
-  const handleCameraCapture = (uri: string) => {
-    setShowCamera(false);
-    analytics.track('product_scan_completed', { success: true });
-    handleSendMessage('Can I safely add this product to my routine?', uri);
-  };
-
-  if (showCamera) {
-    return (
-      <CameraCapture
-        type="shelf"
-        instruction="Hold bottle label clearly inside frame."
-        onCapture={handleCameraCapture}
-        onCancel={() => setShowCamera(false)}
-      />
-    );
-  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -154,22 +135,33 @@ export default function AskScreen() {
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <Text style={styles.screenTitle}>Ask</Text>
-          {hasInteracted && (
+          <View style={styles.headerActions}>
+            {hasInteracted && (
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setMessages([]);
+                  setActiveScanContext(null);
+                  handledInitialQueryRef.current = null;
+                }}
+                style={styles.newChatButton}
+                activeOpacity={0.7}
+                accessibilityLabel="Start new conversation"
+                accessibilityRole="button"
+              >
+                <Text style={styles.newChatText}>New chat</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              onPress={() => {
-                Haptics.selectionAsync();
-                setMessages([]);
-                setActiveScanContext(null);
-                handledInitialQueryRef.current = null;
-              }}
-              style={styles.newChatButton}
-              activeOpacity={0.7}
-              accessibilityLabel="Start new conversation"
+              style={styles.profileButton}
+              onPress={() => router.push('/profile')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityLabel="Account and Settings"
               accessibilityRole="button"
             >
-              <Text style={styles.newChatText}>New chat</Text>
+              <Icon name="person" size={18} color={colors.inkMuted} />
             </TouchableOpacity>
-          )}
+          </View>
         </View>
         <Text style={styles.screenSubtitle}>
           Answers based on your routine, skin history, and what we've learned about you.
@@ -273,6 +265,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   newChatButton: {
     paddingHorizontal: spacing.sm,

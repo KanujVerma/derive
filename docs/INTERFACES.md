@@ -109,3 +109,50 @@ EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 The factory in `src/services/DeriveService.ts` automatically instantiates `RemoteDeriveService` without requiring any changes to React Native UI components.
 
 Live Gemini invocation happens only behind `RemoteDeriveService` on the server. `MockDeriveService` uses deterministic local reasoning and never requires a client Gemini key.
+
+---
+
+## 7. Proposed Backend Extensions (For Sami Review)
+
+The following types and fields are currently prototyped in client-only modules (`src/phenotype/` and `src/pricing/`). They are proposed for future backend schema integration:
+
+### A. OnboardingPayload Extension
+```typescript
+// Proposed addition to OnboardingPayload in src/contracts/DeriveService.ts:
+export interface OnboardingPayload {
+  // ... existing fields ...
+  pihTendency?: 'rarely' | 'sometimes' | 'often' | 'unknown';
+}
+```
+
+### B. SkinProfile Phenotype Provenance Model
+```typescript
+// Proposed table or JSONB column on customer_profiles / skin_profiles:
+export interface ProvenancedValue<T> {
+  value: T;
+  source: 'self_reported' | 'photo_estimate' | 'observed_history' | 'derived_from_history' | 'external_context';
+  confidence: 'low' | 'medium' | 'high';
+  userConfirmed: boolean;
+  observedAt?: string;
+}
+
+export interface SkinPhenotypeRecord {
+  pigmentation_family?: ProvenancedValue<PigmentationFamily>;
+  undertone?: ProvenancedValue<Undertone>;
+  sun_response?: ProvenancedValue<SunResponse>;
+  pih_tendency?: ProvenancedValue<PihTendency>;
+  white_cast_concern?: ProvenancedValue<WhiteCastConcern>;
+  razor_bump_history?: ProvenancedValue<RazorBumpHistory>;
+  hair_curl_pattern?: ProvenancedValue<HairCurlPattern>;
+}
+```
+
+### C. Customer Profile Pricing Attributes
+```typescript
+// Proposed additions to CustomerProfile:
+export interface CustomerProfile {
+  // ... existing fields ...
+  monthlyPlanPriceCents: number; // e.g. 9600 for Arthur's $96/mo plan
+  planPricingStatus: 'provisional_draft' | 'active_approved';
+}
+```

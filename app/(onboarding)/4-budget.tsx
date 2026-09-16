@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
+import { colors, typography, spacing } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { ProductCostPreference } from '@/src/types/schema';
-import { Button } from '@/src/components/ui/Button';
+import { SelectionCard } from '@/src/components/ui/SelectionCard';
+import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 
 const BUDGET_OPTIONS: Array<{
   value: ProductCostPreference;
@@ -38,7 +38,6 @@ export default function BudgetScreen() {
   const { costPreference, setCostPreference } = useOnboardingStore();
 
   const handleSelect = (val: ProductCostPreference) => {
-    Haptics.selectionAsync();
     setCostPreference(val);
   };
 
@@ -49,51 +48,35 @@ export default function BudgetScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.questionTitle}>
-          How should we think about product cost?
+          What kind of product budget feels right?
         </Text>
         <Text style={styles.questionSubtitle}>
-          We recommend products across brands based on fit for your skin.
+          We recommend products across brands based on fit for your skin. Expensive does not automatically mean better.
         </Text>
-
 
         <View style={styles.optionsList}>
           {BUDGET_OPTIONS.map((opt) => {
             const isSelected = costPreference === opt.value;
             return (
-              <TouchableOpacity
+              <SelectionCard
                 key={opt.value}
+                title={opt.title}
+                description={opt.desc}
+                tags={[opt.priceHint]}
+                selected={isSelected}
                 onPress={() => handleSelect(opt.value)}
-                activeOpacity={0.7}
-                style={[styles.card, isSelected && styles.cardSelected]}
-                accessible={true}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: isSelected }}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>
-                    {opt.title}
-                  </Text>
-                  <View style={[styles.badge, isSelected && styles.badgeSelected]}>
-                    <Text style={[styles.badgeText, isSelected && styles.badgeTextSelected]}>
-                      {opt.priceHint}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.cardDesc}>{opt.desc}</Text>
-              </TouchableOpacity>
+                style={styles.cardItem}
+              />
             );
           })}
         </View>
       </ScrollView>
 
-      <View style={styles.bottomBar}>
-        <Button
-          label="Continue"
-          variant="primary"
-          size="large"
-          onPress={() => router.push('/(onboarding)/5-behavior')}
-        />
-      </View>
+      <StickyActionFooter
+        ctaLabel="Continue"
+        onPressCta={() => router.push('/(onboarding)/5-behavior')}
+        disabled={!costPreference}
+      />
     </View>
   );
 }
@@ -106,11 +89,12 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xxl + 80,
   },
   questionTitle: {
+    fontFamily: typography.fontFamilies.serif,
     fontSize: typography.sizes.screenTitle,
-    fontWeight: typography.weights.bold,
+    lineHeight: typography.lineHeights.screenTitle,
     color: colors.ink,
     marginBottom: spacing.xxs,
   },
@@ -118,65 +102,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyRegular,
     color: colors.inkMuted,
     lineHeight: typography.lineHeights.bodyRegular,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   optionsList: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  cardSelected: {
-    borderColor: colors.brand,
-    backgroundColor: colors.brandLight,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  cardTitle: {
-    fontSize: typography.sizes.bodyLarge,
-    fontWeight: typography.weights.bold,
-    color: colors.ink,
-  },
-  cardTitleSelected: {
-    color: colors.brand,
-  },
-  badge: {
-    backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-  },
-  badgeSelected: {
-    backgroundColor: colors.brand,
-  },
-  badgeText: {
-    fontSize: typography.sizes.micro,
-    color: colors.inkMuted,
-    fontWeight: typography.weights.medium,
-  },
-  badgeTextSelected: {
-    color: colors.inkInverse,
-    fontWeight: typography.weights.bold,
-  },
-  cardDesc: {
-    fontSize: typography.sizes.bodyRegular,
-    color: colors.inkMuted,
-    lineHeight: typography.lineHeights.bodyRegular,
-  },
-  bottomBar: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.canvas,
+  cardItem: {
+    marginBottom: 0,
   },
 });

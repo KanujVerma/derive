@@ -15,9 +15,24 @@ import { useRoutineStore } from '@/src/stores/routineStore';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
+import { StatusBadge } from '@/src/components/ui/StatusBadge';
+import { SegmentedControl } from '@/src/components/ui/SegmentedControl';
 import { InsightBasisLabels } from '@/src/types/schema';
 
 type AngleKey = 'front' | 'left' | 'right';
+
+function formatFriendlyDate(dateStr: string): string {
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[parseInt(parts[1], 10) - 1];
+      const day = parseInt(parts[2], 10);
+      if (month && !isNaN(day)) return `${month} ${day}`;
+    }
+  } catch {}
+  return dateStr;
+}
 
 export default function ProgressScreen() {
   const router = useRouter();
@@ -50,7 +65,18 @@ export default function ProgressScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>Progress</Text>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.screenTitle}>Progress</Text>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => router.push('/profile')}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel="Account and Settings"
+            accessibilityRole="button"
+          >
+            <Icon name="person" size={18} color={colors.inkMuted} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.screenSubtitle}>
           What we have learned about your skin over time.
         </Text>
@@ -81,33 +107,18 @@ export default function ProgressScreen() {
 
         {/* 1. SIDE-BY-SIDE PHOTO COMPARISON */}
         <View style={styles.photoSection}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Photo Comparison</Text>
-            {/* Angle Selector Tabs */}
-            <View style={styles.angleTabs}>
-              {(['front', 'left', 'right'] as AngleKey[]).map((angle) => (
-                <TouchableOpacity
-                  key={angle}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setSelectedAngle(angle);
-                  }}
-                  style={[
-                    styles.angleTab,
-                    selectedAngle === angle && styles.angleTabActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.angleTabText,
-                      selectedAngle === angle && styles.angleTabTextActive,
-                    ]}
-                  >
-                    {angle.toUpperCase()}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <Text style={styles.sectionTitle}>Photo Comparison</Text>
+          {/* Segmented Control for Photo Angles on its own full-width row */}
+          <View style={styles.angleControlRow}>
+            <SegmentedControl
+              options={[
+                { value: 'front', label: 'FRONT' },
+                { value: 'left', label: 'LEFT' },
+                { value: 'right', label: 'RIGHT' },
+              ]}
+              value={selectedAngle}
+              onChange={setSelectedAngle}
+            />
           </View>
 
           <View style={styles.comparisonGrid}>
@@ -118,7 +129,7 @@ export default function ProgressScreen() {
                   <Icon name="person" size={32} color={colors.inkSubtle} />
                 </View>
                 <View style={styles.photoTag}>
-                  <Text style={styles.photoTagText}>Baseline • Sep 01</Text>
+                  <Text style={styles.photoTagText}>Baseline • Sep 1</Text>
                 </View>
               </View>
             </View>
@@ -156,7 +167,7 @@ export default function ProgressScreen() {
                     <Text style={styles.insightBasisText}>
                       {InsightBasisLabels[insight.basis] || 'From your skin history'}
                     </Text>
-                    <Text style={styles.insightDateText}>{insight.dateObserved}</Text>
+                    <Text style={styles.insightDateText}>{formatFriendlyDate(insight.dateObserved)}</Text>
                   </View>
                 </View>
               </View>
@@ -178,9 +189,11 @@ export default function ProgressScreen() {
                 <View style={styles.eventCard}>
                   <View style={styles.eventHeader}>
                     <Text style={styles.eventDate}>{event.date}</Text>
-                    <View style={styles.eventBadge}>
-                      <Text style={styles.eventBadgeText}>{event.badge}</Text>
-                    </View>
+                    <StatusBadge
+                      label={event.badge}
+                      variant={event.badge === 'Active' ? 'keep' : event.badge === 'Stable' ? 'active' : 'info'}
+                      size="small"
+                    />
                   </View>
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <Text style={styles.eventDesc}>{event.description}</Text>
@@ -207,6 +220,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.hairline,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   screenTitle: {
     fontFamily: typography.fontFamilies.serif,
     fontSize: typography.sizes.screenTitle,
@@ -217,6 +246,11 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyRegular,
     color: colors.inkMuted,
     marginTop: 2,
+  },
+  angleControlRow: {
+    width: '100%',
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
   scrollContent: {
     paddingHorizontal: spacing.lg,

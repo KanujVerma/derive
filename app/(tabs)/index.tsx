@@ -16,6 +16,7 @@ import { useUserStore } from '@/src/stores/userStore';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
+import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
 
 export default function TodayScreen() {
@@ -27,6 +28,7 @@ export default function TodayScreen() {
     isWeeklyCheckInDue,
     researchInsights,
     refillRequests,
+    isPlanUnderReview,
   } = useRoutineStore();
   const { fullName } = useUserStore();
   const firstName = fullName?.trim()?.split(' ')[0] || 'there';
@@ -93,122 +95,186 @@ export default function TodayScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* DOMINANT STATUS (2-Second Grandma Test) */}
-        <View style={styles.statusSection}>
-          <Text style={styles.statusHeadline}>{todayDominantStatus}</Text>
-          <Text style={styles.statusSubtext}>
-            Your plan is calibrated to your skin. We'll let you know if anything needs attention.
-          </Text>
-        </View>
-
-        {/* TONIGHT'S ROUTINE SUMMARY CARD */}
-        <View style={styles.tonightCard}>
-          <View style={styles.tonightHeaderRow}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
-              <Text style={styles.tonightOverline}>TONIGHT</Text>
-              <Text style={styles.tonightTitle}>
-                {pmSteps.length} steps · Differin night
+        {/* QUIET STATE DURING FIRST ROUTINE REVIEW */}
+        {isPlanUnderReview ? (
+          <View style={styles.reviewPendingContainer}>
+            {/* DOMINANT STATUS FOR REVIEW */}
+            <View style={styles.statusSection}>
+              <Text style={styles.statusHeadline}>
+                Final review: Your first routine gets one final quality check before it goes live.
+              </Text>
+              <Text style={styles.statusSubtext}>
+                We'll let you know as soon as it's ready. You can explore your draft routine below.
               </Text>
             </View>
-            <Badge label="MON / WED / FRI" variant="keep" size="small" />
-          </View>
 
-          {/* Simple step sequence: Cleanser → Differin → Moisturizer */}
-          <View style={styles.stepSequence}>
-            {pmSteps.map((step, idx) => (
-              <React.Fragment key={step.id}>
-                <View style={styles.stepNode}>
-                  <Text style={styles.stepNodeName}>{step.productName}</Text>
-                  <Text style={styles.stepNodeBrand}>{step.brand}</Text>
-                </View>
-                {idx < pmSteps.length - 1 && (
-                  <View style={styles.sequenceArrow}>
-                    <Icon name="forward" size={14} color={colors.inkSubtle} />
-                  </View>
-                )}
-              </React.Fragment>
-            ))}
-          </View>
-
-          <Button
-            label="View Routine"
-            variant="primary"
-            size="medium"
-            onPress={handleViewRoutine}
-            style={styles.viewRoutineButton}
-          />
-        </View>
-
-        {/* CONTEXTUAL MODULE 1: WEEKLY CHECK-IN DUE */}
-        {isWeeklyCheckInDue && (
-          <View style={styles.contextCard}>
-            <View style={styles.contextCardContent}>
-              <Text style={styles.contextTitle}>Weekly Check-in Due</Text>
-              <Text style={styles.contextSub}>
-                Takes about 30 seconds. Checks on your barrier comfort and plan adherence.
-              </Text>
-            </View>
-            <Button
-              label="Check In"
-              variant="brand"
-              size="medium"
-              onPress={handleCheckIn}
-            />
-          </View>
-        )}
-
-        {/* CONTEXTUAL MODULE 2: REFILL / SHIPMENT TRACKING */}
-        {activeRefill && (
-          <View style={styles.refillBanner}>
-            <View style={styles.refillIconCircle}>
-              <Icon name="shipping" size={18} color={colors.brand} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.refillTitle}>
-                {activeRefill.status === 'shipped' ? 'YOUR REFILL SHIPPED' : 'REFILL ORDERED'}
-              </Text>
-              <Text style={styles.refillProductName}>
-                {activeRefill.brand} {activeRefill.productName}
-              </Text>
-              <Text style={styles.refillEta}>
-                {activeRefill.estimatedDelivery ? `Arrives ${activeRefill.estimatedDelivery}` : 'Processing order'}
-              </Text>
-            </View>
-            <Button
-              label="Track"
-              variant="secondary"
-              size="small"
-              onPress={handleViewOrders}
-            />
-          </View>
-        )}
-
-        {/* CONTEXTUAL MODULE 3: COMPACT RESEARCH CARD ("NEW FOR YOU") */}
-        {topResearch && (
-          <View style={styles.researchCard}>
-            <View style={styles.researchHeader}>
-              <View style={styles.researchBadge}>
-                <Icon name="sparkle" size={12} color={colors.brand} />
-                <Text style={styles.researchBadgeText}>NEW FOR YOU</Text>
-              </View>
-              <Badge label="NO CHANGES NEEDED" variant="keep" size="small" />
-            </View>
-
-            <Text style={styles.researchTitle}>
-              New research supports your current routine.
-            </Text>
-            <Text style={styles.researchSummary}>
-              Relevant to your Differin + niacinamide combination.
-            </Text>
-
+            {/* PREVIEW DRAFT ROUTINE (Clearly Labeled DRAFT · NOT ACTIVE) */}
             <TouchableOpacity
-              style={styles.seeWhyRow}
-              onPress={() => handleViewInsight(topResearch.id)}
+              style={styles.draftTonightCard}
+              activeOpacity={0.85}
+              onPress={handleViewRoutine}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Draft routine preview, tap to view full proposed plan"
             >
-              <Text style={styles.seeWhyText}>See why</Text>
-              <Icon name="forward" size={14} color={colors.brand} />
+              <View style={styles.tonightHeaderRow}>
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Badge label="DRAFT · NOT ACTIVE" variant="pause" size="small" />
+                  <Text style={styles.draftTonightTitle}>
+                    {routine?.summarySentence || 'Proposed routine schedule'}
+                  </Text>
+                </View>
+                <Icon name="forward" size={16} color={colors.inkMuted} />
+              </View>
+
+              <Text style={styles.draftTonightExplanation}>
+                {pmSteps.length} evening steps and {routine?.amSteps.length || 0} morning steps configured based on your shelf and skin goals.
+              </Text>
+
+              <View style={styles.cardFooterHint}>
+                <Text style={styles.cardFooterText}>Preview draft routine</Text>
+                <Icon name="forward" size={12} color={colors.brand} />
+              </View>
             </TouchableOpacity>
+
+            {/* WHAT YOU CAN DO WHILE IN REVIEW */}
+            <View style={styles.reviewExplainerCard}>
+              <Icon name="sparkle" size={18} color={colors.brand} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reviewExplainerTitle}>Everything else is ready</Text>
+                <Text style={styles.reviewExplainerText}>
+                  While we finish review, you can scan bottles with camera recognition or ask Derive any skincare question.
+                </Text>
+              </View>
+            </View>
           </View>
+        ) : (
+          <>
+            {/* DOMINANT STATUS (2-Second Grandma Test) */}
+            <View style={styles.statusSection}>
+              <Text style={styles.statusHeadline}>{todayDominantStatus}</Text>
+              <Text style={styles.statusSubtext}>
+                Your plan is calibrated to your skin. We'll let you know if anything needs attention.
+              </Text>
+            </View>
+
+            {/* TONIGHT'S ROUTINE SUMMARY CARD (Tappable) */}
+            <TouchableOpacity
+              style={styles.tonightCard}
+              activeOpacity={0.85}
+              onPress={handleViewRoutine}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Tonight's routine, tap to view full plan"
+            >
+              <View style={styles.tonightHeaderRow}>
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Text style={styles.tonightOverline}>TONIGHT</Text>
+                  <Text style={styles.tonightTitle}>
+                    {pmSteps.length} steps · Differin night
+                  </Text>
+                </View>
+                <View style={styles.badgeChevronRow}>
+                  <Badge label="MON / WED / FRI" variant="keep" size="small" />
+                  <Icon name="forward" size={14} color={colors.inkMuted} style={{ marginLeft: 6 }} />
+                </View>
+              </View>
+
+              {/* Simple step sequence: Cleanser → Differin → Moisturizer */}
+              <View style={styles.stepSequence}>
+                {pmSteps.map((step, idx) => (
+                  <React.Fragment key={step.id}>
+                    <View style={styles.stepNode}>
+                      <Text style={styles.stepNodeName}>{step.productName}</Text>
+                      <Text style={styles.stepNodeBrand}>{step.brand}</Text>
+                    </View>
+                    {idx < pmSteps.length - 1 && (
+                      <View style={styles.sequenceArrow}>
+                        <Icon name="forward" size={14} color={colors.inkSubtle} />
+                      </View>
+                    )}
+                  </React.Fragment>
+                ))}
+              </View>
+
+              <View style={styles.cardFooterHint}>
+                <Text style={styles.cardFooterText}>View routine details</Text>
+                <Icon name="forward" size={12} color={colors.brand} />
+              </View>
+            </TouchableOpacity>
+
+            {/* CONTEXTUAL MODULE 1: WEEKLY CHECK-IN DUE */}
+            {isWeeklyCheckInDue && (
+              <View style={styles.contextCard}>
+                <View style={styles.contextCardContent}>
+                  <Text style={styles.contextTitle}>Weekly Check-in Due</Text>
+                  <Text style={styles.contextSub}>
+                    Takes about 30 seconds. Checks on your barrier comfort and plan adherence.
+                  </Text>
+                </View>
+                <Button
+                  label="Check In"
+                  variant="brand"
+                  size="medium"
+                  onPress={handleCheckIn}
+                />
+              </View>
+            )}
+
+            {/* CONTEXTUAL MODULE 2: REFILL / SHIPMENT TRACKING */}
+            {activeRefill && (
+              <View style={styles.refillBanner}>
+                <View style={styles.refillIconCircle}>
+                  <Icon name="shipping" size={18} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.refillTitle}>
+                    {activeRefill.status === 'shipped' ? 'YOUR REFILL SHIPPED' : 'REFILL ORDERED'}
+                  </Text>
+                  <Text style={styles.refillProductName}>
+                    {activeRefill.brand} {activeRefill.productName}
+                  </Text>
+                  <Text style={styles.refillEta}>
+                    {activeRefill.estimatedDelivery ? `Arrives ${activeRefill.estimatedDelivery}` : 'Processing order'}
+                  </Text>
+                </View>
+                <Button
+                  label="Track"
+                  variant="secondary"
+                  size="small"
+                  onPress={handleViewOrders}
+                />
+              </View>
+            )}
+
+            {/* CONTEXTUAL MODULE 3: COMPACT RESEARCH CARD ("NEW FOR YOU") */}
+            {topResearch && (
+              <View style={styles.researchCard}>
+                <View style={styles.researchHeader}>
+                  <View style={styles.researchBadge}>
+                    <Icon name="sparkle" size={12} color={colors.brand} />
+                    <Text style={styles.researchBadgeText}>NEW FOR YOU</Text>
+                  </View>
+                  <Badge label="NO CHANGES NEEDED" variant="keep" size="small" />
+                </View>
+
+                <Text style={styles.researchTitle}>
+                  New research supports your current routine.
+                </Text>
+                <Text style={styles.researchSummary}>
+                  Relevant to your Differin + niacinamide combination.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.seeWhyRow}
+                  onPress={() => handleViewInsight(topResearch.id)}
+                >
+                  <Text style={styles.seeWhyText}>See why</Text>
+                  <Icon name="forward" size={14} color={colors.brand} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </View>
@@ -232,8 +298,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   profileButton: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: radii.full,
     backgroundColor: colors.surface,
     borderColor: colors.borderSubtle,
@@ -333,8 +399,21 @@ const styles = StyleSheet.create({
   sequenceArrow: {
     paddingHorizontal: 2,
   },
-  viewRoutineButton: {
-    width: '100%',
+  badgeChevronRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardFooterHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    paddingTop: spacing.xs,
+  },
+  cardFooterText: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.semibold,
+    color: colors.brand,
   },
   contextCard: {
     flexDirection: 'row',
@@ -440,5 +519,48 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     fontWeight: typography.weights.semibold,
     color: colors.brand,
+  },
+  reviewPendingContainer: {
+    gap: spacing.md,
+  },
+  draftTonightCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.actionPause.border,
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    ...shadows.subtle,
+  },
+  draftTonightTitle: {
+    fontFamily: typography.fontFamilies.serif,
+    fontSize: typography.sizes.screenTitle,
+    lineHeight: typography.lineHeights.screenTitle,
+    color: colors.ink,
+    marginTop: spacing.xs,
+  },
+  draftTonightExplanation: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    lineHeight: 20,
+    marginTop: spacing.xs,
+  },
+  reviewExplainerCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.brandLight,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    gap: spacing.sm,
+  },
+  reviewExplainerTitle: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.bold,
+    color: colors.brandDark,
+    marginBottom: 2,
+  },
+  reviewExplainerText: {
+    fontSize: typography.sizes.caption,
+    color: colors.ink,
+    lineHeight: 18,
   },
 });

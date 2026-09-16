@@ -20,6 +20,27 @@ import {
   type IngredientSignalConfidence,
   type Routine,
 } from '../src/types/schema.ts';
+import {
+  createProvenancedValue,
+  setOrConfirmPhenotypeValue,
+  updatePhenotypeProfile,
+  isEvidenceApplicable,
+  canInfluenceRoutine,
+  canInformEducationalContext,
+  evaluateTintCompatibility,
+  evaluateWhiteCastRisk,
+  arthurPhenotypeProfile,
+  unconfirmedPhotoEstimate,
+  mockTintedMineralSunscreen,
+  mockFairTintedSunscreen,
+  mockUntintedPhysicalSunscreen,
+  evidenceVisibleLightMelasmaRCT,
+  evidenceAadPihGuidance,
+  evidenceDairyAcneObservationalMetaAnalysis,
+  evidenceAnecdotalLemonExtract,
+  type SkinPhenotypeProfile,
+  type ProvenancedValue,
+} from '../src/phenotype/index.ts';
 
 // ========================================================
 // 1. SAFETY CLASSIFIER TESTS
@@ -699,3 +720,359 @@ test('Guard: Expo client must not ship a Gemini API key', () => {
     `Client-visible Gemini secret path found in: ${offenders.join(', ')}`
   );
 });
+
+// ========================================================
+// 10. PERSONALIZED ALL-IN MONTHLY PRICING TESTS
+// ========================================================
+
+import {
+  calculateProductMonthlyConsumption,
+  calculateMonthlyPlanPrice,
+  evaluatePriceAdjustment,
+  formatCentsToDollars,
+  PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS,
+  PROVISIONAL_OPERATIONS_RISK_CENTS,
+} from '../src/pricing/index.ts';
+import { useOnboardingStore } from '../src/stores/onboardingStore.ts';
+
+test('Personalized Pricing: Normalizes retail prices into 30-day monthly consumption with deterministic rounding', () => {
+  // CeraVe Cleanser: $16 retail, 60-day lifespan -> round(1600 * 30 / 60) = 800 cents ($8.00/month)
+  const cleanserEst = calculateProductMonthlyConsumption({
+    id: 'p1',
+    name: 'Hydrating Facial Cleanser',
+    brand: 'CeraVe',
+  });
+  assert.equal(cleanserEst.retailPriceCents, 1600);
+  assert.equal(cleanserEst.estimatedLifespanDays, 60);
+  assert.equal(cleanserEst.monthlyEquivalentCents, 800);
+  assert.equal(cleanserEst.isDeriveManagedReplenishment, true);
+
+  // Differin: $15 retail, 45-day lifespan -> round(1500 * 30 / 45) = 1000 cents ($10.00/mo)
+  const differinEst = calculateProductMonthlyConsumption({
+    id: 'p2',
+    name: 'Adapalene Gel 0.1%',
+    brand: 'Differin',
+  });
+  assert.equal(differinEst.retailPriceCents, 1500);
+  assert.equal(differinEst.estimatedLifespanDays, 45);
+  assert.equal(differinEst.monthlyEquivalentCents, 1000);
+  assert.equal(differinEst.isDeriveManagedReplenishment, true);
+
+  // La Roche-Posay: $24 retail, 45-day lifespan -> round(2400 * 30 / 45) = 1600 cents ($16.00/mo)
+  const lrpEst = calculateProductMonthlyConsumption({
+    id: 'p4',
+    name: 'Toleriane Double Repair Moisturizer',
+    brand: 'La Roche-Posay',
+  });
+  assert.equal(lrpEst.retailPriceCents, 2400);
+  assert.equal(lrpEst.estimatedLifespanDays, 45);
+  assert.equal(lrpEst.monthlyEquivalentCents, 1600);
+  assert.equal(lrpEst.isDeriveManagedReplenishment, true);
+
+  // Daily Sunscreen: $18 retail, 30-day lifespan -> round(1800 * 30 / 30) = 1800 cents ($18.00/mo)
+  const spfEst = calculateProductMonthlyConsumption({
+    id: 'p5',
+    name: 'Relief Sun SPF 50+',
+    brand: 'Beauty of Joseon',
+  });
+  assert.equal(spfEst.retailPriceCents, 1800);
+  assert.equal(spfEst.estimatedLifespanDays, 30);
+  assert.equal(spfEst.monthlyEquivalentCents, 1800);
+  assert.equal(spfEst.isDeriveManagedReplenishment, true);
+
+  // Deterministic fractional rounding test: $20.00 retail, 45-day lifespan -> round(2000 * 30 / 45) = 1333 cents ($13.33/mo)
+  const defaultEst = calculateProductMonthlyConsumption({
+    id: 'custom_product',
+    name: 'Unknown Cream',
+    brand: 'Generic',
+  });
+  assert.equal(defaultEst.retailPriceCents, 2000);
+  assert.equal(defaultEst.estimatedLifespanDays, 45);
+  assert.equal(defaultEst.monthlyEquivalentCents, 1333);
+});
+
+test('Personalized Pricing: Computes exact Arthur demo monthly estimate ($96/mo) and separates inventory from consumption', () => {
+  const activeProducts = [
+    { id: 'p1', name: 'Hydrating Facial Cleanser', brand: 'CeraVe' }, // 800 cents/mo
+    { id: 'p2', name: 'Adapalene Gel 0.1%', brand: 'Differin' }, // 1000 cents/mo
+    { id: 'p4', name: 'Toleriane Double Repair Moisturizer', brand: 'La Roche-Posay' }, // 1600 cents/mo
+    { id: 'p5', name: 'Relief Sun SPF 50+', brand: 'Beauty of Joseon' }, // 1800 cents/mo
+  ];
+
+  // Arthur owns p1, p2, and p4 on his counter shelf; p5 is a new addition
+  const existingInventory = new Set(['p1', 'p2', 'p4']);
+  const planEstimate = calculateMonthlyPlanPrice(activeProducts, {
+    existingInventoryProductIds: existingInventory,
+  });
+
+  // Verify internal provisional demo assumptions
+  assert.equal(planEstimate.managementFeeCents, PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS); // 3900 cents ($39)
+  assert.equal(planEstimate.operationsRiskCents, PROVISIONAL_OPERATIONS_RISK_CENTS); // 500 cents ($5)
+
+  // Steady-state product consumption: 800 + 1000 + 1600 + 1800 = 5200 cents ($52)
+  // Existing inventory affects shipment timing, NOT steady-state consumption
+  assert.equal(planEstimate.productConsumptionCents, 5200);
+
+  // Exact Arthur demo monthly total: $39 + $52 + $5 = $96.00 / month (9600 cents)
+  assert.equal(planEstimate.monthlyTotalCents, 9600);
+  assert.equal(formatCentsToDollars(planEstimate.monthlyTotalCents), '$96');
+
+  // Verify breakdown inventory flags
+  const p1Item = planEstimate.productBreakdown.find((i) => i.productId === 'p1');
+  const p5Item = planEstimate.productBreakdown.find((i) => i.productId === 'p5');
+  assert.equal(p1Item?.hasExistingInventory, true);
+  assert.equal(p5Item?.hasExistingInventory, false);
+});
+
+test('Personalized Pricing: Excluding a product from Derive-managed replenishment changes result intentionally', () => {
+  const activeProducts = [
+    { id: 'p1', name: 'Hydrating Facial Cleanser', brand: 'CeraVe', isDeriveManagedReplenishment: true }, // 800 cents/mo
+    { id: 'p2', name: 'Adapalene Gel 0.1%', brand: 'Differin', isDeriveManagedReplenishment: false }, // Member provides own prescription
+    { id: 'p4', name: 'Toleriane Double Repair Moisturizer', brand: 'La Roche-Posay', isDeriveManagedReplenishment: true }, // 1600 cents/mo
+    { id: 'p5', name: 'Relief Sun SPF 50+', brand: 'Beauty of Joseon', isDeriveManagedReplenishment: true }, // 1800 cents/mo
+  ];
+
+  const planEstimate = calculateMonthlyPlanPrice(activeProducts);
+
+  // Product consumption excludes p2: 800 + 1600 + 1800 = 4200 cents ($42)
+  assert.equal(planEstimate.productConsumptionCents, 4200);
+
+  // Monthly Total: 3900 + 4200 + 500 = 8600 cents ($86/mo)
+  assert.equal(planEstimate.monthlyTotalCents, 8600);
+  assert.equal(formatCentsToDollars(planEstimate.monthlyTotalCents), '$86');
+});
+
+test('Personalized Pricing: Evaluates price adjustments and enforces member approval on increases', () => {
+  // Case 1: Routine change increases monthly price (e.g. $96 -> $104) -> requires approval
+  const increaseEval = evaluatePriceAdjustment(9600, 10400);
+  assert.equal(increaseEval.requiresMemberApproval, true);
+  assert.equal(increaseEval.priceDeltaCents, 800);
+  assert.match(increaseEval.explanation, /increases your plan by \$8\/mo.*confirmation required/i);
+
+  // Case 2: Routine simplification reduces monthly price (e.g. $96 -> $86) -> no approval required
+  const decreaseEval = evaluatePriceAdjustment(9600, 8600);
+  assert.equal(decreaseEval.requiresMemberApproval, false);
+  assert.equal(decreaseEval.priceDeltaCents, -1000);
+  assert.match(decreaseEval.explanation, /lowers your plan by \$10\/mo/i);
+
+  // Case 3: No price change (e.g. like-for-like swap)
+  const noChangeEval = evaluatePriceAdjustment(9600, 9600);
+  assert.equal(noChangeEval.requiresMemberApproval, false);
+  assert.equal(noChangeEval.priceDeltaCents, 0);
+});
+
+// ========================================================
+// 11. ONBOARDING STORE STATE ISOLATION & DEFAULTS
+// ========================================================
+
+test('Onboarding Store: Initializes to clean empty state and isolates Arthur demo state', () => {
+  // Reset onboarding store to clean production state
+  useOnboardingStore.getState().resetOnboarding();
+  const emptyState = useOnboardingStore.getState();
+
+  assert.equal(emptyState.primaryGoal, null);
+  assert.deepEqual(emptyState.secondaryGoals, []);
+  assert.equal(emptyState.routineComplexity, null);
+  assert.equal(emptyState.costPreference, null);
+  assert.equal(emptyState.middayFeel, null);
+  assert.equal(emptyState.postCleanseTightness, null);
+  assert.deepEqual(emptyState.detectedProducts, []);
+  assert.deepEqual(emptyState.knownSensitivities, []);
+  assert.equal(emptyState.sensitivitiesStatus, 'unanswered');
+  assert.equal(emptyState.isCompleted, false);
+
+  // Load Arthur demo fixture
+  useOnboardingStore.getState().loadArthurDemoState();
+  const arthurState = useOnboardingStore.getState();
+
+  assert.equal(arthurState.primaryGoal, 'breakouts');
+  assert.deepEqual(arthurState.secondaryGoals, ['texture']);
+  assert.equal(arthurState.routineComplexity, 'simple');
+  assert.equal(arthurState.costPreference, 'balanced');
+  assert.equal(arthurState.middayFeel, 'combination');
+  assert.equal(arthurState.postCleanseTightness, false);
+  assert.equal(arthurState.detectedProducts.length, 4);
+  assert.equal(arthurState.hasBadReactions, true);
+  assert.equal(arthurState.productReactions.length, 1);
+  assert.equal(arthurState.formulaSnapshots.length, 1);
+  assert.equal(arthurState.pihTendencyAnswer, 'Sometimes');
+});
+
+// ========================================================
+// 12. PHENOTYPE PROVENANCE & CONFIRMATION INVARIANTS
+// ========================================================
+
+test('Phenotype: Provenance is preserved and categorical confidence is modeled', () => {
+  const provVal = createProvenancedValue('medium', 'self_reported', 'high', true);
+  assert.equal(provVal.value, 'medium');
+  assert.equal(provVal.source, 'self_reported');
+  assert.equal(provVal.confidence, 'high');
+  assert.equal(provVal.userConfirmed, true);
+  assert.ok(provVal.observedAt);
+});
+
+test('Phenotype: Member confirmation strictly outranks unconfirmed photo estimate', () => {
+  // Member confirmed truth
+  const confirmedDepth: ProvenancedValue<'medium'> = {
+    value: 'medium',
+    source: 'self_reported',
+    confidence: 'high',
+    userConfirmed: true,
+    observedAt: '2026-09-01T00:00:00Z',
+  };
+
+  // An incoming unconfirmed photo estimate (e.g. from camera estimate)
+  const incomingEstimate: ProvenancedValue<'medium_deep'> = {
+    value: 'medium_deep',
+    source: 'photo_estimate',
+    confidence: 'medium',
+    userConfirmed: false,
+    observedAt: '2026-09-16T00:00:00Z',
+  };
+
+  // Invariant: Unconfirmed estimate MUST NOT overwrite member confirmation
+  const activeValue = setOrConfirmPhenotypeValue(confirmedDepth as any, incomingEstimate as any);
+  assert.equal(activeValue.value, 'medium');
+  assert.equal(activeValue.source, 'self_reported');
+  assert.equal(activeValue.userConfirmed, true);
+
+  // Member explicitly confirms/corrects to a new value
+  const memberCorrection: ProvenancedValue<'medium_deep'> = {
+    value: 'medium_deep',
+    source: 'self_reported',
+    confidence: 'high',
+    userConfirmed: true,
+  };
+  const updatedValue = setOrConfirmPhenotypeValue(activeValue, memberCorrection as any);
+  assert.equal(updatedValue.value, 'medium_deep');
+  assert.equal(updatedValue.userConfirmed, true);
+});
+
+test('Phenotype: Onboarding store captures PIH adaptive answer with verified provenance', () => {
+  useOnboardingStore.getState().resetOnboarding();
+  assert.equal(useOnboardingStore.getState().pihTendencyAnswer, null);
+
+  // Answer adaptive PIH question
+  useOnboardingStore.getState().setPihTendencyAnswer('Sometimes');
+  assert.equal(useOnboardingStore.getState().pihTendencyAnswer, 'Sometimes');
+
+  // Arthur demo state includes confirmed PIH tendency
+  useOnboardingStore.getState().loadArthurDemoState();
+  assert.equal(useOnboardingStore.getState().pihTendencyAnswer, 'Sometimes');
+});
+
+// ========================================================
+// 13. EVIDENCE GRADE POLICY & ROUTINE INFLUENCE RULES
+// ========================================================
+
+test('Evidence Policy: Grade A/B evidence is eligible when member applicability matches', () => {
+  // Melasma Visible Light RCT (Grade A) applies to Arthur (medium depth, sometimes PIH)
+  const arthurDecision = canInfluenceRoutine(evidenceVisibleLightMelasmaRCT, arthurPhenotypeProfile);
+  assert.equal(arthurDecision.allowed, true);
+  assert.equal(arthurDecision.evidenceGrade, 'A');
+  assert.equal(arthurDecision.applicableToMember, true);
+
+  // AAD Dark Spots / Photoprotection guidance (Grade B) applies to Arthur
+  const aadDecision = canInfluenceRoutine(evidenceAadPihGuidance, arthurPhenotypeProfile);
+  assert.equal(aadDecision.allowed, true);
+  assert.equal(aadDecision.evidenceGrade, 'B');
+});
+
+test('Evidence Policy: Grade A/B evidence does not influence routine when applicability criteria do not match', () => {
+  // Create profile without PIH tendency and with very_light depth
+  const nonApplicableProfile: SkinPhenotypeProfile = {
+    pigmentationFamily: createProvenancedValue('very_light', 'self_reported', 'high', true),
+    pihTendency: createProvenancedValue('rarely', 'self_reported', 'high', true),
+  };
+
+  const decision = canInfluenceRoutine(evidenceVisibleLightMelasmaRCT, nonApplicableProfile);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.applicableToMember, false);
+  assert.match(decision.reason, /does not match member applicability/i);
+});
+
+test('Evidence Policy: Grade C observational evidence cannot silently modify active routine steps', () => {
+  // Dairy/Acne observational meta-analysis (Grade C)
+  const decision = canInfluenceRoutine(evidenceDairyAcneObservationalMetaAnalysis, arthurPhenotypeProfile);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.evidenceGrade, 'C');
+  assert.match(decision.reason, /cannot silently alter active routines/i);
+
+  // But Grade C CAN inform educational intelligence (Ask cards, research insights)
+  assert.equal(canInformEducationalContext(evidenceDairyAcneObservationalMetaAnalysis), true);
+});
+
+test('Evidence Policy: Grade D preliminary or anecdotal evidence cannot drive product behavior', () => {
+  // Anecdotal lemon juice claim (Grade D)
+  const decision = canInfluenceRoutine(evidenceAnecdotalLemonExtract, arthurPhenotypeProfile);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.evidenceGrade, 'D');
+  assert.match(decision.reason, /cannot drive product or routine behavior/i);
+
+  // Grade D CANNOT inform educational context
+  assert.equal(canInformEducationalContext(evidenceAnecdotalLemonExtract), false);
+});
+
+// ========================================================
+// 14. CATEGORICAL TINT COMPATIBILITY & WHITE CAST ASSESSMENT
+// ========================================================
+
+test('Tint Compatibility: Unconfirmed or missing shade requires confirmation before claiming match', () => {
+  // Unconfirmed profile (e.g. initial photo estimate without member confirmation)
+  const unconfirmedResult = evaluateTintCompatibility(mockTintedMineralSunscreen, unconfirmedPhotoEstimate);
+  assert.equal(unconfirmedResult.status, 'needs_confirmation');
+  assert.equal(unconfirmedResult.requiresConfirmation, true);
+  assert.match(unconfirmedResult.rationale, /confirmation required/i);
+
+  // Undefined profile
+  const missingResult = evaluateTintCompatibility(mockTintedMineralSunscreen, undefined);
+  assert.equal(missingResult.status, 'needs_confirmation');
+});
+
+test('Tint Compatibility: Confirmed shade evaluates categorically and identifies iron oxide benefit', () => {
+  // Arthur has confirmed medium depth with neutral undertone
+  const matchResult = evaluateTintCompatibility(mockTintedMineralSunscreen, arthurPhenotypeProfile);
+  assert.equal(matchResult.status, 'likely_match');
+  assert.equal(matchResult.requiresConfirmation, false);
+  assert.equal(matchResult.ironOxideBenefitIdentified, true);
+
+  // Fair tinted sunscreen on medium depth is an unlikely match
+  const fairResult = evaluateTintCompatibility(mockFairTintedSunscreen, arthurPhenotypeProfile);
+  assert.equal(fairResult.status, 'unlikely_match');
+  assert.equal(fairResult.requiresConfirmation, false);
+});
+
+test('White Cast Assessment: Mineral formulas evaluate cast risk without arbitrary scores', () => {
+  const untintedRisk = evaluateWhiteCastRisk(mockUntintedPhysicalSunscreen, arthurPhenotypeProfile);
+  assert.ok(untintedRisk.castRisk === 'moderate' || untintedRisk.castRisk === 'high');
+  assert.match(untintedRisk.rationale, /mineral.*cast/i);
+
+  // Tinted formulation with iron oxides eliminates white cast risk
+  const tintedRisk = evaluateWhiteCastRisk(
+    {
+      mineralFilters: ['zinc_oxide'],
+      nanoParticle: false,
+      tinted: true,
+      estimatedCastLevel: 'none',
+    },
+    arthurPhenotypeProfile
+  );
+  assert.equal(tintedRisk.castRisk, 'none');
+  assert.match(tintedRisk.rationale, /iron oxides/i);
+});
+
+// ========================================================
+// 15. SAFETY & NON-DISCRIMINATION INVARIANTS
+// ========================================================
+
+test('Safety & Privacy: Zero race, ethnicity, or ancestry classifiers in phenotype models', () => {
+  const profileKeys = Object.keys(arthurPhenotypeProfile);
+  for (const key of profileKeys) {
+    assert.ok(!/race|ethnic|ancestry|nationality/i.test(key), `Key ${key} violates non-discrimination rule`);
+  }
+
+  // Ensure Arthur fixture contains no demographic or racial classification
+  const serialized = JSON.stringify(arthurPhenotypeProfile);
+  assert.equal(/caucasian|black|hispanic|asian|african/i.test(serialized), false);
+});
+

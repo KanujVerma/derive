@@ -81,7 +81,7 @@ export const GlassComposer: React.FC<GlassComposerProps> = ({
         )}
 
         <View style={styles.inputRow}>
-          {/* Camera / Photo Attachment Button */}
+          {/* Photo Attachment Button */}
           <TouchableOpacity
             onPress={handlePickImage}
             activeOpacity={0.7}
@@ -92,16 +92,6 @@ export const GlassComposer: React.FC<GlassComposerProps> = ({
           >
             <Icon name="camera" size={20} color={colors.inkMuted} />
           </TouchableOpacity>
-
-          {/* Voice Input Button */}
-          <VoiceInputButton
-            context="ask"
-            size={34}
-            disabled={disabled || isLoading}
-            onTranscript={(transcribed) => {
-              setText((prev) => (prev ? `${prev} ${transcribed}` : transcribed));
-            }}
-          />
 
           {/* Text Input */}
           <TextInput
@@ -116,6 +106,16 @@ export const GlassComposer: React.FC<GlassComposerProps> = ({
             accessibilityLabel="Message input field"
           />
 
+          {/* Voice Input Button (Trailing) */}
+          <VoiceInputButton
+            context="ask"
+            size={40}
+            disabled={disabled || isLoading}
+            onTranscript={(transcribed) => {
+              setText((prev) => (prev ? `${prev} ${transcribed}` : transcribed));
+            }}
+          />
+
           {/* Send Button */}
           <TouchableOpacity
             onPress={handleSend}
@@ -123,7 +123,7 @@ export const GlassComposer: React.FC<GlassComposerProps> = ({
             disabled={(!text.trim() && !attachedImage) || disabled || isLoading}
             style={[
               styles.sendButton,
-              (!text.trim() && !attachedImage || isLoading) && styles.sendButtonDisabled,
+              ((!text.trim() && !attachedImage) || isLoading) && styles.sendButtonDisabled,
             ]}
             accessible={true}
             accessibilityRole="button"

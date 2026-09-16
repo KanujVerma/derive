@@ -4,57 +4,61 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TextInput,
-  TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
+import { colors, typography, spacing, radii } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import {
   BodyArea,
   ReactionSeverity,
   ReactionSymptom,
-  ReactionSymptomLabels,
 } from '@/src/types/schema';
-import { Button } from '@/src/components/ui/Button';
-import { VoiceInputButton } from '@/src/components/ui/VoiceInputButton';
+import { SelectionCard } from '@/src/components/ui/SelectionCard';
+import { SelectionRow } from '@/src/components/ui/SelectionRow';
+import { GroupedSection } from '@/src/components/ui/GroupedSection';
+import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
+import { TextField } from '@/src/components/ui/TextField';
+import { VoiceTextArea } from '@/src/components/ui/VoiceTextArea';
+import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 
 const BODY_AREAS: Array<{ value: BodyArea; label: string }> = [
-  { value: 'underarms', label: 'Underarms' },
+  { value: 'face', label: 'Face' },
   { value: 'cheeks', label: 'Cheeks' },
   { value: 'around_eyes', label: 'Around eyes' },
-  { value: 'face', label: 'Face (general)' },
   { value: 'forehead', label: 'Forehead' },
   { value: 'jawline', label: 'Jawline / Chin' },
   { value: 'neck', label: 'Neck' },
+  { value: 'underarms', label: 'Underarms' },
   { value: 'scalp', label: 'Scalp' },
   { value: 'chest', label: 'Chest' },
   { value: 'back', label: 'Back' },
-  { value: 'body', label: 'Body' },
-  { value: 'other', label: 'Other' },
+  { value: 'other', label: 'Other area' },
 ];
 
 const SYMPTOMS_LIST: Array<{ value: ReactionSymptom; label: string }> = [
-  { value: 'burning_stinging', label: 'Burning or stinging' },
-  { value: 'redness_rash', label: 'Redness or rash' },
+  { value: 'burning_stinging', label: 'Burning / stinging' },
+  { value: 'redness_rash', label: 'Redness / rash' },
   { value: 'itching', label: 'Itching' },
-  { value: 'breakouts', label: 'Breakouts' },
-  { value: 'dryness_peeling', label: 'Dryness or peeling' },
+  { value: 'breakouts', label: 'Blemish flare' },
+  { value: 'dryness_peeling', label: 'Dryness / peeling' },
   { value: 'swelling', label: 'Swelling' },
-  { value: 'other', label: 'Something else' },
+  { value: 'other', label: 'Other symptom' },
 ];
 
 const SEVERITY_LEVELS: Array<{ value: ReactionSeverity; label: string; desc: string }> = [
-  { value: 'mild', label: 'Mild', desc: 'Slight irritation that resolved quickly' },
-  { value: 'moderate', label: 'Moderate', desc: 'Noticeable discomfort or prolonged flare' },
-  { value: 'severe', label: 'Severe', desc: 'Intense reaction, severe burning, or swelling' },
+  { value: 'mild', label: 'Mild', desc: 'Temporary tingling or minor dryness that resolved quickly' },
+  { value: 'moderate', label: 'Moderate', desc: 'Noticeable discomfort, flaking, or rash lasting multiple days' },
+  { value: 'severe', label: 'Severe', desc: 'Intense reaction, severe burning, swelling, or required medical care' },
 ];
 
 export default function ReactionHistoryScreen() {
   const router = useRouter();
-  const { addProductReaction } = useOnboardingStore();
+  const { addProductReaction, setHasBadReactions, hasBadReactions } = useOnboardingStore();
 
+  const [hasReaction, setHasReaction] = useState<boolean | null>(
+    hasBadReactions ?? true
+  );
   const [productName, setProductName] = useState('');
   const [selectedSymptoms, setSelectedSymptoms] = useState<ReactionSymptom[]>(['burning_stinging']);
   const [selectedArea, setSelectedArea] = useState<BodyArea>('face');
@@ -62,7 +66,6 @@ export default function ReactionHistoryScreen() {
   const [notes, setNotes] = useState('');
 
   const toggleSymptom = (symptom: ReactionSymptom) => {
-    Haptics.selectionAsync();
     if (selectedSymptoms.includes(symptom)) {
       if (selectedSymptoms.length === 1) return;
       setSelectedSymptoms(selectedSymptoms.filter((s) => s !== symptom));
@@ -72,6 +75,13 @@ export default function ReactionHistoryScreen() {
   };
 
   const handleSave = () => {
+    if (hasReaction === false) {
+      setHasBadReactions(false);
+      router.back();
+      return;
+    }
+
+    setHasBadReactions(true);
     const trimmedName = productName.trim() || 'Unspecified past product';
     addProductReaction({
       productName: trimmedName,
@@ -94,137 +104,120 @@ export default function ReactionHistoryScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.screenTitle}>Past Product Reaction</Text>
-        <Text style={styles.screenSubtitle}>
-          Tell us what product caused an issue and how your skin reacted. Derive will inspect the formulation in the background.
+        <Text style={styles.questionTitle}>Past Product Reactions</Text>
+        <Text style={styles.questionSubtitle}>
+          Derive looks up formulations in the background to separate true sensitivities from normal active acclimation.
         </Text>
 
-        {/* 1. PRODUCT NAME */}
-        <Text style={styles.sectionLabel}>Which product caused the reaction?</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="e.g. Old Spice gel deodorant, glycolic toner..."
-          placeholderTextColor={colors.inkSubtle}
-          value={productName}
-          onChangeText={setProductName}
-          autoFocus={false}
-        />
-
-        {/* 2. SYMPTOMS */}
-        <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>
-          What happened?
+        {/* PROGRESSIVE GATE: Has a product ever caused an adverse reaction? */}
+        <Text style={styles.sectionHeader}>
+          Has any skincare, hair, deodorant, or body product irritated your skin or caused a bad reaction?
         </Text>
-        <View style={styles.chipRow}>
-          {SYMPTOMS_LIST.map((item) => {
-            const isSelected = selectedSymptoms.includes(item.value);
-            return (
-              <TouchableOpacity
-                key={item.value}
-                onPress={() => toggleSymptom(item.value)}
-                style={[styles.chip, isSelected && styles.chipActive]}
-                accessible={true}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isSelected }}
-              >
-                <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* 3. BODY AREA */}
-        <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>
-          Where did it happen?
-        </Text>
-        <View style={styles.chipRow}>
-          {BODY_AREAS.map((item) => {
-            const isSelected = selectedArea === item.value;
-            return (
-              <TouchableOpacity
-                key={item.value}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setSelectedArea(item.value);
-                }}
-                style={[styles.chip, isSelected && styles.chipActive]}
-                accessible={true}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: isSelected }}
-              >
-                <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* 4. SEVERITY */}
-        <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>
-          How severe was it?
-        </Text>
-        <View style={styles.severityColumn}>
-          {SEVERITY_LEVELS.map((item) => {
-            const isSelected = severity === item.value;
-            return (
-              <TouchableOpacity
-                key={item.value}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setSeverity(item.value);
-                }}
-                style={[styles.severityCard, isSelected && styles.severityCardActive]}
-                accessible={true}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: isSelected }}
-              >
-                <View style={styles.radioDot}>
-                  {isSelected && <View style={styles.radioDotInner} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.severityTitle, isSelected && styles.severityTitleActive]}>
-                    {item.label}
-                  </Text>
-                  <Text style={styles.severityDesc}>{item.desc}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* 5. OPTIONAL NOTES */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg }}>
-          <Text style={styles.sectionLabel}>
-            Anything else we should know? (Optional)
-          </Text>
-          <VoiceInputButton
-            context="reaction_note"
-            size={32}
-            onTranscript={(transcribed) => {
-              setNotes(notes ? `${notes} ${transcribed}` : transcribed);
+        <GroupedSection>
+          <SelectionRow
+            title="Yes, I have had a reaction"
+            subtitle="I want Derive to check ingredients and avoid similar formulations"
+            selected={hasReaction === true}
+            onPress={() => {
+              setHasReaction(true);
+              setHasBadReactions(true);
             }}
+            type="radio"
           />
-        </View>
-        <TextInput
-          style={[styles.textInput, styles.multilineInput]}
-          placeholder="e.g. Cleared up after 3 days of skipping it..."
-          placeholderTextColor={colors.inkSubtle}
-          value={notes}
-          onChangeText={setNotes}
-          multiline={true}
-        />
+          <SelectionRow
+            title="No, not that I recall"
+            subtitle="I tolerate most standard products without notable irritation"
+            selected={hasReaction === false}
+            onPress={() => {
+              setHasReaction(false);
+              setHasBadReactions(false);
+            }}
+            type="radio"
+          />
+        </GroupedSection>
+
+        {/* PROGRESSIVELY DISCLOSED DETAILS (Only if user taps Yes) */}
+        {hasReaction === true && (
+          <View style={styles.detailsContainer}>
+            {/* 1. PRODUCT NAME */}
+            <TextField
+              label="Which product caused the reaction?"
+              placeholder="e.g. Old Spice gel deodorant, glycolic acid toner..."
+              value={productName}
+              onChangeText={setProductName}
+              helper="We will cross-reference its formulation against your active routine."
+            />
+
+            {/* 2. SYMPTOMS */}
+            <Text style={styles.subSectionHeader}>What happened?</Text>
+            <View style={styles.chipsWrap}>
+              {SYMPTOMS_LIST.map((item) => {
+                const isSelected = selectedSymptoms.includes(item.value);
+                return (
+                  <ChoiceChip
+                    key={item.value}
+                    label={item.label}
+                    selected={isSelected}
+                    onSelect={() => toggleSymptom(item.value)}
+                  />
+                );
+              })}
+            </View>
+
+            {/* 3. BODY AREA */}
+            <Text style={[styles.subSectionHeader, { marginTop: spacing.md }]}>
+              Where did the reaction occur?
+            </Text>
+            <View style={styles.chipsWrap}>
+              {BODY_AREAS.map((item) => {
+                const isSelected = selectedArea === item.value;
+                return (
+                  <ChoiceChip
+                    key={item.value}
+                    label={item.label}
+                    selected={isSelected}
+                    onSelect={() => setSelectedArea(item.value)}
+                  />
+                );
+              })}
+            </View>
+
+            {/* 4. SEVERITY */}
+            <Text style={[styles.subSectionHeader, { marginTop: spacing.md }]}>
+              How severe was the reaction?
+            </Text>
+            <View style={styles.severityCards}>
+              {SEVERITY_LEVELS.map((item) => {
+                const isSelected = severity === item.value;
+                return (
+                  <SelectionCard
+                    key={item.value}
+                    title={item.label}
+                    description={item.desc}
+                    selected={isSelected}
+                    onPress={() => setSeverity(item.value)}
+                  />
+                );
+              })}
+            </View>
+
+            {/* 5. NOTES WITH VOICE */}
+            <VoiceTextArea
+              label="Anything else we should know? (Optional)"
+              placeholder="e.g. Happened after 2 days of daily use, resolved after applying vaseline..."
+              value={notes}
+              onChangeText={setNotes}
+              context="reaction_note"
+              minHeight={70}
+            />
+          </View>
+        )}
       </ScrollView>
 
-      <View style={styles.bottomBar}>
-        <Button
-          label="Save Reaction"
-          variant="primary"
-          size="large"
-          onPress={handleSave}
-        />
-      </View>
+      <StickyActionFooter
+        ctaLabel={hasReaction === false ? 'No Reactions — Continue' : 'Save Reaction'}
+        onPressCta={handleSave}
+      />
     </View>
   );
 }
@@ -237,122 +230,45 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xxl + 80,
+    paddingBottom: spacing.xxl + 100,
   },
-  screenTitle: {
+  questionTitle: {
     fontFamily: typography.fontFamilies.serif,
     fontSize: typography.sizes.screenTitle,
     lineHeight: typography.lineHeights.screenTitle,
     color: colors.ink,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xxs,
   },
-  screenSubtitle: {
+  questionSubtitle: {
     fontSize: typography.sizes.bodyRegular,
     color: colors.inkMuted,
-    lineHeight: 22,
+    lineHeight: typography.lineHeights.bodyRegular,
     marginBottom: spacing.lg,
   },
-  sectionLabel: {
-    fontSize: typography.sizes.bodyRegular,
+  sectionHeader: {
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+    marginBottom: spacing.sm,
+  },
+  detailsContainer: {
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  subSectionHeader: {
+    fontSize: typography.sizes.caption,
     fontWeight: typography.weights.semibold,
     color: colors.ink,
     marginBottom: spacing.xs,
   },
-  textInput: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: typography.sizes.bodyRegular,
-    color: colors.ink,
-  },
-  multilineInput: {
-    minHeight: 70,
-    textAlignVertical: 'top',
-  },
-  chipRow: {
+  chipsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  chip: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  chipActive: {
-    backgroundColor: colors.brandLight,
-    borderColor: colors.brand,
-  },
-  chipText: {
-    fontSize: typography.sizes.caption,
-    color: colors.inkMuted,
-    fontWeight: typography.weights.medium,
-  },
-  chipTextActive: {
-    color: colors.brand,
-    fontWeight: typography.weights.semibold,
-  },
-  severityColumn: {
+  severityCards: {
     gap: spacing.xs,
-  },
-  severityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.borderSubtle,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    ...shadows.subtle,
-  },
-  severityCardActive: {
-    borderColor: colors.brand,
-    backgroundColor: colors.surfaceElevated,
-  },
-  radioDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  radioDotInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.brand,
-  },
-  severityTitle: {
-    fontSize: typography.sizes.bodyRegular,
-    fontWeight: typography.weights.semibold,
-    color: colors.ink,
-    marginBottom: 2,
-  },
-  severityTitleActive: {
-    color: colors.brand,
-  },
-  severityDesc: {
-    fontSize: typography.sizes.caption,
-    color: colors.inkMuted,
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.canvas,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
+    marginBottom: spacing.md,
   },
 });

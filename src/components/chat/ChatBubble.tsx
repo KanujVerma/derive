@@ -91,13 +91,11 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
           <Text style={styles.explanationText}>{message.whyExplanation}</Text>
         )}
 
-        {/* ACTION PILL */}
+        {/* RECOMMENDED ACTION CALLOUT */}
         {message.recommendedAction && (
-          <View style={styles.actionRow}>
-            <View style={styles.actionPill}>
-              <Icon name="check" size={12} color={colors.brand} />
-              <Text style={styles.actionPillText}>{message.recommendedAction}</Text>
-            </View>
+          <View style={styles.actionCallout}>
+            <Icon name="check" size={14} color={colors.brand} style={styles.actionCalloutIcon} />
+            <Text style={styles.actionCalloutText}>{message.recommendedAction}</Text>
           </View>
         )}
       </View>
@@ -177,23 +175,27 @@ const styles = StyleSheet.create({
     color: colors.ink,
     lineHeight: 22,
   },
-  actionRow: {
-    marginTop: 4,
-  },
-  actionPill: {
+  actionCallout: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    alignItems: 'flex-start',
+    gap: 8,
     backgroundColor: colors.brandLight,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.full,
-    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+    borderRadius: radii.md,
+    marginTop: 6,
+    width: '100%',
   },
-  actionPillText: {
-    fontSize: typography.sizes.micro,
-    fontWeight: typography.weights.semibold,
-    color: colors.brand,
+  actionCalloutIcon: {
+    marginTop: 2,
+  },
+  actionCalloutText: {
+    flex: 1,
+    flexShrink: 1,
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.medium,
+    color: colors.brandDark,
+    lineHeight: 18,
   },
   scanBox: {
     backgroundColor: colors.canvas,

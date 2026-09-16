@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
+import { colors, typography, spacing } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { Goal, GoalLabels } from '@/src/types/schema';
-import { Button } from '@/src/components/ui/Button';
-import { Icon } from '@/src/components/ui/Icon';
+import { SelectionCard } from '@/src/components/ui/SelectionCard';
+import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
+import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 
 const GOALS_LIST = Object.keys(GoalLabels) as Goal[];
 
@@ -19,36 +20,36 @@ export default function GoalsScreen() {
   } = useOnboardingStore();
 
   const [selectedGoals, setSelectedGoals] = useState<Goal[]>(
-    primaryGoal ? [primaryGoal, ...secondaryGoals] : ['breakouts']
+    primaryGoal ? [primaryGoal, ...secondaryGoals] : []
   );
 
-  const [currentPrimary, setCurrentPrimary] = useState<Goal>(
-    primaryGoal || 'breakouts'
+  const [currentPrimary, setCurrentPrimary] = useState<Goal | null>(
+    primaryGoal || null
   );
 
   const handleToggleGoal = (goal: Goal) => {
-    Haptics.selectionAsync();
     let updated: Goal[];
-
     if (selectedGoals.includes(goal)) {
-      if (selectedGoals.length === 1) return; // Keep at least one
       updated = selectedGoals.filter((g) => g !== goal);
       setSelectedGoals(updated);
       if (currentPrimary === goal) {
-        setCurrentPrimary(updated[0]);
+        setCurrentPrimary(updated.length > 0 ? updated[0] : null);
       }
     } else {
       updated = [...selectedGoals, goal];
       setSelectedGoals(updated);
+      if (!currentPrimary) {
+        setCurrentPrimary(goal);
+      }
     }
   };
 
   const handleSelectPrimary = (goal: Goal) => {
-    Haptics.selectionAsync();
     setCurrentPrimary(goal);
   };
 
   const handleContinue = () => {
+    if (!currentPrimary) return;
     setPrimaryGoal(currentPrimary);
     const secondaries = selectedGoals.filter((g) => g !== currentPrimary);
     useOnboardingStore.setState({ secondaryGoals: secondaries });
@@ -72,26 +73,15 @@ export default function GoalsScreen() {
             const meta = GoalLabels[goal];
 
             return (
-              <TouchableOpacity
+              <SelectionCard
                 key={goal}
+                title={meta.label}
+                description={meta.description}
+                selected={isSelected}
+                selectionType="checkbox"
                 onPress={() => handleToggleGoal(goal)}
-                activeOpacity={0.7}
-                style={[styles.card, isSelected && styles.cardSelected]}
-                accessible={true}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isSelected }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>
-                    {meta.label}
-                  </Text>
-                  <Text style={styles.cardDesc}>{meta.description}</Text>
-                </View>
-
-                <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                  {isSelected && <Icon name="check" size={14} color={colors.inkInverse} />}
-                </View>
-              </TouchableOpacity>
+                style={styles.cardItem}
+              />
             );
           })}
         </View>
@@ -101,7 +91,7 @@ export default function GoalsScreen() {
           <View style={styles.prioritySection}>
             <Text style={styles.priorityHeading}>Which matters most right now?</Text>
             <Text style={styles.prioritySub}>
-              We will balance your routine around this as the main focus.
+              We will balance your routine around this as the primary focus.
             </Text>
 
             <View style={styles.priorityPillContainer}>
@@ -110,26 +100,13 @@ export default function GoalsScreen() {
                 const meta = GoalLabels[goal];
 
                 return (
-                  <TouchableOpacity
+                  <ChoiceChip
                     key={goal}
-                    onPress={() => handleSelectPrimary(goal)}
-                    style={[
-                      styles.priorityChoiceChip,
-                      isPrimary && styles.priorityChoiceChipActive,
-                    ]}
-                    accessible={true}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: isPrimary }}
-                  >
-                    <Text
-                      style={[
-                        styles.priorityChoiceText,
-                        isPrimary && styles.priorityChoiceTextActive,
-                      ]}
-                    >
-                      {meta.label}
-                    </Text>
-                  </TouchableOpacity>
+                    label={meta.label}
+                    selected={isPrimary}
+                    onSelect={() => handleSelectPrimary(goal)}
+                    style={styles.choiceChip}
+                  />
                 );
               })}
             </View>
@@ -137,14 +114,11 @@ export default function GoalsScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.bottomBar}>
-        <Button
-          label="Continue"
-          variant="primary"
-          size="large"
-          onPress={handleContinue}
-        />
-      </View>
+      <StickyActionFooter
+        ctaLabel="Continue"
+        onPressCta={handleContinue}
+        disabled={selectedGoals.length === 0 || !currentPrimary}
+      />
     </View>
   );
 }
@@ -157,64 +131,26 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xxl + 80,
+    paddingBottom: spacing.xxl + 100,
   },
   questionTitle: {
     fontFamily: typography.fontFamilies.serif,
     fontSize: typography.sizes.screenTitle,
     lineHeight: typography.lineHeights.screenTitle,
     color: colors.ink,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xxs,
   },
   questionSubtitle: {
     fontSize: typography.sizes.bodyRegular,
     color: colors.inkMuted,
+    lineHeight: typography.lineHeights.bodyRegular,
     marginBottom: spacing.lg,
   },
   optionsList: {
     gap: spacing.sm,
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderColor: colors.borderSubtle,
-    borderWidth: 1,
-    ...shadows.subtle,
-  },
-  cardSelected: {
-    borderColor: colors.brand,
-    backgroundColor: colors.surfaceElevated,
-  },
-  cardTitle: {
-    fontSize: typography.sizes.bodyRegular,
-    fontWeight: typography.weights.semibold,
-    color: colors.ink,
-    marginBottom: 2,
-  },
-  cardTitleSelected: {
-    color: colors.brand,
-  },
-  cardDesc: {
-    fontSize: typography.sizes.caption,
-    color: colors.inkMuted,
-    lineHeight: 18,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: radii.xs,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.sm,
-  },
-  checkboxSelected: {
-    backgroundColor: colors.brand,
-    borderColor: colors.brand,
+  cardItem: {
+    marginBottom: 0,
   },
   prioritySection: {
     marginTop: spacing.xl,
@@ -224,13 +160,14 @@ const styles = StyleSheet.create({
   },
   priorityHeading: {
     fontSize: typography.sizes.bodyLarge,
-    fontWeight: typography.weights.semibold,
+    fontWeight: typography.weights.bold,
     color: colors.ink,
     marginBottom: 2,
   },
   prioritySub: {
     fontSize: typography.sizes.caption,
     color: colors.inkMuted,
+    lineHeight: typography.lineHeights.caption,
     marginBottom: spacing.md,
   },
   priorityPillContainer: {
@@ -238,36 +175,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
-  priorityChoiceChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.full,
-  },
-  priorityChoiceChipActive: {
-    backgroundColor: colors.brandLight,
-    borderColor: colors.brand,
-  },
-  priorityChoiceText: {
-    fontSize: typography.sizes.caption,
-    fontWeight: typography.weights.medium,
-    color: colors.inkMuted,
-  },
-  priorityChoiceTextActive: {
-    color: colors.brand,
-    fontWeight: typography.weights.semibold,
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.canvas,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
+  choiceChip: {
+    marginBottom: spacing.xxs,
   },
 });

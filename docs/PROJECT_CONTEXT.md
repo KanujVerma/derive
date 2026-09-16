@@ -7,11 +7,11 @@ Derive is a managed skincare service. Customers provide their observations, bath
 
 ## Business Hypothesis & Target
 - **Target**: 10 real paying customers serving as our Founding Beta cohort within 2 weeks.
-- **Price Point**: $129 / month canonical working membership.
+- **Price Point**: Personalized all-in monthly membership (provisional baseline ~\$49–\$129/month derived dynamically from demo assumptions: \$39/mo software/management + normalized 30-day product consumption + \$5/mo operations buffer; \$129/mo serves as the upper anchor for complex multi-active plans; client prototype pending co-founder review with Sami).
 - **Parallel Pipeline**: 50–100 active customer discovery conversations.
 
 ## Service Composition
-The $129/month membership delivers:
+The personalized all-in membership delivers:
 1. **Audited Canonical Routine**: Curated morning and evening steps with personalized dosage, application zones, and schedules.
 2. **Bathroom Shelf Audit**: Evaluation of counter bottles into KEEP, PAUSE, REPLACE, and ADD.
 3. **Dedicated In-Store & Counter Scanner**: Fast evaluations on whether prospective products fit their plan.
@@ -21,7 +21,8 @@ The $129/month membership delivers:
 
 ## Operating Principles
 - **Third-Party Products Today**: We do not formulate custom white-label bottles. We curate established, reliable dermatological formulas (CeraVe, La Roche-Posay, Differin, EltaMD).
+- **Phenotype-Aware, Never Race-Aware**: Skincare personalization is grounded in observable cutaneous biology (pigmentation depth, undertone, post-inflammatory response, hair curl pattern). We strictly prohibit race/ethnicity classifiers, CV colorimetry, or demographic recommendation rules.
 - **Cosmetic Skincare, Not Medicine**: We advise on over-the-counter routines and cosmetic tolerance. We never diagnose skin diseases or treat clinical pathology.
-- **Manual Founder Operations Are Acceptable**: Fast, high-touch founder concierge review before routine publication beats premature automation.
+- **AI-Led Care Loop with Founder Verification Net**: Routine adaptations, weekly check-ins, and learned insights are 100% AI-led and automated. Fast, high-touch founder concierge review serves as a quality net exclusively for initial routine proposals before first activation.
 - **Speed & Learning Over Premature Moats**: Real customer retention and paid conversions teach us what features actually matter.
 - **Long-Term Defensibility**: Lies in proprietary longitudinal context—knowing how specific skin types and barrier histories react to active combinations over 3–12 months.

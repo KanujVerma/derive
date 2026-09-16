@@ -4,29 +4,23 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TextInput,
-  TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
+import { colors, typography, spacing } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
-import { Button } from '@/src/components/ui/Button';
+import { SelectionRow } from '@/src/components/ui/SelectionRow';
+import { GroupedSection } from '@/src/components/ui/GroupedSection';
+import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
+import { TextField } from '@/src/components/ui/TextField';
+import { VoiceTextArea } from '@/src/components/ui/VoiceTextArea';
+import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 
-const PRESCRIPTIONS_LIST = [
-  'Differin / Adapalene',
-  'Tretinoin / Retin-A',
-  'Oral Spironolactone',
-  'Isotretinoin (Accutane)',
-  'None of these',
-];
-
-const SENSITIVITIES_LIST = [
-  'Synthetic Fragrance',
-  'Essential Oils',
-  'High % Niacinamide',
-  'Strong Benzoyl Peroxide',
-  'No known allergies',
+const PRESCRIPTION_OPTIONS = [
+  { id: 'tretinoin', label: 'Tretinoin / Retin-A' },
+  { id: 'spironolactone', label: 'Oral Spironolactone' },
+  { id: 'accutane', label: 'Isotretinoin (Accutane)' },
+  { id: 'hydroquinone', label: 'Hydroquinone' },
 ];
 
 export default function SafetyScreen() {
@@ -34,7 +28,9 @@ export default function SafetyScreen() {
   const {
     activePrescriptions,
     knownSensitivities,
+    sensitivitiesStatus,
     isPregnantOrNursing,
+    pregnancyStatus,
     additionalSafetyNotes,
     detectedProducts,
     setSafetyContext,
@@ -52,104 +48,74 @@ export default function SafetyScreen() {
     hasDifferinOnShelf ? true : null
   );
 
-  const [allergies, setAllergies] = useState<string[]>(
-    knownSensitivities.filter((s) => s !== 'No known allergies' && s !== 'Synthetic Fragrance' && s !== 'Essential Oils')
+  // Sensitivities state
+  const [selectedSensitivities, setSelectedSensitivities] = useState<string[]>(
+    knownSensitivities.filter((s) => s !== 'No known allergies')
   );
-  const [allergyInput, setAllergyInput] = useState('');
-  const [hasNoAllergies, setHasNoAllergies] = useState(
-    knownSensitivities.includes('No known allergies') || allergies.length === 0
+  const [hasNoSensitivities, setHasNoSensitivities] = useState<boolean>(
+    sensitivitiesStatus === 'none_known' || (knownSensitivities.length === 0 && sensitivitiesStatus !== 'reported')
+  );
+  const [customSensInput, setCustomSensInput] = useState('');
+
+  // Prescriptions state
+  const [selectedPrescriptions, setSelectedPrescriptions] = useState<string[]>(
+    activePrescriptions.filter((rx) => !rx.toLowerCase().includes('differin') && rx !== 'None of these')
   );
 
-  const [additionalRx, setAdditionalRx] = useState<string[]>(
-    activePrescriptions.filter((rx) => !rx.includes('Differin') && rx !== 'None of these')
+  // Pregnancy / Nursing tri-state
+  const [pregnancyState, setPregnancyState] = useState<'yes' | 'no' | 'prefer_not_to_say' | 'unanswered'>(
+    pregnancyStatus !== 'unanswered' ? pregnancyStatus : isPregnantOrNursing ? 'yes' : 'no'
   );
-  const [hasNoAdditionalRx, setHasNoAdditionalRx] = useState(
-    activePrescriptions.includes('None of these') || (hasDifferinOnShelf && activePrescriptions.length <= 1)
-  );
-  const [customRxInput, setCustomRxInput] = useState('');
 
-  const [pregnancyChoice, setPregnancyChoice] = useState<'yes' | 'no' | 'prefer_not_to_say'>(
-    isPregnantOrNursing ? 'yes' : 'no'
-  );
   const [notes, setNotes] = useState<string>(additionalSafetyNotes);
 
-  const handleAddAllergy = () => {
-    const trimmed = allergyInput.trim();
+  const handleAddCustomSensitivity = () => {
+    const trimmed = customSensInput.trim();
     if (!trimmed) return;
     Haptics.selectionAsync();
-    if (!allergies.includes(trimmed)) {
-      setAllergies([...allergies, trimmed]);
-      setHasNoAllergies(false);
+    if (!selectedSensitivities.includes(trimmed)) {
+      setSelectedSensitivities([...selectedSensitivities, trimmed]);
+      setHasNoSensitivities(false);
     }
-    setAllergyInput('');
+    setCustomSensInput('');
   };
 
-  const handleRemoveAllergy = (item: string) => {
-    Haptics.selectionAsync();
-    const updated = allergies.filter((a) => a !== item);
-    setAllergies(updated);
-    if (updated.length === 0) {
-      setHasNoAllergies(true);
-    }
+  const handleToggleNoSensitivities = () => {
+    setHasNoSensitivities(true);
+    setSelectedSensitivities([]);
   };
 
-  const handleToggleNoAllergies = () => {
-    Haptics.selectionAsync();
-    setHasNoAllergies(true);
-    setAllergies([]);
-  };
-
-  const toggleAdditionalRx = (rx: string) => {
-    Haptics.selectionAsync();
-    if (additionalRx.includes(rx)) {
-      setAdditionalRx(additionalRx.filter((r) => r !== rx));
+  const togglePrescription = (label: string) => {
+    if (selectedPrescriptions.includes(label)) {
+      setSelectedPrescriptions(selectedPrescriptions.filter((p) => p !== label));
     } else {
-      setAdditionalRx([...additionalRx, rx]);
-      setHasNoAdditionalRx(false);
+      setSelectedPrescriptions([...selectedPrescriptions, label]);
     }
-  };
-
-  const handleAddCustomRx = () => {
-    const trimmed = customRxInput.trim();
-    if (!trimmed) return;
-    Haptics.selectionAsync();
-    if (!additionalRx.includes(trimmed)) {
-      setAdditionalRx([...additionalRx, trimmed]);
-      setHasNoAdditionalRx(false);
-    }
-    setCustomRxInput('');
-  };
-
-  const handleToggleNoAdditionalRx = () => {
-    Haptics.selectionAsync();
-    setHasNoAdditionalRx(true);
-    setAdditionalRx([]);
   };
 
   const handleContinue = () => {
-    const finalRx: string[] = [];
+    const finalPrescriptions: string[] = [];
     if (hasDifferinOnShelf && isUsingDifferin) {
-      finalRx.push('Differin / Adapalene');
+      finalPrescriptions.push('Differin / Adapalene');
     }
-    finalRx.push(...additionalRx);
-    if (finalRx.length === 0) {
-      finalRx.push('None of these');
+    finalPrescriptions.push(...selectedPrescriptions);
+    if (finalPrescriptions.length === 0) {
+      finalPrescriptions.push('None of these');
     }
 
-    const finalSens = hasNoAllergies || allergies.length === 0
-      ? ['No known allergies']
-      : allergies;
-
-    const notesWithPregnancy =
-      pregnancyChoice === 'prefer_not_to_say'
-        ? notes ? `${notes} (Pregnancy status: Prefer not to say)` : 'Pregnancy status: Prefer not to say'
-        : notes;
+    const sensStatus = hasNoSensitivities
+      ? 'none_known'
+      : selectedSensitivities.length > 0
+      ? 'reported'
+      : 'unanswered';
 
     setSafetyContext({
-      sensitivities: finalSens,
-      prescriptions: finalRx,
-      pregnancy: pregnancyChoice === 'yes',
-      notes: notesWithPregnancy,
+      sensitivities: hasNoSensitivities ? [] : selectedSensitivities,
+      sensitivitiesStatus: sensStatus,
+      prescriptions: finalPrescriptions,
+      pregnancy: pregnancyState === 'yes',
+      pregnancyStatus: pregnancyState,
+      notes: notes.trim() || undefined,
     });
 
     router.push('/(onboarding)/7-skin-photos');
@@ -161,232 +127,128 @@ export default function SafetyScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.questionTitle}>Safety Context</Text>
+        <Text style={styles.questionTitle}>A few safety questions</Text>
         <Text style={styles.questionSubtitle}>
-          A few quick details so we never introduce a product that conflicts with your skin.
+          We check active treatments, ingredient intolerances, and contraindications before assembling your plan.
         </Text>
 
-        {/* 1. ALLERGIES */}
-        <Text style={styles.sectionHeader}>Any allergies you already know about?</Text>
-        <Text style={styles.sectionHint}>
-          Prescription drugs, topical ingredients, or contact allergens.
-        </Text>
-
-        <TouchableOpacity
-          onPress={handleToggleNoAllergies}
-          style={[styles.nonePill, hasNoAllergies && styles.nonePillActive]}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.nonePillText, hasNoAllergies && styles.nonePillTextActive]}>
-            None that I know of
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.searchInput}
-            value={allergyInput}
-            onChangeText={setAllergyInput}
-            placeholder="Search or type an allergy..."
-            placeholderTextColor={colors.inkMuted}
-            onSubmitEditing={handleAddAllergy}
-            returnKeyType="done"
-          />
-          {allergyInput.trim().length > 0 && (
-            <TouchableOpacity
-              onPress={handleAddAllergy}
-              style={styles.inlineAddBtn}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.inlineAddBtnText}>Add</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {allergies.length > 0 && (
-          <View style={styles.chipsWrap}>
-            {allergies.map((allergy) => (
-              <View key={allergy} style={styles.activeAllergyChip}>
-                <Text style={styles.activeAllergyText}>{allergy}</Text>
-                <TouchableOpacity
-                  onPress={() => handleRemoveAllergy(allergy)}
-                  style={styles.chipRemove}
-                  accessibilityLabel={`Remove ${allergy}`}
-                >
-                  <Text style={styles.chipRemoveText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* 2. PRESCRIPTIONS & STRONG TREATMENTS */}
-        <Text style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
-          Prescription & strong treatment products
-        </Text>
-
+        {/* SECTION 1: SHELF-DETECTED PRESCRIPTION (DIFFERIN) */}
         {hasDifferinOnShelf && (
-          <View style={styles.detectedDifferinCard}>
-            <Text style={styles.detectedDifferinTitle}>
-              We found Differin Gel 0.1% on your shelf.
-            </Text>
-            <Text style={styles.detectedDifferinPrompt}>
-              Are you currently using it?
-            </Text>
-            <View style={styles.binaryRow}>
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setIsUsingDifferin(true);
-                }}
-                style={[
-                  styles.binaryBtn,
-                  isUsingDifferin === true && styles.binaryBtnSelected,
-                ]}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.binaryText,
-                    isUsingDifferin === true && styles.binaryTextSelected,
-                  ]}
-                >
-                  Yes, currently using it
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setIsUsingDifferin(false);
-                }}
-                style={[
-                  styles.binaryBtn,
-                  isUsingDifferin === false && styles.binaryBtnSelected,
-                ]}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.binaryText,
-                    isUsingDifferin === false && styles.binaryTextSelected,
-                  ]}
-                >
-                  No, stopped or haven't started
-                </Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionHeader}>We found Differin on your shelf</Text>
+            <GroupedSection
+              footer="We identified Differin on your counter. We will incorporate it with barrier buffers."
+            >
+              <SelectionRow
+                title="Yes, I am actively using Differin"
+                subtitle="Incorporate into evening treatment schedule"
+                selected={isUsingDifferin === true}
+                onPress={() => setIsUsingDifferin(true)}
+                type="radio"
+              />
+              <SelectionRow
+                title="No, paused or not using it"
+                subtitle="Do not schedule Differin in current routine"
+                selected={isUsingDifferin === false}
+                onPress={() => setIsUsingDifferin(false)}
+                type="radio"
+              />
+            </GroupedSection>
           </View>
         )}
 
-        <Text style={[styles.subSectionHeader, { marginTop: spacing.md }]}>
-          Are you using any prescription or strong treatment products we didn't find?
-        </Text>
-
-        <TouchableOpacity
-          onPress={handleToggleNoAdditionalRx}
-          style={[styles.nonePill, hasNoAdditionalRx && styles.nonePillActive]}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.nonePillText, hasNoAdditionalRx && styles.nonePillTextActive]}>
-            None that I know of
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.chipsWrap}>
-          {['Tretinoin / Retin-A', 'Oral Spironolactone', 'Accutane / Isotretinoin'].map((rx) => {
-            const isSelected = additionalRx.includes(rx);
-            return (
-              <TouchableOpacity
-                key={rx}
-                onPress={() => toggleAdditionalRx(rx)}
-                style={[styles.chip, isSelected && styles.chipSelected]}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                  {rx}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        {/* SECTION 2: OTHER ACTIVE PRESCRIPTIONS */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>Other Active Prescriptions</Text>
+          <GroupedSection footer="Select any active medications or prescription treatments you are currently using.">
+            {PRESCRIPTION_OPTIONS.map((rx) => {
+              const isSelected = selectedPrescriptions.includes(rx.label);
+              return (
+                <SelectionRow
+                  key={rx.id}
+                  title={rx.label}
+                  selected={isSelected}
+                  onPress={() => togglePrescription(rx.label)}
+                  type="checkbox"
+                />
+              );
+            })}
+          </GroupedSection>
         </View>
 
-        <View style={[styles.inputRow, { marginTop: spacing.xs }]}>
-          <TextInput
-            style={styles.searchInput}
-            value={customRxInput}
-            onChangeText={setCustomRxInput}
-            placeholder="Other prescription (e.g. Clindamycin)..."
-            placeholderTextColor={colors.inkMuted}
-            onSubmitEditing={handleAddCustomRx}
-            returnKeyType="done"
+        {/* SECTION 3: INGREDIENT ALLERGIES / SENSITIVITIES */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>Known Allergies & Sensitivities</Text>
+          <GroupedSection>
+            <SelectionRow
+              title="No known ingredient allergies"
+              subtitle="No medical or severe contact allergies to skincare ingredients"
+              selected={hasNoSensitivities}
+              onPress={handleToggleNoSensitivities}
+              type="radio"
+            />
+          </GroupedSection>
+
+          <TextField
+            placeholder="Add specific ingredient allergy or intolerance..."
+            value={customSensInput}
+            onChangeText={setCustomSensInput}
+            rightElement={
+              customSensInput.trim().length > 0 ? (
+                <ChoiceChip
+                  label="Add"
+                  selected={true}
+                  size="small"
+                  onSelect={handleAddCustomSensitivity}
+                />
+              ) : null
+            }
           />
-          {customRxInput.trim().length > 0 && (
-            <TouchableOpacity
-              onPress={handleAddCustomRx}
-              style={styles.inlineAddBtn}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.inlineAddBtnText}>Add</Text>
-            </TouchableOpacity>
-          )}
         </View>
 
-        {/* 3. PREGNANCY & NURSING */}
-        <Text style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
-          Are you currently pregnant or nursing?
-        </Text>
-        <Text style={styles.sectionHint}>
-          Some skincare ingredients may need to be changed.
-        </Text>
-        <View style={styles.tripletRow}>
-          {[
-            { value: 'yes', label: 'Yes' },
-            { value: 'no', label: 'No' },
-            { value: 'prefer_not_to_say', label: 'Prefer not to say' },
-          ].map((item) => {
-            const isSelected = pregnancyChoice === item.value;
-            return (
-              <TouchableOpacity
-                key={item.value}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setPregnancyChoice(item.value as any);
-                }}
-                style={[styles.tripletBtn, isSelected && styles.tripletBtnSelected]}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[styles.tripletText, isSelected && styles.tripletTextSelected]}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        {/* SECTION 4: PREGNANCY & NURSING (TRI-STATE) */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>Pregnancy or Nursing</Text>
+          <GroupedSection
+            footer="Certain ingredients like high-strength retinoids and salicylic acid require pregnancy-safe alternatives."
+          >
+            <SelectionRow
+              title="Yes, currently pregnant or nursing"
+              subtitle="Exclude high-potency retinoids, hydroquinone, and high-dose acids"
+              selected={pregnancyState === 'yes'}
+              onPress={() => setPregnancyState('yes')}
+              type="radio"
+            />
+            <SelectionRow
+              title="No"
+              selected={pregnancyState === 'no'}
+              onPress={() => setPregnancyState('no')}
+              type="radio"
+            />
+            <SelectionRow
+              title="Prefer not to say"
+              selected={pregnancyState === 'prefer_not_to_say'}
+              onPress={() => setPregnancyState('prefer_not_to_say')}
+              type="radio"
+            />
+          </GroupedSection>
         </View>
 
-        {/* 4. OPTIONAL SAFETY NOTES */}
-        <Text style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
-          Anything else we should know? (Optional)
-        </Text>
-        <TextInput
+        {/* SECTION 5: OPTIONAL SAFETY NOTES */}
+        <VoiceTextArea
+          label="Any other medical or safety context? (Optional)"
+          placeholder="e.g. History of eczema around mouth in winter, dermatologist advised gentle wash..."
           value={notes}
           onChangeText={setNotes}
-          placeholder="e.g. History of eczema, seasonal allergies, sensitive eyes..."
-          placeholderTextColor={colors.inkMuted}
-          style={styles.notesInput}
-          multiline={true}
+          context="reaction_note"
+          minHeight={70}
         />
       </ScrollView>
 
-      <View style={styles.bottomBar}>
-        <Button
-          label="Continue to Skin Photos"
-          variant="primary"
-          size="large"
-          onPress={handleContinue}
-        />
-      </View>
+      <StickyActionFooter
+        ctaLabel="Continue"
+        onPressCta={handleContinue}
+      />
     </View>
   );
 }
@@ -399,11 +261,12 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xxl + 40,
+    paddingBottom: spacing.xxl + 100,
   },
   questionTitle: {
+    fontFamily: typography.fontFamilies.serif,
     fontSize: typography.sizes.screenTitle,
-    fontWeight: typography.weights.bold,
+    lineHeight: typography.lineHeights.screenTitle,
     color: colors.ink,
     marginBottom: spacing.xxs,
   },
@@ -413,219 +276,29 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeights.bodyRegular,
     marginBottom: spacing.lg,
   },
-  sectionHeader: {
-    fontSize: typography.sizes.bodyLarge,
-    fontWeight: typography.weights.bold,
-    color: colors.ink,
-    marginBottom: spacing.xxs,
+  sectionBlock: {
+    marginBottom: spacing.md,
   },
-  subSectionHeader: {
-    fontSize: typography.sizes.bodyRegular,
+  sectionHeader: {
+    fontSize: typography.sizes.micro,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: colors.inkMuted,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  subHeading: {
+    fontSize: typography.sizes.caption,
     fontWeight: typography.weights.semibold,
     color: colors.ink,
-    marginBottom: spacing.xxs,
-  },
-  sectionHint: {
-    fontSize: typography.sizes.caption,
-    color: colors.inkMuted,
-    marginBottom: spacing.sm,
-  },
-  nonePill: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.full,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-  nonePillActive: {
-    borderColor: colors.brand,
-    backgroundColor: colors.brandLight,
-  },
-  nonePillText: {
-    fontSize: typography.sizes.caption,
-    color: colors.ink,
-    fontWeight: typography.weights.medium,
-  },
-  nonePillTextActive: {
-    color: colors.brand,
-    fontWeight: typography.weights.bold,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: typography.sizes.bodyRegular,
-    color: colors.ink,
-  },
-  inlineAddBtn: {
-    backgroundColor: colors.brand,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inlineAddBtnText: {
-    color: colors.inkInverse,
-    fontSize: typography.sizes.caption,
-    fontWeight: typography.weights.bold,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
   chipsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  chip: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.full,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  chipSelected: {
-    borderColor: colors.brand,
-    backgroundColor: colors.brandLight,
-  },
-  chipText: {
-    fontSize: typography.sizes.bodyRegular,
-    color: colors.ink,
-  },
-  chipTextSelected: {
-    color: colors.brand,
-    fontWeight: typography.weights.bold,
-  },
-  activeAllergyChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.brandLight,
-    borderColor: colors.brand,
-    borderWidth: 1,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    gap: 6,
-  },
-  activeAllergyText: {
-    fontSize: typography.sizes.caption,
-    color: colors.brand,
-    fontWeight: typography.weights.semibold,
-  },
-  chipRemove: {
-    padding: 2,
-  },
-  chipRemoveText: {
-    fontSize: 16,
-    color: colors.brand,
-    lineHeight: 16,
-    fontWeight: typography.weights.bold,
-  },
-  detectedDifferinCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.brand,
-    marginTop: spacing.xs,
     marginBottom: spacing.md,
-    ...shadows.subtle,
-  },
-  detectedDifferinTitle: {
-    fontSize: typography.sizes.bodyRegular,
-    fontWeight: typography.weights.bold,
-    color: colors.ink,
-    marginBottom: 2,
-  },
-  detectedDifferinPrompt: {
-    fontSize: typography.sizes.caption,
-    color: colors.inkMuted,
-    marginBottom: spacing.md,
-  },
-  binaryRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  binaryBtn: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  binaryBtnSelected: {
-    borderColor: colors.brand,
-    backgroundColor: colors.brandLight,
-  },
-  binaryText: {
-    fontSize: typography.sizes.bodyRegular,
-    color: colors.ink,
-    fontWeight: typography.weights.medium,
-  },
-  binaryTextSelected: {
-    color: colors.brand,
-    fontWeight: typography.weights.bold,
-  },
-  tripletRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  tripletBtn: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xs,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  tripletBtnSelected: {
-    borderColor: colors.brand,
-    backgroundColor: colors.brandLight,
-  },
-  tripletText: {
-    fontSize: typography.sizes.caption,
-    color: colors.ink,
-    fontWeight: typography.weights.medium,
-    textAlign: 'center',
-  },
-  tripletTextSelected: {
-    color: colors.brand,
-    fontWeight: typography.weights.bold,
-  },
-  notesInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    fontSize: typography.sizes.bodyRegular,
-    color: colors.ink,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  bottomBar: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.canvas,
   },
 });

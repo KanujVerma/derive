@@ -54,7 +54,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
         {/* Expand Chevron */}
         <View style={styles.expandIconContainer}>
           <Icon
-            name={expanded ? 'close' : 'forward'}
+            name={expanded ? 'up' : 'down'}
             size={14}
             color={colors.inkMuted}
           />

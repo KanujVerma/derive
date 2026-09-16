@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,34 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useUserStore } from '@/src/stores/userStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
+import { useRoutineStore } from '@/src/stores/routineStore';
+import { calculateMonthlyPlanPrice, formatCentsToDollars } from '@/src/pricing';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
-import { Button } from '@/src/components/ui/Button';
+import { GroupedSection } from '@/src/components/ui/GroupedSection';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { fullName, email } = useUserStore();
-  const { productReactions } = useOnboardingStore();
+  const { detectedProducts, productReactions } = useOnboardingStore();
+  const { routine, isPlanUnderReview } = useRoutineStore();
+
+  const activeProducts = useMemo(() => {
+    if (routine) {
+      const allSteps = [...routine.amSteps, ...routine.pmSteps];
+      return allSteps.map((s) => ({
+        id: s.productId,
+        name: s.productName,
+        brand: s.brand,
+      }));
+    }
+    return detectedProducts;
+  }, [routine, detectedProducts]);
+
+  const pricingEstimate = useMemo(() => {
+    return calculateMonthlyPlanPrice(activeProducts);
+  }, [activeProducts]);
 
   const handleBack = () => {
     router.back();
@@ -32,20 +51,20 @@ export default function ProfileScreen() {
     router.push(destination as any);
   };
 
-  const handleContactFounder = () => {
+  const handleContactSupport = () => {
     Haptics.selectionAsync();
     Alert.alert(
-      'Derive Concierge',
-      'As a Founding Beta member, you have direct priority access to the founding dermatological care team. Reach out via the Ask tab or email concierge@derive.care.',
-      [{ text: 'Understood' }]
+      'Derive Member Support',
+      'For routine questions or adjustments, ask directly in the Ask tab or email support@derive.care.',
+      [{ text: 'OK' }]
     );
   };
 
   const handleExportData = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert(
-      'Export Ready',
-      'Your encrypted skin history, product reactions, and routine logs have been exported. A download link was sent to your email.',
+      'Export Requested',
+      'A private download link for your skin observations and routine history has been sent to your email.',
       [{ text: 'OK' }]
     );
   };
@@ -81,7 +100,7 @@ export default function ProfileScreen() {
         <View style={styles.memberCard}>
           <View style={styles.memberAvatar}>
             <Text style={styles.avatarInitial}>
-              {fullName ? fullName.charAt(0).toUpperCase() : 'U'}
+              {fullName ? fullName.charAt(0).toUpperCase() : 'M'}
             </Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -89,133 +108,91 @@ export default function ProfileScreen() {
             <Text style={styles.memberEmail}>{email || 'member@derive.care'}</Text>
             <View style={styles.badgeRow}>
               <Badge label="FOUNDING BETA" variant="keep" size="small" />
-              <Text style={styles.memberPrice}>$129/month</Text>
+              <Text style={styles.memberPrice}>
+                {isPlanUnderReview || !routine || routine.status === 'awaiting_review'
+                  ? `Estimated plan: ${formatCentsToDollars(pricingEstimate.monthlyTotalCents)}/mo`
+                  : `Current plan: ${formatCentsToDollars(pricingEstimate.monthlyTotalCents)}/mo`}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Section 1: Your Skin & Routine */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>YOUR SKIN & CARE</Text>
-          <View style={styles.groupedCard}>
-            <TouchableOpacity
-              style={styles.groupedRow}
-              onPress={() => handleRowPress('/(tabs)/plan')}
-              activeOpacity={0.7}
-            >
-              <Icon name="sparkle" size={18} color={colors.brand} />
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>Canonical Routine</Text>
-                <Text style={styles.rowSubtitle}>View AM/PM steps and schedules</Text>
-              </View>
-              <Icon name="forward" size={16} color={colors.inkMuted} />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.groupedRow}
-              onPress={() => handleRowPress('/reaction-history')}
-              activeOpacity={0.7}
-            >
-              <Icon name="warning" size={18} color={colors.inkMuted} />
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>Product Reaction History</Text>
-                <Text style={styles.rowSubtitle}>
-                  {productReactions?.length || 0} audited reaction{productReactions?.length === 1 ? '' : 's'}
-                </Text>
-              </View>
-              <Icon name="forward" size={16} color={colors.inkMuted} />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.groupedRow}
-              onPress={() => handleRowPress('/orders')}
-              activeOpacity={0.7}
-            >
-              <Icon name="shipping" size={18} color={colors.brand} />
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>Orders & Refill Shipments</Text>
-                <Text style={styles.rowSubtitle}>Fulfillment tracking and history</Text>
-              </View>
-              <Icon name="forward" size={16} color={colors.inkMuted} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Section 2: Concierge & Safety */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>SUPPORT & SAFETY</Text>
-          <View style={styles.groupedCard}>
-            <TouchableOpacity
-              style={styles.groupedRow}
-              onPress={handleContactFounder}
-              activeOpacity={0.7}
-            >
-              <Icon name="person" size={18} color={colors.brand} />
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>Concierge Care Access</Text>
-                <Text style={styles.rowSubtitle}>Direct contact with founding team</Text>
-              </View>
-              <Icon name="forward" size={16} color={colors.inkMuted} />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <View style={styles.groupedRowStatic}>
-              <Icon name="shield" size={18} color={colors.brand} />
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>Clinical Safety Circuit Breaker</Text>
-                <Text style={styles.rowSubtitle}>
-                  Severe medical symptoms automatically escalated
-                </Text>
-              </View>
-              <Badge label="ACTIVE" variant="keep" size="small" />
+        {/* Section 1: Routine & Care */}
+        <GroupedSection header="Your Care & History">
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={() => handleRowPress('/(tabs)/plan')}
+            activeOpacity={0.7}
+          >
+            <Icon name="sparkle" size={18} color={colors.brand} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Active Routine</Text>
+              <Text style={styles.rowSubtitle}>View AM/PM steps and active schedules</Text>
             </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
 
-            <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={() => handleRowPress('/reaction-history')}
+            activeOpacity={0.7}
+          >
+            <Icon name="warning" size={18} color={colors.inkMuted} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Product Reaction History</Text>
+              <Text style={styles.rowSubtitle}>
+                {productReactions?.length || 0} audited reaction{productReactions?.length === 1 ? '' : 's'}
+              </Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.groupedRow}
-              onPress={handleExportData}
-              activeOpacity={0.7}
-            >
-              <Icon name="info" size={18} color={colors.inkMuted} />
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>Export My Skin Data</Text>
-                <Text style={styles.rowSubtitle}>GDPR & HIPAA compliant export</Text>
-              </View>
-              <Icon name="forward" size={16} color={colors.inkMuted} />
-            </TouchableOpacity>
-          </View>
-        </View>
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={() => handleRowPress('/orders')}
+            activeOpacity={0.7}
+          >
+            <Icon name="shipping" size={18} color={colors.brand} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Orders & Managed Refills</Text>
+              <Text style={styles.rowSubtitle}>Fulfillment tracking and order history</Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
+        </GroupedSection>
 
-        {/* Founder Switcher for Development / Beta Verification */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>INTERNAL TOOLS</Text>
-          <View style={styles.groupedCard}>
-            <TouchableOpacity
-              style={styles.groupedRow}
-              onPress={() => handleRowPress('/founder')}
-              activeOpacity={0.7}
-            >
-              <Icon name="sparkle" size={18} color={colors.ink} />
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>Founder Desk</Text>
-                <Text style={styles.rowSubtitle}>
-                  Review pending routines and check-in audits
-                </Text>
-              </View>
-              <Icon name="forward" size={16} color={colors.inkMuted} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Section 2: Support & Privacy */}
+        <GroupedSection header="Support & Privacy">
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={handleContactSupport}
+            activeOpacity={0.7}
+          >
+            <Icon name="person" size={18} color={colors.brand} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Member Support</Text>
+              <Text style={styles.rowSubtitle}>Assistance with products and routine timing</Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={handleExportData}
+            activeOpacity={0.7}
+          >
+            <Icon name="info" size={18} color={colors.inkMuted} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Export Personal Data</Text>
+              <Text style={styles.rowSubtitle}>Download your skin logs and routine record</Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
+        </GroupedSection>
 
         {/* Footer Note */}
         <Text style={styles.footerText}>
-          Derive Version 1.0 (Build 2026.09) · "Your skincare, handled."
+          Derive Version 1.0 · "Your skincare, handled."
         </Text>
       </ScrollView>
     </View>
@@ -233,7 +210,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.hairline,
+    borderBottomColor: colors.borderSubtle,
   },
   backButton: {
     width: 36,
@@ -241,7 +218,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.hairline,
+    borderColor: colors.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -250,10 +227,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
+    fontFamily: typography.fontFamilies.serif,
     fontSize: typography.sizes.sectionTitle,
-    fontWeight: typography.weights.bold,
+    lineHeight: typography.lineHeights.sectionTitle,
     color: colors.ink,
-    letterSpacing: -0.3,
   },
   subtitle: {
     fontSize: typography.sizes.caption,
@@ -263,7 +240,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    gap: spacing.xl,
+    gap: spacing.md,
   },
   memberCard: {
     flexDirection: 'row',
@@ -273,8 +250,9 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.hairline,
+    borderColor: colors.border,
     ...shadows.subtle,
+    marginBottom: spacing.xs,
   },
   memberAvatar: {
     width: 52,
@@ -299,54 +277,29 @@ const styles = StyleSheet.create({
   memberEmail: {
     fontSize: typography.sizes.caption,
     color: colors.inkMuted,
-    marginTop: 2,
+    marginTop: 1,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+    gap: spacing.xs,
+    marginTop: 6,
   },
   memberPrice: {
-    fontSize: typography.sizes.micro,
+    fontSize: typography.sizes.caption,
     color: colors.inkMuted,
     fontWeight: typography.weights.medium,
-  },
-  section: {
-    gap: spacing.xs,
-  },
-  sectionHeader: {
-    fontSize: 11,
-    fontWeight: typography.weights.bold,
-    color: colors.inkMuted,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    paddingLeft: spacing.xs,
-  },
-  groupedCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    overflow: 'hidden',
-    ...shadows.subtle,
   },
   groupedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  groupedRowStatic: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
+    minHeight: 56,
   },
   rowContent: {
     flex: 1,
+    marginLeft: spacing.sm,
   },
   rowTitle: {
     fontSize: typography.sizes.bodyRegular,
@@ -354,19 +307,15 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   rowSubtitle: {
-    fontSize: typography.sizes.micro,
+    fontSize: typography.sizes.caption,
     color: colors.inkMuted,
-    marginTop: 2,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.hairline,
-    marginLeft: spacing.xl + spacing.md,
+    marginTop: 1,
   },
   footerText: {
     textAlign: 'center',
     fontSize: typography.sizes.micro,
-    color: colors.inkMuted,
+    color: colors.inkSubtle,
     marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
 });

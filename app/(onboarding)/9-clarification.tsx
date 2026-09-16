@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TextInput,
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -12,15 +11,42 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { Button } from '@/src/components/ui/Button';
+import { Icon } from '@/src/components/ui/Icon';
+
+const DIFFERIN_FREQUENCY_OPTIONS = [
+  '1–2 nights',
+  '3–4 nights',
+  '5–6 nights',
+  'Every night',
+  'Not sure',
+];
+
+const PIH_TENDENCY_OPTIONS: Array<'Rarely' | 'Sometimes' | 'Often' | 'Not sure'> = [
+  'Rarely',
+  'Sometimes',
+  'Often',
+  'Not sure',
+];
 
 export default function ClarificationScreen() {
   const router = useRouter();
-  const { adaptiveFollowUps, setAdaptiveAnswer } = useOnboardingStore();
+  const {
+    primaryGoal,
+    secondaryGoals,
+    adaptiveFollowUps,
+    setAdaptiveAnswer,
+    pihTendencyAnswer,
+    setPihTendencyAnswer,
+  } = useOnboardingStore();
 
   const handleSelectQuickAnswer = (index: number, answer: string) => {
     Haptics.selectionAsync();
     setAdaptiveAnswer(index, answer);
   };
+
+  const allGoals = [primaryGoal, ...secondaryGoals].filter(Boolean);
+  const showPihQuestion = allGoals.includes('breakouts') || allGoals.includes('dark_spots');
+  const hasFollowUps = adaptiveFollowUps.length > 0 || showPihQuestion;
 
   return (
     <View style={styles.container}>
@@ -30,9 +56,13 @@ export default function ClarificationScreen() {
       >
         <View style={styles.aiHeader}>
           <Text style={styles.aiBadge}>DERIVE INTELLIGENCE</Text>
-          <Text style={styles.questionTitle}>A few targeted clarifications.</Text>
+          <Text style={styles.questionTitle}>
+            {hasFollowUps ? 'A few targeted clarifications.' : 'All clear.'}
+          </Text>
           <Text style={styles.questionSubtitle}>
-            Based on your shelf products and goals, answering these helps us fine-tune your routine.
+            {hasFollowUps
+              ? 'Based on your shelf products and goals, selecting your current usage helps us calibrate your routine safely.'
+              : 'We have all the context we need from your shelf audit, safety checks, and goals.'}
           </Text>
         </View>
 
@@ -40,48 +70,113 @@ export default function ClarificationScreen() {
           <View key={idx} style={styles.questionCard}>
             <Text style={styles.qText}>{item.question}</Text>
 
-            {/* Quick Answer Chips if applicable */}
-            {idx === 0 && (
-              <View style={styles.quickChipsRow}>
-                {['1-2 nights', '3-4 nights', 'Every night', 'Not sure'].map((chip) => {
-                  const isSelected = item.answer?.includes(chip);
-                  return (
-                    <TouchableOpacity
-                      key={chip}
-                      onPress={() => handleSelectQuickAnswer(idx, chip)}
-                      style={[styles.quickChip, isSelected && styles.quickChipSelected]}
-                      activeOpacity={0.7}
+            {/* Structured Frequency Choices */}
+            <View style={styles.structuredOptionsContainer}>
+              {DIFFERIN_FREQUENCY_OPTIONS.map((choice) => {
+                const isSelected = item.answer === choice || item.answer?.includes(choice);
+                return (
+                  <TouchableOpacity
+                    key={choice}
+                    onPress={() => handleSelectQuickAnswer(idx, choice)}
+                    style={[
+                      styles.choiceRow,
+                      isSelected && styles.choiceRowSelected,
+                    ]}
+                    activeOpacity={0.7}
+                    accessible={true}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceText,
+                        isSelected && styles.choiceTextSelected,
+                      ]}
                     >
-                      <Text
-                        style={[
-                          styles.quickChipText,
-                          isSelected && styles.quickChipTextSelected,
-                        ]}
-                      >
-                        {chip}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Text input for custom answer */}
-            <TextInput
-              value={item.answer || ''}
-              onChangeText={(text) => setAdaptiveAnswer(idx, text)}
-              placeholder="Type your answer here..."
-              placeholderTextColor={colors.inkMuted}
-              style={styles.textInput}
-            />
+                      {choice}
+                    </Text>
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        isSelected && styles.radioCircleSelected,
+                      ]}
+                    >
+                      {isSelected ? <View style={styles.radioDot} /> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         ))}
+
+        {showPihQuestion && (
+          <View style={styles.questionCard}>
+            <Text style={styles.qCategory}>POST-INFLAMMATORY RESPONSE</Text>
+            <Text style={styles.qText}>
+              Do breakouts or irritation usually leave dark marks that stick around?
+            </Text>
+            <Text style={styles.qHint}>
+              Helps calibrate active exfoliation pacing and photoprotection without risking irritation.
+            </Text>
+
+            <View style={styles.structuredOptionsContainer}>
+              {PIH_TENDENCY_OPTIONS.map((choice) => {
+                const isSelected = pihTendencyAnswer === choice;
+                return (
+                  <TouchableOpacity
+                    key={choice}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setPihTendencyAnswer(choice);
+                    }}
+                    style={[
+                      styles.choiceRow,
+                      isSelected && styles.choiceRowSelected,
+                    ]}
+                    activeOpacity={0.7}
+                    accessible={true}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceText,
+                        isSelected && styles.choiceTextSelected,
+                      ]}
+                    >
+                      {choice}
+                    </Text>
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        isSelected && styles.radioCircleSelected,
+                      ]}
+                    >
+                      {isSelected ? <View style={styles.radioDot} /> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {!hasFollowUps && (
+          <View style={styles.emptyCard}>
+            <Icon name="check" size={24} color={colors.brand} />
+            <Text style={styles.emptyTitle}>Ready to Assemble Your Routine</Text>
+            <Text style={styles.emptySub}>
+              Tap below to review your answers and generate your personalized plan.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.bottomBar}>
         <Button
           label="Review Profile Summary"
-          variant="primary"
+          variant="brand"
           size="large"
           onPress={() => router.push('/(onboarding)/10-summary')}
         />
@@ -111,8 +206,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxs,
   },
   questionTitle: {
+    fontFamily: typography.fontFamilies.serif,
     fontSize: typography.sizes.screenTitle,
-    fontWeight: typography.weights.bold,
+    lineHeight: typography.lineHeights.screenTitle,
     color: colors.ink,
     marginBottom: spacing.xxs,
   },
@@ -123,54 +219,102 @@ const styles = StyleSheet.create({
   },
   questionCard: {
     backgroundColor: colors.surface,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
     ...shadows.card,
   },
+  qCategory: {
+    fontSize: typography.sizes.micro,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.8,
+    color: colors.brand,
+    marginBottom: spacing.xxs,
+  },
   qText: {
     fontSize: typography.sizes.bodyLarge,
     fontWeight: typography.weights.semibold,
     color: colors.ink,
     lineHeight: typography.lineHeights.bodyLarge,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  quickChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  qHint: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    lineHeight: typography.lineHeights.caption,
+    marginBottom: spacing.md,
+  },
+  structuredOptionsContainer: {
     gap: spacing.xs,
-    marginBottom: spacing.sm,
   },
-  quickChip: {
-    backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs + 2,
-    borderRadius: radii.full,
+  choiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  quickChipSelected: {
+  choiceRowSelected: {
     backgroundColor: colors.brandLight,
     borderColor: colors.brand,
   },
-  quickChipText: {
-    fontSize: typography.sizes.caption,
+  choiceText: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.medium,
     color: colors.ink,
   },
-  quickChipTextSelected: {
-    color: colors.brand,
-    fontWeight: typography.weights.bold,
+  choiceTextSelected: {
+    color: colors.brandDark,
+    fontWeight: typography.weights.semibold,
   },
-  textInput: {
-    backgroundColor: colors.canvas,
-    borderRadius: radii.xs,
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+  },
+  radioCircleSelected: {
+    borderColor: colors.brand,
+    backgroundColor: colors.brand,
+  },
+  radioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceElevated,
+  },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.sm,
-    fontSize: typography.sizes.bodyRegular,
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  emptyTitle: {
+    fontSize: typography.sizes.sectionTitle,
+    fontWeight: typography.weights.bold,
     color: colors.ink,
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    maxWidth: 280,
   },
   bottomBar: {
     paddingHorizontal: spacing.lg,

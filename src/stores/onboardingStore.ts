@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import {
+import type {
   Goal,
   RoutineComplexity,
   ProductCostPreference,
@@ -10,16 +10,16 @@ import {
   ReactionSeverity,
   BodyArea,
   ReactionSymptom,
-} from '@/src/types/schema';
+} from '../types/schema.ts';
 
 export interface OnboardingState {
   currentStep: number;
   primaryGoal: Goal | null;
   secondaryGoals: Goal[];
-  routineComplexity: RoutineComplexity;
-  costPreference: ProductCostPreference;
-  middayFeel: MiddayFeel;
-  postCleanseTightness: boolean;
+  routineComplexity: RoutineComplexity | null;
+  costPreference: ProductCostPreference | null;
+  middayFeel: MiddayFeel | null;
+  postCleanseTightness: boolean | null;
   shelfPhotoUri: string | null;
   detectedProducts: Product[];
   frontPhotoUri: string | null;
@@ -27,8 +27,10 @@ export interface OnboardingState {
   rightPhotoUri: string | null;
   photoContextNote: string;
   knownSensitivities: string[];
+  sensitivitiesStatus: 'none_known' | 'reported' | 'unanswered';
   activePrescriptions: string[];
   isPregnantOrNursing: boolean;
+  pregnancyStatus: 'yes' | 'no' | 'prefer_not_to_say' | 'unanswered';
   additionalSafetyNotes: string;
   adaptiveFollowUps: Array<{ question: string; answer?: string }>;
   isCompleted: boolean;
@@ -37,6 +39,9 @@ export interface OnboardingState {
   hasBadReactions: boolean | null;
   productReactions: ProductReaction[];
   formulaSnapshots: FormulaSnapshot[];
+
+  // Phenotype & Skin Response Context
+  pihTendencyAnswer: 'Rarely' | 'Sometimes' | 'Often' | 'Not sure' | null;
 
   // Actions
   setStep: (step: number) => void;
@@ -68,20 +73,52 @@ export interface OnboardingState {
     sensitivities: string[];
     prescriptions: string[];
     pregnancy: boolean;
+    pregnancyStatus?: 'yes' | 'no' | 'prefer_not_to_say' | 'unanswered';
+    sensitivitiesStatus?: 'none_known' | 'reported' | 'unanswered';
     notes?: string;
   }) => void;
   setAdaptiveAnswer: (index: number, answer: string) => void;
+  setPihTendencyAnswer: (answer: 'Rarely' | 'Sometimes' | 'Often' | 'Not sure' | null) => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
+  loadArthurDemoState: () => void;
 }
 
-export const useOnboardingStore = create<OnboardingState>((set) => ({
+const INITIAL_EMPTY_STATE = {
   currentStep: 1,
-  primaryGoal: 'breakouts',
-  secondaryGoals: ['texture'],
-  routineComplexity: 'simple',
-  costPreference: 'balanced',
-  middayFeel: 'combination',
+  primaryGoal: null,
+  secondaryGoals: [],
+  routineComplexity: null,
+  costPreference: null,
+  middayFeel: null,
+  postCleanseTightness: null,
+  shelfPhotoUri: null,
+  detectedProducts: [],
+  frontPhotoUri: null,
+  leftPhotoUri: null,
+  rightPhotoUri: null,
+  photoContextNote: '',
+  knownSensitivities: [],
+  sensitivitiesStatus: 'unanswered' as const,
+  activePrescriptions: [],
+  isPregnantOrNursing: false,
+  pregnancyStatus: 'unanswered' as const,
+  additionalSafetyNotes: '',
+  adaptiveFollowUps: [],
+  isCompleted: false,
+  hasBadReactions: null,
+  productReactions: [],
+  formulaSnapshots: [],
+  pihTendencyAnswer: null,
+};
+
+const ARTHUR_DEMO_STATE = {
+  currentStep: 1,
+  primaryGoal: 'breakouts' as Goal,
+  secondaryGoals: ['texture' as Goal],
+  routineComplexity: 'simple' as RoutineComplexity,
+  costPreference: 'balanced' as ProductCostPreference,
+  middayFeel: 'combination' as MiddayFeel,
   postCleanseTightness: false,
   shelfPhotoUri: null,
   detectedProducts: [
@@ -89,7 +126,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       id: 'p1',
       brand: 'CeraVe',
       name: 'Hydrating Facial Cleanser',
-      category: 'cleanser',
+      category: 'cleanser' as const,
       keyActives: ['Ceramides', 'Hyaluronic Acid'],
       fullIngredients: ['Water', 'Glycerin', 'Cetearyl Alcohol', 'Ceramides', 'Hyaluronic Acid'],
     },
@@ -97,7 +134,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       id: 'p2',
       brand: 'Differin',
       name: 'Adapalene Gel 0.1%',
-      category: 'treatment',
+      category: 'treatment' as const,
       keyActives: ['Adapalene 0.1%'],
       fullIngredients: ['Adapalene', 'Carbomer 940', 'Edetate Disodium', 'Methylparaben', 'Water'],
     },
@@ -105,7 +142,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       id: 'p4',
       brand: 'La Roche-Posay',
       name: 'Toleriane Double Repair Moisturizer',
-      category: 'moisturizer',
+      category: 'moisturizer' as const,
       keyActives: ['Ceramide-3', 'Niacinamide'],
       fullIngredients: ['Water', 'Glycerin', 'Dimethicone', 'Niacinamide', 'Ceramide NP'],
     },
@@ -113,7 +150,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       id: 'p5',
       brand: 'Beauty of Joseon',
       name: 'Relief Sun SPF 50+',
-      category: 'sunscreen',
+      category: 'sunscreen' as const,
       keyActives: ['Rice Extract', 'Probiotics'],
       fullIngredients: ['Water', 'Rice Bran Water', 'Glycerin', 'Niacinamide', 'Probiotics'],
     },
@@ -123,8 +160,10 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
   rightPhotoUri: null,
   photoContextNote: '',
   knownSensitivities: [],
+  sensitivitiesStatus: 'unanswered' as const,
   activePrescriptions: ['Differin 0.1%'],
   isPregnantOrNursing: false,
+  pregnancyStatus: 'unanswered' as const,
   additionalSafetyNotes: '',
   adaptiveFollowUps: [
     {
@@ -133,18 +172,16 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
     },
   ],
   isCompleted: false,
-
-  // Reaction History defaults
-  hasBadReactions: null,
+  hasBadReactions: true,
   productReactions: [
     {
       id: 'rx_seed_1',
       userId: 'guest_user',
       productNameSnapshot: 'High Fragrance Gel Deodorant',
       brandSnapshot: 'Old Spice',
-      symptoms: ['burning_stinging', 'redness_rash'],
-      bodyArea: 'underarms',
-      severity: 'severe',
+      symptoms: ['burning_stinging' as ReactionSymptom, 'redness_rash' as ReactionSymptom],
+      bodyArea: 'underarms' as BodyArea,
+      severity: 'severe' as ReactionSeverity,
       notes: 'Severe burning sensation within 10 minutes of application.',
     },
   ],
@@ -157,6 +194,11 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       capturedAt: '2026-09-01T00:00:00Z',
     },
   ],
+  pihTendencyAnswer: 'Sometimes' as const,
+};
+
+export const useOnboardingStore = create<OnboardingState>((set) => ({
+  ...INITIAL_EMPTY_STATE,
 
   setStep: (step) => set({ currentStep: step }),
   nextStep: () => set((state) => ({ currentStep: Math.min(state.currentStep + 1, 10) })),
@@ -247,11 +289,13 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
 
   setPhotoContextNote: (note) => set({ photoContextNote: note }),
 
-  setSafetyContext: ({ sensitivities, prescriptions, pregnancy, notes }) =>
+  setSafetyContext: ({ sensitivities, prescriptions, pregnancy, pregnancyStatus, sensitivitiesStatus, notes }) =>
     set({
       knownSensitivities: sensitivities,
+      sensitivitiesStatus: sensitivitiesStatus ?? (sensitivities.length > 0 ? 'reported' : 'none_known'),
       activePrescriptions: prescriptions,
       isPregnantOrNursing: pregnancy,
+      pregnancyStatus: pregnancyStatus ?? (pregnancy ? 'yes' : 'no'),
       additionalSafetyNotes: notes || '',
     }),
 
@@ -264,24 +308,11 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       return { adaptiveFollowUps: updated };
     }),
 
+  setPihTendencyAnswer: (answer) => set({ pihTendencyAnswer: answer }),
+
   completeOnboarding: () => set({ isCompleted: true }),
 
-  resetOnboarding: () =>
-    set({
-      currentStep: 1,
-      primaryGoal: 'breakouts',
-      secondaryGoals: [],
-      routineComplexity: 'simple',
-      costPreference: 'balanced',
-      middayFeel: 'combination',
-      postCleanseTightness: false,
-      shelfPhotoUri: null,
-      frontPhotoUri: null,
-      leftPhotoUri: null,
-      rightPhotoUri: null,
-      photoContextNote: '',
-      isCompleted: false,
-      hasBadReactions: null,
-      productReactions: [],
-    }),
+  resetOnboarding: () => set({ ...INITIAL_EMPTY_STATE }),
+
+  loadArthurDemoState: () => set({ ...ARTHUR_DEMO_STATE }),
 }));

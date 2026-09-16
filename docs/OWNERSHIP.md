@@ -13,6 +13,7 @@ To enable Kanuj and Sami to work with maximum velocity and zero blocking, Derive
   - `src/components/**` (UI components, cards, headers, sheets, modals, voice button)
   - `src/constants/theme.ts` (Design tokens, Direction A Mineral colors, typography)
   - `src/services/mock/**` (Mock fixtures, deterministic client simulations)
+  - `src/phenotype/**`, `src/pricing/**` (Client-side phenotype, evidence-policy, and pricing prototypes)
   - `src/services/analytics.ts` (Client-side tracking allowlist)
   - `assets/**` (Brand marks, icons, media)
   - `app.json`, `eas.json` (Mobile configuration & native build profiles)

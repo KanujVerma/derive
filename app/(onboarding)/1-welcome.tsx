@@ -73,7 +73,7 @@ export default function WelcomeScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.featureTitle}>Human-checked before your first plan</Text>
-              <Text style={styles.featureDesc}>Every routine is reviewed by a specialist before it goes live.</Text>
+              <Text style={styles.featureDesc}>Your initial routine receives a final manual quality check before it goes live.</Text>
             </View>
           </View>
         </View>

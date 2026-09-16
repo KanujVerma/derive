@@ -20,6 +20,7 @@ export interface RoutineState {
   researchInsights: ResearchInsight[];
   todayDominantStatus: string;
   isWeeklyCheckInDue: boolean;
+  isPlanUnderReview: boolean;
 
   // Actions
   initializeDefaultRoutine: () => void;
@@ -28,12 +29,14 @@ export interface RoutineState {
   requestRefill: (productId: string, productName: string, brand: string) => void;
   updateRefillStatus: (refillId: string, status: RefillStatus, trackingNumber?: string) => void;
   updateRoutineByFounder: (updatedRoutine: Routine) => void;
+  setRoutineStatus: (status: Routine['status']) => void;
 }
 
 export const useRoutineStore = create<RoutineState>((set, get) => ({
   routine: null,
   userProducts: [],
   completedStepIdsToday: [],
+  isPlanUnderReview: false,
   checkIns: [
     {
       id: 'ci_1',
@@ -155,6 +158,7 @@ export const useRoutineStore = create<RoutineState>((set, get) => ({
     set({
       routine,
       userProducts,
+      isPlanUnderReview: routine.status === 'awaiting_review',
       todayDominantStatus: 'Everything looks on track. No changes today.',
     });
   },
@@ -219,6 +223,16 @@ export const useRoutineStore = create<RoutineState>((set, get) => ({
   updateRoutineByFounder: (updatedRoutine) =>
     set({
       routine: updatedRoutine,
+      isPlanUnderReview: updatedRoutine.status === 'awaiting_review',
       todayDominantStatus: 'Routine updated by your concierge.',
+    }),
+
+  setRoutineStatus: (status) =>
+    set((state) => {
+      if (!state.routine) return state;
+      return {
+        routine: { ...state.routine, status },
+        isPlanUnderReview: status === 'awaiting_review',
+      };
     }),
 }));

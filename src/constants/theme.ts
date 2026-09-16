@@ -57,6 +57,11 @@ export const colors = {
     bg: '#E2EAE4',
     border: '#BED1C5',
   },
+  actionReview: {
+    text: '#7A5B28',
+    bg: '#FBF4E8',
+    border: '#EAD9BD',
+  },
   safetyAlert: {
     text: '#9E2A2B',
     bg: '#F9EBEB',
@@ -147,3 +152,14 @@ export const shadows = {
     elevation: 4,
   },
 };
+
+export const layout = {
+  gutter: 24,
+  sectionGap: 32,
+  itemGap: 16,
+  titleGap: 8,
+  cardPadding: 20,
+  minTouchTarget: 44,
+  ctaHeight: 54,
+} as const;
+

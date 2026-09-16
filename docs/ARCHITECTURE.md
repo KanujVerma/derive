@@ -38,7 +38,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 │              ▼                                              │
 │  ┌────────────────────────┐    ┌─────────────────────────┐  │
 │  │ Google Gemini 2.5 Flash│    │ Stripe Commerce API     │  │
-│  │ (Structured Outputs)   │    │ (Web Checkout $129/mo)  │  │
+│  │ (Structured Outputs)   │    │ (Web Checkout ~$49–$129/mo)  │  │
 │  └────────────────────────┘    └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -85,7 +85,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ---
 
 ## 5. Commerce & Billing
-* **Platform**: Stripe Checkout for web payment of the $129/month Founding Beta tier.
+* **Platform**: Stripe Checkout for web payment of Founding Beta memberships (personalized all-in monthly pricing; baseline ~$49–$129/mo).
 * **Lifecycle**: Webhook events (`customer.subscription.created`, `invoice.payment_succeeded`) update the member's `memberships` status in Supabase.
 
 ---

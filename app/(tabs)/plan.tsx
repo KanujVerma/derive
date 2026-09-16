@@ -14,6 +14,8 @@ import { RoutineCard } from '@/src/components/routine/RoutineCard';
 import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
+import { SegmentedControl } from '@/src/components/ui/SegmentedControl';
+import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
 
 export default function PlanScreen() {
@@ -24,6 +26,7 @@ export default function PlanScreen() {
     userProducts,
     completedStepIdsToday,
     toggleStepCompletion,
+    isPlanUnderReview,
   } = useRoutineStore();
   const [activeTab, setActiveTab] = useState<'routine' | 'products'>('routine');
 
@@ -39,49 +42,33 @@ export default function PlanScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>Plan</Text>
-        <Text style={styles.screenSubtitle}>
-          {routine?.summarySentence || 'Active managed skincare routine.'}
-        </Text>
-
-        {/* View Switcher: ROUTINE vs PRODUCTS */}
-        <View style={styles.segmentedControl}>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.screenTitle}>Plan</Text>
           <TouchableOpacity
-            style={[styles.segment, activeTab === 'routine' && styles.segmentActive]}
-            onPress={() => handleTabSwitch('routine')}
-            activeOpacity={0.8}
-            accessible={true}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === 'routine' }}
+            style={styles.profileButton}
+            onPress={() => router.push('/profile')}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel="Account and Settings"
+            accessibilityRole="button"
           >
-            <Text
-              style={[
-                styles.segmentText,
-                activeTab === 'routine' && styles.segmentTextActive,
-              ]}
-            >
-              ROUTINE
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.segment, activeTab === 'products' && styles.segmentActive]}
-            onPress={() => handleTabSwitch('products')}
-            activeOpacity={0.8}
-            accessible={true}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === 'products' }}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                activeTab === 'products' && styles.segmentTextActive,
-              ]}
-            >
-              PRODUCTS ({userProducts.length})
-            </Text>
+            <Icon name="person" size={18} color={colors.inkMuted} />
           </TouchableOpacity>
         </View>
+        <Text style={styles.screenSubtitle}>
+          {isPlanUnderReview
+            ? 'Draft routine schedule · Under final quality review'
+            : routine?.summarySentence || 'Active managed skincare routine.'}
+        </Text>
+
+        {/* Semantic Segmented Control */}
+        <SegmentedControl
+          options={[
+            { value: 'routine', label: 'ROUTINE' },
+            { value: 'products', label: 'PRODUCTS', badge: userProducts.length },
+          ]}
+          value={activeTab}
+          onChange={handleTabSwitch}
+        />
       </View>
 
       <ScrollView
@@ -91,6 +78,18 @@ export default function PlanScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {isPlanUnderReview && (
+          <View style={styles.draftNoticeBanner}>
+            <View style={styles.draftNoticeHeader}>
+              <Badge label="DRAFT · NOT ACTIVE" variant="pause" size="small" />
+              <Text style={styles.draftNoticeTitle}>Final Review</Text>
+            </View>
+            <Text style={styles.draftNoticeMessage}>
+              Your first routine gets one final quality check before it goes live. You can review the scheduled steps below.
+            </Text>
+          </View>
+        )}
+
         {activeTab === 'routine' ? (
           <>
             {/* AM ROUTINE */}
@@ -103,7 +102,7 @@ export default function PlanScreen() {
               <RoutineCard
                 key={step.id}
                 step={step}
-                onRequestRefill={() => router.push('/refill')}
+                onRequestRefill={isPlanUnderReview ? undefined : () => router.push('/refill')}
               />
             ))}
 
@@ -117,25 +116,38 @@ export default function PlanScreen() {
               <RoutineCard
                 key={step.id}
                 step={step}
-                onRequestRefill={() => router.push('/refill')}
+                onRequestRefill={isPlanUnderReview ? undefined : () => router.push('/refill')}
               />
             ))}
 
-            {/* Replenishment CTA */}
-            <View style={styles.replenishCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.replenishTitle}>Product Replenishment</Text>
-                <Text style={styles.replenishSub}>
-                  Running low on any bottle? Request a refill with one tap.
-                </Text>
+            {/* Consolidated Refills & Tracking Pathway (Only active when routine is active) */}
+            {!isPlanUnderReview && (
+              <View style={styles.replenishCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.replenishTitle}>Managed Refills</Text>
+                  <Text style={styles.replenishSub}>
+                    Running low on any bottle? Tell us in one tap and we'll handle the rest.
+                  </Text>
+                </View>
+                <View style={styles.replenishActions}>
+                  <Button
+                    label="Request Refill"
+                    variant="brand"
+                    size="medium"
+                    onPress={() => router.push('/refill')}
+                  />
+                  <TouchableOpacity
+                    onPress={() => router.push('/orders')}
+                    style={styles.ordersLink}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="shipping" size={15} color={colors.brand} />
+                    <Text style={styles.ordersLinkText}>Orders & Tracking</Text>
+                    <Icon name="forward" size={13} color={colors.brand} />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <Button
-                label="Running Low?"
-                variant="brand"
-                size="medium"
-                onPress={() => router.push('/refill')}
-              />
-            </View>
+            )}
           </>
         ) : (
           <>
@@ -175,27 +187,6 @@ export default function PlanScreen() {
                 </View>
               );
             })}
-
-            {/* Orders & Refills History Link */}
-            <TouchableOpacity
-              onPress={() => router.push('/orders')}
-              style={styles.ordersHistoryLink}
-              activeOpacity={0.7}
-            >
-              <Icon name="shipping" size={16} color={colors.brand} />
-              <Text style={styles.ordersHistoryText}>View Orders & Refills History</Text>
-              <Icon name="forward" size={14} color={colors.brand} />
-            </TouchableOpacity>
-
-            {/* Running Low floating link at bottom of products */}
-            <TouchableOpacity
-              onPress={() => router.push('/refill')}
-              style={styles.bottomRefillRow}
-              activeOpacity={0.7}
-            >
-              <Icon name="bottle" size={18} color={colors.brand} />
-              <Text style={styles.bottomRefillText}>Running low on a product? Tap to request a refill</Text>
-            </TouchableOpacity>
           </>
         )}
       </ScrollView>
@@ -357,34 +348,59 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     marginTop: spacing.xs,
   },
-  ordersHistoryLink: {
+  replenishActions: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  ordersLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
+  ordersLinkText: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.semibold,
+    color: colors.brand,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
     backgroundColor: colors.surface,
     borderColor: colors.borderSubtle,
     borderWidth: 1,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  ordersHistoryText: {
-    flex: 1,
-    marginLeft: spacing.sm,
-    fontSize: typography.sizes.bodyRegular,
-    fontWeight: typography.weights.semibold,
-    color: colors.ink,
-  },
-  bottomRefillRow: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.lg,
   },
-  bottomRefillText: {
-    fontSize: typography.sizes.bodyRegular,
-    fontWeight: typography.weights.semibold,
-    color: colors.brand,
+  draftNoticeBanner: {
+    backgroundColor: colors.actionReview.bg,
+    borderColor: colors.actionReview.border,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  draftNoticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  draftNoticeTitle: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.bold,
+    color: colors.actionReview.text,
+  },
+  draftNoticeMessage: {
+    fontSize: typography.sizes.caption,
+    color: colors.actionReview.text,
+    lineHeight: typography.lineHeights.caption,
   },
 });
