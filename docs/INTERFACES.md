@@ -107,3 +107,5 @@ Switching from mock to remote requires only:
 EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 ```
 The factory in `src/services/DeriveService.ts` automatically instantiates `RemoteDeriveService` without requiring any changes to React Native UI components.
+
+Live Gemini invocation happens only behind `RemoteDeriveService` on the server. `MockDeriveService` uses deterministic local reasoning and never requires a client Gemini key.

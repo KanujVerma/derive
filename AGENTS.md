@@ -54,7 +54,7 @@ When resolving truth or discrepancies:
 - **Zero Raw Audio Storage**: Voice dictation transcribes client-side via speech recognition; no raw audio is recorded, stored, or transmitted.
 - **Private Health Data**: Skin photos and reaction notes are treated as private medical context; never upload to public storage buckets or log in telemetry.
 - **Telemetry Boundaries**: Session replay is strictly OFF (`disable_session_recording: true`). Only allowlisted interaction and navigation events are tracked.
-- **No Secrets in Code**: API keys, Supabase service roles, and private tokens belong exclusively in uncommitted `.env` files.
+- **No Secrets in Code**: API keys, Supabase service roles, and private tokens belong exclusively in uncommitted `.env` files. Gemini credentials are server/Supabase secrets only — never `EXPO_PUBLIC_*` client variables.
 
 ## G. Completion Rules
 Before claiming any task complete:

@@ -46,7 +46,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ---
 
 ## 1. Mobile Client Layer (Kanuj)
-* **Framework**: React Native 0.81 on Expo SDK 53/54, structured via Expo Router (file-system routing in `app/`).
+* **Framework**: React Native 0.86 on Expo SDK 57, structured via Expo Router (file-system routing in `app/`).
 * **State Management**: Zustand stores (`useRoutineStore`, `useOnboardingStore`) for reactive client UI state.
 * **Styling & Tokens**: Direction A Mineral tokens defined in `src/constants/theme.ts`.
 * **Hardware Integrations**:
@@ -65,7 +65,8 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ---
 
 ## 3. Intelligence Orchestration Layer
-* **Model**: Google Gemini 2.5 Flash via structured JSON outputs.
+* **Model**: Google Gemini 2.5 Flash via structured JSON outputs, invoked only from the trusted Supabase/server environment.
+* **Credential boundary**: Gemini API keys are server secrets. The Expo client must never read, embed, or ship a Gemini key (`EXPO_PUBLIC_*` Gemini variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning; `RemoteDeriveService` calls Edge Functions that may invoke Gemini.
 * **Context Assembly**: When evaluating queries, the backend injects:
   1. Customer skin profile (primary goals, midday oil, tightness).
   2. Active prescription products (e.g. Differin 0.1% schedule: Mon/Wed/Fri).

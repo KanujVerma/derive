@@ -43,3 +43,7 @@ Key technical and product decisions accepted for Derive V1.
 ### ADR-10: Manual Operations & $129/Month Canonical Pricing
 * **Decision**: Launch Founding Beta at $129/month for 10 initial members with manual founder review and manual fulfillment desk.
 * **Rationale**: High-touch founder concierge ensures quality and fast customer learning before premature operational automation.
+
+### ADR-11: Gemini Credentials Stay Server-Side
+* **Decision**: The Expo/mobile client never embeds a Gemini API key and never calls Gemini directly. Live model invocation belongs in the trusted Supabase/server environment behind `RemoteDeriveService`.
+* **Rationale**: A client-visible Gemini key would expose a paid API credential and send customer health context from the device. Kanuj continues on `MockDeriveService` with deterministic local reasoning; Sami owns server secrets and Edge Function orchestration.

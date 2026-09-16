@@ -1,5 +1,4 @@
-import { callGemini, isGeminiConfigured } from '../gemini';
-import { Product, ProductCategory } from '../../types/schema';
+import type { Product } from '../../types/schema';
 
 export interface ShelfRecognitionResult {
   products: Product[];
@@ -9,39 +8,10 @@ export interface ShelfRecognitionResult {
 export async function recognizeShelfProducts(
   imageUri: string
 ): Promise<ShelfRecognitionResult> {
-  if (isGeminiConfigured) {
-    const prompt = `You are Derive's computer vision product recognizer. Analyze this skincare shelf or product photo.
-Identify all visible skincare products.
-Return ONLY valid JSON matching this structure:
-{
-  "products": [
-    {
-      "id": "gen_unique_id",
-      "brand": "Brand Name",
-      "name": "Product Name",
-      "category": "cleanser|toner|treatment|serum|moisturizer|sunscreen|oil|mask|other",
-      "keyActives": ["active1", "active2"]
-    }
-  ],
-  "unclearBottlesCount": 0
-}`;
+  // Live shelf recognition is a server/Edge Function concern (Sami).
+  // The Expo client uses deterministic fixtures so Kanuj can build without a Gemini key.
+  void imageUri;
 
-    const raw = await callGemini({ prompt, imageUri });
-    if (raw) {
-      try {
-        const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        return {
-          products: parsed.products || [],
-          unclearBottlesCount: parsed.unclearBottlesCount || 0,
-        };
-      } catch (err) {
-        console.warn('Failed to parse Gemini shelf response, using defaults:', err);
-      }
-    }
-  }
-
-  // Realistic mock data when API key is not yet set
   return {
     products: [
       {

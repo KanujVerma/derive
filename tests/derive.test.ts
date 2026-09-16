@@ -636,3 +636,66 @@ test('DeriveService: MockDeriveService satisfies the IDeriveService contract', a
   assert.equal(checkInRes.adjustmentProposed, false);
   assert.ok(checkInRes.aiAnalysisSentence);
 });
+
+// ========================================================
+// 9. CLIENT GEMINI CREDENTIAL GUARD
+// ========================================================
+
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { callGemini, isGeminiConfigured } from '../src/services/gemini.ts';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SKIP_DIRS = new Set([
+  '.git',
+  '.expo',
+  'node_modules',
+  'dist',
+  'dist-web',
+  'web-build',
+]);
+const CLIENT_GEMINI_ENV = 'EXPO_PUBLIC_' + 'GEMINI_API_KEY';
+
+function collectTextFiles(dir: string, acc: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (SKIP_DIRS.has(name)) continue;
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) {
+      collectTextFiles(full, acc);
+      continue;
+    }
+    if (/\.(ts|tsx|js|json|md|yml|yaml|example)$/.test(name) || name === '.env.example') {
+      acc.push(full);
+    }
+  }
+  return acc;
+}
+
+test('Client Gemini helper never claims live configuration or returns model text', async () => {
+  assert.equal(isGeminiConfigured, false);
+  const raw = await callGemini({
+    prompt: 'customer question with private skin context',
+    imageUri: 'file://private-photo.jpg',
+  });
+  assert.equal(raw, '');
+});
+
+test('Guard: Expo client must not ship a Gemini API key', () => {
+  const assignment = new RegExp(`${CLIENT_GEMINI_ENV}\\s*=`);
+  const envRead = new RegExp(`process\\.env\\.${CLIENT_GEMINI_ENV}`);
+  const offenders: string[] = [];
+
+  for (const file of collectTextFiles(REPO_ROOT)) {
+    const text = readFileSync(file, 'utf8');
+    if (assignment.test(text) || envRead.test(text)) {
+      offenders.push(file.slice(REPO_ROOT.length + 1));
+    }
+  }
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `Client-visible Gemini secret path found in: ${offenders.join(', ')}`
+  );
+});

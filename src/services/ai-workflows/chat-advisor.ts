@@ -1,6 +1,5 @@
 import { checkSkincareSafety } from './safety-classifier.ts';
-import { callGemini, isGeminiConfigured } from '../gemini.ts';
-import type { ChatMessage, Routine } from '../../types/schema.ts';
+import type { Routine } from '../../types/schema.ts';
 
 export interface AdvisorResponse {
   directAnswer: string;
@@ -21,7 +20,7 @@ export interface AdvisorResponse {
 
 export async function askDeriveAdvisor(
   question: string,
-  routine?: Routine | null,
+  _routine?: Routine | null,
   imageUri?: string
 ): Promise<AdvisorResponse> {
   // 1. First run safety gate
@@ -67,40 +66,10 @@ export async function askDeriveAdvisor(
     };
   }
 
-  // 3. Multimodal Gemini reasoning if key available
-  if (isGeminiConfigured) {
-    const prompt = `You are Derive's AI Skincare Advisor. The customer is asking: "${question}".
-Current active routine context: ${JSON.stringify(routine?.summarySentence || 'Basic cleanser and moisturizer')}.
-Follow the DERIVE PRINCIPLES:
-- Direct Answer First (what the user should do right now in 1 sentence).
-- Why (2 sentences max explaining the skin reasoning).
-- Recommended Action (concrete action if needed).
-- Tone: Calm, competent, human, low-jargon. Pass the Grandma test.
-Return ONLY valid JSON:
-{
-  "directAnswer": "...",
-  "whyExplanation": "...",
-  "recommendedAction": "..."
-}`;
+  // Live Gemini invocation is server-side only (RemoteDeriveService / Edge Functions).
+  // Local and mock paths stay deterministic so Kanuj can build without a client API key.
 
-    const raw = await callGemini({ prompt, imageUri });
-    if (raw) {
-      try {
-        const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        return {
-          directAnswer: parsed.directAnswer,
-          whyExplanation: parsed.whyExplanation,
-          recommendedAction: parsed.recommendedAction,
-          isSafetyEscalation: false,
-        };
-      } catch (err) {
-        console.warn('Failed to parse Gemini advisor response:', err);
-      }
-    }
-  }
-
-  // 4. Intelligent deterministic context responses
+  // 3. Intelligent deterministic context responses
   if (q.includes('retinol') || q.includes('differin') || q.includes('tonight')) {
     const day = new Date().getDay(); // 1=Mon, 3=Wed, 5=Fri
     const isRetinolNight = day === 1 || day === 3 || day === 5;
