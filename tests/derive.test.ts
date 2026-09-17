@@ -1364,6 +1364,21 @@ test('K4.4 AutoCapture State Machine: Evaluates framing criteria and angle const
   assert.equal(offCenterRes.passes, false);
   assert.equal(offCenterRes.feedback, 'center_face');
 
+  // Face too close / too low — calibrated from physical iPhone Front capture
+  const tooCloseRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.74, centerX: 0.5, centerY: 0.5 },
+    'front'
+  );
+  assert.equal(tooCloseRes.passes, false);
+  assert.equal(tooCloseRes.feedback, 'too_close');
+
+  const tooLowRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.78 },
+    'front'
+  );
+  assert.equal(tooLowRes.passes, false);
+  assert.equal(tooLowRes.feedback, 'center_face');
+
   // 4. Excessive roll / head tilt
   const tiltedHeadRes = evaluateFrameCriteria(
     { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, roll: 20 },
@@ -1371,6 +1386,24 @@ test('K4.4 AutoCapture State Machine: Evaluates framing criteria and angle const
   );
   assert.equal(tiltedHeadRes.passes, false);
   assert.equal(tiltedHeadRes.feedback, 'center_face');
+
+  // Pitch follows Apple Vision: positive = nodding down, negative = looking up.
+  // Copy tells the member how to correct, not what the pose currently is.
+  const lookingDownRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, pitch: 22 },
+    'front'
+  );
+  assert.equal(lookingDownRes.passes, false);
+  assert.equal(lookingDownRes.feedback, 'tilt_up');
+  assert.equal(lookingDownRes.message, 'Lift your chin slightly');
+
+  const lookingUpRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, pitch: -22 },
+    'front'
+  );
+  assert.equal(lookingUpRes.passes, false);
+  assert.equal(lookingUpRes.feedback, 'tilt_down');
+  assert.equal(lookingUpRes.message, 'Lower your chin slightly');
 
   // 5. Front angle: head turned sideways fails
   const turnedFrontRes = evaluateFrameCriteria(
@@ -1389,11 +1422,18 @@ test('K4.4 AutoCapture State Machine: Evaluates framing criteria and angle const
   assert.equal(straightLookingLeftRes.feedback, 'turn_left');
 
   const properLeftProfileRes = evaluateFrameCriteria(
-    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: -35 },
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: -45 },
     'left'
   );
   assert.equal(properLeftProfileRes.passes, true);
   assert.equal(properLeftProfileRes.feedback, 'ready');
+
+  const fullLeftLateralRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: -80 },
+    'left'
+  );
+  assert.equal(fullLeftLateralRes.passes, false);
+  assert.equal(fullLeftLateralRes.feedback, 'turn_right');
 
   // 7. Right angle gating
   const straightLookingRightRes = evaluateFrameCriteria(
@@ -1404,7 +1444,7 @@ test('K4.4 AutoCapture State Machine: Evaluates framing criteria and angle const
   assert.equal(straightLookingRightRes.feedback, 'turn_right');
 
   const properRightProfileRes = evaluateFrameCriteria(
-    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: 35 },
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: 45 },
     'right'
   );
   assert.equal(properRightProfileRes.passes, true);

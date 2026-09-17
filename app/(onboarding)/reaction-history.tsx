@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,6 @@ import {
   ReactionSymptom,
 } from '@/src/types/schema';
 import { SelectionCard } from '@/src/components/ui/SelectionCard';
-import { SelectionRow } from '@/src/components/ui/SelectionRow';
-import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { TextField } from '@/src/components/ui/TextField';
 import { VoiceTextArea } from '@/src/components/ui/VoiceTextArea';
@@ -64,6 +62,7 @@ export default function ReactionHistoryScreen() {
   const [selectedArea, setSelectedArea] = useState<BodyArea>('face');
   const [severity, setSeverity] = useState<ReactionSeverity>('moderate');
   const [notes, setNotes] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
 
   const toggleSymptom = (symptom: ReactionSymptom) => {
     if (selectedSymptoms.includes(symptom)) {
@@ -101,8 +100,12 @@ export default function ReactionHistoryScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
       >
         <Text style={styles.questionTitle}>Past Product Reactions</Text>
         <Text style={styles.questionSubtitle}>
@@ -113,28 +116,26 @@ export default function ReactionHistoryScreen() {
         <Text style={styles.sectionHeader}>
           Has any skincare, hair, deodorant, or body product irritated your skin or caused a bad reaction?
         </Text>
-        <GroupedSection>
-          <SelectionRow
+        <View style={styles.optionsList}>
+          <SelectionCard
             title="Yes, I have had a reaction"
-            subtitle="I want Derive to check ingredients and avoid similar formulations"
+            description="I want Derive to check ingredients and avoid similar formulations"
             selected={hasReaction === true}
             onPress={() => {
               setHasReaction(true);
               setHasBadReactions(true);
             }}
-            type="radio"
           />
-          <SelectionRow
+          <SelectionCard
             title="No, not that I recall"
-            subtitle="I tolerate most standard products without notable irritation"
+            description="I tolerate most standard products without notable irritation"
             selected={hasReaction === false}
             onPress={() => {
               setHasReaction(false);
               setHasBadReactions(false);
             }}
-            type="radio"
           />
-        </GroupedSection>
+        </View>
 
         {/* PROGRESSIVELY DISCLOSED DETAILS (Only if user taps Yes) */}
         {hasReaction === true && (
@@ -209,6 +210,7 @@ export default function ReactionHistoryScreen() {
               onChangeText={setNotes}
               context="reaction_note"
               minHeight={70}
+              onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
             />
           </View>
         )}
@@ -250,6 +252,9 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     color: colors.ink,
     marginBottom: spacing.sm,
+  },
+  optionsList: {
+    gap: spacing.sm,
   },
   detailsContainer: {
     marginTop: spacing.md,

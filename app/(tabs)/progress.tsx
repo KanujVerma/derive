@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,6 +43,13 @@ export default function ProgressScreen() {
   const { checkIns, learnedInsights, routine, userProducts } = useRoutineStore();
   const { frontPhotoUri, leftPhotoUri, rightPhotoUri } = useOnboardingStore();
   const [selectedAngle, setSelectedAngle] = useState<AngleKey>('front');
+  const [inspect, setInspect] = useState<{ uri: string; label: string } | null>(null);
+  const inspectFrame = Dimensions.get('window');
+
+  const openInspect = (uri: string, label: string) => {
+    Haptics.selectionAsync();
+    setInspect({ uri, label });
+  };
 
   // Determine baseline photo URI based on selected angle
   const baselinePhotoUri =
@@ -160,7 +169,21 @@ export default function ProgressScreen() {
           <View style={styles.comparisonGrid}>
             {/* Baseline Column */}
             <View style={styles.photoCol}>
-              <View style={styles.photoBox}>
+              <TouchableOpacity
+                style={styles.photoBox}
+                activeOpacity={baselinePhotoUri ? 0.85 : 1}
+                disabled={!baselinePhotoUri}
+                onPress={() =>
+                  baselinePhotoUri &&
+                  openInspect(baselinePhotoUri, `${selectedAngle} baseline`)
+                }
+                accessibilityRole="button"
+                accessibilityLabel={
+                  baselinePhotoUri
+                    ? `Inspect ${selectedAngle} baseline photo`
+                    : 'Baseline photo not captured'
+                }
+              >
                 {baselinePhotoUri ? (
                   <Image
                     source={{ uri: baselinePhotoUri }}
@@ -177,12 +200,25 @@ export default function ProgressScreen() {
                     {baselinePhotoUri ? 'Baseline • Active' : 'Baseline • No photo'}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* Current Column */}
             <View style={styles.photoCol}>
-              <View style={styles.photoBox}>
+              <TouchableOpacity
+                style={styles.photoBox}
+                activeOpacity={latestPhotoUri ? 0.85 : 1}
+                disabled={!latestPhotoUri}
+                onPress={() =>
+                  latestPhotoUri && openInspect(latestPhotoUri, 'Latest check-in')
+                }
+                accessibilityRole="button"
+                accessibilityLabel={
+                  latestPhotoUri
+                    ? 'Inspect latest check-in photo'
+                    : 'Latest photo available after next check-in'
+                }
+              >
                 {latestPhotoUri ? (
                   <Image
                     source={{ uri: latestPhotoUri }}
@@ -199,7 +235,7 @@ export default function ProgressScreen() {
                     {latestPhotoUri ? 'Latest • Verified' : 'Latest • Next check-in'}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -279,6 +315,79 @@ export default function ProgressScreen() {
           )}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={!!inspect}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setInspect(null)}
+      >
+        <View style={styles.inspectRoot}>
+          <View
+            style={[
+              styles.inspectHeader,
+              { paddingTop: Math.max(insets.top, spacing.md) },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={() => setInspect(null)}
+              style={styles.inspectClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close photo"
+            >
+              <Icon name="close" size={20} color={colors.ink} />
+            </TouchableOpacity>
+            <View style={styles.inspectPill}>
+              <Text style={styles.inspectTitle} numberOfLines={1}>
+                {inspect?.label || 'Photo'}
+              </Text>
+              <Text style={styles.inspectHint}>
+                Pinch to zoom in.
+              </Text>
+            </View>
+            <View style={{ width: 44 }} />
+          </View>
+          <ScrollView
+            style={styles.inspectScroller}
+            contentContainerStyle={[
+              styles.inspectContent,
+              { paddingBottom: Math.max(insets.bottom, spacing.xl) },
+            ]}
+            maximumZoomScale={4}
+            minimumZoomScale={1}
+            bouncesZoom
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            centerContent
+          >
+            {inspect?.uri ? (
+              <View
+                collapsable={false}
+                style={[
+                  styles.inspectPhotoFrame,
+                  {
+                    width: inspectFrame.width - spacing.lg * 2,
+                    height: Math.round(
+                      Math.min(
+                        (inspectFrame.width - spacing.lg * 2) * 1.25,
+                        inspectFrame.height * 0.62
+                      )
+                    ),
+                  },
+                ]}
+              >
+                <Image
+                  source={{ uri: inspect.uri }}
+                  style={styles.inspectImage}
+                  resizeMode="cover"
+                  accessible
+                  accessibilityLabel={inspect.label}
+                />
+              </View>
+            ) : null}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -572,5 +681,71 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     maxWidth: 280,
+  },
+  inspectRoot: {
+    flex: 1,
+    backgroundColor: colors.canvas,
+  },
+  inspectHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  inspectClose: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...shadows.subtle,
+  },
+  inspectPill: {
+    flex: 1,
+    marginHorizontal: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...shadows.subtle,
+  },
+  inspectTitle: {
+    color: colors.ink,
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.semibold,
+    textAlign: 'center',
+    textTransform: 'capitalize',
+    marginBottom: 2,
+  },
+  inspectHint: {
+    color: colors.inkMuted,
+    fontSize: typography.sizes.caption,
+    textAlign: 'center',
+  },
+  inspectScroller: {
+    flex: 1,
+  },
+  inspectContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inspectPhotoFrame: {
+    borderRadius: radii.xl,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...shadows.subtle,
+  },
+  inspectImage: {
+    width: '100%',
+    height: '100%',
   },
 });

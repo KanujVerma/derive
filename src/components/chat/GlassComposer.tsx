@@ -11,9 +11,12 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { GlassContainer } from '@/src/components/ui/GlassContainer';
 import { colors, radii, typography, spacing } from '@/src/constants/theme';
+import { KEYBOARD_DONE_NATIVE_ID } from '@/src/components/ui/KeyboardDoneBar';
 
 import { Icon } from '@/src/components/ui/Icon';
 import { VoiceInputButton } from '@/src/components/ui/VoiceInputButton';
+import { VoiceListeningBar } from '@/src/components/ui/VoiceListeningBar';
+import { useVoiceDictation } from '@/src/components/ui/useVoiceDictation';
 
 interface GlassComposerProps {
   onSendMessage: (text: string, imageUri?: string) => void;
@@ -30,6 +33,14 @@ export const GlassComposer: React.FC<GlassComposerProps> = ({
 }) => {
   const [text, setText] = useState('');
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
+
+  const { isListening, start, stop } = useVoiceDictation({
+    context: 'ask',
+    onTranscript: (transcribed) => {
+      setText((prev) => (prev ? `${prev} ${transcribed}` : transcribed));
+    },
+    disabled: disabled || isLoading,
+  });
 
   const handlePickImage = async () => {
     try {
@@ -80,58 +91,58 @@ export const GlassComposer: React.FC<GlassComposerProps> = ({
           </View>
         )}
 
-        <View style={styles.inputRow}>
-          {/* Photo Attachment Button */}
-          <TouchableOpacity
-            onPress={handlePickImage}
-            activeOpacity={0.7}
-            style={styles.iconButton}
-            accessible={true}
-            accessibilityLabel="Attach skincare photo"
-            accessibilityRole="button"
-          >
-            <Icon name="camera" size={20} color={colors.inkMuted} />
-          </TouchableOpacity>
+        {isListening ? (
+          <View style={styles.listeningRow}>
+            <VoiceListeningBar onStop={stop} />
+          </View>
+        ) : (
+          <View style={styles.inputRow}>
+            <TouchableOpacity
+              onPress={handlePickImage}
+              activeOpacity={0.7}
+              style={styles.iconButton}
+              accessible={true}
+              accessibilityLabel="Attach skincare photo"
+              accessibilityRole="button"
+            >
+              <Icon name="camera" size={20} color={colors.inkMuted} />
+            </TouchableOpacity>
 
-          {/* Text Input */}
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder={placeholder}
-            placeholderTextColor={colors.inkMuted}
-            multiline={true}
-            style={styles.input}
-            editable={!disabled && !isLoading}
-            accessible={true}
-            accessibilityLabel="Message input field"
-          />
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder={placeholder}
+              placeholderTextColor={colors.inkMuted}
+              multiline={true}
+              inputAccessoryViewID={KEYBOARD_DONE_NATIVE_ID}
+              style={styles.input}
+              editable={!disabled && !isLoading}
+              accessible={true}
+              accessibilityLabel="Message input field"
+            />
 
-          {/* Voice Input Button (Trailing) */}
-          <VoiceInputButton
-            context="ask"
-            size={40}
-            disabled={disabled || isLoading}
-            onTranscript={(transcribed) => {
-              setText((prev) => (prev ? `${prev} ${transcribed}` : transcribed));
-            }}
-          />
+            <VoiceInputButton
+              size={40}
+              disabled={disabled || isLoading}
+              onPress={start}
+            />
 
-          {/* Send Button */}
-          <TouchableOpacity
-            onPress={handleSend}
-            activeOpacity={0.7}
-            disabled={(!text.trim() && !attachedImage) || disabled || isLoading}
-            style={[
-              styles.sendButton,
-              ((!text.trim() && !attachedImage) || isLoading) && styles.sendButtonDisabled,
-            ]}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-          >
-            <Icon name="forward" size={16} color={colors.inkInverse} />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleSend}
+              activeOpacity={0.7}
+              disabled={(!text.trim() && !attachedImage) || disabled || isLoading}
+              style={[
+                styles.sendButton,
+                ((!text.trim() && !attachedImage) || isLoading) && styles.sendButtonDisabled,
+              ]}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+            >
+              <Icon name="forward" size={16} color={colors.inkInverse} />
+            </TouchableOpacity>
+          </View>
+        )}
       </GlassContainer>
     </View>
   );
@@ -178,6 +189,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 48,
+  },
+  listeningRow: {
+    paddingHorizontal: spacing.xs,
+    minHeight: 48,
+    justifyContent: 'center',
   },
   iconButton: {
     width: 44,

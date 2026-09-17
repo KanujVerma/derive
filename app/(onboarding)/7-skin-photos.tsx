@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -40,14 +41,14 @@ const ANGLES: AngleConfig[] = [
     title: 'Left Profile',
     stepNum: 2,
     instruction: 'Turn head slightly to show your left cheek',
-    subtext: 'Captures side cheek and jawline clarity',
+    subtext: 'About a quarter turn — cheek and jawline, not a full side profile',
   },
   {
     key: 'right',
     title: 'Right Profile',
     stepNum: 3,
     instruction: 'Turn head slightly to show your right cheek',
-    subtext: 'Captures right cheek, jawline, and texture clarity',
+    subtext: 'About a quarter turn — right cheek and jawline, not a full side profile',
   },
 ];
 
@@ -69,6 +70,7 @@ export default function SkinPhotosScreen() {
     return 0;
   });
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
   const currentAngle = ANGLES[currentStepIndex];
 
@@ -111,28 +113,41 @@ export default function SkinPhotosScreen() {
 
   if (isCameraActive) {
     return (
-      <CameraCapture
-        type="face"
-        stepBadge={`STEP ${currentAngle.stepNum} OF 3: ${currentAngle.title.toUpperCase()}`}
-        instruction={currentAngle.instruction}
-        subtext="Good even lighting • No filters"
-        qualityGating={{
-          enabled: true,
-          autoCapture: true,
-          targetAngle: currentAngle.key,
-          holdDurationMs: 750,
-        }}
-        onCapture={handleCapture}
-        onCancel={() => setIsCameraActive(false)}
-      />
+      <View style={styles.container}>
+        <Modal
+          visible
+          animationType="fade"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setIsCameraActive(false)}
+        >
+          <CameraCapture
+            type="face"
+            stepBadge={`STEP ${currentAngle.stepNum} OF 3: ${currentAngle.title.toUpperCase()}`}
+            instruction={currentAngle.instruction}
+            subtext="Good even lighting • No filters"
+            qualityGating={{
+              enabled: true,
+              autoCapture: true,
+              targetAngle: currentAngle.key,
+              holdDurationMs: 750,
+            }}
+            onCapture={handleCapture}
+            onCancel={() => setIsCameraActive(false)}
+          />
+        </Modal>
+      </View>
     );
   }
 
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
       >
         <Text style={styles.questionTitle}>Baseline Skin Photos</Text>
         <Text style={styles.questionSubtitle}>
@@ -248,6 +263,7 @@ export default function SkinPhotosScreen() {
           placeholder="e.g. slight flaking around nose from sun yesterday..."
           context="photo_note"
           minHeight={80}
+          onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
         />
 
         {/* PRIVACY REASSURANCE */}

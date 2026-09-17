@@ -22,6 +22,7 @@ export type IconName =
   | 'bell'
   | 'shipping'
   | 'sparkle'
+  | 'flashlight'
   | 'person'
   | 'trash'
   | 'plus'
@@ -29,6 +30,7 @@ export type IconName =
   | 'bottle'
   | 'scan'
   | 'mic'
+  | 'stop'
   | 'down'
   | 'up';
 
@@ -55,6 +57,7 @@ const ICON_MAP: Record<IconName, IconConfig> = {
   bell: { sfSymbol: 'bell', ionicon: 'notifications-outline' },
   shipping: { sfSymbol: 'shippingbox', ionicon: 'cube-outline' },
   sparkle: { sfSymbol: 'sparkles', ionicon: 'sparkles-outline' },
+  flashlight: { sfSymbol: 'flashlight.on.fill', ionicon: 'flashlight' },
   person: { sfSymbol: 'person.fill', ionicon: 'person' },
   trash: { sfSymbol: 'trash', ionicon: 'trash-outline' },
   plus: { sfSymbol: 'plus', ionicon: 'add' },
@@ -62,6 +65,7 @@ const ICON_MAP: Record<IconName, IconConfig> = {
   bottle: { sfSymbol: 'cross.vial', ionicon: 'flask-outline' },
   scan: { sfSymbol: 'viewfinder', ionicon: 'scan-outline' },
   mic: { sfSymbol: 'mic.fill', ionicon: 'mic-outline' },
+  stop: { sfSymbol: 'stop.fill', ionicon: 'stop' },
   down: { sfSymbol: 'chevron.down', ionicon: 'chevron-down' },
   up: { sfSymbol: 'chevron.up', ionicon: 'chevron-up' },
 };

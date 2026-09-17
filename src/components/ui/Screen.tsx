@@ -53,6 +53,8 @@ export const Screen: React.FC<ScreenProps> = ({
           ]}
           showsVerticalScrollIndicator={showsVerticalScrollIndicator}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
         >
           {children}
         </ScrollView>

@@ -8,8 +8,10 @@ import {
   TextStyle,
   StyleProp,
   KeyboardTypeOptions,
+  Keyboard,
 } from 'react-native';
 import { colors, radii, typography, spacing } from '@/src/constants/theme';
+import { KEYBOARD_DONE_NATIVE_ID } from '@/src/components/ui/KeyboardDoneBar';
 
 interface TextFieldProps {
   label?: string;
@@ -28,6 +30,8 @@ interface TextFieldProps {
   inputStyle?: StyleProp<TextStyle>;
   rightElement?: React.ReactNode;
   editable?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 export const TextField: React.FC<TextFieldProps> = ({
@@ -47,6 +51,8 @@ export const TextField: React.FC<TextFieldProps> = ({
   inputStyle,
   rightElement,
   editable = true,
+  onFocus,
+  onBlur,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
 
@@ -77,8 +83,23 @@ export const TextField: React.FC<TextFieldProps> = ({
           secureTextEntry={secureTextEntry}
           autoCapitalize={autoCapitalize}
           editable={editable}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          returnKeyType={multiline ? 'default' : 'done'}
+          blurOnSubmit={!multiline}
+          inputAccessoryViewID={KEYBOARD_DONE_NATIVE_ID}
+          onSubmitEditing={() => {
+            if (!multiline) {
+              Keyboard.dismiss();
+              setIsFocused(false);
+            }
+          }}
+          onFocus={() => {
+            setIsFocused(true);
+            onFocus?.();
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+            onBlur?.();
+          }}
           style={[
             styles.input,
             multiline && styles.inputMultiline,

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle, Keyboard, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, spacing, typography } from '@/src/constants/theme';
 import { Button, ButtonVariant } from '@/src/components/ui/Button';
@@ -40,11 +40,29 @@ export const StickyActionFooter: React.FC<StickyActionFooterProps> = ({
   style,
 }) => {
   const insets = useSafeAreaInsets();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const label = ctaLabel || primaryLabel || 'Continue';
   const handlePrimary = onPressCta || onPrimaryPress || (() => {});
   const handleSecondary = onPressSecondary || onSecondaryPress;
   const isPrimaryDisabled = disabled || primaryDisabled;
   const isPrimaryLoading = loading || primaryLoading;
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  if (keyboardVisible) return null;
 
   return (
     <View

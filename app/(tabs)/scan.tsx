@@ -230,7 +230,7 @@ export default function ScanScreen() {
               <StatusBadge
                 label={scanResult.verdictLabel || scanResult.verdict.toUpperCase()}
                 variant={getVerdictBadgeVariant(scanResult.verdict)}
-                size="medium"
+                size="small"
               />
             </View>
 
@@ -472,7 +472,7 @@ export default function ScanScreen() {
               accessibilityRole="button"
               accessibilityLabel={torchOn ? 'Turn off flash' : 'Turn on flash'}
             >
-              <Icon name="sparkle" size={20} color={torchOn ? colors.brand : '#FFFFFF'} />
+              <Icon name="flashlight" size={20} color={torchOn ? colors.brand : '#FFFFFF'} />
             </TouchableOpacity>
 
             {/* Barcode Reticle Overlay */}
@@ -523,7 +523,12 @@ export default function ScanScreen() {
 
       {/* Unknown Barcode Modal Sheet */}
       {unknownBarcode && (
-        <View style={styles.unknownOverlay}>
+        <View
+          style={[
+            styles.unknownOverlay,
+            { paddingBottom: 88 + insets.bottom },
+          ]}
+        >
           <View style={styles.unknownCard}>
             <View style={styles.unknownIconCircle}>
               <Icon name="warning" size={24} color={colors.actionPause.text} />
@@ -541,14 +546,12 @@ export default function ScanScreen() {
                   setUnknownBarcode(null);
                   setIsSearching(true);
                 }}
-                style={{ flex: 1 }}
               />
               <Button
                 label="Scan Another"
                 variant="outline"
                 size="medium"
                 onPress={handleRetryScan}
-                style={{ flex: 1 }}
               />
             </View>
           </View>
@@ -681,9 +684,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: spacing.xs,
     marginBottom: spacing.sm,
   },
   sectionCategoryTag: {
@@ -1039,12 +1040,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   unknownOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    padding: spacing.lg,
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(23, 26, 24, 0.5)',
+    paddingHorizontal: spacing.lg,
     justifyContent: 'flex-end',
   },
   unknownCard: {
@@ -1079,7 +1077,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   unknownButtons: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: spacing.sm,
     width: '100%',
   },

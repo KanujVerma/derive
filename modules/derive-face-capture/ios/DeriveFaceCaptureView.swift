@@ -130,8 +130,9 @@ public class DeriveFaceCaptureView: ExpoView, AVCaptureVideoDataOutputSampleBuff
       return
     }
 
-    // Vision face rectangles request for pose & bounding box
+    // Revision 3 reports continuous roll/yaw/pitch. Pitch: positive = nodding down.
     let faceRectRequest = VNDetectFaceRectanglesRequest()
+    faceRectRequest.revision = VNDetectFaceRectanglesRequestRevision3
     let faceQualityRequest = VNDetectFaceCaptureQualityRequest()
 
     let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])

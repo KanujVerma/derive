@@ -9,10 +9,11 @@ import {
   Linking,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, typography, spacing } from '@/src/constants/theme';
+import { colors, radii, typography, spacing, shadows } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import {
@@ -69,6 +70,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   onCapture,
   onCancel,
 }) => {
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
@@ -281,7 +283,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         <Image source={{ uri: capturedUri }} style={styles.previewImage} />
 
         {/* Top Review Notice */}
-        <View style={styles.reviewBanner}>
+        <View style={[styles.reviewBanner, { top: Math.max(insets.top, spacing.md) + 8 }]}>
           <Text style={styles.reviewBannerTitle}>Review Your Capture</Text>
           <Text style={styles.reviewBannerSub}>
             Make sure your face is clearly visible in even light without blur.
@@ -289,18 +291,24 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         </View>
 
         {/* Bottom Review Actions */}
-        <View style={styles.reviewControlsStrip}>
+        <View
+          style={[
+            styles.reviewControlsStrip,
+            { paddingBottom: Math.max(insets.bottom, spacing.md) },
+          ]}
+        >
           <View style={styles.confirmRow}>
             <Button
               label="Retake"
               variant="outline"
               size="medium"
               onPress={handleRetake}
-              style={{ flex: 1 }}
+              style={styles.reviewRetakeButton}
+              textStyle={styles.reviewRetakeLabel}
             />
             <Button
               label="Use Photo"
-              variant="primary"
+              variant="brand"
               size="medium"
               onPress={handleConfirm}
               style={{ flex: 1 }}
@@ -339,7 +347,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       )}
 
       {/* Top Floating HUD Banner */}
-      <View style={styles.topHud}>
+      <View style={[styles.topHud, { top: Math.max(insets.top, spacing.md) }]}>
         <View style={styles.topHudRow}>
           {onCancel ? (
             <TouchableOpacity
@@ -349,7 +357,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               accessibilityRole="button"
               accessibilityLabel="Cancel camera"
             >
-              <Icon name="close" size={20} color="#FFFFFF" />
+              <Icon name="close" size={20} color={colors.ink} />
             </TouchableOpacity>
           ) : (
             <View style={{ width: 44 }} />
@@ -369,7 +377,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               accessibilityRole="button"
               accessibilityLabel="Flip camera direction"
             >
-              <Icon name="sparkle" size={20} color="#FFFFFF" />
+              <Icon name="sparkle" size={20} color={colors.ink} />
             </TouchableOpacity>
           ) : (
             <View style={{ width: 44 }} />
@@ -391,8 +399,17 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         </View>
       )}
 
-      {/* Center Guidance Reticle */}
-      <View style={styles.reticleContainer} pointerEvents="none">
+      {/* Center Guidance Reticle — inset so the oval sits in the visible viewfinder, not under the HUD/shutter */}
+      <View
+        style={[
+          styles.reticleContainer,
+          {
+            paddingTop: Math.max(insets.top, spacing.md) + 72,
+            paddingBottom: 130 + insets.bottom,
+          },
+        ]}
+        pointerEvents="none"
+      >
         {type === 'face' ? (
           <View
             style={[
@@ -406,7 +423,12 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       </View>
 
       {/* Bottom Shutter & Controls Strip */}
-      <View style={styles.controlsStrip}>
+      <View
+        style={[
+          styles.controlsStrip,
+          { paddingBottom: Math.max(insets.bottom, spacing.sm) },
+        ]}
+      >
         <View style={styles.shutterRow}>
           <View style={{ width: 60 }} />
 
@@ -523,18 +545,24 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...shadows.subtle,
   },
   instructionPill: {
     flex: 1,
     marginHorizontal: spacing.sm,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: colors.surface,
     borderRadius: radii.lg,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...shadows.subtle,
   },
   stepBadgeText: {
     fontSize: typography.sizes.micro,
@@ -545,14 +573,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   instructionText: {
-    color: '#FFFFFF',
+    color: colors.ink,
     fontSize: typography.sizes.bodyRegular,
     fontWeight: typography.weights.semibold,
     textAlign: 'center',
     marginBottom: 2,
   },
   subtextText: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: colors.inkMuted,
     fontSize: typography.sizes.caption,
     textAlign: 'center',
   },
@@ -593,24 +621,34 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  reviewRetakeButton: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+  },
+  reviewRetakeLabel: {
+    color: colors.ink,
+  },
   reviewBanner: {
     position: 'absolute',
     top: 60,
     left: spacing.lg,
     right: spacing.lg,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(255, 254, 251, 0.94)',
     borderRadius: radii.lg,
     padding: spacing.md,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
   },
   reviewBannerTitle: {
-    color: '#FFFFFF',
+    color: colors.ink,
     fontSize: typography.sizes.bodyLarge,
     fontWeight: typography.weights.bold,
     marginBottom: 4,
   },
   reviewBannerSub: {
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: colors.inkMuted,
     fontSize: typography.sizes.caption,
     textAlign: 'center',
   },
@@ -619,20 +657,22 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 130,
-    backgroundColor: 'rgba(23, 26, 24, 0.95)',
+    backgroundColor: 'rgba(246, 243, 236, 0.96)',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSubtle,
   },
   controlsStrip: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 130,
     backgroundColor: 'rgba(23, 26, 24, 0.92)',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
   },
   confirmRow: {
     flexDirection: 'row',

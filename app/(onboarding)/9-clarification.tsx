@@ -53,6 +53,7 @@ export default function ClarificationScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.aiHeader}>
           <Text style={styles.aiBadge}>DERIVE INTELLIGENCE</Text>

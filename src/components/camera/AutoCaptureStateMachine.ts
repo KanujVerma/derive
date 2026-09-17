@@ -35,9 +35,9 @@ export type AutoCaptureState =
 
 export interface FrameQualityMetrics {
   hasFace: boolean;
-  yaw?: number; // degrees: negative = turned left, positive = turned right
-  pitch?: number; // degrees: negative = down, positive = up
-  roll?: number; // degrees: head tilt
+  yaw?: number; // degrees, Apple Vision: positive = counterclockwise / toward the viewer's right
+  pitch?: number; // degrees, Apple Vision: positive = nodding down (chin toward chest)
+  roll?: number; // degrees, Apple Vision: positive = counterclockwise head tilt
   centerX?: number; // normalized 0..1
   centerY?: number; // normalized 0..1
   faceWidthRatio?: number; // face width / frame width (0..1)
@@ -87,7 +87,7 @@ export function evaluateFrameCriteria(
       message: 'Move closer to the camera',
     };
   }
-  if (size > 0.72) {
+  if (size > 0.66) {
     return {
       passes: false,
       feedback: 'too_close',
@@ -98,7 +98,7 @@ export function evaluateFrameCriteria(
   // Centering check (normalized coordinates: 0.5 is centered)
   const cx = metrics.centerX ?? 0.5;
   const cy = metrics.centerY ?? 0.5;
-  if (cx < 0.32 || cx > 0.68 || cy < 0.25 || cy > 0.75) {
+  if (cx < 0.34 || cx > 0.66 || cy < 0.30 || cy > 0.68) {
     return {
       passes: false,
       feedback: 'center_face',
@@ -116,20 +116,20 @@ export function evaluateFrameCriteria(
     };
   }
 
-  // Pitch check (looking straight ahead, not tilted up/down)
+  // Pitch: Apple Vision positive = nodding down. Tell the member the correction, not the pose.
   const pitch = metrics.pitch ?? 0;
   if (pitch > 16) {
     return {
       passes: false,
-      feedback: 'tilt_down',
-      message: 'Lower your chin slightly',
+      feedback: 'tilt_up',
+      message: 'Lift your chin slightly',
     };
   }
   if (pitch < -16) {
     return {
       passes: false,
-      feedback: 'tilt_up',
-      message: 'Raise your chin slightly',
+      feedback: 'tilt_down',
+      message: 'Lower your chin slightly',
     };
   }
 
@@ -144,16 +144,16 @@ export function evaluateFrameCriteria(
       };
     }
   } else if (targetAngle === 'left') {
-    // User turning left means yaw is negative (or positive depending on convention)
-    // We expect ~25 to 55 degrees rotation to the user's left
-    if (yaw > -20) {
+    // Three-quarter view (~45°), not a true 90° lateral. Front-camera selfies
+    // lose the cheek plane and pick up wide-angle distortion at full profile.
+    if (yaw > -30) {
       return {
         passes: false,
         feedback: 'turn_left',
         message: 'Turn your head slightly to your left',
       };
     }
-    if (yaw < -65) {
+    if (yaw < -55) {
       return {
         passes: false,
         feedback: 'turn_right',
@@ -161,15 +161,14 @@ export function evaluateFrameCriteria(
       };
     }
   } else if (targetAngle === 'right') {
-    // Rotation to user's right
-    if (yaw < 20) {
+    if (yaw < 30) {
       return {
         passes: false,
         feedback: 'turn_right',
         message: 'Turn your head slightly to your right',
       };
     }
-    if (yaw > 65) {
+    if (yaw > 55) {
       return {
         passes: false,
         feedback: 'turn_left',

@@ -64,8 +64,8 @@ Ask before they open:
 |-------|----------|---------------|
 | Front capture | Camera opens, auto-capture triggers within ~5 sec of good positioning | Cannot get face in oval; capture never triggers |
 | Guidance messaging | "Center your face" / "Move closer" / "Hold still" appear and are understood | Instructions feel confusing or stressful |
-| Left profile | "Turn left" instruction understood as their left | Turns wrong direction |
-| Right profile | Completes similarly to left | Gives up before third capture |
+| Left profile | Turns their left (~quarter turn / 45°); not a full side profile | Turns wrong direction or forces a 90° ear-on pose |
+| Right profile | Same on their right | Gives up before third capture |
 | Use Photo / Retake | Comfortable accepting or retaking | Accepts blurry photo without noticing |
 | Cannot skip | Continue button stays inactive until 3 photos | Feels forced and frustrated |
 

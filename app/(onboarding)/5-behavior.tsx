@@ -5,8 +5,6 @@ import { colors, typography, spacing } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { MiddayFeel } from '@/src/types/schema';
 import { SelectionCard } from '@/src/components/ui/SelectionCard';
-import { SelectionRow } from '@/src/components/ui/SelectionRow';
-import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 
 const MIDDAY_OPTIONS: Array<{ value: MiddayFeel; label: string; desc: string }> = [
@@ -63,22 +61,22 @@ export default function BehaviorScreen() {
         <Text style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
           After washing your face, does your skin feel tight or squeaky?
         </Text>
-        <GroupedSection>
-          <SelectionRow
+        <View style={styles.optionsList}>
+          <SelectionCard
             title="Yes, often tight or stripped"
-            subtitle="Indicates a fragile or recovering skin barrier"
+            description="Indicates a fragile or recovering skin barrier"
             selected={tightness === true}
             onPress={() => setTightness(true)}
-            type="radio"
+            style={styles.cardItem}
           />
-          <SelectionRow
+          <SelectionCard
             title="No, feels normal or comfortable"
-            subtitle="Cleanser maintains natural barrier moisture"
+            description="Cleanser maintains natural barrier moisture"
             selected={tightness === false}
             onPress={() => setTightness(false)}
-            type="radio"
+            style={styles.cardItem}
           />
-        </GroupedSection>
+        </View>
       </ScrollView>
 
       <StickyActionFooter

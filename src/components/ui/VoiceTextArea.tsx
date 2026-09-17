@@ -10,6 +10,9 @@ import {
 } from 'react-native';
 import { colors, radii, typography, spacing } from '@/src/constants/theme';
 import { VoiceInputButton, VoiceContext } from './VoiceInputButton';
+import { VoiceListeningBar } from './VoiceListeningBar';
+import { useVoiceDictation } from './useVoiceDictation';
+import { KEYBOARD_DONE_NATIVE_ID } from '@/src/components/ui/KeyboardDoneBar';
 
 interface VoiceTextAreaProps {
   label?: string;
@@ -22,6 +25,8 @@ interface VoiceTextAreaProps {
   style?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
   editable?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 export const VoiceTextArea: React.FC<VoiceTextAreaProps> = ({
@@ -35,6 +40,8 @@ export const VoiceTextArea: React.FC<VoiceTextAreaProps> = ({
   style,
   inputStyle,
   editable = true,
+  onFocus,
+  onBlur,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
 
@@ -47,6 +54,12 @@ export const VoiceTextArea: React.FC<VoiceTextAreaProps> = ({
     }
   };
 
+  const { isListening, start, stop } = useVoiceDictation({
+    context,
+    onTranscript: handleVoiceTranscript,
+    disabled: !editable,
+  });
+
   return (
     <View style={[styles.wrapper, style]}>
       {label && <Text style={styles.label}>{label}</Text>}
@@ -56,37 +69,52 @@ export const VoiceTextArea: React.FC<VoiceTextAreaProps> = ({
           styles.container,
           { minHeight },
           isFocused && styles.containerFocused,
+          isListening && styles.containerFocused,
           !editable && styles.containerDisabled,
         ]}
       >
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={colors.inkSubtle}
-          multiline
-          editable={editable}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          style={[styles.input, inputStyle]}
-        />
-        <View style={styles.footerRow}>
-          {hint ? (
-            <Text style={styles.hintText} numberOfLines={1}>
-              {hint}
-            </Text>
-          ) : (
-            <View style={{ flex: 1 }} />
-          )}
-          <View style={styles.micWrapper}>
-            <VoiceInputButton
-              context={context}
-              size={44}
-              onTranscript={handleVoiceTranscript}
-              disabled={!editable}
-            />
+        {isListening ? (
+          <View style={styles.listeningSlot}>
+            <VoiceListeningBar onStop={stop} />
           </View>
-        </View>
+        ) : (
+          <>
+            <TextInput
+              value={value}
+              onChangeText={onChangeText}
+              placeholder={placeholder}
+              placeholderTextColor={colors.inkSubtle}
+              multiline
+              editable={editable}
+              inputAccessoryViewID={KEYBOARD_DONE_NATIVE_ID}
+              onFocus={() => {
+                setIsFocused(true);
+                onFocus?.();
+              }}
+              onBlur={() => {
+                setIsFocused(false);
+                onBlur?.();
+              }}
+              style={[styles.input, inputStyle]}
+            />
+            <View style={styles.footerRow}>
+              {hint ? (
+                <Text style={styles.hintText} numberOfLines={1}>
+                  {hint}
+                </Text>
+              ) : (
+                <View style={{ flex: 1 }} />
+              )}
+              <View style={styles.micWrapper}>
+                <VoiceInputButton
+                  size={44}
+                  onPress={start}
+                  disabled={!editable}
+                />
+              </View>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -125,6 +153,11 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     flex: 1,
     minHeight: 60,
+  },
+  listeningSlot: {
+    flex: 1,
+    minHeight: 72,
+    justifyContent: 'center',
   },
   footerRow: {
     flexDirection: 'row',

@@ -1,34 +1,62 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Platform } from 'react-native';
-import { colors, typography, spacing, radii } from '@/src/constants/theme';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, typography, radii, spacing } from '@/src/constants/theme';
 import { GlassContainer } from '@/src/components/ui/GlassContainer';
 
 import { Icon, IconName } from '@/src/components/ui/Icon';
+
+const TAB_BAR_HEIGHT = 56;
 
 function TabIcon({ label, icon, focused }: { label: string; icon: IconName; focused: boolean }) {
   const iconColor = focused ? colors.brand : colors.inkMuted;
   return (
     <View style={styles.iconContainer}>
-      <Icon name={icon} size={22} color={iconColor} />
+      <Icon name={icon} size={20} color={iconColor} />
       <Text style={[styles.labelText, focused && styles.labelFocused]}>{label}</Text>
     </View>
   );
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const bottomOffset = Math.max(insets.bottom, 12);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: styles.tabBar,
+        tabBarHideOnKeyboard: true,
+        tabBarStyle: [styles.tabBar, { bottom: bottomOffset }],
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarIconStyle: styles.tabBarIcon,
+        tabBarButton: ({
+          children,
+          onPress,
+          onLongPress,
+          style,
+          accessibilityLabel,
+          testID,
+        }) => (
+          <Pressable
+            onPress={onPress}
+            onLongPress={onLongPress}
+            style={[style, styles.tabBarButton]}
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel}
+            testID={testID}
+          >
+            {children}
+          </Pressable>
+        ),
         tabBarBackground: () => (
           <GlassContainer
             isFloating={true}
             style={StyleSheet.absoluteFill}
             glassEffectStyle="regular"
-            tintColor="rgba(255, 254, 251, 0.94)"
+            tintColor={colors.glass.tintLight}
           />
         ),
       }}
@@ -86,31 +114,45 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 24 : 16,
-    left: 20,
-    right: 20,
-    height: 64,
+    // React Navigation's default bar uses `start`/`end: 0`, which wins over
+    // `left`/`right` and kept the capsule full-bleed. Match tab screen gutters.
+    start: spacing.lg,
+    end: spacing.lg,
+    left: spacing.lg,
+    right: spacing.lg,
+    height: TAB_BAR_HEIGHT,
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingHorizontal: 0,
     borderRadius: radii.xl,
     backgroundColor: 'transparent',
     borderTopWidth: 0,
     elevation: 0,
-    paddingTop: 8,
-    paddingBottom: 8,
+    overflow: 'visible',
+  },
+  tabBarItem: {
+    height: TAB_BAR_HEIGHT,
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingHorizontal: 0,
+    justifyContent: 'center',
+  },
+  tabBarIcon: {
+    width: '100%',
+    height: '100%',
+  },
+  tabBarButton: {
+    flex: 1,
+    padding: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   iconContainer: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 52,
-    height: 48,
-  },
-  iconText: {
-    fontSize: 20,
-    color: colors.inkMuted,
-    marginBottom: 2,
-  },
-  iconFocused: {
-    color: colors.brand,
-    fontWeight: typography.weights.bold,
+    gap: 2,
   },
   labelText: {
     fontSize: typography.sizes.micro,

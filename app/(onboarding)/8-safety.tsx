@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
-import { SelectionRow } from '@/src/components/ui/SelectionRow';
-import { GroupedSection } from '@/src/components/ui/GroupedSection';
+import { SelectionCard } from '@/src/components/ui/SelectionCard';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { TextField } from '@/src/components/ui/TextField';
 import { VoiceTextArea } from '@/src/components/ui/VoiceTextArea';
@@ -68,6 +67,7 @@ export default function SafetyScreen() {
   );
 
   const [notes, setNotes] = useState<string>(additionalSafetyNotes);
+  const scrollRef = useRef<ScrollView>(null);
 
   const handleAddCustomSensitivity = () => {
     const trimmed = customSensInput.trim();
@@ -124,8 +124,12 @@ export default function SafetyScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
       >
         <Text style={styles.questionTitle}>A few safety questions</Text>
         <Text style={styles.questionSubtitle}>
@@ -136,58 +140,59 @@ export default function SafetyScreen() {
         {hasDifferinOnShelf && (
           <View style={styles.sectionBlock}>
             <Text style={styles.sectionHeader}>We found Differin on your shelf</Text>
-            <GroupedSection
-              footer="We identified Differin on your counter. We will incorporate it with barrier buffers."
-            >
-              <SelectionRow
+            <View style={styles.optionsList}>
+              <SelectionCard
                 title="Yes, I am actively using Differin"
-                subtitle="Incorporate into evening treatment schedule"
+                description="Incorporate into evening treatment schedule"
                 selected={isUsingDifferin === true}
                 onPress={() => setIsUsingDifferin(true)}
-                type="radio"
               />
-              <SelectionRow
+              <SelectionCard
                 title="No, paused or not using it"
-                subtitle="Do not schedule Differin in current routine"
+                description="Do not schedule Differin in current routine"
                 selected={isUsingDifferin === false}
                 onPress={() => setIsUsingDifferin(false)}
-                type="radio"
               />
-            </GroupedSection>
+            </View>
+            <Text style={styles.helperText}>
+              We identified Differin on your counter. We will incorporate it with barrier buffers.
+            </Text>
           </View>
         )}
 
         {/* SECTION 2: OTHER ACTIVE PRESCRIPTIONS */}
         <View style={styles.sectionBlock}>
           <Text style={styles.sectionHeader}>Other Active Prescriptions</Text>
-          <GroupedSection footer="Select any active medications or prescription treatments you are currently using.">
+          <View style={styles.optionsList}>
             {PRESCRIPTION_OPTIONS.map((rx) => {
               const isSelected = selectedPrescriptions.includes(rx.label);
               return (
-                <SelectionRow
+                <SelectionCard
                   key={rx.id}
                   title={rx.label}
                   selected={isSelected}
                   onPress={() => togglePrescription(rx.label)}
-                  type="checkbox"
+                  selectionType="checkbox"
                 />
               );
             })}
-          </GroupedSection>
+          </View>
+          <Text style={styles.helperText}>
+            Select any active medications or prescription treatments you are currently using.
+          </Text>
         </View>
 
         {/* SECTION 3: INGREDIENT ALLERGIES / SENSITIVITIES */}
         <View style={styles.sectionBlock}>
           <Text style={styles.sectionHeader}>Known Allergies & Sensitivities</Text>
-          <GroupedSection>
-            <SelectionRow
+          <View style={styles.optionsList}>
+            <SelectionCard
               title="No known ingredient allergies"
-              subtitle="No known severe contact allergies to skincare ingredients"
+              description="No known severe contact allergies to skincare ingredients"
               selected={hasNoSensitivities}
               onPress={handleToggleNoSensitivities}
-              type="radio"
             />
-          </GroupedSection>
+          </View>
 
           <TextField
             placeholder="Add specific ingredient allergy or intolerance..."
@@ -209,29 +214,27 @@ export default function SafetyScreen() {
         {/* SECTION 4: PREGNANCY & NURSING (TRI-STATE) */}
         <View style={styles.sectionBlock}>
           <Text style={styles.sectionHeader}>Pregnancy or Nursing</Text>
-          <GroupedSection
-            footer="Certain ingredients like high-strength retinoids and salicylic acid require pregnancy-safe alternatives."
-          >
-            <SelectionRow
+          <View style={styles.optionsList}>
+            <SelectionCard
               title="Yes, currently pregnant or nursing"
-              subtitle="Exclude high-potency retinoids, hydroquinone, and high-dose acids"
+              description="Exclude high-potency retinoids, hydroquinone, and high-dose acids"
               selected={pregnancyState === 'yes'}
               onPress={() => setPregnancyState('yes')}
-              type="radio"
             />
-            <SelectionRow
+            <SelectionCard
               title="No"
               selected={pregnancyState === 'no'}
               onPress={() => setPregnancyState('no')}
-              type="radio"
             />
-            <SelectionRow
+            <SelectionCard
               title="Prefer not to say"
               selected={pregnancyState === 'prefer_not_to_say'}
               onPress={() => setPregnancyState('prefer_not_to_say')}
-              type="radio"
             />
-          </GroupedSection>
+          </View>
+          <Text style={styles.helperText}>
+            Certain ingredients like high-strength retinoids and salicylic acid require pregnancy-safe alternatives.
+          </Text>
         </View>
 
         {/* SECTION 5: OPTIONAL SAFETY NOTES */}
@@ -242,6 +245,7 @@ export default function SafetyScreen() {
           onChangeText={setNotes}
           context="reaction_note"
           minHeight={70}
+          onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
         />
       </ScrollView>
 
@@ -278,6 +282,16 @@ const styles = StyleSheet.create({
   },
   sectionBlock: {
     marginBottom: spacing.md,
+  },
+  optionsList: {
+    gap: spacing.sm,
+  },
+  helperText: {
+    fontSize: typography.sizes.caption,
+    lineHeight: typography.lineHeights.caption,
+    color: colors.inkSubtle,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
   sectionHeader: {
     fontSize: typography.sizes.micro,

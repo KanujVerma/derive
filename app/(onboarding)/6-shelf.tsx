@@ -87,6 +87,7 @@ export default function ShelfScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.questionTitle}>Products</Text>
         <Text style={styles.questionSubtitle}>

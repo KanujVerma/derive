@@ -4,11 +4,14 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@/src/constants/theme';
 
+import { KeyboardDoneBar } from '@/src/components/ui/KeyboardDoneBar';
+
 export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
+      <KeyboardDoneBar />
       <Stack
         screenOptions={{
           headerShown: false,
