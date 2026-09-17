@@ -215,6 +215,10 @@ export class AutoCaptureStateMachine {
     this.reset();
   }
 
+  public getTargetAngle(): CaptureAngle {
+    return this.config.targetAngle;
+  }
+
   public reset(): void {
     this.state = 'IDLE';
     this.holdStartTime = null;

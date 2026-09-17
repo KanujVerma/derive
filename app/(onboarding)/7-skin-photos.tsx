@@ -116,6 +116,12 @@ export default function SkinPhotosScreen() {
         stepBadge={`STEP ${currentAngle.stepNum} OF 3: ${currentAngle.title.toUpperCase()}`}
         instruction={currentAngle.instruction}
         subtext="Good even lighting • No filters"
+        qualityGating={{
+          enabled: true,
+          autoCapture: true,
+          targetAngle: currentAngle.key,
+          holdDurationMs: 750,
+        }}
         onCapture={handleCapture}
         onCancel={() => setIsCameraActive(false)}
       />

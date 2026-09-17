@@ -1474,3 +1474,89 @@ test('K4.4 AutoCapture State Machine: Enforces continuous hold stability and tra
   assert.equal(out6.shouldTriggerCapture, false);
 });
 
+test('K4.4 Finalization: RoutineStore removes initializeDefaultRoutine trap and isolates Arthur loader', () => {
+  const state = useRoutineStore.getState();
+  // initializeDefaultRoutine must NOT exist
+  assert.equal((state as any).initializeDefaultRoutine, undefined);
+  assert.equal(typeof state.loadArthurDemoRoutine, 'function');
+  assert.equal(typeof state.resetRoutine, 'function');
+
+  // Verify clean state
+  state.resetRoutine();
+  const cleanState = useRoutineStore.getState();
+  assert.equal(cleanState.routine, null);
+  assert.equal(cleanState.userProducts.length, 0);
+  assert.equal(cleanState.checkIns.length, 0);
+});
+
+test('K4.4 Finalization: Product catalog simulation fails closed with zero silent fallback', () => {
+  const searchUnknown = 'non_existent_fake_bottle_xyz';
+  const match = PROTOTYPE_CATALOG.find(
+    (p) =>
+      p.name.toLowerCase().includes(searchUnknown) ||
+      p.brand.toLowerCase().includes(searchUnknown)
+  );
+  // Must be undefined, proving no silent fallback to PROTOTYPE_CATALOG[0]
+  assert.equal(match, undefined);
+
+  // But genuine catalog items match accurately
+  const searchValid = 'anthelios';
+  const validMatch = PROTOTYPE_CATALOG.find(
+    (p) =>
+      p.name.toLowerCase().includes(searchValid) ||
+      p.brand.toLowerCase().includes(searchValid)
+  );
+  assert.ok(validMatch);
+  assert.equal(validMatch?.brand, 'La Roche-Posay');
+});
+
+test('K4.4 Finalization: AutoCapture State Machine multi-angle sequencing and target angle getters', () => {
+  const machine = new AutoCaptureStateMachine({
+    targetAngle: 'front',
+    requiredHoldDurationMs: 500,
+  });
+
+  assert.equal(machine.getTargetAngle(), 'front');
+
+  // Switch to left profile
+  machine.setTargetAngle('left');
+  assert.equal(machine.getTargetAngle(), 'left');
+  assert.equal(machine.getState(), 'IDLE');
+
+  const leftProfileMetrics: FrameQualityMetrics = {
+    hasFace: true,
+    faceWidthRatio: 0.5,
+    centerX: 0.5,
+    centerY: 0.5,
+    yaw: -35, // Looking to left
+    captureQuality: 0.9,
+  };
+
+  const t0 = 10000;
+  const out1 = machine.update(leftProfileMetrics, t0);
+  assert.equal(out1.state, 'READY_CANDIDATE');
+
+  const out2 = machine.update(leftProfileMetrics, t0 + 500);
+  assert.equal(out2.state, 'AUTO_CAPTURE');
+  assert.equal(out2.shouldTriggerCapture, true);
+
+  // Switch to right profile
+  machine.setTargetAngle('right');
+  assert.equal(machine.getTargetAngle(), 'right');
+  assert.equal(machine.getState(), 'IDLE');
+
+  // Left metrics now fail closed for right profile
+  const out3 = machine.update(leftProfileMetrics, t0 + 1000);
+  assert.equal(out3.state, 'NOT_READY');
+  assert.equal(out3.feedback, 'turn_right');
+
+  // Right metrics pass
+  const rightProfileMetrics: FrameQualityMetrics = {
+    ...leftProfileMetrics,
+    yaw: 35,
+  };
+  const out4 = machine.update(rightProfileMetrics, t0 + 1100);
+  assert.equal(out4.state, 'READY_CANDIDATE');
+});
+
+

@@ -168,7 +168,6 @@ export interface RoutineState {
   // Actions
   resetRoutine: () => void;
   loadArthurDemoRoutine: () => void;
-  initializeDefaultRoutine: () => void;
   toggleStepCompletion: (stepId: string) => void;
   submitCheckIn: (checkIn: Omit<CheckIn, 'id' | 'createdAt'>) => void;
   requestRefill: (productId: string, productName: string, brand: string) => void;
@@ -183,8 +182,6 @@ export const useRoutineStore = create<RoutineState>((set, get) => ({
   resetRoutine: () => set({ ...INITIAL_ROUTINE_STATE }),
 
   loadArthurDemoRoutine: () => set(getArthurDemoRoutineState()),
-
-  initializeDefaultRoutine: () => set(getArthurDemoRoutineState()),
 
   toggleStepCompletion: (stepId) =>
     set((state) => {

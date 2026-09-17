@@ -46,24 +46,30 @@ export default function ScanScreen() {
 
   useEffect(() => {
     analytics.track('scan_tab_opened', { source: 'tab_navigation' });
-    if (params?.sim) {
-      const match =
-        PROTOTYPE_CATALOG.find((p) =>
-          p.name.toLowerCase().includes(params.sim!.toLowerCase()) ||
-          p.brand.toLowerCase().includes(params.sim!.toLowerCase())
-        ) || PROTOTYPE_CATALOG[0];
-      setConfirmedProduct(match);
-      setIsSearching(false);
-      const result = evaluateProductScan(match, {
-        routine,
-        userProducts,
-        reactions: productReactions,
-        checkIns,
-        routineComplexity: routineComplexity || undefined,
-        primaryGoal: primaryGoal || undefined,
-        costPreference: costPreference || undefined,
-      });
-      setScanResult(result);
+    if (__DEV__ && params?.sim) {
+      const search = params.sim.toLowerCase();
+      const match = PROTOTYPE_CATALOG.find(
+        (p) =>
+          p.name.toLowerCase().includes(search) ||
+          p.brand.toLowerCase().includes(search)
+      );
+      if (match) {
+        setConfirmedProduct(match);
+        setIsSearching(false);
+        const result = evaluateProductScan(match, {
+          routine,
+          userProducts,
+          reactions: productReactions,
+          checkIns,
+          routineComplexity: routineComplexity || undefined,
+          primaryGoal: primaryGoal || undefined,
+          costPreference: costPreference || undefined,
+        });
+        setScanResult(result);
+      } else {
+        console.warn(`[DEV] Unknown simulated product "${params.sim}". Failing closed without fallback.`);
+        setUnknownBarcode(params.sim);
+      }
     }
   }, [params?.sim]);
 
@@ -492,24 +498,26 @@ export default function ScanScreen() {
             <Text style={styles.manualSearchText}>Can't scan barcode? Search by name</Text>
           </TouchableOpacity>
 
-          {/* Quick Shortcuts for Instant Testing (All Environments / Dev) */}
-          <View style={styles.quickShortcuts}>
-            <Text style={styles.shortcutHeading}>TEST PRESETS</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcutPillRow}>
-              {PROTOTYPE_CATALOG.map((item, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.shortcutPill}
-                  onPress={() => handleSelectCatalogItem(item)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.shortcutPillText}>
-                    {item.brand.split(' ')[0]} {item.name.split(' ')[0]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+          {/* Quick Shortcuts for Instant Testing (Dev only) */}
+          {__DEV__ && (
+            <View style={styles.quickShortcuts}>
+              <Text style={styles.shortcutHeading}>TEST PRESETS</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcutPillRow}>
+                {PROTOTYPE_CATALOG.map((item, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.shortcutPill}
+                    onPress={() => handleSelectCatalogItem(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.shortcutPillText}>
+                      {item.brand.split(' ')[0]} {item.name.split(' ')[0]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
       </ScrollView>
 

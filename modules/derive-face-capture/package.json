@@ -1,0 +1,6 @@
+{
+  "name": "derive-face-capture",
+  "version": "1.0.0",
+  "description": "Native Apple Vision and AVFoundation face auto-capture module for Derive",
+  "main": "index.ts"
+}

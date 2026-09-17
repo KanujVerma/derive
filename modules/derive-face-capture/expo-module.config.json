@@ -1,8 +1,6 @@
 {
-  "name": "derive-face-capture",
-  "platforms": ["ios"],
-  "ios": {
-    "modules": ["DeriveFaceCaptureModule"],
-    "views": ["DeriveFaceCaptureView"]
+  "platforms": ["apple"],
+  "apple": {
+    "modules": ["DeriveFaceCaptureModule"]
   }
 }

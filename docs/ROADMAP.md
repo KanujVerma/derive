@@ -84,18 +84,23 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Zero customer-facing `$129` promises in Kanuj-owned paths.
   - Zero unsupported E2EE or medical claims in customer-facing copy.
 
-### K4.4: Baseline Capture Intelligence, Instant Product Scanning & Beta State Finalization [COMPLETE]
+### K4.4: Baseline Capture Intelligence, Instant Product Scanning & Beta State Finalization [WIRED & COMPILATION READY / PHYSICAL DEVICE VALIDATION IN K5]
 * **Scope**:
-  - Purged remaining default demo state contamination from `routineStore`: initialized `routine: null`, `userProducts: []`, `checkIns: []`, `refillRequests: []`, and empty history by default; isolated Arthur fixture into explicit `loadArthurDemoRoutine()` and `getArthurDemoRoutineState()`.
+  - Purged remaining default demo state contamination from `routineStore`: initialized `routine: null`, `userProducts: []`, `checkIns: []`, `refillRequests: []`, and empty history by default; isolated Arthur fixture into explicit `loadArthurDemoRoutine()` and `getArthurDemoRoutineState()`; removed misleading `initializeDefaultRoutine` action.
+  - Gated development surfaces (`ProfileScreen` demo controls, `Scan` test presets, `params.sim` parameter) behind `__DEV__`; simulation fails closed without match (zero silent fallback to `PROTOTYPE_CATALOG[0]`).
   - Empty-state hardening across Progress, Refill, Plan, and Profile with dynamic routine/treatment adaptive advice.
   - Zero-shutter continuous barcode scanner on Scan tab (`CameraView` with `onBarcodeScanned`), horizontal reticle guide, synchronous lock/debounce ref, torch toggle, and unknown product sheet with search fallback.
   - Deterministic barcode utilities (`normalizeBarcode`, `getBarcodeLookupKeys`, `validateBarcodeChecksum`) resolving UPC-A and EAN-13 variations.
-  - Resolved `ARCHITECTURE_CHALLENGE-04`: implemented Apple Vision + AVFoundation local Expo module (`modules/derive-face-capture/`) analyzing head pose and capture quality on-device at ~8 Hz; created pure TypeScript deterministic state machine (`AutoCaptureStateMachine.ts`) enforcing continuous hold stability before triggering capture; eliminated fake Unsplash photo fallback in camera capture with fail-closed error handling.
+  - Resolved `ARCHITECTURE_CHALLENGE-04`: implemented Apple Vision + AVFoundation local Expo module (`modules/derive-face-capture/`) with CocoaPods podspec and Expo autolinking (`DeriveFaceCaptureModule`); Swift syntax verified; pure TypeScript deterministic state machine (`AutoCaptureStateMachine.ts`) enforcing continuous hold stability before triggering capture.
+  - Fully wired native face capture into `CameraCapture.tsx` and onboarding baseline photos (`app/(onboarding)/7-skin-photos.tsx`) with ref forwarding, imperative `takePhoto()`, frame metrics feedback, single-camera mounting, and clean web/simulator fallback to `expo-camera`.
+  - Physical hardware sensor calibration and lighting tolerance testing explicitly scheduled for K5 on TestFlight.
 * **Acceptance Criteria**:
-  - Full test suite passes 100% (48/48 tests).
+  - Full test suite passes 100% (51/51 tests).
   - TypeScript typecheck passes with 0 errors (`npx tsc --noEmit`).
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
-  - Zero unconfirmed demo data leaks into fresh client launches.
+  - Native Swift syntax checks pass cleanly (`swiftc -parse`).
+  - Expo autolinking resolves `DeriveFaceCapture` pod and module.
+  - Zero unconfirmed demo data leaks into fresh client launches; dev controls hidden in production.
   - Barcode lookup correctly identifies products across UPC and EAN formats without shutter press.
 
 ### K5: Mobile Release & TestFlight [NEXT]

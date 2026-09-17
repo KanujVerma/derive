@@ -211,47 +211,49 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </GroupedSection>
 
-        {/* Section 3: Demo & Development Controls */}
-        <GroupedSection header="Demo & Development Controls">
-          <TouchableOpacity
-            style={styles.groupedRow}
-            onPress={handleLoadDemo}
-            activeOpacity={0.7}
-          >
-            <Icon name="sparkle" size={18} color={colors.brand} />
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Load Arthur Demo Fixture</Text>
-              <Text style={styles.rowSubtitle}>Load 4-product routine, check-in, and Differin schedule</Text>
-            </View>
-            <Icon name="forward" size={16} color={colors.inkMuted} />
-          </TouchableOpacity>
+        {/* Section 3: Demo & Development Controls (dev only) */}
+        {__DEV__ && (
+          <GroupedSection header="Demo & Development Controls">
+            <TouchableOpacity
+              style={styles.groupedRow}
+              onPress={handleLoadDemo}
+              activeOpacity={0.7}
+            >
+              <Icon name="sparkle" size={18} color={colors.brand} />
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>Load Arthur Demo Fixture</Text>
+                <Text style={styles.rowSubtitle}>Load 4-product routine, check-in, and Differin schedule</Text>
+              </View>
+              <Icon name="forward" size={16} color={colors.inkMuted} />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.groupedRow}
-            onPress={handleResetToClean}
-            activeOpacity={0.7}
-          >
-            <Icon name="progress" size={18} color={colors.actionPause.text} />
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Reset to Clean Member State</Text>
-              <Text style={styles.rowSubtitle}>Clear active routine, check-ins, and pending plans</Text>
-            </View>
-            <Icon name="forward" size={16} color={colors.inkMuted} />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.groupedRow}
+              onPress={handleResetToClean}
+              activeOpacity={0.7}
+            >
+              <Icon name="progress" size={18} color={colors.actionPause.text} />
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>Reset to Clean Member State</Text>
+                <Text style={styles.rowSubtitle}>Clear active routine, check-ins, and pending plans</Text>
+              </View>
+              <Icon name="forward" size={16} color={colors.inkMuted} />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.groupedRow}
-            onPress={() => handleRowPress('/founder')}
-            activeOpacity={0.7}
-          >
-            <Icon name="person" size={18} color={colors.inkMuted} />
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Founder Review Queue</Text>
-              <Text style={styles.rowSubtitle}>Internal concierge plan approval console</Text>
-            </View>
-            <Icon name="forward" size={16} color={colors.inkMuted} />
-          </TouchableOpacity>
-        </GroupedSection>
+            <TouchableOpacity
+              style={styles.groupedRow}
+              onPress={() => handleRowPress('/founder')}
+              activeOpacity={0.7}
+            >
+              <Icon name="person" size={18} color={colors.inkMuted} />
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>Founder Review Queue</Text>
+                <Text style={styles.rowSubtitle}>Internal concierge plan approval console</Text>
+              </View>
+              <Icon name="forward" size={16} color={colors.inkMuted} />
+            </TouchableOpacity>
+          </GroupedSection>
+        )}
 
         {/* Footer Note */}
         <Text style={styles.footerText}>

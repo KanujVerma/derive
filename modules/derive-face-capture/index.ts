@@ -1,3 +1,8 @@
-import DeriveFaceCaptureView from './src/DeriveFaceCaptureView';
-export { DeriveFaceCaptureView };
-export type { DeriveFaceCaptureViewProps } from './src/DeriveFaceCaptureView';
+import DeriveFaceCaptureView, {
+  isDeriveFaceCaptureSupported,
+  type DeriveFaceCaptureViewProps,
+  type DeriveFaceCaptureViewRef,
+} from './src/DeriveFaceCaptureView';
+
+export { DeriveFaceCaptureView, isDeriveFaceCaptureSupported };
+export type { DeriveFaceCaptureViewProps, DeriveFaceCaptureViewRef };

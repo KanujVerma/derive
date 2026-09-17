@@ -99,6 +99,11 @@ public class DeriveFaceCaptureView: ExpoView, AVCaptureVideoDataOutputSampleBuff
         let layer = AVCaptureVideoPreviewLayer(session: self.captureSession)
         layer.videoGravity = .resizeAspectFill
         layer.frame = self.bounds
+        if let connection = layer.connection {
+          if connection.isVideoOrientationSupported {
+            connection.videoOrientation = .portrait
+          }
+        }
         self.layer.addSublayer(layer)
         self.previewLayer = layer
       }
@@ -178,7 +183,19 @@ public class DeriveFaceCaptureView: ExpoView, AVCaptureVideoDataOutputSampleBuff
 
   // MARK: - Photo Capture
   public func takePhoto(promise: Promise) {
+    guard pendingPhotoPromise == nil else {
+      promise.reject("BUSY", "Photo capture already in progress")
+      return
+    }
     self.pendingPhotoPromise = promise
+    if let connection = photoOutput.connection(with: .video) {
+      if connection.isVideoOrientationSupported {
+        connection.videoOrientation = .portrait
+      }
+      if connection.isVideoMirroringSupported {
+        connection.isVideoMirrored = true
+      }
+    }
     let settings = AVCapturePhotoSettings()
     photoOutput.capturePhoto(with: settings, delegate: self)
   }
@@ -215,6 +232,16 @@ public class DeriveFaceCaptureView: ExpoView, AVCaptureVideoDataOutputSampleBuff
     } catch {
       pendingPhotoPromise?.reject("WRITE_FAILED", error.localizedDescription)
       pendingPhotoPromise = nil
+    }
+  }
+
+  public override func removeFromSuperview() {
+    super.removeFromSuperview()
+    sessionQueue.async { [weak self] in
+      guard let self = self else { return }
+      if self.captureSession.isRunning {
+        self.captureSession.stopRunning()
+      }
     }
   }
 

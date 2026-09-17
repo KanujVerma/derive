@@ -18,17 +18,15 @@ import { Icon } from '@/src/components/ui/Icon';
 import {
   AutoCaptureStateMachine,
   FrameQualityMetrics,
+  QualityFeedback,
 } from '@/src/components/camera/AutoCaptureStateMachine';
+import {
+  DeriveFaceCaptureView,
+  isDeriveFaceCaptureSupported,
+  type DeriveFaceCaptureViewRef,
+} from '@/modules/derive-face-capture';
 
-export type QualityFeedback =
-  | 'center_face'
-  | 'turn_left'
-  | 'turn_right'
-  | 'hold_steady'
-  | 'too_dark'
-  | 'too_close'
-  | 'too_far'
-  | 'ready';
+export type { QualityFeedback };
 
 export interface QualityGateStatus {
   isReady: boolean;
@@ -96,43 +94,92 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   const defaultFacing: CameraType = type === 'face' ? 'front' : 'back';
   const [facing, setFacing] = useState<CameraType>(initialFacing || defaultFacing);
 
+  // Check if native Apple Vision face capture is supported on this platform/device
+  const isNativeSupported = isDeriveFaceCaptureSupported();
+  const useNativeCapture = type === 'face' && facing === 'front' && isNativeSupported;
+
   // Library upload is strictly disabled for standardized face baseline captures
   const libraryAllowed = allowLibrary ?? (type === 'shelf');
 
   const cameraRef = useRef<CameraView>(null);
+  const nativeFaceRef = useRef<DeriveFaceCaptureViewRef>(null);
+
+  useEffect(() => {
+    if (useNativeCapture) {
+      setIsCameraReady(true);
+    }
+  }, [useNativeCapture]);
 
   const handleFlip = () => {
     Haptics.selectionAsync();
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
   };
 
-  const handleShutterPress = async () => {
-    if (isCapturing || !isCameraReady) return;
+  const handleFrameMetrics = (metrics: FrameQualityMetrics) => {
+    if (!stateMachineRef.current || isCapturing || capturedUri) return;
+
+    const output = stateMachineRef.current.update(metrics);
+    setAutoCaptureProgress(output.holdProgress);
+    setQualityFeedback(output.feedbackMessage);
+
+    if (qualityGating?.onStatusChange) {
+      qualityGating.onStatusChange({
+        isReady: output.isReady,
+        feedback: output.feedback as QualityFeedback,
+        feedbackMessage: output.feedbackMessage,
+      });
+    }
+
+    if (output.shouldTriggerCapture && qualityGating?.autoCapture && !isCapturing) {
+      executePhotoCapture(true);
+    }
+  };
+
+  const executePhotoCapture = async (isAuto = false) => {
+    if (isCapturing) return;
 
     try {
       setIsCapturing(true);
       setCameraError(null);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      if (cameraRef.current) {
+      if (isAuto) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+
+      if (useNativeCapture && nativeFaceRef.current) {
+        const picture = await nativeFaceRef.current.takePhoto();
+        if (picture?.uri) {
+          stateMachineRef.current?.markCaptured();
+          setCapturedUri(picture.uri);
+          return;
+        }
+      } else if (cameraRef.current) {
         const picture = await cameraRef.current.takePictureAsync({
           quality: 0.85,
           skipProcessing: false,
         });
 
         if (picture?.uri) {
+          stateMachineRef.current?.markCaptured();
           setCapturedUri(picture.uri);
           return;
         }
       }
 
       setCameraError('Unable to capture photo. Please steady the camera and try again.');
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Camera capture error:', err);
       setCameraError('Camera error during capture. Please verify permissions and try again.');
     } finally {
       setIsCapturing(false);
     }
+  };
+
+  const handleShutterPress = async () => {
+    if (isCapturing || !isCameraReady) return;
+    await executePhotoCapture(false);
   };
 
   const handleLaunchLibrary = async () => {
@@ -164,6 +211,9 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
 
   const handleRetake = () => {
     setCapturedUri(null);
+    setAutoCaptureProgress(0);
+    setQualityFeedback(null);
+    stateMachineRef.current?.reset();
   };
 
   // 1. Permission Loading State
@@ -264,13 +314,29 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   // 4. Live Camera Viewfinder State
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        facing={facing}
-        mirror={facing === 'front'}
-        style={StyleSheet.absoluteFill}
-        onCameraReady={() => setIsCameraReady(true)}
-      />
+      {useNativeCapture ? (
+        <DeriveFaceCaptureView
+          ref={nativeFaceRef}
+          targetAngle={qualityGating?.targetAngle || 'front'}
+          isActive={!capturedUri}
+          style={StyleSheet.absoluteFill}
+          onFrameMetrics={(e) => handleFrameMetrics(e.nativeEvent)}
+          onPhotoCaptured={(e) => {
+            if (!capturedUri && e.nativeEvent?.uri) {
+              stateMachineRef.current?.markCaptured();
+              setCapturedUri(e.nativeEvent.uri);
+            }
+          }}
+        />
+      ) : (
+        <CameraView
+          ref={cameraRef}
+          facing={facing}
+          mirror={facing === 'front'}
+          style={StyleSheet.absoluteFill}
+          onCameraReady={() => setIsCameraReady(true)}
+        />
+      )}
 
       {/* Top Floating HUD Banner */}
       <View style={styles.topHud}>
