@@ -79,8 +79,22 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 
 ## Sami Workstream (Platform + Intelligence + Operations)
 
-### S1: Platform Foundation
+### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]
 * **Scope**: Supabase setup, baseline PostgreSQL schema, reproducible migration scripts, customer authentication, private photo storage buckets, Row-Level Security (RLS) policies, and secure environment secrets management.
+* **Implemented in S1A**:
+  - Committed local Supabase configuration and an additive migration chain.
+  - Auth-user profile provisioning with a hardened trigger and backfill.
+  - Explicit grants plus operation-specific RLS on every existing public application table.
+  - Private `customer-skin-photos` bucket, member-ID path isolation, immutable uploads, and no client download/list/sign/update/delete permission.
+  - pgTAP coverage for exact policy/grant shape, auth provisioning and synchronization, anonymous denial, owner/cross-owner access, server-owned fields, and private Storage policy behavior.
+  - Explicit safe-column projections in the Sami-owned remote adapter, avoiding wildcard expansion across protected membership and routine fields.
+* **Remaining Before S1 Is Complete**:
+  - Run `supabase db reset` and `supabase test db` against a Docker-backed official local stack and make that verification repeatable in CI.
+  - Implement persistent Expo auth sessions and authenticated route/callback handling in a coordinated shared/mobile change.
+  - Implement a JWT-bound server signer that issues 15-minute photo URLs without trusting caller-supplied user IDs or paths.
+  - Implement idempotent Storage-API deletion before relational/auth deletion; database cascades alone do not delete physical objects.
+  - Replace the unused arbitrary/upserting client upload helper with the canonical bucket and member-owned path convention, then run an API-level upload smoke test in a coordinated change.
+  - Finish remote row-to-domain mapping, routine-item assembly, live function coverage, and integration tests before enabling the remote service in production.
 * **Acceptance Criteria**:
   - Migrations run cleanly from a fresh Supabase database.
   - RLS strictly isolates member data: customer can only read/write their own records.

@@ -32,6 +32,26 @@ npx tsc --noEmit
 npx expo start
 ```
 
+### Local Supabase Verification
+
+The committed `supabase/config.toml` and ordered migrations reproduce the S1
+data-plane locally. Docker Desktop or another Docker-compatible runtime is
+required by the Supabase CLI.
+
+```bash
+# Start the local Auth, Postgres, and Storage services.
+npx supabase start
+
+# Rebuild a fresh database from every committed migration.
+npx supabase db reset
+
+# Run the pgTAP access-control suite in supabase/tests/.
+npx supabase test db
+```
+
+Before linking a hosted project, confirm its PostgreSQL major version matches
+`supabase/config.toml`. Never run a linked reset against production.
+
 ---
 
 ## 2. Tech Stack
