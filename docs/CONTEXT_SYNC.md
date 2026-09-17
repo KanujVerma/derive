@@ -11,7 +11,7 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
 - **Local Branch**: `main`
 - **Starting Local HEAD**: `ae4e49d951477d53967196729a4933fb6fb71b30`
-- **Ending Commit / HEAD**: `4778026` (pushed checkpoint)
+- **Ending Commit / HEAD**: `71e693d6b45f6850d5c53332172ef139fc41d3e8` (pushed checkpoint)
 - **Remote Push Status**: `pushed`
 - **Drive Status**: `sync-required` (DRIVE_SYNC_PAYLOAD emitted in completion report)
 - **Architecture Challenges Raised / Resolved**: None
