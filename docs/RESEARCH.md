@@ -62,9 +62,9 @@ The Founding Beta (10 paying members at $100/mo) is explicitly designed to test 
 ## 4. Preliminary Customer-Discovery Evidence (N=31 Pilot / Wave 1)
 
 ### A. Methodology & Critical Sampling Caveats
-- **Sample Nature**: Convenience sample of 31 respondents recruited primarily from a University of Washington / Computer Science-heavy campus environment.
+- **Sample Nature**: Convenience sample of 31 respondents recruited primarily from a University of Wisconsin–Madison / Computer Science-heavy campus environment.
 - **Demographic Bias**: The sample appears male-skewed and engineering-heavy.
-- **Non-Representativeness**: This sample **MUST NOT** be described as representative of UW students, general skincare consumers, or the broader target market.
+- **Non-Representativeness**: This sample **MUST NOT** be described as representative of UW–Madison students, general skincare consumers, or the broader target market.
 - **Survey Configuration Limitation (Q5 Multi-Select)**: Question 5 ("What is the most annoying part of taking care of your skin?") appears configured in the survey tool as multi-select despite the singular wording "most annoying." Percentages for Q5 reflect selections across respondents and are **not mutually exclusive**. Do not treat them as a single-choice distribution.
 - **No Manufactured Statistical Significance**: Findings are directional pilot signals only.
 

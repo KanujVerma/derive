@@ -19,10 +19,10 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 ### 1. Today ("What matters right now")
 - **2-Second Glance**: Top greeting stating routine status (`Good evening, Arthur. Everything looks on track. No changes today.`).
 - **Non-Blocking Review Notice**: When a member's first plan is awaiting initial review (`status: 'awaiting_review'`), a calm `InfoBanner` displays at the top ("Final Review in Progress") with a 1-tap link to preview the proposed routine without blocking any app features.
-- **Quiet Draft Preview Mode**: While the initial plan is in review, Today enters a quiet state: active tonight steps, active refills, and research insight cards are withheld until verification completes, displaying a single prominent `DRAFT · NOT ACTIVE` routine preview card.
+- **Quiet Draft Preview Mode**: While the initial plan is in review, Today enters a quiet state: active tonight steps, active refills, and contextual research cards are withheld until verification completes, displaying a single prominent `DRAFT · NOT ACTIVE` routine preview card.
 - **Tonight Routine Preview**: Tappable preview card showing ordered steps, timing, and direct link to Plan tab (no redundant nested buttons).
 - **Active Refill Tracker**: Prominent status banner displaying shipment status, carrier, and estimated arrival.
-- **New For You Research Card**: 1 curated clinical paper with plain-English summary and routine relevance.
+- **Actionable Research Card (Contextual Only)**: Curated clinical research surfaces on Today *only* when it directly informs a current routine change, barrier state, or active adjustment (e.g. explaining why an active was paused or why photoprotection was adapted). To preserve Today's 2-second glance without consuming attention with non-actionable reading, broader educational research lives in Ask, Progress, and dedicated detail views (`app/insights/[id]`).
 - **Anti-Anxiety Design**: Zero streaks, zero checkboxes, zero completion guilt.
 
 ### 2. Plan ("Your canonical routine and shelf audit")

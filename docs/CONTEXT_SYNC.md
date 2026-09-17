@@ -6,13 +6,34 @@ This ledger tracks durable architectural, product, and contract decisions across
 
 ---
 
+## 2026-09-17 — Founder Alignment: Narrow Documentation-Correctness Cleanup (Pass 8)
+
+- **Agent / Workstream**: Kanuj & Sami Founder Alignment (Mobile/UX + Platform/Intelligence)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `3cf752d72672798bdec43cca6d416925ecdb20c0`
+- **Remote Push Status**: `pending-push` (to be verified upon commit and push)
+- **Drive Status**: `synced by orchestrator after agent completion`
+- **Milestone Status**: `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress); `K4 COMPLETE` (K4.1 pricing prototype & K4.2 phenotype prototype complete; K5 next).
+- **Ownership / Shared Contracts**: Strictly documentation cleanup. Zero code, UI, migration, or contract edits.
+- **Durable Corrections Made**:
+  1. **Survey Location Correction (`docs/RESEARCH.md`)**: Corrected Wave 1 survey sampling location from "University of Washington" to "University of Wisconsin–Madison" / "UW–Madison" while preserving all sampling caveats and statistical data.
+  2. **AI-Led Care Loop Reconciled with Concierge Beta (`docs/PROJECT_CONTEXT.md`)**: Clarified that scalable long-term Derive is AI-led and software-managed, while the 10-member Founding Beta uses manual founder review of early recommendations, routine adaptations, and check-ins where useful for learning. Reaffirmed that recurring founder consultation is an operational bridge, not the permanent product promise.
+  3. **ADR-13 vs. ADR-21 Target vs. Temporary Override Alignment (`docs/DECISIONS.md`)**: Formally defined ADR-13 as the scalable long-term care-loop target architecture and ADR-21 as the temporary operational override for the 10-member Founding Beta learning cohort.
+  4. **Pass 7 Ledger Final State (`docs/CONTEXT_SYNC.md`)**: Updated Pass 7 bookkeeping to record ending pushed commit `3cf752d`, remote verified status, GitHub CI success (`Run 35250494613`), and Drive sync status.
+  5. **Planned Backend Intelligence & Edge Functions Clarification (`README.md`)**: Clarified that server-side Gemini 2.5 Flash structured intelligence and Supabase Edge Functions are planned architecture (S3 milestone); the client currently uses deterministic local reasoning via `MockDeriveService`.
+  6. **Today Research Card Action-Relevance Alignment (`docs/PRODUCT.md`)**: Reconciled the Today tab research card so clinical literature surfaces on Today only when directly relevant to an active routine adaptation or barrier state, keeping general educational research on Ask, Progress, and detail views to protect Today's 2-second glance.
+
+---
+
 ## 2026-09-17 — Founder Alignment: Founding Beta Concierge Model, $100/Mo Experiment & Durable Context Reconciliation (Pass 7)
 
 - **Agent / Workstream**: Kanuj & Sami Founder Alignment (Mobile/UX + Platform/Intelligence)
 - **Local Branch**: `main`
 - **Starting Shared HEAD / origin/main**: `58277086cf7335a11fa9d5c05e9e4e56aa144957`
-- **Remote Push Status**: `pending-push` (to be verified upon commit and push)
-- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Ending Pushed SHA**: `3cf752d72672798bdec43cca6d416925ecdb20c0`
+- **Remote Push Status**: `pushed / verified`
+- **GitHub CI**: `success` (Run ID: `35250494613`)
+- **Drive Status**: `synced by orchestrator after agent completion`
 - **Milestone Status**: `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress); `K4 COMPLETE` (K4.1 pricing prototype & K4.2 phenotype prototype complete; K5 next).
 - **Ownership / Shared Contracts**: Strictly documentation and durable architectural context reconciliation across both founder workstreams. Zero changes to UI components, database migrations, Supabase schema, or shared TypeScript contracts (`src/contracts/**`, `src/domain/**`).
 - **Durable Decisions & Context Reconciled**:
@@ -24,7 +45,7 @@ This ledger tracks durable architectural, product, and contract decisions across
   6. **Routine Change & Member Approval Policy**: Explicit trust boundary. Derive may automatically ingest check-ins, update observations, generate progress summaries, determine "no change needed", propose modifications, and estimate refill timing. Material changes (adding/replacing products, permanent removal, changing strong active frequency/intensity, introducing strong active, reintroducing adverse-history ingredient, price increase, shipping new/substitute product) require explicit member approval before activation. Prescriptions are contextual only. Safety escalation remains immediate for acute red flags.
   7. **Refill Consent Policy**: Same-product refills use low-friction confirmation ("Running low on [product]? Refill"). No fake deterministic depletion claims, no silent auto-shipment based solely on elapsed calendar days. Future standing consent for same SKU with advance notice and skip option. Substitutions require affirmative approval.
   8. **Founder Research Conversations**: Biweekly-ish customer discovery and feedback conversations for first 10 members; explicitly NOT a permanent recurring consultation feature.
-  9. **Preliminary Customer-Discovery Evidence (N=31 Wave 1 Pilot)**: Recorded survey findings with explicit convenience sample caveats (UW/CS-heavy, male-skewed, not representative) and Q5 multi-select configuration note. 54.8% prioritized build/manage + adapt + progress tracking. Directional signal favoring longitudinal management/progress/adaptation over Scan/fulfillment as primary acquisition wedge. Scan and fulfillment preserved for retention defensibility.
+  9. **Preliminary Customer-Discovery Evidence (N=31 Wave 1 Pilot)**: Recorded survey findings with explicit convenience sample caveats (UW–Madison/CS-heavy, male-skewed, not representative) and Q5 multi-select configuration note. 54.8% prioritized build/manage + adapt + progress tracking. Directional signal favoring longitudinal management/progress/adaptation over Scan/fulfillment as primary acquisition wedge. Scan and fulfillment preserved for retention defensibility.
   10. **Customer-Facing Trust & Safety Language Standards**: "Your skincare, handled." "Your first routine gets one final quality check before it goes live." Strict prohibitions on claiming AI dermatologist, unsubstantiated clinical review, photo disease diagnosis, pseudo-quantitative selfie measurements, causal allergy inference from one event, guaranteed outcomes, or unheld medical credentials.
   11. **README & Durable Docs Line-by-Line Audit**: Removed stale $129 claims, distinguished implemented stack from planned architecture, updated documentation sitemap to include `docs/PRODUCT.md` and `docs/CONTEXT_SYNC.md`, and reconciled all 12 docs across the repository.
 - **Decision Status**:

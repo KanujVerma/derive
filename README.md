@@ -57,8 +57,8 @@ Before linking a hosted project, confirm its PostgreSQL major version matches
 
 - **Mobile Client**: Expo SDK 57, React Native 0.86, TypeScript (strict mode), Expo Router (file-based navigation in `app/`), Zustand state stores.
 - **Visual Design**: Direction A Mineral (Warm Ivory `#F6F3EC`, Elevated Surface `#FFFEFB`, Architectural Charcoal `#171A18`, Mineral Green `#345447`).
-- **Platform / Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Edge Functions, Private Storage) — S1A data plane hardened; full S1 platform in progress.
-- **Intelligence**: Server-side Google Gemini 2.5 Flash via structured JSON schemas (server-side only; Gemini keys are strictly server secrets; mobile client uses deterministic local reasoning via `MockDeriveService`), coupled with deterministic safety circuit breakers.
+- **Platform / Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Private Storage; Edge Functions planned) — S1A data plane hardened; full S1 platform in progress.
+- **Intelligence**: Planned server-side Google Gemini 2.5 Flash via structured JSON schemas (server-side only; Gemini keys are strictly server secrets; Supabase Edge Functions and live model integration are planned for S3; mobile client currently uses deterministic local reasoning via `MockDeriveService`), coupled with deterministic safety circuit breakers.
 - **Commerce**: Planned Stripe web checkout for Founding Beta memberships ($100/month first-10 approved beta experiment; long-term personalized pricing architecture remains provisional). (Currently S5 on roadmap).
 - **Telemetry**: Planned privacy-safe telemetry (PostHog with session replay strictly disabled; typed navigation allowlist only; zero health data/photos/symptoms).
 
@@ -72,7 +72,7 @@ Derive separates development into two independent lanes connected by a thin, sta
   - Mobile screens (`app/**`), UI components (`src/components/**`), design tokens (`src/constants/theme.ts`), haptics, voice input, and client AI interactions.
   - Develops against `MockDeriveService` with zero backend blocking.
 * **Sami (Platform + Intelligence + Operations)**:
-  - Supabase database schema, migrations, RLS policies, Edge Functions (`supabase/**`), intelligence workflows, and founder operations console (`admin/**`).
+  - Supabase database schema, migrations, RLS policies, private storage, planned Edge Functions (`supabase/**`), intelligence workflows, and founder operations console (`admin/**`).
   - Implements `RemoteDeriveService` fulfilling the exact same contract.
 
 ### Toggling Between Mock and Remote Backend
