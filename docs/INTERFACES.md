@@ -140,3 +140,37 @@ Pricing is dynamic, versioned relative to routine and subscription lifecycle, an
   - **Approval State**: Explicit member confirmation state (`pending_approval`, `approved`, `rejected`) for any price increase.
   - **Effective Timing & History**: Activation timestamp, scheduled change dates, and historical audit ledger.
 - **Storage Decision**: The database representation (e.g. subscription versioning table, routine-linked pricing snapshot, or ledger entity) belongs to backend architecture review.
+
+### C. Routine Change Proposal vs. Active State & Member Approval Semantics
+The data model must preserve a clean separation between the canonical *active* routine currently in use and any *proposed* routine modifications awaiting member consent:
+- **Separation of Concerns**: Proposed routine modifications formulated by system intelligence or founder review must not overwrite the active schedule until explicit member consent is obtained.
+- **Member Approval Lifecycle**:
+  - `status`: Categorical proposal lifecycle (`pending_member_approval`, `member_approved`, `member_rejected`, `superseded`).
+  - `materialChanges`: Explicit diff indicating added products, replaced formulas, discontinued steps, active frequency changes, or price adjustments.
+  - `approvalTimestamp`: Recorded timestamp of member confirmation.
+- **Invariants**:
+  - Ingesting weekly check-ins and updating internal tolerance models do not alter active routines without approval.
+  - Routine adjustments that increase monthly plan price or introduce/alter strong actives remain in `pending_member_approval` until the member explicitly confirms.
+
+### D. Standing Refill Consent & Replenishment Lifecycle Semantics
+Refill requests and recurring replenishment must respect explicit customer consent boundaries rather than simulating automatic calendar depletion:
+- **Consent Models**:
+  - **On-Demand Confirmation (Beta Baseline)**: Each refill requires a low-friction affirmative request ("Running low on [product]? Refill").
+  - **Standing Refill Consent (Future Opt-In)**: Members may explicitly opt a stable, previously approved SAME SKU into automatic replenishment with advance notice and a 1-tap skip affordance.
+- **Replenishment Tracking**:
+  - `status`: `requested` | `ordered` | `shipped` | `delivered` | `cancelled`.
+  - `sku`: Must match active routine product; any formula substitution or brand swap requires separate affirmative member approval.
+  - `trackingNumber`, `carrier`, `estimatedArrival`: Transparent fulfillment metadata.
+
+### E. Baseline & Progress Photo Provenance Semantics
+Skin photos serve as longitudinal baseline and progress context, governed by strict privacy and provenance standards:
+- **Baseline Invariant for Founding Beta**: Three standardized captures (`front`, `left`, `right`) are required for initial beta intake; subsequent weekly progress photos are optional.
+- **Required Metadata & Provenance**:
+  - `angle`: Categorical orientation (`front` | `left` | `right`).
+  - `captureType`: `baseline` | `progress` | `reaction_context`.
+  - `captureQualityPassed`: Boolean indicating on-device capture quality gating (lighting, sharpness, pose, stability) passed before auto-capture.
+  - `memberApproved`: Explicit confirmation by member (`Use Photo` chosen over `Retake`).
+  - `capturedAt`: ISO timestamp.
+- **Non-Diagnostic & Privacy Invariants**:
+  - Zero storage of facial recognition embeddings or biometric identifiers.
+  - Photos are treated as private, sensitive consumer skincare data, stored in private storage (`customer-skin-photos`), and delivered exclusively via short-lived signed URLs.

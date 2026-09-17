@@ -6,6 +6,39 @@ This ledger tracks durable architectural, product, and contract decisions across
 
 ---
 
+## 2026-09-17 — Founder Alignment: Founding Beta Concierge Model, $100/Mo Experiment & Durable Context Reconciliation (Pass 7)
+
+- **Agent / Workstream**: Kanuj & Sami Founder Alignment (Mobile/UX + Platform/Intelligence)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `58277086cf7335a11fa9d5c05e9e4e56aa144957`
+- **Remote Push Status**: `pending-push` (to be verified upon commit and push)
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress); `K4 COMPLETE` (K4.1 pricing prototype & K4.2 phenotype prototype complete; K5 next).
+- **Ownership / Shared Contracts**: Strictly documentation and durable architectural context reconciliation across both founder workstreams. Zero changes to UI components, database migrations, Supabase schema, or shared TypeScript contracts (`src/contracts/**`, `src/domain/**`).
+- **Durable Decisions & Context Reconciled**:
+  1. **Founding Beta Concierge Operating Model**: Approved high-touch concierge MVP for the first 10 paying members. Core principle: *Sell the future Derive outcome now; deliver it manually where necessary.* Kanuj manually reviews intake, baseline photos, routine construction, product sourcing/fulfillment, and weekly check-ins. Scalable long-term product remains AI-led and software-managed. Explicitly NOT a private consulting business; zero permanent recurring founder consultation promise.
+  2. **Founding Beta Price Experiment ($100/mo for first 10)**: Approved beta experiment (ADR-21), distinct from long-term pricing architecture. Validates willingness-to-pay, routine adherence, and month-two retention. Customer pays one monthly price covering management plus standard OTC routine products based on actual need. No product wallet, credit balance, or rollover allowance. Existing working products preserved (`KEEP`); no shipping duplicates for calendar billing theater. ADR-10 ($129/mo) marked HISTORICAL / SUPERSEDED. ADR-15 (Personalized All-In Monthly Pricing, Arthur $96/mo demo fixture) remains PROVISIONAL / PENDING COFOUNDER BUSINESS REVIEW.
+  3. **6 Beta Learning Hypotheses**: Recorded explicit success questions: Value, Behavior, Trust, Longitudinal, Fulfillment, Retention. Vanity engagement metrics must not displace evidence against these hypotheses.
+  4. **Autopilot vs. Depth Philosophy**: Clarified that "Autopilot vs. Depth" is a product design philosophy, NOT user modes or a settings toggle. Default is Today + Plan + lightweight check-ins + approvals; optional depth is Scan, Ask, Progress, and research cards. Canonical 5 native tabs preserved.
+  5. **Required Baseline Photos (Founding Beta)**: Required for paid Founding Beta members only. Guided Front -> Left -> Right sequence. Camera evaluates photographic capture quality only (face presence, pose, distance, centering, lighting, sharpness, stability) with auto-capture and manual fallback. On-device quality gating where practical; zero persistent face embeddings or facial recognition. Photos do not diagnose disease or measure hydration/sebum quantitatively.
+  6. **Routine Change & Member Approval Policy**: Explicit trust boundary. Derive may automatically ingest check-ins, update observations, generate progress summaries, determine "no change needed", propose modifications, and estimate refill timing. Material changes (adding/replacing products, permanent removal, changing strong active frequency/intensity, introducing strong active, reintroducing adverse-history ingredient, price increase, shipping new/substitute product) require explicit member approval before activation. Prescriptions are contextual only. Safety escalation remains immediate for acute red flags.
+  7. **Refill Consent Policy**: Same-product refills use low-friction confirmation ("Running low on [product]? Refill"). No fake deterministic depletion claims, no silent auto-shipment based solely on elapsed calendar days. Future standing consent for same SKU with advance notice and skip option. Substitutions require affirmative approval.
+  8. **Founder Research Conversations**: Biweekly-ish customer discovery and feedback conversations for first 10 members; explicitly NOT a permanent recurring consultation feature.
+  9. **Preliminary Customer-Discovery Evidence (N=31 Wave 1 Pilot)**: Recorded survey findings with explicit convenience sample caveats (UW/CS-heavy, male-skewed, not representative) and Q5 multi-select configuration note. 54.8% prioritized build/manage + adapt + progress tracking. Directional signal favoring longitudinal management/progress/adaptation over Scan/fulfillment as primary acquisition wedge. Scan and fulfillment preserved for retention defensibility.
+  10. **Customer-Facing Trust & Safety Language Standards**: "Your skincare, handled." "Your first routine gets one final quality check before it goes live." Strict prohibitions on claiming AI dermatologist, unsubstantiated clinical review, photo disease diagnosis, pseudo-quantitative selfie measurements, causal allergy inference from one event, guaranteed outcomes, or unheld medical credentials.
+  11. **README & Durable Docs Line-by-Line Audit**: Removed stale $129 claims, distinguished implemented stack from planned architecture, updated documentation sitemap to include `docs/PRODUCT.md` and `docs/CONTEXT_SYNC.md`, and reconciled all 12 docs across the repository.
+- **Decision Status**:
+  - `ADR-10: Manual Operations & $129/Month Canonical Pricing`: **HISTORICAL / SUPERSEDED**
+  - `ADR-15: Personalized All-In Monthly Pricing Architecture`: **PROVISIONAL / PENDING COFOUNDER BUSINESS REVIEW**
+  - `ADR-20: S1A Least-Privilege Supabase Data Plane`: **IMPLEMENTED** (full S1 in progress)
+  - `ADR-21: Founding Beta Concierge Operating Model & $100/Month First-10 Pricing Experiment`: **APPROVED BETA EXPERIMENT**
+- **Unresolved Founder Decisions**:
+  - Long-term company pricing architecture, commercial ranges, management fee, and operations buffer after the 10-member beta (Kanuj & Sami alignment).
+  - Open shared-contract challenges (ARCHITECTURE_CHALLENGE-01: `$129` in membership identity; ARCHITECTURE_CHALLENGE-02: safety unknown state collapse; ARCHITECTURE_CHALLENGE-03: `STOP` vs `PAUSE` persistence drift).
+  - Formal cancellation, refund, and fulfillment terms for Founding Beta checkout.
+
+---
+
 ## 2026-09-16 — Sami Platform: S1A Least-Privilege Data Plane
 
 - **Agent / Workstream**: Sami (Platform, Intelligence & Operations)

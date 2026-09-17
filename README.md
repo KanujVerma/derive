@@ -1,7 +1,6 @@
 # Derive: "Your skincare, handled."
 
-Managed skincare service for the 10-customer Founding Beta ($129/month).
-Built on Apple-grade minimalism, contextual intelligence, and persistent customer care.
+Managed skincare service ("Your skincare, handled"). Built on Apple-grade minimalism, contextual intelligence, and persistent customer care. Currently preparing for an initial 10-member Founding Beta cohort ($100/month concierge operating experiment; long-term personalized pricing architecture remains provisional).
 
 ---
 
@@ -58,10 +57,10 @@ Before linking a hosted project, confirm its PostgreSQL major version matches
 
 - **Mobile Client**: Expo SDK 57, React Native 0.86, TypeScript (strict mode), Expo Router (file-based navigation in `app/`), Zustand state stores.
 - **Visual Design**: Direction A Mineral (Warm Ivory `#F6F3EC`, Elevated Surface `#FFFEFB`, Architectural Charcoal `#171A18`, Mineral Green `#345447`).
-- **Platform / Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Edge Functions, Private Storage).
-- **Intelligence**: Server-side Google Gemini 2.5 Flash via structured JSON schemas, coupled with deterministic safety circuit breakers.
-- **Commerce**: Stripe web checkout for Founding Beta memberships ($129/month).
-- **Telemetry**: PostHog (Session Replay strictly disabled; typed navigation allowlist only).
+- **Platform / Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Edge Functions, Private Storage) — S1A data plane hardened; full S1 platform in progress.
+- **Intelligence**: Server-side Google Gemini 2.5 Flash via structured JSON schemas (server-side only; Gemini keys are strictly server secrets; mobile client uses deterministic local reasoning via `MockDeriveService`), coupled with deterministic safety circuit breakers.
+- **Commerce**: Planned Stripe web checkout for Founding Beta memberships ($100/month first-10 approved beta experiment; long-term personalized pricing architecture remains provisional). (Currently S5 on roadmap).
+- **Telemetry**: Planned privacy-safe telemetry (PostHog with session replay strictly disabled; typed navigation allowlist only; zero health data/photos/symptoms).
 
 ---
 
@@ -77,27 +76,30 @@ Derive separates development into two independent lanes connected by a thin, sta
   - Implements `RemoteDeriveService` fulfilling the exact same contract.
 
 ### Toggling Between Mock and Remote Backend
-To switch the mobile application from local mock mode to live Supabase services:
+The service factory supports selecting the remote backend adapter:
 ```bash
 # In your local .env:
 EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 ```
+*Note: The mobile client currently operates primarily against local Zustand stores and `MockDeriveService`. `RemoteDeriveService` and the Supabase platform are in active development (S1A data plane complete; S1B/S2 remote row mapping and live functions in progress). Enabling this flag alone does not make the application production-ready against a remote backend.*
 
 ---
 
 ## 4. Repository Documentation Sitemap
 
 Before beginning substantial feature work, consult the core documentation:
-* [`AGENTS.md`](AGENTS.md): Essential orienting instructions for autonomous AI agents.
-* [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md): Strategic context, target customers, and business goals.
+* [`AGENTS.md`](AGENTS.md): Essential orienting instructions, bootstrap rules, and architecture challenge protocol for AI agents and founders.
+* [`docs/CONTEXT_SYNC.md`](docs/CONTEXT_SYNC.md): Cross-founder and cross-agent durable synchronization ledger.
+* [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md): Strategic context, target customers, Founding Beta concierge operating model, and business hypotheses.
+* [`docs/PRODUCT.md`](docs/PRODUCT.md): Full product specification, navigation, autopilot vs. depth philosophy, baseline photo capture, and care loop.
 * [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md): Granular file ownership and contract change rules.
 * [`docs/ROADMAP.md`](docs/ROADMAP.md): Independent sprint milestones (K1–K5 and S1–S5).
-* [`docs/INTERFACES.md`](docs/INTERFACES.md): Runtime contract specifications and error models.
-* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): System topology and data flow.
-* [`docs/DESIGN.md`](docs/DESIGN.md): Direction A Mineral design tokens and Apple HIG guidelines.
-* [`docs/SAFETY_PRIVACY.md`](docs/SAFETY_PRIVACY.md): Medical boundaries, private photo storage, and telemetry guardrails.
-* [`docs/DECISIONS.md`](docs/DECISIONS.md): Concise log of accepted architecture decisions (ADRs).
-* [`docs/RESEARCH.md`](docs/RESEARCH.md): Competitor teardowns and user discovery research.
+* [`docs/INTERFACES.md`](docs/INTERFACES.md): Runtime contract specifications, error models, and semantic requirements for backend evolution.
+* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): System topology, security boundaries, and data flow.
+* [`docs/DESIGN.md`](docs/DESIGN.md): Direction A Mineral design tokens, spatial grammar, and Apple HIG guidelines.
+* [`docs/SAFETY_PRIVACY.md`](docs/SAFETY_PRIVACY.md): Medical boundaries, private photo storage, non-discrimination invariants, and telemetry guardrails.
+* [`docs/DECISIONS.md`](docs/DECISIONS.md): Concise log of accepted architecture decisions (ADRs) and open challenges.
+* [`docs/RESEARCH.md`](docs/RESEARCH.md): Competitor teardowns, beta learning hypotheses, preliminary customer survey evidence, and peer-reviewed dermatological references.
 
 ---
 

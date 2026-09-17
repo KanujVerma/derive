@@ -41,18 +41,67 @@ High-signal findings synthesized from founder research, customer discovery conve
 
 ---
 
-## 3. Core Hypotheses & Customer Discovery Principles
+## 3. Founding Beta Learning Hypotheses (6 Core Success Questions)
 
-* **[HYPOTHESIS 1 - Month-Two Renewal & Personalized Value]**:
-  Members renew in Month 2 not because they use the app every day, but because they experienced zero breakouts/barrier crashes, have their exact product refills handled automatically, and pay an all-in personalized monthly rate derived from their routine (e.g. Arthur's demo fixture at $96/mo as an illustrative example, not a pricing commitment) that eliminates guesswork.
-* **[HYPOTHESIS 2 - Behavioral Observation > Self-Diagnosis]**:
-  Customers are notoriously inaccurate when asked "What is your Fitzpatrick skin type?" or "Is your skin barrier compromised?". They are highly accurate when asked: *"By midday, how does your face feel?"* and *"Does your face sting when you wash it?"*.
-* **[HYPOTHESIS 3 - Defensibility via Longitudinal Data]**:
-  Long-term competitive advantage is not a proprietary LLM model. It is proprietary longitudinal memory—knowing exactly how Arthur's skin tolerates Differin + Niacinamide across 6 months of weekly check-ins.
+The Founding Beta (10 paying members at $100/mo) is explicitly designed to test six learning hypotheses. The beta fails its primary purpose if it does not generate concrete qualitative and behavioral evidence against these questions:
+
+1. **VALUE**: Will someone pay meaningful recurring money ($100/mo) to stop managing their own skincare?
+2. **BEHAVIOR**: Will members actually follow a Derive-managed routine consistently over weeks?
+3. **TRUST**: Will members accept Derive saying:
+   - *"Don't buy this"*
+   - *"Keep what you already have"*
+   - *"Change this step"*
+4. **LONGITUDINAL**: Does accumulating longitudinal skin history and reaction tracking make Derive meaningfully more useful over time?
+5. **FULFILLMENT**: Does having product sourcing and refills handled increase customer retention enough to justify the operational complexity?
+6. **RETENTION**: Will members voluntarily pay again in Month 2?
+
+*Operating Rule*: Do not optimize for vanity engagement metrics (daily active opens, session duration) at the expense of evaluating these six core hypotheses.
 
 ---
 
-## 4. Dermatological Evidence Architecture & Peer-Reviewed References
+## 4. Preliminary Customer-Discovery Evidence (N=31 Pilot / Wave 1)
+
+### A. Methodology & Critical Sampling Caveats
+- **Sample Nature**: Convenience sample of 31 respondents recruited primarily from a University of Washington / Computer Science-heavy campus environment.
+- **Demographic Bias**: The sample appears male-skewed and engineering-heavy.
+- **Non-Representativeness**: This sample **MUST NOT** be described as representative of UW students, general skincare consumers, or the broader target market.
+- **Survey Configuration Limitation (Q5 Multi-Select)**: Question 5 ("What is the most annoying part of taking care of your skin?") appears configured in the survey tool as multi-select despite the singular wording "most annoying." Percentages for Q5 reflect selections across respondents and are **not mutually exclusive**. Do not treat them as a single-choice distribution.
+- **No Manufactured Statistical Significance**: Findings are directional pilot signals only.
+
+### B. Directional Findings (Wave 1 Pilot, N=31)
+- **Baseline Skincare Habit**:
+  - **71.0%** use 0–2 skincare products at least weekly.
+  - **74.2%** spent under $50 total on skincare in the previous 3 months.
+- **Friction & Product Regret**:
+  - **45.2%** stopped using or regretted at least one skincare product purchase in the past 6 months.
+- **Reported Friction Areas (Q5, Multi-Select)**:
+  - **35.5%** selected *"I don't really have a skincare problem"*.
+  - **32.3%** selected uncertainty about whether their routine is actually working.
+  - **25.8%** selected uncertainty about which products are right for their skin.
+  - **25.8%** selected spending too much money on products.
+- **Single Most Valuable Handled Function (Single-Choice Question)**:
+  - **22.6%** chose *tracking whether skin is improving over time*.
+  - **16.1%** chose *building/managing their routine*.
+  - **16.1%** chose *adjusting the routine based on skin response*.
+  - **9.7%** chose *evaluating whether a new product fits before buying*.
+  - **6.5%** chose *personalized answers to skincare questions*.
+  - **~3.2%** chose *knowing what to keep, pause, replace, or add*.
+  - **0.0%** chose *refill handling / replenishment*.
+  - **25.8%** chose *none of these*.
+- **Aggregate Signal**:
+  - **54.8%** of the total sample chose one of **build/manage routine + adapt based on response + progress tracking** as the single most valuable handled function.
+  - Open-ended qualitative responses highlighted routine simplicity, understanding what skin genuinely needs, information reliability, and more visible skin results.
+
+### C. Interpretation & Strategic Implications
+- **Primary Positioning Wedge**: Directional evidence favors positioning longitudinal management, routine adaptation, and progress tracking over treating Scan (in-store lookup) or fulfillment as the primary customer acquisition hook.
+- **Preserve Scan & Fulfillment**: Do **NOT** remove Scan or managed refills based on N=31. While replenishment is not an initial acquisition hook for low-involvement users, physical product delivery and reliable replenishments may be decisive drivers of month-two retention and service defensibility once a member is active.
+- **Expanded Research Plan**:
+  - Treat the first 31 responses as **Wave 1 / pilot**.
+  - Continue toward 50–100 customer discovery conversations with a more diverse campus intercept sample (campus libraries, student unions, non-CS majors, balanced gender mix).
+
+---
+
+## 5. Dermatological Evidence Architecture & Peer-Reviewed References
 
 Derive strictly adheres to an evidence-grounded recommendation policy. We distinguish methodological study strength from individual member applicability.
 

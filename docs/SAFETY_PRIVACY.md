@@ -4,7 +4,8 @@ Derive operates under uncompromising safety and privacy standards appropriate fo
 
 ---
 
-## 1. Clinical Scope & Medical Boundaries
+## 1. Clinical Scope, Medical Boundaries & Trust Language
+
 * **Cosmetic Guidance Only**: Derive advises on over-the-counter skincare routines, skin barrier maintenance, and cosmetic product compatibility.
 * **No Medical Diagnosis**: Derive does NOT diagnose skin diseases (e.g. atopic dermatitis, cystic acne, rosacea, melanoma, psoriasis).
 * **Emergency Escalation Circuit Breaker**:
@@ -15,9 +16,30 @@ Derive operates under uncompromising safety and privacy standards appropriate fo
   - Rapidly spreading hot hives
   When detected, Derive presents clear, unskippable medical referral copy advising immediate in-person evaluation at an urgent care center or emergency room.
 
+### Customer-Facing Trust & Safety Language Standards
+Derive maintains strict integrity in all customer communications.
+- **Authorized Slogans & Framing**:
+  - Preserve: *"Your skincare, handled."*
+  - Routine Verification: *"Your first routine gets one final quality check before it goes live."*
+- **Strictly Prohibited Claims**:
+  - **No AI Dermatologist**: Never claim or imply that Derive is an "AI dermatologist," clinical diagnostic device, or medical provider.
+  - **No Unsubstantiated Clinical Review**: Never claim "dermatologist reviewed" or "clinically reviewed" unless literally true for that specific formulation or feature.
+  - **No Photo Diagnosis**: Photos are visible baseline/progress context only; never claim disease diagnosis from imagery.
+  - **No Pseudo-Quantitative Measurements**: Never claim exact quantitative skin-barrier, hydration, or sebum percentages from smartphone selfies.
+  - **No False Causal Allergy Inferences**: Never infer a causal ingredient allergy from a single multi-ingredient reaction event.
+  - **No Guaranteed Outcomes**: Never promise guaranteed clearing, cure, or clinical results.
+  - **No Unheld Credentials**: Never claim clinical or dermatological licenses the founders do not hold.
+  - **No Permanent Founder Consultation Promise**: Never market unlimited personal founder consultations as the scalable product.
+  - **No Premature Regulatory Claims**: Never claim HIPAA or GDPR compliance until formally audited and certified; do not claim secure resumability until fully implemented.
+
 ---
 
-## 2. Customer Health Data & Private Photos
+## 2. Customer Health Data, Private Photos & Biometric Invariants
+
+* **Sensitive Skincare Data**: Skin photos, reaction notes, and tolerance logs are treated as private, sensitive consumer skincare data. They are never uploaded to public buckets or exposed in telemetry.
+* **Photo Capture Quality vs. Biometrics**:
+  - Camera quality gating during intake evaluates **photographic capture quality only** (single face presence, pose/orientation, face distance, centering, lighting/exposure, sharpness, stability).
+  - **Zero Persistent Biometrics**: Derive strictly prohibits generating or storing persistent face embeddings, facial recognition models, or biometric identity templates.
 * **Private Photo Storage (S1A Enforced)**: `customer-skin-photos` is provisioned with `public = false`, a 10 MiB limit, and an image MIME allowlist. Authenticated uploads are isolated under a first path segment equal to the caller's immutable Auth UUID.
 * **Zero Public or Direct Customer Reads (S1A Enforced)**: Customers can create immutable objects only under their Auth UUID namespace, but cannot list, download, sign, replace, or delete objects directly. The next S1 slice must add a trusted JWT-bound endpoint that issues 15-minute signed URLs; until it exists, the live signed-photo delivery path is not complete.
 * **Immutable Uploads**: The bucket has no authenticated `UPDATE` policy. Clients must use unique opaque filenames and `upsert: false` so a later capture cannot silently overwrite an earlier longitudinal record.

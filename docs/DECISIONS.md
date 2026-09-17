@@ -40,7 +40,8 @@ Key technical and product decisions accepted for Derive V1.
 * **Decision**: Surface curated clinical research directly in Today and Plan.
 * **Rationale**: Builds member trust and demonstrates that Derive is grounded in published dermatological literature rather than influencer marketing.
 
-### ADR-10: Manual Operations & $129/Month Canonical Pricing
+### ADR-10: [HISTORICAL · SUPERSEDED] Manual Operations & $129/Month Canonical Pricing
+* **Status**: HISTORICAL / SUPERSEDED (Superseded by ADR-21 for the first-10 Founding Beta operating experiment; flat $129/mo is no longer current commercial truth or pricing policy; legacy database defaults and code literal references remain implementation debt).
 * **Decision**: Launch Founding Beta at $129/month for 10 initial members with manual founder review and manual fulfillment desk.
 * **Rationale**: High-touch founder concierge ensures quality and fast customer learning before premature operational automation.
 
@@ -113,6 +114,15 @@ Key technical and product decisions accepted for Derive V1.
 * **Signed-URL Boundary**: Customers have no direct photo download/list/sign capability. A trusted server endpoint will issue 900-second signed URLs after JWT and path ownership validation.
 * **Deletion Boundary**: Customers have immutable insert rights but no direct object or photo-metadata deletion rights. A trusted Storage-API-first workflow must delete physical objects before relational metadata/auth state so a partial client request cannot orphan private health data.
 * **Rationale**: RLS policies and SQL grants are complementary controls. Exact policy-set tests detect permissive drift; explicit remote projections avoid protected-field wildcard failures; and separating immutable upload rights from trusted signing/deletion minimizes accidental exposure and orphaned objects.
+
+### ADR-21: Founding Beta Concierge Operating Model & $100/Month First-10 Pricing Experiment
+* **Status**: APPROVED BETA EXPERIMENT (Distinct from Long-Term Pricing Architecture).
+* **Decision**: Adopt a high-touch concierge MVP operating model for the initial 10 paying Founding Beta members at a flat $100/month experimental price point.
+* **Operating Model**: *Sell the future Derive outcome now; deliver it manually where necessary.* The scalable long-term product is AI-led and software-managed. For the initial 10 members, Kanuj will manually perform or review intake submissions, baseline photos, initial routine construction, product sourcing/fulfillment, and weekly check-ins. Biweekly-ish customer research conversations are conducted for feedback and discovery, not as a permanent personal consultation promise.
+* **Pricing Experiment**: $100/month covers Derive care management plus the standard non-prescription facial skincare products needed for the approved routine. No product wallet, credit balance, or rollover allowance. Existing working products are retained (`KEEP`); shipments follow actual consumption need rather than calendar billing theater. Prescription medications are contextual inputs only, not products Derive prescribes or supplies. Thin or negative initial unit economics are intentionally tolerated for this 10-member learning cohort. Long-term personalized pricing (ADR-15) remains provisional.
+* **Required Baseline Photos**: Standardized Front/Left/Right baseline photos are required for paid Founding Beta members to establish longitudinal comparison context. Capture uses on-device quality gating (pose, distance, centering, lighting, sharpness, stability) with hands-free auto-capture and manual fallback. Photos do NOT diagnose disease or produce fake quantitative barrier metrics.
+* **Routine Approval & Refill Consent**: Material routine changes (adding/replacing products, permanent removals, strong active changes, price increases, new product shipments) require explicit member approval. Refills use low-friction confirmation ("Running low on [product]? Refill"), avoiding silent shipments based on elapsed calendar days.
+* **Rationale**: Directly addresses the 6 core beta learning hypotheses (Value, Behavior, Trust, Longitudinal, Fulfillment, Retention) with 10 real paying members without prematurely hardening operational automation or finalizing long-term company pricing.
 
 ---
 

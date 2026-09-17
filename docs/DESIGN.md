@@ -100,3 +100,29 @@ The layout adheres to strict geometric intervals defined in `src/constants/theme
 * **Primary CTA Height**: 54pt pill button with bold centered typography (`layout.ctaHeight: 54`).
 * **Corner Radii**: 20pt for large cards/grouped containers, 12pt for internal subcards/chips, 27pt for pill CTAs.
 
+---
+
+## 9. Guided Baseline Photo Capture UX & Quality Semantics
+
+Intake photo capture balances effortless Apple-grade interaction with strict photographic standardization:
+
+* **Guided Step Sequence**: Standardized 3-step sequence (`Front View` → `Left Profile` → `Right Profile`) displayed with clean numerical step indicators and visual framing guidelines.
+* **Intended Auto-Capture Flow**:
+  - The camera evaluates **capture quality in real time**:
+    1. Exactly one face in frame.
+    2. Correct pose and head orientation for the active step.
+    3. Proper face distance and size within the guide frame.
+    4. Centered positioning.
+    5. Adequate ambient lighting and balanced exposure (no harsh flash blowout or deep underexposure).
+    6. Sharp focus (no motion blur).
+    7. Severe obstructions avoided (hair or hands covering the face).
+    8. Stable frame maintained for a brief interval (~500ms).
+  - When all quality criteria are met, the shutter fires **automatically without requiring manual tapping**.
+* **Review & Affirmation**:
+  - The user immediately inspects the captured frame and chooses between `[Use Photo]` and `[Retake]`.
+* **Manual Shutter Fallback**:
+  - A tactile manual shutter button is always accessible so users can capture manually if lighting, disability, or environment prevents automated quality satisfaction.
+* **On-Device & Biometric Safeguards**:
+  - Evaluation operates on-device where practical.
+  - Strictly evaluates image quality; never computes or stores persistent face embeddings or facial recognition IDs.
+

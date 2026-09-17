@@ -3,9 +3,10 @@
 ## A. What Derive Is
 Derive is a **managed skincare service** ("Your skincare, handled").
 It is:
-- A personalized, set-it-and-forget-it care service for 10 initial Founding Beta members (personalized all-in monthly pricing derived dynamically from active routine consumption; Arthur demo fixture at $96/mo is an illustrative example, not a pricing commitment).
+- A managed care service for 10 initial Founding Beta members ($100/month concierge operating experiment; long-term personalized pricing architecture remains provisional; Arthur demo fixture at $96/mo is an illustrative client simulation, not a pricing commitment).
 - Grounded in persistent customer history, active schedules, and observed skin tolerance over time.
-- Supported by manual founder operations and a manual final quality check for the initial beta routine before activation.
+- Delivered as a concierge MVP for the first 10 members (sell future outcome now, deliver manually where necessary), with a software-managed, AI-led care loop as the scalable foundation.
+- Protected by a manual founder quality check for the initial beta routine before activation.
 
 It is **NOT**:
 - An "AI dermatologist" or clinical diagnostic device.
@@ -13,7 +14,7 @@ It is **NOT**:
 - An ungrounded conversational chatbot.
 - An anxious daily habit tracker (zero streak counters, zero daily check-in guilt).
 
-## B. Current V1 Information Architecture
+## B. Current V1 Information Architecture (Autopilot vs. Depth Philosophy; 5 Tabs Preserved)
 - **Today**: "What matters right now" (2-second status glance, quiet draft preview mode when initial plan is in review with `DRAFT · NOT ACTIVE` indicator, tappable tonight's routine preview, active refill shipment banner, research insight card, 44x44 pt account affordance).
 - **Plan**: Canonical routine schedule & bathroom shelf audit (top SegmentedControl toggling `ROUTINE` vs `PRODUCTS`, `DRAFT · NOT ACTIVE` banner when in review, KEEP / PAUSE / REPLACE / ADD badges, dosage amounts, rationales, disclosure chevrons, consolidated managed refill action, 44x44 pt account affordance).
 - **Scan**: Pure camera-first viewfinder (no manual tabs), automatic multi-attribute recognition, fallback name search, split evaluation (`FIT FOR YOU RIGHT NOW` vs `FORMULA QUALITY`), 1-tap handoff to Ask, 44x44 pt account affordance.

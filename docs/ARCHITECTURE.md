@@ -80,23 +80,25 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ---
 
-## 4. Founder Console (`admin/**`)
-* Dedicated operations interface for Kanuj and Sami to run the 10-customer beta:
-  - **Routine Review Queue**: Authorize and adjust proposed routines before member publication.
-  - **Fulfillment Desk**: Transition refill requests from `requested` to `shipped` with tracking numbers.
+## 4. Founder Console & Concierge Operations (`admin/**`)
+* Dedicated administrative and concierge operations interface for Kanuj and Sami to run the 10-member Founding Beta:
+  - **Routine Review Queue**: Manually review, adjust, and approve proposed routines before initial member publication or subsequent material routine changes.
+  - **Fulfillment Desk**: Manually source, purchase, and track product shipments and replenishments (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - **Safety Escalation Queue**: Inspect and resolve flagged adverse reaction events.
+  - **Concierge MVP Bridge**: High-touch founder delivery for the first 10 members serves as an operational learning bridge; long-term operations are software-managed and AI-led.
 
 ---
 
 ## 5. Commerce & Billing
-* **Platform**: Stripe Checkout for web payment of Founding Beta memberships (personalized all-in monthly pricing derived from active routine; Arthur demo fixture $96/mo is an illustrative example, not a final pricing commitment; final commercial terms pending founder alignment).
+* **Platform**: Planned Stripe Checkout for web payment of Founding Beta memberships ($100/month approved first-10 beta experiment; long-term personalized pricing architecture remains provisional).
 * **Lifecycle**: Webhook events (`customer.subscription.created`, `invoice.payment_succeeded`) update the member's `memberships` status in Supabase.
+* **Pricing Invariant**: Covers care management plus standard routine products. No product wallet or rollover allowance. Existing working products preserved.
 
 ---
 
 ## 6. Telemetry & Analytics
-* **Provider**: PostHog.
+* **Provider**: Planned privacy-safe telemetry (PostHog; client-side allowlist implemented in `src/services/analytics.ts`; SDK integration planned).
 * **Strict Privacy Guardrails**:
-  - `disable_session_recording: true` (Session replay disabled).
-  - No health photos, symptoms, or chat text transmitted.
-  - Event payloads restricted to allowlisted navigation and operational milestones.
+  - `disable_session_recording: true` (Session replay strictly disabled).
+  - Zero health data, skin photos, symptoms, or conversation text transmitted.
+  - Event payloads restricted to allowlisted navigation, operational milestones, and interaction metrics.
