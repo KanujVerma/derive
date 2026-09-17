@@ -11,7 +11,9 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
 - **Local Branch**: `main`
 - **Starting Shared HEAD / origin/main**: `6e7bd13fbee9103462d248ef07af4cb4af314029`
-- **Remote Push Status**: `pending-push` (to be verified upon commit and push)
+- **Ending Pushed SHA**: `b8b5b2496e5797379d20c576503c1533c7f99990`
+- **Remote Push Status**: `pushed / verified`
+- **GitHub CI**: `success` (Run ID: `35255642794`)
 - **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
 - **Milestone Status**: `K4.3 COMPLETE` (Founding Beta client readiness achieved; K5 Mobile Release & TestFlight next); `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress).
 - **Ownership / Shared Contracts**: Kanuj-owned client code only (`app/**`, `src/components/**`, `src/stores/**`, `src/constants/**`, `tests/**`). Zero changes to Supabase migrations, RLS, shared domain/contracts (`src/domain/**`, `src/contracts/**`), or backend persistence.
