@@ -49,7 +49,11 @@ export default function TodayScreen() {
   const activeRefill = refillRequests.find(
     (r) => r.status === 'shipped' || r.status === 'ordered'
   );
-  const topResearch = researchInsights[0];
+  // Research surfaces on Today strictly when directly actionable (explaining a routine change or adaptation)
+  // Non-actionable literature ('no_change') is omitted from Today to protect the 2-second glance
+  const actionableResearch = researchInsights.find(
+    (r) => r.recommendation === 'action' || (r.recommendation !== 'no_change' && !!r.recommendationReason)
+  );
 
   const handleViewOrders = () => {
     router.push('/orders');
@@ -247,27 +251,27 @@ export default function TodayScreen() {
               </View>
             )}
 
-            {/* CONTEXTUAL MODULE 3: COMPACT RESEARCH CARD ("NEW FOR YOU") */}
-            {topResearch && (
+            {/* CONTEXTUAL MODULE 3: ACTIONABLE RESEARCH CARD (Surfaces only on active change) */}
+            {actionableResearch && (
               <View style={styles.researchCard}>
                 <View style={styles.researchHeader}>
                   <View style={styles.researchBadge}>
                     <Icon name="sparkle" size={12} color={colors.brand} />
-                    <Text style={styles.researchBadgeText}>NEW FOR YOU</Text>
+                    <Text style={styles.researchBadgeText}>ROUTINE INSIGHT</Text>
                   </View>
-                  <Badge label="NO CHANGES NEEDED" variant="keep" size="small" />
+                  <Badge label="ACTION RECOMMENDED" variant="pause" size="small" />
                 </View>
 
                 <Text style={styles.researchTitle}>
-                  New research supports your current routine.
+                  {actionableResearch.title}
                 </Text>
                 <Text style={styles.researchSummary}>
-                  Relevant to your Differin + niacinamide combination.
+                  {actionableResearch.summary}
                 </Text>
 
                 <TouchableOpacity
                   style={styles.seeWhyRow}
-                  onPress={() => handleViewInsight(topResearch.id)}
+                  onPress={() => handleViewInsight(actionableResearch.id)}
                 >
                   <Text style={styles.seeWhyText}>See why</Text>
                   <Icon name="forward" size={14} color={colors.brand} />

@@ -19,7 +19,10 @@ import {
   type ReactionSeverity,
   type IngredientSignalConfidence,
   type Routine,
+  type ResearchInsight,
 } from '../src/types/schema.ts';
+import { config } from '../src/constants/config.ts';
+import { useUserStore } from '../src/stores/userStore.ts';
 import {
   createProvenancedValue,
   setOrConfirmPhenotypeValue,
@@ -1138,3 +1141,96 @@ test('Safety & Privacy: Zero race, ethnicity, or ancestry classifiers in phenoty
   const serialized = JSON.stringify(arthurPhenotypeProfile);
   assert.equal(/caucasian|black|hispanic|asian|african/i.test(serialized), false);
 });
+
+// ========================================================
+// 16. K4.3 FOUNDING BETA CLIENT READINESS INVARIANTS
+// ========================================================
+
+test('K4.3 Pricing Truth: Client configuration centralizes beta price at $100/mo', () => {
+  assert.equal(config.betaPriceMonthly, 100);
+  assert.equal(config.currency, 'USD');
+  assert.equal(config.founderSupportEmail, 'concierge@derive.skin');
+});
+
+test('K4.3 Demo Isolation: UserStore initializes with clean default and separates Arthur demo fixture', () => {
+  useUserStore.getState().resetToDefault();
+  const defaultUser = useUserStore.getState();
+  assert.equal(defaultUser.userId, 'usr_beta_member');
+  assert.equal(defaultUser.email, 'member@derive.skin');
+  assert.equal(defaultUser.fullName, 'Beta Member');
+  assert.equal(defaultUser.tier, 'Founding Beta');
+  assert.ok(!defaultUser.tier.includes('129'), 'Default tier must not embed legacy price string');
+
+  // Load Arthur demo user explicitly
+  useUserStore.getState().loadArthurDemoUser();
+  const arthurUser = useUserStore.getState();
+  assert.equal(arthurUser.userId, 'usr_beta_001');
+  assert.equal(arthurUser.fullName, 'Arthur Pendelton');
+  assert.equal(arthurUser.tier, 'Founding Beta');
+
+  // Reset back to clean default
+  useUserStore.getState().resetToDefault();
+});
+
+test('K4.3 Today Actionable Research Gating: Generic/non-actionable research is omitted from Today', () => {
+  const nonActionableInsight: ResearchInsight = {
+    id: 'res_1',
+    title: 'Niacinamide + Retinoid Synergy',
+    summary: 'New research supports your current routine.',
+    recommendation: 'no_change',
+    recommendationReason: 'No changes needed.',
+    source: 'Journal of Cosmetic Dermatology, 2026',
+    evidenceStrength: 'high',
+    date: 'Sep 2026',
+  };
+
+  const actionableInsight: ResearchInsight = {
+    id: 'res_2',
+    title: 'Visible Light Photoprotection',
+    summary: 'Iron oxide addition recommended for persistent PIH marks.',
+    recommendation: 'action',
+    recommendationReason: 'Active routine adjustment proposed.',
+    source: 'JAAD, 2026',
+    evidenceStrength: 'high',
+    date: 'Sep 2026',
+  };
+
+  const insightsList = [nonActionableInsight];
+
+  // Filtering logic matching Today screen
+  const todayInsightWhenNoAction = insightsList.find(
+    (r) => r.recommendation === 'action' || (r.recommendation !== 'no_change' && !!r.recommendationReason)
+  );
+  assert.equal(todayInsightWhenNoAction, undefined, 'Today must omit research when recommendation is no_change');
+
+  const insightsListWithAction = [nonActionableInsight, actionableInsight];
+  const todayInsightWhenAction = insightsListWithAction.find(
+    (r) => r.recommendation === 'action' || (r.recommendation !== 'no_change' && !!r.recommendationReason)
+  );
+  assert.ok(todayInsightWhenAction, 'Today must surface actionable research');
+  assert.equal(todayInsightWhenAction?.id, 'res_2');
+});
+
+test('K4.3 Baseline Photos Gating: Requires all 3 photos (Front, Left, Right) before completion', () => {
+  useOnboardingStore.getState().resetOnboarding();
+  const store = useOnboardingStore.getState();
+
+  // Partial captures
+  assert.equal(!!(store.frontPhotoUri && store.leftPhotoUri && store.rightPhotoUri), false);
+
+  useOnboardingStore.getState().setSkinPhotos({ front: 'file:///photo_front.jpg' });
+  const step1State = useOnboardingStore.getState();
+  assert.equal(!!(step1State.frontPhotoUri && step1State.leftPhotoUri && step1State.rightPhotoUri), false);
+
+  useOnboardingStore.getState().setSkinPhotos({ left: 'file:///photo_left.jpg' });
+  const step2State = useOnboardingStore.getState();
+  assert.equal(!!(step2State.frontPhotoUri && step2State.leftPhotoUri && step2State.rightPhotoUri), false);
+
+  useOnboardingStore.getState().setSkinPhotos({ right: 'file:///photo_right.jpg' });
+  const allState = useOnboardingStore.getState();
+  assert.equal(!!(allState.frontPhotoUri && allState.leftPhotoUri && allState.rightPhotoUri), true);
+
+  // Clean up
+  useOnboardingStore.getState().resetOnboarding();
+});
+

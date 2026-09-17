@@ -17,8 +17,8 @@ export default function WelcomeScreen() {
   const handleAssistedSetup = () => {
     analytics.track('onboarding_started', { entryPoint: 'founder_assist' });
     Alert.alert(
-      'Assisted Onboarding',
-      'Prefer a personal touch? We can walk through your routine over a 10-minute call or chat. Send a quick email to concierge@derive.skin or continue self-serve.',
+      'Founding Beta Setup Support',
+      'Need help completing your initial intake? We can walk through your routine setup with you. Send a note to concierge@derive.skin or continue self-serve.',
       [
         { text: 'Continue Self-Serve', style: 'cancel' },
         { text: 'Start Setup', onPress: () => router.push('/(onboarding)/2-goals') },
@@ -53,7 +53,7 @@ export default function WelcomeScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.featureTitle}>About 4 minutes</Text>
-              <Text style={styles.featureDesc}>Complete in one sitting or pick up where you left off.</Text>
+              <Text style={styles.featureDesc}>A calm, focused walkthrough of your skin and current routine.</Text>
             </View>
           </View>
 
@@ -62,8 +62,8 @@ export default function WelcomeScreen() {
               <Icon name="lock" size={18} color={colors.brand} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>Private & Encrypted</Text>
-              <Text style={styles.featureDesc}>Your skin photos and routine notes are strictly confidential and never shared.</Text>
+              <Text style={styles.featureTitle}>Private by design</Text>
+              <Text style={styles.featureDesc}>Your skin photos and routine notes stay private to your care loop.</Text>
             </View>
           </View>
 
@@ -72,8 +72,8 @@ export default function WelcomeScreen() {
               <Icon name="person" size={18} color={colors.brand} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>Human-checked before your first plan</Text>
-              <Text style={styles.featureDesc}>Your initial routine receives a final manual quality check before it goes live.</Text>
+              <Text style={styles.featureTitle}>Final quality check</Text>
+              <Text style={styles.featureDesc}>Your first routine gets one final quality check before it goes live.</Text>
             </View>
           </View>
         </View>

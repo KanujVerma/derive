@@ -18,6 +18,7 @@ import { calculateMonthlyPlanPrice, formatCentsToDollars } from '@/src/pricing';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
+import { config } from '@/src/constants/config';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function ProfileScreen() {
     Haptics.selectionAsync();
     Alert.alert(
       'Derive Member Support',
-      'For routine questions or adjustments, ask directly in the Ask tab or email support@derive.care.',
+      `For routine questions or adjustments, ask directly in the Ask tab or email ${config.founderSupportEmail}.`,
       [{ text: 'OK' }]
     );
   };
@@ -64,7 +65,7 @@ export default function ProfileScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert(
       'Export Requested',
-      'A private download link for your skin observations and routine history has been sent to your email.',
+      'Export request received. Your care concierge will compile your skin observations and routine history archive.',
       [{ text: 'OK' }]
     );
   };
@@ -105,14 +106,10 @@ export default function ProfileScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.memberName}>{fullName || 'Derive Member'}</Text>
-            <Text style={styles.memberEmail}>{email || 'member@derive.care'}</Text>
+            <Text style={styles.memberEmail}>{email || 'member@derive.skin'}</Text>
             <View style={styles.badgeRow}>
               <Badge label="FOUNDING BETA" variant="keep" size="small" />
-              <Text style={styles.memberPrice}>
-                {isPlanUnderReview || !routine || routine.status === 'awaiting_review'
-                  ? `Estimated plan: ${formatCentsToDollars(pricingEstimate.monthlyTotalCents)}/mo`
-                  : `Current plan: ${formatCentsToDollars(pricingEstimate.monthlyTotalCents)}/mo`}
-              </Text>
+              <Text style={styles.memberPrice}>${config.betaPriceMonthly}/mo</Text>
             </View>
           </View>
         </View>

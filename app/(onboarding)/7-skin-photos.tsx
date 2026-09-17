@@ -47,7 +47,7 @@ const ANGLES: AngleConfig[] = [
     title: 'Right Profile',
     stepNum: 3,
     instruction: 'Turn head slightly to show your right cheek',
-    subtext: 'Captures symmetry and barrier resilience',
+    subtext: 'Captures right cheek, jawline, and texture clarity',
   },
 ];
 
@@ -85,6 +85,7 @@ export default function SkinPhotosScreen() {
 
   const currentUri = getPhotoUri(currentAngle.key);
   const allCaptured = !!(frontPhotoUri && leftPhotoUri && rightPhotoUri);
+  const capturedCount = [frontPhotoUri, leftPhotoUri, rightPhotoUri].filter(Boolean).length;
 
   const handleCapture = (uri: string) => {
     setIsCameraActive(false);
@@ -104,6 +105,7 @@ export default function SkinPhotosScreen() {
   };
 
   const handleContinue = () => {
+    if (!allCaptured) return;
     router.push('/(onboarding)/9-clarification');
   };
 
@@ -111,6 +113,7 @@ export default function SkinPhotosScreen() {
     return (
       <CameraCapture
         type="face"
+        stepBadge={`STEP ${currentAngle.stepNum} OF 3: ${currentAngle.title.toUpperCase()}`}
         instruction={currentAngle.instruction}
         subtext="Good even lighting • No filters"
         onCapture={handleCapture}
@@ -245,19 +248,19 @@ export default function SkinPhotosScreen() {
         <View style={styles.privacyCard}>
           <Icon name="lock" size={18} color={colors.brand} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.privacyTitle}>Private & Protected</Text>
+            <Text style={styles.privacyTitle}>Private Skincare Data</Text>
             <Text style={styles.privacyText}>
-              Your photos are stored with end-to-end encryption. They are treated as private medical context and never used for public marketing.
+              Your baseline photos are encrypted at rest in private storage and reviewed only by your care team to personalize your routine. They are never shared publicly or used for model training.
             </Text>
           </View>
         </View>
       </ScrollView>
 
       <StickyActionFooter
-        ctaLabel={allCaptured ? 'Continue to Review' : 'Continue'}
+        ctaLabel={allCaptured ? 'Continue to Review' : `Take All 3 Photos (${capturedCount}/3)`}
         onPressCta={handleContinue}
-        secondaryLabel="Skip photos for now"
-        onPressSecondary={handleContinue}
+        disabled={!allCaptured}
+        helperText={!allCaptured ? 'Front, left, and right photos are required for your baseline.' : undefined}
       />
     </View>
   );

@@ -12,15 +12,30 @@ export interface UserState {
   setUser: (userId: string, email: string, fullName?: string) => void;
   toggleFounderMode: () => void;
   logout: () => void;
+  loadArthurDemoUser: () => void;
+  resetToDefault: () => void;
 }
 
-export const useUserStore = create<UserState>((set) => ({
+const DEFAULT_USER_STATE = {
+  userId: 'usr_beta_member',
+  email: 'member@derive.skin',
+  fullName: 'Beta Member',
+  membershipStatus: 'active' as const,
+  tier: 'Founding Beta',
+  isFounderMode: false,
+};
+
+const ARTHUR_DEMO_USER = {
   userId: 'usr_beta_001',
   email: 'arthur@derive.skin',
   fullName: 'Arthur Pendelton',
-  membershipStatus: 'active',
-  tier: 'Founding Beta ($129/mo)',
+  membershipStatus: 'active' as const,
+  tier: 'Founding Beta',
   isFounderMode: false,
+};
+
+export const useUserStore = create<UserState>((set) => ({
+  ...DEFAULT_USER_STATE,
 
   setUser: (userId, email, fullName = 'Beta Member') =>
     set({ userId, email, fullName, membershipStatus: 'active' }),
@@ -34,5 +49,10 @@ export const useUserStore = create<UserState>((set) => ({
       email: '',
       fullName: '',
       membershipStatus: 'none',
+      tier: 'none',
     }),
+
+  loadArthurDemoUser: () => set({ ...ARTHUR_DEMO_USER }),
+
+  resetToDefault: () => set({ ...DEFAULT_USER_STATE }),
 }));

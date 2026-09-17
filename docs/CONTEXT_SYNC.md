@@ -6,12 +6,40 @@ This ledger tracks durable architectural, product, and contract decisions across
 
 ---
 
+## 2026-09-17 — Kanuj Mobile/UX: Founding Beta Client Readiness (Pass 9 / Milestone K4.3)
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `6e7bd13fbee9103462d248ef07af4cb4af314029`
+- **Remote Push Status**: `pending-push` (to be verified upon commit and push)
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `K4.3 COMPLETE` (Founding Beta client readiness achieved; K5 Mobile Release & TestFlight next); `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress).
+- **Ownership / Shared Contracts**: Kanuj-owned client code only (`app/**`, `src/components/**`, `src/stores/**`, `src/constants/**`, `tests/**`). Zero changes to Supabase migrations, RLS, shared domain/contracts (`src/domain/**`, `src/contracts/**`), or backend persistence.
+- **Durable Changes**:
+  1. **Centralized Beta Pricing ($100/mo)**: Sourced customer-facing beta price strictly from `src/constants/config.ts` (`config.betaPriceMonthly = 100`). Removed hardcoded `$129` strings from `app/orders/index.tsx`, `app/profile/index.tsx`, `app/(onboarding)/10-summary.tsx`, and `src/stores/userStore.ts`. Preserved `$129` in shared contracts and migrations as documented `ARCHITECTURE_CHALLENGE-01`.
+  2. **Decoupled Identity Token & Demo Fixture Isolation**: Decoupled `userStore.tier` from price literals (`'Founding Beta'`). Clean default state initializes as `Beta Member` (`usr_beta_member`, `member@derive.skin`), preventing accidental Arthur greeting or demographic leakage on fresh launches. Arthur demo user cleanly isolated in explicit action `loadArthurDemoUser()`.
+  3. **Truthful Onboarding Trust Copy**: Removed unsupported resumability claim ("pick up where you left off"), unverified security claims ("Private & Encrypted", "end-to-end encryption"), and clinical framing ("medical context", "Human-checked"). Framed onboarding as a focused 4-minute intake, private by design, with a manual final quality check before routine activation. Setup support framed as operational assistance (`concierge@derive.skin`), not a recurring consulting promise.
+  4. **Required Baseline Photos for Paid Founding Beta**: Gated the Continue button strictly on all 3 required angles (Front, Left, Right); removed the "Skip photos for now" bypass; corrected right-profile subtext from unmeasurable "barrier resilience" to cosmetic "right cheek, jawline, and texture clarity"; updated privacy guarantee to truthful private storage at rest.
+  5. **In-App Live Camera Foundation (`expo-camera`)**: Refactored `CameraCapture.tsx` from an ImagePicker modal trigger to a true in-app live viewfinder using installed `expo-camera` (`CameraView`). Includes front-facing live stream for face selfies, face oval reticle, floating top HUD instruction pill, manual shutter with haptics, captured photo review (`Use Photo` vs `Retake`), camera flip support, and permission handling with Settings redirect. Strictly disabled photo-library upload for face baseline photos.
+  6. **Extensible Quality-Gating Contract & Deferred Auto-Capture**: Defined `QualityGatingConfig`, `QualityGateStatus`, and `CaptureQualityCriteria` component interfaces. Raised `ARCHITECTURE_CHALLENGE-04` deferring hands-free native frame analysis (yaw/pitch/roll, lighting, sharpness) to a dedicated native Expo module pass.
+  7. **Today Actionable Research Gating**: Filtered research cards on Today to surface strictly when directly relevant to an active routine adaptation or proposed change (`recommendation === 'action'`); generic non-actionable literature (`'no_change'`) is omitted from Today to protect the 2-second status glance.
+  8. **Test Suite Expansion**: Added 4 new invariant tests covering centralized pricing truth, user store demo isolation, Today actionable research filtering, and baseline photo gating (42/42 passing).
+- **Architecture Challenges Raised**:
+  - `ARCHITECTURE_CHALLENGE-04`: Real-Time Face-Quality Auto-Capture Requires Native Dependency & Build Architecture.
+- **Unresolved / Next Work**:
+  - K5: Mobile Release & TestFlight (EAS build, dev client, physical hardware validation).
+  - Dedicated pass for native Apple Vision / CoreML frame processing if hands-free auto-capture is desired for beta members.
+
+---
+
 ## 2026-09-17 — Founder Alignment: Narrow Documentation-Correctness Cleanup (Pass 8)
 
 - **Agent / Workstream**: Kanuj & Sami Founder Alignment (Mobile/UX + Platform/Intelligence)
 - **Local Branch**: `main`
 - **Starting Shared HEAD / origin/main**: `3cf752d72672798bdec43cca6d416925ecdb20c0`
-- **Remote Push Status**: `pending-push` (to be verified upon commit and push)
+- **Ending Pushed SHA**: `6e7bd13fbee9103462d248ef07af4cb4af314029`
+- **Remote Push Status**: `pushed / verified`
+- **GitHub CI**: `success` (Run ID: `35251493589`)
 - **Drive Status**: `synced by orchestrator after agent completion`
 - **Milestone Status**: `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress); `K4 COMPLETE` (K4.1 pricing prototype & K4.2 phenotype prototype complete; K5 next).
 - **Ownership / Shared Contracts**: Strictly documentation cleanup. Zero code, UI, migration, or contract edits.

@@ -182,7 +182,7 @@ export default function SafetyScreen() {
           <GroupedSection>
             <SelectionRow
               title="No known ingredient allergies"
-              subtitle="No medical or severe contact allergies to skincare ingredients"
+              subtitle="No known severe contact allergies to skincare ingredients"
               selected={hasNoSensitivities}
               onPress={handleToggleNoSensitivities}
               type="radio"
@@ -236,8 +236,8 @@ export default function SafetyScreen() {
 
         {/* SECTION 5: OPTIONAL SAFETY NOTES */}
         <VoiceTextArea
-          label="Any other medical or safety context? (Optional)"
-          placeholder="e.g. History of eczema around mouth in winter, dermatologist advised gentle wash..."
+          label="Any other skin sensitivity or safety context? (Optional)"
+          placeholder="e.g. Tendency toward redness around nose in winter, prefer fragrance-free..."
           value={notes}
           onChangeText={setNotes}
           context="reaction_note"

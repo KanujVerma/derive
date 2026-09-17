@@ -68,6 +68,22 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Clean TypeScript typecheck (0 errors) and web export.
   - Zero race/ethnicity classifiers, CV colorimeters, or Fitzpatrick ML inference.
 
+### K4.3: Founding Beta Client Readiness [COMPLETE]
+* **Scope**:
+  - Customer-facing first-10 beta pricing truth ($100/mo) centralized via `src/constants/config.ts` across Account Profile, Managed Orders, and Onboarding Summary.
+  - UserStore demo isolation: decoupled tier string from price literals (`Founding Beta`), isolated Arthur demo identity in explicit `loadArthurDemoUser()`, default state initialized cleanly to `Beta Member`.
+  - Truthful onboarding trust copy: removed unsupported "pick up where you left off" resumability, "end-to-end encryption", and "medical context"; framed assisted setup as operational concierge support (`concierge@derive.skin`).
+  - Mandatory Founding Beta baseline photos: Front, Left, and Right captures required; skip bypass removed; Continue button strictly gated on all 3 captures; right profile subtext clarified to cosmetic texture/clarity.
+  - In-app live camera foundation: built using installed `expo-camera` (`CameraView`) with front-facing live selfie stream, face oval guide, top HUD instruction pill, manual shutter, and review state (`Use Photo` / `Retake`); photo library upload strictly disabled for face baseline photos; permission handling with Settings redirect.
+  - Extensible quality-gating contract: defined `QualityGatingConfig` and `CaptureQualityCriteria` interface; deferred native frame analysis/auto-capture to dedicated native pass (`ARCHITECTURE_CHALLENGE-04`).
+  - Today actionable research filtering: clinical literature surfaces on Today strictly when directly relevant to an active routine change or adaptation; non-actionable educational research omitted from Today to protect the 2-second glance.
+* **Acceptance Criteria**:
+  - Full test suite passes 100% (42/42 tests).
+  - TypeScript typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - Zero customer-facing `$129` promises in Kanuj-owned paths.
+  - Zero unsupported E2EE or medical claims in customer-facing copy.
+
 ### K5: Mobile Release & TestFlight [NEXT]
 * **Scope**: EAS configuration, development client builds, production provisioning profiles, TestFlight deployment, physical device validation, and first-customer test script.
 * **Acceptance Criteria**:

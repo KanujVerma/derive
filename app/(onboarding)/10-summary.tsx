@@ -19,6 +19,7 @@ import { Badge } from '@/src/components/ui/Badge';
 import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 import { analytics } from '@/src/services/analytics';
 import { calculateMonthlyPlanPrice, formatCentsToDollars } from '@/src/pricing';
+import { config } from '@/src/constants/config';
 
 export default function SummaryScreen() {
   const router = useRouter();
@@ -118,31 +119,31 @@ export default function SummaryScreen() {
           Review your inputs. You can tap Edit to adjust any section before we assemble your plan.
         </Text>
 
-        {/* ESTIMATED PLAN CARD */}
+        {/* FOUNDING BETA MEMBERSHIP CARD */}
         <View style={styles.pricingCard}>
           <View style={styles.pricingHeaderRow}>
             <View>
-              <Text style={styles.pricingBadge}>ESTIMATED PLAN</Text>
+              <Text style={styles.pricingBadge}>FOUNDING BETA MEMBERSHIP</Text>
               <View style={styles.priceRow}>
                 <Text style={styles.pricingAmount}>
-                  {formatCentsToDollars(pricingEstimate.monthlyTotalCents)}
+                  ${config.betaPriceMonthly}
                 </Text>
                 <Text style={styles.pricingCadence}>/month</Text>
               </View>
             </View>
-            <Badge label="ALL-INCLUDED" variant="keep" size="small" />
+            <Badge label="FIRST 10 MEMBERS" variant="keep" size="small" />
           </View>
           <Text style={styles.pricingSubtext}>
-            Based on your draft routine. Finalized when your first routine is ready.
+            Covers Derive care management plus all standard OTC products in your approved routine.
           </Text>
 
           <View style={styles.pricingDivider} />
 
           <View style={styles.includesBlock}>
             <Text style={styles.includesHeading}>Includes:</Text>
-            <Text style={styles.includesItem}>• Derive management</Text>
-            <Text style={styles.includesItem}>• Your routine products</Text>
-            <Text style={styles.includesItem}>• Managed replenishment</Text>
+            <Text style={styles.includesItem}>• Continuous routine management & weekly adaptations</Text>
+            <Text style={styles.includesItem}>• Standard OTC routine products included</Text>
+            <Text style={styles.includesItem}>• Managed replenishment as you run low</Text>
           </View>
         </View>
 

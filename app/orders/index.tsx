@@ -15,6 +15,7 @@ import { useRoutineStore } from '@/src/stores/routineStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
+import { config } from '@/src/constants/config';
 import { RefillRequest, RefillStatus } from '@/src/types/schema';
 
 const STAGES: { key: RefillStatus; label: string }[] = [
@@ -241,7 +242,7 @@ export default function OrdersScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.policyTitle}>Managed Refills</Text>
             <Text style={styles.policyText}>
-              Included with your $129/month Founding Beta membership. Running low? Tell us in one tap and we'll handle the rest.
+              Included with your ${config.betaPriceMonthly}/month Founding Beta membership. Running low? Tell us in one tap and we'll handle the rest.
             </Text>
           </View>
         </View>

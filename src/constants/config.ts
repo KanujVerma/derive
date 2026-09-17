@@ -6,8 +6,8 @@
 export const config = {
   appName: 'Derive',
   brandTagline: 'Your skincare, handled.',
-  shortDescription: 'Managed personal skincare with human oversight and continuous guidance.',
-  betaPriceMonthly: 129,
+  shortDescription: 'Managed personal skincare with continuous routine guidance and final quality check before activation.',
+  betaPriceMonthly: 100,
   currency: 'USD',
   founderSupportEmail: 'concierge@derive.skin',
   founderReviewWindowHours: 12,
