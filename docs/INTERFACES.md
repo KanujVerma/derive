@@ -95,18 +95,21 @@ export interface SafetyClassification {
 
 ## 5. Storage & Image Reference Rules
 - Customer skin photos are stored in a private Supabase Storage bucket (`customer-skin-photos`).
-- The mobile client must **never** store or display public S3/Supabase URLs.
-- The backend generates short-lived signed URLs (15-minute expiration) when serving photo comparisons.
+- Canonical object paths are `<authenticated-member-uuid>/<photo-type>/<opaque-file-name>`; metadata rows must use the same member-owned prefix.
+- Uploads are immutable: use unique names with `upsert: false`. The mobile client must **never** store or display public S3/Supabase URLs.
+- The mobile client can upload to its own member namespace but cannot list, directly download, sign, replace, or delete photo objects. It also cannot delete photo metadata directly.
+- The future signer must derive identity from the verified JWT, verify that both the metadata row and object path belong to that identity, and issue a signed URL with a 15-minute (900-second) expiration. It must ignore caller-supplied `userId` values for authorization.
+- Full deletion must use the Storage API before deleting the auth/profile record; deleting rows from `storage.objects` or relying on relational cascades would orphan the physical object.
 
 ---
 
 ## 6. Client vs Remote Service Switch
-Switching from mock to remote requires only:
+The service factory selects the remote adapter with:
 ```bash
 # In .env:
 EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 ```
-The factory in `src/services/DeriveService.ts` automatically instantiates `RemoteDeriveService` without requiring any changes to React Native UI components.
+The factory in `src/services/DeriveService.ts` then instantiates `RemoteDeriveService` for callers of that factory. Current screens still operate primarily through local Zustand stores, and the remote adapter still lacks complete row-to-domain mapping and live function coverage; therefore this flag alone does **not** make the current app a production-ready remote experience. Client/service wiring requires a coordinated integration slice.
 
 Live Gemini invocation happens only behind `RemoteDeriveService` on the server. `MockDeriveService` uses deterministic local reasoning and never requires a client Gemini key.
 

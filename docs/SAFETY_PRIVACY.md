@@ -18,10 +18,11 @@ Derive operates under uncompromising safety and privacy standards appropriate fo
 ---
 
 ## 2. Customer Health Data & Private Photos
-* **Private Photo Storage**: All customer skin photos are stored in private Supabase Storage buckets with public read disabled.
-* **Zero Public URLs**: Photos are NEVER accessible via static public URLs. They are served to authenticated client sessions exclusively via short-lived signed URLs (15-minute validity).
+* **Private Photo Storage (S1A Enforced)**: `customer-skin-photos` is provisioned with `public = false`, a 10 MiB limit, and an image MIME allowlist. Authenticated uploads are isolated under a first path segment equal to the caller's immutable Auth UUID.
+* **Zero Public or Direct Customer Reads (S1A Enforced)**: Customers can create immutable objects only under their Auth UUID namespace, but cannot list, download, sign, replace, or delete objects directly. The next S1 slice must add a trusted JWT-bound endpoint that issues 15-minute signed URLs; until it exists, the live signed-photo delivery path is not complete.
+* **Immutable Uploads**: The bucket has no authenticated `UPDATE` policy. Clients must use unique opaque filenames and `upsert: false` so a later capture cannot silently overwrite an earlier longitudinal record.
 * **Zero Model Training**: Customer photos, symptom descriptions, and conversation histories are never used for public model training or third-party data broker sharing.
-* **Data Deletion**: Complete deletion requests delete all photos from storage, wipe profile records, and purge conversation logs.
+* **Data Deletion Contract**: A complete deletion must first remove every object through the Supabase Storage API, then remove relational/auth records, and finally purge any conversation data that exists. Customers deliberately lack independent blob or photo-metadata deletion rights because partial client workflows can orphan one side. This orchestration is still an S1 implementation requirement and must not be represented as automated until the endpoint is shipped and tested; existing signed URLs may remain valid only until their maximum 15-minute expiry.
 
 ---
 

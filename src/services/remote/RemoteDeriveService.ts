@@ -104,7 +104,7 @@ export class RemoteDeriveService implements IDeriveService {
     const client = this.getClient();
     const { data, error } = await client
       .from('refill_requests')
-      .select('*')
+      .select('id, user_id, product_name, brand, status, tracking_number, requested_at, shipped_at')
       .eq('user_id', userId)
       .order('requested_at', { ascending: false });
     if (error) throw new Error(`RemoteDeriveService.getOrders failed: ${error.message}`);
@@ -125,7 +125,7 @@ export class RemoteDeriveService implements IDeriveService {
     const client = this.getClient();
     const { data, error } = await client
       .from('routines')
-      .select('*')
+      .select('id, user_id, version, status, summary_sentence, created_at, published_at')
       .eq('user_id', userId)
       .order('version', { ascending: false })
       .limit(1)
@@ -138,7 +138,9 @@ export class RemoteDeriveService implements IDeriveService {
     const client = this.getClient();
     const { data, error } = await client
       .from('profiles')
-      .select('*, memberships(*)')
+      .select(
+        'id, email, full_name, phone, created_at, updated_at, memberships(id, user_id, tier, status, created_at)',
+      )
       .eq('id', userId)
       .maybeSingle();
     if (error) throw new Error(`RemoteDeriveService.getCustomerProfile failed: ${error.message}`);

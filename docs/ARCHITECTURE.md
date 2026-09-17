@@ -58,9 +58,13 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ## 2. Platform & Database Layer (Sami)
 * **Database**: Managed PostgreSQL on Supabase.
-* **Row-Level Security (RLS)**: Enforced on every table (`profiles`, `skin_profiles`, `routines`, `check_ins`, `refill_requests`). Customer sessions authenticate with JWTs and can only access their own user records.
-* **Private Storage**: Buckets for user skin photos (`customer-skin-photos`). No public read access. Photos are rendered client-side via signed time-limited URLs.
-* **Auth**: Supabase Email/Password and Passwordless Magic Link auth.
+* **Auth Data Lifecycle (S1A Implemented)**: Inserts into `auth.users` provision a matching `public.profiles` row through a `SECURITY DEFINER` trigger in the unexposed `private` schema with an empty pinned search path. Email and non-authoritative display metadata are synchronized without granting customers profile creation or email-write authority.
+* **Row-Level Security (S1A Implemented)**: Every existing public application table has RLS enabled. `anon` has no application-table privileges. Authenticated members receive an explicit least-privilege operation matrix: owner-scoped profile/skin/shelf/photo/check-in/refill access, read-only membership/routine/catalog access, and no access to founder review tasks, payment identifiers, founder notes, AI analysis fields, or fulfillment state changes. Trusted service-role operations stay server-side.
+* **Private Storage Data Plane (S1A Implemented)**: `customer-skin-photos` is a non-public, 10 MiB image-only bucket. Object names must begin with the authenticated member UUID (`<member-id>/<photo-type>/<opaque-file-name>`). Members can create immutable objects with non-upserting uploads, but have no direct object list/read/sign/update/delete path. Photo metadata is likewise customer-readable and insertable but not customer-deletable.
+* **Signed Photo Delivery (S1 Remaining)**: The database intentionally grants no client download or signing path. A trusted JWT-bound server endpoint must validate the caller and metadata ownership, then issue a 900-second signed URL. That endpoint is not implemented yet, so the signed-URL acceptance criterion remains open.
+* **Deletion (S1 Remaining)**: Relational rows cascade from profile deletion, but physical Storage objects must be deleted through the Storage API before the auth/profile record is removed. The idempotent deletion workflow is not implemented yet.
+* **Client Auth (S1 Remaining)**: Supabase Email/Password and Passwordless Magic Link are the intended methods. Persistent native sessions, callback routing, and route gating require a coordinated mobile/shared implementation.
+* **Remote Adapter Compatibility (S1A Implemented, Adapter Still Provisional)**: Sami-owned PostgREST projections enumerate only customer-readable routine, membership, profile, and refill columns, so column-level grants do not fail due to wildcard expansion. The adapter still requires later row-to-domain mapping, routine-item assembly, live functions, and integration tests before the remote feature flag is production-ready.
 
 ---
 

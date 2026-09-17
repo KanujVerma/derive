@@ -106,3 +106,43 @@ Key technical and product decisions accepted for Derive V1.
 * **Confirmation Requirement**: If a member's pigmentation depth is unconfirmed or estimated, tint evaluation returns `needs_confirmation` before claiming compatibility.
 * **Iron Oxide Photoprotection**: Detect and highlight iron-oxide benefits (HEV / visible light blocking) ONLY when a member has confirmed post-inflammatory hyperpigmentation tendency (sometimes or often); never infer treatment benefits from pigmentation depth alone.
 * **White Cast Assessment**: Assesses white-cast friction using verified catalog or member observation matched against member cast concern; strictly avoids speculative formula-only prediction algorithms.
+
+### ADR-20: S1A Least-Privilege Supabase Data Plane
+* **Status**: IMPLEMENTED (database policy/config/test layer); full S1 remains in progress.
+* **Decision**: Harden the existing baseline through an additive migration rather than rewriting potentially applied history. Provision Auth profiles through locked-down, Derive-namespaced triggers; revoke implicit `anon`/`authenticated` grants; establish fail-closed defaults for future public objects; grant customers only explicit owner-scoped operations; keep founder/payment/server-generated fields inaccessible; and store photos in one canonical private bucket under member-ID path prefixes.
+* **Signed-URL Boundary**: Customers have no direct photo download/list/sign capability. A trusted server endpoint will issue 900-second signed URLs after JWT and path ownership validation.
+* **Deletion Boundary**: Customers have immutable insert rights but no direct object or photo-metadata deletion rights. A trusted Storage-API-first workflow must delete physical objects before relational metadata/auth state so a partial client request cannot orphan private health data.
+* **Rationale**: RLS policies and SQL grants are complementary controls. Exact policy-set tests detect permissive drift; explicit remote projections avoid protected-field wildcard failures; and separating immutable upload rights from trusted signing/deletion minimizes accidental exposure and orphaned objects.
+
+---
+
+## Open Shared-Contract Challenges (PROPOSED · UNRESOLVED)
+
+These findings are review evidence, not accepted contract changes. S1A does not modify Kanuj-owned UI or shared TypeScript contracts.
+
+### ARCHITECTURE_CHALLENGE-01: Price Is Embedded in Membership Identity
+1. **Existing Decision**: ADR-10 and current schema/type literals encode `$129` as `founding_beta_129`, while ADR-15 proposes routine-derived pricing and remains pending cofounder review.
+2. **Exact Evidence**: `supabase/migrations/20260915_init.sql` defaults `memberships.tier` to `founding_beta_129`; `src/domain/types.ts` narrows `CustomerProfile.tier` to that literal; README and client configuration still state `$129`.
+3. **Why It Matters**: Membership identity, commercial price, and future Stripe state are coupled. The database accepts arbitrary text while the shared type claims one literal, so remote casts are unsound.
+4. **Recommended Change**: After founders decide fixed versus routine-derived pricing, use a neutral cohort/plan identity and separately version agreed monetary state and effective timing. Preserve legacy data during migration.
+5. **Alternatives**: Keep `$129` as an explicitly approved legacy Founding Beta contract; adopt another fixed price with a neutral plan code; or adopt the proposed routine-linked pricing ledger at S5.
+6. **Affected Workstreams**: Shared domain contract, database membership model, client presentation, operations, and S5 commerce.
+7. **Unblocked Work**: S1 security hardening can continue without persisting new pricing semantics.
+
+### ARCHITECTURE_CHALLENGE-02: Safety Unknown States Are Collapsed
+1. **Existing Decision**: Product documentation and onboarding state distinguish pregnancy/nursing (`yes`, `no`, `prefer_not_to_say`, `unanswered`) and sensitivities (`none_known`, `reported`, `unanswered`).
+2. **Exact Evidence**: The baseline database stores only a default-false pregnancy boolean and default-empty sensitivity array. `OnboardingPayload` and `SkinProfile` in the shared contract retain only the same boolean/array.
+3. **Why It Matters**: Missing or withheld data becomes a false negative, destroying provenance and weakening conservative safety behavior.
+4. **Recommended Change**: With joint contract approval, add explicit canonical status fields, preserve the legacy boolean/array during transition, and backfill unproven `false`/empty values to `unanswered` rather than assuming `no`/`none_known`.
+5. **Alternatives**: A versioned safety fact/event model may preserve richer history, but retaining the collapsed model is not recommended.
+6. **Affected Workstreams**: Shared onboarding/profile contracts, database persistence, routine intelligence, and client-to-remote mapping.
+7. **Unblocked Work**: S1 RLS/Auth/Storage can continue; S2 persistence should not be declared complete until resolved.
+
+### ARCHITECTURE_CHALLENGE-03: `STOP` vs `PAUSE` Persistence Drift
+1. **Existing Decision**: Product UX defines `KEEP`, `PAUSE`, `REPLACE`, and `ADD`; the shared schema currently permits both `PAUSE` and `STOP`.
+2. **Exact Evidence**: `user_products.action` in the baseline database accepts `STOP` but rejects `PAUSE`, while the routine generator emits both and tests explicitly require `PAUSE` for temporary holds.
+3. **Why It Matters**: A valid client-generated `PAUSE` cannot persist, while `STOP` can persist without a fully documented customer-facing meaning.
+4. **Recommended Change**: Jointly define whether `STOP` is a distinct permanent/safety-terminal action. Then migrate the database to the approved shared superset before narrowing any TypeScript/UI semantics.
+5. **Alternatives**: Standardize V1 on four customer-facing actions, or retain `STOP` as an internal distinct state with explicit presentation rules.
+6. **Affected Workstreams**: Shared schema/domain types, routine generator, database constraint, Plan UI, and remote mapping.
+7. **Unblocked Work**: S1 hardening can continue; S2 user-product persistence requires resolution.

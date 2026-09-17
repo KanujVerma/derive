@@ -6,12 +6,60 @@ This ledger tracks durable architectural, product, and contract decisions across
 
 ---
 
+## 2026-09-16 — Sami Platform: S1A Least-Privilege Data Plane
+
+- **Agent / Workstream**: Sami (Platform, Intelligence & Operations)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `71e693d6b45f6850d5c53332172ef139fc41d3e8`
+- **Pass 6 Ledger Correction Commit**: `59e57c8cae96231ae6764dece6544e7eb14c49c9`
+- **Implementation Commit**: `3f37e706f89898810d10c04f8c4466d914ef69a9`
+- **Ledger Sync**: This docs-only successor commit records the implementation checkpoint without self-referencing its own SHA.
+- **Remote Push Status**: `pushed` (final checkpoint verified against `origin/main`)
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `S1 IN PROGRESS`; S1A database/auth-policy/private-storage data plane is implemented, but official Docker-backed Supabase reset/pgTAP verification, persistent mobile auth, trusted photo signing, and Storage-API-first deletion remain open.
+- **Ownership / Shared Contracts**: No Kanuj-owned UI, `src/domain/**`, `src/contracts/**`, or shared TypeScript schema was changed. Sami-owned `src/services/remote/**` projections were narrowed to customer-readable columns so the new grants do not fail on wildcard expansion.
+- **Durable Changes**:
+  1. Added reproducible local Supabase configuration with migrations, Auth, and Storage enabled; PostgreSQL 15 remains a local pin that must be checked against the hosted project before linking.
+  2. Added an additive S1A migration; the applied baseline migration was not rewritten.
+  3. Added Derive-namespaced Auth triggers and locked private-schema functions that provision/backfill profiles and synchronize Auth-owned email without replacing unrelated triggers.
+  4. Enabled RLS on all eleven existing application tables, normalized existing application-policy drift, revoked implicit client grants, restricted mutable columns, and established server-only default privileges for future public objects/RPCs.
+  5. Kept payment identifiers, founder notes/tasks, AI analysis, fulfillment state, onboarding completion, and ownership reassignment outside client authority.
+  6. Added a non-public 10 MiB image-only `customer-skin-photos` bucket with immutable, owner-bound uploads under `<auth-uuid>/<photo-type>/<opaque-file-name>` and no direct customer list/read/sign/update/delete path.
+  7. Reserved photo-object and photo-metadata deletion for a future trusted Storage-API-first workflow so partial client operations cannot orphan private blobs.
+  8. Added a fail-closed preflight for unexpected `storage.objects` policies because permissive policies combine with OR semantics.
+  9. Added a 64-assertion pgTAP suite covering exact policy roles/commands, grants, default RPC privileges, Auth lifecycle, anonymous denial, owner/cross-owner isolation, server-only fields, bucket invariants, and Storage insert-policy behavior.
+  10. Corrected documentation that previously implied the remote feature flag alone makes the current locally stored UI production-ready.
+- **Verification**:
+  - `npm test`: **PASS**, 38/38.
+  - `npx tsc --noEmit`: **PASS**.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: **PASS**.
+  - PostgreSQL parser: baseline migration, S1A migration, and pgTAP file all parse.
+  - Fresh ephemeral PostgreSQL-compatible migration-chain verification: **PASS** for Auth trigger, future-function defaults, RLS, safe field grants, cross-user isolation, owner-bound Storage insert, and private bucket invariants.
+  - Supabase CLI `2.117.0` read the project configuration, but `supabase db reset` / `supabase test db` could not run because this host has neither Docker nor Podman. The committed pgTAP suite is therefore authored and statically reviewed, not reported as officially executed.
+- **Decision Status**:
+  - `ADR-20: S1A Least-Privilege Supabase Data Plane`: **IMPLEMENTED** (full S1 remains in progress).
+  - Flat-price membership semantics, explicit safety unknown states, and `STOP` versus `PAUSE`: **PROPOSED / UNRESOLVED ARCHITECTURE_CHALLENGES** only.
+  - Phenotype/PIH persistence and personalized pricing persistence: **NOT IMPLEMENTED** in S1A.
+  - Stripe: **NOT STARTED**; remains S5.
+- **Architecture Challenges Raised**:
+  1. `ARCHITECTURE_CHALLENGE-01`: `$129` is embedded in membership identity while pricing direction is unresolved.
+  2. `ARCHITECTURE_CHALLENGE-02`: Database/shared contracts collapse pregnancy/nursing and sensitivity unknown states into `false`/empty values.
+  3. `ARCHITECTURE_CHALLENGE-03`: Database persistence rejects client-valid `PAUSE` while permitting underdefined `STOP`.
+- **Unresolved / Next Work**:
+  - Run the official fresh Supabase reset, pgTAP suite, and Storage API upload smoke test on Docker-backed local/CI infrastructure before deployment.
+  - Implement the JWT-bound 900-second photo signer and idempotent Storage-API-first deletion workflow as S1B.
+  - Coordinate persistent Expo Auth session/callback/route gating and the canonical non-upserting uploader without silently changing Kanuj-owned UI.
+  - Finish remote row-to-domain mapping, routine-item assembly, live functions, and integration coverage before enabling remote mode for customers.
+  - Founders must resolve the three shared-contract challenges before the dependent S2/S5 persistence work is declared complete.
+
+---
+
 ## 2026-09-16 — Kanuj Mobile/UX: Architecture-Correctness Cleanup (Pass 6)
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
 - **Local Branch**: `main`
 - **Starting Local HEAD**: `ae4e49d951477d53967196729a4933fb6fb71b30`
-- **Ending Commit / HEAD**: `4778026` (pushed checkpoint)
+- **Ending Commit / HEAD**: `71e693d6b45f6850d5c53332172ef139fc41d3e8` (pushed checkpoint)
 - **Remote Push Status**: `pushed`
 - **Drive Status**: `sync-required` (DRIVE_SYNC_PAYLOAD emitted in completion report)
 - **Architecture Challenges Raised / Resolved**: None
