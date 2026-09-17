@@ -10,7 +10,9 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.derive.skincare",
-      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "Derive uses your camera to capture private skin progress photos and scan your current skincare shelf.",
         "NSPhotoLibraryUsageDescription": "Derive needs photo library access to upload photos of your skincare products."
@@ -32,6 +34,13 @@
       "expo-router",
       "expo-dev-client",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4100d696-3e03-4b2c-bdb3-1986d5f1a624"
+      }
+    },
+    "owner": "derive-skincare"
   }
 }

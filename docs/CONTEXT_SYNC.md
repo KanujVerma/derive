@@ -6,6 +6,33 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-17 — Kanuj Mobile/UX: K5 Expo Project Link + Physical-Device Signing Attempt
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `d22075a5ef4f6d04f2fa0be61a446cd13bd20de5`
+- **Prior Verified CI Run**: `35268975660` (on commit `d22075a`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `K5 PARTIAL / BLOCKED ON APPLE SIGNING + IPHONE DEVELOPER MODE` (Expo project `@derive-skincare/derive` linked; EAS non-interactive iOS development build cannot create internal-distribution credentials without interactive Apple login; local `expo run:ios --device` reached Xcode signing but failed because Developer Mode is disabled on the connected iPhone.)
+- **Ownership / Shared Contracts**: Kanuj-owned Expo/EAS mobile config only. Zero Supabase, RLS, Stripe, or shared-contract changes. Founder builds remain `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`.
+- **Verified Runtime**:
+  1. `eas whoami` authenticated as Expo user `kanuj`; owner of personal account `kanuj` and org `derive-skincare`.
+  2. `eas project:info` matches `@derive-skincare/derive` / `4100d696-3e03-4b2c-bdb3-1986d5f1a624`. Did not re-run `eas init`.
+  3. Connected physical device: iPhone 17 Pro Max class (`iPhone18,2`), iOS 27, available/trusted. Developer Mode disabled.
+  4. `eas build --platform ios --profile development --non-interactive` initialized remote `buildNumber` to 1, then failed: no Apple credentials suitable for internal distribution in non-interactive mode.
+  5. Local device compile used existing Apple Development identity on this Mac and timed out because Developer Mode is off.
+- **Durable Config This Pass**:
+  1. Persisted Expo link: `extra.eas.projectId` + `owner: derive-skincare`.
+  2. Set `ios.config.usesNonExemptEncryption: false` via Expo's documented TestFlight export-compliance key. Repo contains no custom crypto libraries; networking is standard OS HTTPS. Removed ignored local `ios.buildNumber` now that EAS `appVersionSource` is remote.
+- **Hard Blockers Remaining**:
+  - Interactive Apple Developer login for EAS-managed ad hoc credentials (`eas build --platform ios --profile development`).
+  - Enable iPhone Developer Mode (Settings → Privacy & Security → Developer Mode).
+  - Physical face auto-capture, barcode, production build, TestFlight.
+
+---
+
 ## 2026-09-17 — Kanuj Mobile/UX: K5 Release Continuation After Quota Interrupt
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
