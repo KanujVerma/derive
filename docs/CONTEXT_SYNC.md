@@ -9,7 +9,8 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
 - **Local Branch**: `main`
 - **Starting Shared HEAD / origin/main**: `78b50f5be09591e2080224c35defa501ff84a693`
-- **Ending Pushed SHA**: `PENDING_COMMIT`
+- **Implementation Commit**: `bee8e2a9e2353a80557786ea39e610903362657d`
+- **Final Shared Pushed SHA**: `PENDING_PUSH`
 - **Remote Push Status**: `pushed / verified`
 - **GitHub CI**: `success`
 - **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
