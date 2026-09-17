@@ -10,9 +10,9 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Local Branch**: `main`
 - **Starting Shared HEAD / origin/main**: `78b50f5be09591e2080224c35defa501ff84a693`
 - **Implementation Commit**: `bee8e2a9e2353a80557786ea39e610903362657d`
-- **Final Shared Pushed SHA**: `PENDING_PUSH`
+- **Final Shared Pushed SHA**: `c2b933157e8ebaa64b971a533038670dc4e10b1a`
 - **Remote Push Status**: `pushed / verified`
-- **GitHub CI**: `success`
+- **GitHub CI**: `success` (Run ID: `35259288838`)
 - **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
 - **Milestone Status**: `K4.4 COMPLETE` (Baseline capture intelligence, instant barcode scanning, and beta state finalization achieved; K5 Mobile Release & TestFlight next); `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress).
 - **Ownership / Shared Contracts**: Kanuj-owned client code (`app/**`, `src/components/**`, `src/stores/**`, `src/utils/**`, `src/services/ai-workflows/**`, `modules/**`, `tests/**`). Backward-compatible additions only (`ScanProductInput.barcode?: string`). Zero changes to Supabase migrations, RLS, or Sami backend infrastructure.
