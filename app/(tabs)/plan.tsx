@@ -91,64 +91,87 @@ export default function PlanScreen() {
         )}
 
         {activeTab === 'routine' ? (
-          <>
-            {/* AM ROUTINE */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Morning</Text>
-              <Text style={styles.sectionSub}>3 steps · Cleanse, hydrate & protect</Text>
-            </View>
-
-            {amSteps.map((step) => (
-              <RoutineCard
-                key={step.id}
-                step={step}
-                onRequestRefill={isPlanUnderReview ? undefined : () => router.push('/refill')}
-              />
-            ))}
-
-            {/* PM ROUTINE */}
-            <View style={[styles.sectionHeader, { marginTop: spacing.lg }]}>
-              <Text style={styles.sectionTitle}>Evening</Text>
-              <Text style={styles.sectionSub}>3 steps · Cleanse, treat & moisturize</Text>
-            </View>
-
-            {pmSteps.map((step) => (
-              <RoutineCard
-                key={step.id}
-                step={step}
-                onRequestRefill={isPlanUnderReview ? undefined : () => router.push('/refill')}
-              />
-            ))}
-
-            {/* Consolidated Refills & Tracking Pathway (Only active when routine is active) */}
-            {!isPlanUnderReview && (
-              <View style={styles.replenishCard}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.replenishTitle}>Managed Refills</Text>
-                  <Text style={styles.replenishSub}>
-                    Running low on any bottle? Tell us in one tap and we'll handle the rest.
-                  </Text>
-                </View>
-                <View style={styles.replenishActions}>
-                  <Button
-                    label="Request Refill"
-                    variant="brand"
-                    size="medium"
-                    onPress={() => router.push('/refill')}
-                  />
-                  <TouchableOpacity
-                    onPress={() => router.push('/orders')}
-                    style={styles.ordersLink}
-                    activeOpacity={0.7}
-                  >
-                    <Icon name="shipping" size={15} color={colors.brand} />
-                    <Text style={styles.ordersLinkText}>Orders & Tracking</Text>
-                    <Icon name="forward" size={13} color={colors.brand} />
-                  </TouchableOpacity>
-                </View>
+          amSteps.length === 0 && pmSteps.length === 0 ? (
+            <View style={styles.emptyPlanCard}>
+              <View style={styles.emptyPlanIconCircle}>
+                <Icon name="sparkle" size={24} color={colors.brand} />
               </View>
-            )}
-          </>
+              <Text style={styles.emptyPlanTitle}>No routine scheduled yet</Text>
+              <Text style={styles.emptyPlanText}>
+                Complete your skin profile and shelf audit to assemble your personalized morning and evening routine.
+              </Text>
+              <Button
+                label="Start Routine Setup"
+                variant="brand"
+                size="medium"
+                onPress={() => router.push('/(onboarding)/1-welcome')}
+                style={{ marginTop: spacing.md }}
+              />
+            </View>
+          ) : (
+            <>
+              {/* AM ROUTINE */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Morning</Text>
+                <Text style={styles.sectionSub}>
+                  {amSteps.length} step{amSteps.length === 1 ? '' : 's'} · Cleanse, hydrate & protect
+                </Text>
+              </View>
+
+              {amSteps.map((step) => (
+                <RoutineCard
+                  key={step.id}
+                  step={step}
+                  onRequestRefill={isPlanUnderReview ? undefined : () => router.push('/refill')}
+                />
+              ))}
+
+              {/* PM ROUTINE */}
+              <View style={[styles.sectionHeader, { marginTop: spacing.lg }]}>
+                <Text style={styles.sectionTitle}>Evening</Text>
+                <Text style={styles.sectionSub}>
+                  {pmSteps.length} step{pmSteps.length === 1 ? '' : 's'} · Cleanse, treat & moisturize
+                </Text>
+              </View>
+
+              {pmSteps.map((step) => (
+                <RoutineCard
+                  key={step.id}
+                  step={step}
+                  onRequestRefill={isPlanUnderReview ? undefined : () => router.push('/refill')}
+                />
+              ))}
+
+              {/* Consolidated Refills & Tracking Pathway (Only active when routine is active) */}
+              {!isPlanUnderReview && (
+                <View style={styles.replenishCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.replenishTitle}>Managed Refills</Text>
+                    <Text style={styles.replenishSub}>
+                      Running low on any bottle? Tell us in one tap and we'll handle the rest.
+                    </Text>
+                  </View>
+                  <View style={styles.replenishActions}>
+                    <Button
+                      label="Request Refill"
+                      variant="brand"
+                      size="medium"
+                      onPress={() => router.push('/refill')}
+                    />
+                    <TouchableOpacity
+                      onPress={() => router.push('/orders')}
+                      style={styles.ordersLink}
+                      activeOpacity={0.7}
+                    >
+                      <Icon name="shipping" size={15} color={colors.brand} />
+                      <Text style={styles.ordersLinkText}>Orders & Tracking</Text>
+                      <Icon name="forward" size={13} color={colors.brand} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </>
+          )
         ) : (
           <>
             {/* PRODUCTS LIST */}
@@ -159,34 +182,45 @@ export default function PlanScreen() {
               </Text>
             </View>
 
-            {userProducts.map((up) => {
-              const matchingStep = [...amSteps, ...pmSteps].find(
-                (s) => s.productId === up.productId
-              );
-              const scheduleText = matchingStep?.scheduleText || (matchingStep ? (matchingStep.timing === 'am' ? 'Every morning' : 'Every evening') : undefined);
+            {userProducts.length === 0 ? (
+              <View style={styles.emptyPlanCard}>
+                <Text style={styles.emptyPlanTitle}>No shelf products yet</Text>
+                <Text style={styles.emptyPlanText}>
+                  Products identified during onboarding or counter scans will appear here with KEEP, PAUSE, or REPLACE recommendations.
+                </Text>
+              </View>
+            ) : (
+              userProducts.map((up) => {
+                const matchingStep = [...amSteps, ...pmSteps].find(
+                  (s) => s.productId === up.productId
+                );
+                const scheduleText = matchingStep?.scheduleText || (matchingStep ? (matchingStep.timing === 'am' ? 'Every morning' : 'Every evening') : undefined);
 
-              return (
-                <View key={up.id} style={styles.productAuditCard}>
-                  <View style={styles.productAuditHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.productAuditBrand}>{up.product.brand}</Text>
-                      <Text style={styles.productAuditName}>{up.product.name}</Text>
+                return (
+                  <View key={up.id} style={styles.productAuditCard}>
+                    <View style={styles.productAuditHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.productAuditBrand}>{up.product.brand}</Text>
+                        <Text style={styles.productAuditName}>{up.product.name}</Text>
+                      </View>
+                      <Badge action={up.action} />
                     </View>
-                    <Badge action={up.action} />
-                  </View>
 
-                  <View style={styles.auditReasonBox}>
-                    <Text style={styles.auditReasonText}>{up.actionReason}</Text>
-                  </View>
+                    {up.actionReason ? (
+                      <View style={styles.auditReasonBox}>
+                        <Text style={styles.auditReasonText}>{up.actionReason}</Text>
+                      </View>
+                    ) : null}
 
-                  {scheduleText && up.action === 'KEEP' && (
-                    <Text style={styles.frequencyText}>
-                      Scheduled: {scheduleText}
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
+                    {scheduleText && up.action === 'KEEP' && (
+                      <Text style={styles.frequencyText}>
+                        Scheduled: {scheduleText}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })
+            )}
           </>
         )}
       </ScrollView>
@@ -402,5 +436,39 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: colors.actionReview.text,
     lineHeight: typography.lineHeights.caption,
+  },
+  emptyPlanCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    textAlign: 'center',
+    marginTop: spacing.md,
+    ...shadows.subtle,
+  },
+  emptyPlanIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.full,
+    backgroundColor: colors.brandLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyPlanTitle: {
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.bold,
+    color: colors.ink,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  emptyPlanText: {
+    fontSize: typography.sizes.bodyRegular,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.sm,
   },
 });

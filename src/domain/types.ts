@@ -256,6 +256,7 @@ export interface ScanProductInput {
   productName: string;
   brand?: string;
   imageUri?: string;
+  barcode?: string;
   userRoutineContext?: {
     activeDifferinSchedule?: boolean;
     currentRoutineProducts?: string[];

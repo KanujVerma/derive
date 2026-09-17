@@ -1,17 +1,10 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@/src/constants/theme';
-import { useRoutineStore } from '@/src/stores/routineStore';
 
 export default function RootLayout() {
-  const initializeDefaultRoutine = useRoutineStore((s) => s.initializeDefaultRoutine);
-
-  useEffect(() => {
-    // Ensure default routine is ready on launch
-    initializeDefaultRoutine();
-  }, [initializeDefaultRoutine]);
 
   return (
     <SafeAreaProvider>

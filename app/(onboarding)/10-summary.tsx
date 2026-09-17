@@ -57,12 +57,18 @@ export default function SummaryScreen() {
         status: 'awaiting_review' as const,
       };
 
-      // Save into routine store with isPlanUnderReview = true
+      // Save into routine store with isPlanUnderReview = true and pristine historical arrays
       useRoutineStore.setState({
         routine: pendingRoutine,
         userProducts: proposal.userProducts,
+        completedStepIdsToday: [],
+        checkIns: [],
+        refillRequests: [],
+        learnedInsights: [],
+        researchInsights: [],
         isPlanUnderReview: true,
         todayDominantStatus: 'Final review: Your first routine gets one final quality check before it goes live.',
+        isWeeklyCheckInDue: false,
       });
 
       onboarding.completeOnboarding();
@@ -141,7 +147,7 @@ export default function SummaryScreen() {
 
           <View style={styles.includesBlock}>
             <Text style={styles.includesHeading}>Includes:</Text>
-            <Text style={styles.includesItem}>• Continuous routine management & weekly adaptations</Text>
+            <Text style={styles.includesItem}>• Weekly check-ins, ongoing routine management & adjustments when needed</Text>
             <Text style={styles.includesItem}>• Standard OTC routine products included</Text>
             <Text style={styles.includesItem}>• Managed replenishment as you run low</Text>
           </View>

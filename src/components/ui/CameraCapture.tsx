@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,10 @@ import * as Haptics from 'expo-haptics';
 import { colors, radii, typography, spacing } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
+import {
+  AutoCaptureStateMachine,
+  FrameQualityMetrics,
+} from '@/src/components/camera/AutoCaptureStateMachine';
 
 export type QualityFeedback =
   | 'center_face'
@@ -36,6 +40,7 @@ export interface QualityGatingConfig {
   enabled?: boolean;
   autoCapture?: boolean;
   holdDurationMs?: number;
+  targetAngle?: 'front' | 'left' | 'right';
   onStatusChange?: (status: QualityGateStatus) => void;
 }
 
@@ -70,6 +75,22 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [autoCaptureProgress, setAutoCaptureProgress] = useState(0);
+  const [qualityFeedback, setQualityFeedback] = useState<string | null>(null);
+
+  const stateMachineRef = useRef<AutoCaptureStateMachine | null>(null);
+
+  useEffect(() => {
+    if (qualityGating?.enabled && type === 'face') {
+      stateMachineRef.current = new AutoCaptureStateMachine({
+        targetAngle: qualityGating.targetAngle || 'front',
+        requiredHoldDurationMs: qualityGating.holdDurationMs || 750,
+      });
+    } else {
+      stateMachineRef.current = null;
+    }
+  }, [qualityGating?.enabled, qualityGating?.targetAngle, qualityGating?.holdDurationMs, type]);
 
   // Default facing: front for face baseline selfies, back for shelf/product scanning
   const defaultFacing: CameraType = type === 'face' ? 'front' : 'back';
@@ -86,10 +107,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   };
 
   const handleShutterPress = async () => {
-    if (isCapturing) return;
+    if (isCapturing || !isCameraReady) return;
 
     try {
       setIsCapturing(true);
+      setCameraError(null);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       if (cameraRef.current) {
@@ -104,20 +126,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         }
       }
 
-      // If camera reference was not available or didn't return a URI
-      if (__DEV__) {
-        // Fallback for simulator testing where physical camera hardware is absent
-        setCapturedUri(
-          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=800&q=80'
-        );
-      }
+      setCameraError('Unable to capture photo. Please steady the camera and try again.');
     } catch (err) {
-      console.warn('Camera capture error, attempting fallback:', err);
-      if (__DEV__) {
-        setCapturedUri(
-          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=800&q=80'
-        );
-      }
+      console.warn('Camera capture error:', err);
+      setCameraError('Camera error during capture. Please verify permissions and try again.');
     } finally {
       setIsCapturing(false);
     }
@@ -255,6 +267,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       <CameraView
         ref={cameraRef}
         facing={facing}
+        mirror={facing === 'front'}
         style={StyleSheet.absoluteFill}
         onCameraReady={() => setIsCameraReady(true)}
       />
@@ -278,8 +291,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
 
           <View style={styles.instructionPill}>
             {stepBadge && <Text style={styles.stepBadgeText}>{stepBadge}</Text>}
-            <Text style={styles.instructionText}>{instruction}</Text>
-            {subtext && <Text style={styles.subtextText}>{subtext}</Text>}
+            <Text style={styles.instructionText}>{qualityFeedback || instruction}</Text>
+            {subtext && !qualityFeedback && <Text style={styles.subtextText}>{subtext}</Text>}
           </View>
 
           {allowFlip ? (
@@ -298,10 +311,29 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         </View>
       </View>
 
+      {/* Camera Error Banner */}
+      {cameraError && (
+        <View style={styles.errorBanner}>
+          <Icon name="warning" size={16} color="#FFFFFF" />
+          <Text style={styles.errorBannerText}>{cameraError}</Text>
+          <TouchableOpacity
+            onPress={() => setCameraError(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.errorDismissText}>Dismiss</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Center Guidance Reticle */}
       <View style={styles.reticleContainer} pointerEvents="none">
         {type === 'face' ? (
-          <View style={styles.faceOvalReticle} />
+          <View
+            style={[
+              styles.faceOvalReticle,
+              autoCaptureProgress > 0 && styles.faceOvalReticleHolding,
+            ]}
+          />
         ) : (
           <View style={styles.shelfRectReticle} />
         )}
@@ -316,16 +348,25 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
           <TouchableOpacity
             onPress={handleShutterPress}
             activeOpacity={0.8}
-            disabled={isCapturing}
-            style={[styles.shutterButton, isCapturing && styles.shutterButtonCapturing]}
+            disabled={!isCameraReady || isCapturing}
+            style={[
+              styles.shutterButton,
+              (!isCameraReady || isCapturing) && styles.shutterButtonDisabled,
+              isCapturing && styles.shutterButtonCapturing,
+            ]}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel="Take photo"
+            accessibilityLabel={isCameraReady ? 'Take photo' : 'Camera initializing'}
           >
             {isCapturing ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <View style={styles.shutterInner} />
+              <View
+                style={[
+                  styles.shutterInner,
+                  !isCameraReady && styles.shutterInnerDisabled,
+                ]}
+              />
             )}
           </TouchableOpacity>
 
@@ -467,6 +508,11 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     backgroundColor: 'transparent',
   },
+  faceOvalReticleHolding: {
+    borderColor: colors.brand,
+    borderWidth: 3,
+    borderStyle: 'solid',
+  },
   shelfRectReticle: {
     width: width * 0.85,
     height: width * 0.65,
@@ -540,6 +586,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  shutterButtonDisabled: {
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    opacity: 0.6,
+  },
   shutterButtonCapturing: {
     borderColor: colors.brand,
   },
@@ -548,6 +598,35 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 29,
     backgroundColor: '#FFFFFF',
+  },
+  shutterInnerDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  errorBanner: {
+    position: 'absolute',
+    top: 130,
+    left: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: 'rgba(180, 40, 40, 0.9)',
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    zIndex: 10,
+  },
+  errorBannerText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.medium,
+  },
+  errorDismissText: {
+    color: '#FFFFFF',
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.bold,
+    textDecorationLine: 'underline',
   },
   uploadAltButton: {
     width: 60,

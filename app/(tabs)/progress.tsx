@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
+import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
@@ -37,29 +38,64 @@ function formatFriendlyDate(dateStr: string): string {
 export default function ProgressScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { checkIns, learnedInsights } = useRoutineStore();
+  const { checkIns, learnedInsights, routine, userProducts } = useRoutineStore();
+  const { frontPhotoUri, leftPhotoUri, rightPhotoUri } = useOnboardingStore();
   const [selectedAngle, setSelectedAngle] = useState<AngleKey>('front');
 
-  const timelineEvents = [
-    {
-      date: 'Sep 15, 2026',
-      title: 'Routine Updated',
-      description: 'Differin scheduled Monday, Wednesday, Friday, followed by moisturizer.',
-      badge: 'Active',
-    },
-    {
-      date: 'Sep 08, 2026',
-      title: 'Weekly Check-in #1',
-      description: 'Zero flaking or stinging reported. Skin tolerance confirmed.',
-      badge: 'Stable',
-    },
-    {
-      date: 'Sep 01, 2026',
-      title: 'Initial Plan Established',
-      description: 'Audited 4 current counter products. 3 steps morning, 3 steps evening.',
-      badge: 'Baseline',
-    },
-  ];
+  // Determine baseline photo URI based on selected angle
+  const baselinePhotoUri =
+    selectedAngle === 'front'
+      ? frontPhotoUri
+      : selectedAngle === 'left'
+      ? leftPhotoUri
+      : rightPhotoUri;
+
+  // Find most recent photo from check-ins if available
+  const latestCheckInWithPhoto = checkIns.find((c) => c.photoUrls && c.photoUrls.length > 0);
+  const latestPhotoUri = latestCheckInWithPhoto?.photoUrls?.[0] || null;
+
+  // Build dynamic longitudinal timeline
+  const timelineEvents = React.useMemo(() => {
+    const events: Array<{
+      date: string;
+      title: string;
+      description: string;
+      badge: string;
+    }> = [];
+
+    // Map check-ins in reverse chronological order
+    checkIns.forEach((checkIn, index) => {
+      const checkInNum = checkIns.length - index;
+      const dateStr = checkIn.createdAt ? formatFriendlyDate(checkIn.createdAt.split('T')[0]) : 'Recent';
+      events.push({
+        date: dateStr,
+        title: `Weekly Check-in #${checkInNum}`,
+        description:
+          checkIn.aiAnalysisSentence ||
+          checkIn.notes ||
+          (checkIn.irritation === 'none'
+            ? 'Skin tolerance confirmed with no flaking or stinging reported.'
+            : 'Sensitivity noted during check-in.'),
+        badge: checkIn.adjustmentProposed ? 'Adjustment' : 'Stable',
+      });
+    });
+
+    // Add routine establishment baseline event
+    if (routine) {
+      const dateStr = routine.publishedAt || routine.createdAt
+        ? formatFriendlyDate((routine.publishedAt || routine.createdAt).split('T')[0])
+        : 'Baseline';
+      const totalSteps = routine.amSteps.length + routine.pmSteps.length;
+      events.push({
+        date: dateStr,
+        title: 'Initial Plan Established',
+        description: `Audited routine initialized with ${totalSteps} step${totalSteps === 1 ? '' : 's'}. ${routine.amSteps.length} AM, ${routine.pmSteps.length} PM.`,
+        badge: 'Baseline',
+      });
+    }
+
+    return events;
+  }, [checkIns, routine, userProducts]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -125,11 +161,21 @@ export default function ProgressScreen() {
             {/* Baseline Column */}
             <View style={styles.photoCol}>
               <View style={styles.photoBox}>
-                <View style={styles.photoPlaceholder}>
-                  <Icon name="person" size={32} color={colors.inkSubtle} />
-                </View>
+                {baselinePhotoUri ? (
+                  <Image
+                    source={{ uri: baselinePhotoUri }}
+                    style={styles.photoImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Icon name="person" size={32} color={colors.inkSubtle} />
+                  </View>
+                )}
                 <View style={styles.photoTag}>
-                  <Text style={styles.photoTagText}>Baseline • Sep 1</Text>
+                  <Text style={styles.photoTagText}>
+                    {baselinePhotoUri ? 'Baseline • Active' : 'Baseline • No photo'}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -137,11 +183,21 @@ export default function ProgressScreen() {
             {/* Current Column */}
             <View style={styles.photoCol}>
               <View style={styles.photoBox}>
-                <View style={styles.photoPlaceholder}>
-                  <Icon name="person" size={32} color={colors.brand} />
-                </View>
+                {latestPhotoUri ? (
+                  <Image
+                    source={{ uri: latestPhotoUri }}
+                    style={styles.photoImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Icon name="person" size={32} color={colors.brand} />
+                  </View>
+                )}
                 <View style={styles.photoTag}>
-                  <Text style={styles.photoTagText}>Latest • Sep 15</Text>
+                  <Text style={styles.photoTagText}>
+                    {latestPhotoUri ? 'Latest • Verified' : 'Latest • Next check-in'}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -155,52 +211,72 @@ export default function ProgressScreen() {
             Observations grounded in your check-ins and routine tolerance.
           </Text>
 
-          <View style={styles.insightsList}>
-            {learnedInsights.map((insight) => (
-              <View key={insight.id} style={styles.insightCard}>
-                <View style={styles.insightIconCircle}>
-                  <Icon name="check" size={14} color={colors.brand} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.insightText}>{insight.text}</Text>
-                  <View style={styles.insightMetaRow}>
-                    <Text style={styles.insightBasisText}>
-                      {InsightBasisLabels[insight.basis] || 'From your skin history'}
-                    </Text>
-                    <Text style={styles.insightDateText}>{formatFriendlyDate(insight.dateObserved)}</Text>
+          {learnedInsights.length > 0 ? (
+            <View style={styles.insightsList}>
+              {learnedInsights.map((insight) => (
+                <View key={insight.id} style={styles.insightCard}>
+                  <View style={styles.insightIconCircle}>
+                    <Icon name="check" size={14} color={colors.brand} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.insightText}>{insight.text}</Text>
+                    <View style={styles.insightMetaRow}>
+                      <Text style={styles.insightBasisText}>
+                        {InsightBasisLabels[insight.basis] || 'From your skin history'}
+                      </Text>
+                      <Text style={styles.insightDateText}>{formatFriendlyDate(insight.dateObserved)}</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <Icon name="sparkle" size={20} color={colors.inkMuted} />
+              <Text style={styles.emptyCardTitle}>No observations yet</Text>
+              <Text style={styles.emptyCardText}>
+                As you complete weekly check-ins and follow your plan, we will document evidence-grounded insights about your barrier tolerance here.
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* 3. LONGITUDINAL TIMELINE */}
         <View style={styles.timelineSection}>
           <Text style={styles.sectionTitle}>Timeline</Text>
-          <View style={styles.timelineContainer}>
-            {timelineEvents.map((event, index) => (
-              <View key={index} style={styles.timelineItem}>
-                <View style={styles.spineContainer}>
-                  <View style={styles.dot} />
-                  {index < timelineEvents.length - 1 && <View style={styles.spineLine} />}
-                </View>
-
-                <View style={styles.eventCard}>
-                  <View style={styles.eventHeader}>
-                    <Text style={styles.eventDate}>{event.date}</Text>
-                    <StatusBadge
-                      label={event.badge}
-                      variant={event.badge === 'Active' ? 'keep' : event.badge === 'Stable' ? 'active' : 'info'}
-                      size="small"
-                    />
+          {timelineEvents.length > 0 ? (
+            <View style={styles.timelineContainer}>
+              {timelineEvents.map((event, index) => (
+                <View key={index} style={styles.timelineItem}>
+                  <View style={styles.spineContainer}>
+                    <View style={styles.dot} />
+                    {index < timelineEvents.length - 1 && <View style={styles.spineLine} />}
                   </View>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventDesc}>{event.description}</Text>
+
+                  <View style={styles.eventCard}>
+                    <View style={styles.eventHeader}>
+                      <Text style={styles.eventDate}>{event.date}</Text>
+                      <StatusBadge
+                        label={event.badge}
+                        variant={event.badge === 'Active' ? 'keep' : event.badge === 'Stable' ? 'active' : 'info'}
+                        size="small"
+                      />
+                    </View>
+                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    <Text style={styles.eventDesc}>{event.description}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <Icon name="progress" size={20} color={colors.inkMuted} />
+              <Text style={styles.emptyCardTitle}>No timeline events yet</Text>
+              <Text style={styles.emptyCardText}>
+                Your longitudinal skincare record starts once your routine is established and your first check-in is logged.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -468,5 +544,33 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: colors.inkMuted,
     lineHeight: 18,
+  },
+  photoImage: {
+    width: '100%',
+    height: 160,
+  },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  emptyCardTitle: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  emptyCardText: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 280,
   },
 });

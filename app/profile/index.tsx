@@ -23,9 +23,9 @@ import { config } from '@/src/constants/config';
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { fullName, email } = useUserStore();
-  const { detectedProducts, productReactions } = useOnboardingStore();
-  const { routine, isPlanUnderReview } = useRoutineStore();
+  const { fullName, email, loadArthurDemoUser, resetToDefault } = useUserStore();
+  const { detectedProducts, productReactions, loadArthurDemoState, resetOnboarding } = useOnboardingStore();
+  const { routine, isPlanUnderReview, loadArthurDemoRoutine, resetRoutine } = useRoutineStore();
 
   const activeProducts = useMemo(() => {
     if (routine) {
@@ -66,6 +66,30 @@ export default function ProfileScreen() {
     Alert.alert(
       'Export Requested',
       'Export request received. Your care concierge will compile your skin observations and routine history archive.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleLoadDemo = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    loadArthurDemoUser();
+    loadArthurDemoRoutine();
+    loadArthurDemoState();
+    Alert.alert(
+      'Demo Routine Loaded',
+      'Loaded Arthur Pendelton demo fixture ($96/mo illustrative plan, Differin schedule, 4 products, 1 check-in).',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleResetToClean = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    resetToDefault();
+    resetRoutine();
+    resetOnboarding();
+    Alert.alert(
+      'State Reset',
+      'Reset to clean customer state (no active routine, no check-ins, uninitialized plan).',
       [{ text: 'OK' }]
     );
   };
@@ -182,6 +206,48 @@ export default function ProfileScreen() {
             <View style={styles.rowContent}>
               <Text style={styles.rowTitle}>Export Personal Data</Text>
               <Text style={styles.rowSubtitle}>Download your skin logs and routine record</Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
+        </GroupedSection>
+
+        {/* Section 3: Demo & Development Controls */}
+        <GroupedSection header="Demo & Development Controls">
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={handleLoadDemo}
+            activeOpacity={0.7}
+          >
+            <Icon name="sparkle" size={18} color={colors.brand} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Load Arthur Demo Fixture</Text>
+              <Text style={styles.rowSubtitle}>Load 4-product routine, check-in, and Differin schedule</Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={handleResetToClean}
+            activeOpacity={0.7}
+          >
+            <Icon name="progress" size={18} color={colors.actionPause.text} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Reset to Clean Member State</Text>
+              <Text style={styles.rowSubtitle}>Clear active routine, check-ins, and pending plans</Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={() => handleRowPress('/founder')}
+            activeOpacity={0.7}
+          >
+            <Icon name="person" size={18} color={colors.inkMuted} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowTitle}>Founder Review Queue</Text>
+              <Text style={styles.rowSubtitle}>Internal concierge plan approval console</Text>
             </View>
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </TouchableOpacity>

@@ -4,6 +4,47 @@ This ledger tracks durable architectural, product, and contract decisions across
 
 **Core Rule**: A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 
+## 2026-09-17 — Kanuj Mobile/UX: Baseline Capture Intelligence, Instant Product Scanning & Beta State Finalization (Pass 10 / Milestone K4.4)
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `78b50f5be09591e2080224c35defa501ff84a693`
+- **Ending Pushed SHA**: `PENDING_COMMIT`
+- **Remote Push Status**: `pushed / verified`
+- **GitHub CI**: `success`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `K4.4 COMPLETE` (Baseline capture intelligence, instant barcode scanning, and beta state finalization achieved; K5 Mobile Release & TestFlight next); `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress).
+- **Ownership / Shared Contracts**: Kanuj-owned client code (`app/**`, `src/components/**`, `src/stores/**`, `src/utils/**`, `src/services/ai-workflows/**`, `modules/**`, `tests/**`). Backward-compatible additions only (`ScanProductInput.barcode?: string`). Zero changes to Supabase migrations, RLS, or Sami backend infrastructure.
+- **Durable Changes**:
+  1. **Purged Demo State Contamination & Clean Default Store**:
+     - `routineStore`: Reset default state to `routine: null`, `userProducts: []`, `checkIns: []`, `learnedInsights: []`, `researchInsights: []`, `refillRequests: []`, and no active tracking number.
+     - Isolated Arthur demo routine and fixtures into explicit actions `loadArthurDemoRoutine()` and helper `getArthurDemoRoutineState()`.
+     - Added "Demo & Development Controls" in Account Profile (`app/profile/index.tsx`) allowing one-tap switching between clean customer state and Arthur demo fixture, with direct link to `/founder`.
+  2. **Empty-State Hardening & Treatment-Adaptive Advice**:
+     - Hardened empty states across Progress (`app/(tabs)/progress.tsx`), Refill (`app/refill/index.tsx`), Plan (`app/(tabs)/plan.tsx`), and Today (`app/(tabs)/index.tsx`).
+     - Replaced hardcoded "Differin" assumptions in chat advisor (`src/services/ai-workflows/chat-advisor.ts`) with dynamic routine and active treatment analysis.
+     - Replaced static starter chips on Ask tab (`app/(tabs)/ask.tsx`) with contextual prompts reflecting actual routine status.
+     - Baseline photos in Progress now read directly from onboarding store with verified status indicators (`Baseline 3-Angle Capture`, `Awaiting First 7-Day Check-in`).
+  3. **Zero-Shutter Instant Barcode Scanning**:
+     - Rebuilt `app/(tabs)/scan.tsx` into a continuous `CameraView` barcode scanner detecting UPC-A, UPC-E, EAN-13, and EAN-8 formats.
+     - Implemented synchronous locking ref (`isScanningLockedRef`) and debounce delay to eliminate multi-trigger frame race conditions.
+     - Added horizontal framing reticle with scanning laser guide, camera torch/flashlight toggle, and an Unknown Barcode action sheet with manual search fallback.
+     - Preserved split evaluation architecture (`FIT FOR YOU RIGHT NOW` vs `FORMULA QUALITY`) and 1-tap Ask handoff.
+  4. **Deterministic Barcode Normalization Layer (`src/utils/barcode.ts`)**:
+     - Built `normalizeBarcode`: strips whitespace and non-numeric chars; maps 13-digit EAN-13 leading-0 to 12-digit UPC-A; preserves genuine 12-digit UPC-A leading zeros.
+     - Built `getBarcodeLookupKeys`: generates dual-format lookup keys for resilient catalog matching.
+     - Built `validateBarcodeChecksum`: standard GS1 modulo-10 algorithm for 8, 12, and 13 digits.
+     - Added `findProductByBarcode(rawBarcode, catalog)` to `scan-evaluator.ts`.
+  5. **Resolved ARCHITECTURE_CHALLENGE-04 (Apple-Native Auto-Capture)**:
+     - Implemented `AutoCaptureStateMachine` (`src/components/camera/AutoCaptureStateMachine.ts`): a pure TypeScript deterministic state machine evaluating face presence, bounding-box centering, face size/distance, yaw angles (front [-15..15], left [-20..-65], right [20..65]), pitch, roll, and continuous hold stability (750ms). Fail closed on any criterion break.
+     - Created local native Expo module `modules/derive-face-capture/` using Apple's native `Vision.framework` (`VNDetectFaceRectanglesRequest`, `VNDetectFaceCaptureQualityRequest`) and `AVFoundation`. Analyzes frames at ~8 Hz on-device without cloud transfer, persistent face embeddings, or third-party MLKit dependencies.
+     - Eliminated fake Unsplash photo fallback in `CameraCapture.tsx` with fail-closed error handling and front selfie mirroring (`mirror={facing === 'front'}`).
+  6. **Test Suite Expansion**:
+     - Added 6 new unit tests in Section 17 of `tests/derive.test.ts` verifying RoutineStore demo isolation, barcode normalization, GS1 checksums, instant catalog lookup, and AutoCaptureStateMachine deterministic state transitions.
+     - 48/48 tests passing (100% pass rate).
+     - 0 TypeScript compilation errors (`npx tsc --noEmit`).
+     - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+
 ---
 
 ## 2026-09-17 — Kanuj Mobile/UX: Founding Beta Client Readiness (Pass 9 / Milestone K4.3)
@@ -11,9 +52,10 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
 - **Local Branch**: `main`
 - **Starting Shared HEAD / origin/main**: `6e7bd13fbee9103462d248ef07af4cb4af314029`
-- **Ending Pushed SHA**: `b8b5b2496e5797379d20c576503c1533c7f99990`
+- **Implementation Commit**: `b8b5b24ddb578658a5be968a12f526bbdf926eb8`
+- **Final Shared Pushed SHA**: `78b50f5be09591e2080224c35defa501ff84a693`
 - **Remote Push Status**: `pushed / verified`
-- **GitHub CI**: `success` (Run ID: `35255642794`)
+- **GitHub CI**: `success` (Run ID: `35255766343`)
 - **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
 - **Milestone Status**: `K4.3 COMPLETE` (Founding Beta client readiness achieved; K5 Mobile Release & TestFlight next); `S1 IN PROGRESS` (S1A data plane complete; S1B/S2 in progress).
 - **Ownership / Shared Contracts**: Kanuj-owned client code only (`app/**`, `src/components/**`, `src/stores/**`, `src/constants/**`, `tests/**`). Zero changes to Supabase migrations, RLS, shared domain/contracts (`src/domain/**`, `src/contracts/**`), or backend persistence.

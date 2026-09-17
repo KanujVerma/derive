@@ -96,36 +96,46 @@ export default function RefillModal() {
       >
         <Text style={styles.sectionHeader}>Your Routine Products</Text>
 
-        <View style={styles.productsList}>
-          {uniqueProducts.map((p) => {
-            const isSelected = selectedProductId === p.productId;
-            return (
-              <TouchableOpacity
-                key={p.productId}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setSelectedProductId(p.productId);
-                }}
-                style={[styles.productCard, isSelected && styles.productCardSelected]}
-                activeOpacity={0.7}
-                accessible={true}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: isSelected }}
-              >
-                <View style={styles.radioDot}>
-                  {isSelected && <View style={styles.radioDotInner} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.productBrand}>{p.brand}</Text>
-                  <Text style={[styles.productName, isSelected && styles.productNameSelected]}>
-                    {p.productName}
-                  </Text>
-                  <Text style={styles.productCategory}>{p.category.toUpperCase()} • {p.amount}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {uniqueProducts.length > 0 ? (
+          <View style={styles.productsList}>
+            {uniqueProducts.map((p) => {
+              const isSelected = selectedProductId === p.productId;
+              return (
+                <TouchableOpacity
+                  key={p.productId}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setSelectedProductId(p.productId);
+                  }}
+                  style={[styles.productCard, isSelected && styles.productCardSelected]}
+                  activeOpacity={0.7}
+                  accessible={true}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: isSelected }}
+                >
+                  <View style={styles.radioDot}>
+                    {isSelected && <View style={styles.radioDotInner} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.productBrand}>{p.brand}</Text>
+                    <Text style={[styles.productName, isSelected && styles.productNameSelected]}>
+                      {p.productName}
+                    </Text>
+                    <Text style={styles.productCategory}>{p.category.toUpperCase()} • {p.amount}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.emptyCard}>
+            <Icon name="sparkle" size={24} color={colors.inkMuted} />
+            <Text style={styles.emptyCardTitle}>No routine products yet</Text>
+            <Text style={styles.emptyCardText}>
+              Once your personalized routine is activated, your scheduled products will appear here for 1-tap managed replenishment.
+            </Text>
+          </View>
+        )}
 
         {/* Existing Requests */}
         {refillRequests.length > 0 && (
@@ -142,14 +152,16 @@ export default function RefillModal() {
           </View>
         )}
 
-        <Button
-          label="Request Refill"
-          variant="primary"
-          size="large"
-          disabled={!selectedProductId}
-          onPress={handleRequest}
-          style={{ marginTop: spacing.xl }}
-        />
+        {uniqueProducts.length > 0 && (
+          <Button
+            label="Request Refill"
+            variant="primary"
+            size="large"
+            disabled={!selectedProductId}
+            onPress={handleRequest}
+            style={{ marginTop: spacing.xl }}
+          />
+        )}
       </ScrollView>
     </View>
   );
@@ -297,5 +309,29 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  emptyCardTitle: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  emptyCardText: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 280,
   },
 });

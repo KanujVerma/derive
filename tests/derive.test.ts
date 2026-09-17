@@ -23,6 +23,18 @@ import {
 } from '../src/types/schema.ts';
 import { config } from '../src/constants/config.ts';
 import { useUserStore } from '../src/stores/userStore.ts';
+import { useRoutineStore } from '../src/stores/routineStore.ts';
+import {
+  normalizeBarcode,
+  getBarcodeLookupKeys,
+  validateBarcodeChecksum,
+} from '../src/utils/barcode.ts';
+import { findProductByBarcode } from '../src/services/ai-workflows/scan-evaluator.ts';
+import {
+  AutoCaptureStateMachine,
+  evaluateFrameCriteria,
+  type FrameQualityMetrics,
+} from '../src/components/camera/AutoCaptureStateMachine.ts';
 import {
   createProvenancedValue,
   setOrConfirmPhenotypeValue,
@@ -1232,5 +1244,233 @@ test('K4.3 Baseline Photos Gating: Requires all 3 photos (Front, Left, Right) be
 
   // Clean up
   useOnboardingStore.getState().resetOnboarding();
+});
+
+// ========================================================
+// 17. K4.4 BASELINE CAPTURE, BARCODE SCAN & DEMO ISOLATION
+// ========================================================
+
+test('K4.4 Demo Isolation: RoutineStore initializes with clean default state and isolates Arthur fixture', () => {
+  // Ensure store is reset to clean default
+  useRoutineStore.getState().resetRoutine();
+  const clean = useRoutineStore.getState();
+
+  assert.equal(clean.routine, null, 'Default routine must be null');
+  assert.equal(clean.userProducts.length, 0, 'Default userProducts must be empty');
+  assert.equal(clean.checkIns.length, 0, 'Default checkIns must be empty');
+  assert.equal(clean.learnedInsights.length, 0, 'Default learnedInsights must be empty');
+  assert.equal(clean.researchInsights.length, 0, 'Default researchInsights must be empty');
+  assert.equal(clean.refillRequests.length, 0, 'Default refillRequests must be empty');
+  assert.equal(clean.isPlanUnderReview, false, 'Default plan review must be false');
+  assert.match(clean.todayDominantStatus, /No active routine yet/i);
+
+  // Load Arthur demo routine fixture explicitly
+  useRoutineStore.getState().loadArthurDemoRoutine();
+  const arthur = useRoutineStore.getState();
+
+  assert.ok(arthur.routine !== null, 'Arthur routine should be loaded');
+  assert.equal(arthur.routine?.status, 'published');
+  assert.equal(arthur.userProducts.length, 4, 'Arthur demo has 4 products');
+  assert.equal(arthur.checkIns.length, 1, 'Arthur demo has 1 baseline check-in');
+  assert.equal(arthur.learnedInsights.length, 3, 'Arthur demo has 3 learned insights');
+  assert.equal(arthur.refillRequests.length, 1, 'Arthur demo has 1 refill request');
+  assert.equal(arthur.refillRequests[0].trackingNumber, '9400111899223190442155');
+
+  // Reset back to clean state
+  useRoutineStore.getState().resetRoutine();
+  const afterReset = useRoutineStore.getState();
+  assert.equal(afterReset.routine, null);
+  assert.equal(afterReset.userProducts.length, 0);
+  assert.equal(afterReset.checkIns.length, 0);
+});
+
+test('K4.4 Barcode Normalization: Strips non-digits, normalizes 13-digit leading zero, and preserves 12-digit leading zero', () => {
+  // Whitespace and hyphens
+  assert.equal(normalizeBarcode(' 769915-190602 '), '769915190602');
+
+  // 13-digit EAN-13 starting with '0' normalizes to 12-digit UPC-A
+  assert.equal(normalizeBarcode('0769915190602'), '769915190602');
+  assert.equal(normalizeBarcode('0883140012993'), '883140012993');
+
+  // Genuine 12-digit UPC-A with leading zero preserves its leading zero
+  assert.equal(normalizeBarcode('077043103847'), '077043103847');
+
+  // Empty or invalid input
+  assert.equal(normalizeBarcode(''), '');
+  assert.equal(normalizeBarcode(null as unknown as string), '');
+
+  // Lookup keys generation: provides both 12-digit and 13-digit padded variants
+  const keys12 = getBarcodeLookupKeys('769915190602');
+  assert.ok(keys12.includes('769915190602'));
+  assert.ok(keys12.includes('0769915190602'));
+
+  const keys13 = getBarcodeLookupKeys('0769915190602');
+  assert.ok(keys13.includes('769915190602'));
+  assert.ok(keys13.includes('0769915190602'));
+});
+
+test('K4.4 Barcode Checksum: Validates standard GS1 modulo-10 algorithm', () => {
+  // Valid UPC-A
+  assert.equal(validateBarcodeChecksum('883140012993'), true);
+  // Corrupted UPC-A
+  assert.equal(validateBarcodeChecksum('883140012994'), false);
+
+  // Valid EAN-8
+  assert.equal(validateBarcodeChecksum('96385074'), true);
+  // Corrupted EAN-8
+  assert.equal(validateBarcodeChecksum('96385075'), false);
+
+  // Unsupported digit count fails closed
+  assert.equal(validateBarcodeChecksum('12345'), false);
+});
+
+test('K4.4 Instant Product Lookup: Resiliently matches catalog items across UPC and EAN formats', () => {
+  // Match 12-digit UPC directly
+  const matchDirect = findProductByBarcode('883140012993');
+  assert.ok(matchDirect, 'Should match Anthelios');
+  assert.equal(matchDirect?.name, 'Anthelios Ultra Light Fluid SPF 60');
+
+  // Match 13-digit EAN representation of 12-digit UPC
+  const matchEan = findProductByBarcode('0883140012993');
+  assert.ok(matchEan, 'Should match Anthelios via EAN-13 lookup');
+  assert.equal(matchEan?.brand, 'La Roche-Posay');
+
+  // Match 12-digit UPC with leading zero
+  const matchLeadingZero = findProductByBarcode('077043103847');
+  assert.ok(matchLeadingZero, 'Should match St. Ives');
+  assert.equal(matchLeadingZero?.brand, 'St. Ives');
+
+  // Non-existent barcode returns null
+  const matchUnknown = findProductByBarcode('999999999999');
+  assert.equal(matchUnknown, null);
+});
+
+test('K4.4 AutoCapture State Machine: Evaluates framing criteria and angle constraints deterministically', () => {
+  // 1. Missing face
+  const noFaceRes = evaluateFrameCriteria({ hasFace: false }, 'front');
+  assert.equal(noFaceRes.passes, false);
+  assert.equal(noFaceRes.feedback, 'no_face');
+
+  // 2. Face too far
+  const tooFarRes = evaluateFrameCriteria({ hasFace: true, faceWidthRatio: 0.2 }, 'front');
+  assert.equal(tooFarRes.passes, false);
+  assert.equal(tooFarRes.feedback, 'too_far');
+
+  // 3. Face off-center
+  const offCenterRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.1, centerY: 0.5 },
+    'front'
+  );
+  assert.equal(offCenterRes.passes, false);
+  assert.equal(offCenterRes.feedback, 'center_face');
+
+  // 4. Excessive roll / head tilt
+  const tiltedHeadRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, roll: 20 },
+    'front'
+  );
+  assert.equal(tiltedHeadRes.passes, false);
+  assert.equal(tiltedHeadRes.feedback, 'center_face');
+
+  // 5. Front angle: head turned sideways fails
+  const turnedFrontRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: 30 },
+    'front'
+  );
+  assert.equal(turnedFrontRes.passes, false);
+  assert.equal(turnedFrontRes.feedback, 'turn_left');
+
+  // 6. Left angle gating
+  const straightLookingLeftRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: 0 },
+    'left'
+  );
+  assert.equal(straightLookingLeftRes.passes, false);
+  assert.equal(straightLookingLeftRes.feedback, 'turn_left');
+
+  const properLeftProfileRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: -35 },
+    'left'
+  );
+  assert.equal(properLeftProfileRes.passes, true);
+  assert.equal(properLeftProfileRes.feedback, 'ready');
+
+  // 7. Right angle gating
+  const straightLookingRightRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: 0 },
+    'right'
+  );
+  assert.equal(straightLookingRightRes.passes, false);
+  assert.equal(straightLookingRightRes.feedback, 'turn_right');
+
+  const properRightProfileRes = evaluateFrameCriteria(
+    { hasFace: true, faceWidthRatio: 0.5, centerX: 0.5, centerY: 0.5, yaw: 35 },
+    'right'
+  );
+  assert.equal(properRightProfileRes.passes, true);
+  assert.equal(properRightProfileRes.feedback, 'ready');
+});
+
+test('K4.4 AutoCapture State Machine: Enforces continuous hold stability and transitions to AUTO_CAPTURE', () => {
+  const machine = new AutoCaptureStateMachine({
+    targetAngle: 'front',
+    requiredHoldDurationMs: 600,
+  });
+
+  assert.equal(machine.getState(), 'IDLE');
+
+  const validFrame: FrameQualityMetrics = {
+    hasFace: true,
+    faceWidthRatio: 0.5,
+    centerX: 0.5,
+    centerY: 0.5,
+    roll: 0,
+    pitch: 0,
+    yaw: 0,
+    captureQuality: 0.8,
+  };
+
+  const t0 = 1000;
+
+  // First valid frame -> READY_CANDIDATE
+  const out1 = machine.update(validFrame, t0);
+  assert.equal(out1.state, 'READY_CANDIDATE');
+  assert.equal(out1.holdProgress, 0);
+  assert.equal(out1.shouldTriggerCapture, false);
+
+  // After 300ms (halfway) -> HOLDING
+  const out2 = machine.update(validFrame, t0 + 300);
+  assert.equal(out2.state, 'HOLDING');
+  assert.equal(out2.holdProgress, 0.5);
+  assert.equal(out2.shouldTriggerCapture, false);
+
+  // Interrupt hold by looking away -> Resets to NOT_READY immediately (fail closed)
+  const interruptedFrame: FrameQualityMetrics = {
+    ...validFrame,
+    yaw: 40,
+  };
+  const out3 = machine.update(interruptedFrame, t0 + 400);
+  assert.equal(out3.state, 'NOT_READY');
+  assert.equal(out3.holdProgress, 0);
+  assert.equal(out3.shouldTriggerCapture, false);
+
+  // Resume valid frame -> Restarts from candidate at new timestamp
+  const t1 = 2000;
+  const out4 = machine.update(validFrame, t1);
+  assert.equal(out4.state, 'READY_CANDIDATE');
+  assert.equal(out4.holdProgress, 0);
+
+  // Hold reaches required duration (600ms) -> AUTO_CAPTURE triggers
+  const out5 = machine.update(validFrame, t1 + 600);
+  assert.equal(out5.state, 'AUTO_CAPTURE');
+  assert.equal(out5.holdProgress, 1.0);
+  assert.equal(out5.shouldTriggerCapture, true);
+
+  // Once captured, state moves to REVIEW
+  machine.markCaptured();
+  assert.equal(machine.getState(), 'REVIEW');
+  const out6 = machine.update(validFrame, t1 + 700);
+  assert.equal(out6.state, 'REVIEW');
+  assert.equal(out6.shouldTriggerCapture, false);
 });
 

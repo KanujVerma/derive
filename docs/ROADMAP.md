@@ -84,6 +84,20 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Zero customer-facing `$129` promises in Kanuj-owned paths.
   - Zero unsupported E2EE or medical claims in customer-facing copy.
 
+### K4.4: Baseline Capture Intelligence, Instant Product Scanning & Beta State Finalization [COMPLETE]
+* **Scope**:
+  - Purged remaining default demo state contamination from `routineStore`: initialized `routine: null`, `userProducts: []`, `checkIns: []`, `refillRequests: []`, and empty history by default; isolated Arthur fixture into explicit `loadArthurDemoRoutine()` and `getArthurDemoRoutineState()`.
+  - Empty-state hardening across Progress, Refill, Plan, and Profile with dynamic routine/treatment adaptive advice.
+  - Zero-shutter continuous barcode scanner on Scan tab (`CameraView` with `onBarcodeScanned`), horizontal reticle guide, synchronous lock/debounce ref, torch toggle, and unknown product sheet with search fallback.
+  - Deterministic barcode utilities (`normalizeBarcode`, `getBarcodeLookupKeys`, `validateBarcodeChecksum`) resolving UPC-A and EAN-13 variations.
+  - Resolved `ARCHITECTURE_CHALLENGE-04`: implemented Apple Vision + AVFoundation local Expo module (`modules/derive-face-capture/`) analyzing head pose and capture quality on-device at ~8 Hz; created pure TypeScript deterministic state machine (`AutoCaptureStateMachine.ts`) enforcing continuous hold stability before triggering capture; eliminated fake Unsplash photo fallback in camera capture with fail-closed error handling.
+* **Acceptance Criteria**:
+  - Full test suite passes 100% (48/48 tests).
+  - TypeScript typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - Zero unconfirmed demo data leaks into fresh client launches.
+  - Barcode lookup correctly identifies products across UPC and EAN formats without shutter press.
+
 ### K5: Mobile Release & TestFlight [NEXT]
 * **Scope**: EAS configuration, development client builds, production provisioning profiles, TestFlight deployment, physical device validation, and first-customer test script.
 * **Acceptance Criteria**:

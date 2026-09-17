@@ -130,7 +130,7 @@ export default function SkinPhotosScreen() {
       >
         <Text style={styles.questionTitle}>Baseline Skin Photos</Text>
         <Text style={styles.questionSubtitle}>
-          Three guided angles help Derive track visible redness, texture, and visible changes over time.
+          These photos establish your visible baseline and help us compare changes over time.
         </Text>
 
         {/* STEP PROGRESS TRACKER: Front → Left → Right */}
@@ -244,13 +244,13 @@ export default function SkinPhotosScreen() {
           minHeight={80}
         />
 
-        {/* PRIVACY GUARANTEE */}
+        {/* PRIVACY REASSURANCE */}
         <View style={styles.privacyCard}>
           <Icon name="lock" size={18} color={colors.brand} />
           <View style={{ flex: 1 }}>
             <Text style={styles.privacyTitle}>Private Skincare Data</Text>
             <Text style={styles.privacyText}>
-              Your baseline photos are encrypted at rest in private storage and reviewed only by your care team to personalize your routine. They are never shared publicly or used for model training.
+              We treat your skin photos as private skincare data. They are used to calibrate routine adjustments and monitor visible progress over time.
             </Text>
           </View>
         </View>

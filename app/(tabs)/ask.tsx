@@ -20,14 +20,6 @@ import { Icon } from '@/src/components/ui/Icon';
 import { analytics } from '@/src/services/analytics';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
-const STARTER_PROMPTS = [
-  'Do I use Differin tonight?',
-  'Can I add this vitamin C?',
-  'Why this moisturizer?',
-  'My cheeks feel dry.',
-  'Scan a product',
-];
-
 export default function AskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -48,6 +40,23 @@ export default function AskScreen() {
     reason?: string;
   } | null>(null);
   const handledInitialQueryRef = useRef<string | null>(null);
+
+  const starterPrompts = React.useMemo(() => {
+    const activeTreatment = routine?.pmSteps.find((s) => s.category === 'treatment');
+    const tonightPrompt = activeTreatment
+      ? `Do I use ${activeTreatment.productName} tonight?`
+      : routine
+      ? 'What is my schedule tonight?'
+      : 'What should my routine look like?';
+
+    return [
+      tonightPrompt,
+      'Can I add this vitamin C?',
+      'Why this moisturizer?',
+      'My cheeks feel dry.',
+      'Scan a product',
+    ];
+  }, [routine]);
 
   const hasInteracted = messages.length > 0;
 
@@ -207,7 +216,7 @@ export default function AskScreen() {
 
             {/* Dynamic Starter Pills */}
             <View style={styles.starterContainer}>
-              {STARTER_PROMPTS.map((prompt) => (
+              {starterPrompts.map((prompt) => (
                 <TouchableOpacity
                   key={prompt}
                   onPress={() => handleStarterPress(prompt)}

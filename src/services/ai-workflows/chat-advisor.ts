@@ -70,20 +70,47 @@ export async function askDeriveAdvisor(
   // Local and mock paths stay deterministic so Kanuj can build without a client API key.
 
   // 3. Intelligent deterministic context responses
-  if (q.includes('retinol') || q.includes('differin') || q.includes('tonight')) {
-    const day = new Date().getDay(); // 1=Mon, 3=Wed, 5=Fri
-    const isRetinolNight = day === 1 || day === 3 || day === 5;
-    if (isRetinolNight) {
+  if (q.includes('retinol') || q.includes('differin') || q.includes('tonight') || q.includes('schedule')) {
+    if (!_routine) {
       return {
-        directAnswer: 'Yes, tonight is a Differin night.',
+        directAnswer: 'You do not have an active routine established yet.',
         whyExplanation:
-          'Your schedule calls for Differin on Monday, Wednesday, and Friday to maintain cellular turnover without over-drying.',
+          'Once your baseline routine is reviewed and activated, we will schedule your steps and active treatments night by night.',
+        recommendedAction: 'Review your routine setup in the Plan tab to get started.',
+        isSafetyEscalation: false,
+      };
+    }
+
+    const activeTreatment = _routine.pmSteps.find(
+      (s) => s.category === 'treatment' || s.productName.toLowerCase().includes('differin') || s.productName.toLowerCase().includes('retinol')
+    );
+
+    if (!activeTreatment) {
+      return {
+        directAnswer: 'Tonight is a standard barrier-support night.',
+        whyExplanation:
+          'Your active routine focuses on barrier maintenance without scheduled exfoliating acids or retinoids tonight.',
+        recommendedAction: 'Follow your standard PM cleansing and moisturizing steps.',
+        isSafetyEscalation: false,
+      };
+    }
+
+    const day = new Date().getDay(); // 1=Mon, 3=Wed, 5=Fri
+    const isTreatmentNight = day === 1 || day === 3 || day === 5;
+    const treatmentName = activeTreatment.productName;
+    const scheduleDesc = activeTreatment.scheduleText || 'Monday, Wednesday, and Friday';
+
+    if (isTreatmentNight) {
+      return {
+        directAnswer: `Yes, tonight is a ${treatmentName} night.`,
+        whyExplanation:
+          `Your schedule calls for ${treatmentName} on ${scheduleDesc} to maintain cellular turnover without over-drying.`,
         recommendedAction: 'Apply a single pea-sized amount after cleansing and let dry before moisturizing.',
         isSafetyEscalation: false,
       };
     } else {
       return {
-        directAnswer: 'No, skip Differin tonight.',
+        directAnswer: `No, skip ${treatmentName} tonight.`,
         whyExplanation:
           'Tonight is a barrier-rest night to give your skin time to replenish ceramides and prevent peeling.',
         recommendedAction: 'Cleanse gently and apply your moisturizer.',

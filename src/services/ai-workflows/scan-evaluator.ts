@@ -10,6 +10,7 @@ import type {
   ProductCostPreference,
   ProductCategory,
 } from '../../types/schema.ts';
+import { getBarcodeLookupKeys } from '../../utils/barcode.ts';
 
 export const ProductScanVerdictLabels: Record<ProductScanVerdict, string> = {
   great_fit: 'GREAT FIT',
@@ -277,3 +278,26 @@ export const PROTOTYPE_CATALOG: ScannableProductInput[] = [
     barcode: '360600052793',
   },
 ];
+
+/**
+ * Looks up a catalog product by scanned barcode using resilient key normalization.
+ */
+export function findProductByBarcode(
+  rawBarcode: string,
+  catalog: ScannableProductInput[] = PROTOTYPE_CATALOG
+): ScannableProductInput | null {
+  const lookupKeys = getBarcodeLookupKeys(rawBarcode);
+  if (lookupKeys.length === 0) return null;
+
+  for (const item of catalog) {
+    if (item.barcode) {
+      const itemKeys = getBarcodeLookupKeys(item.barcode);
+      if (lookupKeys.some((k) => itemKeys.includes(k))) {
+        return item;
+      }
+    }
+  }
+
+  return null;
+}
+

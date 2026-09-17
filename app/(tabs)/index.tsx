@@ -46,6 +46,18 @@ export default function TodayScreen() {
   };
 
   const pmSteps = routine?.pmSteps || [];
+  const treatmentStep = pmSteps.find((s) => s.category === 'treatment');
+  const tonightTitle = treatmentStep
+    ? `${pmSteps.length} steps · ${treatmentStep.productName.split(' ')[0]} night`
+    : pmSteps.length > 0
+    ? `${pmSteps.length} evening steps`
+    : 'No steps scheduled tonight';
+  const tonightBadgeLabel = treatmentStep?.scheduleText
+    ? treatmentStep.scheduleText.toUpperCase()
+    : pmSteps.length > 0
+    ? 'ACTIVE SCHEDULE'
+    : 'STANDBY';
+
   const activeRefill = refillRequests.find(
     (r) => r.status === 'shipped' || r.status === 'ordered'
   );
@@ -162,50 +174,69 @@ export default function TodayScreen() {
               </Text>
             </View>
 
-            {/* TONIGHT'S ROUTINE SUMMARY CARD (Tappable) */}
-            <TouchableOpacity
-              style={styles.tonightCard}
-              activeOpacity={0.85}
-              onPress={handleViewRoutine}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel="Tonight's routine, tap to view full plan"
-            >
-              <View style={styles.tonightHeaderRow}>
-                <View style={{ flex: 1, paddingRight: spacing.sm }}>
-                  <Text style={styles.tonightOverline}>TONIGHT</Text>
-                  <Text style={styles.tonightTitle}>
-                    {pmSteps.length} steps · Differin night
-                  </Text>
+            {/* TONIGHT'S ROUTINE OR EMPTY SETUP CARD */}
+            {!routine ? (
+              <View style={styles.emptyPlanCard}>
+                <View style={styles.emptyPlanIconCircle}>
+                  <Icon name="sparkle" size={24} color={colors.brand} />
                 </View>
-                <View style={styles.badgeChevronRow}>
-                  <Badge label="MON / WED / FRI" variant="keep" size="small" />
-                  <Icon name="forward" size={14} color={colors.inkMuted} style={{ marginLeft: 6 }} />
-                </View>
+                <Text style={styles.emptyPlanTitle}>No active routine yet</Text>
+                <Text style={styles.emptyPlanText}>
+                  Complete your skin profile and shelf audit to assemble your personalized morning and evening routine.
+                </Text>
+                <Button
+                  label="Start Routine Setup"
+                  variant="brand"
+                  size="medium"
+                  onPress={() => router.push('/(onboarding)/1-welcome')}
+                  style={{ marginTop: spacing.md }}
+                />
               </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.tonightCard}
+                activeOpacity={0.85}
+                onPress={handleViewRoutine}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Tonight's routine, tap to view full plan"
+              >
+                <View style={styles.tonightHeaderRow}>
+                  <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                    <Text style={styles.tonightOverline}>TONIGHT</Text>
+                    <Text style={styles.tonightTitle}>
+                      {tonightTitle}
+                    </Text>
+                  </View>
+                  <View style={styles.badgeChevronRow}>
+                    <Badge label={tonightBadgeLabel} variant="keep" size="small" />
+                    <Icon name="forward" size={14} color={colors.inkMuted} style={{ marginLeft: 6 }} />
+                  </View>
+                </View>
 
-              {/* Simple step sequence: Cleanser → Differin → Moisturizer */}
-              <View style={styles.stepSequence}>
-                {pmSteps.map((step, idx) => (
-                  <React.Fragment key={step.id}>
-                    <View style={styles.stepNode}>
-                      <Text style={styles.stepNodeName}>{step.productName}</Text>
-                      <Text style={styles.stepNodeBrand}>{step.brand}</Text>
-                    </View>
-                    {idx < pmSteps.length - 1 && (
-                      <View style={styles.sequenceArrow}>
-                        <Icon name="forward" size={14} color={colors.inkSubtle} />
+                {/* Simple step sequence */}
+                <View style={styles.stepSequence}>
+                  {pmSteps.map((step, idx) => (
+                    <React.Fragment key={step.id}>
+                      <View style={styles.stepNode}>
+                        <Text style={styles.stepNodeName}>{step.productName}</Text>
+                        <Text style={styles.stepNodeBrand}>{step.brand}</Text>
                       </View>
-                    )}
-                  </React.Fragment>
-                ))}
-              </View>
+                      {idx < pmSteps.length - 1 && (
+                        <View style={styles.sequenceArrow}>
+                          <Icon name="forward" size={14} color={colors.inkSubtle} />
+                        </View>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
 
-              <View style={styles.cardFooterHint}>
-                <Text style={styles.cardFooterText}>View routine details</Text>
-                <Icon name="forward" size={12} color={colors.brand} />
-              </View>
-            </TouchableOpacity>
+                <View style={styles.cardFooterHint}>
+                  <Text style={styles.cardFooterText}>View routine details</Text>
+                  <Icon name="forward" size={12} color={colors.brand} />
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* CONTEXTUAL MODULE 1: WEEKLY CHECK-IN DUE */}
             {isWeeklyCheckInDue && (
@@ -350,6 +381,39 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyRegular,
     color: colors.inkMuted,
     lineHeight: 22,
+  },
+  emptyPlanCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    textAlign: 'center',
+    ...shadows.subtle,
+  },
+  emptyPlanIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.full,
+    backgroundColor: colors.brandLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyPlanTitle: {
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.bold,
+    color: colors.ink,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  emptyPlanText: {
+    fontSize: typography.sizes.bodyRegular,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.sm,
   },
   tonightCard: {
     backgroundColor: colors.surface,

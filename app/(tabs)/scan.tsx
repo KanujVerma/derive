@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
@@ -16,27 +17,32 @@ import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { StatusBadge, StatusBadgeVariant } from '@/src/components/ui/StatusBadge';
 import { Button } from '@/src/components/ui/Button';
-import { CameraCapture } from '@/src/components/ui/CameraCapture';
 import { analytics } from '@/src/services/analytics';
 import {
   evaluateProductScan,
+  findProductByBarcode,
   PROTOTYPE_CATALOG,
   ScannableProductInput,
 } from '@/src/services/ai-workflows/scan-evaluator';
 import { ProductScanResult, ProductScanVerdict } from '@/src/types/schema';
+import { normalizeBarcode } from '@/src/utils/barcode';
 
 export default function ScanScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ sim?: string }>();
   const insets = useSafeAreaInsets();
+  const [permission, requestPermission] = useCameraPermissions();
   const { routine, userProducts, checkIns } = useRoutineStore();
   const { productReactions, routineComplexity, primaryGoal, costPreference } = useOnboardingStore();
 
-  const [candidateProduct, setCandidateProduct] = useState<ScannableProductInput | null>(null);
   const [confirmedProduct, setConfirmedProduct] = useState<ScannableProductInput | null>(null);
   const [scanResult, setScanResult] = useState<ProductScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const isScanningLockedRef = useRef(false);
 
   useEffect(() => {
     analytics.track('scan_tab_opened', { source: 'tab_navigation' });
@@ -61,27 +67,57 @@ export default function ScanScreen() {
     }
   }, [params?.sim]);
 
-  const handleCapture = (uri: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Simulate automatic optical recognition
-    const detected = PROTOTYPE_CATALOG[0]; // The Ordinary Niacinamide 10% + Zinc 1%
-    setCandidateProduct(detected);
-    analytics.track('product_scan_recognized', { productName: detected.name });
+  const handleBarcodeScanned = (scanningResult: BarcodeScanningResult) => {
+    if (isScanningLockedRef.current) return;
+    isScanningLockedRef.current = true;
+    setIsLocked(true);
+
+    const rawData = scanningResult.data;
+    const matched = findProductByBarcode(rawData);
+
+    if (matched) {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+
+      setConfirmedProduct(matched);
+      const result = evaluateProductScan(matched, {
+        routine,
+        userProducts,
+        reactions: productReactions,
+        checkIns,
+        routineComplexity: routineComplexity || undefined,
+        primaryGoal: primaryGoal || undefined,
+        costPreference: costPreference || undefined,
+      });
+      setScanResult(result);
+      analytics.track('product_scan_recognized', {
+        productName: matched.name,
+      });
+      analytics.track('product_scan_completed', {
+        success: true,
+      });
+      analytics.track('scan_verdict_viewed', {
+        productName: matched.name,
+        verdict: result.verdict,
+      });
+    } else {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      setUnknownBarcode(rawData);
+      analytics.track('product_scan_completed', {
+        success: false,
+      });
+    }
   };
 
   const handleSelectCatalogItem = (item: ScannableProductInput) => {
     Haptics.selectionAsync();
-    setCandidateProduct(item);
+    setConfirmedProduct(item);
     setIsSearching(false);
-  };
-
-  const handleConfirmProduct = () => {
-    if (!candidateProduct) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setConfirmedProduct(candidateProduct);
-
-    // Evaluate personalized verdict
-    const result = evaluateProductScan(candidateProduct, {
+    setUnknownBarcode(null);
+    const result = evaluateProductScan(item, {
       routine,
       userProducts,
       reactions: productReactions,
@@ -90,21 +126,36 @@ export default function ScanScreen() {
       primaryGoal: primaryGoal || undefined,
       costPreference: costPreference || undefined,
     });
-
     setScanResult(result);
+    analytics.track('product_scan_recognized', {
+      productName: item.name,
+    });
     analytics.track('scan_verdict_viewed', {
-      productName: candidateProduct.name,
+      productName: item.name,
       verdict: result.verdict,
     });
   };
 
   const handleResetScan = () => {
     Haptics.selectionAsync();
-    setCandidateProduct(null);
     setConfirmedProduct(null);
     setScanResult(null);
+    setUnknownBarcode(null);
     setSearchQuery('');
     setIsSearching(false);
+    setTimeout(() => {
+      isScanningLockedRef.current = false;
+      setIsLocked(false);
+    }, 1000);
+  };
+
+  const handleRetryScan = () => {
+    Haptics.selectionAsync();
+    setUnknownBarcode(null);
+    setTimeout(() => {
+      isScanningLockedRef.current = false;
+      setIsLocked(false);
+    }, 1000);
   };
 
   const handleHandoffToAsk = () => {
@@ -252,57 +303,6 @@ export default function ScanScreen() {
     );
   }
 
-  // 2. CONFIRMATION VIEW (Identified bottle confirmation)
-  if (candidateProduct && !confirmedProduct) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.screenTitle}>Confirm Product</Text>
-          <TouchableOpacity onPress={handleResetScan} style={styles.resetButton}>
-            <Text style={styles.resetButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.confirmationContent}>
-          <View style={styles.confirmCard}>
-            <View style={styles.confirmIconCircle}>
-              <Icon name="bottle" size={30} color={colors.brand} />
-            </View>
-            <Text style={styles.confirmQuestion}>Is this the bottle on your shelf?</Text>
-
-            <View style={styles.identifiedBox}>
-              <Text style={styles.identifiedBrand}>{candidateProduct.brand}</Text>
-              <Text style={styles.identifiedName}>{candidateProduct.name}</Text>
-              {candidateProduct.keyActives && (
-                <Text style={styles.identifiedActives}>
-                  Actives: {candidateProduct.keyActives.join(', ')}
-                </Text>
-              )}
-            </View>
-
-            <Button
-              label="Yes, evaluate for my skin"
-              variant="brand"
-              size="large"
-              onPress={handleConfirmProduct}
-              style={{ width: '100%', marginTop: spacing.md }}
-            />
-
-            <Button
-              label="Not quite — search by name"
-              variant="ghost"
-              size="medium"
-              onPress={() => {
-                setCandidateProduct(null);
-                setIsSearching(true);
-              }}
-              style={{ width: '100%', marginTop: spacing.xs }}
-            />
-          </View>
-        </View>
-      </View>
-    );
-  }
 
   // 3. MANUAL SEARCH FALLBACK VIEW
   if (isSearching) {
@@ -367,7 +367,55 @@ export default function ScanScreen() {
     );
   }
 
-  // 4. CANONICAL CAMERA-FIRST VIEW (Pure Viewfinder)
+  // 3. PERMISSION SCREEN (If camera permission is denied)
+  if (permission && !permission.granted) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.scannerHeader}>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.screenTitle}>Scan</Text>
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => router.push('/profile')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityLabel="Account and Settings"
+              accessibilityRole="button"
+            >
+              <Icon name="person" size={18} color={colors.inkMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.permissionContainer}>
+          <View style={styles.permissionCard}>
+            <View style={styles.permissionIconCircle}>
+              <Icon name="camera" size={32} color={colors.brand} />
+            </View>
+            <Text style={styles.permissionTitle}>Camera Access Required</Text>
+            <Text style={styles.permissionSubtitle}>
+              Derive uses the camera to scan product barcodes and immediately evaluate formulas against your routine.
+            </Text>
+            <Button
+              label="Allow Camera Access"
+              variant="brand"
+              size="large"
+              onPress={requestPermission}
+              style={{ width: '100%', marginTop: spacing.lg }}
+            />
+            <Button
+              label="Search Products by Name"
+              variant="ghost"
+              size="medium"
+              onPress={() => setIsSearching(true)}
+              style={{ width: '100%', marginTop: spacing.sm }}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // 4. CANONICAL CAMERA-FIRST VIEW (Pure Viewfinder with Continuous Barcode Scanning)
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.scannerHeader}>
@@ -384,7 +432,7 @@ export default function ScanScreen() {
           </TouchableOpacity>
         </View>
         <Text style={styles.subtitle}>
-          Point your camera at any skincare bottle.
+          Align barcode within the guide for instant evaluation.
         </Text>
       </View>
 
@@ -396,44 +444,108 @@ export default function ScanScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.cameraFrameContainer}>
-          <CameraCapture
-            type="shelf"
-            instruction="Point your camera at the bottle"
-            subtext="Automatic optical recognition"
-            onCapture={handleCapture}
-          />
+          {/* Live Barcode Camera Viewport */}
+          <View style={styles.cameraViewport}>
+            <CameraView
+              facing="back"
+              enableTorch={torchOn}
+              barcodeScannerSettings={{
+                barcodeTypes: ['upc_a', 'upc_e', 'ean13', 'ean8'],
+              }}
+              onBarcodeScanned={isLocked ? undefined : handleBarcodeScanned}
+              style={StyleSheet.absoluteFill}
+            />
 
+            {/* Torch Toggle Button */}
+            <TouchableOpacity
+              style={[styles.torchButton, torchOn && styles.torchButtonActive]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setTorchOn((prev) => !prev);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={torchOn ? 'Turn off flash' : 'Turn on flash'}
+            >
+              <Icon name="sparkle" size={20} color={torchOn ? colors.brand : '#FFFFFF'} />
+            </TouchableOpacity>
+
+            {/* Barcode Reticle Overlay */}
+            <View style={styles.reticleOverlay} pointerEvents="none">
+              <View style={styles.reticleBox}>
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+                <View style={styles.laserGuide} />
+              </View>
+              <Text style={styles.reticleGuideText}>Center barcode in box</Text>
+            </View>
+          </View>
+
+          {/* Name Search Fallback Button */}
           <TouchableOpacity
             style={styles.manualSearchLink}
             onPress={() => setIsSearching(true)}
             activeOpacity={0.7}
           >
             <Icon name="search" size={16} color={colors.brand} />
-            <Text style={styles.manualSearchText}>Can't scan? Search by name</Text>
+            <Text style={styles.manualSearchText}>Can't scan barcode? Search by name</Text>
           </TouchableOpacity>
 
-          {/* Quick Shortcuts for Instant Simulator Testing (Dev Only) */}
-          {__DEV__ && (
-            <View style={styles.quickShortcuts}>
-              <Text style={styles.shortcutHeading}>QUICK TEST PRESETS</Text>
-              <View style={styles.shortcutPillRow}>
-                {PROTOTYPE_CATALOG.slice(0, 3).map((item, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={styles.shortcutPill}
-                    onPress={() => handleSelectCatalogItem(item)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.shortcutPillText}>
-                      {item.brand.split(' ')[0]} {item.name.split(' ')[0]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
+          {/* Quick Shortcuts for Instant Testing (All Environments / Dev) */}
+          <View style={styles.quickShortcuts}>
+            <Text style={styles.shortcutHeading}>TEST PRESETS</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcutPillRow}>
+              {PROTOTYPE_CATALOG.map((item, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.shortcutPill}
+                  onPress={() => handleSelectCatalogItem(item)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.shortcutPillText}>
+                    {item.brand.split(' ')[0]} {item.name.split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </View>
       </ScrollView>
+
+      {/* Unknown Barcode Modal Sheet */}
+      {unknownBarcode && (
+        <View style={styles.unknownOverlay}>
+          <View style={styles.unknownCard}>
+            <View style={styles.unknownIconCircle}>
+              <Icon name="warning" size={24} color={colors.actionPause.text} />
+            </View>
+            <Text style={styles.unknownTitle}>Barcode Not Recognized</Text>
+            <Text style={styles.unknownText}>
+              We couldn't find a formula match for barcode {unknownBarcode} in our beta catalog yet.
+            </Text>
+            <View style={styles.unknownButtons}>
+              <Button
+                label="Search by Product Name"
+                variant="brand"
+                size="medium"
+                onPress={() => {
+                  setUnknownBarcode(null);
+                  setIsSearching(true);
+                }}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="Scan Another"
+                variant="outline"
+                size="medium"
+                onPress={handleRetryScan}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -792,5 +904,175 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.medium,
     color: colors.ink,
     marginTop: 1,
+  },
+  cameraViewport: {
+    height: 380,
+    borderRadius: radii.xl,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
+    position: 'relative',
+  },
+  torchButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  torchButtonActive: {
+    backgroundColor: colors.surface,
+  },
+  reticleOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  reticleBox: {
+    width: 280,
+    height: 140,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  corner: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderColor: '#FFFFFF',
+  },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: radii.md,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderTopRightRadius: radii.md,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: radii.md,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: radii.md,
+  },
+  laserGuide: {
+    width: '90%',
+    height: 2,
+    backgroundColor: colors.brand,
+    opacity: 0.85,
+  },
+  reticleGuideText: {
+    color: '#FFFFFF',
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.medium,
+    marginTop: spacing.md,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+  },
+  permissionContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  permissionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...shadows.subtle,
+  },
+  permissionIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.brandLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  permissionTitle: {
+    fontSize: typography.sizes.sectionTitle,
+    fontFamily: typography.fontFamilies.serif,
+    color: colors.ink,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  permissionSubtitle: {
+    fontSize: typography.sizes.bodyRegular,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  unknownOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    padding: spacing.lg,
+    justifyContent: 'flex-end',
+  },
+  unknownCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    ...shadows.floating,
+  },
+  unknownIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.canvasMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  unknownTitle: {
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.weights.bold,
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  unknownText: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: spacing.md,
+  },
+  unknownButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    width: '100%',
   },
 });
