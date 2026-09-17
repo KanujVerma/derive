@@ -13,8 +13,7 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Derive uses your camera to capture private skin progress photos and scan your current skincare shelf.",
-        "NSPhotoLibraryUsageDescription": "Derive needs photo library access to upload photos of your skincare products.",
-        "NSMicrophoneUsageDescription": "Derive uses your microphone for voice dictation when asking skincare questions."
+        "NSPhotoLibraryUsageDescription": "Derive needs photo library access to upload photos of your skincare products."
       }
     },
     "android": {
@@ -31,7 +30,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-font"
     ]
   }
 }

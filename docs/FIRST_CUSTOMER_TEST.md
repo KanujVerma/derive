@@ -15,8 +15,8 @@
 
 ## Setup (Before Member Arrives)
 
-- [ ] iPhone charged, TestFlight build installed
-- [ ] App in clean state (fresh install or Settings → Reset state)
+- [ ] iPhone charged, TestFlight or development-client build installed
+- [ ] App in clean state (fresh install; production builds have no reset control)
 - [ ] No demo or Arthur data visible
 - [ ] WiFi connected
 - [ ] Note-taking ready (paper preferred to avoid device distraction)
@@ -44,7 +44,7 @@ Ask before they open:
 
 | Step | Expected | Failure Signal |
 |------|----------|---------------|
-| Welcome screen | Reads "Your skincare, handled." — clear managed-service promise | Confusion about what Derive does |
+| Welcome screen | Headline "Let's get to know your skin." plus a 4-minute, private, final-quality-check framing | Confusion about what Derive does |
 | Goals selection | Selects 1–3 goals without hesitation | Asks "what does this mean?" for >2 options |
 | Complexity preference | Selects 1 option; no confusion | Feels like a quiz they can fail |
 | Skin behavior | Answers honestly; may ask about specific terms | Feels judged or embarrassed |
@@ -82,9 +82,9 @@ Ask before they open:
 | Check | Expected | Failure Signal |
 |-------|----------|---------------|
 | Review summary | Can identify their products and goals | "I didn't know I was giving all this" |
-| $100 Founding Beta | Visible and makes sense | "$100 for what exactly?" |
-| DRAFT · NOT ACTIVE | Draft state is understood as pending review | Thinks plan is already active |
-| "Kanuj will review" framing | Concierge review feels personal, not algorithmic | Feels like they're waiting for a bot |
+| $100 Founding Beta | Visible on the membership card and makes sense | "$100 for what exactly?" |
+| Final Review copy | Understands the first routine gets a quality check before it goes live | Thinks the plan is already active |
+| Explore-while-reviewing | Can still use Today / Plan preview / Scan / Ask | Feels locked out after submitting |
 
 ---
 
@@ -121,7 +121,7 @@ Ask before they open:
 
 | Check | Expected | Failure Signal |
 |-------|----------|---------------|
-| Composer usable | Can type or dictate | Mic button placement confuses |
+| Composer usable | Can type; mic button is present (native currently uses a local dictation fallback, not live speech recognition) | Mic button placement confuses |
 | Response grounded | References their actual skin/routine | Generic response ignores their context |
 | Scanned product context | If coming from Scan, product banner visible | Context not carried over |
 

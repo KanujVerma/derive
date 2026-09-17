@@ -103,8 +103,15 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Zero unconfirmed demo data leaks into fresh client launches; dev controls hidden in production.
   - Barcode lookup correctly identifies products across UPC and EAN formats without shutter press.
 
-### K5: Mobile Release & TestFlight [NEXT]
+### K5: Mobile Release & TestFlight [IN PROGRESS — BUILD INFRASTRUCTURE LANDED / BLOCKED ON EXPO AUTH + PHYSICAL IPHONE]
 * **Scope**: EAS configuration, development client builds, production provisioning profiles, TestFlight deployment, physical device validation, and first-customer test script.
+* **Landed**:
+  - `expo-dev-client`, `eas.json` (development + production profiles, remote `appVersionSource`, Mock/local `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`), first-customer script.
+  - Local CocoaPods autolinking of `DeriveFaceCapture` + `expo-dev-client`; local simulator native binary exists.
+* **Remaining**:
+  - Expo account login, EAS project link, EAS development cloud build.
+  - Physical iPhone face auto-capture and barcode validation.
+  - Production/store build and internal TestFlight processing + founder install.
 * **Acceptance Criteria**:
   - Installable iOS internal TestFlight build distributed to founders.
   - Onboarding, scanning, and chat verified on physical hardware.

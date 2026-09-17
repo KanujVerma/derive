@@ -6,6 +6,39 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-17 — Kanuj Mobile/UX: K5 Release Continuation After Quota Interrupt
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `ad841b44d15d1d3de90d12fc44642583fe8e3849`
+- **Prior Verified CI Run**: `35266181623` (on commit `ad841b4`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `K5 PARTIAL / BLOCKED ON EXPO AUTH + PHYSICAL IPHONE` (K5 build infrastructure verified on `ad841b4`; empty EAS Apple placeholder strings removed; unused iOS microphone permission removed; `expo-font` peer installed for native/dev-client; first-customer script aligned to current copy. EAS cloud builds, physical face/barcode validation, production build, and TestFlight remain blocked.)
+- **Ownership / Shared Contracts**: Kanuj-owned mobile release config (`app.json`, `eas.json`, `docs/FIRST_CUSTOMER_TEST.md`) plus required native peer `expo-font` for `@expo/vector-icons`. Zero Supabase, RLS, Stripe, or shared-contract changes. K5 founder builds remain `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`.
+- **Verified From Repository / Runtime (not handoff claims)**:
+  1. `expo-dev-client ~57.0.19` is in `package.json`; `expo-dev-client` is listed in `app.json` plugins.
+  2. `eas.json` development profile: `developmentClient: true`, `distribution: internal`, device (not simulator) iOS, Mock/local env flag.
+  3. `eas.json` production profile: `autoIncrement: true`, `distribution: store`, Mock/local env flag, `cli.appVersionSource: remote`.
+  4. Bundle ID `com.derive.skincare`, version `1.0.0`, iOS build number `1`, scheme `derive`.
+  5. Autolinking resolves `DeriveFaceCapture` and `expo-dev-client`; local `ios/Podfile.lock` includes both.
+  6. Local simulator already has `com.derive.skincare` installed on booted iPhone 16 Pro (iOS 18.4).
+  7. `eas whoami` is **Not logged in**. No `extra.eas.projectId` in app config. No physical iPhone connected (`xctrace` listed only this Mac).
+- **Corrections This Pass**:
+  1. Removed empty `submit.production.ios.appleId` / `ascAppId` / `appleTeamId` strings. Official EAS default is `"submit": { "production": {} }`; empty strings are not durable Apple IDs and would skip interactive App Store Connect resolution if treated as set.
+  2. Removed `NSMicrophoneUsageDescription`. Native `VoiceInputButton` uses Web Speech only on web and a local sample fallback on iOS; it does not access the microphone.
+  3. Kept `NSPhotoLibraryUsageDescription` because shelf capture and Ask attachments use `expo-image-picker`. Face baseline photos still disallow library upload.
+  4. Installed missing `expo-font` peer required by `@expo/vector-icons` (`expo-doctor` failed this check; native/dev-client can crash without it).
+  5. Aligned `docs/FIRST_CUSTOMER_TEST.md` to current Welcome / Final Review copy and removed a non-existent production "Reset state" control.
+  6. Excluded `dist`, `dist-web`, and `.expo` from `tsconfig.json` so local web export artifacts cannot flake `tsc`.
+- **Not Done (hard blockers)**:
+  - Expo authentication / EAS project link / EAS development cloud build.
+  - Physical iPhone face auto-capture and barcode validation.
+  - Production EAS build and internal TestFlight upload/processing/install.
+
+---
+
 ## 2026-09-17 — Kanuj Mobile/UX: Wire Native Face Auto-Capture, Remove Dev-Surface Leaks, and Finalize K4.4 (Pass 11 / Milestone K4.4 Finalization)
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
