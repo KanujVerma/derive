@@ -13,7 +13,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { getDeriveService } from './DeriveService.ts';
+import { getDeriveService, isRemoteServiceEnabled } from './DeriveService.ts';
 import type { IDeriveService } from '../contracts/DeriveService.ts';
 import type {
   OnboardingPayload,
@@ -44,10 +44,27 @@ export function getClientService(): IDeriveService {
 }
 
 /**
- * Current user ID accessor with fallback for guest/beta session
+ * Resolves and validates active or explicitly provided user ID.
+ * When remote service mode is active, mock identities ('usr_beta_member', 'usr_beta_001')
+ * and empty identities throw an authentication error to fail closed.
+ */
+export function resolveUserId(userId?: string): string {
+  const id = userId || useUserStore.getState().userId;
+  if (isRemoteServiceEnabled()) {
+    if (!id || id === 'usr_beta_member' || id === 'usr_beta_001') {
+      throw new Error('Authentication required: Remote operations require an authenticated session.');
+    }
+    return id;
+  }
+  return id || 'usr_beta_member';
+}
+
+/**
+ * Current user ID accessor with fallback for guest/beta session in mock mode,
+ * failing closed if remote service mode is active without an authenticated session.
  */
 export function getActiveUserId(): string {
-  return useUserStore.getState().userId || 'usr_beta_member';
+  return resolveUserId();
 }
 
 // ==========================================
@@ -159,7 +176,7 @@ export async function requestProductRefill(input: {
 
 export async function hydrateOrders(userId?: string): Promise<RefillRequest[]> {
   const service = getDeriveService();
-  const id = userId || getActiveUserId();
+  const id = resolveUserId(userId);
   const orders = await service.getOrders(id);
 
   useRoutineStore.setState({ refillRequests: orders });
@@ -168,7 +185,7 @@ export async function hydrateOrders(userId?: string): Promise<RefillRequest[]> {
 
 export async function hydrateProgress(userId?: string): Promise<ProgressData> {
   const service = getDeriveService();
-  const id = userId || getActiveUserId();
+  const id = resolveUserId(userId);
   const progress = await service.getProgress(id);
 
   useRoutineStore.setState({
@@ -182,22 +199,20 @@ export async function hydrateProgress(userId?: string): Promise<ProgressData> {
 
 export async function hydrateRoutine(userId?: string): Promise<RoutinePlan | null> {
   const service = getDeriveService();
-  const id = userId || getActiveUserId();
+  const id = resolveUserId(userId);
   const routine = await service.getRoutine(id);
 
-  if (routine) {
-    useRoutineStore.setState({
-      routine,
-      isPlanUnderReview: routine.status === 'awaiting_review',
-    });
-  }
+  useRoutineStore.setState({
+    routine,
+    isPlanUnderReview: routine?.status === 'awaiting_review',
+  });
 
   return routine;
 }
 
 export async function hydrateResearchInsights(userId?: string): Promise<ResearchInsight[]> {
   const service = getDeriveService();
-  const id = userId || getActiveUserId();
+  const id = resolveUserId(userId);
   const insights = await service.getResearchInsights(id);
 
   useRoutineStore.setState({ researchInsights: insights });
@@ -206,7 +221,7 @@ export async function hydrateResearchInsights(userId?: string): Promise<Research
 
 export async function hydrateCustomerProfile(userId?: string): Promise<CustomerProfile | null> {
   const service = getDeriveService();
-  const id = userId || getActiveUserId();
+  const id = resolveUserId(userId);
   const profile = await service.getCustomerProfile(id);
 
   if (profile) {

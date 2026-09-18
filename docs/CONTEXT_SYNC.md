@@ -6,6 +6,32 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: K6.1 Service Boundary Hardening & Fail-Closed State
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `9ff22dc93f35077ef97515c9ecded42b3e394a5f`
+- **Prior Verified CI Run**: `35359096347` (on commit `9ff22dc`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `K6.1 COMPLETE` (Focused hardening pass resolving 5 concrete gaps: Scan-to-Ask route parameters aligned, fail-closed authentication for remote service calls, fail-closed shelf product recognition in default path, canonical null routine cache projection, and mutation error handling and recoverability across client screens).
+- **Ownership / Shared Contracts**: Client-side only (`src/services/DeriveService.ts`, `src/services/deriveClient.ts`, `src/services/catalog.ts`, `app/**`, `tests/**`). Shared contracts (`src/contracts/**`, `src/domain/**`) strictly frozen and untouched. Zero changes to `supabase/**`, backend migrations, RLS, Edge Functions, or Stripe.
+- **Architectural Deliverables**:
+  1. **Canonical Scan-to-Ask Routing**: Aligned parameters in `app/(tabs)/scan.tsx` to `{ productName, brand, verdict, reason }` while supporting legacy `scanned*` fallbacks in `app/(tabs)/ask.tsx`; avoids synthesizing artificial `ProductScanResult` records when passing query strings.
+  2. **Fail-Closed Remote Identity Validation**: Added `isRemoteServiceEnabled()` helper to `src/services/DeriveService.ts`. Updated `getActiveUserId()` and introduced `resolveUserId()` in `src/services/deriveClient.ts` to strictly fail closed (throw `Error('Authentication required: Remote operations require an authenticated session.')`) when unauthenticated, empty, or mock IDs (`usr_beta_member`, `usr_beta_001`) are used in Remote mode. Mock mode retains deterministic `'usr_beta_member'` fallback.
+  3. **Fail-Closed Shelf Product Recognition**: Replaced fabricated products in `recognizeShelfProducts()` with a clean fail-closed empty result (`{ products: [], unclearBottlesCount: 0 }`). Isolated demo fixture into explicit `getDemoShelfRecognitionFixture()` for developer tests. Added empty shelf guidance card in `app/(onboarding)/6-shelf.tsx`.
+  4. **Canonical Null Routine Projection**: Hardened `hydrateRoutine()` in `src/services/deriveClient.ts` to project `routine: null, isPlanUnderReview: false` when backend returns `null`, preventing stale client caches.
+  5. **Mutation Error Handling & Recoverability**:
+     - `app/(tabs)/scan.tsx`: Catches evaluation errors, displays an error modal, and immediately clears the camera lock ref (`isScanningLockedRef.current = false`) so scanning is never permanently disabled.
+     - `app/(tabs)/ask.tsx`: Displays recoverable chat error bubble from Derive on intelligence failure.
+     - `app/check-in/index.tsx`: Implemented `isSubmitting`, `submitError` banner, and button loading state while keeping user input intact on failure.
+     - `app/refill/index.tsx`: Implemented `isSubmitting`, `error` banner, and button loading state while keeping selection intact on failure.
+- **Verification**:
+  - `npm test`: 60/60 passing (100%), including 5 new regression tests verifying all 5 hardened behaviors.
+  - `npx tsc --noEmit`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+
 ## 2026-09-18 — Kanuj Mobile/UX: K6 Mobile Service Boundary & Remote-Readiness
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

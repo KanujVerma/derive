@@ -143,6 +143,19 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - Zero Gemini API key on client.
 
+### K6.1: Service Boundary Hardening & Fail-Closed State [COMPLETE]
+* **Scope**:
+  - Fix Scan-to-Ask route parameters: aligned to `{ productName, brand, verdict, reason }` with legacy fallback support, avoiding fake `ProductScanResult` synthesis from partial strings.
+  - Remote identity fail-closed validation: `isRemoteServiceEnabled()` helper added to `DeriveService.ts`; `getActiveUserId()` and `resolveUserId()` in `deriveClient.ts` fail closed and throw in Remote mode if unauthenticated, empty, or mock IDs (`usr_beta_member`, `usr_beta_001`) are used.
+  - Production shelf recognition fail-closed: `recognizeShelfProducts()` returns empty list by default; demo fixture isolated to `getDemoShelfRecognitionFixture()`; added empty shelf guidance card in `6-shelf.tsx`.
+  - Canonical null routine projection: `hydrateRoutine()` explicitly sets `routine: null, isPlanUnderReview: false` when backend returns null.
+  - Async mutation error recovery: hardened error handling, loading states, and recovery in `scan.tsx`, `ask.tsx`, `check-in/index.tsx`, and `refill/index.tsx`.
+* **Acceptance Criteria**:
+  - 100% test suite passing (60/60 tests in `tests/derive.test.ts`), with 5 new regression tests.
+  - TypeScript typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - Zero contracts or backend code modified.
+
 ---
 
 ## Sami Workstream (Platform + Intelligence + Operations)

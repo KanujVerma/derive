@@ -41,25 +41,34 @@ export default function ScanScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const isScanningLockedRef = useRef(false);
 
   const performEvaluation = async (item: ScannableProductInput, barcode?: string) => {
-    const isDifferinActive = routine?.pmSteps.some((s) =>
-      s.productName.toLowerCase().includes('differin')
-    );
-    const result = await evaluateProduct({
-      productName: item.name,
-      brand: item.brand,
-      barcode: barcode || item.barcode,
-      userRoutineContext: {
-        activeDifferinSchedule: isDifferinActive,
-        currentRoutineProducts: userProducts.map((p) => p.product.name),
-        recentReactions: productReactions,
-      },
-    });
-    setScanResult(result);
-    return result;
+    setEvaluationError(null);
+    try {
+      const isDifferinActive = routine?.pmSteps.some((s) =>
+        s.productName.toLowerCase().includes('differin')
+      );
+      const result = await evaluateProduct({
+        productName: item.name,
+        brand: item.brand,
+        barcode: barcode || item.barcode,
+        userRoutineContext: {
+          activeDifferinSchedule: isDifferinActive,
+          currentRoutineProducts: userProducts.map((p) => p.product.name),
+          recentReactions: productReactions,
+        },
+      });
+      setScanResult(result);
+      return result;
+    } catch (err: any) {
+      isScanningLockedRef.current = false;
+      setIsLocked(false);
+      setEvaluationError(err?.message || 'Product evaluation failed. Please try again.');
+      throw err;
+    }
   };
 
   useEffect(() => {
@@ -113,6 +122,9 @@ export default function ScanScreen() {
         })
         .catch((err) => {
           console.warn('Scan evaluation failed:', err);
+          isScanningLockedRef.current = false;
+          setIsLocked(false);
+          setEvaluationError(err?.message || 'Product evaluation failed. Please try again.');
         });
     } else {
       try {
@@ -142,6 +154,9 @@ export default function ScanScreen() {
       })
       .catch((err) => {
         console.warn('Catalog item evaluation failed:', err);
+        isScanningLockedRef.current = false;
+        setIsLocked(false);
+        setEvaluationError(err?.message || 'Product evaluation failed. Please try again.');
       });
   };
 
@@ -150,6 +165,7 @@ export default function ScanScreen() {
     setConfirmedProduct(null);
     setScanResult(null);
     setUnknownBarcode(null);
+    setEvaluationError(null);
     setSearchQuery('');
     setIsSearching(false);
     setTimeout(() => {
@@ -161,6 +177,7 @@ export default function ScanScreen() {
   const handleRetryScan = () => {
     Haptics.selectionAsync();
     setUnknownBarcode(null);
+    setEvaluationError(null);
     setTimeout(() => {
       isScanningLockedRef.current = false;
       setIsLocked(false);
@@ -175,11 +192,15 @@ export default function ScanScreen() {
       verdict: scanResult.verdict,
     });
 
-    // Navigate to Ask with rich scan context
+    // Navigate to Ask with canonical route params and legacy fallback params
     router.push({
       pathname: '/(tabs)/ask',
       params: {
         initialQuery: `What does the scan verdict for ${scanResult.brand} ${scanResult.productName} (${scanResult.verdictLabel}) mean for my routine?`,
+        productName: scanResult.productName,
+        brand: scanResult.brand,
+        verdict: scanResult.verdict,
+        reason: scanResult.verdictSummary,
         scannedProductName: scanResult.productName,
         scannedBrand: scanResult.brand,
         scannedVerdict: scanResult.verdict,
@@ -555,6 +576,37 @@ export default function ScanScreen() {
                 variant="outline"
                 size="medium"
                 onPress={handleRetryScan}
+              />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Evaluation Error Modal Sheet */}
+      {evaluationError && !scanResult && (
+        <View
+          style={[
+            styles.unknownOverlay,
+            { paddingBottom: 88 + insets.bottom },
+          ]}
+        >
+          <View style={styles.unknownCard}>
+            <View style={styles.unknownIconCircle}>
+              <Icon name="warning" size={24} color={colors.actionStop.text} />
+            </View>
+            <Text style={styles.unknownTitle}>Evaluation Failed</Text>
+            <Text style={styles.unknownText}>
+              {evaluationError}
+            </Text>
+            <View style={styles.unknownButtons}>
+              <Button
+                label="Try Again"
+                variant="brand"
+                size="medium"
+                onPress={() => {
+                  setEvaluationError(null);
+                  handleResetScan();
+                }}
               />
             </View>
           </View>

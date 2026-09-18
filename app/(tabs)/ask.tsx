@@ -26,9 +26,14 @@ export default function AskScreen() {
   const params = useLocalSearchParams<{
     initialQuery?: string;
     productName?: string;
+    brand?: string;
     verdict?: string;
     reason?: string;
     whatItWouldChangeOrReplace?: string;
+    scannedProductName?: string;
+    scannedBrand?: string;
+    scannedVerdict?: string;
+    scannedReason?: string;
   }>();
   const { routine } = useRoutineStore();
   const flatListRef = useRef<FlatList>(null);
@@ -60,19 +65,24 @@ export default function AskScreen() {
 
   const hasInteracted = messages.length > 0;
 
+  const resolvedProductName = params?.productName || params?.scannedProductName;
+  const resolvedBrand = params?.brand || params?.scannedBrand;
+  const resolvedVerdict = params?.verdict || params?.scannedVerdict;
+  const resolvedReason = params?.reason || params?.scannedReason;
+
   React.useEffect(() => {
-    if (params?.productName && params?.verdict) {
+    if (resolvedProductName && resolvedVerdict) {
       setActiveScanContext({
-        productName: params.productName,
-        verdict: params.verdict,
-        reason: params.reason,
+        productName: resolvedProductName,
+        verdict: resolvedVerdict,
+        reason: resolvedReason,
       });
     }
     if (params?.initialQuery && handledInitialQueryRef.current !== params.initialQuery) {
       handledInitialQueryRef.current = params.initialQuery;
       handleSendMessage(params.initialQuery);
     }
-  }, [params?.initialQuery, params?.productName, params?.verdict]);
+  }, [params?.initialQuery, resolvedProductName, resolvedVerdict, resolvedReason]);
 
   const handleSendMessage = async (text: string, imageUri?: string) => {
     const userMsg: ChatMessage = {
@@ -120,8 +130,16 @@ export default function AskScreen() {
             : Haptics.NotificationFeedbackType.Success
         );
       } catch {}
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Failed to get advisor response:', e);
+      const errorMsg: ChatMessage = {
+        id: `err_${Date.now()}`,
+        conversationId: 'conv_1',
+        sender: 'derive',
+        text: e?.message || 'Unable to consult skincare intelligence right now. Please check your connection and try again.',
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setLoading(false);
     }

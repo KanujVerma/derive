@@ -90,9 +90,20 @@ export async function recognizeShelfProducts(
   imageUri: string
 ): Promise<ShelfRecognitionResult> {
   // Live shelf recognition is a server/Edge Function concern (Sami).
-  // The Expo client uses deterministic fixtures so Kanuj can build without a Gemini key.
+  // The default client path fails closed with an empty list rather than fabricating products.
   void imageUri;
 
+  return {
+    products: [],
+    unclearBottlesCount: 0,
+  };
+}
+
+/**
+ * Explicit fixture helper for developer demonstrations and automated testing.
+ * Isolated from production capture to ensure fail-closed customer integrity.
+ */
+export function getDemoShelfRecognitionFixture(): ShelfRecognitionResult {
   return {
     products: [
       {

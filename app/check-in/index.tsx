@@ -37,6 +37,8 @@ export default function CheckInModal() {
   const [selectedChange, setSelectedChange] = useState<string>('Nothing I can think of');
   const [notes, setNotes] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isFollowUpNeeded = skinState === 'worse' || irritation !== 'none';
 
@@ -75,25 +77,34 @@ export default function CheckInModal() {
   const goalQ = getGoalQuestion();
 
   const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+      await submitWeeklyCheckIn({
+        primaryGoal: primaryGoal || 'breakouts',
+        skinState,
+        irritation,
+        adherence,
+        notes: notes.trim() || undefined,
+      });
 
-    await submitWeeklyCheckIn({
-      primaryGoal: primaryGoal || 'breakouts',
-      skinState,
-      irritation,
-      adherence,
-      notes: notes.trim() || undefined,
-    });
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
 
-    analytics.track('checkin_completed', {
-      outcome: skinState,
-      irritationReported: irritation !== 'none',
-      adherenceReported: true,
-    });
+      analytics.track('checkin_completed', {
+        outcome: skinState,
+        irritationReported: irritation !== 'none',
+        adherenceReported: true,
+      });
 
-    setSubmitted(true);
+      setSubmitted(true);
+    } catch (err: any) {
+      console.warn('Check-in submission failed:', err);
+      setSubmitError(err?.message || 'Failed to submit check-in. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDone = () => {
@@ -291,13 +302,23 @@ export default function CheckInModal() {
           style={styles.notesInput}
         />
 
+        {/* ERROR BANNER */}
+        {submitError && (
+          <View style={styles.errorBanner}>
+            <Icon name="warning" size={16} color={colors.actionStop.text} />
+            <Text style={styles.errorText}>{submitError}</Text>
+          </View>
+        )}
+
         {/* SUBMIT BUTTON */}
         <Button
-          label="Submit Check-in"
+          label={isSubmitting ? 'Submitting...' : 'Submit Check-in'}
           variant="primary"
           size="large"
+          loading={isSubmitting}
+          disabled={isSubmitting}
           onPress={handleSubmit}
-          style={{ marginTop: spacing.xxl }}
+          style={{ marginTop: submitError ? spacing.md : spacing.xxl }}
         />
       </ScrollView>
     </View>
@@ -456,6 +477,23 @@ const styles = StyleSheet.create({
     color: colors.ink,
     minHeight: 70,
     textAlignVertical: 'top',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.actionStop.bg,
+    borderColor: colors.actionStop.border,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: typography.sizes.caption,
+    color: colors.actionStop.text,
+    fontWeight: typography.weights.medium,
   },
   successContent: {
     flex: 1,

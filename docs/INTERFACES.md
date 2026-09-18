@@ -183,8 +183,10 @@ To enforce strict boundary isolation between presentation and backend implementa
   - `evaluateProduct(input)`: Evaluates scanned item against user routine.
   - `submitWeeklyCheckIn(input)`: Records longitudinal observation and syncs store cache.
   - `requestProductRefill(input)`: Submits replenishment request.
-  - `hydrateOrders()`, `hydrateProgress()`, `hydrateRoutine()`, `hydrateResearchInsights()`, `hydrateCustomerProfile()`: Pull state from the active backend.
-- **Client Scanner Partition (`src/services/catalog.ts`)**: Camera viewfinder and offline barcode matching rely strictly on `src/services/catalog.ts` (`findProductByBarcode`, `PROTOTYPE_CATALOG`, `recognizeShelfProducts`).
+  - `hydrateOrders()`, `hydrateProgress()`, `hydrateRoutine()`, `hydrateResearchInsights()`, `hydrateCustomerProfile()`: Pull state from the active backend. `hydrateRoutine()` explicitly sets `routine: null, isPlanUnderReview: false` if backend returns null.
+  - `resolveUserId(userId?)`: Validates user identity. When `isRemoteServiceEnabled()` is true, fails closed (throws error) if unauthenticated, empty, or mock IDs (`usr_beta_member`, `usr_beta_001`) are used.
+- **Client Scanner Partition (`src/services/catalog.ts`)**: Camera viewfinder and offline barcode matching rely strictly on `src/services/catalog.ts` (`findProductByBarcode`, `PROTOTYPE_CATALOG`). Production `recognizeShelfProducts()` returns empty products to fail closed, while demo fixture is isolated to `getDemoShelfRecognitionFixture()`.
 - **Zero-AI-Workflows Rule**: Client code in `app/**` is strictly forbidden from importing `src/services/ai-workflows/**`. Server workflows are invoked exclusively through `IDeriveService` implementations.
 - **Swappability**: The active backend implementation can be swapped at runtime via `setDeriveService()` or via configuration flag without altering any client UI code.
+- **Scan-to-Ask Context Contract**: Navigation from Scan to Ask passes `{ productName, brand, verdict, reason }` as string parameters. Client routes must not synthesize partial `ProductScanResult` records when full attributes are not present.
 

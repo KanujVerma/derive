@@ -23,6 +23,7 @@ export default function ShelfScreen() {
   const router = useRouter();
   const {
     detectedProducts,
+    shelfPhotoUri,
     setShelfPhoto,
     removeProduct,
     addProduct,
@@ -131,27 +132,41 @@ export default function ShelfScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.productsList}>
-          {detectedProducts.map((p) => (
-            <View key={p.id} style={styles.productRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.productBrand}>{p.brand}</Text>
-                <Text style={styles.productName}>{p.name}</Text>
-                <Text style={styles.productCategory}>
-                  {p.category.charAt(0).toUpperCase() + p.category.slice(1)}
-                </Text>
+        {detectedProducts.length === 0 ? (
+          <View style={styles.emptyShelfCard}>
+            <Icon name="info" size={20} color={colors.inkMuted} />
+            <Text style={styles.emptyShelfTitle}>
+              {shelfPhotoUri ? 'No bottles recognized automatically' : 'No current products added'}
+            </Text>
+            <Text style={styles.emptyShelfDesc}>
+              {shelfPhotoUri
+                ? "We couldn't automatically read bottle labels from this photo. You can add your products manually using '+ Add product' above, or continue."
+                : "Snap your counter above or add what you use manually so we don't duplicate active ingredients."}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.productsList}>
+            {detectedProducts.map((p) => (
+              <View key={p.id} style={styles.productRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.productBrand}>{p.brand}</Text>
+                  <Text style={styles.productName}>{p.name}</Text>
+                  <Text style={styles.productCategory}>
+                    {p.category.charAt(0).toUpperCase() + p.category.slice(1)}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => removeProduct(p.id)}
+                  style={styles.removeButton}
+                  accessible={true}
+                  accessibilityLabel={`Remove ${p.name}`}
+                >
+                  <Icon name="close" size={16} color={colors.inkMuted} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => removeProduct(p.id)}
-                style={styles.removeButton}
-                accessible={true}
-                accessibilityLabel={`Remove ${p.name}`}
-              >
-                <Icon name="close" size={16} color={colors.inkMuted} />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
 
         {/* CONDITIONAL PRODUCT REACTION SECTION */}
         <View style={styles.reactionSection}>
@@ -348,6 +363,31 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: colors.brand,
     fontWeight: typography.weights.semibold,
+  },
+  emptyShelfCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xl,
+  },
+  emptyShelfTitle: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+  emptyShelfDesc: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 300,
   },
   productsList: {
     backgroundColor: colors.surface,

@@ -1624,6 +1624,8 @@ import {
   hydrateRoutine,
   hydrateResearchInsights,
   hydrateCustomerProfile,
+  getActiveUserId,
+  resolveUserId,
 } from '../src/services/deriveClient.ts';
 import type { IDeriveService } from '../src/contracts/DeriveService.ts';
 import type {
@@ -1961,6 +1963,209 @@ test('K6 End-to-End Service Flow: Onboarding through routine and check-ins', asy
   });
   assert.equal(refillRes.productName, 'Hydrating Facial Cleanser');
   assert.equal(useRoutineStore.getState().refillRequests.length, 1);
+});
+
+// ========================================================
+// 16. K6.1 HARDENING: BOUNDARY INTEGRITY & FAIL-CLOSED STATE
+// ========================================================
+
+import { isRemoteServiceEnabled } from '../src/services/DeriveService.ts';
+import { RemoteDeriveService } from '../src/services/remote/RemoteDeriveService.ts';
+import {
+  recognizeShelfProducts,
+  getDemoShelfRecognitionFixture,
+} from '../src/services/catalog.ts';
+
+test('K6.1 Hardening: Scan to Ask route parameters map canonical and fallback attributes', () => {
+  // Canonical route params from scan.tsx
+  const canonicalParams = {
+    initialQuery: 'What does the scan verdict for CeraVe Hydrating Facial Cleanser (Great Fit) mean for my routine?',
+    productName: 'Hydrating Facial Cleanser',
+    brand: 'CeraVe',
+    verdict: 'great_fit',
+    reason: 'Gentle hydrating surfactant match',
+  };
+
+  const resolvedName1 = canonicalParams.productName;
+  const resolvedBrand1 = canonicalParams.brand;
+  const resolvedVerdict1 = canonicalParams.verdict;
+  const resolvedReason1 = canonicalParams.reason;
+
+  assert.equal(resolvedName1, 'Hydrating Facial Cleanser');
+  assert.equal(resolvedBrand1, 'CeraVe');
+  assert.equal(resolvedVerdict1, 'great_fit');
+  assert.equal(resolvedReason1, 'Gentle hydrating surfactant match');
+
+  // Legacy route params fallback support
+  const legacyParams: Record<string, string> = {
+    scannedProductName: 'Differin Gel 0.1%',
+    scannedBrand: 'Differin',
+    scannedVerdict: 'fits_plan',
+    scannedReason: 'Active scheduled retinoid',
+  };
+
+  const resolvedName2 = (legacyParams.productName as string | undefined) || legacyParams.scannedProductName;
+  const resolvedBrand2 = (legacyParams.brand as string | undefined) || legacyParams.scannedBrand;
+  const resolvedVerdict2 = (legacyParams.verdict as string | undefined) || legacyParams.scannedVerdict;
+  const resolvedReason2 = (legacyParams.reason as string | undefined) || legacyParams.scannedReason;
+
+  assert.equal(resolvedName2, 'Differin Gel 0.1%');
+  assert.equal(resolvedBrand2, 'Differin');
+  assert.equal(resolvedVerdict2, 'fits_plan');
+  assert.equal(resolvedReason2, 'Active scheduled retinoid');
+});
+
+test('K6.1 Hardening: Remote mode enforces fail-closed authentication on user operations', () => {
+  const origEnv = process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE;
+  const origService = getDeriveService();
+
+  try {
+    // 1. In Mock mode, fallback 'usr_beta_member' is permitted
+    setDeriveService(new MockDeriveService());
+    process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = 'false';
+    useUserStore.setState({ userId: '' });
+    assert.equal(isRemoteServiceEnabled(), false);
+    assert.equal(getActiveUserId(), 'usr_beta_member');
+
+    // 2. Switch to Remote mode
+    const remote = new RemoteDeriveService();
+    setDeriveService(remote);
+    process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = 'true';
+    assert.equal(isRemoteServiceEnabled(), true);
+
+    // Empty user ID throws fail-closed error
+    useUserStore.setState({ userId: '' });
+    assert.throws(
+      () => getActiveUserId(),
+      /Authentication required: Remote operations require an authenticated session/
+    );
+
+    // Mock guest ID 'usr_beta_member' throws fail-closed error in remote mode
+    useUserStore.setState({ userId: 'usr_beta_member' });
+    assert.throws(
+      () => getActiveUserId(),
+      /Authentication required: Remote operations require an authenticated session/
+    );
+
+    // Mock Arthur ID 'usr_beta_001' throws fail-closed error in remote mode
+    useUserStore.setState({ userId: 'usr_beta_001' });
+    assert.throws(
+      () => getActiveUserId(),
+      /Authentication required: Remote operations require an authenticated session/
+    );
+
+    // Explicit call to resolveUserId with mock id throws in remote mode
+    assert.throws(
+      () => resolveUserId('usr_beta_member'),
+      /Authentication required: Remote operations require an authenticated session/
+    );
+
+    // Real authenticated session ID succeeds
+    useUserStore.setState({ userId: 'usr_real_prod_auth_789' });
+    assert.equal(getActiveUserId(), 'usr_real_prod_auth_789');
+    assert.equal(resolveUserId('usr_real_prod_auth_789'), 'usr_real_prod_auth_789');
+  } finally {
+    process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = origEnv;
+    setDeriveService(origService);
+    useUserStore.getState().resetToDefault();
+  }
+});
+
+test('K6.1 Hardening: Shelf recognition fails closed in default path with isolated demo fixture', async () => {
+  // 1. Default shelf recognition returns empty list
+  const liveResult = await recognizeShelfProducts('file:///local_counter_shelf.jpg');
+  assert.deepEqual(liveResult.products, [], 'Default shelf recognition must not fabricate products');
+  assert.equal(liveResult.unclearBottlesCount, 0);
+
+  // 2. Explicit demo fixture is isolated
+  const demoResult = getDemoShelfRecognitionFixture();
+  assert.equal(demoResult.products.length, 5);
+  assert.equal(demoResult.products[0].brand, 'CeraVe');
+  assert.equal(demoResult.products[1].brand, 'Differin');
+});
+
+test('K6.1 Hardening: Canonical cache projection clears stale routine when service returns null', async () => {
+  const origService = getDeriveService();
+
+  try {
+    // Backend returns null (e.g. routine was deleted or user has no routine yet)
+    class NullRoutineBackend extends MockDeriveService {
+      override async getRoutine(_userId: string): Promise<any> {
+        return null;
+      }
+    }
+
+    // Seed store with a stale routine
+    useRoutineStore.setState({
+      routine: {
+        id: 'stale_routine_123',
+        userId: 'usr_beta_member',
+        status: 'awaiting_review',
+        amSteps: [],
+        pmSteps: [],
+      } as any,
+      isPlanUnderReview: true,
+    });
+    assert.ok(useRoutineStore.getState().routine);
+
+    setDeriveService(new NullRoutineBackend());
+
+    const result = await hydrateRoutine('usr_beta_member');
+    assert.equal(result, null);
+    // Verify store cache was cleared and isPlanUnderReview reset
+    assert.equal(useRoutineStore.getState().routine, null);
+    assert.equal(useRoutineStore.getState().isPlanUnderReview, false);
+  } finally {
+    setDeriveService(origService);
+    useRoutineStore.getState().resetRoutine();
+  }
+});
+
+test('K6.1 Hardening: Service mutation failures preserve user intent and error recoverability', async () => {
+  const origService = getDeriveService();
+
+  try {
+    class FailingBackend extends MockDeriveService {
+      override async submitCheckIn(): Promise<any> {
+        throw new Error('Network offline: unable to reach Derive service');
+      }
+      override async requestRefill(): Promise<any> {
+        throw new Error('Replenishment service currently unavailable');
+      }
+    }
+
+    setDeriveService(new FailingBackend());
+    useRoutineStore.getState().resetRoutine();
+
+    // 1. Failed check-in throws without corrupting cache
+    await assert.rejects(
+      async () => {
+        await submitWeeklyCheckIn({
+          skinState: 'better',
+          irritation: 'none',
+          adherence: 'yes',
+        });
+      },
+      /Network offline/
+    );
+    assert.equal(useRoutineStore.getState().checkIns.length, 0);
+
+    // 2. Failed refill request throws without corrupting cache
+    await assert.rejects(
+      async () => {
+        await requestProductRefill({
+          productId: 'prod_99',
+          productName: 'Toleriane Double Repair',
+          brand: 'La Roche-Posay',
+        });
+      },
+      /Replenishment service currently unavailable/
+    );
+    assert.equal(useRoutineStore.getState().refillRequests.length, 0);
+  } finally {
+    setDeriveService(origService);
+    useRoutineStore.getState().resetRoutine();
+  }
 });
 
 

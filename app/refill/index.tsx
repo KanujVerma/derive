@@ -23,6 +23,8 @@ export default function RefillModal() {
 
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Deduplicate products across AM and PM steps
   const steps = [...(routine?.amSteps || []), ...(routine?.pmSteps || [])];
@@ -35,17 +37,27 @@ export default function RefillModal() {
     const target = uniqueProducts.find((p) => p.productId === selectedProductId);
     if (!target) return;
 
+    setIsSubmitting(true);
+    setError(null);
     try {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+      await requestProductRefill({
+        productId: target.productId,
+        productName: target.productName,
+        brand: target.brand,
+      });
 
-    await requestProductRefill({
-      productId: target.productId,
-      productName: target.productName,
-      brand: target.brand,
-    });
-    analytics.track('refill_requested', { productCategory: target.category });
-    setSubmitted(true);
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+
+      analytics.track('refill_requested', { productCategory: target.category });
+      setSubmitted(true);
+    } catch (err: any) {
+      console.warn('Refill request failed:', err);
+      setError(err?.message || 'Refill request failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -157,14 +169,22 @@ export default function RefillModal() {
           </View>
         )}
 
+        {error && (
+          <View style={styles.errorBanner}>
+            <Icon name="warning" size={16} color={colors.actionStop.text} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         {uniqueProducts.length > 0 && (
           <Button
-            label="Request Refill"
+            label={isSubmitting ? 'Submitting...' : 'Request Refill'}
             variant="primary"
             size="large"
-            disabled={!selectedProductId}
+            loading={isSubmitting}
+            disabled={!selectedProductId || isSubmitting}
             onPress={handleRequest}
-            style={{ marginTop: spacing.xl }}
+            style={{ marginTop: error ? spacing.md : spacing.xl }}
           />
         )}
       </ScrollView>
@@ -338,5 +358,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     maxWidth: 280,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.actionStop.bg,
+    borderColor: colors.actionStop.border,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: typography.sizes.caption,
+    color: colors.actionStop.text,
+    fontWeight: typography.weights.medium,
   },
 });

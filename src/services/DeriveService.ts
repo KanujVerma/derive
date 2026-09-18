@@ -20,6 +20,13 @@ export function getDeriveService(): IDeriveService {
   return serviceInstance;
 }
 
+export function isRemoteServiceEnabled(): boolean {
+  if (serviceInstance) {
+    return serviceInstance instanceof RemoteDeriveService;
+  }
+  return process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE === 'true';
+}
+
 /**
  * Reset service instance (useful for test isolation)
  */
