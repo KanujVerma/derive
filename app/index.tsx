@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useAuthStore } from '@/src/stores/authStore';
+import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveAuthRoute } from '@/src/utils/authRouting';
 import { colors } from '@/src/constants/theme';
@@ -10,12 +11,14 @@ import { colors } from '@/src/constants/theme';
 export default function Index() {
   const isCompleted = useOnboardingStore((s) => s.isCompleted);
   const authStatus = useAuthStore((s) => s.status);
+  const profileResolution = useBootstrapStore((s) => s.status);
   const remoteEnabled = isRemoteServiceEnabled();
 
   const destination = resolveAuthRoute({
     remoteEnabled,
     authStatus,
     isOnboardingCompleted: isCompleted,
+    profileResolution,
   });
 
   if (destination.type === 'AUTH_LOADING') {

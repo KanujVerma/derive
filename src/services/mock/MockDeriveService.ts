@@ -29,6 +29,7 @@ import type {
   RefillRequest,
   ResearchInsight,
   CustomerProfile,
+  CustomerBootstrapState,
   RoutinePlan,
   SkinProfile,
   UserProduct,
@@ -70,6 +71,8 @@ export class MockDeriveService implements IDeriveService {
   private researchInsights: ResearchInsight[] = [];
   private recentPhotos: PhotoContextEntry[] = [];
   private customerProfile: CustomerProfile | null = null;
+  private skinProfile: SkinProfile | null = null;
+  private bootstrapOverride: Partial<CustomerBootstrapState> | null = null;
 
   /**
    * Resets all internal state back to clean initial state.
@@ -83,6 +86,8 @@ export class MockDeriveService implements IDeriveService {
     this.researchInsights = [];
     this.recentPhotos = [];
     this.customerProfile = null;
+    this.skinProfile = null;
+    this.bootstrapOverride = null;
   }
 
   /**
@@ -258,6 +263,7 @@ export class MockDeriveService implements IDeriveService {
       status: 'awaiting_review',
     };
 
+    this.skinProfile = skinProfile;
     this.activeRoutine = pendingRoutine;
     this.userProducts = proposal.userProducts;
 
@@ -465,5 +471,36 @@ export class MockDeriveService implements IDeriveService {
 
   async getCustomerProfile(userId: string): Promise<CustomerProfile | null> {
     return this.customerProfile;
+  }
+
+  /**
+   * Optional test override for simulating specific edge cases (e.g. profileExists: false).
+   */
+  setMockBootstrapState(override: Partial<CustomerBootstrapState> | null): void {
+    this.bootstrapOverride = override;
+  }
+
+  async getCustomerBootstrapState(userId: string): Promise<CustomerBootstrapState> {
+    if (this.bootstrapOverride) {
+      return {
+        userId,
+        profileExists: this.bootstrapOverride.profileExists ?? true,
+        onboardingCompleted: this.bootstrapOverride.onboardingCompleted ?? false,
+        membershipStatus: this.bootstrapOverride.membershipStatus ?? 'none',
+        ...this.bootstrapOverride,
+      };
+    }
+
+    const isOnboarded =
+      this.skinProfile?.onboardingCompleted === true ||
+      this.activeRoutine !== null ||
+      this.customerProfile !== null;
+
+    return {
+      userId,
+      profileExists: true,
+      onboardingCompleted: isOnboarded,
+      membershipStatus: this.customerProfile?.membershipStatus ?? 'none',
+    };
   }
 }

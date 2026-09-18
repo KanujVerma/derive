@@ -20,7 +20,8 @@ export type CustomerFacingOperation =
   | 'auth_invalid_otp'
   | 'auth_send_code'
   | 'auth_signin'
-  | 'auth_signout';
+  | 'auth_signout'
+  | 'bootstrap';
 
 export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = {
   onboarding: "We couldn't finish setting up your routine. Your setup is still here. Please try again.",
@@ -35,6 +36,7 @@ export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = 
   auth_send_code: "We couldn't send a code right now. Please try again.",
   auth_signin: "We couldn't sign you in right now. Please try again.",
   auth_signout: "We couldn't sign you out right now. Please try again.",
+  bootstrap: "We couldn't finish loading your account. Please try again.",
 };
 
 /**

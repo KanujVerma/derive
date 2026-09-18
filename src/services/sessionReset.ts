@@ -3,6 +3,7 @@ import { useUserStore } from '../stores/userStore.ts';
 import { useRoutineStore } from '../stores/routineStore.ts';
 import { useScanContextStore } from '../stores/scanContextStore.ts';
 import { useOnboardingStore } from '../stores/onboardingStore.ts';
+import { useBootstrapStore } from '../stores/bootstrapStore.ts';
 
 /**
  * Resets all customer session data, caches, and active state across stores.
@@ -15,5 +16,6 @@ export function resetCustomerSessionData(): void {
   useRoutineStore.getState().resetRoutine();
   useScanContextStore.getState().clearScanContext();
   useOnboardingStore.getState().resetOnboarding();
+  useBootstrapStore.getState().resetBootstrap();
 }
 

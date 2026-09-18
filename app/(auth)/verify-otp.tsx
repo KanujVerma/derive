@@ -18,6 +18,7 @@ import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { verifyEmailOtp, sendEmailOtp, isValidOtpToken } from '@/src/services/authClient';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { resolveAuthRoute } from '@/src/utils/authRouting';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
@@ -79,6 +80,7 @@ export default function VerifyOtpScreen() {
         remoteEnabled: isRemoteServiceEnabled(),
         authStatus: 'SIGNED_IN',
         isOnboardingCompleted: false,
+        profileResolution: useBootstrapStore.getState().status,
       });
       if (destination.route) {
         router.replace(destination.route);

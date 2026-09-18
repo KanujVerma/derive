@@ -3,17 +3,27 @@ export type AuthRouteType =
   | 'MOCK_ONBOARDING'
   | 'AUTH_LOADING'
   | 'AUTH_LOGIN'
-  | 'REMOTE_HOLDING';
+  | 'REMOTE_HOLDING'
+  | 'REMOTE_ONBOARDING'
+  | 'REMOTE_TABS';
 
 export interface AuthRouteDestination {
   type: AuthRouteType;
   route: '/(tabs)' | '/(onboarding)/1-welcome' | '/(auth)/login' | '/holding' | null;
 }
 
+export type ProfileResolutionStatus =
+  | 'UNRESOLVED'
+  | 'RESOLVING'
+  | 'NEEDS_ONBOARDING'
+  | 'READY'
+  | 'ERROR';
+
 export interface ResolveRouteOptions {
   remoteEnabled: boolean;
   authStatus: 'INITIALIZING' | 'SIGNED_OUT' | 'SIGNED_IN';
   isOnboardingCompleted?: boolean;
+  profileResolution?: ProfileResolutionStatus;
 }
 
 /**
@@ -28,12 +38,20 @@ export interface ResolveRouteOptions {
  * 2. In Remote Mode (remoteEnabled === true):
  *    - authStatus === 'INITIALIZING' -> AUTH_LOADING (null route / show loading canvas)
  *    - authStatus === 'SIGNED_OUT'   -> /(auth)/login
- *    - authStatus === 'SIGNED_IN'    -> REMOTE_HOLDING (holding / profile resolution)
+ *    - authStatus === 'SIGNED_IN'    ->
+ *        - profileResolution === 'NEEDS_ONBOARDING' -> REMOTE_ONBOARDING (/(onboarding)/1-welcome)
+ *        - profileResolution === 'READY'            -> REMOTE_TABS (/(tabs))
+ *        - UNRESOLVED, RESOLVING, or ERROR          -> REMOTE_HOLDING (/holding)
  *    CRITICAL: Remote signed-in state MUST NOT inspect local isOnboardingCompleted!
- *    Canonical onboarding and membership status belong strictly to future remote profile hydration (I1-A2).
+ *    Canonical onboarding and membership status belong strictly to canonical remote bootstrap resolution (I1-A2).
  */
 export function resolveAuthRoute(options: ResolveRouteOptions): AuthRouteDestination {
-  const { remoteEnabled, authStatus, isOnboardingCompleted = false } = options;
+  const {
+    remoteEnabled,
+    authStatus,
+    isOnboardingCompleted = false,
+    profileResolution = 'UNRESOLVED',
+  } = options;
 
   if (!remoteEnabled) {
     return isOnboardingCompleted
@@ -50,6 +68,15 @@ export function resolveAuthRoute(options: ResolveRouteOptions): AuthRouteDestina
   }
 
   // authStatus === 'SIGNED_IN' in Remote Mode
+  if (profileResolution === 'NEEDS_ONBOARDING') {
+    return { type: 'REMOTE_ONBOARDING', route: '/(onboarding)/1-welcome' };
+  }
+
+  if (profileResolution === 'READY') {
+    return { type: 'REMOTE_TABS', route: '/(tabs)' };
+  }
+
+  // UNRESOLVED, RESOLVING, or ERROR: route to /holding
   return { type: 'REMOTE_HOLDING', route: '/holding' };
 }
 
@@ -81,11 +108,29 @@ export function getAuthRedirectRoute(
   }
 
   if (destination.type === 'REMOTE_HOLDING') {
-    // In Remote mode when signed in (pre-profile hydration in I1-A2):
+    // In Remote mode when signed in and profile resolution is unresolved/resolving/error:
     // All routes other than /holding must redirect to /holding.
     // If already on holding, return null to avoid redirect loops.
     const onHolding = segment0 === 'holding';
     return onHolding ? null : destination.route;
+  }
+
+  if (destination.type === 'REMOTE_ONBOARDING') {
+    // In Remote mode when signed in and profile resolution is NEEDS_ONBOARDING:
+    // Any route outside the (onboarding) group must redirect to /(onboarding)/1-welcome.
+    // If already inside (onboarding), return null to avoid redirect loops while navigating onboarding.
+    const inOnboarding = segment0 === '(onboarding)';
+    return inOnboarding ? null : destination.route;
+  }
+
+  if (destination.type === 'REMOTE_TABS') {
+    // In Remote mode when signed in and profile resolution is READY:
+    // User is an active member. They should not be on holding or auth or onboarding.
+    // If currently on holding or (auth) or (onboarding) or root, redirect to /(tabs).
+    // If already on (tabs) or standard member screens (profile, orders, check-in, refill, founder, insights), return null.
+    const onHoldingOrAuthOrOnboardingOrRoot =
+      segment0 === '' || segment0 === 'holding' || segment0 === '(auth)' || segment0 === '(onboarding)';
+    return onHoldingOrAuthOrOnboardingOrRoot ? destination.route : null;
   }
 
   return null;

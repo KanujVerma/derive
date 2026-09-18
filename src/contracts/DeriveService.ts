@@ -24,6 +24,7 @@ import type {
   RefillRequest,
   ResearchInsight,
   CustomerProfile,
+  CustomerBootstrapState,
   RoutinePlan,
 } from '../domain/types.ts';
 
@@ -83,4 +84,9 @@ export interface IDeriveService {
    * Retrieve customer profile & membership status.
    */
   getCustomerProfile(userId: string): Promise<CustomerProfile | null>;
+
+  /**
+   * Retrieve canonical post-auth customer bootstrap state (profile existence, onboarding completion, membership status).
+   */
+  getCustomerBootstrapState(userId: string): Promise<CustomerBootstrapState>;
 }

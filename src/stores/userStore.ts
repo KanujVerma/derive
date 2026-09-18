@@ -1,16 +1,19 @@
 import { create } from 'zustand';
+import type { CustomerProfile } from '../domain/types.ts';
 
 export interface UserState {
   userId: string;
   email: string;
   fullName: string;
-  membershipStatus: 'active' | 'trial' | 'none';
+  membershipStatus: 'active' | 'trial' | 'none' | 'paused' | 'cancelled';
   tier: string;
   isFounderMode: boolean;
 
   // Actions
   setUser: (userId: string, email: string, fullName?: string) => void;
   setRemoteSessionUser: (userId: string, email?: string) => void;
+  setRemoteBootstrapMembership: (status: 'active' | 'paused' | 'cancelled' | 'none') => void;
+  setRemoteCustomerProfile: (profile: CustomerProfile) => void;
   toggleFounderMode: () => void;
   logout: () => void;
   loadArthurDemoUser: () => void;
@@ -49,6 +52,18 @@ export const useUserStore = create<UserState>((set) => ({
       membershipStatus: 'none',
       tier: '',
       isFounderMode: false,
+    }),
+
+  setRemoteBootstrapMembership: (status) =>
+    set({ membershipStatus: status }),
+
+  setRemoteCustomerProfile: (profile) =>
+    set({
+      userId: profile.id,
+      email: profile.email,
+      fullName: profile.fullName,
+      membershipStatus: profile.membershipStatus,
+      tier: profile.tier,
     }),
 
   toggleFounderMode: () =>

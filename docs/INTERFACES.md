@@ -25,6 +25,7 @@ export interface IDeriveService {
   getResearchInsights(userId: string): Promise<ResearchInsight[]>;
   getRoutine(userId: string): Promise<RoutinePlan | null>;
   getCustomerProfile(userId: string): Promise<CustomerProfile | null>;
+  getCustomerBootstrapState(userId: string): Promise<CustomerBootstrapState>;
 }
 ```
 
@@ -197,4 +198,21 @@ To enforce strict boundary isolation between presentation and backend implementa
 - **Swappability**: The active backend implementation can be swapped at runtime via `setDeriveService()` or via configuration flag without altering any client UI code.
 - **Scan-to-Ask Context Contract**: Navigation from Scan to Ask preserves the full typed `ProductScanResult` across navigation boundaries via ephemeral `useScanContextStore` (`src/stores/scanContextStore.ts`). Ask synchronously passes this context on the initial automated query and all subsequent queries in that conversation, eliminating React closure race conditions. Context is cleared upon banner dismissal or starting a new conversation. Partial records are never artificially synthesized from route query strings.
 - **Customer-Safe Error Sanitization (`src/utils/customerErrors.ts`)**: All client UI errors are mapped through `getCustomerErrorMessage(operation)` to present deterministic, empathetic Direction A Mineral copy. Internal technical details (e.g. Supabase, PostgREST, RemoteDeriveService, stack traces) are strictly shielded from the member while being preserved in `console.warn` logs, and user draft inputs (form state, selected products) are preserved for seamless retry.
+
+### G. Customer Bootstrap Resolution Contract (`src/contracts/DeriveService.ts`, `src/domain/types.ts`)
+To truthfully determine whether an authenticated user requires onboarding or is an existing active member without guessing:
+- **`CustomerBootstrapState` Contract**:
+  ```typescript
+  export interface CustomerBootstrapState {
+    userId: string;
+    profileExists: boolean;
+    onboardingCompleted: boolean;
+    membershipStatus: 'active' | 'paused' | 'cancelled' | 'none';
+  }
+  ```
+- **Invariants**:
+  - `profileExists`: Verified via `public.profiles`. The presence of a profile row (auto-provisioned by auth triggers) does NOT mean onboarding is complete. If absent, bootstrap fails closed (`profileExists: false`) to catch provisioning failures.
+  - `onboardingCompleted`: Read strictly from `public.skin_profiles.onboarding_completed`. Missing skin profile or false means `NEEDS_ONBOARDING`; true means `READY`.
+  - `membershipStatus`: Queried from `public.memberships` deterministically (latest row by `created_at` descending; absent row maps to `'none'`). Membership state is purely informational in this slice and does NOT gate onboarding navigation.
+  - Tier and pricing fields are strictly excluded, preserving `ARCHITECTURE_CHALLENGE-01` without resolving it prematurely.
 

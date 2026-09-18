@@ -6,6 +6,48 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: I1-A2 Remote Customer Bootstrap Resolution & Profile Handshake
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `b989ca5a1004c2d2e0f3d06d25fcc6cf154bb43c`
+- **Prior Verified CI Run**: `35385390081` (on commit `b989ca5`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-A2 COMPLETE` (Remote profile resolution handshake: implemented `CustomerBootstrapState` shared contract and `getCustomerBootstrapState` on `IDeriveService`, deterministically distinguishing authenticated new members needing onboarding from existing onboarded members using canonical `skin_profiles.onboarding_completed`; replaced raw `as unknown as CustomerProfile` cast with safe explicit column mapping; built client `useBootstrapStore` state machine; updated `holding.tsx` to handle resolving and error states with Retry and Sign Out affordances; updated `resolveAuthRoute` and `getAuthRedirectRoute` to route new members to onboarding and onboarded members to tabs while failing closed on profile provisioning errors; and full verification ladder passed).
+- **Ownership / Shared Contracts**: Coordinated additive shared-contract addition (`src/contracts/DeriveService.ts`, `src/domain/types.ts`). Client-side implementation (`src/stores/bootstrapStore.ts`, `src/stores/userStore.ts`, `src/services/deriveClient.ts`, `src/services/sessionReset.ts`, `src/utils/authRouting.ts`, `src/utils/customerErrors.ts`, `app/holding.tsx`, `app/_layout.tsx`, `app/index.tsx`, `app/(auth)/verify-otp.tsx`, `tests/derive.test.ts`). Narrow Sami-owned RemoteDeriveService implementation (`src/services/remote/RemoteDeriveService.ts`). Zero changes to database migrations, RLS, Edge Functions, Stripe, or server intelligence.
+- **Architectural Deliverables**:
+  1. **Canonical Bootstrap Contract (`CustomerBootstrapState`)**:
+     - Defined additive `CustomerBootstrapState` in `src/domain/types.ts`: `{ userId: string; profileExists: boolean; onboardingCompleted: boolean; membershipStatus: 'active' | 'paused' | 'cancelled' | 'none'; }`.
+     - Added additive `getCustomerBootstrapState(userId: string): Promise<CustomerBootstrapState>` to `IDeriveService`.
+     - Tier and pricing fields strictly excluded, preserving `ARCHITECTURE_CHALLENGE-01` without resolving it prematurely.
+  2. **Canonical Persistence Signals & Invariants**:
+     - `public.profiles` row existence (auto-provisioned by auth triggers) does NOT indicate onboarding completion. Profile absence fails closed (`profileExists: false`) to catch provisioning triggers.
+     - `public.skin_profiles.onboarding_completed` is the sole canonical source of onboarding truth. Absent row or false $\rightarrow$ `NEEDS_ONBOARDING`; true $\rightarrow$ `READY`.
+     - `public.memberships` queried deterministically (latest row by `created_at` descending; absent maps to `'none'`). Membership state is informational and does NOT gate onboarding navigation in this slice.
+  3. **Safe Column Mapping in `RemoteDeriveService`**:
+     - Removed raw `as unknown as CustomerProfile` direct cast. Added pure mappers `mapDbBootstrapState` and `mapDbCustomerProfile`.
+     - Safely maps snake_case DB columns (`full_name` $\rightarrow$ `fullName`, `created_at` $\rightarrow$ `createdAt`, `updated_at` $\rightarrow$ `updatedAt`).
+     - Protected Stripe columns (`stripe_customer_id`, `stripe_subscription_id`) are excluded from customer projections.
+     - Unrepresentable tiers under the frozen contract (`founding_beta_129`) return null rather than fabricating fake tiers.
+  4. **Client Bootstrap State Machine (`src/stores/bootstrapStore.ts`)**:
+     - Implemented `useBootstrapStore` tracking `UNRESOLVED` | `RESOLVING` | `NEEDS_ONBOARDING` | `READY` | `ERROR` lifecycle.
+     - Integrated with `src/services/deriveClient.ts` via `resolveCustomerBootstrap(userId)` with customer-safe error shielding ("We couldn't finish loading your account. Please try again.").
+     - Integrated with `resetCustomerSessionData()` in `src/services/sessionReset.ts` to guarantee bootstrap state is purged on sign-out, cold-start, or $A \rightarrow B$ account switch.
+  5. **Holding Screen UX (`app/holding.tsx`)**:
+     - Displays Direction A Mineral loading canvas with spinner while `RESOLVING` ("Finishing your setup…").
+     - When `ERROR`, renders calm customer copy with "Try Again" retry action and "Sign Out" escape hatch.
+  6. **Deterministic Routing Policies (`src/utils/authRouting.ts`)**:
+     - Updated `resolveAuthRoute` and `getAuthRedirectRoute`: `NEEDS_ONBOARDING` routes to `/(onboarding)/1-welcome`; `READY` routes to `/(tabs)`.
+     - In Remote mode, local `onboardingStore.isCompleted` is strictly ignored; canonical remote data is authoritative.
+- **Verification**:
+  - `npm test`: 81/81 tests passing (100%), including 14 new dedicated I1-A2 tests covering shared contract, mock state, PostgREST query execution, profile mapping, and client routing.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ## 2026-09-18 — Kanuj Mobile/UX: I1-A1.2 Final Auth Route & Session-Truth Closure
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

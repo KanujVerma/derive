@@ -4,12 +4,29 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii } from '@/src/constants/theme';
 import { signOutSession } from '@/src/services/authClient';
+import { useAuthStore } from '@/src/stores/authStore';
+import { useBootstrapStore } from '@/src/stores/bootstrapStore';
+import { resolveCustomerBootstrap } from '@/src/services/deriveClient';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
 export default function HoldingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [signingOut, setSigningOut] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  const sessionUserId = useAuthStore((s) => s.sessionUserId);
+  const status = useBootstrapStore((s) => s.status);
+  const errorMessage = useBootstrapStore((s) => s.errorMessage);
+
+  const isError = status === 'ERROR';
+
+  const handleRetry = async () => {
+    if (retrying || !sessionUserId) return;
+    setRetrying(true);
+    await resolveCustomerBootstrap(sessionUserId);
+    setRetrying(false);
+  };
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -45,17 +62,39 @@ export default function HoldingScreen() {
           resizeMode="contain"
         />
 
-        <Text style={styles.title}>Finishing your setup…</Text>
+        <Text style={styles.title}>
+          {isError ? "We couldn't finish loading your account" : 'Finishing your setup…'}
+        </Text>
         <Text style={styles.subtitle}>
-          Preparing your profile and personal routine workspace.
+          {isError
+            ? errorMessage || getCustomerErrorMessage('bootstrap')
+            : 'Preparing your profile and personal routine workspace.'}
         </Text>
 
-        <View style={styles.spinnerContainer}>
-          <ActivityIndicator size="small" color={colors.ink} />
-        </View>
+        {!isError && (
+          <View style={styles.spinnerContainer}>
+            <ActivityIndicator size="small" color={colors.ink} />
+          </View>
+        )}
       </View>
 
       <View style={styles.footer}>
+        {isError && (
+          <TouchableOpacity
+            onPress={handleRetry}
+            disabled={retrying}
+            style={styles.retryButton}
+            accessibilityRole="button"
+            accessibilityLabel="Try again"
+          >
+            {retrying ? (
+              <ActivityIndicator size="small" color={colors.canvas} />
+            ) : (
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           onPress={handleSignOut}
           disabled={signingOut}
@@ -123,5 +162,20 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     fontWeight: typography.weights.medium,
     color: colors.inkMuted,
+  },
+  retryButton: {
+    minHeight: 44,
+    minWidth: 140,
+    backgroundColor: colors.ink,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  retryButtonText: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.medium,
+    color: colors.canvas,
   },
 });

@@ -222,6 +222,23 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Zero contracts or backend code modified.
 
+### I1-A2: Remote Customer Bootstrap Resolution & Profile Handshake [COMPLETE]
+* **Scope**:
+  - Replace temporary static `/holding` dead-end with canonical Remote bootstrap resolution handshake (`CustomerBootstrapState`).
+  - Distinguish auth identity (`auth.users`), profile existence (`public.profiles`), and canonical onboarding completion (`public.skin_profiles.onboarding_completed`).
+  - Independent membership resolution: query latest row deterministically by `created_at` descending; map missing rows to `none` without blocking onboarding or routing.
+  - Safe mapping: eliminate raw `as unknown as CustomerProfile` casts; explicitly map DB columns to domain properties; protect Stripe customer/subscription IDs from client projection.
+  - Client bootstrap state machine (`useBootstrapStore`): manage `UNRESOLVED`, `RESOLVING`, `NEEDS_ONBOARDING`, `READY`, `ERROR` states with fail-closed error handling.
+  - Holding screen integration: render active resolving spinner vs. calm error canvas with "Try Again" retry and "Sign Out" affordances.
+  - Routing integration: pure routing helpers `resolveAuthRoute` and `getAuthRedirectRoute` route new authenticated members to `/(onboarding)/1-welcome`, onboarded members to `/(tabs)`, and failing/resolving sessions to `/holding`.
+  - Full test suite: comprehensive behavioral tests covering shared contract, mock state, PostgREST query execution, profile mapping, and client lifecycle.
+* **Acceptance Criteria**:
+  - 100% test suite passing (81/81 tests in `tests/derive.test.ts`), including 14 new dedicated I1-A2 bootstrap resolution tests.
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ---
 
 ## Sami Workstream (Platform + Intelligence + Operations)

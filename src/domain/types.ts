@@ -107,6 +107,13 @@ export interface CustomerProfile {
   updatedAt: string;
 }
 
+export interface CustomerBootstrapState {
+  userId: string;
+  profileExists: boolean;
+  onboardingCompleted: boolean;
+  membershipStatus: 'active' | 'paused' | 'cancelled' | 'none';
+}
+
 // Canonical aliases for clarity across workstreams
 export type RoutinePlan = Routine;
 export type RoutineItem = RoutineStep;

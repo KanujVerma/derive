@@ -7,15 +7,20 @@ import { colors } from '@/src/constants/theme';
 import { KeyboardDoneBar } from '@/src/components/ui/KeyboardDoneBar';
 import { useAuthStore } from '@/src/stores/authStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
+import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { startAuthAutoRefresh, stopAuthAutoRefresh } from '@/src/services/supabase';
 import { getCurrentSession, subscribeToAuth } from '@/src/services/authClient';
+import { resolveCustomerBootstrap } from '@/src/services/deriveClient';
 import { resolveAuthRoute, getAuthRedirectRoute } from '@/src/utils/authRouting';
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const authStatus = useAuthStore((s) => s.status);
+  const sessionUserId = useAuthStore((s) => s.sessionUserId);
+  const profileResolution = useBootstrapStore((s) => s.status);
+  const resolvedUserId = useBootstrapStore((s) => s.resolvedUserId);
   const remoteEnabled = isRemoteServiceEnabled();
 
   // Handle AppState changes for Supabase token auto-refresh in remote mode
@@ -46,6 +51,17 @@ export default function RootLayout() {
     return () => unsubscribe();
   }, [remoteEnabled]);
 
+  // Trigger remote bootstrap resolution when signed in
+  useEffect(() => {
+    if (!remoteEnabled) return;
+    if (authStatus !== 'SIGNED_IN' || !sessionUserId) return;
+
+    // Trigger resolution when unresolved or on identity transition
+    if (profileResolution === 'UNRESOLVED' || resolvedUserId !== sessionUserId) {
+      resolveCustomerBootstrap(sessionUserId);
+    }
+  }, [remoteEnabled, authStatus, sessionUserId, profileResolution, resolvedUserId]);
+
   // Route gating in remote mode
   useEffect(() => {
     if (!remoteEnabled) return;
@@ -55,13 +71,14 @@ export default function RootLayout() {
       remoteEnabled,
       authStatus,
       isOnboardingCompleted: useOnboardingStore.getState().isCompleted,
+      profileResolution,
     });
 
     const redirectRoute = getAuthRedirectRoute(segments, destination);
     if (redirectRoute) {
       router.replace(redirectRoute as any);
     }
-  }, [remoteEnabled, authStatus, segments]);
+  }, [remoteEnabled, authStatus, profileResolution, segments]);
 
   if (remoteEnabled && authStatus === 'INITIALIZING') {
     return (

@@ -27,6 +27,7 @@ import type {
   ProgressData,
   ResearchInsight,
   CustomerProfile,
+  CustomerBootstrapState,
   RoutinePlan,
   SkinState,
   IrritationLevel,
@@ -35,6 +36,7 @@ import type {
 import { useRoutineStore } from '../stores/routineStore.ts';
 import { useUserStore } from '../stores/userStore.ts';
 import { useOnboardingStore } from '../stores/onboardingStore.ts';
+import { useBootstrapStore } from '../stores/bootstrapStore.ts';
 import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
 
 /**
@@ -234,15 +236,61 @@ export async function hydrateCustomerProfile(userId?: string): Promise<CustomerP
   const profile = await service.getCustomerProfile(id);
 
   if (profile) {
-    useUserStore.setState({
-      userId: profile.id,
-      email: profile.email,
-      fullName: profile.fullName,
-      membershipStatus: profile.membershipStatus === 'active' ? 'active' : 'none',
-    });
+    useUserStore.getState().setRemoteCustomerProfile(profile);
   }
 
   return profile;
+}
+
+/**
+ * Resolves post-auth customer bootstrap state (profile existence, onboarding completion, membership status).
+ * Updates useBootstrapStore and projects canonical membership status into useUserStore.
+ *
+ * Guaranteed fail-closed:
+ * - If userId is invalid or empty, fails closed with ERROR.
+ * - If profile row is absent (profileExists: false), fails closed with ERROR.
+ * - If service query throws/fails, shields technical details and fails closed with ERROR.
+ */
+export async function resolveCustomerBootstrap(userId: string): Promise<CustomerBootstrapState | null> {
+  const bootstrapStore = useBootstrapStore.getState();
+  const trimmed = typeof userId === 'string' ? userId.trim() : '';
+
+  if (!trimmed) {
+    bootstrapStore.setError(getCustomerErrorMessage('bootstrap'));
+    return null;
+  }
+
+  bootstrapStore.setResolving(trimmed);
+
+  try {
+    const service = getDeriveService();
+    const state = await service.getCustomerBootstrapState(trimmed);
+
+    if (!state.profileExists) {
+      bootstrapStore.setError(getCustomerErrorMessage('bootstrap'));
+      return state;
+    }
+
+    bootstrapStore.setResolved(state);
+
+    // Project canonical membership status into user store
+    useUserStore.getState().setRemoteBootstrapMembership(state.membershipStatus);
+
+    // If onboarding is completed, attempt profile hydration (non-blocking)
+    if (state.onboardingCompleted) {
+      try {
+        await hydrateCustomerProfile(trimmed);
+      } catch (profileErr) {
+        console.warn('Non-blocking profile hydration warning:', profileErr);
+      }
+    }
+
+    return state;
+  } catch (err: any) {
+    console.warn('resolveCustomerBootstrap failed:', err);
+    bootstrapStore.setError(getCustomerErrorMessage('bootstrap'));
+    return null;
+  }
 }
 
 // ==========================================
