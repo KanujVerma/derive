@@ -6,6 +6,48 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: I1-A1 Mobile Auth & Session Spine
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `af23bf57d8d258f6a26ebb8d9564847b7c489f80`
+- **Prior Verified CI Run**: `35367541890` (on commit `af23bf5`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-A1 COMPLETE` (First vertical implementation slice for I1: Mobile passwordless Email OTP authentication flow, session persistence via `@react-native-async-storage/async-storage`, auth boundary and store projections, route gating in remote mode, auto-refresh lifecycle listeners, and sign-out cross-user cache purging implemented cleanly with full test coverage; live Derive Supabase project verification flagged as blocked on project access / configuration).
+- **Ownership / Shared Contracts**: Client-side only (`package.json`, `package-lock.json`, `src/services/supabase.ts`, `src/services/authClient.ts`, `src/services/sessionReset.ts`, `src/stores/authStore.ts`, `src/stores/userStore.ts`, `src/utils/customerErrors.ts`, `app/(auth)/**`, `app/_layout.tsx`, `app/index.tsx`, `app/profile/index.tsx`, `tests/derive.test.ts`). Shared contracts (`src/contracts/**`, `src/domain/**`, `src/types/schema.ts`) strictly frozen and untouched. Zero changes to Sami's backend lane (`supabase/**`, `admin/**`, Edge Functions, migrations, RLS, Stripe).
+- **Architectural Deliverables**:
+  1. **Supabase Client & Session Persistence Configuration**:
+     - Installed and configured `@react-native-async-storage/async-storage` for Supabase client session persistence.
+     - Updated `src/services/supabase.ts` with `auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false }`.
+     - Supports both `EXPO_PUBLIC_SUPABASE_ANON_KEY` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+     - Exported `startAuthAutoRefresh()` and `stopAuthAutoRefresh()` auto-refresh lifecycle helpers.
+     - Fixed `uploadPrivatePhoto` storage helper to use `upsert: false`, respecting INSERT-only RLS policy on private skin photos.
+     - Maintained pure Node test compatibility by avoiding any `react-native` imports in `src/services/supabase.ts`.
+  2. **Auth Client Boundary & Adapter Abstraction**:
+     - Created `src/services/authClient.ts` providing clean auth abstractions: `sendEmailOtp(email)`, `verifyEmailOtp(email, token)`, `getCurrentSession()`, `signOutSession()`, `subscribeToAuth(callback)`.
+     - Includes robust client-side validation (`isValidEmail`, `isValidOtpToken`) and test adapter injection (`setAuthAdapter`, `resetAuthAdapter`).
+     - Shields internal technical errors through `getCustomerErrorMessage('auth_*')`.
+  3. **Session Projection & Cross-User Cache Purging**:
+     - Created `src/stores/authStore.ts` tracking lightweight auth status (`INITIALIZING`, `SIGNED_OUT`, `SIGNED_IN`), `sessionUserId`, and `sessionEmail`.
+     - Added `setRemoteSessionUser(userId, email)` to `src/stores/userStore.ts` to project authenticated identity without falsely asserting paid/active membership (`fullName: ''`, `membershipStatus: 'none'`, `tier: ''`).
+     - Created `src/services/sessionReset.ts` (`resetCustomerSessionData()`) to purge user identity, active routine, check-ins, refill requests, and scan context on sign-out.
+  4. **Direction A Mineral Auth Screens**:
+     - Created `app/(auth)/_layout.tsx`, `app/(auth)/login.tsx` (email entry with validation, loading indicator, Mineral styling, and error handling), and `app/(auth)/verify-otp.tsx` (6-digit OTP entry, 30-second resend cooldown timer, back navigation, auto-submit on completion).
+  5. **Deterministic Route Gating**:
+     - Updated `app/index.tsx` and `app/_layout.tsx`:
+       - Mock mode (`EXPO_PUBLIC_USE_REMOTE_SERVICE=false`): 100% bypasses auth gating, preserving instant launch.
+       - Remote mode (`EXPO_PUBLIC_USE_REMOTE_SERVICE=true`): `INITIALIZING` displays minimal Mineral loading splash without screen flash; `SIGNED_OUT` routes to `/(auth)/login`; `SIGNED_IN` permits access to authenticated app routes.
+     - Registered `AppState` listener in `app/_layout.tsx` to handle auto-refresh on active foreground and suspend on background.
+     - Added Sign Out affordance in `app/profile/index.tsx` with confirmation dialog and cache reset.
+- **Verification**:
+  - `npm test`: 73/73 passing (100%), including 8 new I1-A1 regression tests covering email validation, OTP format validation, error shielding, identity projection, sign-out purging, session synchronization, auth state subscription, and route gating logic.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ## 2026-09-18 — Kanuj Mobile/UX: K6.3 Test Integrity & Contract Truth Hardening Pass
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

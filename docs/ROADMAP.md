@@ -177,6 +177,21 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - Zero contracts or backend code modified.
 
+### I1-A1: Mobile Auth & Session Spine [COMPLETE]
+* **Scope**:
+  - Implement mobile passwordless Email OTP flow (`signInWithOtp` -> `verifyOtp`) in `src/services/authClient.ts` with Direction A Mineral UI (`app/(auth)/login.tsx`, `app/(auth)/verify-otp.tsx`).
+  - Configure `@react-native-async-storage/async-storage` session persistence for Supabase client in `src/services/supabase.ts`.
+  - Provide lightweight auth state projection (`useAuthStore`) and user store session identity projection (`setRemoteSessionUser`) that strictly decouples session establishment from paid membership assertions.
+  - Enforce cross-user cache and state purging on sign-out via `resetCustomerSessionData()` in `src/services/sessionReset.ts`.
+  - Implement deterministic route gating and `AppState` auto-refresh listeners in `app/_layout.tsx` and `app/index.tsx`, while preserving 100% bypass in Mock mode.
+* **Acceptance Criteria**:
+  - 100% test suite passing (73/73 tests in `tests/derive.test.ts`), with 8 dedicated I1-A1 regression tests.
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - Zero contracts or backend code modified.
+
 ---
 
 ## Sami Workstream (Platform + Intelligence + Operations)

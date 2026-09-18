@@ -14,7 +14,13 @@ export type CustomerFacingOperation =
   | 'scan'
   | 'checkin'
   | 'refill'
-  | 'general';
+  | 'general'
+  | 'auth'
+  | 'auth_invalid_email'
+  | 'auth_invalid_otp'
+  | 'auth_send_code'
+  | 'auth_signin'
+  | 'auth_signout';
 
 export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = {
   onboarding: "We couldn't finish setting up your routine. Your setup is still here. Please try again.",
@@ -23,6 +29,12 @@ export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = 
   checkin: "We couldn't submit your check-in. Your answers are still here. Please try again.",
   refill: "We couldn't submit your refill request. Please try again.",
   general: 'Something went wrong on our end. Please try again.',
+  auth: "We couldn't sign you in right now. Please try again.",
+  auth_invalid_email: 'Enter a valid email address.',
+  auth_invalid_otp: "That code didn't work. Check it and try again.",
+  auth_send_code: "We couldn't send a code right now. Please try again.",
+  auth_signin: "We couldn't sign you in right now. Please try again.",
+  auth_signout: "We couldn't sign you out right now. Please try again.",
 };
 
 /**

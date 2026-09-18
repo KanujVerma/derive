@@ -10,6 +10,7 @@ export interface UserState {
 
   // Actions
   setUser: (userId: string, email: string, fullName?: string) => void;
+  setRemoteSessionUser: (userId: string, email?: string) => void;
   toggleFounderMode: () => void;
   logout: () => void;
   loadArthurDemoUser: () => void;
@@ -39,6 +40,15 @@ export const useUserStore = create<UserState>((set) => ({
 
   setUser: (userId, email, fullName = 'Beta Member') =>
     set({ userId, email, fullName, membershipStatus: 'active' }),
+
+  setRemoteSessionUser: (userId, email = '') =>
+    set({
+      userId,
+      email,
+      fullName: '',
+      membershipStatus: 'none',
+      tier: '',
+    }),
 
   toggleFounderMode: () =>
     set((state) => ({ isFounderMode: !state.isFounderMode })),

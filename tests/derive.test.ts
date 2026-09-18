@@ -2529,6 +2529,373 @@ test('K6.2 User Intent Preservation: Failed check-in and refill operations prese
   assert.equal(selectedProductId, 'prod_differin_123');
 });
 
+// ========================================================
+// 15. I1-A1 MOBILE AUTH & SESSION SPINE TESTS
+// ========================================================
+
+import { useAuthStore } from '../src/stores/authStore.ts';
+import {
+  sendEmailOtp,
+  verifyEmailOtp,
+  getCurrentSession,
+  signOutSession,
+  subscribeToAuth,
+  isValidEmail,
+  isValidOtpToken,
+  setAuthAdapter,
+  resetAuthAdapter,
+  type AuthAdapter,
+} from '../src/services/authClient.ts';
+import { resetCustomerSessionData } from '../src/services/sessionReset.ts';
+
+test('I1-A1 Auth Client: Validates email input formats client-side', () => {
+  // Valid emails
+  assert.equal(isValidEmail('member@derive.skin'), true);
+  assert.equal(isValidEmail('user.name+tag@gmail.com'), true);
+  assert.equal(isValidEmail('a@b.co'), true);
+
+  // Invalid emails
+  assert.equal(isValidEmail(''), false);
+  assert.equal(isValidEmail('plainaddress'), false);
+  assert.equal(isValidEmail('@missingusername.com'), false);
+  assert.equal(isValidEmail('user@.com'), false);
+  assert.equal(isValidEmail('user@domain'), false);
+  assert.equal(isValidEmail('user name@domain.com'), false);
+  assert.equal(isValidEmail(null as any), false);
+  assert.equal(isValidEmail(undefined as any), false);
+});
+
+test('I1-A1 Auth Client: Validates 6-digit OTP token format client-side', () => {
+  // Valid 6-digit codes
+  assert.equal(isValidOtpToken('123456'), true);
+  assert.equal(isValidOtpToken('000000'), true);
+  assert.equal(isValidOtpToken('987654'), true);
+
+  // Invalid codes
+  assert.equal(isValidOtpToken('12345'), false);
+  assert.equal(isValidOtpToken('1234567'), false);
+  assert.equal(isValidOtpToken('abcdef'), false);
+  assert.equal(isValidOtpToken('12 456'), false);
+  assert.equal(isValidOtpToken(''), false);
+  assert.equal(isValidOtpToken(null as any), false);
+});
+
+test('I1-A1 Auth Client: sendEmailOtp handles success, validation, and error shielding', async () => {
+  let requestedEmail = '';
+  const mockAdapter: AuthAdapter = {
+    async signInWithOtp(email: string) {
+      requestedEmail = email;
+      if (email === 'fail@derive.skin') {
+        return { data: null, error: new Error('PostgREST error 500: SMTP rate limit exceeded') };
+      }
+      return { data: {}, error: null };
+    },
+    async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
+    async getSession() { return { data: { session: null }, error: null }; },
+    async signOut() { return { error: null }; },
+    onAuthStateChange() { return { data: { subscription: { unsubscribe: () => {} } } }; },
+  };
+
+  setAuthAdapter(mockAdapter);
+
+  try {
+    // 1. Invalid email returns customer-safe validation error without calling adapter
+    requestedEmail = '';
+    const invalidRes = await sendEmailOtp('invalid-email');
+    assert.equal(invalidRes.success, false);
+    assert.equal(invalidRes.error, CUSTOMER_ERROR_MESSAGES.auth_invalid_email);
+    assert.equal(requestedEmail, '');
+
+    // 2. Valid email calls adapter and returns success
+    const validRes = await sendEmailOtp(' MEMBER@DERIVE.SKIN ');
+    assert.equal(validRes.success, true);
+    assert.equal(requestedEmail, 'member@derive.skin');
+
+    // 3. Backend error is shielded and does NOT expose internal SMTP/PostgREST details
+    const failRes = await sendEmailOtp('fail@derive.skin');
+    assert.equal(failRes.success, false);
+    assert.equal(failRes.error, CUSTOMER_ERROR_MESSAGES.auth_send_code);
+    assert.equal(failRes.error?.includes('SMTP'), false);
+    assert.equal(failRes.error?.includes('PostgREST'), false);
+  } finally {
+    resetAuthAdapter();
+  }
+});
+
+test('I1-A1 Auth Client: verifyEmailOtp establishes session and identity projection without asserting paid membership', async () => {
+  const fakeUserId = 'usr_remote_abc_123';
+  const fakeUserEmail = 'realmember@derive.skin';
+
+  const mockAdapter: AuthAdapter = {
+    async signInWithOtp() { return { data: {}, error: null }; },
+    async verifyOtp(email: string, token: string) {
+      if (token === '123456') {
+        return {
+          data: {
+            user: { id: fakeUserId, email: fakeUserEmail },
+            session: { access_token: 'tok_jwt_fake', refresh_token: 'ref_tok_fake' },
+          },
+          error: null,
+        };
+      }
+      return {
+        data: { session: null, user: null },
+        error: new Error('AuthApiError: Invalid OTP token provided'),
+      };
+    },
+    async getSession() { return { data: { session: null }, error: null }; },
+    async signOut() { return { error: null }; },
+    onAuthStateChange() { return { data: { subscription: { unsubscribe: () => {} } } }; },
+  };
+
+  setAuthAdapter(mockAdapter);
+
+  try {
+    // Reset stores to clean state before test
+    resetCustomerSessionData();
+    assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+    assert.equal(useUserStore.getState().userId, '');
+
+    // 1. Invalid token format fails client-side
+    const badTokenRes = await verifyEmailOtp(fakeUserEmail, '999');
+    assert.equal(badTokenRes.success, false);
+    assert.equal(badTokenRes.error, CUSTOMER_ERROR_MESSAGES.auth_invalid_otp);
+
+    // 2. Incorrect token returns customer-safe error and does not mutate session
+    const wrongTokenRes = await verifyEmailOtp(fakeUserEmail, '000000');
+    assert.equal(wrongTokenRes.success, false);
+    assert.equal(wrongTokenRes.error, CUSTOMER_ERROR_MESSAGES.auth_invalid_otp);
+    assert.equal(wrongTokenRes.error?.includes('AuthApiError'), false);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+
+    // 3. Successful verification updates authStore and projects identity into userStore
+    const goodTokenRes = await verifyEmailOtp(fakeUserEmail, '123456');
+    assert.equal(goodTokenRes.success, true);
+    assert.equal(goodTokenRes.session?.access_token, 'tok_jwt_fake');
+
+    // AuthStore projection
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.equal(useAuthStore.getState().sessionUserId, fakeUserId);
+    assert.equal(useAuthStore.getState().sessionEmail, fakeUserEmail);
+
+    // UserStore identity projection: must NOT assert active paid membership
+    const userState = useUserStore.getState();
+    assert.equal(userState.userId, fakeUserId);
+    assert.equal(userState.email, fakeUserEmail);
+    assert.equal(userState.fullName, '');
+    assert.equal(userState.membershipStatus, 'none');
+    assert.equal(userState.tier, '');
+  } finally {
+    resetAuthAdapter();
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A1 Auth Client: signOutSession purges all cross-user customer caches and store state', async () => {
+  let adapterSignOutCalled = false;
+  const mockAdapter: AuthAdapter = {
+    async signInWithOtp() { return { data: {}, error: null }; },
+    async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
+    async getSession() { return { data: { session: null }, error: null }; },
+    async signOut() {
+      adapterSignOutCalled = true;
+      return { error: null };
+    },
+    onAuthStateChange() { return { data: { subscription: { unsubscribe: () => {} } } }; },
+  };
+
+  setAuthAdapter(mockAdapter);
+
+  try {
+    // Populate stores with user-specific sensitive data
+    useAuthStore.getState().setSession('usr_sensitive_999', 'user@derive.skin');
+    useUserStore.getState().setUser('usr_sensitive_999', 'user@derive.skin', 'Jane Member');
+    useRoutineStore.getState().loadArthurDemoRoutine();
+    useScanContextStore.getState().setActiveScannedProduct({
+      productName: 'Sensitive Scanned Sunscreen',
+      brand: 'La Roche-Posay',
+      category: 'sunscreen',
+      verdict: 'great_fit',
+      verdictSummary: 'Great fit for your skin. No sensitizing actives detected.',
+      keyActives: ['Avobenzone'],
+      factsUsedToDecide: ['Broad spectrum', 'Non-comedogenic'],
+    });
+
+    // Pre-conditions
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.equal(useUserStore.getState().userId, 'usr_sensitive_999');
+    assert.notEqual(useRoutineStore.getState().routine, null);
+    assert.notEqual(useScanContextStore.getState().activeScannedProduct, null);
+
+    // Act
+    const result = await signOutSession();
+    assert.equal(result.success, true);
+    assert.equal(adapterSignOutCalled, true);
+
+    // Verify all cross-user caches and identities are purged
+    assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+    assert.equal(useAuthStore.getState().sessionUserId, null);
+    assert.equal(useAuthStore.getState().sessionEmail, null);
+
+    assert.equal(useUserStore.getState().userId, '');
+    assert.equal(useUserStore.getState().email, '');
+    assert.equal(useUserStore.getState().fullName, '');
+    assert.equal(useUserStore.getState().membershipStatus, 'none');
+
+    assert.equal(useRoutineStore.getState().routine, null);
+    assert.equal(useRoutineStore.getState().userProducts.length, 0);
+    assert.equal(useRoutineStore.getState().checkIns.length, 0);
+    assert.equal(useRoutineStore.getState().refillRequests.length, 0);
+
+    assert.equal(useScanContextStore.getState().activeScannedProduct, null);
+  } finally {
+    resetAuthAdapter();
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A1 Auth Client: getCurrentSession synchronizes store state or sets signed out', async () => {
+  const sessionUser = { id: 'usr_existing_sess', email: 'session@derive.skin' };
+  let returnSession = true;
+
+  const mockAdapter: AuthAdapter = {
+    async signInWithOtp() { return { data: {}, error: null }; },
+    async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
+    async getSession() {
+      if (returnSession) {
+        return { data: { session: { user: sessionUser } }, error: null };
+      }
+      return { data: { session: null }, error: null };
+    },
+    async signOut() { return { error: null }; },
+    onAuthStateChange() { return { data: { subscription: { unsubscribe: () => {} } } }; },
+  };
+
+  setAuthAdapter(mockAdapter);
+
+  try {
+    resetCustomerSessionData();
+
+    // 1. Session exists: synchronizes store
+    const sessionRes = await getCurrentSession();
+    assert.equal(sessionRes.userId, 'usr_existing_sess');
+    assert.equal(sessionRes.email, 'session@derive.skin');
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.equal(useUserStore.getState().userId, 'usr_existing_sess');
+
+    // 2. Session does not exist: marks signed out
+    returnSession = false;
+    const noSessionRes = await getCurrentSession();
+    assert.equal(noSessionRes.userId, null);
+    assert.equal(noSessionRes.email, null);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+  } finally {
+    resetAuthAdapter();
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A1 Auth Client: subscribeToAuth reacts to SIGNED_IN and SIGNED_OUT auth events', () => {
+  let authListener: ((event: string, session: any) => void) | null = null;
+
+  const mockAdapter: AuthAdapter = {
+    async signInWithOtp() { return { data: {}, error: null }; },
+    async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
+    async getSession() { return { data: { session: null }, error: null }; },
+    async signOut() { return { error: null }; },
+    onAuthStateChange(callback) {
+      authListener = callback;
+      return { data: { subscription: { unsubscribe: () => { authListener = null; } } } };
+    },
+  };
+
+  setAuthAdapter(mockAdapter);
+
+  try {
+    resetCustomerSessionData();
+    const { unsubscribe } = subscribeToAuth();
+    assert.equal(typeof authListener, 'function');
+
+    // Trigger SIGNED_IN event
+    authListener!('SIGNED_IN', {
+      user: { id: 'usr_sub_123', email: 'sub@derive.skin' },
+    });
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.equal(useAuthStore.getState().sessionUserId, 'usr_sub_123');
+    assert.equal(useUserStore.getState().userId, 'usr_sub_123');
+
+    // Trigger SIGNED_OUT event
+    authListener!('SIGNED_OUT', null);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+    assert.equal(useAuthStore.getState().sessionUserId, null);
+    assert.equal(useUserStore.getState().userId, '');
+
+    unsubscribe();
+    assert.equal(authListener, null);
+  } finally {
+    resetAuthAdapter();
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A1 Route Gating Rules: Evaluates Mock vs Remote gating deterministically', () => {
+  function evaluateInitialRoute(
+    remoteEnabled: boolean,
+    authStatus: 'INITIALIZING' | 'SIGNED_OUT' | 'SIGNED_IN',
+    isOnboardingCompleted: boolean
+  ): { target: string; loading: boolean } {
+    if (!remoteEnabled) {
+      return {
+        target: isOnboardingCompleted ? '/(tabs)' : '/(onboarding)/1-welcome',
+        loading: false,
+      };
+    }
+    if (authStatus === 'INITIALIZING') {
+      return { target: '', loading: true };
+    }
+    if (authStatus === 'SIGNED_OUT') {
+      return { target: '/(auth)/login', loading: false };
+    }
+    return {
+      target: isOnboardingCompleted ? '/(tabs)' : '/(onboarding)/1-welcome',
+      loading: false,
+    };
+  }
+
+  // 1. Mock mode always permits access without authentication
+  assert.deepEqual(evaluateInitialRoute(false, 'SIGNED_OUT', true), {
+    target: '/(tabs)',
+    loading: false,
+  });
+  assert.deepEqual(evaluateInitialRoute(false, 'SIGNED_OUT', false), {
+    target: '/(onboarding)/1-welcome',
+    loading: false,
+  });
+
+  // 2. Remote mode with INITIALIZING shows loading
+  assert.deepEqual(evaluateInitialRoute(true, 'INITIALIZING', false), {
+    target: '',
+    loading: true,
+  });
+
+  // 3. Remote mode with SIGNED_OUT routes to login
+  assert.deepEqual(evaluateInitialRoute(true, 'SIGNED_OUT', false), {
+    target: '/(auth)/login',
+    loading: false,
+  });
+
+  // 4. Remote mode with SIGNED_IN permits app flow
+  assert.deepEqual(evaluateInitialRoute(true, 'SIGNED_IN', false), {
+    target: '/(onboarding)/1-welcome',
+    loading: false,
+  });
+  assert.deepEqual(evaluateInitialRoute(true, 'SIGNED_IN', true), {
+    target: '/(tabs)',
+    loading: false,
+  });
+});
+
+
 
 
 

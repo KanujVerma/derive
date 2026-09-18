@@ -1,12 +1,75 @@
-import React from 'react';
-import { Stack } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppState, View, ActivityIndicator, StyleSheet } from 'react-native';
 import { colors } from '@/src/constants/theme';
-
 import { KeyboardDoneBar } from '@/src/components/ui/KeyboardDoneBar';
+import { useAuthStore } from '@/src/stores/authStore';
+import { useOnboardingStore } from '@/src/stores/onboardingStore';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { startAuthAutoRefresh, stopAuthAutoRefresh } from '@/src/services/supabase';
+import { getCurrentSession, subscribeToAuth } from '@/src/services/authClient';
 
 export default function RootLayout() {
+  const router = useRouter();
+  const segments = useSegments();
+  const authStatus = useAuthStore((s) => s.status);
+  const remoteEnabled = isRemoteServiceEnabled();
+
+  // Handle AppState changes for Supabase token auto-refresh in remote mode
+  useEffect(() => {
+    if (!remoteEnabled) return;
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        startAuthAutoRefresh();
+      } else {
+        stopAuthAutoRefresh();
+      }
+    });
+
+    return () => sub.remove();
+  }, [remoteEnabled]);
+
+  // Initialize session and subscribe to auth changes in remote mode
+  useEffect(() => {
+    if (!remoteEnabled) return;
+
+    getCurrentSession();
+    const { unsubscribe } = subscribeToAuth();
+    return () => unsubscribe();
+  }, [remoteEnabled]);
+
+  // Route gating in remote mode
+  useEffect(() => {
+    if (!remoteEnabled) return;
+    if (authStatus === 'INITIALIZING') return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (authStatus === 'SIGNED_OUT' && !inAuthGroup) {
+      router.replace('/(auth)/login');
+    } else if (authStatus === 'SIGNED_IN' && inAuthGroup) {
+      const isCompleted = useOnboardingStore.getState().isCompleted;
+      if (isCompleted) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(onboarding)/1-welcome');
+      }
+    }
+  }, [remoteEnabled, authStatus, segments]);
+
+  if (remoteEnabled && authStatus === 'INITIALIZING') {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={colors.ink} />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -19,6 +82,7 @@ export default function RootLayout() {
           animation: 'fade',
         }}
       >
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         <Stack.Screen
@@ -57,3 +121,12 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

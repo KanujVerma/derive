@@ -20,6 +20,8 @@ import { Badge } from '@/src/components/ui/Badge';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { config } from '@/src/constants/config';
 import { hydrateCustomerProfile } from '@/src/services/deriveClient';
+import { signOutSession } from '@/src/services/authClient';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -98,6 +100,28 @@ export default function ProfileScreen() {
       'State Reset',
       'Reset to clean customer state (no active routine, no check-ins, uninitialized plan).',
       [{ text: 'OK' }]
+    );
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out? Your stored routine and session data on this device will be cleared.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOutSession();
+            if (isRemoteServiceEnabled()) {
+              router.replace('/(auth)/login');
+            } else {
+              router.replace('/(onboarding)/1-welcome');
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -218,7 +242,23 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </GroupedSection>
 
-        {/* Section 3: Demo & Development Controls (dev only) */}
+        {/* Section 3: Account & Session */}
+        <GroupedSection header="Account">
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={handleSignOut}
+            activeOpacity={0.7}
+          >
+            <Icon name="back" size={18} color={colors.actionPause.text} />
+            <View style={styles.rowContent}>
+              <Text style={[styles.rowTitle, { color: colors.actionPause.text }]}>Sign Out</Text>
+              <Text style={styles.rowSubtitle}>End session on this device</Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
+        </GroupedSection>
+
+        {/* Section 4: Demo & Development Controls (dev only) */}
         {__DEV__ && (
           <GroupedSection header="Demo & Development Controls">
             <TouchableOpacity

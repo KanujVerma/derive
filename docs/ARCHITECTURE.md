@@ -53,6 +53,15 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 * **Device Scanner & Catalog (`src/services/catalog.ts`)**: Pure client catalog fixture and deterministic barcode lookup (`findProductByBarcode`, `PROTOTYPE_CATALOG`) partitioned away from server workflows. In the default/production path, `recognizeShelfProducts` fails closed returning an empty list, while demo fixtures are isolated in `getDemoShelfRecognitionFixture()`.
 * **Clean Initial State Guarantee**: `MockDeriveService` defaults strictly to a clean un-onboarded state (`activeRoutine = null`, empty orders, empty check-ins, `customerProfile = null`). Demo fixtures (e.g. Arthur Pendelton) are isolated in explicit development loaders (`seedArthurDemoData()`) and never leak into initial customer sessions.
 * **Styling & Tokens**: Direction A Mineral tokens defined in `src/constants/theme.ts`.
+* **Mobile Auth & Session Spine (`src/services/authClient.ts`, `src/stores/authStore.ts`)**:
+  - **Passwordless Email OTP**: Client authenticates using 6-digit email OTP codes (`signInWithOtp` -> `verifyOtp({ email, token, type: 'email' })`).
+  - **Session Persistence**: Supabase client is configured with `@react-native-async-storage/async-storage` (`persistSession: true`, `autoRefreshToken: true`, `detectSessionInUrl: false`).
+  - **Lifecycle Token Refresh**: React Native `AppState` listener triggers `startAuthAutoRefresh()` when active and `stopAuthAutoRefresh()` in the background, avoiding orphaned timers.
+  - **Identity vs. Membership Decoupling**: Authenticated session establishment projects identity (`userId`, `email`) into `useAuthStore` and `useUserStore.setRemoteSessionUser()`, but never asserts paid membership (`membershipStatus: 'none'`, `tier: ''`) until canonical remote profile hydration proves it.
+  - **Cross-User Cache Purging**: `resetCustomerSessionData()` purges user identity, active routine, check-ins, refill orders, and transient scan context on sign-out or account switch.
+  - **Deterministic Route Gating**:
+    - Mock Mode (`EXPO_PUBLIC_USE_REMOTE_SERVICE=false`): 100% bypasses auth gating for instant developer velocity and offline demo stability.
+    - Remote Mode (`EXPO_PUBLIC_USE_REMOTE_SERVICE=true`): `INITIALIZING` displays minimal Mineral loading splash; `SIGNED_OUT` routes to `/(auth)/login`; `SIGNED_IN` permits access to authenticated app routes.
 * **Hardware Integrations**:
   - `expo-camera` / viewfinder for shelf scanning and zero-shutter continuous barcode scanning.
   - Native Swift face capture module (`modules/derive-face-capture/`) utilizing Apple's `Vision.framework` with a deterministic 750ms hold state machine (`AutoCaptureStateMachine.ts`).
