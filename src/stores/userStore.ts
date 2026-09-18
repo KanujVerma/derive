@@ -48,6 +48,7 @@ export const useUserStore = create<UserState>((set) => ({
       fullName: '',
       membershipStatus: 'none',
       tier: '',
+      isFounderMode: false,
     }),
 
   toggleFounderMode: () =>
@@ -60,6 +61,7 @@ export const useUserStore = create<UserState>((set) => ({
       fullName: '',
       membershipStatus: 'none',
       tier: 'none',
+      isFounderMode: false,
     }),
 
   loadArthurDemoUser: () => set({ ...ARTHUR_DEMO_USER }),

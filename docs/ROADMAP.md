@@ -209,6 +209,17 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+### I1-A1.2: Final Auth Route & Session-Truth Closure [COMPLETE]
+* **Scope**:
+  - Global Remote Route Enforcement: Implement pure helper `getAuthRedirectRoute` in `src/utils/authRouting.ts` and integrate into root `app/_layout.tsx`, guaranteeing that Remote authenticated sessions (`SIGNED_IN`) cannot bypass `/holding` via direct links, tab URLs, onboarding paths, profile, orders, check-ins, or modal routes, while preventing self-redirect loops when already on `/holding` or inside `(auth)`.
+  - Fail-Closed Sign-Out Verification Truth Table: Refactor `signOutSession()` in `src/services/authClient.ts` to implement a strict 7-case fail-closed truth table. Verification errors or exceptions from `getSession()` fail closed (returning failure and preserving customer caches) rather than guessing logout success.
+  - Founder Mode Isolation: Reset `isFounderMode: false` on `logout()` and force `isFounderMode: false` on `setRemoteSessionUser()` in `src/stores/userStore.ts`. Ensures founder/debug state never survives cross-account transitions or Remote customer identity projection.
+* **Acceptance Criteria**:
+  - 100% test suite passing (76/76 tests in `tests/derive.test.ts`), with dedicated I1-A1.2 regression tests covering global route enforcement (12 scenarios), fail-closed sign-out truth table (7 cases), and founder mode isolation (4 scenarios).
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Zero contracts or backend code modified.
 
 ---

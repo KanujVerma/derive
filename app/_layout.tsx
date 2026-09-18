@@ -10,7 +10,7 @@ import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { startAuthAutoRefresh, stopAuthAutoRefresh } from '@/src/services/supabase';
 import { getCurrentSession, subscribeToAuth } from '@/src/services/authClient';
-import { resolveAuthRoute } from '@/src/utils/authRouting';
+import { resolveAuthRoute, getAuthRedirectRoute } from '@/src/utils/authRouting';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -51,17 +51,15 @@ export default function RootLayout() {
     if (!remoteEnabled) return;
     if (authStatus === 'INITIALIZING') return;
 
-    const inAuthGroup = segments[0] === '(auth)';
     const destination = resolveAuthRoute({
       remoteEnabled,
       authStatus,
       isOnboardingCompleted: useOnboardingStore.getState().isCompleted,
     });
 
-    if (destination.type === 'AUTH_LOGIN' && !inAuthGroup) {
-      router.replace(destination.route!);
-    } else if (destination.type === 'REMOTE_HOLDING' && inAuthGroup) {
-      router.replace(destination.route!);
+    const redirectRoute = getAuthRedirectRoute(segments, destination);
+    if (redirectRoute) {
+      router.replace(redirectRoute as any);
     }
   }, [remoteEnabled, authStatus, segments]);
 

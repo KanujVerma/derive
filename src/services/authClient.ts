@@ -234,40 +234,63 @@ export async function getCurrentSession(): Promise<{ userId: string | null; emai
 
 /**
  * Signs out the active customer session on this device (scope: local).
- * Only purges state and claims success when provider sign-out succeeds or session is confirmed gone.
+ * Only purges state and claims success when provider sign-out succeeds
+ * or session is confirmed absent through verification.
+ * Fails closed on uncertainty (if verification fails, throws, or session remains active).
  */
 export async function signOutSession(): Promise<{ success: boolean; error?: string }> {
+  let signOutError: any = null;
+  let signOutThrew = false;
+
   try {
-    const { error } = await activeAdapter.signOut({ scope: 'local' });
-    if (error) {
-      // Check if session remains active in provider
-      const { data: sessionData } = await activeAdapter.getSession();
-      if (sessionData?.session?.user) {
-        console.warn('signOut failed: session remains active');
-        return {
-          success: false,
-          error: getCustomerErrorMessage('auth_signout'),
-        };
-      }
+    const result = await activeAdapter.signOut({ scope: 'local' });
+    if (result && result.error) {
+      signOutError = result.error;
+    }
+  } catch (err: any) {
+    signOutThrew = true;
+    signOutError = err;
+  }
+
+  // CASE A: signOut succeeded cleanly without error or exception
+  if (!signOutError && !signOutThrew) {
+    resetCustomerSessionData();
+    return { success: true };
+  }
+
+  // When signOut errored or threw, verify provider session state.
+  // We must fail closed on uncertainty (verification error/exception or active session).
+  try {
+    const { data: sessionData, error: getSessionError } = await activeAdapter.getSession();
+
+    // CASE D / G: Verification returned an error -> state unknown -> fail closed
+    if (getSessionError) {
+      console.warn('signOut verification error:', getSessionError.name || 'lookup_failed');
+      return {
+        success: false,
+        error: getCustomerErrorMessage('auth_signout'),
+      };
     }
 
-    // Session successfully terminated or confirmed absent
-    resetCustomerSessionData();
-    return { success: true };
-  } catch (err: any) {
-    try {
-      const { data: sessionData } = await activeAdapter.getSession();
-      if (sessionData?.session?.user) {
-        console.warn('signOut exception: session remains active');
-        return {
-          success: false,
-          error: getCustomerErrorMessage('auth_signout'),
-        };
-      }
-    } catch {}
+    // CASE C / F: Session remains active in provider -> fail closed
+    if (sessionData?.session?.user) {
+      console.warn('signOut failed: session remains active in provider');
+      return {
+        success: false,
+        error: getCustomerErrorMessage('auth_signout'),
+      };
+    }
 
+    // CASE B / E: Verification succeeded and session is confirmed absent
     resetCustomerSessionData();
     return { success: true };
+  } catch (verifyErr: any) {
+    // CASE G: Verification threw an exception -> state unknown -> fail closed
+    console.warn('signOut verification exception:', verifyErr?.name || 'unknown');
+    return {
+      success: false,
+      error: getCustomerErrorMessage('auth_signout'),
+    };
   }
 }
 

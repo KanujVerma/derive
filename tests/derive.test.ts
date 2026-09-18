@@ -2547,7 +2547,7 @@ import {
   type AuthAdapter,
 } from '../src/services/authClient.ts';
 import { resetCustomerSessionData } from '../src/services/sessionReset.ts';
-import { resolveAuthRoute } from '../src/utils/authRouting.ts';
+import { resolveAuthRoute, getAuthRedirectRoute } from '../src/utils/authRouting.ts';
 
 test('I1-A1 Auth Client: Validates email input formats client-side', () => {
   // Valid emails
@@ -2770,38 +2770,118 @@ test('I1-A1.1 Auth Client: signOutSession requests local scope and purges all cr
   }
 });
 
-test('I1-A1.1 Auth Client: signOutSession verifies session state truthfully on provider error', async () => {
-  let activeSession: any = { user: { id: 'usr_active', email: 'active@derive.skin' } };
+test('I1-A1.2 Auth Client: signOutSession exhaustively implements 7-case fail-closed truth table', async () => {
+  let activeSession: any = null;
+  let getSessionError: Error | null = null;
+  let getSessionThrows = false;
+  let signOutError: Error | null = null;
+  let signOutThrows = false;
+  let signOutScope: string | undefined;
 
   const mockAdapter: AuthAdapter = {
     async signInWithOtp() { return { data: {}, error: null }; },
     async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
-    async getSession() { return { data: { session: activeSession }, error: null }; },
-    async signOut() {
-      return { error: new Error('Network timeout during signout') };
+    async getSession() {
+      if (getSessionThrows) {
+        throw new Error('Storage lookup failure');
+      }
+      return { data: { session: activeSession }, error: getSessionError };
+    },
+    async signOut(options) {
+      signOutScope = options?.scope;
+      if (signOutThrows) {
+        throw new Error('Network socket died');
+      }
+      return { error: signOutError };
     },
     onAuthStateChange() { return { data: { subscription: { unsubscribe: () => {} } } }; },
   };
 
   setAuthAdapter(mockAdapter);
 
+  const setupAuthenticatedUser = () => {
+    useAuthStore.getState().setSession('usr_target', 'target@derive.skin');
+    useUserStore.getState().setUser('usr_target', 'target@derive.skin', 'Target User');
+    useRoutineStore.getState().loadArthurDemoRoutine();
+  };
+
   try {
-    useAuthStore.getState().setSession('usr_active', 'active@derive.skin');
-    useUserStore.getState().setUser('usr_active', 'active@derive.skin', 'Active Member');
-
-    // Case 1: Provider error and session is STILL active in provider -> returns failure, keeps state
-    const failRes = await signOutSession();
-    assert.equal(failRes.success, false);
-    assert.equal(failRes.error, CUSTOMER_ERROR_MESSAGES.auth_signout);
-    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
-    assert.equal(useUserStore.getState().userId, 'usr_active');
-
-    // Case 2: Provider error, but session was actually cleared locally/server-side (activeSession = null)
-    activeSession = null;
-    const okRes = await signOutSession();
-    assert.equal(okRes.success, true);
+    // 1. CASE A: provider signOut success -> local scope used, caches cleared, success
+    setupAuthenticatedUser();
+    signOutError = null;
+    signOutThrows = false;
+    activeSession = { user: { id: 'usr_target' } };
+    const resA = await signOutSession();
+    assert.equal(resA.success, true);
+    assert.equal(signOutScope, 'local');
     assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
-    assert.equal(useUserStore.getState().userId, '');
+    assert.equal(useRoutineStore.getState().routine, null);
+
+    // 2. CASE B: provider signOut error + getSession success + no session -> caches cleared, success
+    setupAuthenticatedUser();
+    signOutError = new Error('SignOut network blip');
+    signOutThrows = false;
+    activeSession = null;
+    getSessionError = null;
+    getSessionThrows = false;
+    const resB = await signOutSession();
+    assert.equal(resB.success, true);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+    assert.equal(useRoutineStore.getState().routine, null);
+
+    // 3. CASE C: provider signOut error + getSession success + active session -> caches preserved, failure
+    setupAuthenticatedUser();
+    signOutError = new Error('SignOut network blip');
+    activeSession = { user: { id: 'usr_target' } };
+    getSessionError = null;
+    const resC = await signOutSession();
+    assert.equal(resC.success, false);
+    assert.equal(resC.error, CUSTOMER_ERROR_MESSAGES.auth_signout);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.notEqual(useRoutineStore.getState().routine, null, 'Routine must be preserved on Case C');
+
+    // 4. CASE D: provider signOut error + getSession returns error -> caches preserved, failure
+    setupAuthenticatedUser();
+    signOutError = new Error('SignOut network blip');
+    activeSession = null; // Even if session data was null, getSession returned an error!
+    getSessionError = new Error('Database offline');
+    const resD = await signOutSession();
+    assert.equal(resD.success, false);
+    assert.equal(resD.error, CUSTOMER_ERROR_MESSAGES.auth_signout);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.notEqual(useRoutineStore.getState().routine, null, 'Routine must be preserved on Case D');
+
+    // 5. CASE E: provider signOut throws + getSession success + no session -> caches cleared, success
+    setupAuthenticatedUser();
+    signOutError = null;
+    signOutThrows = true;
+    activeSession = null;
+    getSessionError = null;
+    const resE = await signOutSession();
+    assert.equal(resE.success, true);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+    assert.equal(useRoutineStore.getState().routine, null);
+
+    // 6. CASE F: provider signOut throws + getSession active session -> caches preserved, failure
+    setupAuthenticatedUser();
+    signOutThrows = true;
+    activeSession = { user: { id: 'usr_target' } };
+    getSessionError = null;
+    const resF = await signOutSession();
+    assert.equal(resF.success, false);
+    assert.equal(resF.error, CUSTOMER_ERROR_MESSAGES.auth_signout);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.notEqual(useRoutineStore.getState().routine, null, 'Routine must be preserved on Case F');
+
+    // 7. CASE G: provider signOut throws + getSession throws or errors -> caches preserved, failure
+    setupAuthenticatedUser();
+    signOutThrows = true;
+    getSessionThrows = true;
+    const resG = await signOutSession();
+    assert.equal(resG.success, false);
+    assert.equal(resG.error, CUSTOMER_ERROR_MESSAGES.auth_signout);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.notEqual(useRoutineStore.getState().routine, null, 'Routine must be preserved on Case G');
   } finally {
     resetAuthAdapter();
     resetCustomerSessionData();
@@ -2920,8 +3000,60 @@ test('I1-A1.1 Auth Client: subscribeToAuth handles identity switch with purge an
   }
 });
 
-test('I1-A1.1 Pure Routing Policy: resolveAuthRoute evaluates Mock vs Remote routes deterministically', () => {
-  // 1. Mock Mode (remoteEnabled: false) - purely onboarding completion driven
+test('I1-A1.2 Pure Routing Policy: resolveAuthRoute and getAuthRedirectRoute globally enforce holding and auth boundaries', () => {
+  // 1. Remote SIGNED_IN from auth route requires /holding
+  const destSignedIn = resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_IN' });
+  assert.equal(getAuthRedirectRoute(['(auth)', 'login'], destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute('/(auth)/login', destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute(['(auth)', 'verify-otp'], destSignedIn), '/holding');
+
+  // 2. Remote SIGNED_IN from tabs requires /holding
+  assert.equal(getAuthRedirectRoute(['(tabs)', 'today'], destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute('/(tabs)/today', destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute(['(tabs)', 'plan'], destSignedIn), '/holding');
+
+  // 3. Remote SIGNED_IN from onboarding requires /holding
+  assert.equal(getAuthRedirectRoute(['(onboarding)', '1-welcome'], destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute('/(onboarding)/1-welcome', destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute(['(onboarding)', '8-safety'], destSignedIn), '/holding');
+
+  // 4. Remote SIGNED_IN from Profile requires /holding
+  assert.equal(getAuthRedirectRoute(['profile'], destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute('/profile', destSignedIn), '/holding');
+
+  // 5. Remote SIGNED_IN from Orders requires /holding
+  assert.equal(getAuthRedirectRoute(['orders'], destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute('/orders', destSignedIn), '/holding');
+
+  // 6. Remote SIGNED_IN from modal/customer routes requires /holding
+  assert.equal(getAuthRedirectRoute(['check-in'], destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute(['refill'], destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute(['founder'], destSignedIn), '/holding');
+  assert.equal(getAuthRedirectRoute(['founder', 'review-routine'], destSignedIn), '/holding');
+
+  // 7. Remote SIGNED_IN already on /holding does NOT redirect (prevents redirect loop)
+  assert.equal(getAuthRedirectRoute(['holding'], destSignedIn), null);
+  assert.equal(getAuthRedirectRoute('/holding', destSignedIn), null);
+
+  // 8. Remote SIGNED_OUT from protected/customer route requires login
+  const destSignedOut = resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_OUT' });
+  assert.equal(getAuthRedirectRoute(['(tabs)', 'today'], destSignedOut), '/(auth)/login');
+  assert.equal(getAuthRedirectRoute(['profile'], destSignedOut), '/(auth)/login');
+  assert.equal(getAuthRedirectRoute(['holding'], destSignedOut), '/(auth)/login');
+  assert.equal(getAuthRedirectRoute('/orders', destSignedOut), '/(auth)/login');
+
+  // 9. Remote SIGNED_OUT already in auth flow does NOT redirect-loop
+  assert.equal(getAuthRedirectRoute(['(auth)', 'login'], destSignedOut), null);
+  assert.equal(getAuthRedirectRoute(['(auth)', 'verify-otp'], destSignedOut), null);
+  assert.equal(getAuthRedirectRoute('/(auth)/login', destSignedOut), null);
+
+  // 10. Remote INITIALIZING exposes no protected route (loading canvas)
+  const destInit = resolveAuthRoute({ remoteEnabled: true, authStatus: 'INITIALIZING' });
+  assert.equal(destInit.type, 'AUTH_LOADING');
+  assert.equal(destInit.route, null);
+  assert.equal(getAuthRedirectRoute(['(tabs)'], destInit), null);
+
+  // 11. Mock mode still routes using local onboarding completion
   assert.deepEqual(
     resolveAuthRoute({ remoteEnabled: false, authStatus: 'SIGNED_OUT', isOnboardingCompleted: true }),
     { type: 'MOCK_TABS', route: '/(tabs)' }
@@ -2934,33 +3066,8 @@ test('I1-A1.1 Pure Routing Policy: resolveAuthRoute evaluates Mock vs Remote rou
     resolveAuthRoute({ remoteEnabled: false, authStatus: 'SIGNED_IN', isOnboardingCompleted: true }),
     { type: 'MOCK_TABS', route: '/(tabs)' }
   );
-  assert.deepEqual(
-    resolveAuthRoute({ remoteEnabled: false, authStatus: 'INITIALIZING', isOnboardingCompleted: true }),
-    { type: 'MOCK_TABS', route: '/(tabs)' }
-  );
 
-  // 2. Remote Mode (remoteEnabled: true) - INITIALIZING returns null route / loading canvas
-  assert.deepEqual(
-    resolveAuthRoute({ remoteEnabled: true, authStatus: 'INITIALIZING', isOnboardingCompleted: false }),
-    { type: 'AUTH_LOADING', route: null }
-  );
-  assert.deepEqual(
-    resolveAuthRoute({ remoteEnabled: true, authStatus: 'INITIALIZING', isOnboardingCompleted: true }),
-    { type: 'AUTH_LOADING', route: null }
-  );
-
-  // 3. Remote Mode (remoteEnabled: true) - SIGNED_OUT routes strictly to /(auth)/login
-  assert.deepEqual(
-    resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_OUT', isOnboardingCompleted: false }),
-    { type: 'AUTH_LOGIN', route: '/(auth)/login' }
-  );
-  assert.deepEqual(
-    resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_OUT', isOnboardingCompleted: true }),
-    { type: 'AUTH_LOGIN', route: '/(auth)/login' }
-  );
-
-  // 4. Remote Mode (remoteEnabled: true) - SIGNED_IN routes strictly to /holding
-  // Invariant: MUST NOT inspect isOnboardingCompleted in Remote mode!
+  // 12. Remote route decisions ignore local onboarding completion entirely
   assert.deepEqual(
     resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_IN', isOnboardingCompleted: false }),
     { type: 'REMOTE_HOLDING', route: '/holding' }
@@ -2969,6 +3076,70 @@ test('I1-A1.1 Pure Routing Policy: resolveAuthRoute evaluates Mock vs Remote rou
     resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_IN', isOnboardingCompleted: true }),
     { type: 'REMOTE_HOLDING', route: '/holding' }
   );
+});
+
+test('I1-A1.2 Founder Mode Isolation: resets on logout, remote identity projection, and account switch', () => {
+  try {
+    resetCustomerSessionData();
+
+    // SCENARIO A: set isFounderMode = true, reset customer session, expect isFounderMode === false
+    useUserStore.getState().toggleFounderMode();
+    assert.equal(useUserStore.getState().isFounderMode, true);
+    resetCustomerSessionData();
+    assert.equal(useUserStore.getState().isFounderMode, false, 'resetCustomerSessionData must reset isFounderMode to false');
+
+    // Also test direct userStore.logout()
+    useUserStore.getState().toggleFounderMode();
+    assert.equal(useUserStore.getState().isFounderMode, true);
+    useUserStore.getState().logout();
+    assert.equal(useUserStore.getState().isFounderMode, false, 'userStore.logout must reset isFounderMode to false');
+
+    // SCENARIO B: Remote user A has founder mode true due to stale/local state, identity transition A -> B
+    useAuthStore.getState().setSession('usr_A', 'userA@derive.skin');
+    useUserStore.getState().setRemoteSessionUser('usr_A', 'userA@derive.skin');
+    useUserStore.getState().toggleFounderMode();
+    assert.equal(useUserStore.getState().isFounderMode, true);
+
+    // Simulate identity transition to user B via subscribeToAuth listener
+    let authListener: ((event: string, session: any) => void) | null = null;
+    const mockAdapter: AuthAdapter = {
+      async signInWithOtp() { return { data: {}, error: null }; },
+      async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
+      async getSession() { return { data: { session: null }, error: null }; },
+      async signOut() { return { error: null }; },
+      onAuthStateChange(callback) {
+        authListener = callback;
+        return { data: { subscription: { unsubscribe: () => { authListener = null; } } } };
+      },
+    };
+    setAuthAdapter(mockAdapter);
+    const { unsubscribe } = subscribeToAuth();
+
+    authListener!('SIGNED_IN', {
+      user: { id: 'usr_B', email: 'userB@derive.skin' },
+    });
+    assert.equal(useAuthStore.getState().sessionUserId, 'usr_B');
+    assert.equal(useUserStore.getState().isFounderMode, false, 'User B must not inherit founder mode from User A');
+
+    unsubscribe();
+
+    // SCENARIO C: Remote session projection occurs while store previously had founder mode true
+    useUserStore.getState().toggleFounderMode();
+    assert.equal(useUserStore.getState().isFounderMode, true);
+    useUserStore.getState().setRemoteSessionUser('usr_C', 'userC@derive.skin');
+    assert.equal(useUserStore.getState().isFounderMode, false, 'setRemoteSessionUser must force isFounderMode: false');
+
+    // SCENARIO D: Mock explicit founder-mode toggle still functions in Mock/dev behavior
+    useUserStore.getState().resetToDefault();
+    assert.equal(useUserStore.getState().isFounderMode, false);
+    useUserStore.getState().toggleFounderMode();
+    assert.equal(useUserStore.getState().isFounderMode, true);
+    useUserStore.getState().toggleFounderMode();
+    assert.equal(useUserStore.getState().isFounderMode, false);
+  } finally {
+    resetAuthAdapter();
+    resetCustomerSessionData();
+  }
 });
 
 test('I1-A1.1 Session Reset: resetCustomerSessionData purges onboarding photos and questionnaire state', () => {

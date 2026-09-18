@@ -6,6 +6,35 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: I1-A1.2 Final Auth Route & Session-Truth Closure
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `e75daef7b5456f4e5d4623a745089a9852863276`
+- **Prior Verified CI Run**: `35380014944` (on commit `e75daef`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-A1.2 COMPLETE` (Final client-auth closure: implemented global Remote route enforcement via `getAuthRedirectRoute` ensuring authenticated sessions cannot bypass `/holding` via direct/deep links while preventing redirect loops; implemented 7-case fail-closed truth table in `signOutSession` where verification errors or exceptions fail closed and preserve customer state; and isolated founder mode in `useUserStore` ensuring `isFounderMode: false` on logout, remote identity projection, and account switches).
+- **Ownership / Shared Contracts**: Client-side only (`app/_layout.tsx`, `src/services/authClient.ts`, `src/stores/userStore.ts`, `src/utils/authRouting.ts`, `docs/ROADMAP.md`, `docs/CONTEXT_SYNC.md`, `tests/derive.test.ts`). Shared contracts (`src/contracts/**`, `src/domain/**`, `src/types/schema.ts`) strictly frozen and untouched. Zero changes to Sami's backend lane (`supabase/**`, `admin/**`, Edge Functions, migrations, RLS, Stripe).
+- **Architectural Deliverables**:
+  1. **Global Remote Route Enforcement**:
+     - Added pure helper `getAuthRedirectRoute(currentRoute: string[] | string, destination: AuthRouteDestination): string | null` to `src/utils/authRouting.ts`.
+     - Integrated into `app/_layout.tsx` root layout. In Remote mode (`EXPO_PUBLIC_USE_REMOTE_SERVICE=true`), authenticated sessions (`SIGNED_IN`) are globally forced to `/holding` regardless of direct deep link or manual route requested (`/(tabs)`, `/(onboarding)/*`, `/profile`, `/orders`, `/check-in`, `/refill`, `/founder/*`), while `/holding` itself is recognized as satisfying the destination (preventing redirect loops).
+     - Signed-out Remote sessions are globally forced to `/(auth)/login` if attempting to access any route outside the `(auth)` group, without looping when already in `(auth)`.
+  2. **Fail-Closed Sign-Out Verification Truth Table**:
+     - Hardened `signOutSession()` in `src/services/authClient.ts` to implement a strict 7-case fail-closed truth table.
+     - When `signOut({ scope: 'local' })` returns an error or throws an exception, provider session state is verified via `getSession()`. If `getSession()` returns an error or throws an exception (lookup failure), session state is treated as UNKNOWN $\rightarrow$ fails closed (returns `{ success: false }`, customer state is NOT purged). Only when verification succeeds and confirms `session === null` is the session declared absent and customer state purged.
+  3. **Founder Mode Customer-State Isolation**:
+     - Enforced `isFounderMode: false` in `useUserStore.logout()` and `useUserStore.setRemoteSessionUser()`.
+     - Guarantees that founder/debug mode cannot survive across Remote customer sign-outs, cold-start resets, Remote identity projections, or $A \rightarrow B$ account switches.
+- **Verification**:
+  - `npm test`: 76/76 passing (100%), with dedicated I1-A1.2 regression tests covering global route enforcement (12 scenarios), fail-closed sign-out truth table (7 cases), and founder mode isolation (4 scenarios).
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ## 2026-09-18 — Kanuj Mobile/UX: I1-A1.1 Session Isolation & Post-Auth Routing Hardening Pass
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

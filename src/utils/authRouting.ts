@@ -52,3 +52,41 @@ export function resolveAuthRoute(options: ResolveRouteOptions): AuthRouteDestina
   // authStatus === 'SIGNED_IN' in Remote Mode
   return { type: 'REMOTE_HOLDING', route: '/holding' };
 }
+
+/**
+ * Evaluates whether the current navigation route satisfies the resolved auth destination.
+ * Returns the redirection route string if a redirect is required, or null if the current
+ * route already satisfies the destination (avoiding redirect loops).
+ *
+ * Current route can be specified as a segments array (e.g. from useSegments()) or a pathname string.
+ */
+export function getAuthRedirectRoute(
+  currentRoute: string[] | string,
+  destination: AuthRouteDestination
+): string | null {
+  if (!destination.route) {
+    return null;
+  }
+
+  const segment0 = Array.isArray(currentRoute)
+    ? currentRoute.length > 0 ? currentRoute[0] : ''
+    : currentRoute.replace(/^\//, '').split('/')[0];
+
+  if (destination.type === 'AUTH_LOGIN') {
+    // In Remote mode when signed out:
+    // Any route outside the (auth) group must redirect to /(auth)/login.
+    // If already inside (auth), return null to avoid redirect loops.
+    const inAuthGroup = segment0 === '(auth)';
+    return inAuthGroup ? null : destination.route;
+  }
+
+  if (destination.type === 'REMOTE_HOLDING') {
+    // In Remote mode when signed in (pre-profile hydration in I1-A2):
+    // All routes other than /holding must redirect to /holding.
+    // If already on holding, return null to avoid redirect loops.
+    const onHolding = segment0 === 'holding';
+    return onHolding ? null : destination.route;
+  }
+
+  return null;
+}
