@@ -125,6 +125,12 @@ Key technical and product decisions accepted for Derive V1.
 * **Routine Approval & Refill Consent**: Material routine changes (adding/replacing products, permanent removals, strong active changes, price increases, new product shipments) require explicit member approval. Refills use low-friction confirmation ("Running low on [product]? Refill"), avoiding silent shipments based on elapsed calendar days.
 * **Rationale**: Directly addresses the 6 core beta learning hypotheses (Value, Behavior, Trust, Longitudinal, Fulfillment, Retention) with 10 real paying members without prematurely hardening operational automation or finalizing long-term company pricing.
 
+### ADR-22: Client Domain Operations Traverse IDeriveService Boundary
+* **Status**: APPROVED & IMPLEMENTED (Milestone K6).
+* **Decision**: All mobile screens and UI components route domain operations (onboarding submission, Ask intelligence queries, product scanning evaluation, weekly check-in logging, refill replenishment requests, order tracking, and routine/progress hydrations) strictly through `src/services/deriveClient.ts` backed by `IDeriveService` (`getDeriveService()`). Client routes and components in `app/**` are strictly prohibited from importing server-side intelligence workflows (`src/services/ai-workflows/**`). Local catalog fixtures and barcode lookups are partitioned into `src/services/catalog.ts`.
+* **Rationale**: Eliminates direct coupling between client screens and mock or AI workflow internals, guarantees that swapping between `MockDeriveService` and `RemoteDeriveService` requires zero mobile screen refactoring, prevents any accidental client-side LLM execution, and guarantees clean initial customer state by default without fixture contamination.
+* **Verification**: Enforced by unit tests in `tests/derive.test.ts` verifying zero `ai-workflows` imports in `app/`, clean default state of `MockDeriveService`, and complete swappability of `IDeriveService` via `setDeriveService()`.
+
 ---
 
 ## Open Shared-Contract Challenges (PROPOSED · UNRESOLVED)

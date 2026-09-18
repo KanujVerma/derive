@@ -1,0 +1,136 @@
+/**
+ * Prototype Catalog & Device Scanner Lookup
+ *
+ * Client-accessible product catalog fixture for instant test scanning and
+ * barcode normalization/lookup. Used by the mobile camera layer before
+ * sending the identified product to IDeriveService.scanProduct() for
+ * personalized evaluation.
+ */
+
+import { getBarcodeLookupKeys } from '../utils/barcode.ts';
+import type { ProductCategory } from '../types/schema.ts';
+
+export interface ScannableProductInput {
+  name: string;
+  brand: string;
+  category: ProductCategory;
+  keyActives?: string[];
+  ingredients?: string[];
+  barcode?: string;
+}
+
+export const PROTOTYPE_CATALOG: ScannableProductInput[] = [
+  {
+    name: 'Niacinamide 10% + Zinc 1%',
+    brand: 'The Ordinary',
+    category: 'serum',
+    keyActives: ['Niacinamide 10%', 'Zinc PCA 1%'],
+    ingredients: ['Water', 'Niacinamide', 'Pentylene Glycol', 'Zinc PCA', 'Dimethyl Isosorbide'],
+    barcode: '769915190602',
+  },
+  {
+    name: 'Anthelios Ultra Light Fluid SPF 60',
+    brand: 'La Roche-Posay',
+    category: 'sunscreen',
+    keyActives: ['Avobenzone', 'Homosalate', 'Octisalate'],
+    ingredients: ['Water', 'Dimethicone', 'Isododecane', 'Alcohol Denat.'],
+    barcode: '883140012993',
+  },
+  {
+    name: 'Skin Perfecting 2% BHA Liquid Exfoliant',
+    brand: "Paula's Choice",
+    category: 'treatment',
+    keyActives: ['Salicylic Acid 2%', 'Green Tea Extract'],
+    ingredients: ['Water', 'Methylpropanediol', 'Butylene Glycol', 'Salicylic Acid', 'Polysorbate 20'],
+    barcode: '655439020108',
+  },
+  {
+    name: 'Fresh Apricot Scrub',
+    brand: 'St. Ives',
+    category: 'treatment',
+    keyActives: ['Walnut Shell Powder', 'Apricot Extract'],
+    ingredients: ['Water', 'Juglans Regia Shell Powder', 'Glyceryl Stearate', 'Glycerin', 'Fragrance'],
+    barcode: '077043103847',
+  },
+  {
+    name: 'Hydrating Hyaluronic Acid Serum',
+    brand: 'CeraVe',
+    category: 'serum',
+    keyActives: ['Hyaluronic Acid', 'Ceramides 1, 3, 6-II', 'Vitamin B5'],
+    ingredients: ['Water', 'Glycerin', 'Cetearyl Alcohol', 'Ceramide NP', 'Ceramide AP', 'Sodium Hyaluronate'],
+    barcode: '360600052793',
+  },
+];
+
+export function findProductByBarcode(
+  rawBarcode: string,
+  catalog: ScannableProductInput[] = PROTOTYPE_CATALOG
+): ScannableProductInput | null {
+  const lookupKeys = getBarcodeLookupKeys(rawBarcode);
+  if (lookupKeys.length === 0) return null;
+
+  for (const item of catalog) {
+    if (item.barcode) {
+      const itemKeys = getBarcodeLookupKeys(item.barcode);
+      if (lookupKeys.some((k) => itemKeys.includes(k))) {
+        return item;
+      }
+    }
+  }
+
+  return null;
+}
+
+export interface ShelfRecognitionResult {
+  products: import('../types/schema.ts').Product[];
+  unclearBottlesCount: number;
+}
+
+export async function recognizeShelfProducts(
+  imageUri: string
+): Promise<ShelfRecognitionResult> {
+  // Live shelf recognition is a server/Edge Function concern (Sami).
+  // The Expo client uses deterministic fixtures so Kanuj can build without a Gemini key.
+  void imageUri;
+
+  return {
+    products: [
+      {
+        id: 'p1',
+        brand: 'CeraVe',
+        name: 'Hydrating Facial Cleanser',
+        category: 'cleanser',
+        keyActives: ['Ceramides', 'Hyaluronic Acid'],
+      },
+      {
+        id: 'p2',
+        brand: 'Differin',
+        name: 'Adapalene Gel 0.1% Acne Treatment',
+        category: 'treatment',
+        keyActives: ['Adapalene 0.1% (Retinoid)'],
+      },
+      {
+        id: 'p3',
+        brand: 'The Ordinary',
+        name: 'Niacinamide 10% + Zinc 1%',
+        category: 'serum',
+        keyActives: ['Niacinamide', 'Zinc PCA'],
+      },
+      {
+        id: 'p4',
+        brand: 'La Roche-Posay',
+        name: 'Toleriane Double Repair Face Moisturizer',
+        category: 'moisturizer',
+        keyActives: ['Ceramide-3', 'Niacinamide'],
+      },
+      {
+        id: 'p5',
+        brand: 'Beauty of Joseon',
+        name: 'Relief Sun : Rice + Probiotics (SPF 50+)',
+        category: 'sunscreen',
+        keyActives: ['Rice Extract', 'Grain Probiotics', 'Chemical Filters'],
+      },
+    ],
+    unclearBottlesCount: 0,
+  };
+}

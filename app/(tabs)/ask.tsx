@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii } from '@/src/constants/theme';
 import { ChatMessage } from '@/src/types/schema';
 import { useRoutineStore } from '@/src/stores/routineStore';
-import { askDeriveAdvisor } from '@/src/services/ai-workflows/chat-advisor';
+import { askQuestion } from '@/src/services/deriveClient';
 import { ChatBubble } from '@/src/components/chat/ChatBubble';
 import { GlassComposer } from '@/src/components/chat/GlassComposer';
 import { Icon } from '@/src/components/ui/Icon';
@@ -94,29 +94,28 @@ export default function AskScreen() {
     });
 
     try {
-      const response = await askDeriveAdvisor(
-        userMsg.text,
-        routine,
-        userMsg.attachmentUri
-      );
+      const response = await askQuestion(userMsg.text, {
+        photoAttachmentUri: userMsg.attachmentUri,
+      });
+
+      const isEmergency = response.safety?.isMedicalEmergency || response.safety?.severity === 'emergency';
 
       const deriveMsg: ChatMessage = {
         id: `drv_${Date.now()}`,
         conversationId: 'conv_1',
         sender: 'derive',
-        text: response.directAnswer,
+        text: response.directAnswer || response.answer,
         directAnswer: response.directAnswer,
         whyExplanation: response.whyExplanation,
         recommendedAction: response.recommendedAction,
-        isSafetyEscalation: response.isSafetyEscalation,
-        productScan: response.productScan,
+        isSafetyEscalation: isEmergency,
         timestamp: new Date().toISOString(),
       };
 
       setMessages((prev) => [...prev, deriveMsg]);
       try {
         await Haptics.notificationAsync(
-          response.isSafetyEscalation
+          isEmergency
             ? Haptics.NotificationFeedbackType.Warning
             : Haptics.NotificationFeedbackType.Success
         );

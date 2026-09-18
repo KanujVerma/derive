@@ -12,19 +12,23 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { GoalLabels } from '@/src/types/schema';
-import { generateRoutineProposal } from '@/src/services/ai-workflows/routine-generator';
+import { submitOnboarding } from '@/src/services/deriveClient';
+import { useUserStore } from '@/src/stores/userStore';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
+import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 import { analytics } from '@/src/services/analytics';
 import { calculateMonthlyPlanPrice, formatCentsToDollars } from '@/src/pricing';
 import { config } from '@/src/constants/config';
+import type { OnboardingPayload } from '@/src/domain/types';
 
 export default function SummaryScreen() {
   const router = useRouter();
   const onboarding = useOnboardingStore();
   const [isBuilding, setIsBuilding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const goalName = onboarding.primaryGoal
     ? GoalLabels[onboarding.primaryGoal].label
@@ -37,41 +41,35 @@ export default function SummaryScreen() {
 
   const handleBuildPlan = async () => {
     setIsBuilding(true);
+    setError(null);
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
-      // Generate customized routine proposal
-      const proposal = generateRoutineProposal(
-        {
-          primaryGoal: onboarding.primaryGoal || 'breakouts',
-          routineComplexity: onboarding.routineComplexity || 'simple',
-          costPreference: onboarding.costPreference || 'balanced',
-          middayFeel: onboarding.middayFeel || 'combination',
+      const payload: OnboardingPayload = {
+        userId: useUserStore.getState().userId || 'usr_beta_member',
+        primaryGoal: onboarding.primaryGoal || 'breakouts',
+        secondaryGoals: onboarding.secondaryGoals || [],
+        routineComplexity: onboarding.routineComplexity || 'simple',
+        costPreference: onboarding.costPreference || 'balanced',
+        middayFeel: onboarding.middayFeel || 'combination',
+        postCleanseTightness: onboarding.postCleanseTightness ?? false,
+        confirmedProducts: onboarding.detectedProducts,
+        productReactions: onboarding.productReactions,
+        skinPhotos: {
+          frontUri: onboarding.frontPhotoUri || undefined,
+          leftUri: onboarding.leftPhotoUri || undefined,
+          rightUri: onboarding.rightPhotoUri || undefined,
+          contextNote: onboarding.photoContextNote || undefined,
         },
-        onboarding.detectedProducts
-      );
-
-      // The first proposed routine has status 'awaiting_review'
-      const pendingRoutine = {
-        ...proposal.routine,
-        status: 'awaiting_review' as const,
+        safetyContext: {
+          knownSensitivities: onboarding.knownSensitivities,
+          activePrescriptions: onboarding.activePrescriptions,
+          isPregnantOrNursing: onboarding.isPregnantOrNursing,
+          additionalNotes: onboarding.additionalSafetyNotes || undefined,
+        },
       };
 
-      // Save into routine store with isPlanUnderReview = true and pristine historical arrays
-      useRoutineStore.setState({
-        routine: pendingRoutine,
-        userProducts: proposal.userProducts,
-        completedStepIdsToday: [],
-        checkIns: [],
-        refillRequests: [],
-        learnedInsights: [],
-        researchInsights: [],
-        isPlanUnderReview: true,
-        todayDominantStatus: 'Final review: Your first routine gets one final quality check before it goes live.',
-        isWeeklyCheckInDue: false,
-      });
-
-      onboarding.completeOnboarding();
+      await submitOnboarding(payload);
 
       analytics.track('onboarding_completed', {
         productCount: onboarding.detectedProducts.length,
@@ -85,8 +83,9 @@ export default function SummaryScreen() {
 
       // Navigate to main application
       router.replace('/(tabs)');
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Plan generation error:', e);
+      setError(e?.message || 'Unable to build routine plan. Your answers are saved, please tap to try again.');
     } finally {
       setIsBuilding(false);
     }
@@ -236,6 +235,16 @@ export default function SummaryScreen() {
           )}
         </GroupedSection>
 
+        {error && (
+          <View style={styles.errorNoticeBox}>
+            <Icon name="warning" size={20} color={colors.actionStop.text} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.errorNoticeTitle}>Unable to build routine</Text>
+              <Text style={styles.errorNoticeText}>{error}</Text>
+            </View>
+          </View>
+        )}
+
         {/* FINAL QUALITY REVIEW NOTICE */}
         <View style={styles.reviewNoticeBox}>
           <Icon name="check" size={20} color={colors.brand} />
@@ -372,6 +381,29 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     fontWeight: typography.weights.semibold,
     color: colors.brand,
+  },
+  errorNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.actionStop.bg,
+    borderColor: colors.actionStop.border,
+    borderWidth: 1,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  errorNoticeTitle: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.bold,
+    color: colors.actionStop.text,
+    marginBottom: 2,
+  },
+  errorNoticeText: {
+    fontSize: typography.sizes.micro,
+    color: colors.actionStop.text,
+    lineHeight: typography.lineHeights.caption,
   },
   reviewNoticeBox: {
     flexDirection: 'row',

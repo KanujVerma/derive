@@ -21,6 +21,7 @@ import { Badge } from '@/src/components/ui/Badge';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import { SegmentedControl } from '@/src/components/ui/SegmentedControl';
 import { InsightBasisLabels } from '@/src/types/schema';
+import { hydrateProgress } from '@/src/services/deriveClient';
 
 type AngleKey = 'front' | 'left' | 'right';
 
@@ -45,6 +46,12 @@ export default function ProgressScreen() {
   const [selectedAngle, setSelectedAngle] = useState<AngleKey>('front');
   const [inspect, setInspect] = useState<{ uri: string; label: string } | null>(null);
   const inspectFrame = Dimensions.get('window');
+
+  React.useEffect(() => {
+    hydrateProgress().catch((err) => {
+      console.warn('Failed to hydrate progress:', err);
+    });
+  }, []);
 
   const openInspect = (uri: string, label: string) => {
     Haptics.selectionAsync();

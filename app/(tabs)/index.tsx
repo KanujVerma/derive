@@ -18,6 +18,11 @@ import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
+import {
+  hydrateRoutine,
+  hydrateResearchInsights,
+  hydrateOrders,
+} from '@/src/services/deriveClient';
 
 export default function TodayScreen() {
   const router = useRouter();
@@ -32,6 +37,18 @@ export default function TodayScreen() {
   } = useRoutineStore();
   const { fullName } = useUserStore();
   const firstName = fullName?.trim()?.split(' ')[0] || 'there';
+
+  React.useEffect(() => {
+    if (!routine) {
+      hydrateRoutine().catch((e) => console.warn('Failed to hydrate routine:', e));
+    }
+    if (researchInsights.length === 0) {
+      hydrateResearchInsights().catch((e) => console.warn('Failed to hydrate research:', e));
+    }
+    if (refillRequests.length === 0) {
+      hydrateOrders().catch((e) => console.warn('Failed to hydrate orders:', e));
+    }
+  }, []);
 
   const handleViewRoutine = async () => {
     try {

@@ -174,3 +174,17 @@ Skin photos serve as longitudinal baseline and progress context, governed by str
 - **Non-Diagnostic & Privacy Invariants**:
   - Zero storage of facial recognition embeddings or biometric identifiers.
   - Photos are treated as private, sensitive consumer skincare data, stored in private storage (`customer-skin-photos`), and delivered exclusively via short-lived signed URLs.
+
+### F. Client Service Coordinator & Direct Import Boundary (`src/services/deriveClient.ts`)
+To enforce strict boundary isolation between presentation and backend implementations:
+- **Centralized Coordinator**: All UI routes (`app/**`) execute domain mutations and queries exclusively through `src/services/deriveClient.ts`:
+  - `submitOnboarding(payload)`: Onboards new member, establishes proposed routine, syncs stores.
+  - `askQuestion(question, context)`: Dispatches contextual question to service intelligence.
+  - `evaluateProduct(input)`: Evaluates scanned item against user routine.
+  - `submitWeeklyCheckIn(input)`: Records longitudinal observation and syncs store cache.
+  - `requestProductRefill(input)`: Submits replenishment request.
+  - `hydrateOrders()`, `hydrateProgress()`, `hydrateRoutine()`, `hydrateResearchInsights()`, `hydrateCustomerProfile()`: Pull state from the active backend.
+- **Client Scanner Partition (`src/services/catalog.ts`)**: Camera viewfinder and offline barcode matching rely strictly on `src/services/catalog.ts` (`findProductByBarcode`, `PROTOTYPE_CATALOG`, `recognizeShelfProducts`).
+- **Zero-AI-Workflows Rule**: Client code in `app/**` is strictly forbidden from importing `src/services/ai-workflows/**`. Server workflows are invoked exclusively through `IDeriveService` implementations.
+- **Swappability**: The active backend implementation can be swapped at runtime via `setDeriveService()` or via configuration flag without altering any client UI code.
+

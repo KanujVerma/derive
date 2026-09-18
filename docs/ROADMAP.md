@@ -103,21 +103,45 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Zero unconfirmed demo data leaks into fresh client launches; dev controls hidden in production.
   - Barcode lookup correctly identifies products across UPC and EAN formats without shutter press.
 
-### K5: Mobile Release & TestFlight [IN PROGRESS — EXPO LINKED / BLOCKED ON APPLE SIGNING + IPHONE DEVELOPER MODE]
+### K5: Mobile Release & TestFlight [IMPLEMENTATION COMPLETE · ASC UPLOADED · PHYSICAL SMOKE DEFERRED TO I1]
 * **Scope**: EAS configuration, development client builds, production provisioning profiles, TestFlight deployment, physical device validation, and first-customer test script.
 * **Landed**:
   - `expo-dev-client`, `eas.json` (development + production profiles, remote `appVersionSource`, Mock/local `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`), first-customer script.
-  - Local CocoaPods autolinking of `DeriveFaceCapture` + `expo-dev-client`; local simulator native binary exists.
+  - Local CocoaPods autolinking of `DeriveFaceCapture` + `expo-dev-client`; local simulator native binary verified.
   - Expo project linked: `@derive-skincare/derive` (`4100d696-3e03-4b2c-bdb3-1986d5f1a624`).
   - Export compliance declared as HTTPS-only via `ios.config.usesNonExemptEncryption: false`.
-* **Remaining**:
-  - Interactive Apple login to create EAS internal-distribution credentials, then EAS development cloud build.
-  - Enable Developer Mode on the connected iPhone, then install and physically validate face auto-capture and barcode scan.
-  - Production/store build and internal TestFlight processing + founder install.
+  - Apple Developer signing credentials and distribution profile provisioned.
+  - Production EAS build `3846b3b4-5a36-4f5a-b6bc-c78418987606` (Version `1.0.0 (3)`) succeeded cleanly on EAS cloud builders.
+  - TestFlight submission `f19df267-fde8-45f4-8662-e803fddf87be` completed; `.ipa` uploaded to App Store Connect (`ascAppId: 6813524447`).
+* **Deferred to I1**:
+  - Physical TestFlight installation and hardware validation on connected device.
+
+### K6: Mobile Service Boundary & Remote-Readiness [COMPLETE]
+* **Scope**:
+  - Centralize client-side domain operations through `src/services/deriveClient.ts` delegating strictly to `IDeriveService` (`getDeriveService()`).
+  - Partition local camera catalog and barcode lookup fixtures into `src/services/catalog.ts` (`findProductByBarcode`, `PROTOTYPE_CATALOG`, `recognizeShelfProducts`).
+  - Eliminate all direct server workflow imports (`src/services/ai-workflows/**`) across the entire `app/**` directory.
+  - Harden `MockDeriveService` to initialize strictly clean by default (`activeRoutine = null`, empty orders, empty check-ins, empty insights, `null` customer profile). Arthur demo fixture isolated in explicit `seedArthurDemoData()`.
+  - Refactor all client screens to traverse `deriveClient`:
+    - `app/(onboarding)/10-summary.tsx`: calls `submitOnboarding()`, displays error banner on failure.
+    - `app/(onboarding)/6-shelf.tsx`: routes shelf recognition through `@/src/services/catalog`.
+    - `app/(tabs)/ask.tsx`: routes Ask queries through `askQuestion()`.
+    - `app/(tabs)/scan.tsx`: routes product scanning through `evaluateProduct()`.
+    - `app/check-in/index.tsx`: routes check-ins through `submitWeeklyCheckIn()`.
+    - `app/refill/index.tsx`: routes refills through `requestProductRefill()`.
+    - `app/orders/index.tsx`: hydrates orders through `hydrateOrders()`.
+    - `app/(tabs)/progress.tsx`: hydrates progress through `hydrateProgress()`.
+    - `app/(tabs)/index.tsx`: hydrates routine, research insights, and orders through service boundary.
+    - `app/(tabs)/plan.tsx`: hydrates routine through service boundary.
+    - `app/insights/[id].tsx`: hydrates research through `hydrateResearchInsights()`.
+    - `app/profile/index.tsx`: hydrates profile through `hydrateCustomerProfile()`.
+  - Service swappability verified: injecting a test double via `setDeriveService()` transparently powers all client screens with zero UI refactoring.
 * **Acceptance Criteria**:
-  - Installable iOS internal TestFlight build distributed to founders.
-  - Onboarding, scanning, and chat verified on physical hardware.
-  - First-customer test script executed.
+  - 100% test suite passing (55/55 tests in `tests/derive.test.ts`).
+  - Zero `ai-workflows` imports in `app/**` verified by automated architectural lint test.
+  - TypeScript typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - Zero Gemini API key on client.
 
 ---
 

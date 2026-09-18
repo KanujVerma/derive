@@ -6,6 +6,29 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: K6 Mobile Service Boundary & Remote-Readiness
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `1ba7956213077a619a52cda8a248884a2d685f6f`
+- **Prior Verified CI Run**: `35354355509` (on commit `1ba7956`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `K6 COMPLETE` (Mobile application genuinely backend-swappable via `IDeriveService`; client screens decoupled from mock and AI workflow internals; zero `ai-workflows` imports in `app/**`; clean initial state guaranteed; swappability verified via unit tests; ready for I1 RemoteDeriveService activation); `K5 COMPLETE / ASC UPLOADED` (TestFlight upload verified in EAS build `3846b3b4-5a36-4f5a-b6bc-c78418987606` and submit `f19df267-fde8-45f4-8662-e803fddf87be`; physical hardware smoke deferred to I1).
+- **Ownership / Shared Contracts**: Client-side only (`src/services/deriveClient.ts`, `src/services/catalog.ts`, `src/services/mock/MockDeriveService.ts`, `app/**`, `tests/**`). Shared contracts (`src/contracts/**`, `src/domain/**`) strictly frozen and untouched. Zero changes to `supabase/**`, backend migrations, RLS, Edge Functions, or Stripe.
+- **Architectural Deliverables**:
+  1. **Centralized Service Coordinator (`src/services/deriveClient.ts`)**: Unified client facade exposing `submitOnboarding`, `askQuestion`, `evaluateProduct`, `submitWeeklyCheckIn`, `requestProductRefill`, `hydrateOrders`, `hydrateProgress`, `hydrateRoutine`, `hydrateResearchInsights`, `hydrateCustomerProfile`, and custom hooks (`useOnboardingSubmission`, `useAskDeriveQuery`, `useProductScanEvaluation`, `useWeeklyCheckInSubmission`, `useRefillOrderSubmission`, `useActiveRoutineHydration`).
+  2. **Device Scanner Partition (`src/services/catalog.ts`)**: Partitioned client catalog fixtures (`PROTOTYPE_CATALOG`), barcode lookups (`findProductByBarcode`), and shelf recognition fallback (`recognizeShelfProducts`) away from backend AI workflows.
+  3. **Zero `ai-workflows` in `app/**`**: Eliminated all prohibited direct imports from `ai-workflows` across client screens (`10-summary.tsx`, `6-shelf.tsx`, `ask.tsx`, `scan.tsx`, `check-in/index.tsx`, `refill/index.tsx`, `orders/index.tsx`, `progress.tsx`, `index.tsx`, `plan.tsx`, `insights/[id].tsx`, `profile/index.tsx`).
+  4. **Clean Initial State Guarantee**: `MockDeriveService` hardened to initialize with `activeRoutine = null`, empty orders, empty check-ins, empty insights, and `customerProfile = null`. Explicit `seedArthurDemoData()` available strictly for dev/test environments.
+  5. **Swappability Verification**: Unit-tested runtime dependency injection via `setDeriveService()`, confirming an alternate backend transparently powers the mobile client without screen modifications.
+- **Verification**:
+  - `npm test`: 55/55 passing (100%).
+  - `npx tsc --noEmit`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export in ~2.5s.
+  - Architectural lint: Zero `ai-workflows` imports in `app/**`.
+
 ## 2026-09-17 — Kanuj Mobile/UX: K5 Expo Project Link + Physical-Device Signing Attempt
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

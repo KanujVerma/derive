@@ -19,6 +19,7 @@ import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { config } from '@/src/constants/config';
+import { hydrateCustomerProfile } from '@/src/services/deriveClient';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -26,6 +27,12 @@ export default function ProfileScreen() {
   const { fullName, email, loadArthurDemoUser, resetToDefault } = useUserStore();
   const { detectedProducts, productReactions, loadArthurDemoState, resetOnboarding } = useOnboardingStore();
   const { routine, isPlanUnderReview, loadArthurDemoRoutine, resetRoutine } = useRoutineStore();
+
+  React.useEffect(() => {
+    hydrateCustomerProfile().catch((err) => {
+      console.warn('Failed to hydrate customer profile:', err);
+    });
+  }, []);
 
   const activeProducts = useMemo(() => {
     if (routine) {

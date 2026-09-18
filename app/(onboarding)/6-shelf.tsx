@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { Product } from '@/src/types/schema';
-import { recognizeShelfProducts } from '@/src/services/ai-workflows/shelf-recognition';
+import { recognizeShelfProducts } from '@/src/services/catalog';
 import { CameraCapture } from '@/src/components/ui/CameraCapture';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';

@@ -47,10 +47,14 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ## 1. Mobile Client Layer (Kanuj)
 * **Framework**: React Native 0.86 on Expo SDK 57, structured via Expo Router (file-system routing in `app/`).
-* **State Management**: Zustand stores (`useRoutineStore`, `useOnboardingStore`) for reactive client UI state.
+* **State Management**: Zustand stores (`useRoutineStore`, `useOnboardingStore`, `useUserStore`) for reactive client UI state.
+* **Service Coordinator & Boundary (`src/services/deriveClient.ts`)**: Centralized facade and custom React hooks that route all domain queries, mutations, scanning evaluations, and state hydrations through the frozen `IDeriveService` contract boundary. UI routes (`app/**`) are strictly prohibited from importing backend intelligence workflows (`src/services/ai-workflows/**`).
+* **Device Scanner & Catalog (`src/services/catalog.ts`)**: Pure client catalog fixture and deterministic barcode lookup (`findProductByBarcode`, `PROTOTYPE_CATALOG`, `recognizeShelfProducts`) partitioned away from server workflows.
+* **Clean Initial State Guarantee**: `MockDeriveService` defaults strictly to a clean un-onboarded state (`activeRoutine = null`, empty orders, empty check-ins, `customerProfile = null`). Demo fixtures (e.g. Arthur Pendelton) are isolated in explicit development loaders (`seedArthurDemoData()`) and never leak into initial customer sessions.
 * **Styling & Tokens**: Direction A Mineral tokens defined in `src/constants/theme.ts`.
 * **Hardware Integrations**:
-  - `expo-camera` / viewfinder for shelf scanning.
+  - `expo-camera` / viewfinder for shelf scanning and zero-shutter continuous barcode scanning.
+  - Native Swift face capture module (`modules/derive-face-capture/`) utilizing Apple's `Vision.framework` with a deterministic 750ms hold state machine (`AutoCaptureStateMachine.ts`).
   - `expo-haptics` for tactile confirmations.
   - Native Web Speech API / native voice dictation for hands-free notes.
 

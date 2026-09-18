@@ -17,6 +17,7 @@ import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
 import { analytics } from '@/src/services/analytics';
 import { ResearchActionRecommendation } from '@/src/types/schema';
+import { hydrateResearchInsights } from '@/src/services/deriveClient';
 
 function getRecommendationBadge(rec: ResearchActionRecommendation): {
   label: string;
@@ -41,6 +42,14 @@ export default function ResearchInsightDetailScreen() {
   const { researchInsights } = useRoutineStore();
 
   const insight = researchInsights.find((r) => r.id === id) || researchInsights[0];
+
+  useEffect(() => {
+    if (researchInsights.length === 0) {
+      hydrateResearchInsights().catch((err) => {
+        console.warn('Failed to hydrate research insights:', err);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (insight) {

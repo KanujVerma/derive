@@ -618,19 +618,29 @@ test('Analytics Allowlist: Correctly logs scan and voice input events without PI
 // 8. SHARED DERIVE SERVICE CONTRACT & MOCK TESTS
 // ========================================================
 
-import { getDeriveService } from '../src/services/DeriveService.ts';
+import { getDeriveService, setDeriveService } from '../src/services/DeriveService.ts';
+import { MockDeriveService } from '../src/services/mock/MockDeriveService.ts';
 
 test('DeriveService: MockDeriveService satisfies the IDeriveService contract', async () => {
-  const service = getDeriveService();
+  const service = new MockDeriveService();
   assert.ok(service);
 
-  // 1. Test routine retrieval
+  // 1. Clean default state verification (zero leakage before onboarding or seeding)
+  const initialRoutine = await service.getRoutine('mock_user_1');
+  assert.equal(initialRoutine, null);
+  const initialOrders = await service.getOrders('mock_user_1');
+  assert.equal(initialOrders.length, 0);
+
+  // 2. Explicit seed demo data
+  service.seedArthurDemoData();
+
+  // 3. Test routine retrieval
   const routine = await service.getRoutine('mock_user_1');
   assert.ok(routine);
   assert.ok(routine.amSteps.length > 0);
   assert.ok(routine.pmSteps.length > 0);
 
-  // 2. Test Ask Derive
+  // 4. Test Ask Derive
   const askRes = await service.askDerive({
     userId: 'mock_user_1',
     question: 'Can I use moisturizer before or after Differin?',
@@ -638,7 +648,7 @@ test('DeriveService: MockDeriveService satisfies the IDeriveService contract', a
   assert.equal(askRes.safety.isMedicalEmergency, false);
   assert.ok(askRes.directAnswer);
 
-  // 3. Test Scan Product
+  // 5. Test Scan Product
   const scanRes = await service.scanProduct({
     productName: 'Anthelios Melt-in Milk Sunscreen SPF 60',
     brand: 'La Roche-Posay',
@@ -650,7 +660,7 @@ test('DeriveService: MockDeriveService satisfies the IDeriveService contract', a
   assert.ok(scanRes.verdict === 'great_fit' || scanRes.verdict === 'better_replacement');
   assert.ok(scanRes.whyBullets && scanRes.whyBullets.length > 0);
 
-  // 4. Test Managed Refill Request
+  // 6. Test Managed Refill Request
   const refill = await service.requestRefill({
     userId: 'mock_user_1',
     productId: 'p3',
@@ -660,12 +670,12 @@ test('DeriveService: MockDeriveService satisfies the IDeriveService contract', a
   assert.equal(refill.status, 'requested');
   assert.equal(refill.productName, 'Toleriane Double Repair Face Moisturizer');
 
-  // 5. Test Orders Listing
+  // 7. Test Orders Listing
   const orders = await service.getOrders('mock_user_1');
   assert.ok(orders.length >= 2);
   assert.equal(orders[0].id, refill.id);
 
-  // 6. Test Check-In Submission
+  // 8. Test Check-In Submission
   const checkInRes = await service.submitCheckIn({
     userId: 'mock_user_1',
     skinState: 'better',
@@ -1598,5 +1608,360 @@ test('K4.4 Finalization: AutoCapture State Machine multi-angle sequencing and ta
   const out4 = machine.update(rightProfileMetrics, t0 + 1100);
   assert.equal(out4.state, 'READY_CANDIDATE');
 });
+
+// ========================================================
+// 22. K6 MOBILE SERVICE BOUNDARY & REMOTE-READINESS
+// ========================================================
+
+import {
+  submitOnboarding,
+  askQuestion,
+  evaluateProduct,
+  submitWeeklyCheckIn,
+  requestProductRefill,
+  hydrateOrders,
+  hydrateProgress,
+  hydrateRoutine,
+  hydrateResearchInsights,
+  hydrateCustomerProfile,
+} from '../src/services/deriveClient.ts';
+import type { IDeriveService } from '../src/contracts/DeriveService.ts';
+import type {
+  OnboardingPayload,
+  OnboardingResult,
+  RoutineProposalInput,
+  RoutineProposalResult,
+  AskRequest,
+  AskResponse,
+  ScanProductInput,
+  ProductScanResult,
+  CheckInInput,
+  CheckInResult,
+  ProgressData,
+  RefillRequestInput,
+  RefillRequest,
+  ResearchInsight,
+  CustomerProfile,
+  RoutinePlan,
+} from '../src/domain/types.ts';
+
+test('K6 Service Boundary: MockDeriveService initializes strictly clean with zero Arthur leakage', async () => {
+  const service = new MockDeriveService();
+
+  // Clean initial state verification
+  assert.equal(await service.getRoutine('test_user'), null);
+  assert.deepEqual(await service.getOrders('test_user'), []);
+  assert.deepEqual(await service.getResearchInsights('test_user'), []);
+  const progress = await service.getProgress('test_user');
+  assert.deepEqual(progress.checkIns, []);
+  assert.deepEqual(progress.learnedInsights, []);
+  assert.deepEqual(progress.recentPhotos, []);
+  assert.equal(await service.getCustomerProfile('test_user'), null);
+
+  // Explicit demo seeding works when requested
+  service.seedArthurDemoData();
+  const arthurRoutine = await service.getRoutine('usr_arthur_1');
+  assert.ok(arthurRoutine);
+  assert.equal(arthurRoutine.amSteps.length, 3);
+  const arthurOrders = await service.getOrders('usr_arthur_1');
+  assert.equal(arthurOrders.length, 1);
+
+  // Reset returns cleanly to empty state
+  service.reset();
+  assert.equal(await service.getRoutine('usr_arthur_1'), null);
+  assert.deepEqual(await service.getOrders('usr_arthur_1'), []);
+});
+
+test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService', async () => {
+  // Build a test double representing a remote backend
+  class RemoteBackendMock implements IDeriveService {
+    calls: string[] = [];
+
+    async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
+      this.calls.push('onboard');
+      return {
+        userId: 'usr_remote_123',
+        proposedRoutine: {
+          id: 'rt_remote',
+          userId: 'usr_remote_123',
+          createdAt: new Date().toISOString(),
+          status: 'awaiting_review',
+          summarySentence: 'Remote customized plan.',
+          confidenceScore: 0.95,
+          amSteps: [],
+          pmSteps: [],
+        },
+        userProducts: [],
+      };
+    }
+
+    async proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult> {
+      this.calls.push('proposeRoutine');
+      return {
+        proposedRoutine: {
+          id: 'rt_prop',
+          userId: input.userId,
+          createdAt: new Date().toISOString(),
+          status: 'draft',
+          summarySentence: 'Proposed.',
+          confidenceScore: 0.9,
+          amSteps: [],
+          pmSteps: [],
+        },
+        userProducts: [],
+      };
+    }
+
+    async askDerive(request: AskRequest): Promise<AskResponse> {
+      this.calls.push('askDerive');
+      return {
+        answer: 'Remote response',
+        directAnswer: 'Remote direct answer',
+        whyExplanation: 'Remote explanation',
+        safety: {
+          isMedicalEmergency: false,
+          severity: 'safe',
+        },
+      };
+    }
+
+    async scanProduct(input: ScanProductInput): Promise<ProductScanResult> {
+      this.calls.push('scanProduct');
+      return {
+        productName: input.productName,
+        brand: input.brand || 'Remote Brand',
+        verdict: 'great_fit',
+        verdictLabel: 'GREAT FIT',
+        verdictSummary: 'Remote scan verdict',
+        factsUsedToDecide: ['Remote intelligence'],
+      };
+    }
+
+    async submitCheckIn(input: CheckInInput): Promise<CheckInResult> {
+      this.calls.push('submitCheckIn');
+      return {
+        checkIn: {
+          id: 'ci_remote',
+          userId: input.userId,
+          primaryGoal: input.primaryGoal || 'breakouts',
+          skinState: input.skinState,
+          irritation: input.irritation,
+          adherence: input.adherence || 'yes',
+          aiAnalysisSentence: 'Remote analysis recorded.',
+          adjustmentProposed: false,
+          createdAt: new Date().toISOString(),
+        },
+        aiAnalysisSentence: 'Remote analysis recorded.',
+        adjustmentProposed: false,
+      };
+    }
+
+    async getProgress(userId: string): Promise<ProgressData> {
+      this.calls.push('getProgress');
+      return {
+        checkIns: [],
+        learnedInsights: [],
+        recentPhotos: [],
+        routineHistorySummary: 'Remote history',
+        isCheckInDue: false,
+      };
+    }
+
+    async requestRefill(input: RefillRequestInput): Promise<RefillRequest> {
+      this.calls.push('requestRefill');
+      return {
+        id: 'ref_remote',
+        userId: input.userId,
+        productId: input.productId,
+        productName: input.productName,
+        brand: input.brand,
+        status: 'requested',
+        requestedDate: new Date().toISOString().split('T')[0],
+      };
+    }
+
+    async getOrders(userId: string): Promise<RefillRequest[]> {
+      this.calls.push('getOrders');
+      return [];
+    }
+
+    async getResearchInsights(userId: string): Promise<ResearchInsight[]> {
+      this.calls.push('getResearchInsights');
+      return [];
+    }
+
+    async getRoutine(userId: string): Promise<RoutinePlan | null> {
+      this.calls.push('getRoutine');
+      return null;
+    }
+
+    async getCustomerProfile(userId: string): Promise<CustomerProfile | null> {
+      this.calls.push('getCustomerProfile');
+      return {
+        id: userId,
+        fullName: 'Remote Member',
+        email: 'remote@example.com',
+        membershipStatus: 'active',
+        joinedAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  const backend = new RemoteBackendMock();
+  setDeriveService(backend);
+
+  // 1. Verify askQuestion reaches swappable backend
+  const askRes = await askQuestion('How do I apply this?');
+  assert.equal(askRes.directAnswer, 'Remote direct answer');
+  assert.ok(backend.calls.includes('askDerive'));
+
+  // 2. Verify evaluateProduct reaches swappable backend
+  const scanRes = await evaluateProduct({ productName: 'Test SPF' });
+  assert.equal(scanRes.verdict, 'great_fit');
+  assert.ok(backend.calls.includes('scanProduct'));
+
+  // 3. Verify submitWeeklyCheckIn reaches swappable backend and syncs store
+  const checkInRes = await submitWeeklyCheckIn({
+    skinState: 'better',
+    irritation: 'none',
+  });
+  assert.equal(checkInRes.checkIn.id, 'ci_remote');
+  assert.ok(backend.calls.includes('submitCheckIn'));
+
+  // 4. Verify requestProductRefill reaches swappable backend
+  const refillRes = await requestProductRefill({
+    productId: 'p_test',
+    productName: 'Remote Cream',
+    brand: 'Remote Lab',
+  });
+  assert.equal(refillRes.id, 'ref_remote');
+  assert.ok(backend.calls.includes('requestRefill'));
+
+  // 5. Verify hydrators reach swappable backend
+  await hydrateOrders();
+  assert.ok(backend.calls.includes('getOrders'));
+
+  await hydrateProgress();
+  assert.ok(backend.calls.includes('getProgress'));
+
+  await hydrateRoutine();
+  assert.ok(backend.calls.includes('getRoutine'));
+
+  await hydrateCustomerProfile();
+  assert.ok(backend.calls.includes('getCustomerProfile'));
+
+  // Restore MockDeriveService for other tests
+  setDeriveService(new MockDeriveService());
+});
+
+test('K6 Architectural Boundary: Zero ai-workflows imports across app directory', () => {
+  const appDir = join(REPO_ROOT, 'app');
+  const files = collectTextFiles(appDir).filter((f) => /\.(ts|tsx)$/.test(f));
+  assert.ok(files.length > 0, 'Must have inspected app files');
+
+  const violations: string[] = [];
+  for (const file of files) {
+    const content = readFileSync(file, 'utf8');
+    if (content.includes('ai-workflows')) {
+      violations.push(file);
+    }
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Found prohibited direct ai-workflows imports in client screens: ${violations.join(', ')}`
+  );
+});
+
+test('K6 End-to-End Service Flow: Onboarding through routine and check-ins', async () => {
+  const service = new MockDeriveService();
+  setDeriveService(service);
+
+  useRoutineStore.getState().resetRoutine();
+  useUserStore.getState().resetToDefault();
+  useOnboardingStore.getState().resetOnboarding();
+
+  // 1. Submit onboarding via coordinator
+  const payload: OnboardingPayload = {
+    userId: 'usr_beta_k6',
+    primaryGoal: 'breakouts',
+    secondaryGoals: ['texture'],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'combination',
+    postCleanseTightness: false,
+    confirmedProducts: [
+      {
+        id: 'p1',
+        brand: 'CeraVe',
+        name: 'Hydrating Facial Cleanser',
+        category: 'cleanser',
+      },
+      {
+        id: 'p2',
+        brand: 'Differin',
+        name: 'Adapalene Gel 0.1%',
+        category: 'treatment',
+      },
+    ],
+    productReactions: [],
+    skinPhotos: {
+      frontUri: 'file:///photo_front.jpg',
+      leftUri: 'file:///photo_left.jpg',
+      rightUri: 'file:///photo_right.jpg',
+    },
+    safetyContext: {
+      knownSensitivities: [],
+      activePrescriptions: ['Differin 0.1%'],
+      isPregnantOrNursing: false,
+    },
+  };
+
+  const onboardResult = await submitOnboarding(payload);
+  assert.ok(onboardResult.proposedRoutine);
+  assert.equal(onboardResult.proposedRoutine.status, 'awaiting_review');
+
+  // Verify store state synchronized
+  const routineState = useRoutineStore.getState();
+  assert.equal(routineState.isPlanUnderReview, true);
+  assert.ok(routineState.routine);
+  assert.equal(routineState.routine.amSteps.length, 3);
+
+  // 2. Ask question handling
+  const safetyRes = await askQuestion('My face is swollen and my throat feels tight');
+  assert.equal(safetyRes.safety.isMedicalEmergency, true);
+
+  const normalRes = await askQuestion('Should I use moisturizer with Differin?');
+  assert.equal(normalRes.safety.isMedicalEmergency, false);
+  assert.ok(normalRes.directAnswer.length > 0);
+
+  // 3. Scan evaluation
+  const scan = await evaluateProduct({
+    productName: 'Anthelios Ultra Light Fluid SPF 60',
+    brand: 'La Roche-Posay',
+    barcode: '883140012993',
+  });
+  assert.ok(scan.verdict === 'great_fit' || scan.verdict === 'better_replacement');
+
+  // 4. Submit weekly check-in
+  const checkInRes = await submitWeeklyCheckIn({
+    skinState: 'better',
+    irritation: 'none',
+    adherence: 'yes',
+  });
+  assert.equal(checkInRes.adjustmentProposed, false);
+  assert.equal(useRoutineStore.getState().checkIns.length, 1);
+
+  // 5. Refill request
+  const refillRes = await requestProductRefill({
+    productId: 'p1',
+    productName: 'Hydrating Facial Cleanser',
+    brand: 'CeraVe',
+  });
+  assert.equal(refillRes.productName, 'Hydrating Facial Cleanser');
+  assert.equal(useRoutineStore.getState().refillRequests.length, 1);
+});
+
 
 

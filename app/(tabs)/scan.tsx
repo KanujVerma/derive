@@ -19,11 +19,11 @@ import { StatusBadge, StatusBadgeVariant } from '@/src/components/ui/StatusBadge
 import { Button } from '@/src/components/ui/Button';
 import { analytics } from '@/src/services/analytics';
 import {
-  evaluateProductScan,
   findProductByBarcode,
   PROTOTYPE_CATALOG,
   ScannableProductInput,
-} from '@/src/services/ai-workflows/scan-evaluator';
+} from '@/src/services/catalog';
+import { evaluateProduct } from '@/src/services/deriveClient';
 import { ProductScanResult, ProductScanVerdict } from '@/src/types/schema';
 import { normalizeBarcode } from '@/src/utils/barcode';
 
@@ -44,6 +44,24 @@ export default function ScanScreen() {
   const [isLocked, setIsLocked] = useState(false);
   const isScanningLockedRef = useRef(false);
 
+  const performEvaluation = async (item: ScannableProductInput, barcode?: string) => {
+    const isDifferinActive = routine?.pmSteps.some((s) =>
+      s.productName.toLowerCase().includes('differin')
+    );
+    const result = await evaluateProduct({
+      productName: item.name,
+      brand: item.brand,
+      barcode: barcode || item.barcode,
+      userRoutineContext: {
+        activeDifferinSchedule: isDifferinActive,
+        currentRoutineProducts: userProducts.map((p) => p.product.name),
+        recentReactions: productReactions,
+      },
+    });
+    setScanResult(result);
+    return result;
+  };
+
   useEffect(() => {
     analytics.track('scan_tab_opened', { source: 'tab_navigation' });
     if (__DEV__ && params?.sim) {
@@ -56,16 +74,9 @@ export default function ScanScreen() {
       if (match) {
         setConfirmedProduct(match);
         setIsSearching(false);
-        const result = evaluateProductScan(match, {
-          routine,
-          userProducts,
-          reactions: productReactions,
-          checkIns,
-          routineComplexity: routineComplexity || undefined,
-          primaryGoal: primaryGoal || undefined,
-          costPreference: costPreference || undefined,
+        performEvaluation(match).catch((err) => {
+          console.warn('[DEV] Evaluation failed for simulated product:', err);
         });
-        setScanResult(result);
       } else {
         console.warn(`[DEV] Unknown simulated product "${params.sim}". Failing closed without fallback.`);
         setUnknownBarcode(params.sim);
@@ -87,26 +98,22 @@ export default function ScanScreen() {
       } catch {}
 
       setConfirmedProduct(matched);
-      const result = evaluateProductScan(matched, {
-        routine,
-        userProducts,
-        reactions: productReactions,
-        checkIns,
-        routineComplexity: routineComplexity || undefined,
-        primaryGoal: primaryGoal || undefined,
-        costPreference: costPreference || undefined,
-      });
-      setScanResult(result);
-      analytics.track('product_scan_recognized', {
-        productName: matched.name,
-      });
-      analytics.track('product_scan_completed', {
-        success: true,
-      });
-      analytics.track('scan_verdict_viewed', {
-        productName: matched.name,
-        verdict: result.verdict,
-      });
+      performEvaluation(matched, rawData)
+        .then((result) => {
+          analytics.track('product_scan_recognized', {
+            productName: matched.name,
+          });
+          analytics.track('product_scan_completed', {
+            success: true,
+          });
+          analytics.track('scan_verdict_viewed', {
+            productName: matched.name,
+            verdict: result.verdict,
+          });
+        })
+        .catch((err) => {
+          console.warn('Scan evaluation failed:', err);
+        });
     } else {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -123,23 +130,19 @@ export default function ScanScreen() {
     setConfirmedProduct(item);
     setIsSearching(false);
     setUnknownBarcode(null);
-    const result = evaluateProductScan(item, {
-      routine,
-      userProducts,
-      reactions: productReactions,
-      checkIns,
-      routineComplexity: routineComplexity || undefined,
-      primaryGoal: primaryGoal || undefined,
-      costPreference: costPreference || undefined,
-    });
-    setScanResult(result);
-    analytics.track('product_scan_recognized', {
-      productName: item.name,
-    });
-    analytics.track('scan_verdict_viewed', {
-      productName: item.name,
-      verdict: result.verdict,
-    });
+    performEvaluation(item)
+      .then((result) => {
+        analytics.track('product_scan_recognized', {
+          productName: item.name,
+        });
+        analytics.track('scan_verdict_viewed', {
+          productName: item.name,
+          verdict: result.verdict,
+        });
+      })
+      .catch((err) => {
+        console.warn('Catalog item evaluation failed:', err);
+      });
   };
 
   const handleResetScan = () => {

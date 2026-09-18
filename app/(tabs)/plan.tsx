@@ -17,6 +17,7 @@ import { Icon } from '@/src/components/ui/Icon';
 import { SegmentedControl } from '@/src/components/ui/SegmentedControl';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
+import { hydrateRoutine } from '@/src/services/deriveClient';
 
 export default function PlanScreen() {
   const router = useRouter();
@@ -29,6 +30,12 @@ export default function PlanScreen() {
     isPlanUnderReview,
   } = useRoutineStore();
   const [activeTab, setActiveTab] = useState<'routine' | 'products'>('routine');
+
+  React.useEffect(() => {
+    if (!routine) {
+      hydrateRoutine().catch((e) => console.warn('Failed to hydrate routine:', e));
+    }
+  }, []);
 
   const handleTabSwitch = (tab: 'routine' | 'products') => {
     setActiveTab(tab);

@@ -11,8 +11,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
-import { useRoutineStore } from '@/src/stores/routineStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
+import { submitWeeklyCheckIn } from '@/src/services/deriveClient';
 import { SkinState, IrritationLevel, AdherenceLevel } from '@/src/types/schema';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
@@ -29,7 +29,6 @@ const CHANGE_REASONS = [
 export default function CheckInModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { submitCheckIn } = useRoutineStore();
   const { primaryGoal } = useOnboardingStore();
 
   const [skinState, setSkinState] = useState<SkinState>('better');
@@ -80,24 +79,12 @@ export default function CheckInModal() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
 
-    const analysisSentence =
-      irritation === 'lot'
-        ? 'Irritation noted. Concierge notified to review reducing active treatment frequency.'
-        : skinState === 'better'
-        ? 'Visible improvement noted. Current plan is performing well.'
-        : 'Skin stable. Maintain current routine schedule.';
-
-    submitCheckIn({
-      userId: 'guest_user',
+    await submitWeeklyCheckIn({
       primaryGoal: primaryGoal || 'breakouts',
-      goalOutcome: skinState,
       skinState,
       irritation,
       adherence,
-      changeReason: isFollowUpNeeded ? selectedChange : undefined,
       notes: notes.trim() || undefined,
-      aiAnalysisSentence: analysisSentence,
-      adjustmentProposed: irritation === 'lot',
     });
 
     analytics.track('checkin_completed', {

@@ -14,11 +14,12 @@ import { useRoutineStore } from '@/src/stores/routineStore';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { analytics } from '@/src/services/analytics';
+import { requestProductRefill } from '@/src/services/deriveClient';
 
 export default function RefillModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { routine, requestRefill, refillRequests } = useRoutineStore();
+  const { routine, refillRequests } = useRoutineStore();
 
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -38,7 +39,11 @@ export default function RefillModal() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
 
-    requestRefill(target.productId, target.productName, target.brand);
+    await requestProductRefill({
+      productId: target.productId,
+      productName: target.productName,
+      brand: target.brand,
+    });
     analytics.track('refill_requested', { productCategory: target.category });
     setSubmitted(true);
   };

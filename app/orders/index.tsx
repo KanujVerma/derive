@@ -17,6 +17,7 @@ import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
 import { config } from '@/src/constants/config';
 import { RefillRequest, RefillStatus } from '@/src/types/schema';
+import { hydrateOrders } from '@/src/services/deriveClient';
 
 const STAGES: { key: RefillStatus; label: string }[] = [
   { key: 'requested', label: 'Requested' },
@@ -44,6 +45,12 @@ export default function OrdersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { refillRequests } = useRoutineStore();
+
+  React.useEffect(() => {
+    hydrateOrders().catch((err) => {
+      console.warn('Failed to hydrate orders:', err);
+    });
+  }, []);
 
   const handleBack = () => {
     router.back();
