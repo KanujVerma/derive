@@ -3428,7 +3428,10 @@ test('I1-A2 Client Profile Resolution & Routing Policy: pure routing rules and h
   assert.equal(getAuthRedirectRoute(['(tabs)', 'plan'], destTabs), null);
   assert.equal(getAuthRedirectRoute(['profile'], destTabs), null);
   assert.equal(getAuthRedirectRoute(['orders'], destTabs), null);
-  assert.equal(getAuthRedirectRoute(['founder'], destTabs), null);
+  // Founder operations are local/demo only: Remote customer on founder route redirected to /(tabs)
+  assert.equal(getAuthRedirectRoute(['founder'], destTabs), '/(tabs)');
+  assert.equal(getAuthRedirectRoute(['founder', 'review-routine'], destTabs), '/(tabs)');
+  assert.equal(getAuthRedirectRoute(['founder', 'refills'], destTabs), '/(tabs)');
 
   // 25. getAuthRedirectRoute: REMOTE_HOLDING destination
   const destHolding = {
@@ -3600,7 +3603,331 @@ test('I1-A2 RemoteDeriveService PostgREST query execution: typed client double v
   assert.ok(queryLog.includes('limit:1'));
 });
 
+// ========================================================
+// 23. I1-A2.1 BOOTSTRAP FRESHNESS & FOUNDER SURFACE ISOLATION
+// ========================================================
 
+test('I1-A2.1 Bootstrap Freshness: User A -> User B identity switch race (A resolves after B)', async () => {
+  try {
+    resetCustomerSessionData();
 
+    // Create deferred promises for deterministic resolution control
+    let resolveA!: (value: CustomerBootstrapState) => void;
+    const promiseA = new Promise<CustomerBootstrapState>((res) => {
+      resolveA = res;
+    });
 
+    let resolveB!: (value: CustomerBootstrapState) => void;
+    const promiseB = new Promise<CustomerBootstrapState>((res) => {
+      resolveB = res;
+    });
 
+    const mockService = new MockDeriveService();
+    mockService.getCustomerBootstrapState = async (userId: string) => {
+      if (userId === 'usr_A') {
+        return promiseA;
+      }
+      if (userId === 'usr_B') {
+        return promiseB;
+      }
+      return {
+        userId,
+        profileExists: true,
+        onboardingCompleted: false,
+        membershipStatus: 'none',
+      };
+    };
+    setDeriveService(mockService);
+
+    // 1. User A authenticated, bootstrap request A begins
+    useAuthStore.getState().setSession('usr_A', 'a@derive.skin');
+    useUserStore.getState().setRemoteSessionUser('usr_A', 'a@derive.skin');
+    const requestA = resolveCustomerBootstrap('usr_A');
+    assert.equal(useBootstrapStore.getState().status, 'RESOLVING');
+    assert.equal(useBootstrapStore.getState().resolvedUserId, 'usr_A');
+
+    // 2. Before A resolves, user switches to B. sessionReset is called.
+    resetCustomerSessionData();
+    useAuthStore.getState().setSession('usr_B', 'b@derive.skin');
+    useUserStore.getState().setRemoteSessionUser('usr_B', 'b@derive.skin');
+
+    // 3. User B bootstrap request begins
+    const requestB = resolveCustomerBootstrap('usr_B');
+    assert.equal(useBootstrapStore.getState().status, 'RESOLVING');
+    assert.equal(useBootstrapStore.getState().resolvedUserId, 'usr_B');
+
+    // 4. B resolves FIRST (User B is an existing active member)
+    resolveB({
+      userId: 'usr_B',
+      profileExists: true,
+      onboardingCompleted: true,
+      membershipStatus: 'active',
+    });
+    const resultB = await requestB;
+    assert.ok(resultB);
+    assert.equal(resultB.userId, 'usr_B');
+    assert.equal(useBootstrapStore.getState().status, 'READY');
+    assert.equal(useBootstrapStore.getState().resolvedUserId, 'usr_B');
+    assert.equal(useUserStore.getState().membershipStatus, 'active');
+
+    // 5. Older A request resolves AFTERWARD (User A was a new member needing onboarding)
+    resolveA({
+      userId: 'usr_A',
+      profileExists: true,
+      onboardingCompleted: false,
+      membershipStatus: 'none',
+    });
+    const resultA = await requestA;
+    // The stale result must be discarded by resolveCustomerBootstrap
+    assert.equal(resultA, null);
+
+    // Store state must strictly remain User B's state
+    assert.equal(useBootstrapStore.getState().status, 'READY');
+    assert.equal(useBootstrapStore.getState().resolvedUserId, 'usr_B');
+    assert.equal(useBootstrapStore.getState().bootstrapState?.userId, 'usr_B');
+    assert.equal(useUserStore.getState().membershipStatus, 'active');
+  } finally {
+    setDeriveService(null);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A2.1 Bootstrap Freshness: Reverse completion order (A finishes before B while B is active identity)', async () => {
+  try {
+    resetCustomerSessionData();
+
+    let resolveA!: (value: CustomerBootstrapState) => void;
+    const promiseA = new Promise<CustomerBootstrapState>((res) => {
+      resolveA = res;
+    });
+
+    let resolveB!: (value: CustomerBootstrapState) => void;
+    const promiseB = new Promise<CustomerBootstrapState>((res) => {
+      resolveB = res;
+    });
+
+    const mockService = new MockDeriveService();
+    mockService.getCustomerBootstrapState = async (userId: string) => {
+      if (userId === 'usr_A') return promiseA;
+      if (userId === 'usr_B') return promiseB;
+      return { userId, profileExists: true, onboardingCompleted: false, membershipStatus: 'none' };
+    };
+    setDeriveService(mockService);
+
+    // 1. User A starts
+    useAuthStore.getState().setSession('usr_A', 'a@derive.skin');
+    useUserStore.getState().setRemoteSessionUser('usr_A', 'a@derive.skin');
+    const requestA = resolveCustomerBootstrap('usr_A');
+
+    // 2. Switch to User B before A resolves
+    resetCustomerSessionData();
+    useAuthStore.getState().setSession('usr_B', 'b@derive.skin');
+    useUserStore.getState().setRemoteSessionUser('usr_B', 'b@derive.skin');
+    const requestB = resolveCustomerBootstrap('usr_B');
+
+    // 3. User A returns BEFORE User B finishes
+    resolveA({
+      userId: 'usr_A',
+      profileExists: true,
+      onboardingCompleted: true,
+      membershipStatus: 'active',
+    });
+    const resultA = await requestA;
+    // A must be discarded because active session and attempt belong to B
+    assert.equal(resultA, null);
+    assert.equal(useBootstrapStore.getState().status, 'RESOLVING');
+    assert.equal(useBootstrapStore.getState().resolvedUserId, 'usr_B');
+
+    // 4. User B finishes
+    resolveB({
+      userId: 'usr_B',
+      profileExists: true,
+      onboardingCompleted: false,
+      membershipStatus: 'none',
+    });
+    const resultB = await requestB;
+    assert.ok(resultB);
+    assert.equal(resultB.userId, 'usr_B');
+    assert.equal(useBootstrapStore.getState().status, 'NEEDS_ONBOARDING');
+    assert.equal(useBootstrapStore.getState().resolvedUserId, 'usr_B');
+  } finally {
+    setDeriveService(null);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A2.1 Bootstrap Freshness: Same-user retry race (attempt 1 later errors after attempt 2 succeeded)', async () => {
+  try {
+    resetCustomerSessionData();
+
+    let rejectAttempt1!: (err: Error) => void;
+    const promise1 = new Promise<CustomerBootstrapState>((_, rej) => {
+      rejectAttempt1 = rej;
+    });
+
+    let resolveAttempt2!: (value: CustomerBootstrapState) => void;
+    const promise2 = new Promise<CustomerBootstrapState>((res) => {
+      resolveAttempt2 = res;
+    });
+
+    let invocationCount = 0;
+    const mockService = new MockDeriveService();
+    mockService.getCustomerBootstrapState = async () => {
+      invocationCount++;
+      if (invocationCount === 1) return promise1;
+      return promise2;
+    };
+    setDeriveService(mockService);
+
+    useAuthStore.getState().setSession('usr_retry', 'retry@derive.skin');
+    useUserStore.getState().setRemoteSessionUser('usr_retry', 'retry@derive.skin');
+
+    // 1. Attempt 1 starts
+    const request1 = resolveCustomerBootstrap('usr_retry');
+    assert.equal(useBootstrapStore.getState().status, 'RESOLVING');
+
+    // 2. User presses Retry -> Attempt 2 starts
+    const request2 = resolveCustomerBootstrap('usr_retry');
+    assert.equal(useBootstrapStore.getState().status, 'RESOLVING');
+
+    // 3. Attempt 2 resolves with success (READY)
+    resolveAttempt2({
+      userId: 'usr_retry',
+      profileExists: true,
+      onboardingCompleted: true,
+      membershipStatus: 'active',
+    });
+    const result2 = await request2;
+    assert.ok(result2);
+    assert.equal(useBootstrapStore.getState().status, 'READY');
+
+    // 4. Attempt 1 later fails/rejects with a network error
+    rejectAttempt1(new Error('Network timeout on attempt 1'));
+    const result1 = await request1;
+    assert.equal(result1, null);
+
+    // Stale error from attempt 1 MUST NOT overwrite newer success
+    assert.equal(useBootstrapStore.getState().status, 'READY');
+    assert.equal(useBootstrapStore.getState().errorMessage, null);
+    assert.equal(useBootstrapStore.getState().resolvedUserId, 'usr_retry');
+  } finally {
+    setDeriveService(null);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A2.1 Bootstrap Freshness: Stale profile hydration discarded after identity switch', async () => {
+  try {
+    resetCustomerSessionData();
+
+    let resolveProfileA!: (profile: CustomerProfile) => void;
+    const profilePromiseA = new Promise<CustomerProfile>((res) => {
+      resolveProfileA = res;
+    });
+
+    // Create a RemoteDeriveService double to trigger isRemoteServiceEnabled() === true
+    const mockRemoteService = Object.create(RemoteDeriveService.prototype) as RemoteDeriveService;
+    mockRemoteService.getCustomerProfile = async (id: string) => {
+      if (id === 'usr_A') return profilePromiseA;
+      return null;
+    };
+    setDeriveService(mockRemoteService);
+    assert.equal(isRemoteServiceEnabled(), true);
+
+    // 1. User A starts profile hydration
+    useAuthStore.getState().setSession('usr_A', 'a@derive.skin');
+    useUserStore.getState().setRemoteSessionUser('usr_A', 'a@derive.skin');
+
+    const hydrationA = hydrateCustomerProfile('usr_A');
+
+    // 2. Identity switches to B
+    resetCustomerSessionData();
+    useAuthStore.getState().setSession('usr_B', 'b@derive.skin');
+    useUserStore.getState().setRemoteSessionUser('usr_B', 'b@derive.skin');
+
+    // 3. Profile A finishes loading
+    resolveProfileA({
+      id: 'usr_A',
+      email: 'a@derive.skin',
+      fullName: 'Alice Anderson',
+      membershipStatus: 'active',
+      tier: 'founding_beta_129',
+      createdAt: '2026-09-18T00:00:00.000Z',
+      updatedAt: '2026-09-18T00:00:00.000Z',
+    });
+
+    const resultA = await hydrationA;
+    // Should return null and NOT project Alice's data into UserStore for B
+    assert.equal(resultA, null);
+    assert.equal(useUserStore.getState().userId, 'usr_B');
+    assert.equal(useUserStore.getState().fullName, '');
+  } finally {
+    setDeriveService(null);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A2.1 Founder Surface Isolation: Remote customer states cannot access /founder/**', () => {
+  // 1. Remote READY: allowed customer screens
+  const destTabs = {
+    type: 'REMOTE_TABS' as const,
+    route: '/(tabs)' as const,
+  };
+  assert.equal(getAuthRedirectRoute(['(tabs)', 'today'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['(tabs)', 'plan'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['(tabs)', 'scan'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['(tabs)', 'ask'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['(tabs)', 'progress'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['profile'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['orders'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['check-in'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['refill'], destTabs), null);
+  assert.equal(getAuthRedirectRoute(['insights', 'retinoid-tolerance'], destTabs), null);
+
+  // Founder routes in Remote READY: must be redirected to /(tabs)
+  assert.equal(getAuthRedirectRoute(['founder'], destTabs), '/(tabs)');
+  assert.equal(getAuthRedirectRoute(['founder', 'review-routine'], destTabs), '/(tabs)');
+  assert.equal(getAuthRedirectRoute(['founder', 'refills'], destTabs), '/(tabs)');
+  assert.equal(getAuthRedirectRoute('/founder', destTabs), '/(tabs)');
+  assert.equal(getAuthRedirectRoute('/founder/review-routine', destTabs), '/(tabs)');
+  assert.equal(getAuthRedirectRoute('/founder/refills', destTabs), '/(tabs)');
+
+  // 2. Remote NEEDS_ONBOARDING: founder routes redirect to onboarding
+  const destOnboarding = {
+    type: 'REMOTE_ONBOARDING' as const,
+    route: '/(onboarding)/1-welcome' as const,
+  };
+  assert.equal(getAuthRedirectRoute(['founder'], destOnboarding), '/(onboarding)/1-welcome');
+  assert.equal(getAuthRedirectRoute(['founder', 'review-routine'], destOnboarding), '/(onboarding)/1-welcome');
+  assert.equal(getAuthRedirectRoute(['founder', 'refills'], destOnboarding), '/(onboarding)/1-welcome');
+
+  // 3. Remote RESOLVING / ERROR: founder routes redirect to holding
+  const destHolding = {
+    type: 'REMOTE_HOLDING' as const,
+    route: '/holding' as const,
+  };
+  assert.equal(getAuthRedirectRoute(['founder'], destHolding), '/holding');
+  assert.equal(getAuthRedirectRoute(['founder', 'review-routine'], destHolding), '/holding');
+  assert.equal(getAuthRedirectRoute(['founder', 'refills'], destHolding), '/holding');
+
+  // 4. Remote SIGNED_OUT: founder routes redirect to login
+  const destLogin = {
+    type: 'AUTH_LOGIN' as const,
+    route: '/(auth)/login' as const,
+  };
+  assert.equal(getAuthRedirectRoute(['founder'], destLogin), '/(auth)/login');
+  assert.equal(getAuthRedirectRoute(['founder', 'review-routine'], destLogin), '/(auth)/login');
+  assert.equal(getAuthRedirectRoute(['founder', 'refills'], destLogin), '/(auth)/login');
+
+  // 5. Mock mode: does not enforce remote redirect on founder routes
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: false, authStatus: 'SIGNED_IN', isOnboardingCompleted: true }),
+    { type: 'MOCK_TABS', route: '/(tabs)' }
+  );
+  // getAuthRedirectRoute for MOCK_TABS destination does not redirect
+  const destMockTabs = {
+    type: 'MOCK_TABS' as const,
+    route: '/(tabs)' as const,
+  };
+  assert.equal(getAuthRedirectRoute(['founder'], destMockTabs), null);
+});

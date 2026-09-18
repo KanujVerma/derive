@@ -6,6 +6,38 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: I1-A2.1 Bootstrap Freshness & Founder Surface Isolation
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `f57b5c908f369bc601e3ddbd08501d2405a9ec2c`
+- **Prior Verified CI Run**: `35386770475` (on commit `f57b5c9`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-A2.1 COMPLETE` (Bootstrap freshness and founder surface isolation: bound async bootstrap resolution and profile hydration to monotonic resolution attempt generation and active session UUID, discarding stale results, older retry errors, and switched-identity projections; updated session reset to immediately invalidate outstanding requests; and enforced founder route isolation in `getAuthRedirectRoute`, redirecting Remote customers to `/(tabs)` when READY, onboarding when NEEDS_ONBOARDING, holding when UNRESOLVED/RESOLVING/ERROR, and login when SIGNED_OUT, while preserving Mock developer workflows).
+- **Ownership / Shared Contracts**: Client-side implementation strictly (`src/stores/bootstrapStore.ts`, `src/services/deriveClient.ts`, `src/utils/authRouting.ts`, `tests/derive.test.ts`). Zero shared contract modifications (`CustomerBootstrapState` and `IDeriveService` untouched). Zero backend modifications (database migrations, RLS, Edge Functions, Stripe, and server intelligence untouched).
+- **Architectural Deliverables**:
+  1. **Monotonic Attempt Generation & Identity Guards (`src/stores/bootstrapStore.ts`, `src/services/deriveClient.ts`)**:
+     - Extended `useBootstrapStore` with `resolutionAttempt: number`.
+     - `setResolving(userId)` increments and returns the attempt counter.
+     - `setResolved(state, attempt)` and `setError(message, attempt)` reject state transitions if the request attempt does not match the active generation.
+     - `resetBootstrap()` increments `resolutionAttempt`, immediately invalidating any pending async network promises.
+     - `resolveCustomerBootstrap` validates that `attempt === currentAttempt` AND `activeSessionUser === state.userId` before committing state, projecting membership, or initiating profile hydration.
+     - Catch block verifies attempt and identity before committing `ERROR`, preventing older failed attempts from overwriting newer successful resolutions.
+  2. **Profile Hydration Freshness (`src/services/deriveClient.ts`)**:
+     - `hydrateCustomerProfile(userId)` validates that `profile.id === activeSessionUser` in Remote mode before projecting profile data into `useUserStore`.
+  3. **Founder Mobile Surface Isolation (`src/utils/authRouting.ts`)**:
+     - Updated `getAuthRedirectRoute`: Remote customers attempting to access `/founder/**` are strictly redirected based on their bootstrap state (`READY` $\rightarrow$ `/(tabs)`, `NEEDS_ONBOARDING` $\rightarrow$ `/(onboarding)/1-welcome`, `UNRESOLVED`/`RESOLVING`/`ERROR` $\rightarrow$ `/holding`, `SIGNED_OUT` $\rightarrow$ `/(auth)/login`).
+     - Normal customer surfaces (`/(tabs)`, `/profile`, `/orders`, `/check-in`, `/refill`, `/insights/**`) remain fully permitted.
+     - Mock mode developer/demo founder access remains unrestricted.
+- **Verification**:
+  - `npm test`: 86/86 tests passing (100%), including 5 new dedicated I1-A2.1 regression tests.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ## 2026-09-18 — Kanuj Mobile/UX: I1-A2 Remote Customer Bootstrap Resolution & Profile Handshake
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

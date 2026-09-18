@@ -37,6 +37,7 @@ import { useRoutineStore } from '../stores/routineStore.ts';
 import { useUserStore } from '../stores/userStore.ts';
 import { useOnboardingStore } from '../stores/onboardingStore.ts';
 import { useBootstrapStore } from '../stores/bootstrapStore.ts';
+import { useAuthStore } from '../stores/authStore.ts';
 import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
 
 /**
@@ -236,6 +237,13 @@ export async function hydrateCustomerProfile(userId?: string): Promise<CustomerP
   const profile = await service.getCustomerProfile(id);
 
   if (profile) {
+    // Freshness guard: in Remote mode, confirm the profile still belongs to the active authenticated session user
+    if (isRemoteServiceEnabled()) {
+      const activeSessionUser = useAuthStore.getState().sessionUserId;
+      if (!activeSessionUser || activeSessionUser !== profile.id) {
+        return null;
+      }
+    }
     useUserStore.getState().setRemoteCustomerProfile(profile);
   }
 
@@ -250,6 +258,7 @@ export async function hydrateCustomerProfile(userId?: string): Promise<CustomerP
  * - If userId is invalid or empty, fails closed with ERROR.
  * - If profile row is absent (profileExists: false), fails closed with ERROR.
  * - If service query throws/fails, shields technical details and fails closed with ERROR.
+ * - Guarded against race conditions: stale results from prior requests or switched identities are discarded.
  */
 export async function resolveCustomerBootstrap(userId: string): Promise<CustomerBootstrapState | null> {
   const bootstrapStore = useBootstrapStore.getState();
@@ -260,18 +269,34 @@ export async function resolveCustomerBootstrap(userId: string): Promise<Customer
     return null;
   }
 
-  bootstrapStore.setResolving(trimmed);
+  const attempt = bootstrapStore.setResolving(trimmed);
 
   try {
     const service = getDeriveService();
     const state = await service.getCustomerBootstrapState(trimmed);
 
+    // Freshness check: verify that this request attempt is still current and identity hasn't changed
+    const currentAttempt = useBootstrapStore.getState().resolutionAttempt;
+    if (attempt !== currentAttempt) {
+      return null;
+    }
+
+    if (isRemoteServiceEnabled()) {
+      const activeSessionUser = useAuthStore.getState().sessionUserId;
+      if (!activeSessionUser || activeSessionUser !== state.userId) {
+        return null;
+      }
+    }
+
     if (!state.profileExists) {
-      bootstrapStore.setError(getCustomerErrorMessage('bootstrap'));
+      bootstrapStore.setError(getCustomerErrorMessage('bootstrap'), attempt);
       return state;
     }
 
-    bootstrapStore.setResolved(state);
+    const committed = bootstrapStore.setResolved(state, attempt);
+    if (!committed) {
+      return null;
+    }
 
     // Project canonical membership status into user store
     useUserStore.getState().setRemoteBootstrapMembership(state.membershipStatus);
@@ -288,7 +313,20 @@ export async function resolveCustomerBootstrap(userId: string): Promise<Customer
     return state;
   } catch (err: any) {
     console.warn('resolveCustomerBootstrap failed:', err);
-    bootstrapStore.setError(getCustomerErrorMessage('bootstrap'));
+
+    // Freshness check: verify attempt and identity before committing ERROR
+    const currentAttempt = useBootstrapStore.getState().resolutionAttempt;
+    if (attempt === currentAttempt) {
+      if (isRemoteServiceEnabled()) {
+        const activeSessionUser = useAuthStore.getState().sessionUserId;
+        if (activeSessionUser && activeSessionUser === trimmed) {
+          bootstrapStore.setError(getCustomerErrorMessage('bootstrap'), attempt);
+        }
+      } else {
+        bootstrapStore.setError(getCustomerErrorMessage('bootstrap'), attempt);
+      }
+    }
+
     return null;
   }
 }

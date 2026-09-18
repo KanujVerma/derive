@@ -125,12 +125,14 @@ export function getAuthRedirectRoute(
 
   if (destination.type === 'REMOTE_TABS') {
     // In Remote mode when signed in and profile resolution is READY:
-    // User is an active member. They should not be on holding or auth or onboarding.
-    // If currently on holding or (auth) or (onboarding) or root, redirect to /(tabs).
-    // If already on (tabs) or standard member screens (profile, orders, check-in, refill, founder, insights), return null.
+    // User is an active member. They should not be on holding, auth, onboarding, or founder routes.
+    // Founder operations (/founder/**) are local/demo tooling; Remote customers are strictly denied.
+    // If currently on holding, (auth), (onboarding), root, or founder, redirect to /(tabs).
+    // If on (tabs) or standard member screens (profile, orders, check-in, refill, insights), return null.
+    const isFounderRoute = segment0 === 'founder';
     const onHoldingOrAuthOrOnboardingOrRoot =
       segment0 === '' || segment0 === 'holding' || segment0 === '(auth)' || segment0 === '(onboarding)';
-    return onHoldingOrAuthOrOnboardingOrRoot ? destination.route : null;
+    return isFounderRoute || onHoldingOrAuthOrOnboardingOrRoot ? destination.route : null;
   }
 
   return null;

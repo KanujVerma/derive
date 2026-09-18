@@ -239,7 +239,21 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
 
----
+### I1-A2.1: Bootstrap Freshness & Founder Surface Isolation [COMPLETE]
+* **Scope**:
+  - Bound async bootstrap resolution (`resolveCustomerBootstrap`) and profile hydration (`hydrateCustomerProfile`) to active authenticated session UUID (`useAuthStore.sessionUserId`) and monotonic attempt generation (`resolutionAttempt`).
+  - Stale success, error, membership projection, or profile projection from prior attempts or switched identities ($A \rightarrow B$) are discarded.
+  - Same-user retry races discard older errors when newer attempts succeed.
+  - Session reset (`resetBootstrap`, `resetCustomerSessionData`) increments attempt generation, invalidating in-flight network promises.
+  - Isolate local/demo mobile founder routes (`/founder/**`): Remote customers are redirected to `/(tabs)` when READY, onboarding when NEEDS_ONBOARDING, holding when UNRESOLVED/RESOLVING/ERROR, and login when SIGNED_OUT.
+  - Preserve developer/demo founder workflow in Mock mode.
+* **Acceptance Criteria**:
+  - 100% test suite passing (86/86 tests in `tests/derive.test.ts`), including 5 new dedicated I1-A2.1 tests.
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - Zero shared contract or backend modifications.
 
 ## Sami Workstream (Platform + Intelligence + Operations)
 
