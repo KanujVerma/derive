@@ -2547,6 +2547,7 @@ import {
   type AuthAdapter,
 } from '../src/services/authClient.ts';
 import { resetCustomerSessionData } from '../src/services/sessionReset.ts';
+import { resolveAuthRoute } from '../src/utils/authRouting.ts';
 
 test('I1-A1 Auth Client: Validates email input formats client-side', () => {
   // Valid emails
@@ -2671,7 +2672,7 @@ test('I1-A1 Auth Client: verifyEmailOtp establishes session and identity project
     // 3. Successful verification updates authStore and projects identity into userStore
     const goodTokenRes = await verifyEmailOtp(fakeUserEmail, '123456');
     assert.equal(goodTokenRes.success, true);
-    assert.equal(goodTokenRes.session?.access_token, 'tok_jwt_fake');
+    assert.equal(goodTokenRes.userId, fakeUserId);
 
     // AuthStore projection
     assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
@@ -2691,14 +2692,14 @@ test('I1-A1 Auth Client: verifyEmailOtp establishes session and identity project
   }
 });
 
-test('I1-A1 Auth Client: signOutSession purges all cross-user customer caches and store state', async () => {
-  let adapterSignOutCalled = false;
+test('I1-A1.1 Auth Client: signOutSession requests local scope and purges all cross-user customer caches', async () => {
+  let signOutScope: string | undefined;
   const mockAdapter: AuthAdapter = {
     async signInWithOtp() { return { data: {}, error: null }; },
     async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
     async getSession() { return { data: { session: null }, error: null }; },
-    async signOut() {
-      adapterSignOutCalled = true;
+    async signOut(options) {
+      signOutScope = options?.scope;
       return { error: null };
     },
     onAuthStateChange() { return { data: { subscription: { unsubscribe: () => {} } } }; },
@@ -2707,10 +2708,17 @@ test('I1-A1 Auth Client: signOutSession purges all cross-user customer caches an
   setAuthAdapter(mockAdapter);
 
   try {
-    // Populate stores with user-specific sensitive data
+    // Populate stores with user-specific sensitive data including onboarding store
     useAuthStore.getState().setSession('usr_sensitive_999', 'user@derive.skin');
     useUserStore.getState().setUser('usr_sensitive_999', 'user@derive.skin', 'Jane Member');
     useRoutineStore.getState().loadArthurDemoRoutine();
+    useOnboardingStore.getState().loadArthurDemoState();
+    useOnboardingStore.getState().completeOnboarding();
+    useOnboardingStore.getState().setSkinPhotos({
+      front: 'file:///sensitive_face.jpg',
+      left: 'file:///sensitive_left.jpg',
+      right: 'file:///sensitive_right.jpg',
+    });
     useScanContextStore.getState().setActiveScannedProduct({
       productName: 'Sensitive Scanned Sunscreen',
       brand: 'La Roche-Posay',
@@ -2725,12 +2733,14 @@ test('I1-A1 Auth Client: signOutSession purges all cross-user customer caches an
     assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
     assert.equal(useUserStore.getState().userId, 'usr_sensitive_999');
     assert.notEqual(useRoutineStore.getState().routine, null);
+    assert.equal(useOnboardingStore.getState().isCompleted, true);
+    assert.equal(useOnboardingStore.getState().frontPhotoUri, 'file:///sensitive_face.jpg');
     assert.notEqual(useScanContextStore.getState().activeScannedProduct, null);
 
     // Act
     const result = await signOutSession();
     assert.equal(result.success, true);
-    assert.equal(adapterSignOutCalled, true);
+    assert.equal(signOutScope, 'local');
 
     // Verify all cross-user caches and identities are purged
     assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
@@ -2747,6 +2757,12 @@ test('I1-A1 Auth Client: signOutSession purges all cross-user customer caches an
     assert.equal(useRoutineStore.getState().checkIns.length, 0);
     assert.equal(useRoutineStore.getState().refillRequests.length, 0);
 
+    // Onboarding store purged
+    assert.equal(useOnboardingStore.getState().isCompleted, false);
+    assert.equal(useOnboardingStore.getState().frontPhotoUri, null);
+    assert.equal(useOnboardingStore.getState().detectedProducts.length, 0);
+    assert.equal(useOnboardingStore.getState().productReactions.length, 0);
+
     assert.equal(useScanContextStore.getState().activeScannedProduct, null);
   } finally {
     resetAuthAdapter();
@@ -2754,7 +2770,45 @@ test('I1-A1 Auth Client: signOutSession purges all cross-user customer caches an
   }
 });
 
-test('I1-A1 Auth Client: getCurrentSession synchronizes store state or sets signed out', async () => {
+test('I1-A1.1 Auth Client: signOutSession verifies session state truthfully on provider error', async () => {
+  let activeSession: any = { user: { id: 'usr_active', email: 'active@derive.skin' } };
+
+  const mockAdapter: AuthAdapter = {
+    async signInWithOtp() { return { data: {}, error: null }; },
+    async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
+    async getSession() { return { data: { session: activeSession }, error: null }; },
+    async signOut() {
+      return { error: new Error('Network timeout during signout') };
+    },
+    onAuthStateChange() { return { data: { subscription: { unsubscribe: () => {} } } }; },
+  };
+
+  setAuthAdapter(mockAdapter);
+
+  try {
+    useAuthStore.getState().setSession('usr_active', 'active@derive.skin');
+    useUserStore.getState().setUser('usr_active', 'active@derive.skin', 'Active Member');
+
+    // Case 1: Provider error and session is STILL active in provider -> returns failure, keeps state
+    const failRes = await signOutSession();
+    assert.equal(failRes.success, false);
+    assert.equal(failRes.error, CUSTOMER_ERROR_MESSAGES.auth_signout);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.equal(useUserStore.getState().userId, 'usr_active');
+
+    // Case 2: Provider error, but session was actually cleared locally/server-side (activeSession = null)
+    activeSession = null;
+    const okRes = await signOutSession();
+    assert.equal(okRes.success, true);
+    assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+    assert.equal(useUserStore.getState().userId, '');
+  } finally {
+    resetAuthAdapter();
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-A1.1 Auth Client: getCurrentSession synchronizes store state or purges customer caches on no session', async () => {
   const sessionUser = { id: 'usr_existing_sess', email: 'session@derive.skin' };
   let returnSession = true;
 
@@ -2783,19 +2837,27 @@ test('I1-A1 Auth Client: getCurrentSession synchronizes store state or sets sign
     assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
     assert.equal(useUserStore.getState().userId, 'usr_existing_sess');
 
-    // 2. Session does not exist: marks signed out
+    // 2. Session does not exist: marks signed out AND purges all stale customer caches
+    // First inject stale local data
+    useUserStore.getState().setUser('usr_stale', 'stale@derive.skin', 'Stale User');
+    useRoutineStore.getState().loadArthurDemoRoutine();
+    useOnboardingStore.getState().loadArthurDemoState();
+
     returnSession = false;
     const noSessionRes = await getCurrentSession();
     assert.equal(noSessionRes.userId, null);
     assert.equal(noSessionRes.email, null);
     assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
+    assert.equal(useUserStore.getState().userId, '');
+    assert.equal(useRoutineStore.getState().routine, null);
+    assert.equal(useOnboardingStore.getState().isCompleted, false);
   } finally {
     resetAuthAdapter();
     resetCustomerSessionData();
   }
 });
 
-test('I1-A1 Auth Client: subscribeToAuth reacts to SIGNED_IN and SIGNED_OUT auth events', () => {
+test('I1-A1.1 Auth Client: subscribeToAuth handles identity switch with purge and preserves cache on same-user refresh', () => {
   let authListener: ((event: string, session: any) => void) | null = null;
 
   const mockAdapter: AuthAdapter = {
@@ -2816,15 +2878,35 @@ test('I1-A1 Auth Client: subscribeToAuth reacts to SIGNED_IN and SIGNED_OUT auth
     const { unsubscribe } = subscribeToAuth();
     assert.equal(typeof authListener, 'function');
 
-    // Trigger SIGNED_IN event
+    // 1. First user signs in
     authListener!('SIGNED_IN', {
-      user: { id: 'usr_sub_123', email: 'sub@derive.skin' },
+      user: { id: 'usr_A', email: 'userA@derive.skin' },
     });
     assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
-    assert.equal(useAuthStore.getState().sessionUserId, 'usr_sub_123');
-    assert.equal(useUserStore.getState().userId, 'usr_sub_123');
+    assert.equal(useAuthStore.getState().sessionUserId, 'usr_A');
+    assert.equal(useUserStore.getState().userId, 'usr_A');
 
-    // Trigger SIGNED_OUT event
+    // User A loads routine data
+    useRoutineStore.getState().loadArthurDemoRoutine();
+    assert.notEqual(useRoutineStore.getState().routine, null);
+
+    // 2. TOKEN_REFRESHED or SIGNED_IN for the same user A: caches MUST NOT be purged
+    authListener!('TOKEN_REFRESHED', {
+      user: { id: 'usr_A', email: 'userA@derive.skin' },
+    });
+    assert.equal(useAuthStore.getState().sessionUserId, 'usr_A');
+    assert.notEqual(useRoutineStore.getState().routine, null, 'Routine cache should be preserved on token refresh');
+
+    // 3. Different user B signs in: caches for user A MUST be purged
+    authListener!('SIGNED_IN', {
+      user: { id: 'usr_B', email: 'userB@derive.skin' },
+    });
+    assert.equal(useAuthStore.getState().status, 'SIGNED_IN');
+    assert.equal(useAuthStore.getState().sessionUserId, 'usr_B');
+    assert.equal(useUserStore.getState().userId, 'usr_B');
+    assert.equal(useRoutineStore.getState().routine, null, 'Routine cache must be purged on user identity switch');
+
+    // 4. SIGNED_OUT event purges all session state
     authListener!('SIGNED_OUT', null);
     assert.equal(useAuthStore.getState().status, 'SIGNED_OUT');
     assert.equal(useAuthStore.getState().sessionUserId, null);
@@ -2838,61 +2920,76 @@ test('I1-A1 Auth Client: subscribeToAuth reacts to SIGNED_IN and SIGNED_OUT auth
   }
 });
 
-test('I1-A1 Route Gating Rules: Evaluates Mock vs Remote gating deterministically', () => {
-  function evaluateInitialRoute(
-    remoteEnabled: boolean,
-    authStatus: 'INITIALIZING' | 'SIGNED_OUT' | 'SIGNED_IN',
-    isOnboardingCompleted: boolean
-  ): { target: string; loading: boolean } {
-    if (!remoteEnabled) {
-      return {
-        target: isOnboardingCompleted ? '/(tabs)' : '/(onboarding)/1-welcome',
-        loading: false,
-      };
-    }
-    if (authStatus === 'INITIALIZING') {
-      return { target: '', loading: true };
-    }
-    if (authStatus === 'SIGNED_OUT') {
-      return { target: '/(auth)/login', loading: false };
-    }
-    return {
-      target: isOnboardingCompleted ? '/(tabs)' : '/(onboarding)/1-welcome',
-      loading: false,
-    };
-  }
+test('I1-A1.1 Pure Routing Policy: resolveAuthRoute evaluates Mock vs Remote routes deterministically', () => {
+  // 1. Mock Mode (remoteEnabled: false) - purely onboarding completion driven
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: false, authStatus: 'SIGNED_OUT', isOnboardingCompleted: true }),
+    { type: 'MOCK_TABS', route: '/(tabs)' }
+  );
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: false, authStatus: 'SIGNED_OUT', isOnboardingCompleted: false }),
+    { type: 'MOCK_ONBOARDING', route: '/(onboarding)/1-welcome' }
+  );
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: false, authStatus: 'SIGNED_IN', isOnboardingCompleted: true }),
+    { type: 'MOCK_TABS', route: '/(tabs)' }
+  );
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: false, authStatus: 'INITIALIZING', isOnboardingCompleted: true }),
+    { type: 'MOCK_TABS', route: '/(tabs)' }
+  );
 
-  // 1. Mock mode always permits access without authentication
-  assert.deepEqual(evaluateInitialRoute(false, 'SIGNED_OUT', true), {
-    target: '/(tabs)',
-    loading: false,
-  });
-  assert.deepEqual(evaluateInitialRoute(false, 'SIGNED_OUT', false), {
-    target: '/(onboarding)/1-welcome',
-    loading: false,
-  });
+  // 2. Remote Mode (remoteEnabled: true) - INITIALIZING returns null route / loading canvas
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: true, authStatus: 'INITIALIZING', isOnboardingCompleted: false }),
+    { type: 'AUTH_LOADING', route: null }
+  );
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: true, authStatus: 'INITIALIZING', isOnboardingCompleted: true }),
+    { type: 'AUTH_LOADING', route: null }
+  );
 
-  // 2. Remote mode with INITIALIZING shows loading
-  assert.deepEqual(evaluateInitialRoute(true, 'INITIALIZING', false), {
-    target: '',
-    loading: true,
-  });
+  // 3. Remote Mode (remoteEnabled: true) - SIGNED_OUT routes strictly to /(auth)/login
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_OUT', isOnboardingCompleted: false }),
+    { type: 'AUTH_LOGIN', route: '/(auth)/login' }
+  );
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_OUT', isOnboardingCompleted: true }),
+    { type: 'AUTH_LOGIN', route: '/(auth)/login' }
+  );
 
-  // 3. Remote mode with SIGNED_OUT routes to login
-  assert.deepEqual(evaluateInitialRoute(true, 'SIGNED_OUT', false), {
-    target: '/(auth)/login',
-    loading: false,
-  });
+  // 4. Remote Mode (remoteEnabled: true) - SIGNED_IN routes strictly to /holding
+  // Invariant: MUST NOT inspect isOnboardingCompleted in Remote mode!
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_IN', isOnboardingCompleted: false }),
+    { type: 'REMOTE_HOLDING', route: '/holding' }
+  );
+  assert.deepEqual(
+    resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_IN', isOnboardingCompleted: true }),
+    { type: 'REMOTE_HOLDING', route: '/holding' }
+  );
+});
 
-  // 4. Remote mode with SIGNED_IN permits app flow
-  assert.deepEqual(evaluateInitialRoute(true, 'SIGNED_IN', false), {
-    target: '/(onboarding)/1-welcome',
-    loading: false,
+test('I1-A1.1 Session Reset: resetCustomerSessionData purges onboarding photos and questionnaire state', () => {
+  useOnboardingStore.getState().loadArthurDemoState();
+  useOnboardingStore.getState().completeOnboarding();
+  useOnboardingStore.getState().setSkinPhotos({
+    front: 'file:///sensitive_face.jpg',
+    left: 'file:///sensitive_left.jpg',
+    right: 'file:///sensitive_right.jpg',
   });
-  assert.deepEqual(evaluateInitialRoute(true, 'SIGNED_IN', true), {
-    target: '/(tabs)',
-    loading: false,
-  });
+  assert.equal(useOnboardingStore.getState().isCompleted, true);
+  assert.equal(useOnboardingStore.getState().frontPhotoUri, 'file:///sensitive_face.jpg');
+
+  resetCustomerSessionData();
+
+  assert.equal(useOnboardingStore.getState().isCompleted, false);
+  assert.equal(useOnboardingStore.getState().frontPhotoUri, null);
+  assert.equal(useOnboardingStore.getState().detectedProducts.length, 0);
+  assert.equal(useOnboardingStore.getState().productReactions.length, 0);
+  assert.equal(useOnboardingStore.getState().primaryGoal, null);
+  assert.equal(useOnboardingStore.getState().secondaryGoals.length, 0);
 });
 
 

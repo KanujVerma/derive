@@ -22,6 +22,7 @@ import { config } from '@/src/constants/config';
 import { hydrateCustomerProfile } from '@/src/services/deriveClient';
 import { signOutSession } from '@/src/services/authClient';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -113,11 +114,19 @@ export default function ProfileScreen() {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
-            await signOutSession();
-            if (isRemoteServiceEnabled()) {
-              router.replace('/(auth)/login');
+            const res = await signOutSession();
+            if (res.success) {
+              if (isRemoteServiceEnabled()) {
+                router.replace('/(auth)/login');
+              } else {
+                router.replace('/(onboarding)/1-welcome');
+              }
             } else {
-              router.replace('/(onboarding)/1-welcome');
+              Alert.alert(
+                'Sign Out',
+                res.error || getCustomerErrorMessage('auth_signout'),
+                [{ text: 'OK' }]
+              );
             }
           },
         },

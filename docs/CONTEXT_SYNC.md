@@ -6,6 +6,44 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: I1-A1.1 Session Isolation & Post-Auth Routing Hardening Pass
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `ce3398d27b0e52caf94eff9c5032f46a849275e2`
+- **Prior Verified CI Run**: `35371569927` (on commit `ce3398d`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-A1.1 COMPLETE` (Hardened post-auth routing and session isolation: implemented neutral profile-resolution holding state in Remote mode, created pure testable `resolveAuthRoute` helper, purged onboarding store state on session reset to prevent sensitive photo/goal leaks across accounts, enforced cold-start cache purge on absent sessions, detected identity switches to purge prior user caches while preserving caches on same-user token refreshes, set local device signout scope, enforced truthful sign-out verification, minimized returned token surface, and aligned architectural documentation).
+- **Ownership / Shared Contracts**: Client-side only (`app/holding.tsx`, `app/(auth)/verify-otp.tsx`, `app/_layout.tsx`, `app/index.tsx`, `app/profile/index.tsx`, `src/services/authClient.ts`, `src/services/sessionReset.ts`, `src/utils/authRouting.ts`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/CONTEXT_SYNC.md`, `tests/derive.test.ts`). Shared contracts (`src/contracts/**`, `src/domain/**`, `src/types/schema.ts`) strictly frozen and untouched. Zero changes to Sami's backend lane (`supabase/**`, `admin/**`, Edge Functions, migrations, RLS, Stripe).
+- **Architectural Deliverables**:
+  1. **Neutral Remote Profile Resolution (`/holding`)**:
+     - Created `app/holding.tsx` rendering Direction A Mineral holding canvas ("Finishing your setup…") with safe Sign Out escape hatch.
+     - In Remote mode (`EXPO_PUBLIC_USE_REMOTE_SERVICE=true`), authenticated sessions (`SIGNED_IN`) route strictly to `/holding`, decoupling client navigation from local `onboardingStore.isCompleted`. Canonical onboarding and membership determinations are deferred to server profile hydration in I1-A2.
+  2. **Pure Production Routing Helper (`resolveAuthRoute`)**:
+     - Created `src/utils/authRouting.ts` implementing `resolveAuthRoute(options: ResolveRouteOptions): AuthRouteDestination`.
+     - Standardized route evaluation across `app/index.tsx`, `app/_layout.tsx`, `app/(auth)/verify-otp.tsx`, and `tests/derive.test.ts`.
+  3. **Sensitive Onboarding State Purging**:
+     - Updated `src/services/sessionReset.ts` (`resetCustomerSessionData()`) to invoke `useOnboardingStore.getState().resetOnboarding()`.
+     - Ensures sensitive front/left/right skin photos, photo context notes, skin goals, adverse reaction logs, and prescriptions are purged on sign-out, cold start, and identity switch.
+  4. **Cold-Start Cache Purging & Identity Switching**:
+     - Updated `getCurrentSession()` in `src/services/authClient.ts`: purges customer session data when no active session is returned by provider.
+     - Added identity transition check in `subscribeToAuth` and `verifyEmailOtp`: if authenticated user UUID changes ($A \rightarrow B$), purges user A's data before projecting user B. Preserves user caches across same-user token refreshes ($A \rightarrow A$).
+  5. **Truthful Local Device Sign-Out**:
+     - Configured `{ scope: 'local' }` in `signOutSession()` and `defaultSupabaseAdapter.signOut`, matching customer UI copy ("End session on this device").
+     - Hardened error handling in `signOutSession()`: if provider signOut throws or errors, verifies whether provider session actually remains active. If session remains active, reports failure without navigating or purging; if confirmed absent, purges caches and returns success.
+  6. **Token Minimization**:
+     - Updated `verifyEmailOtp()` to return `VerifyOtpResult` (`{ success: boolean; userId?: string; error?: string }`), removing raw `session` (access/refresh tokens) from the UI surface.
+  7. **Documentation Truth Alignment**:
+     - Corrected `docs/ARCHITECTURE.md` to reflect passwordless 6-digit Email OTP as the canonical client auth mechanism, removing references to Magic Link and Email/Password.
+- **Verification**:
+  - `npm test`: 75/75 passing (100%), including new I1-A1.1 regression tests covering local sign-out scope, error truthfulness, cold-start purge, identity switch vs token refresh preservation, pure routing policy, and onboarding store reset.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ## 2026-09-18 — Kanuj Mobile/UX: I1-A1 Mobile Auth & Session Spine
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

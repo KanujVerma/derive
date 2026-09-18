@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useAuthStore } from '@/src/stores/authStore';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { resolveAuthRoute } from '@/src/utils/authRouting';
 import { colors } from '@/src/constants/theme';
 
 export default function Index() {
@@ -11,16 +12,13 @@ export default function Index() {
   const authStatus = useAuthStore((s) => s.status);
   const remoteEnabled = isRemoteServiceEnabled();
 
-  // In Mock Mode, auth gating is bypassed completely
-  if (!remoteEnabled) {
-    if (isCompleted) {
-      return <Redirect href="/(tabs)" />;
-    }
-    return <Redirect href="/(onboarding)/1-welcome" />;
-  }
+  const destination = resolveAuthRoute({
+    remoteEnabled,
+    authStatus,
+    isOnboardingCompleted: isCompleted,
+  });
 
-  // In Remote Mode, gate behind session state
-  if (authStatus === 'INITIALIZING') {
+  if (destination.type === 'AUTH_LOADING') {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color={colors.ink} />
@@ -28,15 +26,7 @@ export default function Index() {
     );
   }
 
-  if (authStatus === 'SIGNED_OUT') {
-    return <Redirect href="/(auth)/login" />;
-  }
-
-  // authStatus === 'SIGNED_IN'
-  if (isCompleted) {
-    return <Redirect href="/(tabs)" />;
-  }
-  return <Redirect href="/(onboarding)/1-welcome" />;
+  return <Redirect href={destination.route!} />;
 }
 
 const styles = StyleSheet.create({

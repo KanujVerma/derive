@@ -192,6 +192,25 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Zero contracts or backend code modified.
 
+### I1-A1.1: Session Isolation & Post-Auth Routing Hardening [COMPLETE]
+* **Scope**:
+  - Establish neutral profile-resolution holding state (`/holding`, `app/holding.tsx`) in Remote mode: authenticated sessions route to `/holding` rather than branching on local `onboardingStore.isCompleted`, leaving canonical onboarding and membership determination to future remote profile hydration (I1-A2).
+  - Centralize production routing policy in pure testable helper `resolveAuthRoute` (`src/utils/authRouting.ts`) shared identically by `app/index.tsx`, `app/_layout.tsx`, `app/(auth)/verify-otp.tsx`, and `tests/derive.test.ts`.
+  - Include `useOnboardingStore.resetOnboarding()` in `resetCustomerSessionData()` so sensitive face photos, skin goals, adverse reaction logs, and prescriptions never leak across authenticated accounts.
+  - Enforce cross-user cache purging on cold-start when no active session is found (`getCurrentSession()`).
+  - Detect authenticated user UUID transitions ($A \rightarrow B$) in `subscribeToAuth` and `verifyEmailOtp` and purge old user caches before projecting the new identity, while preserving caches across same-user token refreshes ($A \rightarrow A$).
+  - Configure explicit local device sign-out scope (`{ scope: 'local' }`) matching customer UI copy ("End session on this device").
+  - Enforce truthful sign-out verification in `signOutSession()`: verify session termination in provider on error and prevent UI navigation if session remains active.
+  - Enforce token minimization in `verifyEmailOtp`: never expose access/refresh tokens to the calling UI (`VerifyOtpResult`).
+  - Correct documentation drift in `docs/ARCHITECTURE.md` to reflect passwordless 6-digit Email OTP architecture.
+* **Acceptance Criteria**:
+  - 100% test suite passing (75/75 tests in `tests/derive.test.ts`), with dedicated I1-A1.1 regression tests.
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - Zero contracts or backend code modified.
+
 ---
 
 ## Sami Workstream (Platform + Intelligence + Operations)

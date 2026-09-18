@@ -17,7 +17,8 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { verifyEmailOtp, sendEmailOtp, isValidOtpToken } from '@/src/services/authClient';
-import { useOnboardingStore } from '@/src/stores/onboardingStore';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { resolveAuthRoute } from '@/src/utils/authRouting';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
 const RESEND_COOLDOWN_SECONDS = 30;
@@ -74,11 +75,13 @@ export default function VerifyOtpScreen() {
       try {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
-      const isCompleted = useOnboardingStore.getState().isCompleted;
-      if (isCompleted) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/(onboarding)/1-welcome');
+      const destination = resolveAuthRoute({
+        remoteEnabled: isRemoteServiceEnabled(),
+        authStatus: 'SIGNED_IN',
+        isOnboardingCompleted: false,
+      });
+      if (destination.route) {
+        router.replace(destination.route);
       }
     } else {
       setErrorMessage(result.error || getCustomerErrorMessage('auth_invalid_otp'));

@@ -15,11 +15,21 @@ export interface AuthSession {
   refresh_token?: string;
 }
 
+export interface SignOutOptions {
+  scope?: 'global' | 'local' | 'others';
+}
+
+export interface VerifyOtpResult {
+  success: boolean;
+  userId?: string;
+  error?: string;
+}
+
 export interface AuthAdapter {
   signInWithOtp(email: string): Promise<{ data: any; error: any }>;
   verifyOtp(email: string, token: string): Promise<{ data: { session: any; user: any }; error: any }>;
   getSession(): Promise<{ data: { session: any }; error: any }>;
-  signOut(): Promise<{ error: any }>;
+  signOut(options?: SignOutOptions): Promise<{ error: any }>;
   onAuthStateChange(callback: (event: string, session: any) => void): {
     data: { subscription: { unsubscribe: () => void } };
   };
@@ -70,11 +80,11 @@ const defaultSupabaseAdapter: AuthAdapter = {
     return supabase.auth.getSession();
   },
 
-  async signOut() {
+  async signOut(options: SignOutOptions = { scope: 'local' }) {
     if (!supabase) {
       return { error: null };
     }
-    return supabase.auth.signOut();
+    return supabase.auth.signOut(options);
   },
 
   onAuthStateChange(callback: (event: string, session: any) => void) {
@@ -119,7 +129,7 @@ export async function sendEmailOtp(
   try {
     const { error } = await activeAdapter.signInWithOtp(normalizedEmail);
     if (error) {
-      console.warn('sendEmailOtp backend error:', error.message || error);
+      console.warn('sendEmailOtp backend error:', error.name || 'send_failed');
       return {
         success: false,
         error: getCustomerErrorMessage('auth_send_code'),
@@ -127,7 +137,7 @@ export async function sendEmailOtp(
     }
     return { success: true };
   } catch (err: any) {
-    console.warn('sendEmailOtp exception:', err.message || err);
+    console.warn('sendEmailOtp exception:', err?.name || 'unknown_error');
     return {
       success: false,
       error: getCustomerErrorMessage('auth_send_code'),
@@ -138,11 +148,12 @@ export async function sendEmailOtp(
 /**
  * Verifies a 6-digit email OTP token.
  * On success, updates the auth store session and sets the user store identity projection.
+ * Minimizes return surface: does NOT leak access or refresh tokens to caller UI.
  */
 export async function verifyEmailOtp(
   email: string,
   token: string
-): Promise<{ success: boolean; session?: any; error?: string }> {
+): Promise<VerifyOtpResult> {
   const normalizedEmail = (email || '').trim().toLowerCase();
   const normalizedToken = (token || '').trim();
 
@@ -156,7 +167,7 @@ export async function verifyEmailOtp(
   try {
     const { data, error } = await activeAdapter.verifyOtp(normalizedEmail, normalizedToken);
     if (error || !data?.user) {
-      console.warn('verifyEmailOtp backend error:', error?.message || error);
+      console.warn('verifyEmailOtp backend error:', error?.name || 'verification_failed');
       return {
         success: false,
         error: getCustomerErrorMessage('auth_invalid_otp'),
@@ -166,16 +177,22 @@ export async function verifyEmailOtp(
     const userId = data.user.id;
     const sessionEmail = data.user.email || normalizedEmail;
 
+    // If changing authenticated customer, purge previous customer caches first
+    const currentUserId = useAuthStore.getState().sessionUserId;
+    if (currentUserId && currentUserId !== userId) {
+      resetCustomerSessionData();
+    }
+
     // Project established identity into client stores
     useAuthStore.getState().setSession(userId, sessionEmail);
     useUserStore.getState().setRemoteSessionUser(userId, sessionEmail);
 
     return {
       success: true,
-      session: data.session,
+      userId,
     };
   } catch (err: any) {
-    console.warn('verifyEmailOtp exception:', err.message || err);
+    console.warn('verifyEmailOtp exception:', err?.name || 'unknown_error');
     return {
       success: false,
       error: getCustomerErrorMessage('auth_invalid_otp'),
@@ -185,12 +202,13 @@ export async function verifyEmailOtp(
 
 /**
  * Retrieves the current session from the auth provider and synchronizes the client stores.
+ * When no session is found, purges any residual customer caches.
  */
 export async function getCurrentSession(): Promise<{ userId: string | null; email: string | null }> {
   try {
     const { data, error } = await activeAdapter.getSession();
     if (error || !data?.session?.user) {
-      useAuthStore.getState().setSignedOut();
+      resetCustomerSessionData();
       return { userId: null, email: null };
     }
 
@@ -198,39 +216,66 @@ export async function getCurrentSession(): Promise<{ userId: string | null; emai
     const userId = user.id;
     const email = user.email || null;
 
+    const currentUserId = useAuthStore.getState().sessionUserId;
+    if (currentUserId && currentUserId !== userId) {
+      resetCustomerSessionData();
+    }
+
     useAuthStore.getState().setSession(userId, email);
     useUserStore.getState().setRemoteSessionUser(userId, email || '');
 
     return { userId, email };
   } catch (err: any) {
-    console.warn('getCurrentSession exception:', err.message || err);
-    useAuthStore.getState().setSignedOut();
+    console.warn('getCurrentSession exception:', err?.name || 'unknown_error');
+    resetCustomerSessionData();
     return { userId: null, email: null };
   }
 }
 
 /**
- * Signs out the active customer session, purges client caches and stores via resetCustomerSessionData.
+ * Signs out the active customer session on this device (scope: local).
+ * Only purges state and claims success when provider sign-out succeeds or session is confirmed gone.
  */
 export async function signOutSession(): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await activeAdapter.signOut();
+    const { error } = await activeAdapter.signOut({ scope: 'local' });
     if (error) {
-      console.warn('signOut error:', error.message || error);
+      // Check if session remains active in provider
+      const { data: sessionData } = await activeAdapter.getSession();
+      if (sessionData?.session?.user) {
+        console.warn('signOut failed: session remains active');
+        return {
+          success: false,
+          error: getCustomerErrorMessage('auth_signout'),
+        };
+      }
     }
-  } catch (err: any) {
-    console.warn('signOut exception:', err.message || err);
-  } finally {
-    // Always purge local customer data on sign-out request
-    resetCustomerSessionData();
-  }
 
-  return { success: true };
+    // Session successfully terminated or confirmed absent
+    resetCustomerSessionData();
+    return { success: true };
+  } catch (err: any) {
+    try {
+      const { data: sessionData } = await activeAdapter.getSession();
+      if (sessionData?.session?.user) {
+        console.warn('signOut exception: session remains active');
+        return {
+          success: false,
+          error: getCustomerErrorMessage('auth_signout'),
+        };
+      }
+    } catch {}
+
+    resetCustomerSessionData();
+    return { success: true };
+  }
 }
 
 /**
  * Subscribes to auth state changes from the active provider.
  * Automatically synchronizes store projections on session transitions.
+ * Purges prior customer caches when switching authenticated user UUIDs (A -> B),
+ * while preserving valid user caches across same-user token refreshes (A -> A).
  */
 export function subscribeToAuth(
   callback?: (event: string, session: any) => void
@@ -238,6 +283,12 @@ export function subscribeToAuth(
   const { data } = activeAdapter.onAuthStateChange((event, session) => {
     if (session?.user) {
       const user = session.user;
+      const currentUserId = useAuthStore.getState().sessionUserId;
+
+      if (currentUserId && currentUserId !== user.id) {
+        resetCustomerSessionData();
+      }
+
       useAuthStore.getState().setSession(user.id, user.email || null);
       useUserStore.getState().setRemoteSessionUser(user.id, user.email || '');
     } else if (event === 'SIGNED_OUT' || !session) {
@@ -255,3 +306,4 @@ export function subscribeToAuth(
     },
   };
 }
+

@@ -10,6 +10,7 @@ import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { startAuthAutoRefresh, stopAuthAutoRefresh } from '@/src/services/supabase';
 import { getCurrentSession, subscribeToAuth } from '@/src/services/authClient';
+import { resolveAuthRoute } from '@/src/utils/authRouting';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -20,6 +21,10 @@ export default function RootLayout() {
   // Handle AppState changes for Supabase token auto-refresh in remote mode
   useEffect(() => {
     if (!remoteEnabled) return;
+
+    if (AppState.currentState === 'active') {
+      startAuthAutoRefresh();
+    }
 
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
@@ -47,16 +52,16 @@ export default function RootLayout() {
     if (authStatus === 'INITIALIZING') return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const destination = resolveAuthRoute({
+      remoteEnabled,
+      authStatus,
+      isOnboardingCompleted: useOnboardingStore.getState().isCompleted,
+    });
 
-    if (authStatus === 'SIGNED_OUT' && !inAuthGroup) {
-      router.replace('/(auth)/login');
-    } else if (authStatus === 'SIGNED_IN' && inAuthGroup) {
-      const isCompleted = useOnboardingStore.getState().isCompleted;
-      if (isCompleted) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/(onboarding)/1-welcome');
-      }
+    if (destination.type === 'AUTH_LOGIN' && !inAuthGroup) {
+      router.replace(destination.route!);
+    } else if (destination.type === 'REMOTE_HOLDING' && inAuthGroup) {
+      router.replace(destination.route!);
     }
   }, [remoteEnabled, authStatus, segments]);
 
@@ -83,6 +88,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="holding" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         <Stack.Screen
