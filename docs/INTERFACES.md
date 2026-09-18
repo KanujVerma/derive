@@ -43,6 +43,16 @@ export interface IDeriveService {
   - `postCleanseTightness`: boolean
   - `confirmedProducts`: Product[]
   - `productReactions`: ProductReaction[]
+  - `formulaSnapshots`?: FormulaSnapshot[]
+  - `adaptiveFollowUps`?: Array<{ question: string; answer?: string }>
+  - `pihTendencyAnswer`?: 'Rarely' | 'Sometimes' | 'Often' | 'Not sure' | null
+  - `hasBadReactions`?: boolean | null
+  - `skinPhotos`:
+    - `frontUri`?: string
+    - `leftUri`?: string
+    - `rightUri`?: string
+    - `shelfUri`?: string
+    - `contextNote`?: string
   - `safetyContext`:
     - `knownSensitivities`: string[]
     - `sensitivitiesStatus`: `SensitivitiesStatus` (`'none_known'` | `'reported'` | `'unanswered'`)
@@ -51,7 +61,12 @@ export interface IDeriveService {
     - `pregnancyStatus`: `PregnancyStatus` (`'yes'` | `'no'` | `'prefer_not_to_say'` | `'unanswered'`)
     - `additionalNotes`?: string
 * **Builder**: `buildOnboardingPayload(snapshot, userId?, overrideRemote?)` (`src/services/deriveClient.ts`) creates the canonical payload while enforcing non-mock identity in Remote mode.
-* **Output**: `OnboardingResult` with initialized `CustomerProfile`, `SkinProfile`, and canonical `Routine`.
+* **Output**: `OnboardingResult`:
+  - `userId`: string
+  - `skinProfile`: `SkinProfile`
+  - `proposedRoutine`: `Routine | null` (null when routine proposal is deferred to async founder review / generation)
+  - `userProducts`: `UserProduct[]`
+  - `initialRoutineState`: `InitialRoutineState` (`'pending_generation'` | `'awaiting_review'`)
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.

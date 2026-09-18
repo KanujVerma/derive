@@ -211,6 +211,8 @@ export interface ProgressData {
 // 4. ONBOARDING PAYLOAD & RESULT
 // ==========================================
 
+export type InitialRoutineState = 'pending_generation' | 'awaiting_review';
+
 export interface OnboardingPayload {
   userId?: string;
   primaryGoal: Goal;
@@ -221,10 +223,15 @@ export interface OnboardingPayload {
   postCleanseTightness: boolean;
   confirmedProducts: Product[];
   productReactions: ProductReaction[];
+  formulaSnapshots?: FormulaSnapshot[];
+  adaptiveFollowUps?: Array<{ question: string; answer?: string }>;
+  pihTendencyAnswer?: 'Rarely' | 'Sometimes' | 'Often' | 'Not sure' | null;
+  hasBadReactions?: boolean | null;
   skinPhotos: {
     frontUri?: string;
     leftUri?: string;
     rightUri?: string;
+    shelfUri?: string;
     contextNote?: string;
   };
   safetyContext: {
@@ -240,8 +247,9 @@ export interface OnboardingPayload {
 export interface OnboardingResult {
   userId: string;
   skinProfile: SkinProfile;
-  proposedRoutine: Routine;
+  proposedRoutine: Routine | null;
   userProducts: UserProduct[];
+  initialRoutineState: InitialRoutineState;
 }
 
 export interface RoutineProposalInput {

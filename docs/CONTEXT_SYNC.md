@@ -6,6 +6,48 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj & Sami: I1-B1 Authenticated Remote Onboarding Intake Commit & Private Photo Pipeline
+
+- **Agent / Workstream**: Kanuj & Sami Shared Integration (Platform Persistence, Edge Functions & Mobile Pipeline)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `e8c0f88b08c7d1973971bea8bbd0deee8b6e468c`
+- **Prior Verified CI Run**: `35392766598` (on commit `e8c0f88`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B1 COMPLETE` (First authenticated Remote write integration: established Colima container runtime and verified real local Supabase Postgres; implemented additive database migration `20260918213146_onboarding_intake_submission_and_idempotency.sql` creating `public.onboarding_submissions` and partial unique indexes for draft uniqueness and `founder_review_tasks` initial routine review idempotency; created and verified `prepare-onboarding` and `onboard-customer` Edge Functions; implemented private photo upload helper `uploadPhotoToStorage` enforcing `customer-skin-photos` and `upsert: false`; evolved `OnboardingResult` to support `proposedRoutine: null` and `initialRoutineState: 'pending_generation'` without routine generation in B1; enriched `OnboardingPayload` with formula snapshots, adaptive follow-ups, PIH tendency, and bad reactions; verified client screen `10-summary.tsx` and stores handle null routines and re-resolve bootstrap truth before navigating in Remote mode; and validated via 83 pgTAP assertions and 97 unit tests).
+- **Ownership / Shared Contracts**: Coordinated additive shared contracts update (`src/domain/types.ts`). Additive database migration (`supabase/migrations/20260918213146_onboarding_intake_submission_and_idempotency.sql`) and dedicated pgTAP test suite (`supabase/tests/i1_b1_onboarding_intake.test.sql`). Edge Functions (`supabase/functions/prepare-onboarding/index.ts`, `supabase/functions/onboard-customer/index.ts`). Client photo upload helper (`src/services/onboardingPhotoUpload.ts`), Remote service implementation (`src/services/remote/RemoteDeriveService.ts`), client coordinator hardening (`src/services/deriveClient.ts`), and summary screen bootstrap verification (`app/(onboarding)/10-summary.tsx`). Pricing (ARCHITECTURE_CHALLENGE-01) strictly preserved as unresolved. `eas.json` Remote flag strictly preserved as `false`.
+- **Architectural Deliverables**:
+  1. **Additive Database Migration (`20260918213146_onboarding_intake_submission_and_idempotency.sql`)**:
+     - Created `public.onboarding_submissions`: internal intake staging ledger storing opaque storage paths and sanitized intake snapshots (`payload_snapshot JSONB`) with partial unique index ensuring a single active draft per member (`WHERE status = 'draft'`). RLS enabled; all privileges revoked from `anon` and `authenticated`, restricted to `service_role`.
+     - Attached `private.set_updated_at()` trigger.
+     - Added partial unique index to `public.founder_review_tasks (user_id, task_type) WHERE task_type = 'initial_routine' AND status = 'pending'`, ensuring idempotency across retried submissions.
+  2. **Supabase Edge Functions (`prepare-onboarding` & `onboard-customer`)**:
+     - `prepare-onboarding`: Authenticates caller JWT via `supabase.auth.getUser()`, derives immutable user UUID from token, retrieves existing active draft or creates a new draft in `onboarding_submissions`, generates server-issued storage paths (`<userId>/<angle>/<uuid>.jpg`), checks existing Storage objects for upload retry/resumption, and returns upload targets.
+     - `onboard-customer`: Authenticates caller JWT, enforces safety consistency (rejects pregnancy and sensitivity contradictions with HTTP 400), verifies Storage existence of required photos (`front`, `left`, `right`, and optional `shelf`), sanitizes snapshot (stripping local `file:///` URIs), commits `onboarding_submissions` to `committed`, upserts `skin_profiles` with `onboarding_completed: false`, records `user_photos` rows, idempotently inserts pending `initial_routine` founder review task, and **strictly last** sets `skin_profiles.onboarding_completed = true`.
+  3. **Shared Contracts & Domain Types**:
+     - Added `InitialRoutineState = 'pending_generation' | 'awaiting_review'`.
+     - Evolved `OnboardingResult`: `proposedRoutine: Routine | null`, `initialRoutineState: InitialRoutineState`.
+     - Enriched `OnboardingPayload`: `formulaSnapshots`, `adaptiveFollowUps`, `pihTendencyAnswer`, `hasBadReactions`, `skinPhotos.shelfUri`.
+  4. **Private Photo Pipeline (`src/services/onboardingPhotoUpload.ts`)**:
+     - Implemented `uploadPhotoToStorage(storagePath, localUri, client)` uploading directly to `customer-skin-photos` at server-issued path with `upsert: false`. Detects MIME types (`image/jpeg`, `image/png`, `image/webp`) and throws on error, never persisting local URIs.
+  5. **RemoteDeriveService & Client Integration**:
+     - Implemented 3-stage `onboard(payload)` pipeline in `RemoteDeriveService.ts`: `prepare-onboarding` -> upload photos -> `onboard-customer` (sanitizing local URIs).
+     - Hardened `submitOnboarding()` in `src/services/deriveClient.ts` to safely handle `proposedRoutine: null` and `initialRoutineState: 'pending_generation'` without dereferencing `status`, and preserve proven remote membership status.
+     - Updated `app/(onboarding)/10-summary.tsx` to re-resolve `CustomerBootstrapState` and verify `onboardingCompleted === true` before navigating with `router.replace('/(tabs)')` in Remote mode.
+  6. **Comprehensive Verification**:
+     - Colima container runtime active on host; real local Supabase Postgres, GoTrue, Storage, and Edge Runtime running cleanly.
+     - 83/83 pgTAP assertions passing across `s1_access_control.test.sql` and `i1_b1_onboarding_intake.test.sql`.
+     - Scratch integration test executed successfully against live local Supabase stack verifying test user authentication, `prepare-onboarding`, storage photo uploads, `onboard-customer` commit, and database records.
+     - 97/97 unit tests passing in `tests/derive.test.ts`.
+- **Verification**:
+  - `npm test`: 97/97 tests passing (100%).
+  - `npx supabase test db`: 83/83 assertions passing (100%).
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ## 2026-09-18 — Kanuj & Sami: I1-B0 Onboarding Persistence Contract & Safety Alignment
 
 - **Agent / Workstream**: Kanuj & Sami Shared Alignment (Mobile Client, Shared Contracts & Platform Persistence)

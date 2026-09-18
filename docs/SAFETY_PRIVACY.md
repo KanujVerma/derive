@@ -97,3 +97,15 @@ Derive maintains strict integrity in all customer communications.
   - Database migrations backfill existing records conservatively: `is_pregnant_or_nursing IS TRUE` -> `'yes'`, otherwise `'unanswered'` (never fabricating an explicit `'no'`).
   - Summary and review UI displays `'Not answered'` for unanswered states rather than falsely reporting `'No'`.
 
+---
+
+## 8. Server-Side Safety Contradiction Rejection & Intake Privacy (I1-B1)
+
+* **Server-Side Contradiction Defense**: The `onboard-customer` Edge Function acts as a cryptographic and logical safety checkpoint:
+  - Rejects `pregnancyStatus === 'yes'` when `isPregnantOrNursing === false` (and vice versa) with HTTP 400 Bad Request.
+  - Rejects `sensitivitiesStatus === 'reported'` when `knownSensitivities` is empty with HTTP 400 Bad Request.
+  - Rejects `sensitivitiesStatus === 'none_known'` when `knownSensitivities` is non-empty with HTTP 400 Bad Request.
+* **Zero Client-Local URI Leakage**: Raw local file system URIs (`file:///`, `ph://`, `content://`) are stripped on the client before network transmission and rejected/omitted in Postgres snapshot ledgers. Only server-issued opaque Storage object paths (`<userId>/<angle>/<uuid>.jpg`) are preserved.
+* **Storage Verification Before Relational Commit**: The server explicitly checks Storage existence of required baseline photos (`front`, `left`, `right`) before writing to `skin_profiles` or `user_photos`.
+* **Single Atomic Commit Marker**: The commit state `skin_profiles.onboarding_completed = true` is set strictly as the final operation in the commit sequence, preventing partially initialized accounts from being considered complete.
+

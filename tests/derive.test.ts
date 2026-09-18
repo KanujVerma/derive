@@ -1645,6 +1645,7 @@ import {
   resolveUserId,
   buildOnboardingPayload,
 } from '../src/services/deriveClient.ts';
+import { uploadPhotoToStorage } from '../src/services/onboardingPhotoUpload.ts';
 import { useBootstrapStore } from '../src/stores/bootstrapStore.ts';
 import {
   RemoteDeriveService,
@@ -1746,6 +1747,7 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
           pmSteps: [],
         },
         userProducts: [],
+        initialRoutineState: 'awaiting_review',
       };
     }
 
@@ -4120,5 +4122,326 @@ test('I1-B0 Mock Service: Preserves canonical safety statuses on returned SkinPr
   assert.equal(result.skinProfile.pregnancyStatus, 'no');
   assert.equal(result.skinProfile.isPregnantOrNursing, false);
   assert.equal(result.skinProfile.onboardingCompleted, true);
+  assert.equal(result.initialRoutineState, 'awaiting_review');
+});
+
+// ========================================================
+// 33. I1-B1 AUTHENTICATED REMOTE ONBOARDING INTAKE & PHOTO PIPELINE
+// ========================================================
+
+test('I1-B1 Shared Contract & Payload: buildOnboardingPayload maps enriched fields with fidelity', () => {
+  const dummyFormulaSnapshots: FormulaSnapshot[] = [
+    {
+      id: 'fs_test_1',
+      productId: 'prod_test_1',
+      brand: 'TestBrand',
+      productName: 'TestMoisturizer',
+      ingredients: ['water', 'glycerin', 'ceramide np'],
+      capturedAt: new Date().toISOString(),
+    },
+  ];
+
+  const payload = buildOnboardingPayload(
+    {
+      primaryGoal: 'breakouts',
+      secondaryGoals: ['texture'],
+      routineComplexity: 'simple',
+      costPreference: 'balanced',
+      middayFeel: 'oily_shiny',
+      postCleanseTightness: true,
+      frontPhotoUri: 'file:///local/front.jpg',
+      leftPhotoUri: 'file:///local/left.jpg',
+      rightPhotoUri: 'file:///local/right.jpg',
+      shelfPhotoUri: 'file:///local/shelf.jpg',
+      photoContextNote: 'Morning lighting near window',
+      formulaSnapshots: dummyFormulaSnapshots,
+      adaptiveFollowUps: [{ question: 'Do you experience flaking?', answer: 'Rarely' }],
+      pihTendencyAnswer: 'Sometimes',
+      hasBadReactions: true,
+      productReactions: [],
+      knownSensitivities: ['Fragrance'],
+      sensitivitiesStatus: 'reported',
+      pregnancyStatus: 'no',
+      isPregnantOrNursing: false,
+    },
+    'usr_beta_member',
+    false
+  );
+
+  assert.equal(payload.skinPhotos.frontUri, 'file:///local/front.jpg');
+  assert.equal(payload.skinPhotos.leftUri, 'file:///local/left.jpg');
+  assert.equal(payload.skinPhotos.rightUri, 'file:///local/right.jpg');
+  assert.equal(payload.skinPhotos.shelfUri, 'file:///local/shelf.jpg');
+  assert.equal(payload.skinPhotos.contextNote, 'Morning lighting near window');
+  assert.deepEqual(payload.formulaSnapshots, dummyFormulaSnapshots);
+  assert.deepEqual(payload.adaptiveFollowUps, [{ question: 'Do you experience flaking?', answer: 'Rarely' }]);
+  assert.equal(payload.pihTendencyAnswer, 'Sometimes');
+  assert.equal(payload.hasBadReactions, true);
+});
+
+test('I1-B1 Client Routine Store & submitOnboarding: Safely handles null proposedRoutine and pending_generation without dereference error', async () => {
+  class B1RemoteMockService extends MockDeriveService {
+    override async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
+      return {
+        userId: 'usr_b1_member',
+        skinProfile: {
+          id: 'sp_b1_test',
+          userId: 'usr_b1_member',
+          primaryGoal: payload.primaryGoal,
+          secondaryGoals: payload.secondaryGoals,
+          routineComplexity: payload.routineComplexity,
+          costPreference: payload.costPreference,
+          middayFeel: payload.middayFeel,
+          postCleanseTightness: payload.postCleanseTightness,
+          knownSensitivities: [],
+          sensitivitiesStatus: 'none_known',
+          activePrescriptions: [],
+          isPregnantOrNursing: false,
+          pregnancyStatus: 'no',
+          onboardingCompleted: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        proposedRoutine: null,
+        userProducts: [],
+        initialRoutineState: 'pending_generation',
+      };
+    }
+  }
+
+  const origService = getDeriveService();
+  setDeriveService(new B1RemoteMockService());
+
+  try {
+    const payload = buildOnboardingPayload({
+      primaryGoal: 'breakouts',
+      sensitivitiesStatus: 'none_known',
+      pregnancyStatus: 'no',
+    }, 'usr_b1_member', false);
+
+    // Call submitOnboarding with null proposedRoutine
+    const result = await submitOnboarding(payload);
+
+    assert.equal(result.proposedRoutine, null);
+    assert.equal(result.initialRoutineState, 'pending_generation');
+
+    // RoutineStore projections
+    const routineState = useRoutineStore.getState();
+    assert.equal(routineState.routine, null);
+    assert.equal(routineState.isPlanUnderReview, true);
+    assert.deepEqual(routineState.userProducts, []);
+  } finally {
+    setDeriveService(origService);
+  }
+});
+
+test('I1-B1 Membership Protection: submitOnboarding does not assert active membership in Remote mode', async () => {
+  class B1RemoteServiceDouble extends RemoteDeriveService {
+    constructor() {
+      super({} as any);
+    }
+    override async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
+      return {
+        userId: 'usr_remote_truth',
+        skinProfile: {
+          id: 'sp_remote_test',
+          userId: 'usr_remote_truth',
+          primaryGoal: payload.primaryGoal,
+          secondaryGoals: payload.secondaryGoals,
+          routineComplexity: payload.routineComplexity,
+          costPreference: payload.costPreference,
+          middayFeel: payload.middayFeel,
+          postCleanseTightness: payload.postCleanseTightness,
+          knownSensitivities: [],
+          sensitivitiesStatus: 'none_known',
+          activePrescriptions: [],
+          isPregnantOrNursing: false,
+          pregnancyStatus: 'no',
+          onboardingCompleted: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        proposedRoutine: null,
+        userProducts: [],
+        initialRoutineState: 'pending_generation',
+      };
+    }
+  }
+
+  const origService = getDeriveService();
+  setDeriveService(new B1RemoteServiceDouble());
+
+  try {
+    // Initial user state has membershipStatus: 'none'
+    useUserStore.setState({
+      userId: 'usr_remote_truth',
+      membershipStatus: 'none',
+    });
+
+    const payload = buildOnboardingPayload({
+      primaryGoal: 'breakouts',
+      sensitivitiesStatus: 'none_known',
+      pregnancyStatus: 'no',
+    }, 'usr_remote_truth', true);
+
+    await submitOnboarding(payload);
+
+    // In Remote mode, membershipStatus must NOT be blindly overwritten to 'active'
+    assert.equal(useUserStore.getState().membershipStatus, 'none');
+  } finally {
+    setDeriveService(origService);
+  }
+});
+
+test('I1-B1 Storage Photo Upload Helper: Enforces private bucket, server path, and upsert=false', async () => {
+  const uploadCalls: Array<{ bucket: string; path: string; options: any }> = [];
+
+  const mockClient = {
+    storage: {
+      from: (bucket: string) => ({
+        upload: async (path: string, body: any, options: any) => {
+          uploadCalls.push({ bucket, path, options });
+          return { data: { path }, error: null };
+        },
+      }),
+    },
+  };
+
+  // Mock global fetch for testing
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url: any) => {
+    return {
+      ok: true,
+      blob: async () => ({
+        type: 'image/jpeg',
+      }),
+    } as any;
+  };
+
+  try {
+    await uploadPhotoToStorage(
+      'usr_123/front/photo_test.jpg',
+      'file:///local/photo_test.jpg',
+      mockClient
+    );
+
+    assert.equal(uploadCalls.length, 1);
+    assert.equal(uploadCalls[0].bucket, 'customer-skin-photos');
+    assert.equal(uploadCalls[0].path, 'usr_123/front/photo_test.jpg');
+    assert.equal(uploadCalls[0].options.upsert, false);
+    assert.equal(uploadCalls[0].options.contentType, 'image/jpeg');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('I1-B1 RemoteDeriveService Onboarding Pipeline: Orchestrates prepare -> private photo uploads -> commit', async () => {
+  const functionInvocations: Array<{ functionName: string; body: any }> = [];
+  const storageUploads: Array<{ path: string; options: any }> = [];
+
+  const mockSupabaseClient = {
+    functions: {
+      invoke: async (name: string, options: { body: any }) => {
+        functionInvocations.push({ functionName: name, body: options.body });
+        if (name === 'prepare-onboarding') {
+          return {
+            data: {
+              submissionId: 'sub_b1_123',
+              uploadTargets: {
+                front: { path: 'usr_remote/front/front_1.jpg', uploaded: false },
+                left: { path: 'usr_remote/left/left_1.jpg', uploaded: false },
+                right: { path: 'usr_remote/right/right_1.jpg', uploaded: true }, // already uploaded
+                shelf: { path: 'usr_remote/shelf/shelf_1.jpg', uploaded: false },
+              },
+            },
+            error: null,
+          };
+        }
+        if (name === 'onboard-customer') {
+          return {
+            data: {
+              userId: 'usr_remote',
+              skinProfile: {
+                id: 'sp_remote_b1',
+                userId: 'usr_remote',
+                primaryGoal: options.body.payload.primaryGoal,
+                secondaryGoals: [],
+                routineComplexity: 'simple',
+                costPreference: 'balanced',
+                middayFeel: 'combination',
+                postCleanseTightness: false,
+                knownSensitivities: [],
+                sensitivitiesStatus: 'none_known',
+                activePrescriptions: [],
+                isPregnantOrNursing: false,
+                pregnancyStatus: 'no',
+                onboardingCompleted: true,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+              proposedRoutine: null,
+              userProducts: [],
+              initialRoutineState: 'pending_generation',
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: new Error(`Unexpected function ${name}`) };
+      },
+    },
+    storage: {
+      from: (bucket: string) => ({
+        upload: async (path: string, body: any, options: any) => {
+          storageUploads.push({ path, options });
+          return { data: { path }, error: null };
+        },
+      }),
+    },
+  };
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    blob: async () => ({ type: 'image/jpeg' }),
+  } as any);
+
+  try {
+    const service = new RemoteDeriveService(mockSupabaseClient);
+    const payload = buildOnboardingPayload({
+      primaryGoal: 'breakouts',
+      frontPhotoUri: 'file:///local/front.jpg',
+      leftPhotoUri: 'file:///local/left.jpg',
+      rightPhotoUri: 'file:///local/right.jpg',
+      shelfPhotoUri: 'file:///local/shelf.jpg',
+      sensitivitiesStatus: 'none_known',
+      pregnancyStatus: 'no',
+    }, 'usr_remote', true);
+
+    const result = await service.onboard(payload);
+
+    // 1. Invocation ordering: prepare-onboarding first, onboard-customer second
+    assert.equal(functionInvocations.length, 2);
+    assert.equal(functionInvocations[0].functionName, 'prepare-onboarding');
+    assert.equal(functionInvocations[1].functionName, 'onboard-customer');
+
+    // 2. Storage uploads: front, left, and shelf uploaded. Right skipped (was uploaded: true)
+    assert.equal(storageUploads.length, 3);
+    assert.equal(storageUploads[0].path, 'usr_remote/front/front_1.jpg');
+    assert.equal(storageUploads[1].path, 'usr_remote/left/left_1.jpg');
+    assert.equal(storageUploads[2].path, 'usr_remote/shelf/shelf_1.jpg');
+
+    // 3. Sanitized payload passed to onboard-customer (no file:/// URIs)
+    const commitPayload = functionInvocations[1].body.payload;
+    assert.equal(commitPayload.skinPhotos.frontUri, undefined);
+    assert.equal(commitPayload.skinPhotos.leftUri, undefined);
+    assert.equal(commitPayload.skinPhotos.rightUri, undefined);
+    assert.equal(commitPayload.skinPhotos.shelfUri, undefined);
+
+    // 4. Result matches canonical initialRoutineState and null proposedRoutine
+    assert.equal(result.proposedRoutine, null);
+    assert.equal(result.initialRoutineState, 'pending_generation');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 

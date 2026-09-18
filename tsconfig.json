@@ -9,5 +9,5 @@
       "@/*": ["./*"]
     }
   },
-  "exclude": ["node_modules", "tests", "dist", "dist-web", ".expo"]
+  "exclude": ["node_modules", "tests", "dist", "dist-web", ".expo", "supabase"]
 }

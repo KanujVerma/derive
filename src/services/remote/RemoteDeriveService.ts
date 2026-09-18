@@ -29,6 +29,7 @@ import type {
   RoutinePlan,
 } from '../../domain/types.ts';
 import { supabase } from '../supabase.ts';
+import { uploadPhotoToStorage } from '../onboardingPhotoUpload.ts';
 
 export class RemoteDeriveService implements IDeriveService {
   private customClient: any = null;
@@ -51,10 +52,67 @@ export class RemoteDeriveService implements IDeriveService {
 
   async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
     const client = this.getClient();
+
+    // 1. Prepare onboarding submission and retrieve opaque server-issued upload targets
+    const { data: prepareData, error: prepareError } = await client.functions.invoke(
+      'prepare-onboarding',
+      { body: {} }
+    );
+    if (prepareError || !prepareData?.submissionId) {
+      throw new Error(
+        `RemoteDeriveService.onboard failed in prepare-onboarding: ${prepareError?.message || 'Invalid prepare response'}`
+      );
+    }
+
+    const { submissionId, uploadTargets } = prepareData;
+
+    // 2. Upload private skin photos directly to server-issued storage targets
+    const frontUri = payload.skinPhotos?.frontUri;
+    const leftUri = payload.skinPhotos?.leftUri;
+    const rightUri = payload.skinPhotos?.rightUri;
+    const shelfUri = payload.skinPhotos?.shelfUri;
+
+    if (!uploadTargets?.front?.uploaded) {
+      if (!frontUri) throw new Error('Missing front photo URI for onboarding');
+      await uploadPhotoToStorage(uploadTargets.front.path, frontUri, client);
+    }
+
+    if (!uploadTargets?.left?.uploaded) {
+      if (!leftUri) throw new Error('Missing left photo URI for onboarding');
+      await uploadPhotoToStorage(uploadTargets.left.path, leftUri, client);
+    }
+
+    if (!uploadTargets?.right?.uploaded) {
+      if (!rightUri) throw new Error('Missing right photo URI for onboarding');
+      await uploadPhotoToStorage(uploadTargets.right.path, rightUri, client);
+    }
+
+    if (shelfUri && uploadTargets?.shelf && !uploadTargets.shelf.uploaded) {
+      await uploadPhotoToStorage(uploadTargets.shelf.path, shelfUri, client);
+    }
+
+    // 3. Commit intake with onboard-customer (sanitizing client-local URIs)
+    const { skinPhotos, ...restPayload } = payload;
+    const sanitizedPayload = {
+      ...restPayload,
+      skinPhotos: {
+        contextNote: skinPhotos?.contextNote,
+      },
+    };
+
     const { data, error } = await client.functions.invoke('onboard-customer', {
-      body: payload,
+      body: {
+        submissionId,
+        payload: sanitizedPayload,
+      },
     });
-    if (error) throw new Error(`RemoteDeriveService.onboard failed: ${error.message}`);
+
+    if (error || !data) {
+      throw new Error(
+        `RemoteDeriveService.onboard failed in onboard-customer: ${error?.message || 'Empty response'}`
+      );
+    }
+
     return data as OnboardingResult;
   }
 

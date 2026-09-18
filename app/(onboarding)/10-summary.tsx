@@ -12,7 +12,7 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { GoalLabels } from '@/src/types/schema';
-import { submitOnboarding, buildOnboardingPayload } from '@/src/services/deriveClient';
+import { submitOnboarding, buildOnboardingPayload, isRemoteMode, getDeriveService } from '@/src/services/deriveClient';
 import { useUserStore } from '@/src/stores/userStore';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { Icon } from '@/src/components/ui/Icon';
@@ -49,6 +49,14 @@ export default function SummaryScreen() {
       const payload = buildOnboardingPayload(onboarding, useUserStore.getState().userId);
 
       await submitOnboarding(payload);
+
+      // In Remote mode, verify canonical bootstrap truth before navigating
+      if (isRemoteMode()) {
+        const bootstrap = await getDeriveService().getCustomerBootstrapState(useUserStore.getState().userId);
+        if (!bootstrap.onboardingCompleted) {
+          throw new Error('Onboarding completion verification failed on server');
+        }
+      }
 
       analytics.track('onboarding_completed', {
         productCount: onboarding.detectedProducts.length,

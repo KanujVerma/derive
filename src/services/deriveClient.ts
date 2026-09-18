@@ -14,6 +14,8 @@
 
 import { useState, useCallback } from 'react';
 import { getDeriveService, isRemoteServiceEnabled } from './DeriveService.ts';
+export { getDeriveService, isRemoteServiceEnabled };
+export const isRemoteMode = isRemoteServiceEnabled;
 import type { IDeriveService } from '../contracts/DeriveService.ts';
 import type {
   OnboardingPayload,
@@ -102,10 +104,15 @@ export function buildOnboardingPayload(
     postCleanseTightness: onboardingState.postCleanseTightness ?? false,
     confirmedProducts: onboardingState.detectedProducts || [],
     productReactions: onboardingState.productReactions || [],
+    formulaSnapshots: onboardingState.formulaSnapshots || [],
+    adaptiveFollowUps: onboardingState.adaptiveFollowUps || [],
+    pihTendencyAnswer: onboardingState.pihTendencyAnswer ?? null,
+    hasBadReactions: onboardingState.hasBadReactions ?? null,
     skinPhotos: {
       frontUri: onboardingState.frontPhotoUri || undefined,
       leftUri: onboardingState.leftPhotoUri || undefined,
       rightUri: onboardingState.rightPhotoUri || undefined,
+      shelfUri: onboardingState.shelfPhotoUri || undefined,
       contextNote: onboardingState.photoContextNote || undefined,
     },
     safetyContext: {
@@ -136,17 +143,17 @@ export async function submitOnboarding(payload: OnboardingPayload): Promise<Onbo
     refillRequests: [],
     learnedInsights: [],
     researchInsights: [],
-    isPlanUnderReview: result.proposedRoutine.status === 'awaiting_review',
+    isPlanUnderReview: result.proposedRoutine ? result.proposedRoutine.status === 'awaiting_review' : true,
     todayDominantStatus: 'Final review: Your first routine gets one final quality check before it goes live.',
     isWeeklyCheckInDue: false,
   });
 
-  // Synchronize user store profile
+  // Synchronize user store profile without overriding remote membership status
   if (result.userId) {
-    useUserStore.setState({
+    useUserStore.setState((state) => ({
       userId: result.userId,
-      membershipStatus: 'active',
-    });
+      membershipStatus: isRemoteMode() ? state.membershipStatus : 'active',
+    }));
   }
 
   // Mark local onboarding flow complete

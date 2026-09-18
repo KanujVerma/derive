@@ -283,6 +283,40 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Database runtime verification status truthfully reported (Docker daemon absent).
 
+### I1-B1: Authenticated Remote Onboarding Intake Commit & Private Photo Pipeline [COMPLETE]
+* **Scope**:
+  - Additive database migration `20260918213146_onboarding_intake_submission_and_idempotency.sql`:
+    - Created `public.onboarding_submissions` table for durable intake staging with unique partial index on `(user_id) WHERE status = 'draft'`.
+    - Revoked all privileges on `onboarding_submissions` from `anon` and `authenticated`; granted full access to `service_role`.
+    - Added partial unique index on `public.founder_review_tasks (user_id, task_type) WHERE task_type = 'initial_routine' AND status = 'pending'` for idempotency.
+    - Attached `private.set_updated_at()` trigger to `onboarding_submissions`.
+  - Edge Functions implementation:
+    - `prepare-onboarding`: Authenticates caller JWT via `supabase.auth.getUser()`, derives immutable user UUID, creates or retrieves active draft submission, verifies any previously uploaded photos for retry support, and returns server-issued upload targets (`<userId>/<angle>/<opaque_id>.jpg`).
+    - `onboard-customer`: Authenticates caller JWT, validates payload consistency (rejecting safety contradictions), verifies existence of required private photos (`front`, `left`, `right`, and optional `shelf`) in `customer-skin-photos` using admin client, sanitizes snapshot (stripping local `file:///` URIs), commits `onboarding_submissions` to `committed`, upserts `skin_profiles` with `onboarding_completed = false`, records `user_photos` rows, creates pending `initial_routine` founder review task, and **strictly last** sets `skin_profiles.onboarding_completed = true`.
+  - Shared contracts & domain types:
+    - Added `InitialRoutineState = 'pending_generation' | 'awaiting_review'`.
+    - Evolved `OnboardingResult`: `proposedRoutine: Routine | null`, `initialRoutineState: InitialRoutineState`.
+    - Enriched `OnboardingPayload` with `formulaSnapshots`, `adaptiveFollowUps`, `pihTendencyAnswer`, `hasBadReactions`, and `skinPhotos.shelfUri`.
+  - Client photo upload helper (`src/services/onboardingPhotoUpload.ts`):
+    - Uploads private photos directly to `customer-skin-photos` at server-issued paths with `upsert: false`. Detects MIME types and throws on error, never persisting local URIs.
+  - RemoteDeriveService & Client integration:
+    - Implemented 3-stage `onboard(payload)` pipeline in `RemoteDeriveService.ts`: `prepare-onboarding` -> upload photos -> `onboard-customer`.
+    - Hardened `submitOnboarding()` in `src/services/deriveClient.ts` to safely handle `proposedRoutine: null` without dereferencing `status`, and preserve proven remote membership status.
+    - Updated `app/(onboarding)/10-summary.tsx` to re-resolve `CustomerBootstrapState` and verify `onboardingCompleted === true` before navigating in Remote mode.
+  - Database & test verification:
+    - Colima native container runtime active; Supabase local stack fully running.
+    - 83/83 pgTAP assertions passing across `s1_access_control.test.sql` and `i1_b1_onboarding_intake.test.sql`.
+    - End-to-end integration verified on real local Supabase with synthetic authenticated test user.
+    - 97/97 unit tests passing in `tests/derive.test.ts`.
+* **Acceptance Criteria**:
+  - 100% test suite passing (97/97 tests in `tests/derive.test.ts`).
+  - 100% pgTAP test suite passing (83/83 assertions).
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - End-to-end intake verified on local Supabase container stack.
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]

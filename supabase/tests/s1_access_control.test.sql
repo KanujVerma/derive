@@ -5,7 +5,7 @@ select plan(71);
 -- Schema, policy, privilege, auth-provisioning, and bucket invariants.
 select results_eq(
   $$
-    select relname::text
+    select relname::text collate "default"
     from pg_class
     where oid in (
       'public.profiles'::regclass,
@@ -41,7 +41,7 @@ select results_eq(
 
 select results_eq(
   $$
-    select tablename || '.' || policyname || ':' || cmd || ':' || array_to_string(roles, ',')
+    select (tablename || '.' || policyname || ':' || cmd || ':' || array_to_string(roles, ',')) collate "default"
     from pg_policies
     where schemaname = 'public'
       and tablename = any (array[
@@ -85,7 +85,7 @@ select results_eq(
 
 select results_eq(
   $$
-    select policyname || ':' || cmd || ':' || array_to_string(roles, ',')
+    select (policyname || ':' || cmd || ':' || array_to_string(roles, ',')) collate "default"
     from pg_policies
     where schemaname = 'storage'
       and tablename = 'objects'
@@ -97,7 +97,7 @@ select results_eq(
 
 select results_eq(
   $$
-    select tgname::text
+    select tgname::text collate "default"
     from pg_trigger
     where tgrelid = 'auth.users'::regclass
       and not tgisinternal

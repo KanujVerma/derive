@@ -315,6 +315,7 @@ export class MockDeriveService implements IDeriveService {
       skinProfile,
       proposedRoutine: pendingRoutine,
       userProducts: proposal.userProducts,
+      initialRoutineState: 'awaiting_review',
     };
   }
 
