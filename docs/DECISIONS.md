@@ -160,23 +160,22 @@ These findings are review evidence, not accepted contract changes. S1A does not 
 6. **Affected Workstreams**: Shared domain contract, database membership model, client presentation, operations, and S5 commerce.
 7. **Unblocked Work**: S1 security hardening can continue without persisting new pricing semantics.
 
-### ARCHITECTURE_CHALLENGE-02: Safety Unknown States Are Collapsed
-1. **Existing Decision**: Product documentation and onboarding state distinguish pregnancy/nursing (`yes`, `no`, `prefer_not_to_say`, `unanswered`) and sensitivities (`none_known`, `reported`, `unanswered`).
-2. **Exact Evidence**: The baseline database stores only a default-false pregnancy boolean and default-empty sensitivity array. `OnboardingPayload` and `SkinProfile` in the shared contract retain only the same boolean/array.
-3. **Why It Matters**: Missing or withheld data becomes a false negative, destroying provenance and weakening conservative safety behavior.
-4. **Recommended Change**: With joint contract approval, add explicit canonical status fields, preserve the legacy boolean/array during transition, and backfill unproven `false`/empty values to `unanswered` rather than assuming `no`/`none_known`.
-5. **Alternatives**: A versioned safety fact/event model may preserve richer history, but retaining the collapsed model is not recommended.
-6. **Affected Workstreams**: Shared onboarding/profile contracts, database persistence, routine intelligence, and client-to-remote mapping.
-7. **Unblocked Work**: S1 RLS/Auth/Storage can continue; S2 persistence should not be declared complete until resolved.
+### ARCHITECTURE_CHALLENGE-02: Safety Unknown States Are Collapsed [RESOLVED IN I1-B0]
+1. **Status**: RESOLVED & IMPLEMENTED (I1-B0).
+2. **Prior State**: The baseline database stored only a default-false pregnancy boolean and default-empty sensitivity array. Missing or withheld disclosures were collapsed into false negatives (`no` / `none_known`), destroying safety provenance.
+3. **Resolution Implemented (I1-B0)**:
+   - **Additive Migration (`20260918203554_onboarding_safety_status_and_action_pause.sql`)**: Added `pregnancy_status` (CHECK `in ('yes', 'no', 'prefer_not_to_say', 'unanswered')`) and `sensitivities_status` (CHECK `in ('none_known', 'reported', 'unanswered')`) with default `'unanswered'` and `NOT NULL`. Conservative epistemic backfill: `is_pregnant_or_nursing IS TRUE` -> `'yes'`, else `'unanswered'`; non-empty `known_sensitivities` -> `'reported'`, else `'unanswered'`. Column grants for insert/update granted to `authenticated`.
+   - **Shared Schema & Contracts**: Added `PregnancyStatusSchema`, `SensitivitiesStatusSchema`, and updated `SkinProfile` and `OnboardingPayload.safetyContext` in `src/types/schema.ts` and `src/domain/types.ts`.
+   - **Client State & UI Truth**: Updated `useOnboardingStore`, `8-safety.tsx` (initialized strictly to `none_known` / explicit choice, never coercing `unanswered`), `10-summary.tsx` (truthful display copy `'Not answered'` for unanswered states), and pure payload builder `buildOnboardingPayload` in `src/services/deriveClient.ts`.
+4. **Affected Workstreams**: Shared onboarding/profile contracts, database persistence, routine intelligence, and client-to-remote mapping.
 
-### ARCHITECTURE_CHALLENGE-03: `STOP` vs `PAUSE` Persistence Drift
-1. **Existing Decision**: Product UX defines `KEEP`, `PAUSE`, `REPLACE`, and `ADD`; the shared schema currently permits both `PAUSE` and `STOP`.
-2. **Exact Evidence**: `user_products.action` in the baseline database accepts `STOP` but rejects `PAUSE`, while the routine generator emits both and tests explicitly require `PAUSE` for temporary holds.
-3. **Why It Matters**: A valid client-generated `PAUSE` cannot persist, while `STOP` can persist without a fully documented customer-facing meaning.
-4. **Recommended Change**: Jointly define whether `STOP` is a distinct permanent/safety-terminal action. Then migrate the database to the approved shared superset before narrowing any TypeScript/UI semantics.
-5. **Alternatives**: Standardize V1 on four customer-facing actions, or retain `STOP` as an internal distinct state with explicit presentation rules.
-6. **Affected Workstreams**: Shared schema/domain types, routine generator, database constraint, Plan UI, and remote mapping.
-7. **Unblocked Work**: S1 hardening can continue; S2 user-product persistence requires resolution.
+### ARCHITECTURE_CHALLENGE-03: `STOP` vs `PAUSE` Persistence Drift [RESOLVED IN I1-B0]
+1. **Status**: RESOLVED & IMPLEMENTED (I1-B0).
+2. **Prior State**: `user_products.action` in the baseline database accepted `STOP` but rejected `PAUSE`, while the routine generator emitted both and tests required `PAUSE` for temporary holds.
+3. **Resolution Implemented (I1-B0)**:
+   - **Additive Migration (`20260918203554_onboarding_safety_status_and_action_pause.sql`)**: Replaced `user_products_action_check` constraint with canonical superset: `CHECK (action in ('KEEP', 'PAUSE', 'REPLACE', 'ADD', 'STOP'))`.
+   - **Verified via pgTAP**: Tests verify acceptance of `PAUSE`, `KEEP`, `REPLACE`, `ADD`, `STOP`, and rejection of invalid actions.
+4. **Affected Workstreams**: Shared schema/domain types, routine generator, database constraint, Plan UI, and remote persistence.
 
 ### ARCHITECTURE_CHALLENGE-04: Real-Time Face-Quality Auto-Capture Requires Native Dependency & Build Architecture [ARCHITECTURE SELECTED & WIRED / PHYSICAL DEVICE VALIDATION IN K5]
 1. **Existing Decision**: ADR-21 requires hands-free camera auto-capture gated on continuous real-time capture quality (face presence, pose/orientation, distance/face size, centering, lighting, sharpness, stability) with manual fallback.

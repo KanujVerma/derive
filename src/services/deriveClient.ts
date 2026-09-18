@@ -35,7 +35,7 @@ import type {
 } from '../domain/types.ts';
 import { useRoutineStore } from '../stores/routineStore.ts';
 import { useUserStore } from '../stores/userStore.ts';
-import { useOnboardingStore } from '../stores/onboardingStore.ts';
+import { useOnboardingStore, type OnboardingState } from '../stores/onboardingStore.ts';
 import { useBootstrapStore } from '../stores/bootstrapStore.ts';
 import { useAuthStore } from '../stores/authStore.ts';
 import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
@@ -57,11 +57,12 @@ export function getClientService(): IDeriveService {
  * NOTE: This is a client-side identity presence check to prevent mock data leakage, NOT proof of
  * an authenticated session or valid Supabase JWT (which is enforced server-side via RLS in S1/I1).
  */
-export function resolveUserId(userId?: string): string {
+export function resolveUserId(userId?: string, overrideRemote?: boolean): string {
   const rawId = userId !== undefined ? userId : useUserStore.getState().userId;
   const trimmed = typeof rawId === 'string' ? rawId.trim() : '';
+  const isRemote = overrideRemote !== undefined ? overrideRemote : isRemoteServiceEnabled();
 
-  if (isRemoteServiceEnabled()) {
+  if (isRemote) {
     if (!trimmed || trimmed === 'usr_beta_member' || trimmed === 'usr_beta_001') {
       throw new Error('Valid member identity required: Remote operations require a non-mock customer identity.');
     }
@@ -77,6 +78,45 @@ export function resolveUserId(userId?: string): string {
  */
 export function getActiveUserId(): string {
   return resolveUserId();
+}
+
+/**
+ * Pure builder function to construct canonical OnboardingPayload from onboarding state snapshot.
+ * Guarantees provenance of safety context (sensitivitiesStatus, pregnancyStatus) and enforces
+ * non-mock identity check in Remote mode.
+ */
+export function buildOnboardingPayload(
+  onboardingState: Partial<OnboardingState>,
+  userId?: string,
+  overrideRemote?: boolean
+): OnboardingPayload {
+  const resolvedUserId = resolveUserId(userId, overrideRemote);
+
+  return {
+    userId: resolvedUserId,
+    primaryGoal: onboardingState.primaryGoal || 'breakouts',
+    secondaryGoals: onboardingState.secondaryGoals || [],
+    routineComplexity: onboardingState.routineComplexity || 'simple',
+    costPreference: onboardingState.costPreference || 'balanced',
+    middayFeel: onboardingState.middayFeel || 'combination',
+    postCleanseTightness: onboardingState.postCleanseTightness ?? false,
+    confirmedProducts: onboardingState.detectedProducts || [],
+    productReactions: onboardingState.productReactions || [],
+    skinPhotos: {
+      frontUri: onboardingState.frontPhotoUri || undefined,
+      leftUri: onboardingState.leftPhotoUri || undefined,
+      rightUri: onboardingState.rightPhotoUri || undefined,
+      contextNote: onboardingState.photoContextNote || undefined,
+    },
+    safetyContext: {
+      knownSensitivities: onboardingState.knownSensitivities || [],
+      sensitivitiesStatus: onboardingState.sensitivitiesStatus || 'unanswered',
+      activePrescriptions: onboardingState.activePrescriptions || [],
+      isPregnantOrNursing: onboardingState.isPregnantOrNursing ?? false,
+      pregnancyStatus: onboardingState.pregnancyStatus || 'unanswered',
+      additionalNotes: onboardingState.additionalSafetyNotes || undefined,
+    },
+  };
 }
 
 // ==========================================

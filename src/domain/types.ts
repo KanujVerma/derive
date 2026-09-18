@@ -22,6 +22,8 @@ import type {
   FormulaSnapshot,
   IngredientSignal,
   SkinProfile,
+  PregnancyStatus,
+  SensitivitiesStatus,
   ProductCategory,
   RoutineAction,
   Product,
@@ -64,6 +66,8 @@ export type {
   FormulaSnapshot,
   IngredientSignal,
   SkinProfile,
+  PregnancyStatus,
+  SensitivitiesStatus,
   ProductCategory,
   RoutineAction,
   Product,
@@ -225,8 +229,10 @@ export interface OnboardingPayload {
   };
   safetyContext: {
     knownSensitivities: string[];
+    sensitivitiesStatus: SensitivitiesStatus;
     activePrescriptions: string[];
     isPregnantOrNursing: boolean;
+    pregnancyStatus: PregnancyStatus;
     additionalNotes?: string;
   };
 }

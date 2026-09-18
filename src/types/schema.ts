@@ -135,6 +135,12 @@ export interface IngredientSignal {
   notes?: string;
 }
 
+export const PregnancyStatusSchema = z.enum(['yes', 'no', 'prefer_not_to_say', 'unanswered']);
+export type PregnancyStatus = z.infer<typeof PregnancyStatusSchema>;
+
+export const SensitivitiesStatusSchema = z.enum(['none_known', 'reported', 'unanswered']);
+export type SensitivitiesStatus = z.infer<typeof SensitivitiesStatusSchema>;
+
 export interface SkinProfile {
   id: string;
   userId: string;
@@ -145,8 +151,10 @@ export interface SkinProfile {
   middayFeel: MiddayFeel;
   postCleanseTightness: boolean;
   knownSensitivities: string[];
+  sensitivitiesStatus: SensitivitiesStatus;
   activePrescriptions: string[];
   isPregnantOrNursing: boolean;
+  pregnancyStatus: PregnancyStatus;
   additionalNotes?: string;
   onboardingCompleted: boolean;
   createdAt: string;

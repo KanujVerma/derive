@@ -6,6 +6,48 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj & Sami: I1-B0 Onboarding Persistence Contract & Safety Alignment
+
+- **Agent / Workstream**: Kanuj & Sami Shared Alignment (Mobile Client, Shared Contracts & Platform Persistence)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `80b5bb859be1adbc3aeb4b295ee4b7e0f80f46b2`
+- **Prior Verified CI Run**: `35391183013` (on commit `80b5bb8`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B0 COMPLETE` (Onboarding persistence contract & safety alignment: resolved ARCHITECTURE_CHALLENGE-02 by adding explicit categorical status fields `pregnancy_status` and `sensitivities_status` across database, contracts, store, and UI to prevent unanswered/withheld states from collapsing into false negatives; resolved ARCHITECTURE_CHALLENGE-03 by aligning `public.user_products.action` check constraint to accept `PAUSE` alongside `KEEP`, `REPLACE`, `ADD`, and `STOP`; implemented pure payload builder `buildOnboardingPayload` with fail-closed non-mock identity protection in Remote mode; preserved legacy fields for backward compatibility; and verified via 92/92 unit tests and 71 pgTAP test assertions).
+- **Ownership / Shared Contracts**: Coordinated additive shared contracts update (`src/types/schema.ts`, `src/domain/types.ts`). Additive migration (`supabase/migrations/20260918203554_onboarding_safety_status_and_action_pause.sql`) and expanded pgTAP tests (`supabase/tests/s1_access_control.test.sql`). Client updates (`src/stores/onboardingStore.ts`, `src/services/deriveClient.ts`, `src/services/mock/MockDeriveService.ts`, `app/(onboarding)/8-safety.tsx`, `app/(onboarding)/10-summary.tsx`, `tests/derive.test.ts`). Pricing (ARCHITECTURE_CHALLENGE-01) strictly preserved as unresolved. `eas.json` Remote flag strictly preserved as `false`.
+- **Architectural Deliverables**:
+  1. **Additive Database Migration (`20260918203554_onboarding_safety_status_and_action_pause.sql`)**:
+     - `public.skin_profiles`: added `pregnancy_status` (`CHECK in ('yes', 'no', 'prefer_not_to_say', 'unanswered')`) and `sensitivities_status` (`CHECK in ('none_known', 'reported', 'unanswered')`), `NOT NULL`, default `'unanswered'`.
+     - Conservative epistemic backfill: `is_pregnant_or_nursing IS TRUE` $\rightarrow$ `'yes'`, else `'unanswered'` (never infers explicit negative); non-empty `known_sensitivities` $\rightarrow$ `'reported'`, else `'unanswered'`.
+     - Least-privilege column grants for insert and update granted to `authenticated` role on `public.skin_profiles`.
+     - `public.user_products`: updated `user_products_action_check` constraint to `CHECK (action in ('KEEP', 'PAUSE', 'REPLACE', 'ADD', 'STOP'))`.
+  2. **Shared Canonical Schema & Domain Contracts**:
+     - `src/types/schema.ts`: added `PregnancyStatusSchema`, `PregnancyStatus`, `SensitivitiesStatusSchema`, `SensitivitiesStatus`; updated `SkinProfile` to include `sensitivitiesStatus` and `pregnancyStatus`.
+     - `src/domain/types.ts`: re-exported status types; updated `OnboardingPayload.safetyContext` to include `sensitivitiesStatus` and `pregnancyStatus`.
+  3. **Pure Payload Builder & Remote Identity Protection (`src/services/deriveClient.ts`)**:
+     - Exported `buildOnboardingPayload(onboardingState, userId?, overrideRemote?)`.
+     - Preserves safety provenance and provides safe fallbacks.
+     - In Remote mode, fails closed and throws if `userId` is missing, empty, or a mock ID (`usr_beta_member`, `usr_beta_001`).
+     - In Mock mode, permits fallback to `'usr_beta_member'`.
+  4. **Client State & UI Non-Coercion**:
+     - `src/stores/onboardingStore.ts`: updated `OnboardingState` and `setSafetyContext` parameter/default types to `SensitivitiesStatus` and `PregnancyStatus`, defaulting omitted values to `'unanswered'`.
+     - `app/(onboarding)/8-safety.tsx`: `hasNoSensitivities` initialized strictly to `sensitivitiesStatus === 'none_known'`; `pregnancyState` initialized strictly to `pregnancyStatus`; rendered active sensitivity chips.
+     - `app/(onboarding)/10-summary.tsx`: display copy shows `'Not answered'` for unanswered pregnancy and sensitivities states; refactored to use `buildOnboardingPayload`.
+  5. **Mock Service Compatibility**:
+     - `src/services/mock/MockDeriveService.ts`: `onboard()` preserves `sensitivitiesStatus` and `pregnancyStatus` on the returned `SkinProfile`.
+  6. **Comprehensive Test Verification**:
+     - `supabase/tests/s1_access_control.test.sql`: expanded plan to 71 assertions; verified authenticated column grants, `skin_profiles` defaults, constraint violations, and `user_products.action` `PAUSE` acceptance.
+     - `tests/derive.test.ts`: 92/92 tests passing (100%), including 6 dedicated tests for initial unanswered state, safety screen initialization non-coercion, explicit choices, summary display copy, pure payload builder, remote mock identity protection, and mock service preservation.
+- **Verification**:
+  - `npm test`: 92/92 tests passing (100%).
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - Database runtime verification: Docker daemon absent on host (`DATABASE_RUNTIME_VERIFICATION_BLOCKED`).
+
 ## 2026-09-18 — Kanuj Mobile/UX: I1-A2.1 Bootstrap Freshness & Founder Surface Isolation
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

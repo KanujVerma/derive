@@ -255,6 +255,34 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Zero shared contract or backend modifications.
 
+### I1-B0: Onboarding Persistence Contract & Safety Alignment [COMPLETE]
+* **Scope**:
+  - Resolved `ARCHITECTURE_CHALLENGE-02` (Safety Status Provenance) and `ARCHITECTURE_CHALLENGE-03` (Routine Action Alignment):
+  - Additive database migration `20260918203554_onboarding_safety_status_and_action_pause.sql`:
+    - Added `pregnancy_status` (CHECK `in ('yes', 'no', 'prefer_not_to_say', 'unanswered')`) and `sensitivities_status` (CHECK `in ('none_known', 'reported', 'unanswered')`) to `public.skin_profiles` with `NOT NULL` and default `'unanswered'`.
+    - Conservative epistemic backfill: `is_pregnant_or_nursing IS TRUE` -> `'yes'`, else `'unanswered'` (never infers explicit negative); non-empty `known_sensitivities` -> `'reported'`, else `'unanswered'`.
+    - Granted column-level insert/update privileges to `authenticated` role.
+    - Updated `public.user_products.action` check constraint to accept `PAUSE` alongside `KEEP`, `REPLACE`, `ADD`, and `STOP`.
+  - Shared domain and schema contracts:
+    - Added `PregnancyStatusSchema`, `SensitivitiesStatusSchema`, and updated `SkinProfile` and `OnboardingPayload.safetyContext` in `src/types/schema.ts` and `src/domain/types.ts`.
+  - Pure payload builder:
+    - Created `buildOnboardingPayload()` in `src/services/deriveClient.ts` to construct canonical `OnboardingPayload` with safety status provenance and enforce fail-closed non-mock identity protection in Remote mode.
+  - Client state & UI non-coercion:
+    - Updated `useOnboardingStore` default state and `setSafetyContext` fallbacks.
+    - Fixed `app/(onboarding)/8-safety.tsx`: `hasNoSensitivities` initialized strictly to `sensitivitiesStatus === 'none_known'` and `pregnancyState` strictly to `pregnancyStatus`, preventing initial unanswered state from collapsing into false negatives; rendered active sensitivity chips.
+    - Fixed `app/(onboarding)/10-summary.tsx`: display copy shows `'Not answered'` for unanswered pregnancy and sensitivities states; uses `buildOnboardingPayload`.
+  - Service & test verification:
+    - Updated `MockDeriveService.onboard()` to preserve safety statuses.
+    - Expanded pgTAP test suite in `supabase/tests/s1_access_control.test.sql` to 71 tests.
+    - Added 6 dedicated unit tests to `tests/derive.test.ts` (92/92 passing).
+* **Acceptance Criteria**:
+  - 100% test suite passing (92/92 tests in `tests/derive.test.ts`).
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - Database runtime verification status truthfully reported (Docker daemon absent).
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]

@@ -12,7 +12,7 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { GoalLabels } from '@/src/types/schema';
-import { submitOnboarding } from '@/src/services/deriveClient';
+import { submitOnboarding, buildOnboardingPayload } from '@/src/services/deriveClient';
 import { useUserStore } from '@/src/stores/userStore';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { Icon } from '@/src/components/ui/Icon';
@@ -46,29 +46,7 @@ export default function SummaryScreen() {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
-      const payload: OnboardingPayload = {
-        userId: useUserStore.getState().userId || 'usr_beta_member',
-        primaryGoal: onboarding.primaryGoal || 'breakouts',
-        secondaryGoals: onboarding.secondaryGoals || [],
-        routineComplexity: onboarding.routineComplexity || 'simple',
-        costPreference: onboarding.costPreference || 'balanced',
-        middayFeel: onboarding.middayFeel || 'combination',
-        postCleanseTightness: onboarding.postCleanseTightness ?? false,
-        confirmedProducts: onboarding.detectedProducts,
-        productReactions: onboarding.productReactions,
-        skinPhotos: {
-          frontUri: onboarding.frontPhotoUri || undefined,
-          leftUri: onboarding.leftPhotoUri || undefined,
-          rightUri: onboarding.rightPhotoUri || undefined,
-          contextNote: onboarding.photoContextNote || undefined,
-        },
-        safetyContext: {
-          knownSensitivities: onboarding.knownSensitivities,
-          activePrescriptions: onboarding.activePrescriptions,
-          isPregnantOrNursing: onboarding.isPregnantOrNursing,
-          additionalNotes: onboarding.additionalSafetyNotes || undefined,
-        },
-      };
+      const payload = buildOnboardingPayload(onboarding, useUserStore.getState().userId);
 
       await submitOnboarding(payload);
 
@@ -226,12 +204,23 @@ export default function SummaryScreen() {
             '/(onboarding)/8-safety'
           )}
           {renderAuditRow(
+            'Sensitivities / Allergies',
+            onboarding.sensitivitiesStatus === 'none_known'
+              ? 'No known allergies'
+              : onboarding.sensitivitiesStatus === 'reported' && onboarding.knownSensitivities.length > 0
+              ? onboarding.knownSensitivities.join(', ')
+              : 'Not answered',
+            '/(onboarding)/8-safety'
+          )}
+          {renderAuditRow(
             'Pregnancy / Nursing',
             onboarding.pregnancyStatus === 'yes'
               ? 'Yes'
+              : onboarding.pregnancyStatus === 'no'
+              ? 'No'
               : onboarding.pregnancyStatus === 'prefer_not_to_say'
               ? 'Prefer not to say'
-              : 'No',
+              : 'Not answered',
             '/(onboarding)/8-safety'
           )}
         </GroupedSection>

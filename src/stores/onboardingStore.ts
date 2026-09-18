@@ -10,6 +10,8 @@ import type {
   ReactionSeverity,
   BodyArea,
   ReactionSymptom,
+  PregnancyStatus,
+  SensitivitiesStatus,
 } from '../types/schema.ts';
 
 export interface OnboardingState {
@@ -27,10 +29,10 @@ export interface OnboardingState {
   rightPhotoUri: string | null;
   photoContextNote: string;
   knownSensitivities: string[];
-  sensitivitiesStatus: 'none_known' | 'reported' | 'unanswered';
+  sensitivitiesStatus: SensitivitiesStatus;
   activePrescriptions: string[];
   isPregnantOrNursing: boolean;
-  pregnancyStatus: 'yes' | 'no' | 'prefer_not_to_say' | 'unanswered';
+  pregnancyStatus: PregnancyStatus;
   additionalSafetyNotes: string;
   adaptiveFollowUps: Array<{ question: string; answer?: string }>;
   isCompleted: boolean;
@@ -73,8 +75,8 @@ export interface OnboardingState {
     sensitivities: string[];
     prescriptions: string[];
     pregnancy: boolean;
-    pregnancyStatus?: 'yes' | 'no' | 'prefer_not_to_say' | 'unanswered';
-    sensitivitiesStatus?: 'none_known' | 'reported' | 'unanswered';
+    pregnancyStatus?: PregnancyStatus;
+    sensitivitiesStatus?: SensitivitiesStatus;
     notes?: string;
   }) => void;
   setAdaptiveAnswer: (index: number, answer: string) => void;
@@ -292,10 +294,10 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
   setSafetyContext: ({ sensitivities, prescriptions, pregnancy, pregnancyStatus, sensitivitiesStatus, notes }) =>
     set({
       knownSensitivities: sensitivities,
-      sensitivitiesStatus: sensitivitiesStatus ?? (sensitivities.length > 0 ? 'reported' : 'none_known'),
+      sensitivitiesStatus: sensitivitiesStatus ?? (sensitivities.length > 0 ? 'reported' : 'unanswered'),
       activePrescriptions: prescriptions,
       isPregnantOrNursing: pregnancy,
-      pregnancyStatus: pregnancyStatus ?? (pregnancy ? 'yes' : 'no'),
+      pregnancyStatus: pregnancyStatus ?? (pregnancy ? 'yes' : 'unanswered'),
       additionalSafetyNotes: notes || '',
     }),
 

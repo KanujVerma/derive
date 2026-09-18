@@ -43,8 +43,14 @@ export interface IDeriveService {
   - `postCleanseTightness`: boolean
   - `confirmedProducts`: Product[]
   - `productReactions`: ProductReaction[]
-  - `skinPhotos`: Front/Left/Right URIs and context note
-  - `safetyContext`: Known sensitivities, active prescriptions, pregnancy status
+  - `safetyContext`:
+    - `knownSensitivities`: string[]
+    - `sensitivitiesStatus`: `SensitivitiesStatus` (`'none_known'` | `'reported'` | `'unanswered'`)
+    - `activePrescriptions`: string[]
+    - `isPregnantOrNursing`: boolean
+    - `pregnancyStatus`: `PregnancyStatus` (`'yes'` | `'no'` | `'prefer_not_to_say'` | `'unanswered'`)
+    - `additionalNotes`?: string
+* **Builder**: `buildOnboardingPayload(snapshot, userId?, overrideRemote?)` (`src/services/deriveClient.ts`) creates the canonical payload while enforcing non-mock identity in Remote mode.
 * **Output**: `OnboardingResult` with initialized `CustomerProfile`, `SkinProfile`, and canonical `Routine`.
 
 ### `scanProduct(input: ScanProductInput)`

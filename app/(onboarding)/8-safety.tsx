@@ -52,7 +52,7 @@ export default function SafetyScreen() {
     knownSensitivities.filter((s) => s !== 'No known allergies')
   );
   const [hasNoSensitivities, setHasNoSensitivities] = useState<boolean>(
-    sensitivitiesStatus === 'none_known' || (knownSensitivities.length === 0 && sensitivitiesStatus !== 'reported')
+    sensitivitiesStatus === 'none_known'
   );
   const [customSensInput, setCustomSensInput] = useState('');
 
@@ -63,7 +63,7 @@ export default function SafetyScreen() {
 
   // Pregnancy / Nursing tri-state
   const [pregnancyState, setPregnancyState] = useState<'yes' | 'no' | 'prefer_not_to_say' | 'unanswered'>(
-    pregnancyStatus !== 'unanswered' ? pregnancyStatus : isPregnantOrNursing ? 'yes' : 'no'
+    pregnancyStatus !== 'unanswered' ? pregnancyStatus : (isPregnantOrNursing ? 'yes' : 'unanswered')
   );
 
   const [notes, setNotes] = useState<string>(additionalSafetyNotes);
@@ -81,8 +81,12 @@ export default function SafetyScreen() {
   };
 
   const handleToggleNoSensitivities = () => {
-    setHasNoSensitivities(true);
-    setSelectedSensitivities([]);
+    if (hasNoSensitivities) {
+      setHasNoSensitivities(false);
+    } else {
+      setHasNoSensitivities(true);
+      setSelectedSensitivities([]);
+    }
   };
 
   const togglePrescription = (label: string) => {
@@ -209,6 +213,22 @@ export default function SafetyScreen() {
               ) : null
             }
           />
+
+          {selectedSensitivities.length > 0 && (
+            <View style={[styles.chipsWrap, { marginTop: spacing.sm }]}>
+              {selectedSensitivities.map((s) => (
+                <ChoiceChip
+                  key={s}
+                  label={`${s} ✕`}
+                  selected={true}
+                  size="small"
+                  onSelect={() =>
+                    setSelectedSensitivities(selectedSensitivities.filter((item) => item !== s))
+                  }
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* SECTION 4: PREGNANCY & NURSING (TRI-STATE) */}

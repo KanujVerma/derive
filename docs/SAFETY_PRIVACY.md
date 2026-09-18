@@ -83,3 +83,17 @@ Derive maintains strict integrity in all customer communications.
 * **Visual Fairness Across Pigmentation Strata**: In accordance with algorithmic bias research (*Daneshjou et al. Nat Med 2022*), any computer vision system evaluated in Derive must demonstrate balanced error parity across all pigmentation strata (very light through very deep).
 * **Mechanism Over Demographics (PFB)**: Pseudofolliculitis barbae is addressed strictly through mechanical shaving practices, hair curl pattern, and follicular dynamics—never racial profiling (*Ogunbiyi PMC12360796*).
 * **No Causal Diet Interventions**: Weak population observational associations (such as dairy and acne, *Aghasi et al. 2018*) must never be converted into automated diet interventions or causal rules.
+
+---
+
+## 7. Safety Disclosure Provenance & Epistemic Non-Coercion (I1-B0)
+
+* **Explicit Disclosure Provenance**: Safety contexts maintain categorical status invariants across the entire stack (database, contracts, Zustand stores, and UI):
+  - **Pregnancy & Nursing**: `PregnancyStatus` (`'yes'`, `'no'`, `'prefer_not_to_say'`, `'unanswered'`).
+  - **Ingredient Sensitivities**: `SensitivitiesStatus` (`'none_known'`, `'reported'`, `'unanswered'`).
+* **Epistemic Non-Coercion Invariant**: An unanswered or withheld safety question must NEVER be silently coerced into an explicit negative assertion.
+  - A user who skips or has not yet reached the safety screen is `unanswered`, NOT `no` or `none_known`.
+  - A user selecting "Prefer not to say" must be preserved as `prefer_not_to_say`, NOT coerced into `no`.
+  - Database migrations backfill existing records conservatively: `is_pregnant_or_nursing IS TRUE` -> `'yes'`, otherwise `'unanswered'` (never fabricating an explicit `'no'`).
+  - Summary and review UI displays `'Not answered'` for unanswered states rather than falsely reporting `'No'`.
+

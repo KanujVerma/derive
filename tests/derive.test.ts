@@ -1643,6 +1643,7 @@ import {
   resolveCustomerBootstrap,
   getActiveUserId,
   resolveUserId,
+  buildOnboardingPayload,
 } from '../src/services/deriveClient.ts';
 import { useBootstrapStore } from '../src/stores/bootstrapStore.ts';
 import {
@@ -1725,8 +1726,10 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
           middayFeel: 'comfortable',
           postCleanseTightness: false,
           knownSensitivities: [],
+          sensitivitiesStatus: 'unanswered',
           activePrescriptions: [],
           isPregnantOrNursing: false,
+          pregnancyStatus: 'unanswered',
           onboardingCompleted: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -1981,8 +1984,10 @@ test('K6 End-to-End Service Flow: Onboarding through routine and check-ins', asy
     },
     safetyContext: {
       knownSensitivities: [],
+      sensitivitiesStatus: 'unanswered',
       activePrescriptions: ['Differin 0.1%'],
       isPregnantOrNursing: false,
+      pregnancyStatus: 'unanswered',
     },
   };
 
@@ -3931,3 +3936,189 @@ test('I1-A2.1 Founder Surface Isolation: Remote customer states cannot access /f
   };
   assert.equal(getAuthRedirectRoute(['founder'], destMockTabs), null);
 });
+
+// ========================================================
+// I1-B0 ONBOARDING PERSISTENCE & SAFETY PROVENANCE TESTS
+// ========================================================
+
+test('I1-B0 Safety State Provenance: Store initializes to unanswered without false negatives', () => {
+  useOnboardingStore.getState().resetOnboarding();
+  const state = useOnboardingStore.getState();
+
+  assert.equal(state.pregnancyStatus, 'unanswered');
+  assert.equal(state.isPregnantOrNursing, false);
+  assert.equal(state.sensitivitiesStatus, 'unanswered');
+  assert.deepEqual(state.knownSensitivities, []);
+
+  // Screen initialization non-coercion logic check
+  const sensitivitiesStatusValue: string = state.sensitivitiesStatus;
+  const hasNoSensitivities = sensitivitiesStatusValue === 'none_known';
+  assert.equal(hasNoSensitivities, false, 'Unanswered sensitivities must not coerce to hasNoSensitivities=true');
+
+  const pregnancyState = state.pregnancyStatus !== 'unanswered'
+    ? state.pregnancyStatus
+    : (state.isPregnantOrNursing ? 'yes' : 'unanswered');
+  assert.equal(pregnancyState, 'unanswered', 'Unanswered pregnancy must not coerce to pregnancyState="no"');
+});
+
+test('I1-B0 Safety State Provenance: setSafetyContext preserves explicit user choices and fallbacks', () => {
+  useOnboardingStore.getState().resetOnboarding();
+
+  // 1. Explicit 'none_known'
+  useOnboardingStore.getState().setSafetyContext({
+    sensitivities: [],
+    sensitivitiesStatus: 'none_known',
+    prescriptions: [],
+    pregnancy: false,
+    pregnancyStatus: 'no',
+  });
+  let state = useOnboardingStore.getState();
+  assert.equal(state.sensitivitiesStatus, 'none_known');
+  assert.equal(state.pregnancyStatus, 'no');
+  assert.equal(state.isPregnantOrNursing, false);
+
+  // 2. Explicit 'prefer_not_to_say'
+  useOnboardingStore.getState().setSafetyContext({
+    sensitivities: ['Niacinamide'],
+    sensitivitiesStatus: 'reported',
+    prescriptions: [],
+    pregnancy: false,
+    pregnancyStatus: 'prefer_not_to_say',
+  });
+  state = useOnboardingStore.getState();
+  assert.equal(state.sensitivitiesStatus, 'reported');
+  assert.deepEqual(state.knownSensitivities, ['Niacinamide']);
+  assert.equal(state.pregnancyStatus, 'prefer_not_to_say');
+  assert.equal(state.isPregnantOrNursing, false);
+
+  // 3. Explicit 'yes'
+  useOnboardingStore.getState().setSafetyContext({
+    sensitivities: [],
+    sensitivitiesStatus: 'unanswered',
+    prescriptions: [],
+    pregnancy: true,
+    pregnancyStatus: 'yes',
+  });
+  state = useOnboardingStore.getState();
+  assert.equal(state.pregnancyStatus, 'yes');
+  assert.equal(state.isPregnantOrNursing, true);
+  assert.equal(state.sensitivitiesStatus, 'unanswered');
+
+  // 4. Default fallbacks when statuses are omitted:
+  // Non-empty sensitivities -> 'reported', empty sensitivities -> 'unanswered' (never 'none_known')
+  useOnboardingStore.getState().setSafetyContext({
+    sensitivities: [],
+    prescriptions: [],
+    pregnancy: false,
+  });
+  state = useOnboardingStore.getState();
+  assert.equal(state.sensitivitiesStatus, 'unanswered', 'Omitted sensitivitiesStatus with empty array must default to unanswered');
+  assert.equal(state.pregnancyStatus, 'unanswered', 'Omitted pregnancyStatus with false boolean must default to unanswered');
+});
+
+test('I1-B0 Summary Screen Display Copy: Formats safety states truthfully', () => {
+  // Pure copy formatter matching 10-summary.tsx audit rows
+  function formatPregnancyDisplay(status: string): string {
+    return status === 'yes'
+      ? 'Yes'
+      : status === 'no'
+      ? 'No'
+      : status === 'prefer_not_to_say'
+      ? 'Prefer not to say'
+      : 'Not answered';
+  }
+
+  function formatSensitivitiesDisplay(status: string, items: string[]): string {
+    return status === 'none_known'
+      ? 'No known allergies'
+      : status === 'reported' && items.length > 0
+      ? items.join(', ')
+      : 'Not answered';
+  }
+
+  // Pregnancy display truth
+  assert.equal(formatPregnancyDisplay('yes'), 'Yes');
+  assert.equal(formatPregnancyDisplay('no'), 'No');
+  assert.equal(formatPregnancyDisplay('prefer_not_to_say'), 'Prefer not to say');
+  assert.equal(formatPregnancyDisplay('unanswered'), 'Not answered');
+
+  // Sensitivities display truth
+  assert.equal(formatSensitivitiesDisplay('none_known', []), 'No known allergies');
+  assert.equal(formatSensitivitiesDisplay('reported', ['Benzoyl Peroxide', 'Fragrance']), 'Benzoyl Peroxide, Fragrance');
+  assert.equal(formatSensitivitiesDisplay('unanswered', []), 'Not answered');
+});
+
+test('I1-B0 Pure Payload Builder: Preserves safety provenance and handles empty state cleanly', () => {
+  // Empty state snapshot
+  const payload = buildOnboardingPayload({}, 'usr_beta_member', false);
+  assert.equal(payload.userId, 'usr_beta_member');
+  assert.equal(payload.primaryGoal, 'breakouts');
+  assert.equal(payload.safetyContext.sensitivitiesStatus, 'unanswered');
+  assert.equal(payload.safetyContext.pregnancyStatus, 'unanswered');
+  assert.equal(payload.safetyContext.isPregnantOrNursing, false);
+  assert.deepEqual(payload.safetyContext.knownSensitivities, []);
+
+  // Explicit safety choices snapshot
+  const customPayload = buildOnboardingPayload({
+    primaryGoal: 'fine_lines',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    pregnancyStatus: 'prefer_not_to_say',
+    isPregnantOrNursing: false,
+    activePrescriptions: ['Tretinoin 0.05%'],
+  }, 'usr_beta_member', false);
+
+  assert.equal(customPayload.safetyContext.sensitivitiesStatus, 'none_known');
+  assert.equal(customPayload.safetyContext.pregnancyStatus, 'prefer_not_to_say');
+  assert.equal(customPayload.safetyContext.isPregnantOrNursing, false);
+  assert.deepEqual(customPayload.safetyContext.activePrescriptions, ['Tretinoin 0.05%']);
+});
+
+test('I1-B0 Remote Identity Protection: buildOnboardingPayload fails closed against mock IDs in Remote mode', () => {
+  // Mock mode: allows fallback to 'usr_beta_member'
+  const mockPayload = buildOnboardingPayload({}, undefined, false);
+  assert.equal(mockPayload.userId, 'usr_beta_member');
+
+  // Remote mode: rejects empty/missing user ID
+  assert.throws(
+    () => buildOnboardingPayload({}, '', true),
+    /Valid member identity required/
+  );
+  assert.throws(
+    () => buildOnboardingPayload({}, '   ', true),
+    /Valid member identity required/
+  );
+
+  // Remote mode: rejects known mock IDs
+  assert.throws(
+    () => buildOnboardingPayload({}, 'usr_beta_member', true),
+    /Valid member identity required/
+  );
+  assert.throws(
+    () => buildOnboardingPayload({}, 'usr_beta_001', true),
+    /Valid member identity required/
+  );
+
+  // Remote mode: accepts valid non-mock customer identity
+  const remotePayload = buildOnboardingPayload({}, 'usr_real_member_999', true);
+  assert.equal(remotePayload.userId, 'usr_real_member_999');
+});
+
+test('I1-B0 Mock Service: Preserves canonical safety statuses on returned SkinProfile', async () => {
+  const service = new MockDeriveService();
+  const payload = buildOnboardingPayload({
+    primaryGoal: 'breakouts',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    pregnancyStatus: 'no',
+    isPregnantOrNursing: false,
+    activePrescriptions: [],
+  }, 'usr_beta_member', false);
+
+  const result = await service.onboard(payload);
+  assert.equal(result.skinProfile.sensitivitiesStatus, 'none_known');
+  assert.equal(result.skinProfile.pregnancyStatus, 'no');
+  assert.equal(result.skinProfile.isPregnantOrNursing, false);
+  assert.equal(result.skinProfile.onboardingCompleted, true);
+});
+

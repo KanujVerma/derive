@@ -1,6 +1,6 @@
 begin;
 
-select plan(64);
+select plan(71);
 
 -- Schema, policy, privilege, auth-provisioning, and bucket invariants.
 select results_eq(
@@ -254,6 +254,16 @@ select ok(
   'authenticated role cannot forge server completion or reassign shelf ownership'
 );
 
+select ok(
+  has_column_privilege('authenticated', 'public.skin_profiles', 'pregnancy_status', 'select')
+    and has_column_privilege('authenticated', 'public.skin_profiles', 'pregnancy_status', 'insert')
+    and has_column_privilege('authenticated', 'public.skin_profiles', 'pregnancy_status', 'update')
+    and has_column_privilege('authenticated', 'public.skin_profiles', 'sensitivities_status', 'select')
+    and has_column_privilege('authenticated', 'public.skin_profiles', 'sensitivities_status', 'insert')
+    and has_column_privilege('authenticated', 'public.skin_profiles', 'sensitivities_status', 'update'),
+  'authenticated role has select, insert, and update column privileges for pregnancy_status and sensitivities_status'
+);
+
 create function public.s1_default_privilege_probe()
 returns integer
 language sql
@@ -392,6 +402,36 @@ select results_eq(
   'a member creates their own skin profile'
 );
 
+select results_eq(
+  $$select pregnancy_status, sensitivities_status from public.skin_profiles$$,
+  $$values ('unanswered'::text, 'unanswered'::text)$$,
+  'skin_profiles defaults pregnancy_status and sensitivities_status to unanswered'
+);
+
+select results_eq(
+  $$
+    update public.skin_profiles
+    set pregnancy_status = 'prefer_not_to_say', sensitivities_status = 'none_known'
+    returning pregnancy_status, sensitivities_status
+  $$,
+  $$values ('prefer_not_to_say'::text, 'none_known'::text)$$,
+  'a member updates pregnancy_status and sensitivities_status on their own skin profile'
+);
+
+select throws_ok(
+  $$update public.skin_profiles set pregnancy_status = 'maybe'$$,
+  '23514',
+  null,
+  'skin_profiles rejects invalid pregnancy_status check constraint'
+);
+
+select throws_ok(
+  $$update public.skin_profiles set sensitivities_status = 'invalid_val'$$,
+  '23514',
+  null,
+  'skin_profiles rejects invalid sensitivities_status check constraint'
+);
+
 select throws_ok(
   $$
     insert into public.skin_profiles (
@@ -508,6 +548,19 @@ select results_eq(
   $$update public.user_products set action = 'REPLACE' returning action$$,
   array['REPLACE'],
   'a member updates a product on their own shelf'
+);
+
+select results_eq(
+  $$update public.user_products set action = 'PAUSE' returning action$$,
+  array['PAUSE'],
+  'user_products accepts PAUSE action'
+);
+
+select throws_ok(
+  $$update public.user_products set action = 'DISCARD' returning action$$,
+  '23514',
+  null,
+  'user_products rejects invalid action'
 );
 
 select results_eq(
