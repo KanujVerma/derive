@@ -68,6 +68,29 @@ export interface IDeriveService {
   - `userProducts`: `UserProduct[]`
   - `initialRoutineState`: `InitialRoutineState` (`'pending_generation'` | `'awaiting_review'`)
 
+### `proposeRoutine(input: RoutineProposalInput)`
+* **Input**: `RoutineProposalInput`:
+  - `profile`:
+    - `primaryGoal`: Goal
+    - `secondaryGoals`?: Goal[]
+    - `routineComplexity`: RoutineComplexity (`simple` | `balanced` | `maximize`)
+    - `costPreference`?: ProductCostPreference
+    - `middayFeel`?: MiddayFeel
+    - `postCleanseTightness`?: boolean
+    - `activePrescriptions`?: string[]
+    - `isPregnantOrNursing`?: boolean
+    - `pregnancyStatus`?: `PregnancyStatus` (`'yes'` | `'no'` | `'prefer_not_to_say'` | `'unanswered'`)
+    - `sensitivitiesStatus`?: `SensitivitiesStatus` (`'none_known'` | `'reported'` | `'unanswered'`)
+  - `shelfProducts`: Product[]
+  - `reactions`?: ProductReaction[]
+* **Output**: `RoutineProposalResult`:
+  - `routine`: `Routine` (`id`, `version`, `status: 'awaiting_review'`, `amSteps`, `pmSteps`, `rationales`)
+  - `userProducts`: `UserProduct[]` (with actions: `'KEEP'` | `'PAUSE'` | `'REPLACE'` | `'ADD'` | `'STOP'`)
+  - `clarificationQuestions`?: string[]
+* **Lifecycle State Transition**:
+  - B1 intake commit leaves `initialRoutineState: 'pending_generation'` with `proposedRoutine: null` and `isPlanUnderReview: false`.
+  - Once routine proposal is generated and persisted by server intelligence (I1-B2), the state transitions to `awaiting_review` with `isPlanUnderReview: true`, enabling quiet draft preview on the mobile client.
+
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.
 * **Output**: `ProductScanResult`:

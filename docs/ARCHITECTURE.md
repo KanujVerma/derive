@@ -95,17 +95,34 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
   - **Private Photo Upload Pipeline (`src/services/onboardingPhotoUpload.ts`)**: Direct upload to private `customer-skin-photos` at server-issued paths with `upsert: false`. Zero public URLs and zero local URIs persisted.
   - **Canonical Bootstrap Coordination & Post-Submit Routing**: `10-summary.tsx` invokes the production coordinator `resolveCustomerBootstrap(activeUserId)` rather than querying raw backend state. Transitions to the application occur only when `useBootstrapStore` reaches `status === 'READY'`, letting root route gating maintain canonical navigation truth.
   - **Truthful Status Semantics (`pending_generation` vs `awaiting_review`)**: When `proposedRoutine === null` and `initialRoutineState === 'pending_generation'`, `isPlanUnderReview` is strictly `false` and copy reads "Your routine is being prepared." Only when a routine is proposed and `initialRoutineState === 'awaiting_review'` does `isPlanUnderReview` become `true` with "Final review" copy. Routine generation is strictly deferred to I1-B2.
+* **Initial Routine Intelligence Pipeline & Domain Persistence (I1-B2 Planned / Sami Scope)**:
+  - **Lifecycle Progression**:
+    1. **B1 Commit (`pending_generation`)**: Intake finalized in database; member skin profile and photo metadata committed; pending initial routine founder review task created; `isPlanUnderReview: false`.
+    2. **B2 Server Generation (`awaiting_review`)**: Server context assembly ingests committed intake (`payload_snapshot JSONB` + `skin_profiles`), invokes Gemini 2.5 Flash with structured schema, validates clinical invariants, persists proposal to `public.routines` (`version = 1`, `status = 'awaiting_review'`) and `public.routine_items`, and normalizes shelf actions into `public.user_products`. Task transitions to awaiting founder review.
+    3. **B2 Client Hydration**: Client fetches canonical routine via `hydrateRoutine()`, transitions `initialRoutineState` to `awaiting_review`, sets `isPlanUnderReview: true`, and displays quiet draft preview (`DRAFT · NOT ACTIVE`) on Today and Plan.
+  - **Relational Domain Persistence (S2/B2)**:
+    - `public.routines`: Canonical routine header with `version = 1`, `status = 'awaiting_review'`, `user_id`.
+    - `public.routine_items`: Step items (`step_name`, `step_order`, `frequency`, `step_type: 'am' | 'pm'`, `product_id` / product references).
+    - `public.user_products`: Normalization of member counter products with actions `KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`.
+  - **Staging vs. Relational Normalization**:
+    - Product reactions (`product_reactions`) and formula snapshots (`formula_snapshots`) are currently preserved in `onboarding_submissions.payload_snapshot` JSONB during B1; relational table normalization is scheduled under S2.
 
 ---
 
 ## 3. Intelligence Orchestration Layer
 * **Model**: Google Gemini 2.5 Flash via structured JSON outputs, invoked only from the trusted Supabase/server environment.
 * **Credential boundary**: Gemini API keys are server secrets. The Expo client must never read, embed, or ship a Gemini key (`EXPO_PUBLIC_*` Gemini variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning; `RemoteDeriveService` calls Edge Functions that may invoke Gemini.
-* **Context Assembly**: When evaluating queries, the backend injects:
-  1. Customer skin profile (primary goals, midday oil, tightness).
+* **Context Assembly**: When evaluating queries or generating routine proposals, the backend injects:
+  1. Customer skin profile (primary goals, midday oil, tightness, `pregnancy_status`, `sensitivities_status`).
   2. Active prescription products (e.g. Differin 0.1% schedule: Mon/Wed/Fri).
   3. Tolerated shelf products vs. past adverse reactions.
   4. Most recent weekly check-in skin state and barrier symptoms.
+  5. Standardized baseline photos metadata (angles, capture timestamps).
+* **Clinical & Safety Invariants (Enforced in Intelligence & Persistence)**:
+  1. **Sunscreen AM Invariant**: Sunscreen steps must NEVER appear in the evening (`pmSteps`) routine.
+  2. **Retinoid PM Invariant**: Strong retinoids (Adapalene/Differin, Tretinoin) must NEVER appear in the morning (`amSteps`) routine.
+  3. **Pregnancy / Nursing Contraindication**: Retinoids and high-strength salicylic acid are strictly excluded when `pregnancy_status === 'yes'`.
+  4. **Reported Sensitivities**: Known sensitized ingredients must not be introduced in added or replacement products when `sensitivities_status === 'reported'`.
 * **Safety Circuit Breaker**: Pre-model regex and deterministic classifier that intercepts medical emergencies before model generation.
 
 ---

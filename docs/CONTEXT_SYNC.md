@@ -6,16 +6,65 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj & Sami: B1.1 Final Coordination & Sami I1-B2 Intelligence Handoff
+
+- **Agent / Workstream**: Kanuj & Sami Shared Coordination (Platform Intelligence Handoff & Boundary Alignment)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `9a056bd42748257ff72474c7a8785fe4a613e90d`
+- **Prior Verified CI Run**: `35399275112` (on commit `9a056bd`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `B1/B1.1 CLOSED & SEALED · I1-B2 HANDOFF ESTABLISHED` (Formal handoff from closed B1/B1.1 onboarding persistence to Sami's I1-B2 server intelligence stream: established explicit coordination rules and boundary definitions to prevent duplicate work or premature implementation; verified that B1/B1.1 mechanisms are fully landed, passing 100/100 unit tests, 96/96 pgTAP assertions, and clean CI 35399275112; audited existing routine intelligence prototypes and categorized server vs. client responsibilities; documented the DO NOT REIMPLEMENT canonical mechanisms; framed the I1-B2 input and output contracts; defined the normalization dependencies for product reactions, formula snapshots, and ingredient signals; and reaffirmed ARCHITECTURE_CHALLENGE-01 as unresolved so B2 does not encode commercial pricing).
+- **Ownership / Shared Contracts**: Coordinated documentation updates (`docs/ROADMAP.md`, `docs/CONTEXT_SYNC.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`). Zero code changes across `app/**`, `src/**`, `supabase/**`, `admin/**`, or `scripts/**`. Pricing (`ARCHITECTURE_CHALLENGE-01`) preserved as unresolved. `eas.json` Remote flag preserved as `false`.
+- **Durable Deliverables**:
+  1. **Canonical B1/B1.1 Mechanisms Sealed ("DO NOT REIMPLEMENT")**:
+     - **Private Photo Bucket**: `customer-skin-photos` is an image-only private bucket with member-isolated path prefix (`<userId>/<angle>/<uuid>.jpg`) and `upsert: false`. Zero client signing, listing, or public URLs.
+     - **Platform Gateway JWT Verification**: `supabase/config.toml` enforces `verify_jwt = true` on `prepare-onboarding` and `onboard-customer`, rejecting unauthenticated traffic at the edge. Handlers enforce `auth.getUser()` caller UUID derivation.
+     - **Staging Ledger (`public.onboarding_submissions`)**: Tracks draft and committed intake states with partial unique indexes on `(user_id) WHERE status = 'draft'` and `WHERE status = 'committed'`. Isolated to `service_role`.
+     - **Atomic Transactional Finalization (`public.commit_onboarding_intake`)**: Atomic PostgreSQL function executing with `SECURITY INVOKER` by `service_role`. Locks submission row `FOR UPDATE`, upserts `skin_profiles` with `onboarding_completed: false`, records `user_photos` idempotently (`ON CONFLICT (storage_path) DO NOTHING`), ensures pending `initial_routine` review task, sets `skin_profiles.onboarding_completed = true` strictly last, and marks submission `committed`.
+     - **Review Task Idempotency**: `public.founder_review_tasks` enforces partial unique index on `(user_id, task_type) WHERE task_type = 'initial_routine' AND status = 'pending'`.
+     - **Photo Metadata Idempotency**: Unique constraint on `public.user_photos (storage_path)`.
+     - **Pure Payload Builder**: `buildOnboardingPayload` in `src/services/deriveClient.ts` captures safety provenance (`pregnancy_status`, `sensitivities_status`) and prevents unanswered states from collapsing to false negatives.
+     - **Post-Commit Bootstrap Coordinator**: `app/(onboarding)/10-summary.tsx` invokes `resolveCustomerBootstrap(activeUserId)` on Supabase session identity, requiring `status === 'READY'` before navigation.
+     - **Decoupled Status Semantics**: `pending_generation` (`isPlanUnderReview: false`, "Your routine is being prepared.") vs `awaiting_review` (`isPlanUnderReview: true`, "Final review").
+     - **Replay Idempotency**: `onboard-customer` replays committed result without duplicate relational writes; `prepare-onboarding` resumes committed intake.
+     - **CI Automation**: GitHub Actions `database` job runs official Supabase CLI with pgTAP and local E2E harness (`scripts/test-i1-b1-local.mjs`).
+  2. **Explicit Sami B2 Server Scope (Platform & Intelligence)**:
+     - Context assembly: Ingest intake context from `public.onboarding_submissions.payload_snapshot` and canonical `public.skin_profiles` (`pregnancy_status`, `sensitivities_status`, midday feel, tightness, goals, prescriptions, reactions, photo metadata).
+     - Model execution: Server-side Gemini 2.5 Flash invocation using server secrets (zero client keys) with structured JSON output enforcing canonical schema.
+     - Clinical & safety rules: Sunscreen AM invariant (sunscreens never in evening), Retinoid PM invariant (differin/tretinoin never in morning), and pregnancy/sensitivity contraindications.
+     - Relational persistence: Persist routine proposal into `public.routines` (`version = 1`, `status = 'awaiting_review'`) and `public.routine_items`.
+     - Shelf action normalization: Normalize shelf products into `public.user_products` with canonical actions (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`).
+     - Review task progression: Transition or associate initial routine review task in `public.founder_review_tasks` for founder review.
+  3. **Explicit Kanuj Client Role (Mobile & UX)**:
+     - Hydrate routine via `hydrateRoutine()` in `src/services/deriveClient.ts`.
+     - When `status === 'awaiting_review'`, set `isPlanUnderReview: true` and render quiet draft preview mode (`DRAFT · NOT ACTIVE` indicator) on Today and Plan tabs.
+     - Preserve non-blocking navigation across Today, Plan, Scan, Ask, and Progress.
+     - Zero client-side Gemini execution or direct schema modifications.
+  4. **Status of Normalization Dependencies**:
+     - `product_reactions`: Currently staged in `onboarding_submissions.payload_snapshot` JSONB. Relational normalization table planned for S2.
+     - `formula_snapshots`: Staged in `payload_snapshot` JSONB. Relational normalization table planned for S2.
+     - `ingredient_signals`: Pure inference logic exists in `src/services/ai-workflows/ingredient-intelligence.ts`. Server-side execution and persistence planned for S3.
+  5. **Pricing Challenge Preservation**:
+     - `ARCHITECTURE_CHALLENGE-01` remains `PROPOSED · UNRESOLVED`. I1-B2 routine intelligence must NOT assume or hardcode `$129` or resolve commercial pricing semantics.
+- **Verification**:
+  - `npm test`: 100/100 passing (100%).
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` strictly preserved.
+
 ## 2026-09-18 — Kanuj & Sami: I1-B1.1 Transactional Intake Finalization, Auth Gate & Canonical Post-Commit Routing
 
 - **Agent / Workstream**: Kanuj & Sami Shared Integration (Platform Transactional Finalizer, Edge Gateway & Client State Routing)
 - **Local Branch**: `main`
 - **Starting Shared HEAD / origin/main**: `cebff0c56a1bf46720a1b8aef4b4ea44e74d9a0e`
 - **Prior Verified CI Run**: `35397943476` (on commit `cebff0c`)
-- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
-- **GitHub CI**: `pending`
+- **Remote Push Status**: `pushed` (`9a056bd42748257ff72474c7a8785fe4a613e90d`)
+- **GitHub CI**: `35399275112 — SUCCESS` (on commit `9a056bd`)
 - **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
-- **Milestone Status**: `I1-B1.1 COMPLETE` (Transactional intake finalization, platform JWT gate, and canonical post-commit routing: resolved Finding 1 by introducing atomic PostgreSQL finalization function `public.commit_onboarding_intake` executed by `service_role` inside a single database transaction, guaranteeing atomic rollback upon any mid-finalization error; resolved Finding 2 by implementing response-loss and replay idempotency across `onboard-customer` and `prepare-onboarding` with partial unique index on `onboarding_submissions (user_id) WHERE status = 'committed'` and `user_photos (storage_path)`; resolved Finding 3 by enabling platform gateway JWT verification `verify_jwt = true` in `supabase/config.toml` while retaining handler-level `auth.getUser()` defense in depth; resolved Finding 4 by replacing raw bootstrap checks in `app/(onboarding)/10-summary.tsx` with production coordinator `resolveCustomerBootstrap(activeUserId)` requiring `status === 'READY'`; resolved Finding 5 by decoupling `pending_generation` [`isPlanUnderReview: false`, "Your routine is being prepared."] from `awaiting_review` [`isPlanUnderReview: true`, "Final review"]; hardened concurrent draft insert races; added committed local E2E test harness `scripts/test-i1-b1-local.mjs`; added automated Supabase database & integration job to GitHub Actions CI; verified via 96/96 pgTAP assertions and 100/100 unit tests).
+- **Milestone Status**: `I1-B1.1 COMPLETE · CLOSED & SEALED` (Transactional intake finalization, platform JWT gate, and canonical post-commit routing: resolved Finding 1 by introducing atomic PostgreSQL finalization function `public.commit_onboarding_intake` executed by `service_role` inside a single database transaction, guaranteeing atomic rollback upon any mid-finalization error; resolved Finding 2 by implementing response-loss and replay idempotency across `onboard-customer` and `prepare-onboarding` with partial unique index on `onboarding_submissions (user_id) WHERE status = 'committed'` and `user_photos (storage_path)`; resolved Finding 3 by enabling platform gateway JWT verification `verify_jwt = true` in `supabase/config.toml` while retaining handler-level `auth.getUser()` defense in depth; resolved Finding 4 by replacing raw bootstrap checks in `app/(onboarding)/10-summary.tsx` with production coordinator `resolveCustomerBootstrap(activeUserId)` requiring `status === 'READY'`; resolved Finding 5 by decoupling `pending_generation` [`isPlanUnderReview: false`, "Your routine is being prepared."] from `awaiting_review` [`isPlanUnderReview: true`, "Final review"]; hardened concurrent draft insert races; added committed local E2E test harness `scripts/test-i1-b1-local.mjs`; added automated Supabase database & integration job to GitHub Actions CI; verified via 96/96 pgTAP assertions and 100/100 unit tests).
 - **Ownership / Shared Contracts**: Coordinated transactional database migration (`supabase/migrations/20260918230000_transactional_intake_and_replay_idempotency.sql`), pgTAP test suite (`supabase/tests/i1_b1_onboarding_intake.test.sql`), Edge Functions (`prepare-onboarding`, `onboard-customer`), client coordinator (`src/services/deriveClient.ts`), Summary screen (`app/(onboarding)/10-summary.tsx`), CI workflow (`.github/workflows/ci.yml`), and committed test script (`scripts/test-i1-b1-local.mjs`). Pricing (ARCHITECTURE_CHALLENGE-01) strictly preserved as unresolved. `eas.json` Remote flag strictly preserved as `false`.
 - **Architectural Deliverables**:
   1. **Additive Database Migration (`20260918230000_transactional_intake_and_replay_idempotency.sql`)**:

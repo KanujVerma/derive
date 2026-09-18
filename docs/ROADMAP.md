@@ -348,6 +348,28 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Database & integration tests automated in GitHub Actions CI.
 
+### I1-B2: Initial Routine Intelligence Integration [NEXT · SAMI PRIMARY]
+* **Scope**:
+  - **Server-Side Intelligence & Persistence (Sami Primary)**:
+    - Context assembly: Ingest committed intake snapshot from `public.onboarding_submissions.payload_snapshot`, canonical `skin_profiles` (goals, midday feel, tightness, `pregnancy_status`, `sensitivities_status`), confirmed shelf products, adverse reaction history, and photo metadata.
+    - Server-side Gemini 2.5 Flash invocation using server secrets (zero client keys) with structured JSON output enforcing canonical schema.
+    - Deterministic clinical & safety guardrails: Sunscreen AM invariant (sunscreens never in PM), Retinoid PM invariant (adapalene/tretinoin never in AM), and strict exclusion of contra-indicated actives during pregnancy/nursing.
+    - Relational routine persistence: Insert generated routine into `public.routines` (`version = 1`, `status = 'awaiting_review'`) and routine steps into `public.routine_items`.
+    - Shelf action normalization: Map shelf products into `public.user_products` with canonical actions (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`).
+    - Founder review queue transition: Transition initial routine review task in `public.founder_review_tasks` or record routine association for founder manual quality check.
+  - **Client-Side Consumption (Kanuj)**:
+    - Mobile hydration: `hydrateRoutine()` in `src/services/deriveClient.ts` hydrates routine and detects `awaiting_review` status (`isPlanUnderReview = true`).
+    - Quiet draft preview: Renders `DRAFT · NOT ACTIVE` indicator on Today and Plan tabs while preserving non-blocking navigation across all 5 tabs.
+    - Truthful customer messaging: Displays "Final review: Your first routine gets one final quality check before it goes live."
+    - Zero client-side Gemini execution; fails closed on missing or unauthenticated sessions.
+* **Acceptance Criteria**:
+  - Server pipeline generates valid routine proposal from committed intake data.
+  - AM/PM invariants and pregnancy/sensitivity contraindications strictly upheld.
+  - Generated routine persisted to `public.routines` (`status = 'awaiting_review'`) and `public.routine_items`.
+  - Shelf products normalized into `public.user_products` with valid actions.
+  - Mobile client cleanly hydrates routine in `awaiting_review` state and displays quiet draft preview.
+  - 100% tests passing, 0 TypeScript errors, clean Expo web export, `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]
