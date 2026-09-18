@@ -4228,8 +4228,76 @@ test('I1-B1 Client Routine Store & submitOnboarding: Safely handles null propose
     // RoutineStore projections
     const routineState = useRoutineStore.getState();
     assert.equal(routineState.routine, null);
-    assert.equal(routineState.isPlanUnderReview, true);
+    assert.equal(routineState.isPlanUnderReview, false);
+    assert.equal(routineState.todayDominantStatus, 'Your routine is being prepared.');
     assert.deepEqual(routineState.userProducts, []);
+  } finally {
+    setDeriveService(origService);
+  }
+});
+
+test('I1-B1.1 Client Routine Store & submitOnboarding: awaiting_review with routine sets isPlanUnderReview and final review copy', async () => {
+  class B1AwaitingReviewService extends MockDeriveService {
+    override async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
+      return {
+        userId: 'usr_b1_awaiting',
+        skinProfile: {
+          id: 'sp_awaiting_test',
+          userId: 'usr_b1_awaiting',
+          primaryGoal: payload.primaryGoal,
+          secondaryGoals: payload.secondaryGoals,
+          routineComplexity: payload.routineComplexity,
+          costPreference: payload.costPreference,
+          middayFeel: payload.middayFeel,
+          postCleanseTightness: payload.postCleanseTightness,
+          knownSensitivities: [],
+          sensitivitiesStatus: 'none_known',
+          activePrescriptions: [],
+          isPregnantOrNursing: false,
+          pregnancyStatus: 'no',
+          onboardingCompleted: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        proposedRoutine: {
+          id: 'rtn_test_1',
+          userId: 'usr_b1_awaiting',
+          version: 1,
+          status: 'awaiting_review',
+          summarySentence: 'Draft plan under review',
+          amSteps: [],
+          pmSteps: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        userProducts: [],
+        initialRoutineState: 'awaiting_review',
+      };
+    }
+  }
+
+  const origService = getDeriveService();
+  setDeriveService(new B1AwaitingReviewService());
+
+  try {
+    const payload = buildOnboardingPayload({
+      primaryGoal: 'breakouts',
+      sensitivitiesStatus: 'none_known',
+      pregnancyStatus: 'no',
+    }, 'usr_b1_awaiting', false);
+
+    const result = await submitOnboarding(payload);
+
+    assert.ok(result.proposedRoutine);
+    assert.equal(result.initialRoutineState, 'awaiting_review');
+
+    const routineState = useRoutineStore.getState();
+    assert.ok(routineState.routine);
+    assert.equal(routineState.isPlanUnderReview, true);
+    assert.equal(
+      routineState.todayDominantStatus,
+      'Final review: Your first routine gets one final quality check before it goes live.'
+    );
   } finally {
     setDeriveService(origService);
   }
@@ -4442,6 +4510,135 @@ test('I1-B1 RemoteDeriveService Onboarding Pipeline: Orchestrates prepare -> pri
     assert.equal(result.initialRoutineState, 'pending_generation');
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('I1-B1.1 RemoteDeriveService: Committed prepare status causes zero uploads and succeeds cleanly', async () => {
+  const functionInvocations: Array<{ functionName: string; body: any }> = [];
+  const storageUploads: Array<{ path: string; options: any }> = [];
+
+  const mockSupabaseClient = {
+    functions: {
+      invoke: async (name: string, options: { body: any }) => {
+        functionInvocations.push({ functionName: name, body: options.body });
+        if (name === 'prepare-onboarding') {
+          return {
+            data: {
+              submissionId: 'sub_already_committed',
+              submissionStatus: 'committed',
+              uploadTargets: {
+                front: { path: 'usr_committed/front/front_1.jpg', uploaded: true },
+                left: { path: 'usr_committed/left/left_1.jpg', uploaded: true },
+                right: { path: 'usr_committed/right/right_1.jpg', uploaded: true },
+              },
+            },
+            error: null,
+          };
+        }
+        if (name === 'onboard-customer') {
+          return {
+            data: {
+              userId: 'usr_committed',
+              skinProfile: {
+                id: 'sp_committed',
+                userId: 'usr_committed',
+                primaryGoal: 'breakouts',
+                secondaryGoals: [],
+                routineComplexity: 'simple',
+                costPreference: 'balanced',
+                middayFeel: 'combination',
+                postCleanseTightness: false,
+                knownSensitivities: [],
+                sensitivitiesStatus: 'none_known',
+                activePrescriptions: [],
+                isPregnantOrNursing: false,
+                pregnancyStatus: 'no',
+                onboardingCompleted: true,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+              proposedRoutine: null,
+              userProducts: [],
+              initialRoutineState: 'pending_generation',
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: new Error(`Unexpected function ${name}`) };
+      },
+    },
+    storage: {
+      from: (bucket: string) => ({
+        upload: async (path: string, body: any, options: any) => {
+          storageUploads.push({ path, options });
+          return { data: { path }, error: null };
+        },
+      }),
+    },
+  };
+
+  const service = new RemoteDeriveService(mockSupabaseClient);
+  const payload = buildOnboardingPayload({
+    primaryGoal: 'breakouts',
+    frontPhotoUri: 'file:///local/front.jpg',
+    leftPhotoUri: 'file:///local/left.jpg',
+    rightPhotoUri: 'file:///local/right.jpg',
+    sensitivitiesStatus: 'none_known',
+    pregnancyStatus: 'no',
+  }, 'usr_committed', true);
+
+  const result = await service.onboard(payload);
+
+  // Zero storage uploads attempted because prepare returned submissionStatus = 'committed' (all targets uploaded)
+  assert.equal(storageUploads.length, 0);
+  assert.equal(functionInvocations.length, 2);
+  assert.equal(result.userId, 'usr_committed');
+  assert.equal(result.skinProfile.onboardingCompleted, true);
+  assert.equal(result.initialRoutineState, 'pending_generation');
+});
+
+test('I1-B1.1 Canonical Bootstrap Integration: resolveCustomerBootstrap updates useBootstrapStore to READY upon confirmed onboarding completion', async () => {
+  class B1RemoteBootstrapService extends MockDeriveService {
+    override async getCustomerBootstrapState(userId: string): Promise<CustomerBootstrapState> {
+      return {
+        userId,
+        profileExists: true,
+        onboardingCompleted: true,
+        membershipStatus: 'none',
+      };
+    }
+    override async getCustomerProfile(userId: string): Promise<CustomerProfile | null> {
+      return {
+        id: userId,
+        email: 'test@example.com',
+        fullName: 'Test User',
+        tier: 'founding_beta_129',
+        membershipStatus: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  const origService = getDeriveService();
+  setDeriveService(new B1RemoteBootstrapService());
+
+  try {
+    const userId = 'usr_bootstrap_test_b1';
+    useAuthStore.setState({ sessionUserId: userId });
+
+    const state = await resolveCustomerBootstrap(userId);
+
+    assert.ok(state);
+    assert.equal(state?.profileExists, true);
+    assert.equal(state?.onboardingCompleted, true);
+
+    // BootstrapStore reaches READY
+    const store = useBootstrapStore.getState();
+    assert.equal(store.status, 'READY');
+    assert.equal(store.resolvedUserId, userId);
+  } finally {
+    setDeriveService(origService);
   }
 });
 

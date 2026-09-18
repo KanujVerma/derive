@@ -317,6 +317,37 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - End-to-end intake verified on local Supabase container stack.
 
+### I1-B1.1: Transactional Intake Finalization, Auth Gate & Canonical Post-Commit Routing [COMPLETE]
+* **Scope**:
+  - Additive database migration `20260918230000_transactional_intake_and_replay_idempotency.sql`:
+    - Enforced at most one committed initial intake per member via partial unique index `onboarding_submissions (user_id) WHERE status = 'committed'`.
+    - Enforced Storage path uniqueness on `user_photos (storage_path)`.
+    - Enforced storage path check constraints on `onboarding_submissions` (`front`, `left`, `right`, and `shelf` matching caller UUID prefixes and folder categories).
+    - Created atomic transactional RPC `public.commit_onboarding_intake` executed by `service_role` (`SECURITY INVOKER`, privileges revoked from `PUBLIC`, `anon`, `authenticated`), guaranteeing atomic rollback on any relational error.
+  - Platform gateway JWT verification:
+    - Enabled `verify_jwt = true` in `supabase/config.toml` for `prepare-onboarding` and `onboard-customer`, blocking unauthenticated/malformed tokens at the platform gateway while retaining handler `auth.getUser()` defense in depth.
+  - Edge Functions hardening:
+    - `prepare-onboarding`: Resumes committed intake without creating duplicate drafts; recovers from concurrent draft insert races (`23505`) by re-querying the winning draft.
+    - `onboard-customer`: Recognizes already-committed submissions and replays the canonical result without repeating relational writes or duplicate tasks.
+    - Sanitized customer-safe error codes (`UNAUTHORIZED`, `INVALID_PAYLOAD`, `PHOTO_VERIFICATION_FAILED`, `NO_ACTIVE_DRAFT`, `ONBOARDING_COMMIT_FAILED`, `INTERNAL_ERROR`).
+  - Canonical post-submit bootstrap coordinator:
+    - Replaced raw bootstrap queries in `10-summary.tsx` with production coordinator `resolveCustomerBootstrap(activeUserId)` on the active authenticated Supabase session user, requiring `useBootstrapStore.status === 'READY'` before app transition.
+  - Truthful status semantics:
+    - Decoupled `pending_generation` (`isPlanUnderReview: false`, "Your routine is being prepared.") from `awaiting_review` (`isPlanUnderReview: true`, "Final review").
+  - Committed local E2E test harness (`scripts/test-i1-b1-local.mjs`):
+    - Repeatable full-stack test exercising Auth, Edge Gateway, Storage, transactional commit, atomic rollback, and replay idempotency with synthetic users.
+  - Database CI gate:
+    - Added `database` job to `.github/workflows/ci.yml` running `supabase start`, `supabase db reset`, `supabase test db`, and `node scripts/test-i1-b1-local.mjs`.
+* **Acceptance Criteria**:
+  - 100% test suite passing (100/100 tests in `tests/derive.test.ts`).
+  - 100% pgTAP test suite passing (96/96 assertions in `supabase/tests/**`).
+  - 100% local E2E test harness passing (11/11 stages in `scripts/test-i1-b1-local.mjs`).
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - Database & integration tests automated in GitHub Actions CI.
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]

@@ -12,8 +12,10 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { GoalLabels } from '@/src/types/schema';
-import { submitOnboarding, buildOnboardingPayload, isRemoteMode, getDeriveService } from '@/src/services/deriveClient';
+import { submitOnboarding, buildOnboardingPayload, isRemoteMode, resolveCustomerBootstrap } from '@/src/services/deriveClient';
 import { useUserStore } from '@/src/stores/userStore';
+import { useAuthStore } from '@/src/stores/authStore';
+import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
@@ -50,11 +52,21 @@ export default function SummaryScreen() {
 
       await submitOnboarding(payload);
 
-      // In Remote mode, verify canonical bootstrap truth before navigating
+      // In Remote mode, verify canonical bootstrap truth through production coordinator
       if (isRemoteMode()) {
-        const bootstrap = await getDeriveService().getCustomerBootstrapState(useUserStore.getState().userId);
-        if (!bootstrap.onboardingCompleted) {
+        const activeUserId = useAuthStore.getState().sessionUserId;
+        if (!activeUserId) {
+          throw new Error('No active authenticated session user');
+        }
+
+        const bootstrap = await resolveCustomerBootstrap(activeUserId);
+        if (!bootstrap || !bootstrap.profileExists || !bootstrap.onboardingCompleted) {
           throw new Error('Onboarding completion verification failed on server');
+        }
+
+        const storeStatus = useBootstrapStore.getState().status;
+        if (storeStatus !== 'READY') {
+          throw new Error('Bootstrap store status failed to reach READY');
         }
       }
 

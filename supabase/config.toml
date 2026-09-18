@@ -33,7 +33,7 @@ enable_confirmations = false
 
 [functions.prepare-onboarding]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/prepare-onboarding/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
@@ -44,7 +44,7 @@ entrypoint = "./functions/prepare-onboarding/index.ts"
 
 [functions.onboard-customer]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/onboard-customer/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx

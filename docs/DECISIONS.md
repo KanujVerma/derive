@@ -145,23 +145,30 @@ Key technical and product decisions accepted for Derive V1.
 * **Rationale**: Eliminates direct coupling between client screens and mock or AI workflow internals, guarantees that swapping between `MockDeriveService` and `RemoteDeriveService` requires zero mobile screen refactoring, prevents any accidental client-side LLM execution, guarantees clean initial customer state by default without fixture contamination, preserves full scan metadata across views without synthetic fabrication, guarantees test suite type correctness in CI against canonical contracts, and ensures a resilient customer experience where errors are safe and non-destructive.
 * **Verification**: Enforced by 65 unit and regression tests in `tests/derive.test.ts`, application typecheck (`npx tsc --noEmit`), test semantic typecheck (`npm run typecheck:tests`), and clean web export verifying zero `ai-workflows` imports in `app/`, clean default state of `MockDeriveService`, complete swappability of `IDeriveService`, fail-closed remote identity validation, full scan context delivery, customer error sanitization, and user intent preservation.
 
-### ADR-25: Authenticated Remote Onboarding Intake Commit & Private Photo Pipeline (I1-B1)
-* **Decision**: Implement the first authenticated Remote write path via two serverless Edge Functions (`prepare-onboarding` and `onboard-customer`), internal staging ledger `public.onboarding_submissions`, direct immutable client photo uploads to `customer-skin-photos` (`upsert: false`), and an evolved `OnboardingResult` contract that permits `proposedRoutine: null` and `initialRoutineState: 'pending_generation'` without routine generation in B1.
+### ADR-25: Authenticated Remote Onboarding Intake Commit, Atomic Finalization & Replay Idempotency (I1-B1 & I1-B1.1)
+* **Decision**: Implement the authenticated Remote write path via two serverless Edge Functions (`prepare-onboarding` and `onboard-customer`), internal staging ledger `public.onboarding_submissions`, direct immutable client photo uploads to `customer-skin-photos` (`upsert: false`), an atomic PostgreSQL finalization function (`public.commit_onboarding_intake`), and an evolved `OnboardingResult` contract that permits `proposedRoutine: null` and `initialRoutineState: 'pending_generation'` without routine generation in B1.
 * **Key Mechanisms**:
-  1. **Two-Stage Edge Function Handshake**:
-     - `prepare-onboarding`: Authenticates caller JWT, retrieves or generates an active draft submission in `public.onboarding_submissions`, generates server-issued storage paths (`<userId>/<angle>/<uuid>.jpg`), and checks existing Storage objects for retry resumption.
-     - `onboard-customer`: Authenticates caller JWT, enforces safety consistency (rejects pregnancy and sensitivity contradictions), verifies storage presence of required photos, sanitizes snapshot (stripping local `file:///` URIs), marks submission `committed`, upserts `public.skin_profiles` with `onboarding_completed: false`, inserts `public.user_photos`, idempotently creates a pending `initial_routine` founder review task, and **strictly last** sets `public.skin_profiles.onboarding_completed = true`.
-  2. **Storage and Snapshot Privacy Invariants**:
-     - Clients upload directly to `customer-skin-photos` using server-issued paths with `upsert: false`.
-     - Raw client-local URIs (`file:///`, `ph://`, `content://`) are never persisted in Postgres or snapshot ledgers.
-     - `public.onboarding_submissions` is protected by RLS with zero privileges granted to `anon` and `authenticated`, reserved exclusively for trusted `service_role` operations.
-  3. **Founder Review Idempotency**:
-     - `public.founder_review_tasks` enforces a partial unique index on `(user_id, task_type) WHERE task_type = 'initial_routine' AND status = 'pending'`, preventing duplicate review tasks on retried submissions.
-  4. **Deferred Routine Generation & Evolved Contract**:
-     - `OnboardingResult` defines `initialRoutineState: 'pending_generation' | 'awaiting_review'` and `proposedRoutine: Routine | null`.
-     - In B1, routine proposal generation is intentionally deferred to I1-B2; client screens (`useRoutineStore`, `10-summary.tsx`) safely handle null routines and verify `CustomerBootstrapState.onboardingCompleted === true` before routing to `/(tabs)`.
-* **Rationale**: Guarantees zero unverified writes or corrupted state, preserves complete intake provenance, eliminates race conditions and duplicate founder review tasks, protects private customer skin photos with least privilege, and cleanly separates intake persistence (B1) from routine generation (B2).
-* **Verification**: Verified with 83 pgTAP assertions on real local Supabase Postgres, 97 unit tests in `tests/derive.test.ts`, zero TypeScript errors (`npx tsc --noEmit` and `npm run typecheck:tests`), clean Expo web export, and end-to-end integration execution with synthetic authenticated test user.
+  1. **Platform Gateway JWT Gate + Handler Verification**:
+     - `supabase/config.toml` enforces platform gateway JWT validation (`verify_jwt = true`).
+     - Handlers independently verify caller JWT via `auth.getUser()`, derive immutable user UUIDs, and reject cross-user spoofing.
+  2. **Atomic Transactional Finalization RPC (`public.commit_onboarding_intake`)**:
+     - `SECURITY INVOKER` function granted exclusively to `service_role` (`PUBLIC`, `anon`, `authenticated` revoked).
+     - Inside a single database transaction: locks submission row (`FOR UPDATE`), handles already-committed submissions idempotently, upserts `skin_profiles` with `onboarding_completed: false`, records `user_photos` idempotently (`ON CONFLICT (storage_path) DO NOTHING`), ensures exactly one pending `initial_routine` founder review task, sets `skin_profiles.onboarding_completed = true` strictly last, marks the submission `committed`, and returns the canonical profile.
+     - Any relational error rolls back the entire transaction, ensuring no half-committed or corrupted states.
+  3. **Replay & Response-Loss Idempotency**:
+     - Retrying a committed submission re-verifies canonical state and returns identical results without repeating relational writes or generating duplicate founder review tasks.
+     - `public.onboarding_submissions` enforces a partial unique index on `(user_id) WHERE status = 'committed'`.
+     - `public.user_photos` enforces a unique index on `storage_path`.
+  4. **Prepare-After-Commit Resumption & Concurrency Protection**:
+     - `prepare-onboarding` checks for existing committed intake first, returning its metadata without creating duplicate drafts.
+     - Concurrent draft insert races (`23505`) re-query the winning draft, preventing customer-visible 500 errors.
+  5. **Canonical Post-Submit Bootstrap Coordinator**:
+     - `10-summary.tsx` invokes `resolveCustomerBootstrap(activeUserId)`, requiring `status === 'READY'` before app transition.
+  6. **Truthful Status Semantics**:
+     - `pending_generation` sets `isPlanUnderReview: false` and "Your routine is being prepared."
+     - `awaiting_review` sets `isPlanUnderReview: true` and "Final review" copy.
+* **Rationale**: Guarantees zero unverified writes or corrupted state, preserves complete intake provenance, survives partial failures, lost responses, and concurrent retries, protects private customer skin photos with least privilege, and cleanly separates intake persistence (B1) from routine generation (B2).
+* **Verification**: Verified with 96 pgTAP assertions on local Supabase Postgres, 100 unit tests in `tests/derive.test.ts`, committed full-stack local E2E test harness (`scripts/test-i1-b1-local.mjs`), clean Expo web export, zero TypeScript errors, and automated GitHub CI with Supabase database testing.
 
 ---
 

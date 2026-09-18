@@ -1,5 +1,5 @@
 // Supabase Edge Function: onboard-customer
-// DERIVE I1-B1 Authenticated Remote Onboarding Intake Commit & Private Photo Pipeline
+// DERIVE I1-B1.1 Transactional Intake Finalization, Auth Gate & Canonical Post-Commit Routing
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
@@ -10,11 +10,33 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function errorResponse(message: string, status = 400) {
-  return new Response(JSON.stringify({ error: message }), {
+function errorResponse(code: string, message: string, status = 400) {
+  return new Response(JSON.stringify({ code, error: message }), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function mapSkinProfileRow(row: any, userId: string) {
+  return {
+    id: row.id,
+    userId,
+    primaryGoal: row.primary_goal,
+    secondaryGoals: row.secondary_goals || [],
+    routineComplexity: row.routine_complexity,
+    costPreference: row.cost_preference,
+    middayFeel: row.midday_feel,
+    postCleanseTightness: row.post_cleanse_tightness ?? false,
+    knownSensitivities: row.known_sensitivities || [],
+    sensitivitiesStatus: row.sensitivities_status || "unanswered",
+    activePrescriptions: row.active_prescriptions || [],
+    isPregnantOrNursing: row.is_pregnant_or_nursing ?? false,
+    pregnancyStatus: row.pregnancy_status || "unanswered",
+    additionalNotes: row.additional_notes || null,
+    onboardingCompleted: true,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || new Date().toISOString(),
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -25,14 +47,14 @@ Deno.serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return errorResponse("Missing authorization header", 401);
+      return errorResponse("UNAUTHORIZED", "Missing authorization header", 401);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-    // 1. Authenticate caller from JWT
+    // 1. Authenticate caller from JWT (handler-level defense in depth)
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -43,61 +65,153 @@ Deno.serve(async (req: Request) => {
     } = await userClient.auth.getUser();
 
     if (authError || !user) {
-      return errorResponse("Unauthorized", 401);
+      return errorResponse("UNAUTHORIZED", "Invalid or expired session token", 401);
     }
 
     const userId = user.id;
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // 2. Parse and validate payload
+    // 2. Parse request body
     const rawBody = await req.json();
-    const submissionId = rawBody.submissionId;
+    const requestedSubmissionId: string | undefined = rawBody.submissionId;
     const payload = rawBody.payload || rawBody;
 
-    if (!payload.primaryGoal) return errorResponse("Missing required field: primaryGoal");
-    if (!payload.routineComplexity) return errorResponse("Missing required field: routineComplexity");
-    if (!payload.costPreference) return errorResponse("Missing required field: costPreference");
-    if (!payload.middayFeel) return errorResponse("Missing required field: middayFeel");
+    // 3. Response-loss & Idempotent Replay Check:
+    // Check if the submission (or user's initial intake) is ALREADY committed
+    let committedQuery = adminClient
+      .from("onboarding_submissions")
+      .select("id, status")
+      .eq("user_id", userId)
+      .eq("status", "committed");
+
+    if (requestedSubmissionId) {
+      committedQuery = committedQuery.eq("id", requestedSubmissionId);
+    }
+
+    const { data: alreadyCommitted } = await committedQuery.maybeSingle();
+
+    if (alreadyCommitted) {
+      // Replay canonical committed result without repeating relational writes
+      const { data: skinProfileRow, error: fetchErr } = await adminClient
+        .from("skin_profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!fetchErr && skinProfileRow && skinProfileRow.onboarding_completed) {
+        return new Response(
+          JSON.stringify({
+            userId,
+            skinProfile: mapSkinProfileRow(skinProfileRow, userId),
+            proposedRoutine: null,
+            userProducts: [],
+            initialRoutineState: "pending_generation",
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
+    // 4. Validate payload requirements
+    if (!payload.primaryGoal) return errorResponse("INVALID_PAYLOAD", "Missing required field: primaryGoal");
+    if (!payload.routineComplexity) return errorResponse("INVALID_PAYLOAD", "Missing required field: routineComplexity");
+    if (!payload.costPreference) return errorResponse("INVALID_PAYLOAD", "Missing required field: costPreference");
+    if (!payload.middayFeel) return errorResponse("INVALID_PAYLOAD", "Missing required field: middayFeel");
 
     // Safety consistency validation
     const pregnancyStatus = payload.safetyContext?.pregnancyStatus ?? "unanswered";
     const isPregnantOrNursing = payload.safetyContext?.isPregnantOrNursing ?? false;
 
     if (pregnancyStatus === "yes" && !isPregnantOrNursing) {
-      return errorResponse("Safety contradiction: isPregnantOrNursing must be true when pregnancyStatus is yes");
+      return errorResponse("INVALID_PAYLOAD", "Safety contradiction: isPregnantOrNursing must be true when pregnancyStatus is yes");
     }
     if (pregnancyStatus !== "yes" && isPregnantOrNursing) {
-      return errorResponse("Safety contradiction: isPregnantOrNursing cannot be true when pregnancyStatus is not yes");
+      return errorResponse("INVALID_PAYLOAD", "Safety contradiction: isPregnantOrNursing cannot be true when pregnancyStatus is not yes");
     }
 
     const sensitivitiesStatus = payload.safetyContext?.sensitivitiesStatus ?? "unanswered";
     const knownSensitivities = payload.safetyContext?.knownSensitivities ?? [];
 
     if (sensitivitiesStatus === "reported" && knownSensitivities.length === 0) {
-      return errorResponse("Safety contradiction: reported sensitivities requires non-empty knownSensitivities");
+      return errorResponse("INVALID_PAYLOAD", "Safety contradiction: reported sensitivities requires non-empty knownSensitivities");
     }
     if (sensitivitiesStatus === "none_known" && knownSensitivities.length > 0) {
-      return errorResponse("Safety contradiction: none_known sensitivities contradicts provided sensitivities");
+      return errorResponse("INVALID_PAYLOAD", "Safety contradiction: none_known sensitivities contradicts provided sensitivities");
     }
 
-    // 3. Find active draft in onboarding_submissions
+    // 5. Query active draft
     let draftQuery = adminClient
       .from("onboarding_submissions")
       .select("*")
       .eq("user_id", userId)
       .eq("status", "draft");
 
-    if (submissionId) {
-      draftQuery = draftQuery.eq("id", submissionId);
+    if (requestedSubmissionId) {
+      draftQuery = draftQuery.eq("id", requestedSubmissionId);
     }
 
     const { data: draft, error: draftErr } = await draftQuery.maybeSingle();
     if (draftErr || !draft) {
-      return errorResponse("No active draft onboarding submission found for user");
+      // Check if another concurrent request just committed it
+      const { data: racedCommit } = await adminClient
+        .from("onboarding_submissions")
+        .select("id, status")
+        .eq("user_id", userId)
+        .eq("status", "committed")
+        .maybeSingle();
+
+      if (racedCommit) {
+        const { data: skinProfileRow } = await adminClient
+          .from("skin_profiles")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (skinProfileRow && skinProfileRow.onboarding_completed) {
+          return new Response(
+            JSON.stringify({
+              userId,
+              skinProfile: mapSkinProfileRow(skinProfileRow, userId),
+              proposedRoutine: null,
+              userProducts: [],
+              initialRoutineState: "pending_generation",
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+      }
+
+      return errorResponse("NO_ACTIVE_DRAFT", "No active draft onboarding submission found for user", 404);
     }
 
-    // 4. Verify storage objects exist in customer-skin-photos
-    const verifyObjectExists = async (path: string): Promise<boolean> => {
+    // 6. Photo path defense in depth (verify paths belong to caller's userId and expected folders)
+    const expectedFrontPrefix = `${userId}/front/`;
+    const expectedLeftPrefix = `${userId}/left/`;
+    const expectedRightPrefix = `${userId}/right/`;
+    const expectedShelfPrefix = `${userId}/shelf/`;
+
+    if (!draft.front_storage_path.startsWith(expectedFrontPrefix)) {
+      return errorResponse("INVALID_INTAKE", "Front photo path unauthorized or invalid", 400);
+    }
+    if (!draft.left_storage_path.startsWith(expectedLeftPrefix)) {
+      return errorResponse("INVALID_INTAKE", "Left photo path unauthorized or invalid", 400);
+    }
+    if (!draft.right_storage_path.startsWith(expectedRightPrefix)) {
+      return errorResponse("INVALID_INTAKE", "Right photo path unauthorized or invalid", 400);
+    }
+    if (draft.shelf_storage_path && !draft.shelf_storage_path.startsWith(expectedShelfPrefix)) {
+      return errorResponse("INVALID_INTAKE", "Shelf photo path unauthorized or invalid", 400);
+    }
+
+    // 7. Verify storage objects exist in private customer-skin-photos bucket
+    const verifyObjectExists = async (path: string | null | undefined): Promise<boolean> => {
+      if (!path) return false;
       try {
         const parts = path.split("/");
         if (parts.length < 3) return false;
@@ -119,15 +233,15 @@ Deno.serve(async (req: Request) => {
       verifyObjectExists(draft.right_storage_path),
     ]);
 
-    if (!frontExists) return errorResponse("Missing required front photo in storage");
-    if (!leftExists) return errorResponse("Missing required left photo in storage");
-    if (!rightExists) return errorResponse("Missing required right photo in storage");
+    if (!frontExists) return errorResponse("PHOTO_VERIFICATION_FAILED", "Missing required front photo in storage");
+    if (!leftExists) return errorResponse("PHOTO_VERIFICATION_FAILED", "Missing required left photo in storage");
+    if (!rightExists) return errorResponse("PHOTO_VERIFICATION_FAILED", "Missing required right photo in storage");
 
     const hasShelfPhoto = draft.shelf_storage_path
       ? await verifyObjectExists(draft.shelf_storage_path)
       : false;
 
-    // 5. Sanitize snapshot (strip local file/ph URIs)
+    // 8. Sanitize snapshot (strictly strip local file/ph/content URIs)
     const sanitizedSnapshot = {
       primaryGoal: payload.primaryGoal,
       secondaryGoals: payload.secondaryGoals || [],
@@ -158,128 +272,56 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    // 6. Commit Step 1: Update onboarding_submissions status to committed
-    const { error: commitDraftErr } = await adminClient
-      .from("onboarding_submissions")
-      .update({
-        payload_snapshot: sanitizedSnapshot,
-        status: "committed",
-        committed_at: new Date().toISOString(),
-      })
-      .eq("id", draft.id);
-
-    if (commitDraftErr) {
-      return errorResponse(`Failed committing onboarding submission: ${commitDraftErr.message}`, 500);
-    }
-
-    // 7. Commit Step 2: Upsert public.skin_profiles with onboarding_completed = false
-    const { data: skinProfileRow, error: skinErr } = await adminClient
-      .from("skin_profiles")
-      .upsert(
-        {
-          user_id: userId,
-          primary_goal: payload.primaryGoal,
-          secondary_goals: payload.secondaryGoals || [],
-          routine_complexity: payload.routineComplexity,
-          cost_preference: payload.costPreference,
-          midday_feel: payload.middayFeel,
-          post_cleanse_tightness: payload.postCleanseTightness ?? false,
-          known_sensitivities: knownSensitivities,
-          sensitivities_status: sensitivitiesStatus,
-          active_prescriptions: payload.safetyContext?.activePrescriptions || [],
-          is_pregnant_or_nursing: isPregnantOrNursing,
-          pregnancy_status: pregnancyStatus,
-          additional_notes: payload.safetyContext?.additionalNotes || null,
-          onboarding_completed: false,
-        },
-        { onConflict: "user_id" }
-      )
-      .select()
-      .single();
-
-    if (skinErr || !skinProfileRow) {
-      return errorResponse(`Failed persisting skin profile: ${skinErr?.message}`, 500);
-    }
-
-    // 8. Commit Step 3: Insert public.user_photos
+    // 9. Prepare atomic relational parameters
     const photosToInsert = [
-      { user_id: userId, photo_type: "front", storage_path: draft.front_storage_path },
-      { user_id: userId, photo_type: "left", storage_path: draft.left_storage_path },
-      { user_id: userId, photo_type: "right", storage_path: draft.right_storage_path },
+      { photo_type: "front", storage_path: draft.front_storage_path },
+      { photo_type: "left", storage_path: draft.left_storage_path },
+      { photo_type: "right", storage_path: draft.right_storage_path },
     ];
     if (hasShelfPhoto && draft.shelf_storage_path) {
       photosToInsert.push({
-        user_id: userId,
         photo_type: "shelf",
         storage_path: draft.shelf_storage_path,
       });
     }
 
-    const { error: photosErr } = await adminClient
-      .from("user_photos")
-      .insert(photosToInsert);
+    const skinProfileInput = {
+      primary_goal: payload.primaryGoal,
+      secondary_goals: payload.secondaryGoals || [],
+      routine_complexity: payload.routineComplexity,
+      cost_preference: payload.costPreference,
+      midday_feel: payload.middayFeel,
+      post_cleanse_tightness: payload.postCleanseTightness ?? false,
+      known_sensitivities: knownSensitivities,
+      sensitivities_status: sensitivitiesStatus,
+      active_prescriptions: payload.safetyContext?.activePrescriptions || [],
+      is_pregnant_or_nursing: isPregnantOrNursing,
+      pregnancy_status: pregnancyStatus,
+      additional_notes: payload.safetyContext?.additionalNotes || null,
+    };
 
-    if (photosErr) {
-      return errorResponse(`Failed recording photo metadata: ${photosErr.message}`, 500);
-    }
-
-    // 9. Commit Step 4: Create pending initial_routine founder review task (idempotent)
-    const { data: existingTask } = await adminClient
-      .from("founder_review_tasks")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("task_type", "initial_routine")
-      .eq("status", "pending")
-      .maybeSingle();
-
-    if (!existingTask) {
-      const { error: taskErr } = await adminClient
-        .from("founder_review_tasks")
-        .insert({
-          user_id: userId,
-          task_type: "initial_routine",
-          status: "pending",
-          priority: "normal",
-          notes: "Intake committed. Initial routine pending review.",
-        });
-
-      if (taskErr && taskErr.code !== "23505") {
-        return errorResponse(`Failed creating founder review task: ${taskErr.message}`, 500);
+    // 10. Execute atomic transactional finalization RPC in PostgreSQL
+    const { data: finalizedSkinProfile, error: rpcErr } = await adminClient.rpc(
+      "commit_onboarding_intake",
+      {
+        p_submission_id: draft.id,
+        p_user_id: userId,
+        p_payload_snapshot: sanitizedSnapshot,
+        p_skin_profile: skinProfileInput,
+        p_photos: photosToInsert,
+        p_task_notes: "Intake committed. Initial routine pending review.",
       }
-    }
+    );
 
-    // 10. Commit Step 5: STRICTLY LAST - set onboarding_completed = true
-    const { error: completeErr } = await adminClient
-      .from("skin_profiles")
-      .update({ onboarding_completed: true })
-      .eq("user_id", userId);
-
-    if (completeErr) {
-      return errorResponse(`Failed completing skin profile: ${completeErr.message}`, 500);
+    if (rpcErr || !finalizedSkinProfile) {
+      console.error("onboard-customer RPC execution failed:", rpcErr?.code, rpcErr?.message);
+      return errorResponse("ONBOARDING_COMMIT_FAILED", "Failed to finalize onboarding intake", 500);
     }
 
     // 11. Return canonical OnboardingResult
     const result = {
       userId,
-      skinProfile: {
-        id: skinProfileRow.id,
-        userId,
-        primaryGoal: payload.primaryGoal,
-        secondaryGoals: payload.secondaryGoals || [],
-        routineComplexity: payload.routineComplexity,
-        costPreference: payload.costPreference,
-        middayFeel: payload.middayFeel,
-        postCleanseTightness: payload.postCleanseTightness ?? false,
-        knownSensitivities,
-        sensitivitiesStatus,
-        activePrescriptions: payload.safetyContext?.activePrescriptions || [],
-        isPregnantOrNursing,
-        pregnancyStatus,
-        additionalNotes: payload.safetyContext?.additionalNotes,
-        onboardingCompleted: true,
-        createdAt: skinProfileRow.created_at,
-        updatedAt: new Date().toISOString(),
-      },
+      skinProfile: mapSkinProfileRow(finalizedSkinProfile, userId),
       proposedRoutine: null,
       userProducts: [],
       initialRoutineState: "pending_generation",
@@ -290,6 +332,7 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    return errorResponse(err?.message || "Internal server error", 500);
+    console.error("onboard-customer unhandled error:", err?.message || "unknown");
+    return errorResponse("INTERNAL_ERROR", "Internal server error", 500);
   }
 });

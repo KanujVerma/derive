@@ -134,6 +134,11 @@ export async function submitOnboarding(payload: OnboardingPayload): Promise<Onbo
   const service = getDeriveService();
   const result = await service.onboard(payload);
 
+  const isAwaitingReview = Boolean(
+    result.proposedRoutine &&
+    (result.initialRoutineState === 'awaiting_review' || result.proposedRoutine.status === 'awaiting_review')
+  );
+
   // Synchronize canonical proposed routine into routine store
   useRoutineStore.setState({
     routine: result.proposedRoutine,
@@ -143,8 +148,10 @@ export async function submitOnboarding(payload: OnboardingPayload): Promise<Onbo
     refillRequests: [],
     learnedInsights: [],
     researchInsights: [],
-    isPlanUnderReview: result.proposedRoutine ? result.proposedRoutine.status === 'awaiting_review' : true,
-    todayDominantStatus: 'Final review: Your first routine gets one final quality check before it goes live.',
+    isPlanUnderReview: isAwaitingReview,
+    todayDominantStatus: isAwaitingReview
+      ? 'Final review: Your first routine gets one final quality check before it goes live.'
+      : 'Your routine is being prepared.',
     isWeeklyCheckInDue: false,
   });
 

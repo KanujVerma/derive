@@ -39,3 +39,37 @@ jobs:
 
       - name: Run Expo production export
         run: EXPO_NO_TELEMETRY=1 npx expo export -p web
+
+  database:
+    name: Database & Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Start Supabase local stack
+        run: supabase start
+
+      - name: Reset database and verify migrations
+        run: supabase db reset
+
+      - name: Run Supabase pgTAP database tests
+        run: supabase test db
+
+      - name: Run local integration E2E harness
+        run: node scripts/test-i1-b1-local.mjs

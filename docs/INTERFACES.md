@@ -207,7 +207,7 @@ Skin photos serve as longitudinal baseline and progress context, governed by str
 ### F. Client Service Coordinator & Direct Import Boundary (`src/services/deriveClient.ts`)
 To enforce strict boundary isolation between presentation and backend implementations:
 - **Centralized Coordinator**: All UI routes (`app/**`) execute domain mutations and queries exclusively through `src/services/deriveClient.ts`:
-  - `submitOnboarding(payload)`: Onboards new member, establishes proposed routine, syncs stores.
+  - `submitOnboarding(payload)`: Onboards new member, maps canonical `OnboardingResult` (`proposedRoutine: null` and `initialRoutineState: 'pending_generation'` sets `isPlanUnderReview: false` with "Your routine is being prepared"; only `awaiting_review` sets `isPlanUnderReview: true` with "Final review"), preserves proven remote membership, and relies on `resolveCustomerBootstrap` to verify `READY` status before navigation.
   - `askQuestion(question, context)`: Dispatches contextual question to service intelligence.
   - `evaluateProduct(input)`: Evaluates scanned item against user routine.
   - `submitWeeklyCheckIn(input)`: Records longitudinal observation and syncs store cache.

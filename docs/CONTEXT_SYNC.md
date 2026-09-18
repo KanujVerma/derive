@@ -6,6 +6,48 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj & Sami: I1-B1.1 Transactional Intake Finalization, Auth Gate & Canonical Post-Commit Routing
+
+- **Agent / Workstream**: Kanuj & Sami Shared Integration (Platform Transactional Finalizer, Edge Gateway & Client State Routing)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `cebff0c56a1bf46720a1b8aef4b4ea44e74d9a0e`
+- **Prior Verified CI Run**: `35397943476` (on commit `cebff0c`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B1.1 COMPLETE` (Transactional intake finalization, platform JWT gate, and canonical post-commit routing: resolved Finding 1 by introducing atomic PostgreSQL finalization function `public.commit_onboarding_intake` executed by `service_role` inside a single database transaction, guaranteeing atomic rollback upon any mid-finalization error; resolved Finding 2 by implementing response-loss and replay idempotency across `onboard-customer` and `prepare-onboarding` with partial unique index on `onboarding_submissions (user_id) WHERE status = 'committed'` and `user_photos (storage_path)`; resolved Finding 3 by enabling platform gateway JWT verification `verify_jwt = true` in `supabase/config.toml` while retaining handler-level `auth.getUser()` defense in depth; resolved Finding 4 by replacing raw bootstrap checks in `app/(onboarding)/10-summary.tsx` with production coordinator `resolveCustomerBootstrap(activeUserId)` requiring `status === 'READY'`; resolved Finding 5 by decoupling `pending_generation` [`isPlanUnderReview: false`, "Your routine is being prepared."] from `awaiting_review` [`isPlanUnderReview: true`, "Final review"]; hardened concurrent draft insert races; added committed local E2E test harness `scripts/test-i1-b1-local.mjs`; added automated Supabase database & integration job to GitHub Actions CI; verified via 96/96 pgTAP assertions and 100/100 unit tests).
+- **Ownership / Shared Contracts**: Coordinated transactional database migration (`supabase/migrations/20260918230000_transactional_intake_and_replay_idempotency.sql`), pgTAP test suite (`supabase/tests/i1_b1_onboarding_intake.test.sql`), Edge Functions (`prepare-onboarding`, `onboard-customer`), client coordinator (`src/services/deriveClient.ts`), Summary screen (`app/(onboarding)/10-summary.tsx`), CI workflow (`.github/workflows/ci.yml`), and committed test script (`scripts/test-i1-b1-local.mjs`). Pricing (ARCHITECTURE_CHALLENGE-01) strictly preserved as unresolved. `eas.json` Remote flag strictly preserved as `false`.
+- **Architectural Deliverables**:
+  1. **Additive Database Migration (`20260918230000_transactional_intake_and_replay_idempotency.sql`)**:
+     - Created partial unique index `onboarding_submissions_committed_user_idx` on `(user_id) WHERE status = 'committed'`.
+     - Created unique index `user_photos_storage_path_idx` on `public.user_photos (storage_path)`.
+     - Enforced photo path check constraints on `onboarding_submissions` (`front`, `left`, `right`, and `shelf` matching caller UUID prefixes and folder categories).
+     - Created atomic transactional RPC `public.commit_onboarding_intake`: locks submission `FOR UPDATE`, handles already-committed submissions idempotently, upserts `skin_profiles` (`onboarding_completed: false`), records `user_photos` idempotently (`ON CONFLICT (storage_path) DO NOTHING`), ensures exactly one pending `initial_routine` review task, sets `skin_profiles.onboarding_completed = true` strictly last, marks submission `committed`, and returns canonical profile. Revoked `EXECUTE` from `PUBLIC`, `anon`, and `authenticated`; granted exclusively to `service_role`.
+  2. **Platform Gateway JWT Verification & Edge Function Hardening**:
+     - Set `verify_jwt = true` in `supabase/config.toml` for `prepare-onboarding` and `onboard-customer`.
+     - Retained handler `auth.getUser()` caller UUID derivation; caller identity cannot be spoofed via request body or cross-user submission IDs.
+     - Sanitized error codes (`UNAUTHORIZED`, `INVALID_PAYLOAD`, `PHOTO_VERIFICATION_FAILED`, `NO_ACTIVE_DRAFT`, `ONBOARDING_COMMIT_FAILED`, `INTERNAL_ERROR`), never leaking database or schema internals to mobile.
+     - `prepare-onboarding` resumes existing committed intake without creating duplicate drafts, and recovers from concurrent draft insert races (`23505`) by re-querying the winning draft.
+     - `onboard-customer` recognizes already-committed submissions and replays the canonical result without repeating relational writes.
+  3. **Canonical Post-Submit Bootstrap Coordinator**:
+     - `app/(onboarding)/10-summary.tsx` invokes `resolveCustomerBootstrap(activeUserId)` on the active authenticated Supabase session user.
+     - Confirms `profileExists === true`, `onboardingCompleted === true`, and `useBootstrapStore.getState().status === 'READY'` before app transition.
+  4. **Truthful Status Semantics**:
+     - `pending_generation`: sets `routine: null`, `userProducts: []`, `isPlanUnderReview: false`, and `todayDominantStatus: 'Your routine is being prepared.'`.
+     - `awaiting_review`: sets `isPlanUnderReview: true` and `todayDominantStatus: 'Final review: Your first routine gets one final quality check before it goes live.'`.
+  5. **Committed Local E2E Test Harness (`scripts/test-i1-b1-local.mjs`)**:
+     - Exercises full lifecycle: platform JWT gate (401), test user creation, `prepare-onboarding`, cross-user rejection, missing photos check, direct Storage upload (`upsert: false`), transactional rollback on invalid input, atomic commit, response-loss replay idempotency, prepare resumption, and single committed submission constraint.
+  6. **Automated Database CI Gate (`.github/workflows/ci.yml`)**:
+     - Added `database` job running `supabase/setup-cli@v1` (pinned to 2.117.0), `supabase start`, `supabase db reset`, `supabase test db`, and `node scripts/test-i1-b1-local.mjs`.
+- **Verification**:
+  - `npm test`: 100/100 tests passing (100%).
+  - `npx supabase test db`: 96/96 assertions passing (100%).
+  - `node scripts/test-i1-b1-local.mjs`: All 11 verification steps passing (100%).
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` strictly preserved.
+
 ## 2026-09-18 — Kanuj & Sami: I1-B1 Authenticated Remote Onboarding Intake Commit & Private Photo Pipeline
 
 - **Agent / Workstream**: Kanuj & Sami Shared Integration (Platform Persistence, Edge Functions & Mobile Pipeline)
