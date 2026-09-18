@@ -17,6 +17,7 @@ import { SkinState, IrritationLevel, AdherenceLevel } from '@/src/types/schema';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { analytics } from '@/src/services/analytics';
+import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
 const CHANGE_REASONS = [
   'Tried a new product',
@@ -101,7 +102,7 @@ export default function CheckInModal() {
       setSubmitted(true);
     } catch (err: any) {
       console.warn('Check-in submission failed:', err);
-      setSubmitError(err?.message || 'Failed to submit check-in. Please try again.');
+      setSubmitError(getCustomerErrorMessage('checkin'));
     } finally {
       setIsSubmitting(false);
     }

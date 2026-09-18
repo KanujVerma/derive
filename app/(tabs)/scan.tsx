@@ -26,6 +26,8 @@ import {
 import { evaluateProduct } from '@/src/services/deriveClient';
 import { ProductScanResult, ProductScanVerdict } from '@/src/types/schema';
 import { normalizeBarcode } from '@/src/utils/barcode';
+import { useScanContextStore } from '@/src/stores/scanContextStore';
+import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -64,9 +66,10 @@ export default function ScanScreen() {
       setScanResult(result);
       return result;
     } catch (err: any) {
+      console.warn('performEvaluation error:', err);
       isScanningLockedRef.current = false;
       setIsLocked(false);
-      setEvaluationError(err?.message || 'Product evaluation failed. Please try again.');
+      setEvaluationError(getCustomerErrorMessage('scan'));
       throw err;
     }
   };
@@ -124,7 +127,7 @@ export default function ScanScreen() {
           console.warn('Scan evaluation failed:', err);
           isScanningLockedRef.current = false;
           setIsLocked(false);
-          setEvaluationError(err?.message || 'Product evaluation failed. Please try again.');
+          setEvaluationError(getCustomerErrorMessage('scan'));
         });
     } else {
       try {
@@ -156,7 +159,7 @@ export default function ScanScreen() {
         console.warn('Catalog item evaluation failed:', err);
         isScanningLockedRef.current = false;
         setIsLocked(false);
-        setEvaluationError(err?.message || 'Product evaluation failed. Please try again.');
+        setEvaluationError(getCustomerErrorMessage('scan'));
       });
   };
 
@@ -191,6 +194,9 @@ export default function ScanScreen() {
       productName: scanResult.productName,
       verdict: scanResult.verdict,
     });
+
+    // Store full typed ProductScanResult in transient client store for Ask context
+    useScanContextStore.getState().setActiveScannedProduct(scanResult);
 
     // Navigate to Ask with canonical route params and legacy fallback params
     router.push({

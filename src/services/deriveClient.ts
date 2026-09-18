@@ -35,6 +35,7 @@ import type {
 import { useRoutineStore } from '../stores/routineStore.ts';
 import { useUserStore } from '../stores/userStore.ts';
 import { useOnboardingStore } from '../stores/onboardingStore.ts';
+import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
 
 /**
  * Direct service accessor for programmatic operations
@@ -44,24 +45,32 @@ export function getClientService(): IDeriveService {
 }
 
 /**
- * Resolves and validates active or explicitly provided user ID.
- * When remote service mode is active, mock identities ('usr_beta_member', 'usr_beta_001')
- * and empty identities throw an authentication error to fail closed.
+ * Resolves and validates active or explicitly provided user ID for client operations.
+ *
+ * In Remote mode, operations fail closed if no usable non-mock customer identity is available,
+ * rejecting missing, empty, whitespace-only, or known mock IDs ('usr_beta_member', 'usr_beta_001').
+ * In Mock mode, falls back to 'usr_beta_member' for deterministic local development.
+ *
+ * NOTE: This is a client-side identity presence check to prevent mock data leakage, NOT proof of
+ * an authenticated session or valid Supabase JWT (which is enforced server-side via RLS in S1/I1).
  */
 export function resolveUserId(userId?: string): string {
-  const id = userId || useUserStore.getState().userId;
+  const rawId = userId !== undefined ? userId : useUserStore.getState().userId;
+  const trimmed = typeof rawId === 'string' ? rawId.trim() : '';
+
   if (isRemoteServiceEnabled()) {
-    if (!id || id === 'usr_beta_member' || id === 'usr_beta_001') {
-      throw new Error('Authentication required: Remote operations require an authenticated session.');
+    if (!trimmed || trimmed === 'usr_beta_member' || trimmed === 'usr_beta_001') {
+      throw new Error('Valid member identity required: Remote operations require a non-mock customer identity.');
     }
-    return id;
+    return trimmed;
   }
-  return id || 'usr_beta_member';
+
+  return trimmed || 'usr_beta_member';
 }
 
 /**
- * Current user ID accessor with fallback for guest/beta session in mock mode,
- * failing closed if remote service mode is active without an authenticated session.
+ * Current user ID accessor with fallback for local mock session,
+ * failing closed in remote mode if no usable non-mock customer identity is available.
  */
 export function getActiveUserId(): string {
   return resolveUserId();
@@ -251,7 +260,8 @@ export function useOnboardingSubmission() {
       const result = await submitOnboarding(payload);
       return result;
     } catch (err: any) {
-      const message = err?.message || 'Failed to build your routine plan. Please try again.';
+      console.warn('submitOnboarding error:', err);
+      const message = getCustomerErrorMessage('onboarding');
       setError(message);
       return null;
     } finally {
@@ -283,7 +293,8 @@ export function useAskDeriveQuery() {
         const response = await askQuestion(question, activeContext);
         return response;
       } catch (err: any) {
-        const message = err?.message || 'Unable to consult skincare intelligence right now.';
+        console.warn('askQuestion error:', err);
+        const message = getCustomerErrorMessage('ask');
         setError(message);
         return null;
       } finally {
@@ -310,7 +321,8 @@ export function useScanProductEvaluation() {
         const result = await evaluateProduct(input);
         return result;
       } catch (err: any) {
-        const message = err?.message || 'Product evaluation failed. Please try again.';
+        console.warn('evaluateProduct error:', err);
+        const message = getCustomerErrorMessage('scan');
         setError(message);
         return null;
       } finally {
@@ -337,7 +349,8 @@ export function useCheckInMutation() {
         const result = await submitWeeklyCheckIn(input);
         return result;
       } catch (err: any) {
-        const message = err?.message || 'Failed to submit check-in. Please try again.';
+        console.warn('submitWeeklyCheckIn error:', err);
+        const message = getCustomerErrorMessage('checkin');
         setError(message);
         return null;
       } finally {
@@ -369,7 +382,8 @@ export function useRefillMutation() {
         const result = await requestProductRefill(input);
         return result;
       } catch (err: any) {
-        const message = err?.message || 'Refill request failed. Please try again.';
+        console.warn('requestProductRefill error:', err);
+        const message = getCustomerErrorMessage('refill');
         setError(message);
         return null;
       } finally {

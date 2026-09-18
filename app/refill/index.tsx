@@ -15,6 +15,7 @@ import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { analytics } from '@/src/services/analytics';
 import { requestProductRefill } from '@/src/services/deriveClient';
+import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
 export default function RefillModal() {
   const router = useRouter();
@@ -54,7 +55,7 @@ export default function RefillModal() {
       setSubmitted(true);
     } catch (err: any) {
       console.warn('Refill request failed:', err);
-      setError(err?.message || 'Refill request failed. Please try again.');
+      setError(getCustomerErrorMessage('refill'));
     } finally {
       setIsSubmitting(false);
     }

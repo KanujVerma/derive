@@ -156,6 +156,18 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - Zero contracts or backend code modified.
 
+### K6.2: Integration-Semantics & Error Hardening [COMPLETE]
+* **Scope**:
+  - Full-fidelity Scan → Ask context preservation: `useScanContextStore` in `src/stores/scanContextStore.ts` carries the full typed `ProductScanResult` across navigation boundaries; Ask synchronously delivers it to `askQuestion` on initial and subsequent queries; banner dismissal or "New chat" clears context.
+  - Remote identity guard refinement: `resolveUserId()` rejects missing, empty, and whitespace-only (`'   '`) strings with clear client guard messaging (`Valid member identity required: Remote operations require a non-mock customer identity.`).
+  - Customer-safe error sanitization: centralized mapper `src/utils/customerErrors.ts` ensures all client UI displays empathetic Direction A Mineral copy instead of leaking raw backend/technical errors (`PostgREST`, `Supabase`, `RemoteDeriveService`), while preserving technical logs in `console.warn` and protecting user draft inputs.
+* **Acceptance Criteria**:
+  - 100% test suite passing (64/64 tests in `tests/derive.test.ts`), with 4 new K6.2 regression tests.
+  - TypeScript typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - Zero raw `err?.message` displayed in `app/**` or `src/services/deriveClient.ts`.
+  - Zero contracts or backend code modified.
+
 ---
 
 ## Sami Workstream (Platform + Intelligence + Operations)

@@ -22,6 +22,7 @@ import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 import { analytics } from '@/src/services/analytics';
 import { calculateMonthlyPlanPrice, formatCentsToDollars } from '@/src/pricing';
 import { config } from '@/src/constants/config';
+import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import type { OnboardingPayload } from '@/src/domain/types';
 
 export default function SummaryScreen() {
@@ -85,7 +86,7 @@ export default function SummaryScreen() {
       router.replace('/(tabs)');
     } catch (e: any) {
       console.warn('Plan generation error:', e);
-      setError(e?.message || 'Unable to build routine plan. Your answers are saved, please tap to try again.');
+      setError(getCustomerErrorMessage('onboarding'));
     } finally {
       setIsBuilding(false);
     }

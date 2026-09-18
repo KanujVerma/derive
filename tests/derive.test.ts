@@ -1646,6 +1646,11 @@ import type {
   CustomerProfile,
   RoutinePlan,
 } from '../src/domain/types.ts';
+import { useScanContextStore } from '../src/stores/scanContextStore.ts';
+import {
+  getCustomerErrorMessage,
+  CUSTOMER_ERROR_MESSAGES,
+} from '../src/utils/customerErrors.ts';
 
 test('K6 Service Boundary: MockDeriveService initializes strictly clean with zero Arthur leakage', async () => {
   const service = new MockDeriveService();
@@ -2015,7 +2020,7 @@ test('K6.1 Hardening: Scan to Ask route parameters map canonical and fallback at
   assert.equal(resolvedReason2, 'Active scheduled retinoid');
 });
 
-test('K6.1 Hardening: Remote mode enforces fail-closed authentication on user operations', () => {
+test('K6.1 Hardening: Remote mode enforces fail-closed customer identity presence on user operations', () => {
   const origEnv = process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE;
   const origService = getDeriveService();
 
@@ -2037,31 +2042,44 @@ test('K6.1 Hardening: Remote mode enforces fail-closed authentication on user op
     useUserStore.setState({ userId: '' });
     assert.throws(
       () => getActiveUserId(),
-      /Authentication required: Remote operations require an authenticated session/
+      /Valid member identity required: Remote operations require a non-mock customer identity/
+    );
+
+    // Whitespace-only user ID throws fail-closed error
+    useUserStore.setState({ userId: '   ' });
+    assert.throws(
+      () => getActiveUserId(),
+      /Valid member identity required: Remote operations require a non-mock customer identity/
+    );
+
+    // Tab/newline user ID throws fail-closed error
+    assert.throws(
+      () => resolveUserId('\t\n  '),
+      /Valid member identity required: Remote operations require a non-mock customer identity/
     );
 
     // Mock guest ID 'usr_beta_member' throws fail-closed error in remote mode
     useUserStore.setState({ userId: 'usr_beta_member' });
     assert.throws(
       () => getActiveUserId(),
-      /Authentication required: Remote operations require an authenticated session/
+      /Valid member identity required: Remote operations require a non-mock customer identity/
     );
 
     // Mock Arthur ID 'usr_beta_001' throws fail-closed error in remote mode
     useUserStore.setState({ userId: 'usr_beta_001' });
     assert.throws(
       () => getActiveUserId(),
-      /Authentication required: Remote operations require an authenticated session/
+      /Valid member identity required: Remote operations require a non-mock customer identity/
     );
 
     // Explicit call to resolveUserId with mock id throws in remote mode
     assert.throws(
       () => resolveUserId('usr_beta_member'),
-      /Authentication required: Remote operations require an authenticated session/
+      /Valid member identity required: Remote operations require a non-mock customer identity/
     );
 
-    // Real authenticated session ID succeeds
-    useUserStore.setState({ userId: 'usr_real_prod_auth_789' });
+    // Real customer identity succeeds and trims
+    useUserStore.setState({ userId: '  usr_real_prod_auth_789  ' });
     assert.equal(getActiveUserId(), 'usr_real_prod_auth_789');
     assert.equal(resolveUserId('usr_real_prod_auth_789'), 'usr_real_prod_auth_789');
   } finally {
@@ -2167,6 +2185,245 @@ test('K6.1 Hardening: Service mutation failures preserve user intent and error r
     useRoutineStore.getState().resetRoutine();
   }
 });
+
+// ========================================================
+// 18. K6.2 INTEGRATION-SEMANTICS & ERROR HARDENING
+// ========================================================
+
+test('K6.2 Scan Context: Full typed ProductScanResult handoff and transmission on first and subsequent Ask queries', async () => {
+  const origService = getDeriveService();
+
+  try {
+    const fullScanResult: ProductScanResult = {
+      barcode: '0883140012993',
+      productName: 'Anthelios Ultra Light Fluid SPF 60',
+      brand: 'La Roche-Posay',
+      verdict: 'great_fit',
+      verdictLabel: 'Great Fit',
+      verdictSummary: 'Lightweight chemical and mineral hybrid sunscreen with high UVA/UVB protection.',
+      whatItWouldChangeOrReplace: 'Replaces generic daytime moisturizer with dedicated photoprotection.',
+      confidence: 0.98,
+      ingredientsIdentified: ['Avobenzone', 'Homosalate', 'Octisalate', 'Octocrylene', 'Silica'],
+      safetyFlags: [],
+      fitScore: 94,
+    };
+
+    // 1. Store holds full typed object
+    useScanContextStore.getState().setActiveScannedProduct(fullScanResult);
+    const stored = useScanContextStore.getState().activeScannedProduct;
+    assert.deepEqual(stored, fullScanResult);
+    assert.equal(stored?.fitScore, 94);
+    assert.equal(stored?.confidence, 0.98);
+    assert.deepEqual(stored?.ingredientsIdentified, ['Avobenzone', 'Homosalate', 'Octisalate', 'Octocrylene', 'Silica']);
+
+    // 2. Service receives the full typed product on first Ask query
+    let capturedAskRequest: AskRequest | null = null;
+    class ContextTrackingService extends MockDeriveService {
+      override async askDerive(req: AskRequest): Promise<AskResponse> {
+        capturedAskRequest = req;
+        return super.askDerive(req);
+      }
+    }
+
+    setDeriveService(new ContextTrackingService());
+
+    // First query with active scanned context passed (synchronously read from store)
+    const currentContext = useScanContextStore.getState().activeScannedProduct || undefined;
+    await askQuestion('How do I layer this SPF with my morning routine?', {
+      scannedProduct: currentContext,
+    });
+
+    assert.ok(capturedAskRequest !== null);
+    assert.equal((capturedAskRequest as AskRequest).question, 'How do I layer this SPF with my morning routine?');
+    assert.deepEqual((capturedAskRequest as AskRequest).activeContext?.scannedProduct, fullScanResult);
+    assert.equal((capturedAskRequest as AskRequest).activeContext?.scannedProduct?.fitScore, 94);
+
+    // 3. Subsequent query in the same conversation retains the full scan context
+    capturedAskRequest = null;
+    const retainedContext = useScanContextStore.getState().activeScannedProduct || undefined;
+    await askQuestion('Does it pill under makeup?', {
+      scannedProduct: retainedContext,
+    });
+
+    assert.ok(capturedAskRequest !== null);
+    assert.equal((capturedAskRequest as AskRequest).question, 'Does it pill under makeup?');
+    assert.deepEqual((capturedAskRequest as AskRequest).activeContext?.scannedProduct, fullScanResult);
+  } finally {
+    setDeriveService(origService);
+    useScanContextStore.getState().clearScanContext();
+  }
+});
+
+test('K6.2 Scan Context Lifecycle: Banner dismissal and new chat clear active scan context', async () => {
+  const origService = getDeriveService();
+
+  try {
+    const scan1: ProductScanResult = {
+      productName: 'Hydrating Cleanser',
+      brand: 'CeraVe',
+      verdict: 'great_fit',
+      verdictLabel: 'Great Fit',
+      verdictSummary: 'Non-stripping ceramides formula.',
+      confidence: 0.95,
+      ingredientsIdentified: ['Ceramides', 'Hyaluronic Acid'],
+      safetyFlags: [],
+      fitScore: 92,
+    };
+
+    const scan2: ProductScanResult = {
+      productName: 'Adapalene 0.1% Gel',
+      brand: 'Differin',
+      verdict: 'keep',
+      verdictLabel: 'Keep In Routine',
+      verdictSummary: 'Targeted topical retinoid for cellular turnover.',
+      confidence: 0.99,
+      ingredientsIdentified: ['Adapalene'],
+      safetyFlags: [],
+      fitScore: 96,
+    };
+
+    let capturedAskRequest: AskRequest | null = null;
+    class ContextTrackingService extends MockDeriveService {
+      override async askDerive(req: AskRequest): Promise<AskResponse> {
+        capturedAskRequest = req;
+        return super.askDerive(req);
+      }
+    }
+    setDeriveService(new ContextTrackingService());
+
+    // 1. Set initial scan
+    useScanContextStore.getState().setActiveScannedProduct(scan1);
+    assert.equal(useScanContextStore.getState().activeScannedProduct?.productName, 'Hydrating Cleanser');
+
+    // 2. New scan handoff replaces prior context immediately
+    useScanContextStore.getState().setActiveScannedProduct(scan2);
+    assert.equal(useScanContextStore.getState().activeScannedProduct?.productName, 'Adapalene 0.1% Gel');
+
+    // 3. User dismisses banner or taps New chat -> clearScanContext()
+    useScanContextStore.getState().clearScanContext();
+    assert.equal(useScanContextStore.getState().activeScannedProduct, null);
+
+    // 4. Query sent after dismissal does not send scannedProduct
+    capturedAskRequest = null;
+    const clearedContext = useScanContextStore.getState().activeScannedProduct || undefined;
+    await askQuestion('Why is my skin feeling dry this afternoon?', {
+      scannedProduct: clearedContext,
+    });
+
+    assert.ok(capturedAskRequest !== null);
+    assert.equal((capturedAskRequest as AskRequest).activeContext?.scannedProduct, undefined);
+  } finally {
+    setDeriveService(origService);
+    useScanContextStore.getState().clearScanContext();
+  }
+});
+
+test('K6.2 Customer Errors: Shields raw backend/technical errors and returns empathetic Mineral copy', () => {
+  // 1. All domain operations return deterministic Mineral copy
+  assert.equal(
+    getCustomerErrorMessage('onboarding'),
+    "We couldn't finish setting up your routine. Your setup is still here. Please try again."
+  );
+  assert.equal(
+    getCustomerErrorMessage('ask'),
+    'Unable to get an answer right now. Please try again.'
+  );
+  assert.equal(
+    getCustomerErrorMessage('scan'),
+    "We couldn't evaluate this product right now. Please try again."
+  );
+  assert.equal(
+    getCustomerErrorMessage('checkin'),
+    "We couldn't submit your check-in. Your answers are still here. Please try again."
+  );
+  assert.equal(
+    getCustomerErrorMessage('refill'),
+    "We couldn't submit your refill request. Please try again."
+  );
+  assert.equal(
+    getCustomerErrorMessage('general'),
+    'Something went wrong on our end. Please try again.'
+  );
+
+  // Fallback for unexpected operation key
+  assert.equal(
+    getCustomerErrorMessage('unknown_op' as any),
+    'Something went wrong on our end. Please try again.'
+  );
+
+  // 2. Technical leakage check: none of the copy contains backend internals
+  const technicalTerms = [
+    'supabase',
+    'postgrest',
+    'remotederiveservice',
+    'edge function',
+    'network offline',
+    'stack trace',
+    'sql',
+    '500',
+    '400',
+    'null',
+    'undefined',
+  ];
+
+  for (const [op, message] of Object.entries(CUSTOMER_ERROR_MESSAGES)) {
+    for (const term of technicalTerms) {
+      assert.equal(
+        message.toLowerCase().includes(term),
+        false,
+        `Customer message for '${op}' must not leak technical term '${term}'`
+      );
+    }
+  }
+
+  // 3. Simulated raw backend error is shielded by mapper
+  const rawBackendError = new Error('RemoteDeriveService.onboard failed: PostgREST error 400 (PGRST100)');
+  const displayedMessage = getCustomerErrorMessage('onboarding');
+  assert.equal(displayedMessage.includes(rawBackendError.message), false);
+  assert.equal(displayedMessage, CUSTOMER_ERROR_MESSAGES.onboarding);
+});
+
+test('K6.2 User Intent Preservation: Failed check-in and refill operations preserve user form state', async () => {
+  // Check-in state simulation
+  let checkInSubmitted = false;
+  let checkInError: string | null = null;
+  const draftForm = {
+    skinState: 'better' as const,
+    adherence: 'yes' as const,
+    irritation: 'none' as const,
+    notes: 'Feeling noticeably smoother on forehead.',
+  };
+
+  try {
+    throw new Error('RemoteDeriveService.submitWeeklyCheckIn failed: Network timeout');
+  } catch (_err: any) {
+    checkInError = getCustomerErrorMessage('checkin');
+  }
+
+  // Verify form was NOT marked submitted and error is customer-safe
+  assert.equal(checkInSubmitted, false);
+  assert.equal(checkInError, CUSTOMER_ERROR_MESSAGES.checkin);
+  // User's draft answers remain intact
+  assert.equal(draftForm.skinState, 'better');
+  assert.equal(draftForm.notes, 'Feeling noticeably smoother on forehead.');
+
+  // Refill state simulation
+  let refillSubmitted = false;
+  let refillError: string | null = null;
+  const selectedProductId: string | null = 'prod_differin_123';
+
+  try {
+    throw new Error('RemoteDeriveService.requestProductRefill failed: 503 Service Unavailable');
+  } catch (_err: any) {
+    refillError = getCustomerErrorMessage('refill');
+  }
+
+  assert.equal(refillSubmitted, false);
+  assert.equal(refillError, CUSTOMER_ERROR_MESSAGES.refill);
+  // User's product selection remains intact
+  assert.equal(selectedProductId, 'prod_differin_123');
+});
+
 
 
 

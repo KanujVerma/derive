@@ -6,6 +6,37 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: K6.2 Integration-Semantics Hardening Pass
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `dbd8854deeaa3dddeeb81f9e661642018887df77`
+- **Prior Verified CI Run**: `35363350999` (on commit `dbd8854`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `K6.2 COMPLETE` (Focused hardening pass resolving 3 concrete integration semantic gaps: Scan-to-Ask context handoff preserves full typed `ProductScanResult` across navigation boundary without string synthesis and delivers synchronously to first and subsequent Ask queries; fail-closed non-mock client identity presence check in `src/services/deriveClient.ts` with whitespace rejection; centralized customer-safe error sanitization in `src/utils/customerErrors.ts` preventing raw backend error leakage to customer UI while preserving user draft intent).
+- **Ownership / Shared Contracts**: Client-side only (`src/stores/scanContextStore.ts`, `src/utils/customerErrors.ts`, `src/services/deriveClient.ts`, `app/(tabs)/ask.tsx`, `app/(tabs)/scan.tsx`, `app/(onboarding)/10-summary.tsx`, `app/check-in/index.tsx`, `app/refill/index.tsx`, `tests/**`). Shared contracts (`src/contracts/**`, `src/domain/**`) strictly frozen and untouched. Zero changes to `supabase/**`, backend migrations, RLS, Edge Functions, or Stripe.
+- **Architectural Deliverables**:
+  1. **Full-Fidelity Scan → Ask Context Preservation**:
+     - Created `src/stores/scanContextStore.ts` (`useScanContextStore`) providing ephemeral client state for the full typed `ProductScanResult`.
+     - In `app/(tabs)/scan.tsx`: `handleHandoffToAsk` populates `useScanContextStore.getState().setActiveScannedProduct(scanResult)` before navigating.
+     - In `app/(tabs)/ask.tsx`: Reads `useScanContextStore.getState().activeScannedProduct` synchronously on initial query execution, eliminating React closure / render timing race conditions on the first automated request.
+     - Context lifecycle: Subsequent messages retain the scanned product context; dismissing the scan banner or starting a "New chat" clears the context via `clearScanContext()`; direct navigation into Ask clears any stale context.
+  2. **Fail-Closed Non-Mock Identity Presence Guard**:
+     - Updated `resolveUserId()` in `src/services/deriveClient.ts` to trim inputs and reject missing, empty, and whitespace-only (`'   '`, `'\t'`, `'\n'`) strings in Remote mode.
+     - Explicitly throws `'Valid member identity required: Remote operations require a non-mock customer identity.'`, cleanly distinguishing client-side non-mock presence checks from server-side authenticated session / Supabase JWT enforcement (enforced via Postgres RLS in S1/I1).
+  3. **Centralized Customer-Safe Error Sanitization & Intent Preservation**:
+     - Created `src/utils/customerErrors.ts` mapping domain operations (`onboarding`, `ask`, `scan`, `checkin`, `refill`, `general`) to empathetic, deterministic Direction A Mineral copy.
+     - Replaced all raw `err?.message` leaks across `app/(onboarding)/10-summary.tsx`, `app/(tabs)/ask.tsx`, `app/(tabs)/scan.tsx`, `app/check-in/index.tsx`, `app/refill/index.tsx`, and `src/services/deriveClient.ts`.
+     - Technical details remain in controlled `console.warn` logs for developer troubleshooting without leaking internal strings (`PostgREST`, `Supabase`, `RemoteDeriveService`) to end-users.
+     - Form state preservation: Check-in and refill failures keep the user's form inputs and selected products intact for retry.
+- **Verification**:
+  - `npm test`: 64/64 passing (100%), including 4 new K6.2 regression tests covering scan context handoff, lifecycle clearing, customer error mapping, and user form state preservation.
+  - `npx tsc --noEmit`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - Zero raw `err?.message` displayed in `app/**` or `src/services/deriveClient.ts`.
+
 ## 2026-09-18 — Kanuj Mobile/UX: K6.1 Service Boundary Hardening & Fail-Closed State
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

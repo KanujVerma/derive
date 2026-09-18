@@ -11,8 +11,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii } from '@/src/constants/theme';
-import { ChatMessage } from '@/src/types/schema';
+import { ChatMessage, ProductScanResult } from '@/src/types/schema';
 import { useRoutineStore } from '@/src/stores/routineStore';
+import { useScanContextStore } from '@/src/stores/scanContextStore';
+import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import { askQuestion } from '@/src/services/deriveClient';
 import { ChatBubble } from '@/src/components/chat/ChatBubble';
 import { GlassComposer } from '@/src/components/chat/GlassComposer';
@@ -39,11 +41,7 @@ export default function AskScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [activeScanContext, setActiveScanContext] = useState<{
-    productName: string;
-    verdict: string;
-    reason?: string;
-  } | null>(null);
+  const activeScannedProduct = useScanContextStore((s) => s.activeScannedProduct);
   const handledInitialQueryRef = useRef<string | null>(null);
 
   const starterPrompts = React.useMemo(() => {
@@ -65,26 +63,27 @@ export default function AskScreen() {
 
   const hasInteracted = messages.length > 0;
 
-  const resolvedProductName = params?.productName || params?.scannedProductName;
-  const resolvedBrand = params?.brand || params?.scannedBrand;
-  const resolvedVerdict = params?.verdict || params?.scannedVerdict;
-  const resolvedReason = params?.reason || params?.scannedReason;
-
   React.useEffect(() => {
-    if (resolvedProductName && resolvedVerdict) {
-      setActiveScanContext({
-        productName: resolvedProductName,
-        verdict: resolvedVerdict,
-        reason: resolvedReason,
-      });
+    if (!params?.productName && !params?.scannedProductName && messages.length === 0) {
+      useScanContextStore.getState().clearScanContext();
     }
     if (params?.initialQuery && handledInitialQueryRef.current !== params.initialQuery) {
       handledInitialQueryRef.current = params.initialQuery;
-      handleSendMessage(params.initialQuery);
+      const currentScanContext = useScanContextStore.getState().activeScannedProduct || undefined;
+      handleSendMessage(params.initialQuery, undefined, currentScanContext);
     }
-  }, [params?.initialQuery, resolvedProductName, resolvedVerdict, resolvedReason]);
+  }, [params?.initialQuery, params?.productName, params?.scannedProductName]);
 
-  const handleSendMessage = async (text: string, imageUri?: string) => {
+  const handleSendMessage = async (
+    text: string,
+    imageUri?: string,
+    scanContextOverride?: ProductScanResult
+  ) => {
+    const activeProduct =
+      scanContextOverride !== undefined
+        ? scanContextOverride
+        : (useScanContextStore.getState().activeScannedProduct || undefined);
+
     const userMsg: ChatMessage = {
       id: `usr_${Date.now()}`,
       conversationId: 'conv_1',
@@ -105,6 +104,7 @@ export default function AskScreen() {
 
     try {
       const response = await askQuestion(userMsg.text, {
+        scannedProduct: activeProduct,
         photoAttachmentUri: userMsg.attachmentUri,
       });
 
@@ -136,7 +136,7 @@ export default function AskScreen() {
         id: `err_${Date.now()}`,
         conversationId: 'conv_1',
         sender: 'derive',
-        text: e?.message || 'Unable to consult skincare intelligence right now. Please check your connection and try again.',
+        text: getCustomerErrorMessage('ask'),
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -167,7 +167,7 @@ export default function AskScreen() {
                 onPress={() => {
                   Haptics.selectionAsync();
                   setMessages([]);
-                  setActiveScanContext(null);
+                  useScanContextStore.getState().clearScanContext();
                   handledInitialQueryRef.current = null;
                 }}
                 style={styles.newChatButton}
@@ -195,18 +195,18 @@ export default function AskScreen() {
       </View>
 
       {/* Active Scan Context Banner (if handed off from Scan tab) */}
-      {activeScanContext && (
+      {activeScannedProduct && (
         <View style={styles.scanBanner}>
           <View style={styles.scanBannerTextCol}>
             <Text style={styles.scanBannerLabel}>
               DISCUSSING SCANNED PRODUCT
             </Text>
             <Text style={styles.scanBannerTitle} numberOfLines={1}>
-              {activeScanContext.productName} • {activeScanContext.verdict.toUpperCase().replace(/_/g, ' ')}
+              {activeScannedProduct.productName} • {activeScannedProduct.verdict.toUpperCase().replace(/_/g, ' ')}
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => setActiveScanContext(null)}
+            onPress={() => useScanContextStore.getState().clearScanContext()}
             style={styles.scanBannerClose}
             accessibilityLabel="Dismiss product context"
           >
