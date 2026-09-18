@@ -95,6 +95,7 @@ Every substantial agent run on either founder's machine must begin and finish wi
 Before claiming any task complete:
 1. Run test suite: `npm test` (must pass 100%).
 2. Run typecheck: `npx tsc --noEmit` (0 errors).
-3. Run web build: `EXPO_NO_TELEMETRY=1 npx expo export -p web` (must succeed cleanly).
-4. Inspect git diff: verify no unintended files, secrets, or temporary files are staged.
-5. Verify that founder ownership boundaries were respected.
+3. Run test typecheck: `npm run typecheck:tests` (0 errors).
+4. Run web build: `EXPO_NO_TELEMETRY=1 npx expo export -p web` (must succeed cleanly).
+5. Inspect git diff: verify no unintended files, secrets, or temporary files are staged.
+6. Verify that founder ownership boundaries were respected.

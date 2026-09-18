@@ -27,6 +27,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@types/node": "^22.20.3",
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
   },
@@ -35,7 +36,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "node --experimental-strip-types tests/derive.test.ts"
+    "test": "node --experimental-strip-types tests/derive.test.ts",
+    "typecheck:tests": "tsc -p tsconfig.tests.json --noEmit"
   },
   "private": true
 }

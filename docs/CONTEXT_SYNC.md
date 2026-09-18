@@ -6,6 +6,40 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj Mobile/UX: K6.3 Test Integrity & Contract Truth Hardening Pass
+
+- **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `61d9076ea56dc3fd242019cf53a325778fe491d9`
+- **Prior Verified CI Run**: `35365954751` (on commit `61d9076`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `K6.3 COMPLETE` (Verification integrity and contract truth pass eliminating false-green test typechecking holes, establishing dedicated test semantic typecheck in CI, auditing and aligning test fixtures to canonical production contracts without modifying shared schemas, and separating UI display banner fallbacks from typed service domain context).
+- **Ownership / Shared Contracts**: Client-side and test infrastructure only (`tsconfig.tests.json`, `package.json`, `.github/workflows/ci.yml`, `AGENTS.md`, `src/utils/scanContext.ts`, `app/(tabs)/ask.tsx`, `tests/derive.test.ts`). Shared contracts (`src/contracts/**`, `src/domain/**`, `src/types/schema.ts`) strictly frozen and untouched. Zero changes to Sami's backend lane (`supabase/**`, `admin/**`, Edge Functions, Stripe).
+- **Architectural Deliverables**:
+  1. **Closed False-Green CI Hole**:
+     - Root `tsconfig.json` excluded `"tests"`, while `npm test` ran Node's `--experimental-strip-types` without typechecking, permitting broken types in `tests/derive.test.ts` to pass CI.
+     - Added `tsconfig.tests.json` extending root configuration with `"types": ["node", "react-native"]` and targeting `tests/**/*.ts`.
+     - Added `"typecheck:tests": "tsc -p tsconfig.tests.json --noEmit"` to `package.json`.
+     - Added dedicated `Run test TypeScript check` step to `.github/workflows/ci.yml` directly after strict application TypeScript check.
+     - Updated `AGENTS.md` completion rules to require `npm run typecheck:tests` (0 errors).
+  2. **Canonical Contract Truth & Fixture Realignment**:
+     - Audited all test fixtures against canonical schemas. Completely eradicated hallucinated fields (`barcode`, `confidence`, `ingredientsIdentified`, `safetyFlags`, `fitScore`) and illegal verdicts (`verdict: 'keep'`).
+     - Realized test fixtures with canonical `ProductScanResult` properties (`category`, `keyActives`, `factsUsedToDecide`) and legal verdicts (`fits_plan`, `great_fit`).
+     - Aligned `RemoteBackendMock` implementation in `tests/derive.test.ts` with required `SkinProfile`, `Routine`, `ProductScanResult`, and `CustomerProfile` properties.
+  3. **Separation of Route Display Fallback from Service Context**:
+     - Created `src/utils/scanContext.ts` with pure functions `resolveAskDisplayBanner` and `resolveAskServiceContext`.
+     - Lightweight route query strings provide UI banner continuity (e.g. for deep links or external routes) but are NEVER synthesized into a synthetic `ProductScanResult`.
+     - `askQuestion` transmission to `IDeriveService.askDerive` carries strictly the full typed `ProductScanResult` from `useScanContextStore`.
+     - Banner dismissal clears both route banner fallback state and transient store context.
+- **Verification**:
+  - `npm test`: 65/65 passing (100%).
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - Zero hallucinated fields or illegal verdicts in codebase.
+
 ## 2026-09-18 — Kanuj Mobile/UX: K6.2 Integration-Semantics Hardening Pass
 
 - **Agent / Workstream**: Kanuj (Mobile Client, UX & Prototyping)

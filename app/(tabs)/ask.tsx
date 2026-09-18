@@ -15,6 +15,11 @@ import { ChatMessage, ProductScanResult } from '@/src/types/schema';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useScanContextStore } from '@/src/stores/scanContextStore';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
+import {
+  resolveAskDisplayBanner,
+  resolveAskServiceContext,
+  type AskRouteParams,
+} from '@/src/utils/scanContext';
 import { askQuestion } from '@/src/services/deriveClient';
 import { ChatBubble } from '@/src/components/chat/ChatBubble';
 import { GlassComposer } from '@/src/components/chat/GlassComposer';
@@ -25,22 +30,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 export default function AskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{
-    initialQuery?: string;
-    productName?: string;
-    brand?: string;
-    verdict?: string;
-    reason?: string;
-    whatItWouldChangeOrReplace?: string;
-    scannedProductName?: string;
-    scannedBrand?: string;
-    scannedVerdict?: string;
-    scannedReason?: string;
-  }>();
+  const params = useLocalSearchParams() as AskRouteParams;
   const { routine } = useRoutineStore();
   const flatListRef = useRef<FlatList>(null);
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isRouteBannerDismissed, setIsRouteBannerDismissed] = useState(false);
   const activeScannedProduct = useScanContextStore((s) => s.activeScannedProduct);
   const handledInitialQueryRef = useRef<string | null>(null);
 
@@ -79,10 +74,10 @@ export default function AskScreen() {
     imageUri?: string,
     scanContextOverride?: ProductScanResult
   ) => {
-    const activeProduct =
-      scanContextOverride !== undefined
-        ? scanContextOverride
-        : (useScanContextStore.getState().activeScannedProduct || undefined);
+    const activeProduct = resolveAskServiceContext(
+      useScanContextStore.getState().activeScannedProduct,
+      scanContextOverride
+    );
 
     const userMsg: ChatMessage = {
       id: `usr_${Date.now()}`,
@@ -155,6 +150,11 @@ export default function AskScreen() {
     }
   };
 
+  const displayScanBanner = resolveAskDisplayBanner(
+    activeScannedProduct,
+    isRouteBannerDismissed ? undefined : params
+  );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Clean Header */}
@@ -168,6 +168,7 @@ export default function AskScreen() {
                   Haptics.selectionAsync();
                   setMessages([]);
                   useScanContextStore.getState().clearScanContext();
+                  setIsRouteBannerDismissed(true);
                   handledInitialQueryRef.current = null;
                 }}
                 style={styles.newChatButton}
@@ -194,19 +195,22 @@ export default function AskScreen() {
         </Text>
       </View>
 
-      {/* Active Scan Context Banner (if handed off from Scan tab) */}
-      {activeScannedProduct && (
+      {/* Active Scan Context Banner (Store Full Context or Route Display Fallback) */}
+      {displayScanBanner && (
         <View style={styles.scanBanner}>
           <View style={styles.scanBannerTextCol}>
             <Text style={styles.scanBannerLabel}>
               DISCUSSING SCANNED PRODUCT
             </Text>
             <Text style={styles.scanBannerTitle} numberOfLines={1}>
-              {activeScannedProduct.productName} • {activeScannedProduct.verdict.toUpperCase().replace(/_/g, ' ')}
+              {displayScanBanner.productName} • {displayScanBanner.verdictLabel}
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => useScanContextStore.getState().clearScanContext()}
+            onPress={() => {
+              useScanContextStore.getState().clearScanContext();
+              setIsRouteBannerDismissed(true);
+            }}
             style={styles.scanBannerClose}
             accessibilityLabel="Dismiss product context"
           >

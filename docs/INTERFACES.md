@@ -49,14 +49,21 @@ export interface IDeriveService {
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.
 * **Output**: `ProductScanResult`:
-  - `verdict`: `great_fit` | `could_work` | `not_needed` | `better_replacement` | `use_with_caution` | `not_good_fit`
-  - `verdictLabel`: e.g. `'BETTER AS A REPLACEMENT'`
-  - `reason`: One-sentence core rationale
-  - `whatItWouldChangeOrReplace`: Explicit routine impact
-  - `whyBullets`: 2–3 factual, user-specific explanation bullets
+  - `productName`: string
+  - `brand`: string
+  - `category`: `ProductCategory`
+  - `keyActives`: string[]
+  - `verdict`: `great_fit` | `could_work` | `fits_plan` | `not_needed` | `better_replacement` | `use_with_caution` | `not_good_fit`
+  - `verdictLabel`?: string (e.g. `'BETTER AS A REPLACEMENT'`)
+  - `verdictSummary`: string
+  - `reason`?: One-sentence core rationale
+  - `whatItWouldChangeOrReplace`?: Explicit routine impact
+  - `factsUsedToDecide`: string[]
+  - `whyBullets`?: 2–3 factual, user-specific explanation bullets
 
 ### `askDerive(request: AskRequest)`
-* **Input**: `userId`, `question`, optional `activeContext` (e.g. `scannedProduct`).
+* **Input**: `userId`, `question`, optional `activeContext` (`scannedProduct: ProductScanResult`, `currentStepId`, `photoAttachmentUri`).
+  - *Context Resolution*: Pure helper `resolveAskServiceContext` (`src/utils/scanContext.ts`) extracts the full typed `ProductScanResult` from `useScanContextStore`. Lightweight route params are used exclusively by `resolveAskDisplayBanner` for UI display continuity and are never synthesized into artificial `ProductScanResult` records.
 * **Output**: `AskResponse`:
   - `directAnswer`: 1 concise sentence answering the core question
   - `whyExplanation`: Grounded clinical/routine reasoning

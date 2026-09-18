@@ -413,7 +413,11 @@ test('Canonical Routine: Sunscreen in PM is rejected as invalid', () => {
         productName: 'Gentle Cleanser',
         brand: 'CeraVe',
         category: 'cleanser',
+        amount: '1 pump',
+        area: 'Face',
         timing: 'am',
+        days: [],
+        purpose: 'Cleansing',
         whyChosen: 'Gentle morning cleanse',
       },
     ],
@@ -425,7 +429,11 @@ test('Canonical Routine: Sunscreen in PM is rejected as invalid', () => {
         productName: 'Gentle Cleanser',
         brand: 'CeraVe',
         category: 'cleanser',
+        amount: '1 pump',
+        area: 'Face',
         timing: 'pm',
+        days: [],
+        purpose: 'Cleansing',
         whyChosen: 'Gentle evening cleanse',
       },
       {
@@ -435,7 +443,11 @@ test('Canonical Routine: Sunscreen in PM is rejected as invalid', () => {
         productName: 'Relief Sun SPF 50+',
         brand: 'Beauty of Joseon',
         category: 'sunscreen',
+        amount: 'Two finger lengths',
+        area: 'Face and neck',
         timing: 'pm',
+        days: [],
+        purpose: 'Sun protection',
         whyChosen: 'Erroneously placed sunscreen in evening',
       },
     ],
@@ -464,7 +476,11 @@ test('Canonical Routine: Differin in AM is rejected as invalid', () => {
         productName: 'Differin Adapalene Gel 0.1%',
         brand: 'Differin',
         category: 'treatment',
+        amount: 'Pea-sized amount',
+        area: 'Face avoiding eyes',
         timing: 'am',
+        days: [],
+        purpose: 'Retinoid treatment',
         whyChosen: 'Erroneously placed retinoid in morning',
       },
     ],
@@ -545,12 +561,12 @@ test('Scan Evaluator: Accurately evaluates Anthelios SPF 60 as a great fit', () 
     currentRoutineProducts: ['CeraVe Hydrating Cleanser', 'Differin Adapalene Gel 0.1%'],
     recentReactions: [],
     primaryGoal: 'breakouts',
-    complexityPreference: 'simple',
+    routineComplexity: 'simple',
   });
 
   assert.equal(verdict.verdict, 'great_fit');
-  assert.match(verdict.reason, /sunscreen/i);
-  assert.ok(verdict.whyBullets.length >= 2);
+  assert.match(verdict.reason || '', /sunscreen/i);
+  assert.ok((verdict.whyBullets?.length ?? 0) >= 2);
 });
 
 test('Scan Evaluator: Flags Paula Choice BHA with caution due to active Differin schedule', () => {
@@ -562,11 +578,11 @@ test('Scan Evaluator: Flags Paula Choice BHA with caution due to active Differin
     currentRoutineProducts: ['CeraVe Hydrating Cleanser', 'Differin Adapalene Gel 0.1%'],
     recentReactions: [],
     primaryGoal: 'breakouts',
-    complexityPreference: 'simple',
+    routineComplexity: 'simple',
   });
 
   assert.equal(verdict.verdict, 'use_with_caution');
-  assert.match(verdict.reason, /Differin/i);
+  assert.match(verdict.reason || '', /Differin/i);
   assert.ok(verdict.whatItWouldChangeOrReplace);
 });
 
@@ -579,7 +595,7 @@ test('Scan Evaluator: Disapproves harsh physical scrubs for active breakout rout
     currentRoutineProducts: ['CeraVe Hydrating Cleanser', 'Differin Adapalene Gel 0.1%'],
     recentReactions: [],
     primaryGoal: 'breakouts',
-    complexityPreference: 'simple',
+    routineComplexity: 'simple',
   });
 
   assert.equal(verdict.verdict, 'not_good_fit');
@@ -1642,7 +1658,6 @@ import type {
   ProgressData,
   RefillRequestInput,
   RefillRequest,
-  ResearchInsight,
   CustomerProfile,
   RoutinePlan,
 } from '../src/domain/types.ts';
@@ -1651,6 +1666,10 @@ import {
   getCustomerErrorMessage,
   CUSTOMER_ERROR_MESSAGES,
 } from '../src/utils/customerErrors.ts';
+import {
+  resolveAskDisplayBanner,
+  resolveAskServiceContext,
+} from '../src/utils/scanContext.ts';
 
 test('K6 Service Boundary: MockDeriveService initializes strictly clean with zero Arthur leakage', async () => {
   const service = new MockDeriveService();
@@ -1688,13 +1707,30 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
       this.calls.push('onboard');
       return {
         userId: 'usr_remote_123',
+        skinProfile: {
+          id: 'sp_remote',
+          userId: 'usr_remote_123',
+          primaryGoal: 'fine_lines',
+          secondaryGoals: [],
+          routineComplexity: 'simple',
+          costPreference: 'balanced',
+          middayFeel: 'comfortable',
+          postCleanseTightness: false,
+          knownSensitivities: [],
+          activePrescriptions: [],
+          isPregnantOrNursing: false,
+          onboardingCompleted: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
         proposedRoutine: {
           id: 'rt_remote',
           userId: 'usr_remote_123',
+          version: 1,
           createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           status: 'awaiting_review',
           summarySentence: 'Remote customized plan.',
-          confidenceScore: 0.95,
           amSteps: [],
           pmSteps: [],
         },
@@ -1705,13 +1741,14 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
     async proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult> {
       this.calls.push('proposeRoutine');
       return {
-        proposedRoutine: {
+        routine: {
           id: 'rt_prop',
-          userId: input.userId,
+          userId: 'usr_remote_123',
+          version: 1,
           createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           status: 'draft',
           summarySentence: 'Proposed.',
-          confidenceScore: 0.9,
           amSteps: [],
           pmSteps: [],
         },
@@ -1737,6 +1774,8 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
       return {
         productName: input.productName,
         brand: input.brand || 'Remote Brand',
+        category: 'sunscreen',
+        keyActives: ['Zinc Oxide'],
         verdict: 'great_fit',
         verdictLabel: 'GREAT FIT',
         verdictSummary: 'Remote scan verdict',
@@ -1783,7 +1822,7 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
         productName: input.productName,
         brand: input.brand,
         status: 'requested',
-        requestedDate: new Date().toISOString().split('T')[0],
+        requestedAt: new Date().toISOString(),
       };
     }
 
@@ -1808,8 +1847,10 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
         id: userId,
         fullName: 'Remote Member',
         email: 'remote@example.com',
+        tier: 'founding_beta_129',
         membershipStatus: 'active',
-        joinedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
     }
   }
@@ -1904,12 +1945,14 @@ test('K6 End-to-End Service Flow: Onboarding through routine and check-ins', asy
         brand: 'CeraVe',
         name: 'Hydrating Facial Cleanser',
         category: 'cleanser',
+        keyActives: ['Ceramides'],
       },
       {
         id: 'p2',
         brand: 'Differin',
         name: 'Adapalene Gel 0.1%',
         category: 'treatment',
+        keyActives: ['Adapalene'],
       },
     ],
     productReactions: [],
@@ -1933,15 +1976,15 @@ test('K6 End-to-End Service Flow: Onboarding through routine and check-ins', asy
   const routineState = useRoutineStore.getState();
   assert.equal(routineState.isPlanUnderReview, true);
   assert.ok(routineState.routine);
-  assert.equal(routineState.routine.amSteps.length, 3);
+  assert.equal(routineState.routine!.amSteps.length, 3);
 
   // 2. Ask question handling
   const safetyRes = await askQuestion('My face is swollen and my throat feels tight');
-  assert.equal(safetyRes.safety.isMedicalEmergency, true);
+  assert.equal(safetyRes.safety?.isMedicalEmergency, true);
 
   const normalRes = await askQuestion('Should I use moisturizer with Differin?');
-  assert.equal(normalRes.safety.isMedicalEmergency, false);
-  assert.ok(normalRes.directAnswer.length > 0);
+  assert.equal(normalRes.safety?.isMedicalEmergency, false);
+  assert.ok((normalRes.directAnswer?.length ?? 0) > 0);
 
   // 3. Scan evaluation
   const scan = await evaluateProduct({
@@ -2187,40 +2230,46 @@ test('K6.1 Hardening: Service mutation failures preserve user intent and error r
 });
 
 // ========================================================
-// 18. K6.2 INTEGRATION-SEMANTICS & ERROR HARDENING
+// 18. K6.2 & K6.3 INTEGRATION-SEMANTICS & CONTRACT INTEGRITY
 // ========================================================
 
-test('K6.2 Scan Context: Full typed ProductScanResult handoff and transmission on first and subsequent Ask queries', async () => {
+test('K6.3 Service Boundary: Ask question transmission carries full typed ProductScanResult and preserves context across queries', async () => {
   const origService = getDeriveService();
 
   try {
-    const fullScanResult: ProductScanResult = {
-      barcode: '0883140012993',
+    const fullScanResult = {
       productName: 'Anthelios Ultra Light Fluid SPF 60',
       brand: 'La Roche-Posay',
+      category: 'sunscreen',
+      keyActives: ['Avobenzone', 'Homosalate', 'Octisalate', 'Octocrylene'],
       verdict: 'great_fit',
-      verdictLabel: 'Great Fit',
+      verdictLabel: 'GREAT FIT',
       verdictSummary: 'Lightweight chemical and mineral hybrid sunscreen with high UVA/UVB protection.',
+      reason: 'High photoprotection without pore congestion.',
       whatItWouldChangeOrReplace: 'Replaces generic daytime moisturizer with dedicated photoprotection.',
-      confidence: 0.98,
-      ingredientsIdentified: ['Avobenzone', 'Homosalate', 'Octisalate', 'Octocrylene', 'Silica'],
-      safetyFlags: [],
-      fitScore: 94,
-    };
+      factsUsedToDecide: ['High broad-spectrum UV protection', 'Lightweight non-comedogenic fluid'],
+      whyBullets: ['Broad-spectrum UVA/UVB defense', 'Compatible with active Differin schedule'],
+    } satisfies ProductScanResult;
 
-    // 1. Store holds full typed object
+    // 1. Store holds exact canonical ProductScanResult
     useScanContextStore.getState().setActiveScannedProduct(fullScanResult);
     const stored = useScanContextStore.getState().activeScannedProduct;
     assert.deepEqual(stored, fullScanResult);
-    assert.equal(stored?.fitScore, 94);
-    assert.equal(stored?.confidence, 0.98);
-    assert.deepEqual(stored?.ingredientsIdentified, ['Avobenzone', 'Homosalate', 'Octisalate', 'Octocrylene', 'Silica']);
+    assert.equal(stored?.productName, 'Anthelios Ultra Light Fluid SPF 60');
+    assert.equal(stored?.category, 'sunscreen');
+    assert.deepEqual(stored?.keyActives, ['Avobenzone', 'Homosalate', 'Octisalate', 'Octocrylene']);
+    assert.deepEqual(stored?.factsUsedToDecide, ['High broad-spectrum UV protection', 'Lightweight non-comedogenic fluid']);
 
     // 2. Service receives the full typed product on first Ask query
-    let capturedAskRequest: AskRequest | null = null;
+    const captured = {
+      askRequest: null as AskRequest | null,
+      get(): AskRequest | null {
+        return this.askRequest;
+      },
+    };
     class ContextTrackingService extends MockDeriveService {
       override async askDerive(req: AskRequest): Promise<AskResponse> {
-        capturedAskRequest = req;
+        captured.askRequest = req;
         return super.askDerive(req);
       }
     }
@@ -2233,59 +2282,62 @@ test('K6.2 Scan Context: Full typed ProductScanResult handoff and transmission o
       scannedProduct: currentContext,
     });
 
-    assert.ok(capturedAskRequest !== null);
-    assert.equal((capturedAskRequest as AskRequest).question, 'How do I layer this SPF with my morning routine?');
-    assert.deepEqual((capturedAskRequest as AskRequest).activeContext?.scannedProduct, fullScanResult);
-    assert.equal((capturedAskRequest as AskRequest).activeContext?.scannedProduct?.fitScore, 94);
+    assert.ok(captured.get() !== null);
+    assert.equal(captured.get()!.question, 'How do I layer this SPF with my morning routine?');
+    assert.deepEqual(captured.get()!.activeContext?.scannedProduct, fullScanResult);
+    assert.equal(captured.get()!.activeContext?.scannedProduct?.category, 'sunscreen');
 
     // 3. Subsequent query in the same conversation retains the full scan context
-    capturedAskRequest = null;
+    captured.askRequest = null;
     const retainedContext = useScanContextStore.getState().activeScannedProduct || undefined;
     await askQuestion('Does it pill under makeup?', {
       scannedProduct: retainedContext,
     });
 
-    assert.ok(capturedAskRequest !== null);
-    assert.equal((capturedAskRequest as AskRequest).question, 'Does it pill under makeup?');
-    assert.deepEqual((capturedAskRequest as AskRequest).activeContext?.scannedProduct, fullScanResult);
+    assert.ok(captured.get() !== null);
+    assert.equal(captured.get()!.question, 'Does it pill under makeup?');
+    assert.deepEqual(captured.get()!.activeContext?.scannedProduct, fullScanResult);
   } finally {
     setDeriveService(origService);
     useScanContextStore.getState().clearScanContext();
   }
 });
 
-test('K6.2 Scan Context Lifecycle: Banner dismissal and new chat clear active scan context', async () => {
+test('K6.3 Scan Context Lifecycle: Banner dismissal and new chat clear active scan context', async () => {
   const origService = getDeriveService();
 
   try {
-    const scan1: ProductScanResult = {
+    const scan1 = {
       productName: 'Hydrating Cleanser',
       brand: 'CeraVe',
+      category: 'cleanser',
+      keyActives: ['Ceramides', 'Hyaluronic Acid'],
       verdict: 'great_fit',
-      verdictLabel: 'Great Fit',
+      verdictLabel: 'GREAT FIT',
       verdictSummary: 'Non-stripping ceramides formula.',
-      confidence: 0.95,
-      ingredientsIdentified: ['Ceramides', 'Hyaluronic Acid'],
-      safetyFlags: [],
-      fitScore: 92,
-    };
+      factsUsedToDecide: ['Barrier supportive ceramides'],
+    } satisfies ProductScanResult;
 
-    const scan2: ProductScanResult = {
+    const scan2 = {
       productName: 'Adapalene 0.1% Gel',
       brand: 'Differin',
-      verdict: 'keep',
-      verdictLabel: 'Keep In Routine',
+      category: 'treatment',
+      keyActives: ['Adapalene'],
+      verdict: 'fits_plan',
+      verdictLabel: 'GREAT FIT',
       verdictSummary: 'Targeted topical retinoid for cellular turnover.',
-      confidence: 0.99,
-      ingredientsIdentified: ['Adapalene'],
-      safetyFlags: [],
-      fitScore: 96,
-    };
+      factsUsedToDecide: ['Scheduled evening retinoid'],
+    } satisfies ProductScanResult;
 
-    let capturedAskRequest: AskRequest | null = null;
+    const capturedLifecycle = {
+      askRequest: null as AskRequest | null,
+      get(): AskRequest | null {
+        return this.askRequest;
+      },
+    };
     class ContextTrackingService extends MockDeriveService {
       override async askDerive(req: AskRequest): Promise<AskResponse> {
-        capturedAskRequest = req;
+        capturedLifecycle.askRequest = req;
         return super.askDerive(req);
       }
     }
@@ -2304,18 +2356,71 @@ test('K6.2 Scan Context Lifecycle: Banner dismissal and new chat clear active sc
     assert.equal(useScanContextStore.getState().activeScannedProduct, null);
 
     // 4. Query sent after dismissal does not send scannedProduct
-    capturedAskRequest = null;
+    capturedLifecycle.askRequest = null;
     const clearedContext = useScanContextStore.getState().activeScannedProduct || undefined;
     await askQuestion('Why is my skin feeling dry this afternoon?', {
       scannedProduct: clearedContext,
     });
 
-    assert.ok(capturedAskRequest !== null);
-    assert.equal((capturedAskRequest as AskRequest).activeContext?.scannedProduct, undefined);
+    assert.ok(capturedLifecycle.get() !== null);
+    assert.equal(capturedLifecycle.get()!.activeContext?.scannedProduct, undefined);
   } finally {
     setDeriveService(origService);
     useScanContextStore.getState().clearScanContext();
   }
+});
+
+test('K6.3 Scan Context: Pure helpers distinguish full service context from route display fallback', () => {
+  const realScan = {
+    productName: 'Anthelios Ultra Light Fluid SPF 60',
+    brand: 'La Roche-Posay',
+    category: 'sunscreen',
+    keyActives: ['Avobenzone'],
+    verdict: 'great_fit',
+    verdictLabel: 'GREAT FIT',
+    verdictSummary: 'Broad-spectrum SPF 60',
+    factsUsedToDecide: ['SPF 60 test'],
+  } satisfies ProductScanResult;
+
+  // 1. Full transient store result outranks route parameters for banner
+  const bannerFromStore = resolveAskDisplayBanner(realScan, {
+    productName: 'Different Name',
+    verdict: 'could_work',
+  });
+  assert.ok(bannerFromStore !== null);
+  assert.equal(bannerFromStore.source, 'transient_store');
+  assert.equal(bannerFromStore.productName, 'Anthelios Ultra Light Fluid SPF 60');
+  assert.equal(bannerFromStore.verdictLabel, 'GREAT FIT');
+
+  // 2. Fallback to canonical route params when store is null
+  const bannerFromCanonicalRoute = resolveAskDisplayBanner(null, {
+    productName: 'CeraVe PM Moisturizer',
+    verdict: 'great_fit',
+  });
+  assert.ok(bannerFromCanonicalRoute !== null);
+  assert.equal(bannerFromCanonicalRoute.source, 'route_params');
+  assert.equal(bannerFromCanonicalRoute.productName, 'CeraVe PM Moisturizer');
+  assert.equal(bannerFromCanonicalRoute.verdictLabel, 'GREAT FIT');
+
+  // 3. Fallback to legacy route params when store is null
+  const bannerFromLegacyRoute = resolveAskDisplayBanner(null, {
+    scannedProductName: 'Differin Gel',
+    scannedVerdict: 'fits_plan',
+  });
+  assert.ok(bannerFromLegacyRoute !== null);
+  assert.equal(bannerFromLegacyRoute.source, 'route_params');
+  assert.equal(bannerFromLegacyRoute.productName, 'Differin Gel');
+  assert.equal(bannerFromLegacyRoute.verdictLabel, 'FITS PLAN');
+
+  // 4. Returns null when neither store nor route params exist
+  assert.equal(resolveAskDisplayBanner(null, {}), null);
+  assert.equal(resolveAskDisplayBanner(null, undefined), null);
+
+  // 5. Service context resolution: route strings NEVER become a synthetic ProductScanResult
+  assert.equal(resolveAskServiceContext(null), undefined);
+  assert.deepEqual(resolveAskServiceContext(realScan), realScan);
+  const overrideScan = { ...realScan, productName: 'Overridden Scan' } satisfies ProductScanResult;
+  assert.deepEqual(resolveAskServiceContext(realScan, overrideScan), overrideScan);
 });
 
 test('K6.2 Customer Errors: Shields raw backend/technical errors and returns empathetic Mineral copy', () => {

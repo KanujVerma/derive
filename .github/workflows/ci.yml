@@ -34,5 +34,8 @@ jobs:
       - name: Run strict TypeScript check
         run: npx tsc --noEmit
 
+      - name: Run test TypeScript check
+        run: npm run typecheck:tests
+
       - name: Run Expo production export
         run: EXPO_NO_TELEMETRY=1 npx expo export -p web

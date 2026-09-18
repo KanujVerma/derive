@@ -165,7 +165,16 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - 100% test suite passing (64/64 tests in `tests/derive.test.ts`), with 4 new K6.2 regression tests.
   - TypeScript typecheck passes with 0 errors (`npx tsc --noEmit`).
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
-  - Zero raw `err?.message` displayed in `app/**` or `src/services/deriveClient.ts`.
+### K6.3: Test Integrity, CI Typechecking & Contract Truth [COMPLETE]
+* **Scope**:
+  - Close false-green CI hole: add `tsconfig.tests.json`, `"typecheck:tests": "tsc -p tsconfig.tests.json --noEmit"` in `package.json`, dedicated test typecheck step in `.github/workflows/ci.yml`, and enforce in `AGENTS.md` completion rules.
+  - Canonical contract truth & fixture realignment: audit all test fixtures against canonical schemas, eradicating hallucinated fields (`barcode`, `confidence`, `ingredientsIdentified`, `safetyFlags`, `fitScore`) and illegal verdicts (`verdict: 'keep'`), restoring required canonical `ProductScanResult` properties (`category`, `keyActives`, `factsUsedToDecide`) and legal verdicts (`fits_plan`, `great_fit`). Production contracts remain authoritative; tests adapt strictly to contracts.
+  - Separation of route display fallback from service context: create pure utility `src/utils/scanContext.ts` (`resolveAskDisplayBanner`, `resolveAskServiceContext`). Route query strings provide visual UI continuity (e.g. for deep links) and are never synthesized into artificial `ProductScanResult` domain records. Only the full typed `ProductScanResult` from `useScanContextStore` is sent to `IDeriveService.askDerive()`.
+* **Acceptance Criteria**:
+  - 100% test suite passing (65/65 tests in `tests/derive.test.ts`), with dedicated K6.3 regression tests.
+  - Application typecheck passes with 0 errors (`npx tsc --noEmit`).
+  - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
+  - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - Zero contracts or backend code modified.
 
 ---
