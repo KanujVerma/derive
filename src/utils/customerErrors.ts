@@ -21,7 +21,8 @@ export type CustomerFacingOperation =
   | 'auth_send_code'
   | 'auth_signin'
   | 'auth_signout'
-  | 'bootstrap';
+  | 'bootstrap'
+  | 'routine';
 
 export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = {
   onboarding: "We couldn't finish setting up your routine. Your setup is still here. Please try again.",
@@ -37,6 +38,7 @@ export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = 
   auth_signin: "We couldn't sign you in right now. Please try again.",
   auth_signout: "We couldn't sign you out right now. Please try again.",
   bootstrap: "We couldn't finish loading your account. Please try again.",
+  routine: "We couldn't refresh your routine right now. Please try again.",
 };
 
 /**

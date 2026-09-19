@@ -1,6 +1,6 @@
 # Derive: "Your skincare, handled."
 
-Managed skincare service ("Your skincare, handled"). Built on Apple-grade minimalism, contextual intelligence, and persistent customer care. Currently preparing for an initial 10-member Founding Beta cohort ($100/month concierge operating experiment; long-term personalized pricing architecture remains provisional).
+Managed skincare service ("Your skincare, handled"). Built on Apple-grade minimalism, contextual intelligence, and persistent customer care. Currently preparing for an initial 10-member Founding Beta cohort. Membership is **$25/month** for Derive managing skincare; products are purchased separately (ADR-26 / I1-B4A).
 
 ---
 
@@ -61,7 +61,7 @@ developer/CI, and trusted-server credential boundaries.
 - **Visual Design**: Direction A Mineral (Warm Ivory `#F6F3EC`, Elevated Surface `#FFFEFB`, Architectural Charcoal `#171A18`, Mineral Green `#345447`).
 - **Platform / Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Private Storage; Edge Functions planned) — S1A data plane hardened; full S1 platform in progress.
 - **Intelligence**: Planned server-side Google Gemini 2.5 Flash via structured JSON schemas (server-side only; Gemini keys are strictly server secrets; Supabase Edge Functions and live model integration are planned for S3; mobile client currently uses deterministic local reasoning via `MockDeriveService`), coupled with deterministic safety circuit breakers.
-- **Commerce**: Planned Stripe web checkout for Founding Beta memberships ($100/month first-10 approved beta experiment; long-term personalized pricing architecture remains provisional). (Currently S5 on roadmap).
+- **Commerce**: Planned Stripe web checkout for Founding Beta **membership** ($25/month display after I1-B4A; Stripe in S5). Products are separate transactions. Full Shop is deferred.
 - **Telemetry**: Planned privacy-safe telemetry (PostHog with session replay strictly disabled; typed navigation allowlist only; zero health data/photos/symptoms).
 
 ---

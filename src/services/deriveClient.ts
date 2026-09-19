@@ -31,6 +31,8 @@ import type {
   CustomerProfile,
   CustomerBootstrapState,
   RoutinePlan,
+  UserProduct,
+  RoutineProposalResult,
   SkinState,
   IrritationLevel,
   AdherenceLevel,
@@ -139,19 +141,27 @@ export async function submitOnboarding(payload: OnboardingPayload): Promise<Onbo
     (result.initialRoutineState === 'awaiting_review' || result.proposedRoutine.status === 'awaiting_review')
   );
 
+  const isPendingGeneration =
+    result.initialRoutineState === 'pending_generation' || (!result.proposedRoutine && !isAwaitingReview);
+
   // Synchronize canonical proposed routine into routine store
   useRoutineStore.setState({
-    routine: result.proposedRoutine,
-    userProducts: result.userProducts,
+    routine: result.proposedRoutine || null,
+    userProducts: result.userProducts || [],
     completedStepIdsToday: [],
     checkIns: [],
     refillRequests: [],
     learnedInsights: [],
     researchInsights: [],
     isPlanUnderReview: isAwaitingReview,
-    todayDominantStatus: isAwaitingReview
+    isRoutineBeingPrepared: isPendingGeneration,
+    planHydrationStatus: 'ready',
+    planHydrationError: null,
+    todayDominantStatus: isPendingGeneration
+      ? 'Your routine is being prepared.'
+      : isAwaitingReview
       ? 'Final review: Your first routine gets one final quality check before it goes live.'
-      : 'Your routine is being prepared.',
+      : 'Everything looks on track. No changes today.',
     isWeeklyCheckInDue: false,
   });
 
@@ -263,18 +273,276 @@ export async function hydrateProgress(userId?: string): Promise<ProgressData> {
   return progress;
 }
 
+/**
+ * @deprecated Compatibility wrapper over hydratePlanState.
+ *
+ * Routine and UserProduct state must always be hydrated atomically.
+ * Do not call this to perform independent routine-only reads; use hydratePlanState() directly.
+ * Kept for backward compatibility with existing non-critical call sites.
+ */
 export async function hydrateRoutine(userId?: string): Promise<RoutinePlan | null> {
+  const result = await hydratePlanState(userId);
+  return result?.routine ?? null;
+}
+
+
+const inFlightHydrations = new Map<
+  string,
+  Promise<{
+    routine: RoutinePlan | null;
+    userProducts: UserProduct[];
+    isRoutineBeingPrepared: boolean;
+  } | null>
+>();
+const inFlightHydrationTokens = new Map<string, object>();
+
+const inFlightProposals = new Map<string, Promise<RoutineProposalResult | null>>();
+const inFlightProposalTokens = new Map<string, object>();
+
+export function clearInFlightHydrations(): void {
+  inFlightHydrations.clear();
+  inFlightHydrationTokens.clear();
+}
+
+export function clearInFlightProposals(): void {
+  inFlightProposals.clear();
+  inFlightProposalTokens.clear();
+}
+
+/**
+ * Hydrates canonical plan state (Routine + UserProducts) from the service boundary.
+ *
+ * Enforces:
+ * - Concurrent in-flight request deduplication per user.
+ * - Identity freshness check against active session in Remote mode.
+ * - Monotonic attempt checking to prevent stale commit races.
+ * - Derivation of isRoutineBeingPrepared when onboarding is completed and routine is null.
+ */
+export function hydratePlanState(userId?: string): Promise<{
+  routine: RoutinePlan | null;
+  userProducts: UserProduct[];
+  isRoutineBeingPrepared: boolean;
+} | null> {
   const service = getDeriveService();
   const id = resolveUserId(userId);
-  const routine = await service.getRoutine(id);
 
-  useRoutineStore.setState({
-    routine,
-    isPlanUnderReview: routine?.status === 'awaiting_review',
-  });
+  const inFlight = inFlightHydrations.get(id);
+  if (inFlight) {
+    return inFlight;
+  }
 
-  return routine;
+  const requestToken = {};
+  const hydrationPromise = (async () => {
+    const attempt = useRoutineStore.getState().startPlanHydration();
+    try {
+      const [routine, userProducts] = await Promise.all([
+        service.getRoutine(id),
+        service.getUserProducts(id),
+      ]);
+
+      // Freshness check: in Remote mode, ensure active identity still matches
+      if (isRemoteServiceEnabled()) {
+        const activeSessionUser = useAuthStore.getState().sessionUserId;
+        if (!activeSessionUser || activeSessionUser !== id) {
+          return null;
+        }
+      }
+
+      const currentAttempt = useRoutineStore.getState().planHydrationAttempt;
+      if (attempt !== currentAttempt) {
+        return null;
+      }
+
+      const bootstrap = useBootstrapStore.getState();
+      const isRemote = isRemoteServiceEnabled();
+      const isOnboarded = isRemote
+        ? bootstrap.status === 'READY' && bootstrap.bootstrapState?.onboardingCompleted === true
+        : useOnboardingStore.getState().isCompleted;
+
+      const isBeingPrepared = routine === null && Boolean(isOnboarded);
+
+      const committed = useRoutineStore.getState().setPlanHydrated(
+        routine,
+        userProducts,
+        isBeingPrepared,
+        attempt
+      );
+
+      if (!committed) return null;
+
+      return { routine, userProducts, isRoutineBeingPrepared: isBeingPrepared };
+    } catch (err: any) {
+      console.warn('hydratePlanState error:', err);
+      const currentAttempt = useRoutineStore.getState().planHydrationAttempt;
+      if (attempt === currentAttempt) {
+        const commitError = (preserveBeingPrepared: boolean) => {
+          useRoutineStore.getState().setPlanHydrationError(
+            getCustomerErrorMessage('routine'),
+            attempt
+          );
+          // B3.1 Defect A: If member is canonically onboarded but we got a transient read error,
+          // preserve pending-generation semantics so Today/Plan show calm preparation + retry
+          // rather than un-onboarded "Start Routine Setup" empty-state.
+          if (preserveBeingPrepared) {
+            useRoutineStore.setState({
+              routine: null,
+              isRoutineBeingPrepared: true,
+              isPlanUnderReview: false,
+            });
+          }
+        };
+
+        if (isRemoteServiceEnabled()) {
+          const activeSessionUser = useAuthStore.getState().sessionUserId;
+          if (activeSessionUser && activeSessionUser === id) {
+            // Check if member is onboarded — do NOT generate a proposal; just preserve truth
+            const bootstrap = useBootstrapStore.getState();
+            const isOnboarded =
+              bootstrap.status === 'READY' &&
+              bootstrap.bootstrapState?.onboardingCompleted === true;
+            commitError(Boolean(isOnboarded));
+          }
+        } else {
+          const isOnboarded = useOnboardingStore.getState().isCompleted;
+          commitError(Boolean(isOnboarded));
+        }
+      }
+      return null;
+    } finally {
+      // B3.1 Defect B: only clear this user's in-flight slot if THIS request still owns it.
+      // Logout → re-login of the same user may store a newer request under the same key.
+      if (inFlightHydrationTokens.get(id) === requestToken) {
+        inFlightHydrationTokens.delete(id);
+        inFlightHydrations.delete(id);
+      }
+    }
+  })();
+
+  inFlightHydrations.set(id, hydrationPromise);
+  inFlightHydrationTokens.set(id, requestToken);
+  return hydrationPromise;
+
+
 }
+
+/**
+ * Ensures initial routine proposal is generated and loaded for onboarded members.
+ *
+ * Guarantees:
+ * - If a routine is already loaded or available from server hydration, returns early without calling proposeRoutine.
+ * - Deduplicates concurrent proposal calls across screens (Today & Plan mounting simultaneously).
+ * - Identifies pending_generation state and transitions to draft awaiting_review upon completion.
+ * - In case of generation failure, sets customer-facing error while preserving pending state for retry.
+ * - If canonical plan hydration itself fails (transient error), does NOT call proposeRoutine — the member
+ *   must retry hydration first before a proposal is attempted, preventing model invocation on read failures.
+ */
+export async function ensureInitialRoutineProposal(
+  userId?: string
+): Promise<RoutineProposalResult | null> {
+  const id = resolveUserId(userId);
+
+  const store = useRoutineStore.getState();
+  if (store.routine !== null) {
+    return null;
+  }
+
+  const existingProposal = inFlightProposals.get(id);
+  if (existingProposal) {
+    return existingProposal;
+  }
+
+  // If not currently marked as being prepared, or if a prior attempt errored,
+  // hydrate first to inspect canonical server state.
+  // On retry: isRoutineBeingPrepared may already be true (Defect A preservation) but
+  // planHydrationStatus is 'error', so re-run hydration rather than skipping it.
+  const needsHydration = !store.isRoutineBeingPrepared || store.planHydrationStatus === 'error';
+  if (needsHydration) {
+    await hydratePlanState(id);
+  }
+
+  const stateAfterHydration = useRoutineStore.getState();
+  if (stateAfterHydration.routine !== null) {
+    return null;
+  }
+
+  if (!stateAfterHydration.isRoutineBeingPrepared) {
+    return null;
+  }
+
+  // B3.1 Defect A: If canonical plan hydration itself failed (transient network/backend error),
+  // do NOT treat the failure as evidence that no routine exists and do NOT call proposeRoutine.
+  // The retry sequence is: retry hydration → if routine null + isOnboarded → then proposal.
+  // This prevents triggering a model/provider because a read endpoint temporarily failed.
+  if (stateAfterHydration.planHydrationStatus === 'error') {
+    return null;
+  }
+
+  const existingAfterHydration = inFlightProposals.get(id);
+  if (existingAfterHydration) {
+    return existingAfterHydration;
+  }
+
+  const requestToken = {};
+  const proposalPromise = (async (): Promise<RoutineProposalResult | null> => {
+    const attempt = useRoutineStore.getState().startPlanHydration();
+    try {
+      const service = getDeriveService();
+      const result = await service.proposeRoutine();
+
+      if (isRemoteServiceEnabled()) {
+        const activeSessionUser = useAuthStore.getState().sessionUserId;
+        if (!activeSessionUser || activeSessionUser !== id) {
+          return null;
+        }
+      }
+
+      const currentAttempt = useRoutineStore.getState().planHydrationAttempt;
+      if (attempt !== currentAttempt) {
+        return null;
+      }
+
+      useRoutineStore.getState().setPlanHydrated(
+        result.routine,
+        result.userProducts,
+        false,
+        attempt
+      );
+
+      return result;
+    } catch (err: any) {
+      console.warn('ensureInitialRoutineProposal error:', err);
+      const currentAttempt = useRoutineStore.getState().planHydrationAttempt;
+      if (attempt === currentAttempt) {
+        if (isRemoteServiceEnabled()) {
+          const activeSessionUser = useAuthStore.getState().sessionUserId;
+          if (activeSessionUser && activeSessionUser === id) {
+            useRoutineStore.getState().setPlanHydrationError(
+              getCustomerErrorMessage('routine'),
+              attempt
+            );
+          }
+        } else {
+          useRoutineStore.getState().setPlanHydrationError(
+            getCustomerErrorMessage('routine'),
+            attempt
+          );
+        }
+      }
+      return null;
+    } finally {
+      // B3.1 Defect B: only clear this user's proposal slot if THIS request still owns it.
+      if (inFlightProposalTokens.get(id) === requestToken) {
+        inFlightProposalTokens.delete(id);
+        inFlightProposals.delete(id);
+      }
+    }
+  })();
+
+  inFlightProposals.set(id, proposalPromise);
+  inFlightProposalTokens.set(id, requestToken);
+  return proposalPromise;
+}
+
 
 export async function hydrateResearchInsights(userId?: string): Promise<ResearchInsight[]> {
   const service = getDeriveService();
