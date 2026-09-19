@@ -31,6 +31,8 @@ import type {
   CustomerProfile,
   CustomerBootstrapState,
   RoutinePlan,
+  UserProduct,
+  RoutineProposalResult,
   SkinState,
   IrritationLevel,
   AdherenceLevel,
@@ -139,19 +141,27 @@ export async function submitOnboarding(payload: OnboardingPayload): Promise<Onbo
     (result.initialRoutineState === 'awaiting_review' || result.proposedRoutine.status === 'awaiting_review')
   );
 
+  const isPendingGeneration =
+    result.initialRoutineState === 'pending_generation' || (!result.proposedRoutine && !isAwaitingReview);
+
   // Synchronize canonical proposed routine into routine store
   useRoutineStore.setState({
-    routine: result.proposedRoutine,
-    userProducts: result.userProducts,
+    routine: result.proposedRoutine || null,
+    userProducts: result.userProducts || [],
     completedStepIdsToday: [],
     checkIns: [],
     refillRequests: [],
     learnedInsights: [],
     researchInsights: [],
     isPlanUnderReview: isAwaitingReview,
-    todayDominantStatus: isAwaitingReview
+    isRoutineBeingPrepared: isPendingGeneration,
+    planHydrationStatus: 'ready',
+    planHydrationError: null,
+    todayDominantStatus: isPendingGeneration
+      ? 'Your routine is being prepared.'
+      : isAwaitingReview
       ? 'Final review: Your first routine gets one final quality check before it goes live.'
-      : 'Your routine is being prepared.',
+      : 'Everything looks on track. No changes today.',
     isWeeklyCheckInDue: false,
   });
 
@@ -274,6 +284,213 @@ export async function hydrateRoutine(userId?: string): Promise<RoutinePlan | nul
   });
 
   return routine;
+}
+
+const inFlightHydrations = new Map<
+  string,
+  Promise<{
+    routine: RoutinePlan | null;
+    userProducts: UserProduct[];
+    isRoutineBeingPrepared: boolean;
+  } | null>
+>();
+
+const inFlightProposals = new Map<string, Promise<RoutineProposalResult | null>>();
+
+export function clearInFlightHydrations(): void {
+  inFlightHydrations.clear();
+}
+
+export function clearInFlightProposals(): void {
+  inFlightProposals.clear();
+}
+
+/**
+ * Hydrates canonical plan state (Routine + UserProducts) from the service boundary.
+ *
+ * Enforces:
+ * - Concurrent in-flight request deduplication per user.
+ * - Identity freshness check against active session in Remote mode.
+ * - Monotonic attempt checking to prevent stale commit races.
+ * - Derivation of isRoutineBeingPrepared when onboarding is completed and routine is null.
+ */
+export async function hydratePlanState(userId?: string): Promise<{
+  routine: RoutinePlan | null;
+  userProducts: UserProduct[];
+  isRoutineBeingPrepared: boolean;
+} | null> {
+  const service = getDeriveService();
+  const id = resolveUserId(userId);
+
+  const inFlight = inFlightHydrations.get(id);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const hydrationPromise = (async () => {
+    const attempt = useRoutineStore.getState().startPlanHydration();
+    try {
+      const [routine, userProducts] = await Promise.all([
+        service.getRoutine(id),
+        service.getUserProducts(id),
+      ]);
+
+      // Freshness check: in Remote mode, ensure active identity still matches
+      if (isRemoteServiceEnabled()) {
+        const activeSessionUser = useAuthStore.getState().sessionUserId;
+        if (!activeSessionUser || activeSessionUser !== id) {
+          return null;
+        }
+      }
+
+      const currentAttempt = useRoutineStore.getState().planHydrationAttempt;
+      if (attempt !== currentAttempt) {
+        return null;
+      }
+
+      const bootstrap = useBootstrapStore.getState();
+      const isRemote = isRemoteServiceEnabled();
+      const isOnboarded = isRemote
+        ? bootstrap.status === 'READY' && bootstrap.bootstrapState?.onboardingCompleted === true
+        : useOnboardingStore.getState().isCompleted;
+
+      const isBeingPrepared = routine === null && Boolean(isOnboarded);
+
+      const committed = useRoutineStore.getState().setPlanHydrated(
+        routine,
+        userProducts,
+        isBeingPrepared,
+        attempt
+      );
+
+      if (!committed) return null;
+
+      return { routine, userProducts, isRoutineBeingPrepared: isBeingPrepared };
+    } catch (err: any) {
+      console.warn('hydratePlanState error:', err);
+      const currentAttempt = useRoutineStore.getState().planHydrationAttempt;
+      if (attempt === currentAttempt) {
+        if (isRemoteServiceEnabled()) {
+          const activeSessionUser = useAuthStore.getState().sessionUserId;
+          if (activeSessionUser && activeSessionUser === id) {
+            useRoutineStore.getState().setPlanHydrationError(
+              getCustomerErrorMessage('routine'),
+              attempt
+            );
+          }
+        } else {
+          useRoutineStore.getState().setPlanHydrationError(
+            getCustomerErrorMessage('routine'),
+            attempt
+          );
+        }
+      }
+      return null;
+    } finally {
+      inFlightHydrations.delete(id);
+    }
+  })();
+
+  inFlightHydrations.set(id, hydrationPromise);
+  return hydrationPromise;
+}
+
+/**
+ * Ensures initial routine proposal is generated and loaded for onboarded members.
+ *
+ * Guarantees:
+ * - If a routine is already loaded or available from server hydration, returns early without calling proposeRoutine.
+ * - Deduplicates concurrent proposal calls across screens (Today & Plan mounting simultaneously).
+ * - Identifies pending_generation state and transitions to draft awaiting_review upon completion.
+ * - In case of generation failure, sets customer-facing error while preserving pending state for retry.
+ */
+export async function ensureInitialRoutineProposal(
+  userId?: string
+): Promise<RoutineProposalResult | null> {
+  const id = resolveUserId(userId);
+
+  const store = useRoutineStore.getState();
+  if (store.routine !== null) {
+    return null;
+  }
+
+  const existingProposal = inFlightProposals.get(id);
+  if (existingProposal) {
+    return existingProposal;
+  }
+
+  // If not currently marked as being prepared, hydrate first to inspect canonical server state
+  if (!store.isRoutineBeingPrepared) {
+    await hydratePlanState(id);
+  }
+
+  const stateAfterHydration = useRoutineStore.getState();
+  if (stateAfterHydration.routine !== null) {
+    return null;
+  }
+
+  if (!stateAfterHydration.isRoutineBeingPrepared) {
+    return null;
+  }
+
+  const existingAfterHydration = inFlightProposals.get(id);
+  if (existingAfterHydration) {
+    return existingAfterHydration;
+  }
+
+  const proposalPromise = (async (): Promise<RoutineProposalResult | null> => {
+    const attempt = useRoutineStore.getState().startPlanHydration();
+    try {
+      const service = getDeriveService();
+      const result = await service.proposeRoutine();
+
+      if (isRemoteServiceEnabled()) {
+        const activeSessionUser = useAuthStore.getState().sessionUserId;
+        if (!activeSessionUser || activeSessionUser !== id) {
+          return null;
+        }
+      }
+
+      const currentAttempt = useRoutineStore.getState().planHydrationAttempt;
+      if (attempt !== currentAttempt) {
+        return null;
+      }
+
+      useRoutineStore.getState().setPlanHydrated(
+        result.routine,
+        result.userProducts,
+        false,
+        attempt
+      );
+
+      return result;
+    } catch (err: any) {
+      console.warn('ensureInitialRoutineProposal error:', err);
+      const currentAttempt = useRoutineStore.getState().planHydrationAttempt;
+      if (attempt === currentAttempt) {
+        if (isRemoteServiceEnabled()) {
+          const activeSessionUser = useAuthStore.getState().sessionUserId;
+          if (activeSessionUser && activeSessionUser === id) {
+            useRoutineStore.getState().setPlanHydrationError(
+              getCustomerErrorMessage('routine'),
+              attempt
+            );
+          }
+        } else {
+          useRoutineStore.getState().setPlanHydrationError(
+            getCustomerErrorMessage('routine'),
+            attempt
+          );
+        }
+      }
+      return null;
+    } finally {
+      inFlightProposals.delete(id);
+    }
+  })();
+
+  inFlightProposals.set(id, proposalPromise);
+  return proposalPromise;
 }
 
 export async function hydrateResearchInsights(userId?: string): Promise<ResearchInsight[]> {

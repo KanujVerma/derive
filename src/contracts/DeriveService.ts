@@ -26,6 +26,7 @@ import type {
   CustomerProfile,
   CustomerBootstrapState,
   RoutinePlan,
+  UserProduct,
 } from '../domain/types.ts';
 
 export interface IDeriveService {
@@ -37,8 +38,14 @@ export interface IDeriveService {
 
   /**
    * Generate or recalculate an evidence-based routine proposal based on profile & shelf.
+   * In Remote mode, input is optional/non-authoritative; authoritative context is derived server-side.
    */
-  proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult>;
+  proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult>;
+
+  /**
+   * Retrieve all member shelf and recommendation products.
+   */
+  getUserProducts(userId: string): Promise<UserProduct[]>;
 
   /**
    * Ask Derive a question with contextual awareness (active routine, scanned product, safety check).

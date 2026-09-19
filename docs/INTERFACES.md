@@ -15,7 +15,8 @@ Code definitions:
 ```typescript
 export interface IDeriveService {
   onboard(payload: OnboardingPayload): Promise<OnboardingResult>;
-  proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult>;
+  proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult>;
+  getUserProducts(userId: string): Promise<UserProduct[]>;
   askDerive(request: AskRequest): Promise<AskResponse>;
   scanProduct(input: ScanProductInput): Promise<ProductScanResult>;
   submitCheckIn(input: CheckInInput): Promise<CheckInResult>;
@@ -141,6 +142,18 @@ export interface IDeriveService {
       - Zero filesystem fallback in provider resolution (`.server-provider-config`, founder paths, and `Deno.readTextFile` eliminated).
       - Model outputs cannot promote `key_actives`, `full_ingredients`, or `retail_price_approx` to provisional (`is_catalog_standard = false`) products, preventing accumulation of hallucinated facts across subsequent proposals.
       - Null/unknown `is_confirmed_by_user` strictly fails closed to `false` in client mapping (`row.is_confirmed_by_user === true`).
+  13. **Mobile Initial Routine Integration & Parity [DELIVERED IN I1-B3]**:
+      - `IDeriveService`: `proposeRoutine(input?: RoutineProposalInput)` optional input parameter and `getUserProducts(userId: string): Promise<UserProduct[]>`.
+      - `deriveClient.ts`: `hydratePlanState(userId?)` and `ensureInitialRoutineProposal(userId?)` coordinators with in-flight request deduplication (`inFlightHydrations`, `inFlightProposals`), remote session identity freshness, attempt monotonicity, and restart recovery.
+      - `routineStore.ts`: `isRoutineBeingPrepared`, `planHydrationStatus` (`'idle' | 'loading' | 'ready' | 'error'`), `planHydrationAttempt`, `planHydrationError`, `startPlanHydration()`, `setPlanHydrated()`, `setPlanHydrationError()`, and monotonic `resetRoutine()`.
+      - Calm preparation UI on Today and Plan tabs: renders "Your routine is being prepared" while generation is pending; hides "Start Routine Setup" and refill CTAs; recovers automatically upon completion.
+
+### `getUserProducts(userId: string): Promise<UserProduct[]>`
+* **Input**: `userId`: string
+* **Output**: `UserProduct[]` (with actions: `'KEEP'` | `'PAUSE'` | `'REPLACE'` | `'ADD'` | `'STOP'`).
+* **Semantics**:
+  - In Mock mode: returns member shelf and recommended products.
+  - In Remote mode: queries `public.user_products` joined with `public.products`, mapping `row.is_confirmed_by_user === true` (fail-closed on null/unknown).
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.

@@ -195,10 +195,10 @@ export class RemoteDeriveService implements IDeriveService {
     return data as OnboardingResult;
   }
 
-  async proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult> {
+  async proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult> {
     const client = this.getClient();
     const { data, error } = await client.functions.invoke('propose-routine', {
-      body: input,
+      body: input || {},
     });
     if (error) throw new Error(`RemoteDeriveService.proposeRoutine failed: ${error.message}`);
     return data as RoutineProposalResult;
