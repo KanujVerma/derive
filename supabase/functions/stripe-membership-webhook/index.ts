@@ -7,6 +7,7 @@ import {
   commerceJson,
   trustedServerValue,
 } from "../_shared/commerce.ts";
+import { selectCurrentMembershipSubscription } from "../_shared/subscriptions.ts";
 
 const handledEvents = new Set([
   "checkout.session.completed",
@@ -59,46 +60,64 @@ Deno.serve(async (req: Request) => {
       return commerceJson({ received: true, handled: false });
     }
 
-    let subscription: Stripe.Subscription;
+    let eventSubscription: Stripe.Subscription;
+    let checkout: Stripe.Checkout.Session | null = null;
     let customerEmail: string | null = null;
-    let userId: string | null = null;
 
     if (event.type.startsWith("checkout.session.")) {
-      const checkout = event.data.object as Stripe.Checkout.Session;
+      checkout = event.data.object as Stripe.Checkout.Session;
       const subscriptionId = resourceId(checkout.subscription as string | { id?: string } | null);
       if (!subscriptionId) throw new CommerceError("INVALID_EVENT", "Subscription checkout is incomplete", 400);
-      subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      eventSubscription = await stripe.subscriptions.retrieve(subscriptionId);
       customerEmail = checkout.customer_details?.email ?? checkout.customer_email ?? null;
-      userId = validUserId(checkout.client_reference_id)
-        ?? validUserId(checkout.metadata?.derive_user_id)
-        ?? validUserId(subscription.metadata?.derive_user_id);
     } else {
-      const eventSubscription = event.data.object as Stripe.Subscription;
-      // Read current Stripe truth rather than trusting an older event snapshot.
-      // This also makes same-second, out-of-order subscription events converge.
-      subscription = await stripe.subscriptions.retrieve(eventSubscription.id);
-      userId = validUserId(subscription.metadata?.derive_user_id)
-        ?? validUserId(eventSubscription.metadata?.derive_user_id);
+      const snapshot = event.data.object as Stripe.Subscription;
+      eventSubscription = await stripe.subscriptions.retrieve(snapshot.id);
     }
 
-    const customerId = resourceId(subscription.customer as string | { id?: string });
+    const customerId = resourceId(eventSubscription.customer as string | { id?: string });
     if (!customerId) throw new CommerceError("INVALID_EVENT", "Stripe customer identity is missing", 400);
-
-    if (!userId || !customerEmail) {
-      const customer = await stripe.customers.retrieve(customerId);
-      if (!("deleted" in customer && customer.deleted)) {
-        userId = userId ?? validUserId(customer.metadata?.derive_user_id);
-        customerEmail = customerEmail ?? customer.email ?? null;
-      }
-    }
 
     const expectedPriceId = trustedServerValue("STRIPE_FOUNDING_BETA_PRICE_ID");
     if (!/^price_[A-Za-z0-9_]+$/.test(expectedPriceId)) {
       console.error("STRIPE_FOUNDING_BETA_PRICE_ID is malformed");
       throw new CommerceError("COMMERCE_NOT_CONFIGURED", "Membership billing is not configured", 503);
     }
-    if (!subscription.items.data.some((item) => item.price.id === expectedPriceId)) {
+    if (!eventSubscription.items.data.some((item) => item.price.id === expectedPriceId)) {
       return commerceJson({ received: true, handled: false });
+    }
+
+    // Events can arrive for an older subscription after a replacement is paid.
+    // Project the customer's current Stripe truth instead of the event's resource.
+    const listed = await stripe.subscriptions.list({
+      customer: customerId,
+      price: expectedPriceId,
+      status: "all",
+      limit: 100,
+    });
+    if (listed.has_more) {
+      throw new CommerceError("WEBHOOK_PERSISTENCE_FAILED", "Membership state could not be synchronized", 500);
+    }
+    const subscription = selectCurrentMembershipSubscription(listed.data, expectedPriceId);
+    if (!subscription) return commerceJson({ received: true, handled: false });
+
+    const sameSubscription = subscription.id === eventSubscription.id;
+    let userId = validUserId(subscription.metadata?.derive_user_id);
+    if (sameSubscription && checkout) {
+      userId = userId ?? validUserId(checkout.client_reference_id)
+        ?? validUserId(checkout.metadata?.derive_user_id);
+    }
+    if (sameSubscription) {
+      userId = userId ?? validUserId(eventSubscription.metadata?.derive_user_id);
+    } else {
+      customerEmail = null;
+    }
+    if (!userId || !customerEmail) {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!("deleted" in customer && customer.deleted)) {
+        userId = userId ?? validUserId(customer.metadata?.derive_user_id);
+        customerEmail = customerEmail ?? customer.email ?? null;
+      }
     }
 
     const supabaseUrl = trustedServerValue("SUPABASE_URL");

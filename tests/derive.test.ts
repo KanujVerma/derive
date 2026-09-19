@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { selectCurrentMembershipSubscription } from '../supabase/functions/_shared/subscriptions.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -8099,4 +8100,21 @@ test('I1-B4B Obsolete changeReason is gone and note limit is explicit', () => {
   const remote = fs.readFileSync(path.resolve('src/services/remote/RemoteDeriveService.ts'), 'utf8');
   assert.equal(remote.includes('get-progress'), false);
   assert.equal(remote.includes("from('check_ins')"), true);
+});
+test('S5: current paid membership survives later delivery for an older canceled subscription', () => {
+  const subscription = (id: string, created: number, status: string, priceId = 'price_founding') => ({
+    id, created, status, items: { data: [{ price: { id: priceId } }] },
+  });
+  const current = selectCurrentMembershipSubscription([
+    subscription('sub_old', 10, 'canceled'),
+    subscription('sub_new', 20, 'active'),
+  ], 'price_founding');
+  assert.equal(current?.id, 'sub_new');
+  assert.equal(selectCurrentMembershipSubscription([
+    subscription('sub_old', 10, 'active'),
+    subscription('sub_new', 20, 'canceled'),
+  ], 'price_founding')?.id, 'sub_old');
+  assert.equal(selectCurrentMembershipSubscription([
+    subscription('sub_other', 30, 'active', 'price_other'),
+  ], 'price_founding'), null);
 });

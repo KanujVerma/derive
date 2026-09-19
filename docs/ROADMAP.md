@@ -508,7 +508,7 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Onboarding, Profile, Orders, and Refill copy state products are separate. ADR-26 implemented. ARCHITECTURE_CHALLENGE-01 resolved. Remote mapper accepts `founding_beta`.
 * **Implemented in I1-B4B**:
   - Optional multi-select `CheckInContextTag` + one optional context note every weekly check-in. Tags are context, not causation. `cycle` is not a period tracker. Medication/supplement context does not alter prescriptions.
-  - Additive `check_ins` migration, real `submit-checkin` Edge Function, RLS-backed Remote progress reads (no phantom `get-progress`). Learned insights remain empty in Remote until S3. Next milestone is **S4**.
+  - Additive `check_ins` migration, real `submit-checkin` Edge Function, RLS-backed Remote progress reads (no phantom `get-progress`). Learned insights remain empty in Remote until S3 durable insight persistence. **S4 is complete on `main`.** Next remaining platform/commerce work is **S5**. C1 Shop is not started.
 * **Approved product truth**:
   - Do **not** frame as "$25 for AI". $25 is a current Founding Beta experiment, not a lifetime company price.
   - Commercial-independence invariant: margin, affiliate, sponsorship, and coupons must never silently alter KEEP / PAUSE / REPLACE / ADD, Scan, safety, or ranking. New SKU charges require explicit consent; same-SKU refills may stay low-friction.
@@ -544,7 +544,7 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Account deletion removes private Storage objects before relational/auth deletion.
   - [x] Zero secrets are committed to version control; public and trusted-runtime environment boundaries are explicit.
 
-### S2: Core Domain Persistence [COMPLETE · REVIEW PENDING]
+### S2: Core Domain Persistence [COMPLETE]
 * **Scope**: Relational tables and queries for customer profiles, skin profiles, catalog products, formula snapshots, product reactions, ingredient signals, routine versions, weekly check-ins, photo records, and refill orders.
 * **Implemented**:
   - Audited and extended the existing baseline through one additive migration; no baseline table was recreated or rewritten.
@@ -562,7 +562,7 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Routine updates create new version snapshots rather than overwriting historical records.
   - [x] Product reactions persist historical formula snapshots at the exact time of the reaction.
 
-### S3: Server-Side Intelligence Services [COMPLETE · REVIEW PENDING]
+### S3: Server-Side Intelligence Services [COMPLETE]
 * **Scope**: Edge Functions for routine proposal generation, product scan evaluation with categorical verdicts, Ask Derive conversation synthesis, safety classifier circuit breaker, and probabilistic ingredient signal inference.
 * **Implemented**:
   - Added JWT-gated `propose-routine`, `scan-product`, `ask-derive`, and `infer-ingredient-signals` Edge Functions. Handler identity is derived from the verified token; caller-supplied profile truth and spoofed member IDs are rejected or ignored.
@@ -581,14 +581,15 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Ingredient signals update confidence using distinct multi-product overlap and tolerated-exposure discounting.
   - [x] Unknown/withheld pregnancy status fails closed for pregnancy-excluded actives, and recognized prescription schedules are preserved exactly or require clarification.
 
-### S4: Founder Operations Console
+### S4: Founder Operations Console [COMPLETE]
 * **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta members. After I1-B4A, customer-facing membership truth is the $25/month Derive-management experiment with products purchased separately; S4 itself remains founder review/edit/publish of routines, refill status, formula audit, and internal notes. Do not treat full Shop as an S4 acceptance criterion.
+* **Implemented**: Founder-only `admin/**` console, JWT-gated `founder-operations`, allowlisted `founder_accounts`, immutable routine review/publish, refill transitions, formula verification, safety queue, internal notes, and append-only audit. Landed on shared `main` via cumulative PR #16.
 * **Acceptance Criteria**:
   - Founders can review, edit, and publish routine proposals before member notification.
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
-### S5: Commerce & Remote Service Integration
+### S5: Commerce & Remote Service Integration [IMPLEMENTED; HOSTED ACTIVATION PENDING]
 * **Status**: IMPLEMENTED LOCALLY · HOSTED STRIPE/SUPABASE CONFIGURATION PENDING.
 * **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership** (target $25/month after B4A; Stripe Price owns live money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` hosted-session adapters. Separate product commerce v0 may follow membership checkout. Full personalized Shop is later / evidence-driven.
 * **Acceptance Criteria**:

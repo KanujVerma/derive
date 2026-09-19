@@ -41,6 +41,19 @@ This ledger tracks durable architectural, product, and contract decisions across
   - Create/link the founders' hosted Supabase project, create the Stripe test-mode recurring Founding Beta Price, store function secrets, deploy S5 functions/migration, and run one real test-mode Checkout → signed webhook → Billing Portal smoke test.
   - Do not enable production Remote mode or live Stripe mode until that hosted test-mode smoke test and cofounder review pass.
 
+## 2026-09-19 — Pre-C1 integration: land cumulative S1–S4 (#16) onto B4 main
+
+- **Agent / Workstream**: Kanuj integration (shared `main`)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `87c6df5c5d889cbb03fe8f9f4535cc5df2091d3c`
+- **Integration method**: merged cumulative PR #16 once (`sami/s4-founder-operations` @ `8c02d414cc4a270ac629e7058af0c1dc1f233c14`). Did not merge stacked #13/#14/#15. Did not merge #17.
+- **Remote Push Status**: merge commit on `origin/main`
+- **GitHub CI**: merge SHA `1a19ea5e9b03f052a593fa28b401874ccf651d84` run `35463159299` SUCCESS
+- **Milestone Status**: `S1 COMPLETE`. `S2 COMPLETE`. `S3 COMPLETE`. `S4 COMPLETE`. `I1-B4A COMPLETE`. `I1-B4B COMPLETE`. Next: `S5` (commerce / live Remote). `C1 Shop` not started.
+- **Ownership / Shared Contracts**: Sami S1–S4 implementation retained with Kanuj B3.1/B4A/B4B. Commercial truth remains `$25/month` Founding Beta management, products separate, `founding_beta`.
+- **Stacked PR disposition**: #13/#14/#15 closed as superseded by #16. #17 left open (docs bookkeeping; actual B4A/B4B already on main).
+- **Explicitly NOT done**: C1 Shop; S5 Stripe/live Remote enablement; no membership-model change.
+
 ## 2026-09-18 — Sami Platform: S3 Server-Side Intelligence Services
 
 - **Agent / Workstream**: Sami (Platform, Intelligence & Safety Orchestration)
