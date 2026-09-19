@@ -35,6 +35,7 @@ import {
   evaluateFrameCriteria,
   type FrameQualityMetrics,
 } from '../src/components/camera/AutoCaptureStateMachine.ts';
+import { resolvePublicEnvironment } from '../src/config/environment.ts';
 import {
   createProvenancedValue,
   setOrConfirmPhenotypeValue,
@@ -762,6 +763,145 @@ test('Guard: Expo client must not ship a Gemini API key', () => {
     offenders,
     [],
     `Client-visible Gemini secret path found in: ${offenders.join(', ')}`
+  );
+});
+
+test('Environment contract: Prefers publishable keys and preserves a legacy anon-key fallback', () => {
+  const current = resolvePublicEnvironment({
+    supabaseUrl: ' https://project.supabase.co ',
+    supabasePublishableKey: ' sb_publishable_current ',
+    legacySupabaseAnonKey: 'legacy-key',
+    useRemoteService: ' true ',
+  });
+
+  assert.deepEqual(current, {
+    supabaseUrl: 'https://project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_current',
+    supabaseKeySource: 'publishable',
+    useRemoteService: true,
+  });
+
+  const legacy = resolvePublicEnvironment({
+    supabaseUrl: 'http://127.0.0.1:54321',
+    legacySupabaseAnonKey: 'legacy-local-key',
+  });
+  assert.equal(legacy.supabasePublishableKey, 'legacy-local-key');
+  assert.equal(legacy.supabaseKeySource, 'legacy_anon');
+  assert.equal(legacy.useRemoteService, false);
+});
+
+test('Environment contract: Remote mode fails closed on missing or malformed configuration', () => {
+  assert.throws(
+    () => resolvePublicEnvironment({ useRemoteService: 'true' }),
+    /EXPO_PUBLIC_SUPABASE_URL.*EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/,
+  );
+  assert.throws(
+    () => resolvePublicEnvironment({ useRemoteService: '1' }),
+    /must be either "true" or "false"/,
+  );
+  assert.throws(
+    () => resolvePublicEnvironment({ supabaseUrl: 'http://project.supabase.co' }),
+    /must use HTTPS/,
+  );
+  assert.throws(
+    () => resolvePublicEnvironment({ supabasePublishableKey: 'sb_secret_server_only' }),
+    /publishable key|must never be embedded/,
+  );
+  assert.throws(
+    () => resolvePublicEnvironment({ supabasePublishableKey: 'placeholder-key' }),
+    /must be a Supabase publishable key/,
+  );
+  const serviceRolePayload = Buffer.from(JSON.stringify({ role: 'service_role' }))
+    .toString('base64url');
+  assert.throws(
+    () => resolvePublicEnvironment({ legacySupabaseAnonKey: `header.${serviceRolePayload}.sig` }),
+    /service-role keys must never be embedded/,
+  );
+});
+
+test('Environment template: Lists only approved names and contains zero credential values', () => {
+  const template = readFileSync(join(REPO_ROOT, '.env.example'), 'utf8');
+  const assignments = [...template.matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)];
+  const names = assignments.map((match) => match[1]).sort();
+
+  assert.deepEqual(names, [
+    'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'EXPO_PUBLIC_USE_REMOTE_SERVICE',
+  ]);
+
+  const approvedPublicNames = new Set([
+    'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'EXPO_PUBLIC_USE_REMOTE_SERVICE',
+  ]);
+  for (const [name, value] of assignments.map((match) => [match[1], match[2]])) {
+    if (name.startsWith('EXPO_PUBLIC_')) {
+      assert.ok(approvedPublicNames.has(name), `Unexpected public variable: ${name}`);
+    }
+    if (name !== 'EXPO_PUBLIC_USE_REMOTE_SERVICE') {
+      assert.equal(value, '', `${name} must not contain a committed value`);
+    }
+  }
+
+  assert.doesNotMatch(template, /EXPO_PUBLIC_.*(?:SECRET|SERVICE_ROLE|DB_PASSWORD|ACCESS_TOKEN)/);
+  assert.doesNotMatch(template, /(?:sb_secret_|sk_live_|sk_test_)/);
+});
+
+test('Environment guard: Mobile source references only approved public variables', () => {
+  const approved = new Set([
+    'EXPO_PUBLIC_SUPABASE_ANON_KEY', // Temporary compatibility fallback only.
+    'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'EXPO_PUBLIC_USE_REMOTE_SERVICE',
+  ]);
+  const files = [
+    ...collectTextFiles(join(REPO_ROOT, 'app')),
+    ...collectTextFiles(join(REPO_ROOT, 'src')),
+    join(REPO_ROOT, 'app.json'),
+    join(REPO_ROOT, 'eas.json'),
+  ];
+  const offenders = new Set<string>();
+
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8');
+    for (const match of text.matchAll(/EXPO_PUBLIC_[A-Z0-9_]+/g)) {
+      if (!approved.has(match[0])) {
+        offenders.add(`${file.slice(REPO_ROOT.length + 1)}:${match[0]}`);
+      }
+    }
+  }
+
+  assert.deepEqual([...offenders], []);
+});
+
+test('S1 private-photo endpoints preserve JWT ownership, 900-second signing, and Storage-first deletion', () => {
+  const signer = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/photo-url/index.ts'),
+    'utf8',
+  );
+  const deletion = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/delete-customer-account/index.ts'),
+    'utf8',
+  );
+  const supabaseConfig = readFileSync(join(REPO_ROOT, 'supabase/config.toml'), 'utf8');
+
+  assert.match(signer, /SIGNED_URL_TTL_SECONDS = 900/);
+  assert.match(signer, /\.eq\("user_id", user\.id\)/);
+  assert.match(signer, /unexpectedFields/);
+  assert.match(signer, /"Cache-Control": "private, no-store, max-age=0"/);
+
+  const storageRemoval = deletion.indexOf('.remove(paths.slice(');
+  const authDeletion = deletion.indexOf('auth.admin.deleteUser(user.id)');
+  assert.ok(storageRemoval >= 0, 'Deletion must remove Storage objects through the Storage API');
+  assert.ok(authDeletion > storageRemoval, 'Auth deletion must occur strictly after Storage removal');
+  assert.match(deletion, /unexpectedFields/);
+  assert.match(deletion, /listNamespaceObjects\(adminClient, user\.id\)/);
+
+  assert.match(supabaseConfig, /\[functions\.photo-url\][\s\S]*?verify_jwt = true/);
+  assert.match(
+    supabaseConfig,
+    /\[functions\.delete-customer-account\][\s\S]*?verify_jwt = true/,
   );
 });
 
@@ -4641,4 +4781,3 @@ test('I1-B1.1 Canonical Bootstrap Integration: resolveCustomerBootstrap updates 
     setDeriveService(origService);
   }
 });
-

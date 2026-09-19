@@ -162,8 +162,8 @@ export interface SafetyClassification {
 - Canonical object paths are `<authenticated-member-uuid>/<photo-type>/<opaque-file-name>`; metadata rows must use the same member-owned prefix.
 - Uploads are immutable: use unique names with `upsert: false`. The mobile client must **never** store or display public S3/Supabase URLs.
 - The mobile client can upload to its own member namespace but cannot list, directly download, sign, replace, or delete photo objects. It also cannot delete photo metadata directly.
-- The future signer must derive identity from the verified JWT, verify that both the metadata row and object path belong to that identity, and issue a signed URL with a 15-minute (900-second) expiration. It must ignore caller-supplied `userId` values for authorization.
-- Full deletion must use the Storage API before deleting the auth/profile record; deleting rows from `storage.objects` or relying on relational cascades would orphan the physical object.
+- `photo-url` is the only customer photo delivery interface. It derives identity from the verified JWT, rejects caller-supplied `userId` or path values, verifies that both the metadata row and canonical object path belong to the caller, and issues a signed URL with an exact 15-minute (900-second) expiration and private/no-store caching.
+- `delete-customer-account` is the destructive lifecycle interface. It requires the exact `DELETE_MY_DERIVE_ACCOUNT` confirmation, rejects caller-supplied identity, recursively inventories and removes the authenticated caller's Storage namespace through the Storage API, verifies the namespace is empty, and deletes the Auth user last. Deleting rows from `storage.objects` directly or relying only on relational cascades is forbidden because it can orphan physical objects.
 
 ---
 
@@ -271,4 +271,3 @@ To truthfully determine whether an authenticated user requires onboarding or is 
   - `onboardingCompleted`: Read strictly from `public.skin_profiles.onboarding_completed`. Missing skin profile or false means `NEEDS_ONBOARDING`; true means `READY`.
   - `membershipStatus`: Queried from `public.memberships` deterministically (latest row by `created_at` descending; absent row maps to `'none'`). Membership state is purely informational in this slice and does NOT gate onboarding navigation.
   - Tier and pricing fields are strictly excluded, preserving `ARCHITECTURE_CHALLENGE-01` without resolving it prematurely.
-

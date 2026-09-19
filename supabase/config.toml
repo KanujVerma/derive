@@ -52,3 +52,15 @@ entrypoint = "./functions/onboard-customer/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/onboard-customer/*.html" ]
+
+[functions.photo-url]
+enabled = true
+verify_jwt = true
+import_map = "./functions/photo-url/deno.json"
+entrypoint = "./functions/photo-url/index.ts"
+
+[functions.delete-customer-account]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-customer-account/deno.json"
+entrypoint = "./functions/delete-customer-account/index.ts"

@@ -56,6 +56,34 @@ This ledger tracks durable architectural, product, and contract decisions across
   - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
   - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` strictly preserved.
 
+## 2026-09-18 — Sami Platform: S1 Platform Foundation Complete
+
+- **Agent / Workstream**: Sami (Platform Foundation, Private Data Lifecycle & Environment Security)
+- **Local Branch**: `sami/s1-env-contract`
+- **Starting Shared HEAD / origin/main**: `de507dda2dd45d46845d7bd22a0f958058f1eb0f`
+- **Final Reconciled origin/main Base**: `b3d4fb1` (I1-B2 contract-truth correction preserved before checkpoint)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Milestone Status**: `S1 COMPLETE` (Consolidated the already-landed migration/RLS/auth/onboarding platform with the final environment, private-photo delivery, and account-deletion controls; production Remote mode remains deliberately disabled.)
+- **Ownership / Shared Contracts**: Sami-owned platform, service configuration, Edge Functions, tests, and durable documentation only. Zero changes to Kanuj-owned UI and zero changes to `src/domain/types.ts`. `ARCHITECTURE_CHALLENGE-01` pricing remains unresolved; no new price semantics were introduced.
+- **Durable Deliverables**:
+  1. **Fail-Closed Mobile Environment Contract**: Added `src/config/environment.ts` with static Expo environment references, exact boolean parsing, HTTPS/local URL validation, canonical `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, a transitional legacy anon-key fallback, and rejection of secret or malformed canonical keys. Remote mode refuses to initialize without valid public client values.
+  2. **Public-Only Template & Runtime Documentation**: Reduced root `.env.example` to the three approved public mobile names and documented the separate Expo, CLI/CI, local Edge, and trusted-server credential boundaries in `docs/ENVIRONMENT.md`. Stripe and PostHog remain outside S1.
+  3. **Persistent Auth Compatibility Preserved**: Reconciled the environment resolver with the current `AsyncStorage` Supabase client, app-lifecycle refresh, and authenticated Remote client path; no rollback of the landed I1 Auth spine.
+  4. **JWT-Bound Private Photo Delivery**: Added `photo-url` with platform `verify_jwt = true` plus handler `auth.getUser()` verification, caller-owned `user_photos` lookup, canonical path validation, no caller-supplied identity/path authority, exact 900-second signing, and private/no-store response caching. Hosted signed origins are unchanged; local internal `kong` URLs are rewritten only to an explicit or loopback public local Supabase origin.
+  5. **Storage-First Account Deletion**: Added `delete-customer-account` with platform and handler JWT verification, exact destructive confirmation, unexpected-field rejection, recursive caller-namespace inventory, bounded deletion, empty-namespace verification, and Auth-user deletion strictly last so relational cascades cannot orphan private Storage objects.
+  6. **Canonical Upload Boundary**: Removed the obsolete arbitrary/upserting photo uploader. The established onboarding uploader remains the sole client upload helper, restricted to server-issued paths in `customer-skin-photos` with `upsert: false`.
+  7. **Regression & Full-Stack Proof**: Expanded unit/static guards for the environment allowlist and S1 endpoint invariants, and extended the local full-stack harness through owner/cross-owner signing, exact TTL, signed-object retrieval, identity-spoof rejection, destructive-confirmation enforcement, complete Storage cleanup, Auth deletion ordering, and other-member isolation.
+- **Verification**:
+  - `npm test`: 105/105 passing.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: clean export.
+  - `npx supabase db reset`: clean rebuild through the full additive migration chain.
+  - `npx supabase test db`: 96/96 pgTAP assertions passing.
+  - `node scripts/test-i1-b1-local.mjs`: all 13 S1 full-stack stages passing.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` strictly preserved.
+
 ## 2026-09-18 — Kanuj & Sami: B1.1 Final Coordination & Sami I1-B2 Intelligence Handoff
 
 - **Agent / Workstream**: Kanuj & Sami Shared Coordination (Platform Intelligence Handoff & Boundary Alignment)

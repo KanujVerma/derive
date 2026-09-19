@@ -374,27 +374,30 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 
 ## Sami Workstream (Platform + Intelligence + Operations)
 
-### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]
+### S1: Platform Foundation [COMPLETE]
 * **Scope**: Supabase setup, baseline PostgreSQL schema, reproducible migration scripts, customer authentication, private photo storage buckets, Row-Level Security (RLS) policies, and secure environment secrets management.
-* **Implemented in S1A**:
+* **Implemented**:
   - Committed local Supabase configuration and an additive migration chain.
   - Auth-user profile provisioning with a hardened trigger and backfill.
   - Explicit grants plus operation-specific RLS on every existing public application table.
   - Private `customer-skin-photos` bucket, member-ID path isolation, immutable uploads, and no client download/list/sign/update/delete permission.
   - pgTAP coverage for exact policy/grant shape, auth provisioning and synchronization, anonymous denial, owner/cross-owner access, server-owned fields, and private Storage policy behavior.
   - Explicit safe-column projections in the Sami-owned remote adapter, avoiding wildcard expansion across protected membership and routine fields.
-* **Remaining Before S1 Is Complete**:
-  - Run `supabase db reset` and `supabase test db` against a Docker-backed official local stack and make that verification repeatable in CI.
-  - Implement persistent Expo auth sessions and authenticated route/callback handling in a coordinated shared/mobile change.
-  - Implement a JWT-bound server signer that issues 15-minute photo URLs without trusting caller-supplied user IDs or paths.
-  - Implement idempotent Storage-API deletion before relational/auth deletion; database cascades alone do not delete physical objects.
-  - Replace the unused arbitrary/upserting client upload helper with the canonical bucket and member-owned path convention, then run an API-level upload smoke test in a coordinated change.
-  - Finish remote row-to-domain mapping, routine-item assembly, live function coverage, and integration tests before enabling the remote service in production.
+  - Official Docker-backed `supabase db reset`, pgTAP, and API-level integration verification in local development and CI.
+  - Persistent Expo Auth sessions with app-lifecycle token refresh and authenticated route gating.
+  - Canonical non-upserting client photo upload helper restricted to server-issued member-owned paths; the obsolete arbitrary/upserting helper was removed.
+  - JWT-gated `photo-url` Edge Function that derives the caller from `auth.getUser()`, verifies the caller-owned photo metadata/path, and issues an exact 900-second signed URL with `Cache-Control: private, no-store`.
+  - JWT-gated `delete-customer-account` Edge Function that requires exact destructive confirmation, rejects caller-supplied identity, inventories and deletes the caller's complete Storage namespace first, verifies it is empty, and deletes the Auth user last.
+  - Fail-closed public mobile environment validation with a canonical Supabase publishable-key contract and a documented separation between public Expo values, local CLI values, CI secrets, and trusted server-only secrets.
+* **Boundary After S1**:
+  - The production Remote service flag remains `false`. Remote row-to-domain mapping, routine-item assembly, model execution, normalized reaction/formula persistence, and commerce belong to I1-B2/S2/S3/S5 and do not reopen S1.
+  - `ARCHITECTURE_CHALLENGE-01` remains unresolved; S1 does not encode a new price or change Kanuj-owned UI.
 * **Acceptance Criteria**:
-  - Migrations run cleanly from a fresh Supabase database.
-  - RLS strictly isolates member data: customer can only read/write their own records.
-  - Customer skin photos accessible solely via short-lived signed URLs (no public URLs).
-  - Zero secrets committed to version control.
+  - [x] Migrations run cleanly from a fresh Supabase database.
+  - [x] RLS strictly isolates member data: customer can only read/write their own records.
+  - [x] Customer skin photos are accessible solely through short-lived signed URLs; no public URL path exists.
+  - [x] Account deletion removes private Storage objects before relational/auth deletion.
+  - [x] Zero secrets are committed to version control; public and trusted-runtime environment boundaries are explicit.
 
 ### S2: Core Domain Persistence
 * **Scope**: Relational tables and queries for customer profiles, skin profiles, catalog products, formula snapshots, product reactions, ingredient signals, routine versions, weekly check-ins, photo records, and refill orders.

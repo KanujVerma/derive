@@ -1,7 +1,8 @@
 // scripts/test-i1-b1-local.mjs
-// DERIVE I1-B1.1 Committed Local E2E Test Harness
+// DERIVE S1 Committed Local E2E Test Harness
 // Exercises: Auth, Gateway JWT Gate, prepare-onboarding, direct private Storage,
-// onboard-customer transactional RPC, rollback, replay idempotency, and prepare resumption.
+// onboard-customer transactional RPC, rollback, replay idempotency, private
+// photo signing, and Storage-first account deletion.
 
 import { createClient } from '@supabase/supabase-js';
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ const TINY_JPEG_BASE64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP////////////////////
 const tinyJpegBytes = Buffer.from(TINY_JPEG_BASE64, 'base64');
 
 async function run() {
-  console.log('=== DERIVE I1-B1.1 Local Full-Stack E2E Test Harness ===\n');
+  console.log('=== DERIVE S1 Local Full-Stack E2E Test Harness ===\n');
 
   // -------------------------------------------------------------
   // Step 1: Platform Gateway JWT Gate Verification
@@ -52,6 +53,20 @@ async function run() {
       body: JSON.stringify({}),
     });
     assert.equal(resCommitNoAuth.status, 401, 'onboard-customer without auth must return 401');
+
+    const resPhotoNoAuth = await fetch(`${SUPABASE_URL}/functions/v1/photo-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photoId: '00000000-0000-4000-8000-000000000000' }),
+    });
+    assert.equal(resPhotoNoAuth.status, 401, 'photo-url without auth must return 401');
+
+    const resDeleteNoAuth = await fetch(`${SUPABASE_URL}/functions/v1/delete-customer-account`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmation: 'DELETE_MY_DERIVE_ACCOUNT' }),
+    });
+    assert.equal(resDeleteNoAuth.status, 401, 'delete-customer-account without auth must return 401');
     console.log('   ✓ Platform JWT gate correctly blocks unauthenticated requests (401)');
   }
 
@@ -102,6 +117,7 @@ async function run() {
     password: testPassword,
   });
   assert.ok(!u2SignErr && u2Sign.session, `User 2 sign in failed: ${u2SignErr?.message}`);
+  const user2Jwt = u2Sign.session.access_token;
   console.log(`   ✓ Authenticated test users: ${user1.id} and ${user2.id}`);
 
   // -------------------------------------------------------------
@@ -282,7 +298,7 @@ async function run() {
 
   const { data: userPhotos } = await adminClient
     .from('user_photos')
-    .select('photo_type, storage_path')
+    .select('id, photo_type, storage_path')
     .eq('user_id', user1.id);
   assert.equal(userPhotos.length, 3, 'Must have exactly 3 photo rows');
 
@@ -366,7 +382,125 @@ async function run() {
   assert.equal(dupCommitErr.code, '23505', 'Must fail with 23505 unique violation');
   console.log('   ✓ Partial unique index blocks duplicate committed submissions');
 
-  console.log('\n=== ALL DERIVE I1-B1.1 LOCAL E2E VERIFICATION CHECKS PASSED ===\n');
+  // -------------------------------------------------------------
+  // Step 12: JWT-Bound Private Photo Signing
+  // -------------------------------------------------------------
+  console.log('12. Testing JWT-bound 15-minute private photo signing...');
+  const targetPhoto = userPhotos.find((photo) => photo.photo_type === 'front');
+  assert.ok(targetPhoto?.id, 'Committed front photo must have a metadata ID');
+
+  const signedResponse = await fetch(`${SUPABASE_URL}/functions/v1/photo-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${user1Jwt}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ photoId: targetPhoto.id }),
+  });
+  assert.equal(signedResponse.status, 200, 'Owner must receive a signed photo URL');
+  assert.match(signedResponse.headers.get('cache-control') || '', /no-store/);
+  const signedBody = await signedResponse.json();
+  assert.equal(signedBody.expiresIn, 900, 'Signed URL lifetime must be exactly 900 seconds');
+  assert.ok(typeof signedBody.signedUrl === 'string' && signedBody.signedUrl.length > 0);
+
+  const signedPhotoResponse = await fetch(signedBody.signedUrl);
+  assert.equal(signedPhotoResponse.status, 200, 'Signed owner URL must retrieve the private object');
+
+  const crossOwnerResponse = await fetch(`${SUPABASE_URL}/functions/v1/photo-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${user2Jwt}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ photoId: targetPhoto.id }),
+  });
+  assert.equal(crossOwnerResponse.status, 404, 'Cross-owner photo lookup must fail closed');
+
+  const spoofedOwnerResponse = await fetch(`${SUPABASE_URL}/functions/v1/photo-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${user1Jwt}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({
+      photoId: targetPhoto.id,
+      userId: user2.id,
+      path: `${user2.id}/front/spoofed.jpg`,
+    }),
+  });
+  assert.equal(spoofedOwnerResponse.status, 400, 'Caller-supplied identity or path must be rejected');
+  console.log('   ✓ Owner signing succeeds for 900 seconds; cross-owner and spoofed access fail closed');
+
+  // -------------------------------------------------------------
+  // Step 13: Storage-First Account Deletion
+  // -------------------------------------------------------------
+  console.log('13. Testing Storage-first account deletion...');
+  const badConfirmation = await fetch(`${SUPABASE_URL}/functions/v1/delete-customer-account`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${user1Jwt}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ confirmation: 'DELETE' }),
+  });
+  assert.equal(badConfirmation.status, 400, 'Deletion must require the exact confirmation phrase');
+
+  const spoofedDeletion = await fetch(`${SUPABASE_URL}/functions/v1/delete-customer-account`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${user1Jwt}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({
+      confirmation: 'DELETE_MY_DERIVE_ACCOUNT',
+      userId: user2.id,
+    }),
+  });
+  assert.equal(spoofedDeletion.status, 400, 'Deletion must reject caller-supplied identity fields');
+
+  const deleteResponse = await fetch(`${SUPABASE_URL}/functions/v1/delete-customer-account`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${user1Jwt}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ confirmation: 'DELETE_MY_DERIVE_ACCOUNT' }),
+  });
+  assert.equal(deleteResponse.status, 200, 'Confirmed caller deletion must succeed');
+  assert.match(deleteResponse.headers.get('cache-control') || '', /no-store/);
+  assert.deepEqual(await deleteResponse.json(), { deleted: true });
+
+  const { data: deletedProfile } = await adminClient
+    .from('profiles')
+    .select('id')
+    .eq('id', user1.id)
+    .maybeSingle();
+  assert.equal(deletedProfile, null, 'Relational profile must cascade only after Storage deletion');
+
+  for (const folder of ['front', 'left', 'right', 'shelf', 'checkin']) {
+    const { data: remainingObjects, error: remainingError } = await adminClient.storage
+      .from('customer-skin-photos')
+      .list(`${user1.id}/${folder}`, { limit: 100 });
+    assert.ok(!remainingError, `Storage verification failed for ${folder}`);
+    assert.equal(remainingObjects.length, 0, `No ${folder} objects may survive deletion`);
+  }
+
+  const { data: deletedAuth, error: deletedAuthError } = await adminClient.auth.admin.getUserById(user1.id);
+  assert.ok(deletedAuthError || !deletedAuth?.user, 'Caller Auth user must be deleted last');
+  const { data: survivingAuth, error: survivingAuthError } = await adminClient.auth.admin.getUserById(user2.id);
+  assert.ok(!survivingAuthError && survivingAuth?.user, 'Other members must remain untouched');
+  console.log('   ✓ Private objects removed first; caller relational/Auth state deleted; other member untouched');
+
+  const { error: cleanupError } = await adminClient.auth.admin.deleteUser(user2.id);
+  assert.ok(!cleanupError, 'Synthetic unaffected user cleanup must succeed');
+
+  console.log('\n=== ALL DERIVE S1 LOCAL E2E VERIFICATION CHECKS PASSED ===\n');
 }
 
 run().catch((err) => {

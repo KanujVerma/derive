@@ -45,7 +45,10 @@ export class RemoteDeriveService implements IDeriveService {
       return this.customClient;
     }
     if (!supabase) {
-      throw new Error('Supabase client is not configured. Set EXPO_PUBLIC_SUPABASE_URL and anon key.');
+      throw new Error(
+        'Supabase client is not configured. Set EXPO_PUBLIC_SUPABASE_URL '
+          + 'and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.',
+      );
     }
     return supabase;
   }
