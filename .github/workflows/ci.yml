@@ -73,3 +73,7 @@ jobs:
 
       - name: Run local integration E2E harness
         run: node scripts/test-i1-b1-local.mjs
+
+      - name: Run local B2 routine integration E2E harness
+        run: node scripts/test-i1-b2-local.mjs
+

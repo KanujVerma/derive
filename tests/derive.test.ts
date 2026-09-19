@@ -59,6 +59,14 @@ import {
   type ProductWhiteCastObservation,
   type SunResponse,
 } from '../src/phenotype/index.ts';
+import {
+  validateRoutineProposal,
+  assembleRoutineContext,
+  generateContextGroundedProposal,
+  formatRoutineStepScheduleText,
+  type AssembledRoutineContext,
+  type RoutineIntelligenceProposal,
+} from '../src/services/ai-workflows/routine-intelligence.ts';
 
 // ========================================================
 // 1. SAFETY CLASSIFIER TESTS
@@ -4641,4 +4649,592 @@ test('I1-B1.1 Canonical Bootstrap Integration: resolveCustomerBootstrap updates 
     setDeriveService(origService);
   }
 });
+
+// ========================================================
+// 28. I1-B2 SERVER INITIAL ROUTINE INTELLIGENCE & DETERMINISTIC VALIDATION
+// ========================================================
+
+test('I1-B2 Intelligence: Valid simple intake produces valid proposal conforming to schema and invariants', () => {
+  const context: AssembledRoutineContext = {
+    userId: 'usr_test_b2_1',
+    primaryGoal: 'breakouts',
+    secondaryGoals: ['maintain'],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'oily_shiny',
+    postCleanseTightness: false,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: [],
+    confirmedProducts: [
+      {
+        brand: 'CeraVe',
+        name: 'Foaming Facial Cleanser',
+        category: 'cleanser',
+        keyActives: ['Ceramides', 'Niacinamide'],
+      },
+      {
+        brand: 'Differin',
+        name: 'Adapalene Gel 0.1%',
+        category: 'treatment',
+        keyActives: ['Adapalene'],
+      },
+    ],
+    productReactions: [],
+    formulaSnapshots: [],
+    pihTendencyAnswer: 'Rarely',
+  };
+
+  const proposal = generateContextGroundedProposal(context);
+
+  // Proposal structure validation
+  assert.ok(proposal.summarySentence.length > 0);
+  assert.ok(proposal.amSteps.length >= 2, 'AM routine must have at least cleanser and SPF');
+  assert.ok(proposal.pmSteps.length >= 2, 'PM routine must have at least cleanser and moisturizer');
+  assert.ok(proposal.catalogProducts.length > 0);
+
+  // AM/PM Invariants
+  const amSpf = proposal.amSteps.find((s) => s.category === 'sunscreen');
+  assert.ok(amSpf, 'AM routine must contain daily sunscreen');
+  assert.equal(amSpf?.timing, 'am');
+
+  const pmSpf = proposal.pmSteps.find((s) => s.category === 'sunscreen');
+  assert.equal(pmSpf, undefined, 'PM routine must NEVER contain sunscreen');
+
+  const amRetinoid = proposal.amSteps.find((s) => s.productName.toLowerCase().includes('adapalene'));
+  assert.equal(amRetinoid, undefined, 'AM routine must NEVER contain active retinoid');
+
+  const pmRetinoid = proposal.pmSteps.find((s) => s.productName.toLowerCase().includes('adapalene'));
+  assert.ok(pmRetinoid, 'PM routine should contain retinoid treatment on recovery schedule');
+  assert.deepEqual(pmRetinoid?.days, ['mon', 'wed', 'fri']);
+
+  // Deterministic Validator
+  const validation = validateRoutineProposal(proposal, context);
+  assert.equal(validation.valid, true);
+  assert.equal(validation.errors.length, 0);
+});
+
+test('I1-B2 Intelligence: Existing suitable products are marked KEEP while harsh products are marked PAUSE or STOP', () => {
+  const context: AssembledRoutineContext = {
+    userId: 'usr_test_b2_shelf',
+    primaryGoal: 'redness',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'dry_tight',
+    postCleanseTightness: true,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: [],
+    confirmedProducts: [
+      {
+        brand: 'Vanicream',
+        name: 'Gentle Facial Cleanser',
+        category: 'cleanser',
+        keyActives: ['Glycerin'],
+      },
+      {
+        brand: 'St. Ives',
+        name: 'Fresh Skin Apricot Scrub',
+        category: 'other',
+        keyActives: ['Walnut Shell Powder'],
+      },
+      {
+        brand: 'Sea Breeze',
+        name: 'Astringent for Sensitive Skin',
+        category: 'other',
+        keyActives: ['Alcohol Denat.'],
+      },
+    ],
+    productReactions: [],
+    formulaSnapshots: [],
+  };
+
+  const proposal = generateContextGroundedProposal(context);
+
+  const cleanserDec = proposal.productDecisions.find((d) => d.productName.includes('Gentle Facial Cleanser'));
+  assert.equal(cleanserDec?.action, 'KEEP');
+
+  const scrubDec = proposal.productDecisions.find((d) => d.productName.includes('Apricot Scrub'));
+  assert.equal(scrubDec?.action, 'PAUSE');
+  assert.match(scrubDec?.actionReason || '', /micro-tears|abrasives/i);
+
+  const astringentDec = proposal.productDecisions.find((d) => d.productName.includes('Astringent'));
+  assert.equal(astringentDec?.action, 'STOP');
+  assert.match(astringentDec?.actionReason || '', /drying astringent/i);
+});
+
+test('I1-B2 Invariants: Validator strictly rejects PM sunscreen', () => {
+  const invalidProposal: RoutineIntelligenceProposal = {
+    summarySentence: 'Invalid routine with PM sunscreen.',
+    productDecisions: [],
+    amSteps: [
+      {
+        order: 1,
+        timing: 'am',
+        productName: 'Gentle Cleanser',
+        brand: 'BrandA',
+        category: 'cleanser',
+        amount: '1 pump',
+        area: 'Face',
+        days: [],
+        purpose: 'Cleanse',
+        whyChosen: 'Cleanse gently',
+      },
+    ],
+    pmSteps: [
+      {
+        order: 1,
+        timing: 'pm',
+        productName: 'UV Clear SPF 46',
+        brand: 'EltaMD',
+        category: 'sunscreen',
+        amount: '1/4 tsp',
+        area: 'Face',
+        days: [],
+        purpose: 'SPF at night',
+        whyChosen: 'Should not be in PM',
+      },
+    ],
+    catalogProducts: [
+      { brand: 'BrandA', name: 'Gentle Cleanser', category: 'cleanser', keyActives: [] },
+      { brand: 'EltaMD', name: 'UV Clear SPF 46', category: 'sunscreen', keyActives: ['Zinc Oxide'] },
+    ],
+  };
+
+  const validation = validateRoutineProposal(invalidProposal);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((e) => e.includes('Sunscreen invariant')));
+});
+
+test('I1-B2 Invariants: Validator strictly rejects AM retinoid', () => {
+  const invalidProposal: RoutineIntelligenceProposal = {
+    summarySentence: 'Invalid routine with AM retinoid.',
+    productDecisions: [],
+    amSteps: [
+      {
+        order: 1,
+        timing: 'am',
+        productName: 'Differin Adapalene Gel 0.1%',
+        brand: 'Differin',
+        category: 'treatment',
+        amount: 'Pea-sized',
+        area: 'Face',
+        days: ['mon', 'wed', 'fri'],
+        purpose: 'Morning retinoid',
+        whyChosen: 'Should not be in AM',
+      },
+    ],
+    pmSteps: [],
+    catalogProducts: [
+      { brand: 'Differin', name: 'Differin Adapalene Gel 0.1%', category: 'treatment', keyActives: ['Adapalene'] },
+    ],
+  };
+
+  const validation = validateRoutineProposal(invalidProposal);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((e) => e.includes('Active retinoid invariant')));
+});
+
+test('I1-B2 Safety: Validator strictly excludes retinoids and contraindicated actives during pregnancy/nursing', () => {
+  const pregnancyContext: Partial<AssembledRoutineContext> = {
+    isPregnantOrNursing: true,
+    pregnancyStatus: 'yes',
+  };
+
+  // 1. Validator rejects proposal scheduling a retinoid for pregnant member
+  const invalidProposal: RoutineIntelligenceProposal = {
+    summarySentence: 'Unsafe pregnancy routine.',
+    productDecisions: [
+      {
+        productName: 'Tretinoin Cream 0.05%',
+        brand: 'Generic',
+        category: 'treatment',
+        action: 'KEEP',
+        actionReason: 'Unsafe keep',
+      },
+    ],
+    amSteps: [],
+    pmSteps: [
+      {
+        order: 1,
+        timing: 'pm',
+        productName: 'Tretinoin Cream 0.05%',
+        brand: 'Generic',
+        category: 'treatment',
+        amount: 'Pea-sized',
+        area: 'Face',
+        days: ['mon', 'wed', 'fri'],
+        purpose: 'Retinoid in pregnancy',
+        whyChosen: 'Contraindicated',
+      },
+    ],
+    catalogProducts: [
+      { brand: 'Generic', name: 'Tretinoin Cream 0.05%', category: 'treatment', keyActives: ['Tretinoin'] },
+    ],
+  };
+
+  const validation = validateRoutineProposal(invalidProposal, pregnancyContext);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((e) => e.includes('Pregnancy safety invariant')));
+
+  // 2. Generator automatically pauses retinoids when pregnancy is disclosed
+  const pregnantContext: AssembledRoutineContext = {
+    userId: 'usr_pregnant_test',
+    primaryGoal: 'breakouts',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'comfortable',
+    postCleanseTightness: false,
+    isPregnantOrNursing: true,
+    pregnancyStatus: 'yes',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: [],
+    confirmedProducts: [
+      {
+        brand: 'Differin',
+        name: 'Adapalene Gel 0.1%',
+        category: 'treatment',
+        keyActives: ['Adapalene'],
+      },
+    ],
+    productReactions: [],
+    formulaSnapshots: [],
+  };
+
+  const safeProposal = generateContextGroundedProposal(pregnantContext);
+  const retinoidDecision = safeProposal.productDecisions.find((d) => d.productName.includes('Adapalene'));
+  assert.equal(retinoidDecision?.action, 'PAUSE');
+  assert.match(retinoidDecision?.actionReason || '', /pregnancy|contraindicated/i);
+
+  // Retinoid is NOT in active amSteps or pmSteps
+  const inAm = safeProposal.amSteps.some((s) => s.productName.includes('Adapalene'));
+  const inPm = safeProposal.pmSteps.some((s) => s.productName.includes('Adapalene'));
+  assert.equal(inAm, false);
+  assert.equal(inPm, false);
+
+  const safeValidation = validateRoutineProposal(safeProposal, pregnantContext);
+  assert.equal(safeValidation.valid, true);
+});
+
+test('I1-B2 Invariants: Validator strictly rejects invalid action and category enums', () => {
+  const invalidProposal: RoutineIntelligenceProposal = {
+    summarySentence: 'Invalid enums proposal.',
+    productDecisions: [
+      {
+        productName: 'Some Product',
+        brand: 'Some Brand',
+        category: 'invalid_category' as any,
+        action: 'DELETE' as any,
+        actionReason: 'Invalid action enum',
+      },
+    ],
+    amSteps: [
+      {
+        order: 1,
+        timing: 'am',
+        productName: 'Some Product',
+        brand: 'Some Brand',
+        category: 'invalid_category' as any,
+        amount: '1 pump',
+        area: 'Face',
+        days: [],
+        purpose: 'Test',
+        whyChosen: 'Test rationale',
+      },
+    ],
+    pmSteps: [],
+    catalogProducts: [
+      { brand: 'Some Brand', name: 'Some Product', category: 'invalid_category' as any, keyActives: [] },
+    ],
+  };
+
+  const validation = validateRoutineProposal(invalidProposal);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((e) => e.includes('invalid action')));
+  assert.ok(validation.errors.some((e) => e.includes('not a valid ProductCategory')));
+});
+
+test('I1-B2 Invariants: Validator strictly rejects missing required routine step fields', () => {
+  const missingFieldProposal: RoutineIntelligenceProposal = {
+    summarySentence: 'Missing fields proposal.',
+    productDecisions: [],
+    amSteps: [
+      {
+        order: 1,
+        timing: 'am',
+        productName: '',
+        brand: '',
+        category: 'cleanser',
+        amount: '',
+        area: '',
+        days: [],
+        purpose: '',
+        whyChosen: '',
+      },
+    ],
+    pmSteps: [],
+    catalogProducts: [
+      { brand: '', name: '', category: 'cleanser', keyActives: [] },
+    ],
+  };
+
+  const validation = validateRoutineProposal(missingFieldProposal);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((e) => e.includes('missing one or more required fields')));
+});
+
+test('I1-B2 PIH Adaptation: Member with reported PIH tendency receives targeted photoprotection rationale', () => {
+  const pihContext: AssembledRoutineContext = {
+    userId: 'usr_pih_test',
+    primaryGoal: 'dark_spots',
+    secondaryGoals: ['maintain'],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'oily_shiny',
+    postCleanseTightness: false,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: [],
+    confirmedProducts: [],
+    productReactions: [],
+    formulaSnapshots: [],
+    pihTendencyAnswer: 'Often',
+  };
+
+  const proposal = generateContextGroundedProposal(pihContext);
+  const spfStep = proposal.amSteps.find((s) => s.category === 'sunscreen');
+  assert.ok(spfStep);
+  assert.match(spfStep?.whyChosen || '', /photoprotection|pigment|dark spots/i);
+});
+
+test('I1-B2 RemoteDeriveService: getRoutine assembles routines + routine_items into canonical Routine with amSteps, pmSteps and derived scheduleText', async () => {
+  const mockRoutineRow = {
+    id: 'rout_123',
+    user_id: 'usr_b2_read_test',
+    version: 1,
+    status: 'awaiting_review',
+    summary_sentence: 'Evidence-based gentle barrier-protective routine proposal.',
+    created_at: '2026-09-18T12:00:00.000Z',
+    updated_at: '2026-09-18T12:05:00.000Z',
+    published_at: null,
+    founder_notes: 'Reviewed initial proposal',
+  };
+
+  const mockItemRows = [
+    {
+      id: 'item_am_1',
+      routine_id: 'rout_123',
+      order_index: 1,
+      timing: 'am',
+      product_id: 'prod_cleanser_uuid',
+      product_name: 'Gentle Facial Cleanser',
+      brand: 'Vanicream',
+      category: 'cleanser',
+      amount: '1-2 pumps',
+      area: 'Entire face',
+      days: [],
+      purpose: 'Morning Cleanse',
+      why_chosen: 'Cleanses without tightness.',
+      watch_for: null,
+    },
+    {
+      id: 'item_am_2',
+      routine_id: 'rout_123',
+      order_index: 2,
+      timing: 'am',
+      product_id: 'prod_spf_uuid',
+      product_name: 'UV Clear SPF 46',
+      brand: 'EltaMD',
+      category: 'sunscreen',
+      amount: 'Two finger lengths',
+      area: 'Entire face and neck',
+      days: [],
+      purpose: 'UV Protection',
+      why_chosen: 'Daily broad-spectrum photoprotection.',
+      watch_for: null,
+    },
+    {
+      id: 'item_pm_1',
+      routine_id: 'rout_123',
+      order_index: 1,
+      timing: 'pm',
+      product_id: 'prod_cleanser_uuid',
+      product_name: 'Gentle Facial Cleanser',
+      brand: 'Vanicream',
+      category: 'cleanser',
+      amount: '1-2 pumps',
+      area: 'Entire face',
+      days: [],
+      purpose: 'Evening Cleanse',
+      why_chosen: 'Removes sunscreen and oil.',
+      watch_for: null,
+    },
+    {
+      id: 'item_pm_2',
+      routine_id: 'rout_123',
+      order_index: 2,
+      timing: 'pm',
+      product_id: 'prod_diff_uuid',
+      product_name: 'Adapalene Gel 0.1%',
+      brand: 'Differin',
+      category: 'treatment',
+      amount: 'Pea-sized amount',
+      area: 'Entire face avoiding eye contours',
+      days: ['mon', 'wed', 'fri'],
+      purpose: 'Targeted Cellular Renewal',
+      why_chosen: 'Scheduled 3 nights/week for cellular turnover.',
+      watch_for: 'Watch for dryness.',
+    },
+  ];
+
+  const mockSupabaseClient = {
+    from: (table: string) => {
+      if (table === 'routines') {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => ({
+                limit: () => ({
+                  maybeSingle: async () => ({ data: mockRoutineRow, error: null }),
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'routine_items') {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: async () => ({ data: mockItemRows, error: null }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    },
+  };
+
+  const service = new RemoteDeriveService(mockSupabaseClient);
+  const routine = await service.getRoutine('usr_b2_read_test');
+
+  assert.ok(routine !== null);
+  assert.equal(routine.id, 'rout_123');
+  assert.equal(routine.userId, 'usr_b2_read_test');
+  assert.equal(routine.version, 1);
+  assert.equal(routine.status, 'awaiting_review');
+  assert.equal(routine.updatedAt, '2026-09-18T12:05:00.000Z');
+  assert.equal(routine.founderNotes, 'Reviewed initial proposal');
+
+  // amSteps assembly
+  assert.equal(routine.amSteps.length, 2);
+  assert.equal(routine.amSteps[0].productName, 'Gentle Facial Cleanser');
+  assert.equal(routine.amSteps[0].order, 1);
+  assert.equal(routine.amSteps[0].timing, 'am');
+  assert.equal(routine.amSteps[0].scheduleText, 'Every morning');
+
+  assert.equal(routine.amSteps[1].productName, 'UV Clear SPF 46');
+  assert.equal(routine.amSteps[1].category, 'sunscreen');
+  assert.equal(routine.amSteps[1].productId, 'prod_spf_uuid');
+
+  // pmSteps assembly
+  assert.equal(routine.pmSteps.length, 2);
+  assert.equal(routine.pmSteps[1].productName, 'Adapalene Gel 0.1%');
+  assert.equal(routine.pmSteps[1].timing, 'pm');
+  assert.deepEqual(routine.pmSteps[1].days, ['mon', 'wed', 'fri']);
+  assert.equal(routine.pmSteps[1].scheduleText, 'Mon, Wed, Fri');
+  assert.equal(routine.pmSteps[1].watchFor, 'Watch for dryness.');
+});
+
+test('I1-B2 RemoteDeriveService: getUserProducts maps joined products table into canonical UserProduct with nested Product', async () => {
+  const mockUserProductRows = [
+    {
+      id: 'up_row_1',
+      user_id: 'usr_b2_up_test',
+      product_id: 'prod_uuid_1',
+      detected_brand: null,
+      detected_name: null,
+      action: 'KEEP',
+      action_reason: 'Working well with baseline skin barrier.',
+      frequency_nights_per_week: 7,
+      is_confirmed_by_user: true,
+      created_at: '2026-09-18T12:00:00.000Z',
+      products: {
+        id: 'prod_uuid_1',
+        brand: 'CeraVe',
+        name: 'Hydrating Facial Cleanser',
+        category: 'cleanser',
+        key_actives: ['Ceramides', 'Hyaluronic Acid'],
+        full_ingredients: ['Purified Water', 'Glycerin', 'Ceramide NP'],
+        retail_price_approx: 15.99,
+        is_catalog_standard: true,
+      },
+    },
+    {
+      id: 'up_row_2',
+      user_id: 'usr_b2_up_test',
+      product_id: 'prod_uuid_2',
+      detected_brand: null,
+      detected_name: null,
+      action: 'PAUSE',
+      action_reason: 'Paused during pregnancy and nursing.',
+      frequency_nights_per_week: 0,
+      is_confirmed_by_user: true,
+      created_at: '2026-09-18T12:00:00.000Z',
+      products: {
+        id: 'prod_uuid_2',
+        brand: 'Differin',
+        name: 'Adapalene Gel 0.1%',
+        category: 'treatment',
+        key_actives: ['Adapalene'],
+        full_ingredients: ['Adapalene 0.1%'],
+        retail_price_approx: 14.5,
+        is_catalog_standard: true,
+      },
+    },
+  ];
+
+  const mockSupabaseClient = {
+    from: (table: string) => {
+      if (table === 'user_products') {
+        return {
+          select: () => ({
+            eq: async () => ({ data: mockUserProductRows, error: null }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    },
+  };
+
+  const service = new RemoteDeriveService(mockSupabaseClient);
+  const userProducts = await service.getUserProducts('usr_b2_up_test');
+
+  assert.equal(userProducts.length, 2);
+
+  const p1 = userProducts[0];
+  assert.equal(p1.id, 'up_row_1');
+  assert.equal(p1.action, 'KEEP');
+  assert.equal(p1.productId, 'prod_uuid_1');
+  assert.equal(p1.product.brand, 'CeraVe');
+  assert.equal(p1.product.name, 'Hydrating Facial Cleanser');
+  assert.equal(p1.product.category, 'cleanser');
+  assert.deepEqual(p1.product.keyActives, ['Ceramides', 'Hyaluronic Acid']);
+  assert.equal(p1.product.retailPriceApprox, 15.99);
+
+  const p2 = userProducts[1];
+  assert.equal(p2.action, 'PAUSE');
+  assert.equal(p2.product.name, 'Adapalene Gel 0.1%');
+  assert.equal(p2.frequencyNightsPerWeek, 0);
+});
+
 
