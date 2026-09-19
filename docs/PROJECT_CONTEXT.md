@@ -38,7 +38,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
 
 ## 2. Founding Beta Pricing — Approved $25 Management Membership (Products Separate)
 
-* **Status**: **APPROVED PRODUCT DIRECTION (ADR-26) / NOT IMPLEMENTED IN CODE**. Current runtime still uses `config.betaPriceMonthly = 100` and `founding_beta_129`. I1-B4A is the implementation pass.
+* **Status**: **IMPLEMENTED (I1-B4A / ADR-26)**. Current runtime uses `config.betaPriceMonthly = 25` and `founding_beta`.
 * **Price Point**: Flat **$25/month** Founding Beta experiment for Derive managing the member's skincare. Not "$25 for AI." Not a lifetime company price.
 * **Products**: Purchased separately. Membership price is independent of routine size, retail cost, lifespan, and refill rate. No V1 membership tiers.
 * **Strategic Rationale**:

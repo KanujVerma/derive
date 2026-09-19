@@ -788,143 +788,164 @@ test('Guard: Expo client must not ship a Gemini API key', () => {
 });
 
 // ========================================================
-// 10. PERSONALIZED ALL-IN MONTHLY PRICING TESTS
+// 10. I1-B4A MEMBERSHIP + SEPARATE PRODUCT COMMERCE
 // ========================================================
 
-import {
-  calculateProductMonthlyConsumption,
-  calculateMonthlyPlanPrice,
-  evaluatePriceAdjustment,
-  formatCentsToDollars,
-  PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS,
-  PROVISIONAL_OPERATIONS_RISK_CENTS,
-} from '../src/pricing/index.ts';
 import { useOnboardingStore } from '../src/stores/onboardingStore.ts';
+import { membershipDisplayLabel } from '../src/domain/types.ts';
 
-test('Personalized Pricing: Normalizes retail prices into 30-day monthly consumption with deterministic rounding', () => {
-  // CeraVe Cleanser: $16 retail, 60-day lifespan -> round(1600 * 30 / 60) = 800 cents ($8.00/month)
-  const cleanserEst = calculateProductMonthlyConsumption({
-    id: 'p1',
-    name: 'Hydrating Facial Cleanser',
-    brand: 'CeraVe',
-  });
-  assert.equal(cleanserEst.retailPriceCents, 1600);
-  assert.equal(cleanserEst.estimatedLifespanDays, 60);
-  assert.equal(cleanserEst.monthlyEquivalentCents, 800);
-  assert.equal(cleanserEst.isDeriveManagedReplenishment, true);
-
-  // Differin: $15 retail, 45-day lifespan -> round(1500 * 30 / 45) = 1000 cents ($10.00/mo)
-  const differinEst = calculateProductMonthlyConsumption({
-    id: 'p2',
-    name: 'Adapalene Gel 0.1%',
-    brand: 'Differin',
-  });
-  assert.equal(differinEst.retailPriceCents, 1500);
-  assert.equal(differinEst.estimatedLifespanDays, 45);
-  assert.equal(differinEst.monthlyEquivalentCents, 1000);
-  assert.equal(differinEst.isDeriveManagedReplenishment, true);
-
-  // La Roche-Posay: $24 retail, 45-day lifespan -> round(2400 * 30 / 45) = 1600 cents ($16.00/mo)
-  const lrpEst = calculateProductMonthlyConsumption({
-    id: 'p4',
-    name: 'Toleriane Double Repair Moisturizer',
-    brand: 'La Roche-Posay',
-  });
-  assert.equal(lrpEst.retailPriceCents, 2400);
-  assert.equal(lrpEst.estimatedLifespanDays, 45);
-  assert.equal(lrpEst.monthlyEquivalentCents, 1600);
-  assert.equal(lrpEst.isDeriveManagedReplenishment, true);
-
-  // Daily Sunscreen: $18 retail, 30-day lifespan -> round(1800 * 30 / 30) = 1800 cents ($18.00/mo)
-  const spfEst = calculateProductMonthlyConsumption({
-    id: 'p5',
-    name: 'Relief Sun SPF 50+',
-    brand: 'Beauty of Joseon',
-  });
-  assert.equal(spfEst.retailPriceCents, 1800);
-  assert.equal(spfEst.estimatedLifespanDays, 30);
-  assert.equal(spfEst.monthlyEquivalentCents, 1800);
-  assert.equal(spfEst.isDeriveManagedReplenishment, true);
-
-  // Deterministic fractional rounding test: $20.00 retail, 45-day lifespan -> round(2000 * 30 / 45) = 1333 cents ($13.33/mo)
-  const defaultEst = calculateProductMonthlyConsumption({
-    id: 'custom_product',
-    name: 'Unknown Cream',
-    brand: 'Generic',
-  });
-  assert.equal(defaultEst.retailPriceCents, 2000);
-  assert.equal(defaultEst.estimatedLifespanDays, 45);
-  assert.equal(defaultEst.monthlyEquivalentCents, 1333);
+test('I1-B4A Display Price: Client configuration centralizes Founding Beta at $25/mo', () => {
+  assert.equal(config.betaPriceMonthly, 25);
+  assert.equal(config.currency, 'USD');
 });
 
-test('Personalized Pricing: Computes exact Arthur demo monthly estimate ($96/mo) and separates inventory from consumption', () => {
-  const activeProducts = [
-    { id: 'p1', name: 'Hydrating Facial Cleanser', brand: 'CeraVe' }, // 800 cents/mo
-    { id: 'p2', name: 'Adapalene Gel 0.1%', brand: 'Differin' }, // 1000 cents/mo
-    { id: 'p4', name: 'Toleriane Double Repair Moisturizer', brand: 'La Roche-Posay' }, // 1600 cents/mo
-    { id: 'p5', name: 'Relief Sun SPF 50+', brand: 'Beauty of Joseon' }, // 1800 cents/mo
+test('I1-B4A Canonical Membership Identity: CustomerProfile.tier is price-neutral founding_beta', () => {
+  assert.equal(membershipDisplayLabel('founding_beta'), 'Founding Beta');
+  const profile: CustomerProfile = {
+    id: 'usr_b4a',
+    email: 'member@derive.skin',
+    fullName: 'Beta Member',
+    tier: 'founding_beta',
+    membershipStatus: 'active',
+    createdAt: '2026-09-19T00:00:00.000Z',
+    updatedAt: '2026-09-19T00:00:00.000Z',
+  };
+  assert.equal(profile.tier, 'founding_beta');
+  assert.ok(!profile.tier.includes('129'));
+  assert.ok(!profile.tier.includes('25'));
+});
+
+test('I1-B4A Mock Parity: MockDeriveService seeds founding_beta', async () => {
+  const service = new MockDeriveService();
+  service.seedArthurDemoData();
+  const arthur = await service.getCustomerProfile('usr_arthur_1');
+  assert.ok(arthur);
+  assert.equal(arthur!.tier, 'founding_beta');
+});
+
+test('I1-B4A Remote Mapper: accepts founding_beta and fails closed on unknown or legacy 129', () => {
+  const mapped = mapDbCustomerProfile({
+    id: 'u_b4a',
+    email: 'mapped@example.com',
+    full_name: 'Mapped Member',
+    phone: '+15550001111',
+    created_at: '2026-09-19T12:00:00Z',
+    updated_at: '2026-09-19T14:00:00Z',
+    memberships: [
+      {
+        id: 'm_b4a',
+        user_id: 'u_b4a',
+        tier: 'founding_beta',
+        status: 'active',
+        created_at: '2026-09-19T12:00:00Z',
+      },
+    ],
+  });
+  assert.equal(mapped?.tier, 'founding_beta');
+  assert.equal(mapped?.membershipStatus, 'active');
+
+  const legacy = mapDbCustomerProfile({
+    id: 'u_legacy',
+    email: 'legacy@example.com',
+    full_name: 'Legacy Member',
+    created_at: '2026-09-19T12:00:00Z',
+    updated_at: '2026-09-19T12:00:00Z',
+    memberships: [
+      {
+        id: 'm_legacy',
+        user_id: 'u_legacy',
+        tier: 'founding_beta_129',
+        status: 'active',
+        created_at: '2026-09-19T12:00:00Z',
+      },
+    ],
+  });
+  assert.equal(legacy, null, 'legacy founding_beta_129 is not canonical after B4A');
+
+  const unknown = mapDbCustomerProfile({
+    id: 'u_unknown',
+    email: 'unknown@example.com',
+    full_name: 'Unknown Tier',
+    created_at: '2026-09-19T12:00:00Z',
+    updated_at: '2026-09-19T12:00:00Z',
+    memberships: [
+      {
+        id: 'm_unknown',
+        user_id: 'u_unknown',
+        tier: 'pro_96_monthly',
+        status: 'active',
+        created_at: '2026-09-19T12:00:00Z',
+      },
+    ],
+  });
+  assert.equal(unknown, null, 'unknown tier must fail closed');
+});
+
+test('I1-B4A Pricing Engine Removed: no active src/pricing imports or all-in calculations', () => {
+  const activeSurfaces = [
+    'src/services/deriveClient.ts',
+    'src/services/mock/MockDeriveService.ts',
+    'src/services/remote/RemoteDeriveService.ts',
+    'src/stores/userStore.ts',
+    'app/(onboarding)/10-summary.tsx',
+    'app/profile/index.tsx',
+    'app/orders/index.tsx',
+    'app/refill/index.tsx',
+    'app/(tabs)/plan.tsx',
   ];
-
-  // Arthur owns p1, p2, and p4 on his counter shelf; p5 is a new addition
-  const existingInventory = new Set(['p1', 'p2', 'p4']);
-  const planEstimate = calculateMonthlyPlanPrice(activeProducts, {
-    existingInventoryProductIds: existingInventory,
-  });
-
-  // Verify internal provisional demo assumptions
-  assert.equal(planEstimate.managementFeeCents, PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS); // 3900 cents ($39)
-  assert.equal(planEstimate.operationsRiskCents, PROVISIONAL_OPERATIONS_RISK_CENTS); // 500 cents ($5)
-
-  // Steady-state product consumption: 800 + 1000 + 1600 + 1800 = 5200 cents ($52)
-  // Existing inventory affects shipment timing, NOT steady-state consumption
-  assert.equal(planEstimate.productConsumptionCents, 5200);
-
-  // Exact Arthur demo monthly total: $39 + $52 + $5 = $96.00 / month (9600 cents)
-  assert.equal(planEstimate.monthlyTotalCents, 9600);
-  assert.equal(formatCentsToDollars(planEstimate.monthlyTotalCents), '$96');
-
-  // Verify breakdown inventory flags
-  const p1Item = planEstimate.productBreakdown.find((i) => i.productId === 'p1');
-  const p5Item = planEstimate.productBreakdown.find((i) => i.productId === 'p5');
-  assert.equal(p1Item?.hasExistingInventory, true);
-  assert.equal(p5Item?.hasExistingInventory, false);
-});
-
-test('Personalized Pricing: Excluding a product from Derive-managed replenishment changes result intentionally', () => {
-  const activeProducts = [
-    { id: 'p1', name: 'Hydrating Facial Cleanser', brand: 'CeraVe', isDeriveManagedReplenishment: true }, // 800 cents/mo
-    { id: 'p2', name: 'Adapalene Gel 0.1%', brand: 'Differin', isDeriveManagedReplenishment: false }, // Member provides own prescription
-    { id: 'p4', name: 'Toleriane Double Repair Moisturizer', brand: 'La Roche-Posay', isDeriveManagedReplenishment: true }, // 1600 cents/mo
-    { id: 'p5', name: 'Relief Sun SPF 50+', brand: 'Beauty of Joseon', isDeriveManagedReplenishment: true }, // 1800 cents/mo
+  const forbidden = [
+    "from '@/src/pricing'",
+    'from "../pricing',
+    'calculateMonthlyPlanPrice',
+    'calculateProductMonthlyConsumption',
+    'evaluatePriceAdjustment',
+    'PROVISIONAL_DEMO_MANAGEMENT_FEE',
+    'PROVISIONAL_DEMO_OPERATIONS_RISK',
   ];
-
-  const planEstimate = calculateMonthlyPlanPrice(activeProducts);
-
-  // Product consumption excludes p2: 800 + 1600 + 1800 = 4200 cents ($42)
-  assert.equal(planEstimate.productConsumptionCents, 4200);
-
-  // Monthly Total: 3900 + 4200 + 500 = 8600 cents ($86/mo)
-  assert.equal(planEstimate.monthlyTotalCents, 8600);
-  assert.equal(formatCentsToDollars(planEstimate.monthlyTotalCents), '$86');
+  for (const relPath of activeSurfaces) {
+    const content = fs.readFileSync(path.resolve(relPath), 'utf8');
+    for (const token of forbidden) {
+      assert.ok(!content.includes(token), `${relPath} must not contain ${token}`);
+    }
+  }
+  assert.equal(fs.existsSync(path.resolve('src/pricing')), false, 'src/pricing directory must be removed');
 });
 
-test('Personalized Pricing: Evaluates price adjustments and enforces member approval on increases', () => {
-  // Case 1: Routine change increases monthly price (e.g. $96 -> $104) -> requires approval
-  const increaseEval = evaluatePriceAdjustment(9600, 10400);
-  assert.equal(increaseEval.requiresMemberApproval, true);
-  assert.equal(increaseEval.priceDeltaCents, 800);
-  assert.match(increaseEval.explanation, /increases your plan by \$8\/mo.*confirmation required/i);
+test('I1-B4A Customer Copy: membership is $25 management; products are separate', () => {
+  const summary = fs.readFileSync(path.resolve('app/(onboarding)/10-summary.tsx'), 'utf8');
+  const profile = fs.readFileSync(path.resolve('app/profile/index.tsx'), 'utf8');
+  const orders = fs.readFileSync(path.resolve('app/orders/index.tsx'), 'utf8');
+  const refill = fs.readFileSync(path.resolve('app/refill/index.tsx'), 'utf8');
+  const combined = `${summary}\n${profile}\n${orders}\n${refill}`;
 
-  // Case 2: Routine simplification reduces monthly price (e.g. $96 -> $86) -> no approval required
-  const decreaseEval = evaluatePriceAdjustment(9600, 8600);
-  assert.equal(decreaseEval.requiresMemberApproval, false);
-  assert.equal(decreaseEval.priceDeltaCents, -1000);
-  assert.match(decreaseEval.explanation, /lowers your plan by \$10\/mo/i);
+  assert.ok(summary.includes('config.betaPriceMonthly'), 'onboarding uses centralized display price');
+  assert.ok(summary.includes('purchased separately'), 'onboarding states products are purchased separately');
+  assert.ok(!summary.includes('products included'), 'onboarding must not claim products are included');
+  assert.ok(!summary.includes('OTC products'), 'onboarding must not imply bundled OTC products');
+  assert.ok(profile.includes('purchased separately'));
+  assert.ok(orders.includes('separate from your Derive membership'));
+  assert.ok(refill.includes('separate from your Derive membership'));
+  assert.ok(!combined.includes('$100'));
+  assert.ok(!combined.includes('$129'));
+  assert.ok(!combined.includes('$96'));
+  assert.ok(!combined.includes('96/mo'));
+  assert.ok(!combined.toLowerCase().includes('$25 for ai'));
+});
 
-  // Case 3: No price change (e.g. like-for-like swap)
-  const noChangeEval = evaluatePriceAdjustment(9600, 9600);
-  assert.equal(noChangeEval.requiresMemberApproval, false);
-  assert.equal(noChangeEval.priceDeltaCents, 0);
+test('I1-B4A UserStore Display Label: canonical founding_beta projects to Founding Beta', () => {
+  useUserStore.getState().resetToDefault();
+  useUserStore.getState().setRemoteCustomerProfile({
+    id: 'usr_label',
+    email: 'label@derive.skin',
+    fullName: 'Label Member',
+    tier: 'founding_beta',
+    membershipStatus: 'active',
+    createdAt: '2026-09-19T00:00:00.000Z',
+    updatedAt: '2026-09-19T00:00:00.000Z',
+  });
+  assert.equal(useUserStore.getState().tier, 'Founding Beta');
+  assert.ok(!useUserStore.getState().tier.includes('129'));
+  useUserStore.getState().resetToDefault();
 });
 
 // ========================================================
@@ -1206,8 +1227,8 @@ test('Safety & Privacy: Zero race, ethnicity, or ancestry classifiers in phenoty
 // 16. K4.3 FOUNDING BETA CLIENT READINESS INVARIANTS
 // ========================================================
 
-test('K4.3 Pricing Truth: Client configuration centralizes beta price at $100/mo', () => {
-  assert.equal(config.betaPriceMonthly, 100);
+test('K4.3 Pricing Truth: Client configuration centralizes beta price at $25/mo', () => {
+  assert.equal(config.betaPriceMonthly, 25);
   assert.equal(config.currency, 'USD');
   assert.equal(config.founderSupportEmail, 'concierge@derive.skin');
 });
@@ -1891,7 +1912,7 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
         id: userId,
         fullName: 'Remote Member',
         email: 'remote@example.com',
-        tier: 'founding_beta_129',
+        tier: 'founding_beta',
         membershipStatus: 'active',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -3320,7 +3341,7 @@ test('I1-A2 Database Mapping: canonical PostgREST projections and deterministic 
       {
         id: 'm1',
         user_id: 'u7',
-        tier: 'founding_beta_129',
+        tier: 'founding_beta',
         status: 'active',
         created_at: '2026-09-10T12:00:00Z',
       },
@@ -3331,7 +3352,7 @@ test('I1-A2 Database Mapping: canonical PostgREST projections and deterministic 
     email: 'sarah@example.com',
     fullName: 'Sarah Connor',
     phone: '+15551234567',
-    tier: 'founding_beta_129',
+    tier: 'founding_beta',
     membershipStatus: 'active',
     createdAt: '2026-09-10T12:00:00Z',
     updatedAt: '2026-09-10T14:00:00Z',
@@ -3889,7 +3910,7 @@ test('I1-A2.1 Bootstrap Freshness: Stale profile hydration discarded after ident
       email: 'a@derive.skin',
       fullName: 'Alice Anderson',
       membershipStatus: 'active',
-      tier: 'founding_beta_129',
+      tier: 'founding_beta',
       createdAt: '2026-09-18T00:00:00.000Z',
       updatedAt: '2026-09-18T00:00:00.000Z',
     });
@@ -4643,7 +4664,7 @@ test('I1-B1.1 Canonical Bootstrap Integration: resolveCustomerBootstrap updates 
         id: userId,
         email: 'test@example.com',
         fullName: 'Test User',
-        tier: 'founding_beta_129',
+        tier: 'founding_beta',
         membershipStatus: 'active',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

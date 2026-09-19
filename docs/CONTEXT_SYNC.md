@@ -6,6 +6,40 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19 — Kanuj: DERIVE I1-B4A Membership & Separate Product Commerce Model Reconciliation
+
+- **Agent / Workstream**: Kanuj (Customer Experience + Mobile) Primary with shared-contract + Sami-owned additive membership migration
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `c7f0778498f53e2ce34c54d43dc839671f24ed2c`
+- **Prior Verified CI Run**: `35429680035` (SUCCESS on predecessor)
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required`
+- **Milestone Status**: `I1-B4A COMPLETE` (membership $25 display, products separate, `founding_beta` identity, pricing engine removed). `I1-B4B NEXT / NOT IMPLEMENTED`.
+- **Ownership / Shared Contracts**: Shared `CustomerProfile.tier` / `MembershipTier`. Sami-owned additive migration on `public.memberships` with no customer write grant change. Kanuj-owned customer copy. No check-in schema/UI (B4B). No Shop. No Stripe.
+- **Durable Deliverables**:
+  1. `config.betaPriceMonthly = 25` (display/config only; Stripe/S5 owns charged money).
+  2. `MembershipTier = 'founding_beta'` on `CustomerProfile`; `membershipDisplayLabel` projects `Founding Beta` in `userStore`.
+  3. Additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql`: fail-closed preflight on unknown/NULL tiers; backfill `founding_beta_129` → `founding_beta`; default `founding_beta`; NOT NULL; CHECK `tier = 'founding_beta'`. `20260915_init.sql` untouched.
+  4. Removed `src/pricing/**` (plan-pricing, fixtures, types, index) and all-in tests.
+  5. Remote `mapDbCustomerProfile` accepts only `founding_beta`; fails closed on legacy `founding_beta_129` and unknown tiers.
+  6. Mock default + onboard profiles use `founding_beta`.
+  7. Onboarding / Profile / Orders / Refill copy: membership is Derive management; products purchased separately.
+  8. ADR-26 marked implemented; ADR-15 remains SUPERSEDED/HISTORICAL; ADR-21 concierge kept, $100 all-in superseded; ARCHITECTURE_CHALLENGE-01 RESOLVED & IMPLEMENTED.
+  9. Commercial-independence invariant recorded in ADR-26 and `docs/SAFETY_PRIVACY.md`.
+- **Explicitly NOT done**: B4B check-in tags/note; Shop; Stripe checkout/webhooks; sixth tab; coupons/affiliates; provider selection.
+- **Verification Gates**:
+  - `npm test`: 146/146 passing.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: clean export.
+  - `npx supabase db reset`: applied 9 migrations including `20260919075053_i1_b4_membership_identity_reconciliation.sql`.
+  - `npx supabase test db`: 138/138 pgTAP (4 files).
+  - `node scripts/test-i1-b1-local.mjs`: 11/11.
+  - `node scripts/test-i1-b2-local.mjs`: 8/8.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+  - B4B not started. Shop/Stripe not started.
+
 ## 2026-09-19 — Kanuj: DERIVE I1-B3.1 Client Hardening + I1-B4 Impact Map (Decision Recorded, Not Implemented)
 
 - **Agent / Workstream**: Kanuj (Customer Experience + Mobile) Primary

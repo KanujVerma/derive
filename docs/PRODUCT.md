@@ -64,7 +64,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 - **Timeline Events**: Milestone log of routine changes and barrier developments.
 
 ### 6. Profile & Settings (`app/profile`)
-- **Customer Account Identity**: Member name, email, Founding Beta badge, and membership price. **Implemented today:** `${config.betaPriceMonthly}/mo` (`100`) plus unused `calculateMonthlyPlanPrice` imports. **Approved I1-B4A (not implemented):** `$25/mo` Derive-management membership; products purchased separately; no routine-derived plan price.
+- **Customer Account Identity**: Member name, email, Founding Beta badge, and membership price. **Implemented (I1-B4A):** `${config.betaPriceMonthly}/mo` (`25`) for Derive management. Products purchased separately.
 - **Clean Customer Scope**: Dedicated customer-facing sections for Care & History (Active Routine, Product Reaction History, Orders & Refills) and Support & Privacy (Member Support, Export Personal Data).
 - **No Developer Bloat**: Internal founder review desk links, dev toggles, and unsubstantiated HIPAA/GDPR regulatory claims are completely removed from customer view.
 
@@ -72,8 +72,8 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 
 ## Founding Beta Pricing & Operating Model
 
-### 1. Founding Beta Membership — APPROVED SUCCESSOR ($25/Month Management; Products Separate) [I1-B4A · NOT IMPLEMENTED]
-* **Status**: **APPROVED PRODUCT DIRECTION** (ADR-26). Code still shows `$100` / `founding_beta_129` until I1-B4A.
+### 1. Founding Beta Membership — $25/Month Management; Products Separate [IMPLEMENTED I1-B4A]
+* **Status**: **IMPLEMENTED** (ADR-26 / I1-B4A). Display `config.betaPriceMonthly = 25`. Canonical identity `founding_beta`.
 * **Target Cohort**: First 10 paying Founding Beta members.
 * **Pricing Concept**: Flat **$25/month** Founding Beta experiment that pays for Derive **managing** the member's skincare (canonical routine, ongoing adaptation, weekly check-ins, Progress, Scan, Ask, product-fit guidance, beta founder quality review). Do **not** frame as "$25 for AI". $25 is not a lifetime company price.
 * **Products Are Separate**: Routine products are purchased separately. Membership price does not depend on product count, retail cost, lifespan, refill rate, or routine size. No V1 membership tiers.
@@ -83,7 +83,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 * **Prescriptions Are Contextual Only**: Prescription medications are contextual inputs, never products Derive prescribes, modifies, or supplies.
 
 ### 1b. Historical: $100/Month All-In First-10 Experiment — SUPERSEDED
-* **Status**: **HISTORICAL / SUPERSEDED** by §1 / ADR-26. Remaining in current UI copy and `config.betaPriceMonthly = 100` until I1-B4A.
+* **Status**: **HISTORICAL / SUPERSEDED** by §1 / ADR-26 / I1-B4A. No longer customer-facing.
 * **Historical Pricing Concept**: Flat **$100/month** covering Derive care management plus standard non-prescription facial skincare products needed for the approved routine.
 * **No Product Wallet or Rollover Allowance**: The member does NOT receive a product wallet, credit balance, rollover allowance, or "$X of products."
 * **Preserve Working Products**: Existing products that already work are retained (`KEEP`); Derive does not ship duplicate bottles merely because a member pays monthly.
@@ -94,7 +94,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 
 ### 2. Long-Term Personalized All-In Monthly Pricing Architecture [SUPERSEDED / HISTORICAL]
 > [!NOTE]
-> SUPERSEDED by ADR-26. Prototype remains in `src/pricing/**` until I1-B4A removes it. Arthur $96/mo, $39 management, and $5 buffer are historical simulation fixtures, not commercial truth.
+> SUPERSEDED by ADR-26 / I1-B4A. Prototype directory `src/pricing/**` has been removed. Arthur $96/mo, $39 management, and $5 buffer are historical simulation fixtures, not commercial truth.
 
 Derive is prototyping moving away from arbitrary subscription tiers and flat-rate assumptions toward a personalized monthly plan price derived dynamically from active routine consumption:
 - **Pricing Formula (Internal Simulation)**:
@@ -139,7 +139,7 @@ Derive is prototyping moving away from arbitrary subscription tiers and flat-rat
    - **Privacy & Biological Invariants**:
      - Quality evaluation is on-device where practical; zero persistent face embeddings or facial recognition.
      - Baseline photos do NOT diagnose clinical conditions, determine exact skin type, measure hydration/sebum quantitatively, replace self-reported history, or infer race/ethnicity/Fitzpatrick.
-6. **Review & Audit**: Grouped review card with direct `[Edit]` links per section, Founding Beta membership price card (`config.betaPriceMonthly` today; approved $25 after I1-B4A), and reassurance that the first plan receives a final manual quality check before going live. Tapping `[Build My Plan]` completes onboarding and starts background initial-routine preparation (`isRoutineBeingPrepared`); it does not imply the draft is already under founder review.
+6. **Review & Audit**: Grouped review card with direct `[Edit]` links per section, Founding Beta membership card (`$25/month` via `config.betaPriceMonthly`), and explicit copy that routine products are purchased separately. Tapping `[Build My Plan]` completes onboarding and starts background initial-routine preparation (`isRoutineBeingPrepared`); it does not imply the draft is already under founder review.
 
 ---
 

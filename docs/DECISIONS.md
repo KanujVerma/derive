@@ -171,14 +171,14 @@ Key technical and product decisions accepted for Derive V1.
 * **Verification**: Verified with 96 pgTAP assertions on local Supabase Postgres, 100 unit tests in `tests/derive.test.ts`, committed full-stack local E2E test harness (`scripts/test-i1-b1-local.mjs`), clean Expo web export, zero TypeScript errors, and automated GitHub CI with Supabase database testing.
 
 ### ADR-26: Membership + Separate Product Commerce (Founding Beta $25 Experiment)
-* **Status**: APPROVED PRODUCT DIRECTION / NOT IMPLEMENTED IN CODE (I1-B4A is the implementation pass; I1-B3.1 only records this decision).
+* **Status**: IMPLEMENTED (I1-B4A). Founding Beta display is `$25/month` (`config.betaPriceMonthly`). Canonical identity is `founding_beta`. Products are purchased separately. Stripe remains S5.
 * **Decision**: Founding Beta membership is a **$25/month** experiment that pays for Derive managing the member's skincare — personalized canonical routine, ongoing adaptation, weekly check-ins, Progress history, Scan, Ask, personalized product-fit guidance, and initial founder quality review during beta. Customer-facing framing is "Derive manages your skincare," never "$25 for AI." $25 is a current Founding Beta experiment, not a permanent lifetime company price.
 * **Products are separate**: Routine products are purchased separately. Membership price MUST NOT depend on product count, retail cost, lifespan, refill rate, routine size, or routine changes. No Basic / Pro / Premium membership tiers in V1.
 * **Price-neutral identity**: Canonical membership cohort identity is `founding_beta` (or an equivalent price-free identifier). Legacy `founding_beta_129` migrates additively to `founding_beta`. Price MUST NOT exist in tier identity. Do not encode 25 / 2500 / $25 in the tier string. Stripe owns live billing money in S5; do not invent premature Stripe amount/version schema before S5 requires it.
 * **Commercial-independence invariant**: Derive margin, affiliate commission, sponsorship, coupon availability, and commercial relationship MUST NEVER silently alter KEEP / PAUSE / REPLACE / ADD, Scan verdict, safety verdict, or recommendation ranking. New product/substitution charges require explicit customer consent. Same-SKU refills may remain low-friction.
 * **IA**: Preserve five tabs (Today, Plan, Scan, Ask, Progress). Do not add a sixth root Shop tab. Near-term commerce entry points: Plan → Products, Account / Orders, Refill. Full Shop is deferred / evidence-driven. First-10 beta may use manual/external/founder-assisted product purchasing.
 * **Supersedes**: ADR-15 in full (personalized all-in / routine-derived membership pricing). Partially supersedes ADR-21's $100 all-in / products-included pricing clause. Preserves ADR-21 concierge operating principles (KEEP working products, explicit approval for material new-SKU charges, need-based refill confirmation, required baseline photos, prescriptions as context only).
-* **Not in this ADR's implementation yet**: `config.betaPriceMonthly` remains 100 until B4A; `CustomerProfile.tier` remains `'founding_beta_129'` until B4A; `src/pricing/**` remains until B4A deletes it.
+* **Not remaining in this ADR as unimplemented**: I1-B4A applied `config.betaPriceMonthly = 25`, `CustomerProfile.tier = 'founding_beta'`, additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql`, and removed `src/pricing/**`. Shop and Stripe remain deferred.
 
 ---
 
@@ -186,13 +186,15 @@ Key technical and product decisions accepted for Derive V1.
 
 These findings are review evidence, not accepted contract changes. S1A does not modify Kanuj-owned UI or shared TypeScript contracts.
 
-### ARCHITECTURE_CHALLENGE-01: Price Is Embedded in Membership Identity [APPROVED DIRECTION · PENDING I1-B4A]
-1. **Status**: Founders approved the successor identity (`founding_beta`) and $25/month Founding Beta display (ADR-26). Code, schema default, and Remote mapper still use `founding_beta_129`. Do not treat this challenge as implemented.
-2. **Existing Decision**: ADR-10 and current schema/type literals encode `$129` as `founding_beta_129`. ADR-15 (routine-derived all-in) is SUPERSEDED. ADR-21 $100 all-in/products-included pricing is SUPERSEDED for commercial truth. ADR-26 is the approved successor, unimplemented until I1-B4A.
-3. **Exact Evidence**: `supabase/migrations/20260915_init.sql` defaults `memberships.tier` to `founding_beta_129`; `src/domain/types.ts` narrows `CustomerProfile.tier` to that literal; `RemoteDeriveService` profile mapping returns null unless `tier === 'founding_beta_129'`; `config.betaPriceMonthly` is still `100`.
-4. **Why It Matters**: Membership identity, commercial price, and future Stripe state are coupled. After B4A migration, Remote mapping that only accepts `founding_beta_129` would drop valid members.
-5. **Recommended Change (I1-B4A, not this pass)**: Additive migration `founding_beta_129` → `founding_beta`; default new rows to `founding_beta`; widen shared `CustomerProfile.tier`; update Mock/Remote parity; display $25 from `config.betaPriceMonthly` (or equivalent display constant). Do not encode 25 in the tier string. Stripe amount persistence stays S5.
-6. **Affected Workstreams**: Shared domain contract, database membership model, client presentation, operations, and S5 commerce.
+### ARCHITECTURE_CHALLENGE-01: Price Is Embedded in Membership Identity [RESOLVED & IMPLEMENTED IN I1-B4A]
+1. **Status**: RESOLVED & IMPLEMENTED (I1-B4A). Money is no longer encoded in membership identity. Stripe monetary persistence is **not** claimed here; S5 owns charged money.
+2. **Prior State**: ADR-10 and schema/type literals encoded `$129` as `founding_beta_129`. Remote `mapDbCustomerProfile()` returned null unless `tier === 'founding_beta_129'`.
+3. **Resolution Implemented (I1-B4A)**:
+   - Additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql`: fail-closed preflight on unknown/NULL tiers; backfill `founding_beta_129` → `founding_beta`; default `founding_beta`; `NOT NULL`; `CHECK (tier = 'founding_beta')`.
+   - Shared type `MembershipTier = 'founding_beta'` on `CustomerProfile.tier`.
+   - Remote mapper accepts only `founding_beta` and fails closed otherwise.
+   - Display price `$25/month` via `config.betaPriceMonthly` (customer-facing experiment, not Stripe ledger).
+4. **Affected Workstreams**: Shared domain contract, database membership model, Mock/Remote mapping, onboarding/profile/orders copy.
 
 ### ARCHITECTURE_CHALLENGE-02: Safety Unknown States Are Collapsed [RESOLVED IN I1-B0]
 1. **Status**: RESOLVED & IMPLEMENTED (I1-B0).

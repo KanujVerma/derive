@@ -470,9 +470,9 @@ export function mapDbCustomerProfile(data: {
 
   const latest = rawMemberships[0];
 
-  // If there is no membership or the tier is not representable under the frozen contract,
-  // we return null rather than fabricating an arbitrary tier.
-  if (!latest || latest.tier !== 'founding_beta_129') {
+  // If there is no membership or the tier is not the canonical price-neutral identity,
+  // fail closed rather than fabricating an arbitrary tier.
+  if (!latest || latest.tier !== 'founding_beta') {
     return null;
   }
 
@@ -486,7 +486,7 @@ export function mapDbCustomerProfile(data: {
     email: data.email,
     fullName: data.full_name || '',
     phone: data.phone || undefined,
-    tier: 'founding_beta_129',
+    tier: 'founding_beta',
     membershipStatus: status,
     createdAt: data.created_at,
     updatedAt: data.updated_at,

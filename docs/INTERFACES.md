@@ -320,9 +320,8 @@ To truthfully determine whether an authenticated user requires onboarding or is 
   - `profileExists`: Verified via `public.profiles`. The presence of a profile row (auto-provisioned by auth triggers) does NOT mean onboarding is complete. If absent, bootstrap fails closed (`profileExists: false`) to catch provisioning failures.
   - `onboardingCompleted`: Read strictly from `public.skin_profiles.onboarding_completed`. Missing skin profile or false means `NEEDS_ONBOARDING`; true means `READY`.
   - `membershipStatus`: Queried from `public.memberships` deterministically (latest row by `created_at` descending; absent row maps to `'none'`). Membership state is purely informational in this slice and does NOT gate onboarding navigation.
-  - Tier and pricing fields are strictly excluded from bootstrap. I1-B4A will separately migrate `CustomerProfile.tier` from `'founding_beta_129'` to price-neutral `'founding_beta'` (not implemented in this pass).
+  - Tier and pricing fields are strictly excluded from bootstrap. I1-B4A migrated `CustomerProfile.tier` from historical `'founding_beta_129'` to price-neutral `'founding_beta'`. Display price is `config.betaPriceMonthly` (`25`). Stripe remains S5.
 
-### H. Planned I1-B4 Contract Changes (NOT IMPLEMENTED)
-- **B4A membership**: `CustomerProfile.tier` becomes `'founding_beta'` (legacy `'founding_beta_129'` accepted only during additive migration). Display price is $25/month membership, products separate. Remove `src/pricing/**` all-in engine. Mock/Remote must map both identities during migration, then canonical `founding_beta`.
-- **B4B check-in**: Additive `CheckInContextTag` enum plus optional `contextTags` and `contextNote` on `CheckIn` / `CheckInInput`. Preserve legacy `notes`. Tags are context, not causation. `submit-checkin` Edge Function is not in this repo yet; B4B must keep Mock parity and document Remote/function mapping for Sami.
-
+### H. I1-B4 Contract Status
+- **B4A membership (IMPLEMENTED)**: `CustomerProfile.tier` is `'founding_beta'`. Display price is $25/month membership, products separate. `src/pricing/**` all-in engine removed. Mock/Remote map canonical `founding_beta` and fail closed otherwise.
+- **B4B check-in (NOT IMPLEMENTED)**: Additive `CheckInContextTag` enum plus optional `contextTags` and `contextNote` on `CheckIn` / `CheckInInput`. Preserve legacy `notes`. Tags are context, not causation. `submit-checkin` Edge Function is not in this repo yet.

@@ -16,15 +16,14 @@ When information conflicts, actual repository implementation, runtime code, and 
 Read documents relevant to your specific task rather than loading all documentation indiscriminately.
 
 ## Ownership
-- **Kanuj (Customer Experience + Mobile)**: Mobile app (`app/**`), UI components (`src/components/**`), client stores, themes, haptics, camera/voice UX, client analytics allowlist, and Expo/EAS configuration. Client pricing prototype (`src/pricing/**`) remains until I1-B4A removes it.
+- **Kanuj (Customer Experience + Mobile)**: Mobile app (`app/**`), UI components (`src/components/**`), client stores, themes, haptics, camera/voice UX, client analytics allowlist, and Expo/EAS configuration.
 - **Sami (Platform + Intelligence + Operations)**: Supabase backend (`supabase/**`), database schema/migrations, RLS, private storage, Edge Functions, server intelligence workflows, and founder operations (`admin/**`).
 - **Shared Contracts**: `src/contracts/**`, `src/domain/**`, and `src/types/schema.ts` form the stable integration boundary.
 
-## Commercial truth (implemented vs approved)
-- **Implemented today**: `config.betaPriceMonthly = 100`; `CustomerProfile.tier = 'founding_beta_129'`; memberships default `founding_beta_129`; `src/pricing/**` still computes routine-derived all-in estimates. Check-in context tags are not persisted.
-- **Approved, not implemented (I1-B4A / ADR-26)**: $25/month Founding Beta membership for Derive managing skincare; products purchased separately; price-neutral identity `founding_beta`; no routine-price coupling; commercial-independence invariant.
+## Commercial truth
+- **Implemented (I1-B4A)**: Founding Beta membership display is `$25/month` via `config.betaPriceMonthly` (display only; Stripe/S5 owns charged money). Canonical identity is `founding_beta`. Products are purchased separately. Routine-derived all-in pricing (`src/pricing/**`) has been removed.
 - **Approved, not implemented (I1-B4B)**: optional multi-select check-in context tags + one optional context note.
-- Do not implement B4A/B4B, Shop, Stripe, or a sixth tab unless that pass is explicitly opened.
+- Do not implement B4B, Shop, Stripe, or a sixth tab unless that pass is explicitly opened.
 
 Never silently cross founder ownership boundaries. For shared-contract modifications or cross-boundary integrations, document rationale and changes in `docs/CONTEXT_SYNC.md`.
 

@@ -164,10 +164,10 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ---
 
 ## 5. Commerce & Billing
-* **Platform**: Planned Stripe Checkout (S5) for Founding Beta **membership**. Approved display truth is **$25/month** Derive-management (ADR-26 / I1-B4A, not yet in code). Current client still shows `config.betaPriceMonthly = 100`. Stripe owns live money; do not invent premature Stripe amount/version schema before S5.
+* **Platform**: Planned Stripe Checkout (S5) for Founding Beta **membership**. Implemented display truth is **$25/month** Derive-management (ADR-26 / I1-B4A). `config.betaPriceMonthly` is customer-facing display/config only. Stripe owns live money; do not invent premature Stripe amount/version schema before S5.
 * **Lifecycle**: Webhook events (`customer.subscription.created`, `invoice.payment_succeeded`) update the member's `memberships` status in Supabase.
 * **Membership vs products**: Membership does not include products. Product commerce is separate (Plan → Products, Orders, Refill as near-term entry points). Full Shop and a sixth tab are deferred.
-* **Identity**: Implemented default remains `founding_beta_129`. Approved successor (B4A, additive migration) is price-neutral `founding_beta`.
+* **Identity**: Canonical default is `founding_beta` (I1-B4A additive migration from historical `founding_beta_129`).
 * **Historical**: $100 all-in/products-included (ADR-21), $129 identity (ADR-10), routine-derived $96 Arthur prototype (ADR-15) are superseded as commercial direction.
 
 ---

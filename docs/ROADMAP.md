@@ -500,15 +500,17 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Unit tests, app/test typecheck, and Expo web export remain green. Backend schema unchanged.
   - `eas.json` Remote flag remains `false`.
 
-### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [PLANNED — NOT IMPLEMENTED]
-* **Approved product truth (founder/orchestrator; not yet in code)**:
-  - Founding Beta membership is **$25/month** for Derive managing the member's skincare (routine, adaptations, weekly check-ins, Progress, Scan, Ask, product-fit guidance, beta founder quality review). Do **not** frame as "$25 for AI". $25 is a current Founding Beta experiment, not a lifetime company price.
-  - Routine products are purchased separately. Membership price does **not** depend on product count, retail cost, lifespan, refill rate, or routine size. No Basic/Pro/Premium V1 tiers.
+### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [B4A COMPLETE · B4B NEXT]
+* **Implemented in I1-B4A**:
+  - Founding Beta membership display is **$25/month** (`config.betaPriceMonthly`). Membership pays for Derive managing skincare. Products are purchased separately. Membership price does not depend on routine size or product cost.
+  - Canonical identity `founding_beta` via additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql` (legacy `founding_beta_129` backfilled; unknown tiers fail closed). `src/pricing/**` all-in engine removed.
+  - Onboarding, Profile, Orders, and Refill copy state products are separate. ADR-26 implemented. ARCHITECTURE_CHALLENGE-01 resolved. Remote mapper accepts `founding_beta`.
+* **Approved product truth**:
+  - Do **not** frame as "$25 for AI". $25 is a current Founding Beta experiment, not a lifetime company price.
   - Commercial-independence invariant: margin, affiliate, sponsorship, and coupons must never silently alter KEEP / PAUSE / REPLACE / ADD, Scan, safety, or ranking. New SKU charges require explicit consent; same-SKU refills may stay low-friction.
-  - Five-tab IA preserved. Full Shop deferred. Stripe billing deferred to S5 except architecture/docs truth.
-* **B4A — Membership & Product Commerce Model Reconciliation** (do not start until orchestrator opens the pass):
-  - Display truth $25/month; remove active dynamic all-in membership pricing and obsolete `src/pricing/**` if unused; price-neutral identity `founding_beta_129` → `founding_beta` via additive migration; Mock/Remote/profile/onboarding/orders copy; supersede ADR-15; partially supersede ADR-21 pricing; add ADR-26.
-* **B4B — Weekly Check-In Context Model & Persistence** (separate pass after B4A or as sequenced by orchestrator):
+  - Five-tab IA preserved. Full Shop deferred. Stripe billing deferred to S5.
+* **B4A — Membership & Product Commerce Model Reconciliation** [COMPLETE]
+* **B4B — Weekly Check-In Context Model & Persistence** [NEXT / NOT IMPLEMENTED]:
   - Optional multi-select `CheckInContextTag` + one optional context note every check-in; persist additively; reuse VoiceTextArea; tags are context not causation; `cycle` is not a period tracker.
 * **Not in B4**: Shop tab, Stripe checkout amounts, coupons, affiliates, food diary, period tracker, membership tiers, provider selection.
 

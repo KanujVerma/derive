@@ -84,6 +84,15 @@ Derive maintains strict integrity in all customer communications.
 * **Mechanism Over Demographics (PFB)**: Pseudofolliculitis barbae is addressed strictly through mechanical shaving practices, hair curl pattern, and follicular dynamics—never racial profiling (*Ogunbiyi PMC12360796*).
 * **No Causal Diet Interventions**: Weak population observational associations (such as dairy and acne, *Aghasi et al. 2018*) must never be converted into automated diet interventions or causal rules.
 
+## 6b. Commercial Independence of Recommendations (I1-B4A / ADR-26)
+
+Derive recommendation and safety truth must remain independent of monetization.
+
+* Commercial incentives — including Derive margin, affiliate commission, sponsorship, coupon availability, and commercial relationship — MUST NEVER silently alter KEEP, PAUSE, REPLACE, ADD, STOP, Scan fit verdict, safety classification, or recommendation ordering.
+* New product or substitution charges require explicit customer consent.
+* Same-SKU refills may remain lower-friction.
+* Membership price is independent of routine size and product cost. Products are separate commerce from the $25 Founding Beta membership experiment.
+
 ---
 
 ## 7. Safety Disclosure Provenance & Epistemic Non-Coercion (I1-B0)

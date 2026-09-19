@@ -45,7 +45,7 @@ High-signal findings synthesized from founder research, customer discovery conve
 
 The Founding Beta (10 paying members) is explicitly designed to test these learning hypotheses. The beta fails its primary purpose if it does not generate concrete qualitative and behavioral evidence against these questions.
 
-**Approved successor hypotheses (ADR-26 / I1-B4; $25 is not yet in code):**
+**Implemented successor hypotheses (ADR-26 / I1-B4A):**
 
 1. **VALUE**: Will a qualified customer pay **$25 recurring** for Derive management **independent of product cost**?
 2. **BEHAVIOR**: Will members follow a Derive-managed routine?
