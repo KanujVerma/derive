@@ -8190,81 +8190,132 @@ test('C1 Shop: Scan is reachable inside Shop (canonical route file exists)', () 
   assert.ok(scanExists, 'app/shop/scan.tsx must exist as canonical Scan implementation');
 });
 
-test('C1 Shop: Ask Scan action routes to canonical Shop (not legacy /(tabs)/scan)', () => {
+test('C1 Shop: Ask Scan action routes directly to /shop/scan', () => {
   const askContent = fs.readFileSync(path.resolve('app/(tabs)/ask.tsx'), 'utf8');
-  // Must push to /(tabs)/shop, not /(tabs)/scan
-  assert.ok(askContent.includes("router.push('/(tabs)/shop')"), 'Ask must route to /(tabs)/shop');
-  // Must NOT have the legacy direct route push to scan tab
-  const legacyScanPush = "router.push('/(tabs)/scan')";
-  assert.ok(!askContent.includes(legacyScanPush), 'Ask must not push to legacy /(tabs)/scan');
+  assert.ok(askContent.includes("router.push('/shop/scan')"), 'Ask must route directly to /shop/scan');
+  assert.ok(!askContent.includes("router.push('/(tabs)/shop')"), 'Ask must not route to Shop home when scanning');
 });
 
 test('C1 Shop: only five member root tabs exist (no sixth tab)', () => {
   const layoutContent = fs.readFileSync(path.resolve('app/(tabs)/_layout.tsx'), 'utf8');
-  const tabScreenMatches = layoutContent.match(/name=["'][^"']+["'][^/]*options=\{/g) ?? [];
-  // There are exactly 5 active tab names: index, plan, shop, ask, progress
-  // scan has href: null so it's hidden
   const activeTabs = ['index', 'plan', 'shop', 'ask', 'progress'];
   for (const tab of activeTabs) {
     assert.ok(layoutContent.includes(`name="${tab}"`), `Tab '${tab}' must be in layout`);
   }
-  // scan must be hidden (href: null)
   assert.ok(layoutContent.includes('href: null'), 'scan tab must be hidden with href: null');
 });
 
 test('C1 Shop: only one scanner implementation (no duplicate)', () => {
   const tabScanContent = fs.readFileSync(path.resolve('app/(tabs)/scan.tsx'), 'utf8');
-  // The tabs/scan.tsx must be a redirect shim, not a scanner implementation
   assert.ok(tabScanContent.includes('Redirect'), 'app/(tabs)/scan.tsx must be a redirect shim');
   assert.ok(!tabScanContent.includes('CameraView'), 'app/(tabs)/scan.tsx must NOT contain CameraView — scanner is in shop/scan.tsx');
-  // The real scanner must be in shop/scan.tsx
   const shopScanContent = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
   assert.ok(shopScanContent.includes('CameraView'), 'app/shop/scan.tsx must be the canonical scanner');
 });
 
-test('C1 Shop: all entry points converge on one product detail architecture (shop.tsx uses handleProductPress)', () => {
+test('C1 Shop: legacy /(tabs)/scan redirects to /shop/scan', () => {
+  const tabScanContent = fs.readFileSync(path.resolve('app/(tabs)/scan.tsx'), 'utf8');
+  assert.ok(tabScanContent.includes('href="/shop/scan"'), 'legacy scan route must redirect directly to /shop/scan');
+  assert.ok(!tabScanContent.includes('href="/(tabs)/shop"'), 'legacy scan route must not redirect to Shop home');
+});
+
+test('C1 Shop: canonical product detail route app/shop/[productId].tsx exists and shop product press navigates to it', () => {
+  assert.ok(fs.existsSync(path.resolve('app/shop/[productId].tsx')), 'app/shop/[productId].tsx must exist');
   const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
-  assert.ok(shopContent.includes('handleProductPress'), 'shop.tsx must have a single product navigation handler');
-  // C1.5 note must be present (deferred detail page)
-  assert.ok(shopContent.includes('C1.5'), 'shop.tsx must document C1.5 product detail deferral');
+  assert.ok(shopContent.includes("router.push(`/shop/${productId}`"), 'shop.tsx must navigate to /shop/[productId]');
+  assert.ok(!/handleProductPress[\s\S]*?router\.push\('\/\(tabs\)\/plan'\)/.test(shopContent), 'handleProductPress must not route product presses to Plan');
+});
+
+test('C1 Shop: Plan Products contains Shop/product-detail integration', () => {
+  const planContent = fs.readFileSync(path.resolve('app/(tabs)/plan.tsx'), 'utf8');
+  assert.ok(planContent.includes("router.push(`/shop/${up.productId}`"), 'plan.tsx must link products to /shop/[productId]');
+  assert.ok(planContent.includes('Shop your plan'), 'plan.tsx must include subtle Shop your plan entry');
+  assert.ok(planContent.includes("router.push('/(tabs)/shop')"), 'plan.tsx must link to Shop tab');
+});
+
+test('C1 Shop: Plan ADD product route is suppressed while routine is not published', () => {
+  const planContent = fs.readFileSync(path.resolve('app/(tabs)/plan.tsx'), 'utf8');
+  assert.ok(
+    planContent.includes("up.action === 'ADD' && isPublished && !isPlanUnderReview"),
+    'ADD product link in Plan must require published routine and not under review'
+  );
+});
+
+test('C1 Shop: Plan PAUSE/STOP have no acquisition CTA and REPLACE never sells old product', () => {
+  const planContent = fs.readFileSync(path.resolve('app/(tabs)/plan.tsx'), 'utf8');
+  assert.ok(!planContent.includes("up.action === 'PAUSE' && isPublished"), 'PAUSE must never have acquisition CTA');
+  assert.ok(!planContent.includes("up.action === 'STOP' && isPublished"), 'STOP must never have acquisition CTA');
+  assert.ok(!planContent.includes("up.action === 'REPLACE' && isPublished"), 'REPLACE must never have purchase CTA for old product');
+});
+
+test('C1 Shop: Today only renders commerce module for published unconfirmed ADD', () => {
+  const todayContent = fs.readFileSync(path.resolve('app/(tabs)/index.tsx'), 'utf8');
+  assert.ok(todayContent.includes("up.action === 'ADD' && !up.isConfirmedByUser"), 'Today must filter for unconfirmed ADD');
+  assert.ok(todayContent.includes("routine?.status === 'published'"), 'Today must require published routine');
+  assert.ok(todayContent.includes('YOUR PLAN NEEDS ONE PRODUCT'), 'Single product copy must be present');
+  assert.ok(todayContent.includes('router.push(`/shop/${neededProducts[0].productId}`'), 'Single product must route to product detail');
+  assert.ok(todayContent.includes("router.push('/(tabs)/shop')"), 'Multiple products must route to Shop tab');
+});
+
+test('C1 Shop: Today has no Shop card when no product action is needed', () => {
+  const todayContent = fs.readFileSync(path.resolve('app/(tabs)/index.tsx'), 'utf8');
+  assert.ok(todayContent.includes('neededProducts.length === 1'), 'Single-item guard');
+  assert.ok(todayContent.includes('neededProducts.length > 1'), 'Multi-item guard');
+  assert.ok(!todayContent.includes('neededProducts.length === 0 && ('), 'Must render nothing when length is 0');
+});
+
+test('C1 Shop: product detail resolves canonical member product by productId and fails honestly when unresolvable', () => {
+  const detailContent = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
+  assert.ok(detailContent.includes('userProducts.find((up) => up.productId === productId)'), 'Must resolve from userProducts');
+  assert.ok(detailContent.includes('Product details unavailable'), 'Must fail closed with truthful unavailable state');
+  assert.ok(!detailContent.includes('params.productName'), 'Must not synthesize product truth from params.productName');
+  assert.ok(!detailContent.includes('params.brand'), 'Must not synthesize product truth from params.brand');
+  assert.ok(!detailContent.includes('params.category'), 'Must not synthesize product truth from params.category');
+  assert.ok(!detailContent.includes('params.price'), 'Must not synthesize product truth from params.price');
+});
+
+test('C1 Shop: product detail does not fabricate price and uses truthful C1 commerce language', () => {
+  const detailContent = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
+  assert.ok(detailContent.includes('product.retailPriceApprox != null'), 'Price must only render when retailPriceApprox is non-null');
+  assert.ok(detailContent.includes('Purchase through Derive coming soon'), 'Must use truthful C1 commerce language');
+  assert.ok(!detailContent.includes('Available at checkout'), 'Must never say Available at checkout');
+});
+
+test('C1 Shop: no Available at checkout copy remains in C1 customer UI', () => {
+  const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
+  assert.ok(!shopContent.includes('Available at checkout'), 'shop.tsx must not contain Available at checkout');
+  assert.ok(shopContent.includes('Purchase through Derive coming soon'), 'shop.tsx must use truthful coming soon copy');
 });
 
 test('C1 Shop: member no-products-needed state is calm (no manufactured urgency)', () => {
   const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
   assert.ok(shopContent.includes('Your current plan is covered'), 'Calm plan-covered message must exist');
-  // No high-pressure copy in the calm state
   assert.ok(!shopContent.includes('Buy Now'), 'No "Buy Now" copy in C1 Shop (physical commerce deferred)');
   assert.ok(!shopContent.includes('Limited Time'), 'No manufactured urgency copy');
 });
 
 test('C1 Shop: public fallback works without fake routine context', () => {
   const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
-  // Non-member/guest path must exist
   assert.ok(shopContent.includes("audience === 'guest'") || shopContent.includes("isMember"), 'Audience branching must exist');
-  // Must NOT show fake plan sections for non-members
   assert.ok(!shopContent.includes('Needed for Your Plan\nNo membership'), 'No fake plan sections for non-members');
 });
 
 test('C1 Shop: PROTOTYPE_CATALOG is not treated as production Shop inventory', () => {
   const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
-  // shop.tsx must not import PROTOTYPE_CATALOG
   assert.ok(!shopContent.includes('PROTOTYPE_CATALOG'), 'shop.tsx must not import PROTOTYPE_CATALOG as production inventory');
 });
 
 test('C1 Shop: C1 does not add physical-commerce methods to shared contract (S5 boundary preserved)', () => {
   const serviceContent = fs.readFileSync(path.resolve('src/contracts/DeriveService.ts'), 'utf8');
-  // C1 MUST NOT add physical-commerce checkout methods to shared contract
   assert.ok(!serviceContent.includes('createProductCheckout'), 'No physical product checkout in shared contract');
   assert.ok(!serviceContent.includes('createShopifySession'), 'No Shopify session in shared contract');
   assert.ok(!serviceContent.includes('createProductOffer'), 'No ProductOffer creation in shared contract');
-  // C1 commerce types must not be in shared contract paths
   assert.ok(!serviceContent.includes('ShopAudience'), 'ShopAudience must not be in shared DeriveService contract');
   const commerceTypes = fs.readFileSync(path.resolve('src/commerce/types.ts'), 'utf8');
   assert.ok(!/export\s+(type|interface)\s+HostedMembershipSession/.test(commerceTypes), 'C1 commerce types must not define S5 HostedMembershipSession');
 });
 
 test('C1 Shop: no backend files modified — supabase directory unchanged', () => {
-  // Confirm no migration was added
   const migrations = fs.readdirSync(path.resolve('supabase/migrations'));
   const c1Migrations = migrations.filter(m => m.includes('c1') || m.includes('shop') || m.includes('product_offer') || m.includes('commerce'));
   assert.deepEqual(c1Migrations, [], 'C1 must not add any supabase migrations');

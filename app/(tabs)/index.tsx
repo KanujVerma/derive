@@ -29,6 +29,7 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const {
     routine,
+    userProducts,
     todayDominantStatus,
     isWeeklyCheckInDue,
     researchInsights,
@@ -40,6 +41,11 @@ export default function TodayScreen() {
   } = useRoutineStore();
   const { fullName } = useUserStore();
   const firstName = fullName?.trim()?.split(' ')[0] || 'there';
+
+  const isPublished = routine?.status === 'published' || routine?.status === 'approved';
+  const neededProducts = isPublished
+    ? userProducts.filter((up) => up.action === 'ADD' && !up.isConfirmedByUser)
+    : [];
 
   React.useEffect(() => {
     ensureInitialRoutineProposal().catch((e) => console.warn('Failed to ensure routine proposal:', e));
@@ -350,6 +356,48 @@ export default function TodayScreen() {
               </View>
             )}
 
+            {/* CONTEXTUAL MODULE: NEEDED PRODUCTS IN PLAN */}
+            {neededProducts.length === 1 && (
+              <View style={styles.shopNeededBanner}>
+                <View style={styles.shopNeededIconCircle}>
+                  <Icon name="bottle" size={18} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shopNeededOverline}>YOUR PLAN NEEDS ONE PRODUCT</Text>
+                  <Text style={styles.shopNeededTitle} numberOfLines={1}>
+                    {neededProducts[0].product.name}
+                  </Text>
+                  <Text style={styles.shopNeededSub}>Recommended addition</Text>
+                </View>
+                <Button
+                  label="Review product"
+                  variant="secondary"
+                  size="small"
+                  onPress={() => router.push(`/shop/${neededProducts[0].productId}` as any)}
+                />
+              </View>
+            )}
+
+            {neededProducts.length > 1 && (
+              <View style={styles.shopNeededBanner}>
+                <View style={styles.shopNeededIconCircle}>
+                  <Icon name="shop" size={18} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shopNeededOverline}>
+                    YOUR PLAN NEEDS {neededProducts.length} PRODUCTS
+                  </Text>
+                  <Text style={styles.shopNeededSub}>Recommended additions for your active routine</Text>
+                </View>
+                <Button
+                  label="Review in Shop"
+                  variant="secondary"
+                  size="small"
+                  onPress={() => router.push('/(tabs)/shop')}
+                />
+              </View>
+            )}
+
             {/* CONTEXTUAL MODULE 3: ACTIONABLE RESEARCH CARD (Surfaces only on active change) */}
             {actionableResearch && (
               <View style={styles.researchCard}>
@@ -605,6 +653,41 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   refillEta: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+  },
+  shopNeededBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.md,
+    ...shadows.subtle,
+  },
+  shopNeededIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    backgroundColor: colors.brandLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopNeededOverline: {
+    fontSize: typography.sizes.micro,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.8,
+    color: colors.brand,
+    marginBottom: 2,
+  },
+  shopNeededTitle: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+  },
+  shopNeededSub: {
     fontSize: typography.sizes.caption,
     color: colors.inkMuted,
   },

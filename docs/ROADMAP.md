@@ -603,10 +603,14 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 ## Kanuj Commerce Stream (Shop & Customer Acquisition)
 
 ### C1: Shop V1 Personalized Commerce UX [DRAFT PR / IN PROGRESS]
-* **Scope**: Durable mobile foundation for Derive Shop. Member root tab replaces Scan with Shop (`Today · Plan · Shop · Ask · Progress`). Single canonical scanner nested at `app/shop/scan.tsx` with redirect compatibility shim. Personalized member Shop home (`NEEDED FOR YOUR PLAN`, `YOUR ROUTINE`, `SCAN A PRODUCT`, `ORDERS & REFILLS`). Non-member and guest fallback view models without fake personalization or fabricated scores. Action-to-commerce semantics (`resolveActionCommerceSemantics`). Invariants: unapproved recommendations never monetized, recommendation independence from commercial offers, price truth without fabricated amounts.
+* **Scope**: Durable mobile foundation for Derive Shop. Member root tab replaces Scan with Shop (`Today · Plan · Shop · Ask · Progress`). Single canonical scanner nested at `app/shop/scan.tsx` with direct redirect compatibility shim. Canonical reusable product detail destination (`app/shop/[productId].tsx`) resolving strictly from hydrated client state. Plan → Shop integration with restrained "View product" links and suppressed acquisition when routine is unpublished. Today contextual card for unconfirmed ADD items on published routines. Direct Ask and legacy scan routing to `/shop/scan`. Non-member and guest fallback view models without fake personalization or fabricated scores. Action-to-commerce semantics (`resolveActionCommerceSemantics`). Invariants: unapproved recommendations never monetized, recommendation independence from commercial offers, price truth without fabricated amounts.
 * **Acceptance Criteria**:
   - [x] Target member navigation is 5 tabs: Today, Plan, Shop, Ask, Progress. No sixth tab.
   - [x] Scan lives canonically inside Shop (`app/shop/scan.tsx`); only one scanner implementation exists.
+  - [x] Canonical product detail route exists at `app/shop/[productId].tsx` resolving from canonical client state.
+  - [x] Plan Products integrates with Shop/product detail with suppressed ADD when unpublished.
+  - [x] Today integrates contextual needed-products card for published unconfirmed ADD.
+  - [x] Ask and legacy Scan routes navigate directly to canonical `/shop/scan`.
   - [x] Non-member and guest presentation fallbacks exist without fake routine context.
   - [x] Action-to-commerce semantics enforce ADD eligible on publish only; PAUSE/STOP never; REPLACE never sells old product.
   - [x] Zero physical-commerce backend or DB changes in C1 (deferred to C1.5).

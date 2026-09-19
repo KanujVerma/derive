@@ -27,8 +27,11 @@ Long-term product loop mental model:
 | Component | Status | Owner | Description |
 | :--- | :--- | :--- | :--- |
 | **Member Navigation (Today · Plan · Shop · Ask · Progress)** | IMPLEMENTED | Kanuj | Shop replaces Scan as root tab; Scan nested inside Shop. Five root tabs. |
+| **Canonical Single Scanner (`app/shop/scan.tsx`)** | IMPLEMENTED | Kanuj | Moved from `app/(tabs)/scan.tsx`. Route compatibility redirect to `/shop/scan` preserved. |
+| **Canonical Product Detail (`app/shop/[productId].tsx`)** | IMPLEMENTED | Kanuj | Single destination for product cards across Shop, Plan, and Today. Resolves from canonical client state. |
+| **Plan → Shop Integration** | IMPLEMENTED | Kanuj | Products tab links ADD/KEEP items to `/shop/[productId]`. ADD acquisition suppressed when routine unconfirmed. Subtle "Shop your plan" link. |
+| **Today → Shop Contextual Integration** | IMPLEMENTED | Kanuj | Contextual card surfaces only when published routine has unconfirmed ADD items. Single -> product detail; multiple -> Shop tab. |
 | **Shop Audience Model (Guest / Non-Member / Member)** | APPROVED TARGET | Kanuj | Pure client view models in `src/commerce/types.ts`. Non-member fallback architected. |
-| **Canonical Single Scanner (`app/shop/scan.tsx`)** | IMPLEMENTED | Kanuj | Moved from `app/(tabs)/scan.tsx`. Route compatibility redirect preserved. |
 | **Action-to-Commerce Semantics** | IMPLEMENTED | Kanuj | `resolveActionCommerceSemantics()`: ADD eligible on publish; PAUSE/STOP never; KEEP non-urgent; REPLACE never sells old product. |
 | **No Universal Product Score Invariant** | IMPLEMENTED | Kanuj | Categorical fit guidance only (`GREAT FIT`, `COULD WORK`, `USE WITH CAUTION`, etc.). |
 | **Calm Empty States (Plan Covered / Review Pending)** | IMPLEMENTED | Kanuj | "Your current plan is covered" — Derive encourages buying nothing when appropriate. |
@@ -73,7 +76,7 @@ Today · Plan · Shop · Ask · Progress
 ```
 - **Shop replaces Scan as a root tab.** There are never six root tabs.
 - **Scan is a capability; Shop is a top-level domain.** Scan now lives canonically at `/shop/scan` (`app/shop/scan.tsx`).
-- **Legacy Route Compatibility**: `app/(tabs)/scan.tsx` is preserved as a lightweight redirect shim to `/(tabs)/shop`. Deep links, Ask handoffs, and starter pills route to canonical Shop Scan.
+- **Legacy Route Compatibility**: `app/(tabs)/scan.tsx` is preserved as a lightweight redirect shim directly to `/shop/scan`. Deep links, Ask handoffs, and starter pills route to canonical Shop Scan directly.
 - **Single Scanner Invariant**: There is strictly **one** camera scanner implementation (`app/shop/scan.tsx`). Zero code duplication.
 
 ---
@@ -93,7 +96,7 @@ The single source of truth is `resolveActionCommerceSemantics(action, routineSta
 ### Invariants:
 1. **Unapproved Recommendations Are Never Monetized**: If `routine.status !== 'published' && routine.status !== 'approved'`, ADD items cannot produce active purchase CTAs. Members preview recommendations during review without commercial pressure.
 2. **Recommendation Independence**: Skincare decisions are 100% independent of commerce. Margin, deals, or affiliate relationships cannot alter `KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`, or Scan verdicts.
-3. **No Fake Price / No Fake Offers**: Price truth is respected. If approximate retail price is absent, it displays "Price available at checkout" or is omitted. Zero fabricated discounts or coupon banners.
+3. **No Fake Price / No Fake Offers**: Price truth is respected. If approximate retail price is absent, it displays "Price not listed" or is omitted. Zero fabricated discounts or coupon banners.
 
 ---
 

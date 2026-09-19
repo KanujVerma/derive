@@ -17,16 +17,20 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Ownership / Shared Contracts**: Kanuj-owned mobile changes strictly in `app/**`, `src/components/**`, `src/commerce/**`, `src/services/analytics.ts`, `tests/**`, and docs. Zero modifications to `src/contracts/**`, `src/domain/**`, `src/types/schema.ts`, or backend `supabase/**`.
 - **Durable Deliverables**:
   1. Approved 5-tab member navigation implemented: `Today · Plan · Shop · Ask · Progress`. Shop replaces Scan as root tab; Scan is nested as a capability under `/shop/scan` (`app/shop/scan.tsx`).
-  2. Single canonical scanner invariant maintained at `app/shop/scan.tsx`. Route compatibility redirect shim at `app/(tabs)/scan.tsx`.
-  3. Action-to-commerce semantics formalized in `src/commerce/types.ts` (`resolveActionCommerceSemantics`): ADD eligible only on routine publish/approval; PAUSE/STOP never eligible; KEEP non-urgent in-plan status; REPLACE never sells old product.
-  4. Personalized member Shop home (`app/(tabs)/shop.tsx`) with `NEEDED FOR YOUR PLAN`, `YOUR ROUTINE`, `SCAN A PRODUCT`, and `ORDERS & REFILLS`.
-  5. Calm empty states: "Your current plan is covered" when no items needed; review pending explainer when routine unconfirmed.
-  6. Non-member and guest fallback view models without fabricated routine context or scores.
-  7. Comprehensive commerce documentation in `docs/COMMERCE.md` covering audience states, Stripe vs Shopify evaluation, Product/Recommendation/Offer separation, and open business questions.
-  8. 25 focused regression tests in `tests/derive.test.ts` verifying commerce invariants, boundary protection, and navigation truth (212/212 tests pass).
+  2. Single canonical scanner invariant maintained at `app/shop/scan.tsx`. Route compatibility redirect shim at `app/(tabs)/scan.tsx` redirects directly to `/shop/scan`. Ask Scan starter pill navigates directly to `/shop/scan`.
+  3. Canonical reusable product detail destination implemented at `app/shop/[productId].tsx`, resolving strictly from hydrated canonical client state (`userProducts` and routine steps). Truthful unavailable fallback; no synthetic param models; no fabricated pricing.
+  4. Plan → Shop integration: Products tab links ADD and KEEP items to `/shop/[productId]`. ADD acquisition CTA is strictly suppressed while routine is draft or under review. Subtle "Shop your plan" link in shelf header.
+  5. Today contextual integration: surfaces needed-products card strictly when published routine has unconfirmed ADD items (1 item -> product detail; multiple -> Shop tab). Zero cards when plan is covered.
+  6. Action-to-commerce semantics formalized in `src/commerce/types.ts` (`resolveActionCommerceSemantics`): ADD eligible only on routine publish/approval; PAUSE/STOP never eligible; KEEP non-urgent in-plan status; REPLACE never sells old product. False offer copy (`Available at checkout`) removed in favor of truthful `Purchase through Derive coming soon`.
+  7. Personalized member Shop home (`app/(tabs)/shop.tsx`) with `NEEDED FOR YOUR PLAN`, `YOUR ROUTINE`, `SCAN A PRODUCT`, and `ORDERS & REFILLS`.
+  8. Calm empty states: "Your current plan is covered" when no items needed; review pending explainer when routine unconfirmed.
+  9. Non-member and guest fallback view models without fabricated routine context or scores.
+  10. Comprehensive commerce documentation in `docs/COMMERCE.md` covering audience states, Stripe vs Shopify evaluation, Product/Recommendation/Offer separation, and open business questions.
+  11. 28 focused regression tests in `tests/derive.test.ts` verifying commerce invariants, boundary protection, navigation truth, and integration routes (221/221 tests pass).
 - **PR Disposition**:
   - Closed superseded PR #17 (`docs(i1-b4): close reconciliation bookkeeping`).
   - Inspected and protected open PR #18 (`sami/s5-commerce-remote-integration` @ `f9e76a1`). C1 isolates physical commerce in draft branch without touching S5 membership billing.
+  - Draft PR #19 updated with final closure commit.
 
 ## 2026-09-19 — Pre-C1 integration: land cumulative S1–S4 (#16) onto B4 main
 

@@ -144,7 +144,7 @@ export default function AskScreen() {
     Haptics.selectionAsync();
     if (prompt === 'Scan a product') {
       analytics.track('shop_scan_opened', { source: 'shop_tab', entryPoint: 'ask_starter_pill' });
-      router.push('/(tabs)/shop');
+      router.push('/shop/scan');
     } else {
       handleSendMessage(prompt);
     }

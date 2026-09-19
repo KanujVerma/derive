@@ -124,10 +124,7 @@ export default function ShopScreen() {
   const handleProductPress = (productId: string, productName: string) => {
     Haptics.selectionAsync().catch(() => {});
     analytics.track('shop_product_viewed', { productId, productName, source: 'shop_home' });
-    // C1.5: Navigate to canonical product detail route /shop/[productId]
-    // Deferred until ProductOffer schema and product detail page are implemented.
-    // For now navigate to Plan for product context.
-    router.push('/(tabs)/plan');
+    router.push(`/shop/${productId}` as any);
   };
 
   // =============================================
@@ -205,12 +202,12 @@ export default function ShopScreen() {
                       </View>
                       <Icon name="forward" size={16} color={colors.inkMuted} />
                     </View>
-                    {/* C1.5: Real "Get This" / "Buy" CTA replaces this once commerce backend exists */}
+                    {/* C1 truthful commerce presentation */}
                     <View style={styles.deferredCTA}>
                       <Icon name="bottle" size={14} color={colors.brand} />
                       <Text style={styles.deferredCTAText}>
                         {semantics.acquisitionEligible
-                          ? 'Available at checkout · Coming soon'
+                          ? 'Purchase through Derive coming soon'
                           : 'Finalizing your plan first'}
                       </Text>
                     </View>
