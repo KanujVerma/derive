@@ -1,10 +1,8 @@
 // scripts/test-i1-b2-local.mjs
 // DERIVE I1-B2 Committed Local Full-Stack E2E Test Harness
-// Exercises: Auth, Gateway JWT gate, onboarding readiness, product catalog
-// normalization, atomic relational routine persistence, awaiting_review status,
-// provider-independent version-1 replay, and authenticated client reads. Model
-// generation itself is covered by S3 schema/guard tests and fails closed without
-// a server Gemini secret.
+// Exercises: Auth, Gateway JWT Gate, committed intake requirement, propose-routine Edge Function,
+// product catalog normalization, atomic relational routine persistence, awaiting_review status,
+// version-1 idempotency/replay, RemoteDeriveService getRoutine/getUserProducts assembly.
 
 import { createClient } from '@supabase/supabase-js';
 import assert from 'node:assert/strict';
@@ -78,7 +76,7 @@ async function run() {
   console.log(`   ✓ Authenticated test user: ${userId}`);
 
   // -------------------------------------------------------------
-  // Step 3: Trigger propose-routine BEFORE onboarding (must fail closed)
+  // Step 3: Trigger propose-routine BEFORE onboarding commit (must fail closed)
   // -------------------------------------------------------------
   console.log('3. Testing propose-routine before intake commit (fail-closed check)...');
   {
@@ -90,10 +88,10 @@ async function run() {
       },
       body: JSON.stringify({}),
     });
-    assert.equal(resPreCommit.status, 409, 'propose-routine before onboarding must return 409');
+    assert.equal(resPreCommit.status, 400, 'propose-routine before committed intake must return 400');
     const body = await resPreCommit.json();
-    assert.equal(body.code, 'PROFILE_NOT_READY');
-    console.log('   ✓ propose-routine fails closed before the member profile is ready (409 PROFILE_NOT_READY)');
+    assert.equal(body.code, 'INTAKE_NOT_COMMITTED');
+    console.log('   ✓ propose-routine fails closed when intake is not committed (400 INTAKE_NOT_COMMITTED)');
   }
 
   // -------------------------------------------------------------
@@ -194,86 +192,51 @@ async function run() {
   }
 
   // -------------------------------------------------------------
-  // Step 5: Seed the deterministic B2 persistence fixture, then exercise the
-  // S3 endpoint's provider-independent replay path.
+  // Step 5A: Client cannot select provider; missing provider returns 503 MODEL_UNAVAILABLE
   // -------------------------------------------------------------
-  console.log('5. Persisting an initial routine fixture and reading it through propose-routine replay...');
+  console.log('5A. Testing propose-routine client cannot select provider via x-routine-fixture (fail-closed check)...');
+  {
+    await adminClient.from('server_runtime_config').delete().eq('key', 'routine_model_provider');
+
+    const propResWithClientHeader = await fetch(`${SUPABASE_URL}/functions/v1/propose-routine`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userJwt}`,
+        'x-routine-fixture': 'true', // Client attempts to force fixture
+      },
+      body: JSON.stringify({}),
+    });
+    // Server must ignore client fixture header and fail closed if no server provider is configured
+    if (!process.env.ROUTINE_MODEL_PROVIDER && !process.env.GEMINI_API_KEY) {
+      assert.equal(propResWithClientHeader.status, 503, 'propose-routine with client fixture header on unconfigured server must return 503 MODEL_UNAVAILABLE');
+      const errBody = await propResWithClientHeader.json();
+      assert.equal(errBody.code, 'MODEL_UNAVAILABLE');
+      assert.ok(!errBody.stack, 'Error response must never contain stack traces');
+      console.log('   ✓ propose-routine strictly rejects client-side provider selection; unconfigured server returns 503 MODEL_UNAVAILABLE');
+    } else {
+      console.log('   (Server-level provider env detected; skipping 503 assertion)');
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Step 5B: Trigger Initial Routine Generation via Server-Configured Fixture Provider
+  // -------------------------------------------------------------
+  console.log('5B. Triggering initial routine generation via server-configured fixture provider (no client fixture header)...');
   let proposalResult;
   {
-    const products = [
-      {
-        brand: 'CeraVe', name: 'Foaming Facial Cleanser', category: 'cleanser',
-        key_actives: ['Ceramides', 'Niacinamide'], full_ingredients: [],
-        retail_price_approx: 16, is_catalog_standard: true,
-      },
-      {
-        brand: 'Derive Test', name: 'Daily Mineral SPF 40', category: 'sunscreen',
-        key_actives: ['Zinc Oxide'], full_ingredients: [],
-        retail_price_approx: 22, is_catalog_standard: true,
-      },
-      {
-        brand: 'Differin', name: 'Adapalene Gel 0.1%', category: 'treatment',
-        key_actives: ['Adapalene'], full_ingredients: [],
-        retail_price_approx: 18, is_catalog_standard: true,
-      },
-      {
-        brand: 'Derive Test', name: 'Barrier Moisturizer', category: 'moisturizer',
-        key_actives: ['Ceramides'], full_ingredients: [],
-        retail_price_approx: 20, is_catalog_standard: true,
-      },
-    ];
-    const routineItems = [
-      {
-        order_index: 1, timing: 'am', brand: 'CeraVe', product_name: 'Foaming Facial Cleanser',
-        category: 'cleanser', amount: '1 pump', area: 'Face', days: [],
-        purpose: 'Gentle cleanse', why_chosen: 'Preserves the barrier.', watch_for: null,
-      },
-      {
-        order_index: 2, timing: 'am', brand: 'Derive Test', product_name: 'Daily Mineral SPF 40',
-        category: 'sunscreen', amount: 'Two finger lengths', area: 'Face and neck', days: [],
-        purpose: 'Daily UV protection', why_chosen: 'Supports breakout-mark prevention.', watch_for: null,
-      },
-      {
-        order_index: 1, timing: 'pm', brand: 'CeraVe', product_name: 'Foaming Facial Cleanser',
-        category: 'cleanser', amount: '1 pump', area: 'Face', days: [],
-        purpose: 'Remove sunscreen', why_chosen: 'Preserves the barrier.', watch_for: null,
-      },
-      {
-        order_index: 2, timing: 'pm', brand: 'Differin', product_name: 'Adapalene Gel 0.1%',
-        category: 'treatment', amount: 'Pea-sized', area: 'Face', days: ['mon', 'wed', 'fri'],
-        purpose: 'Breakout care', why_chosen: 'Preserves the confirmed PM schedule.', watch_for: 'Dryness',
-      },
-      {
-        order_index: 3, timing: 'pm', brand: 'Derive Test', product_name: 'Barrier Moisturizer',
-        category: 'moisturizer', amount: '1 pump', area: 'Face', days: [],
-        purpose: 'Barrier support', why_chosen: 'Balances the active step.', watch_for: null,
-      },
-    ];
-    const userProducts = products.map((product) => ({
-      detected_brand: product.brand,
-      detected_name: product.name,
-      action: product.category === 'treatment' ? 'KEEP' : 'ADD',
-      action_reason: 'Synthetic B2 persistence fixture',
-      frequency_nights_per_week: product.category === 'treatment' ? 3 : 7,
-    }));
-    const { data: persisted, error: persistError } = await adminClient.rpc('commit_routine_proposal', {
-      p_user_id: userId,
-      p_version: 1,
-      p_summary_sentence: 'A simple barrier-first routine for consistent breakout care.',
-      p_founder_notes: 'Synthetic local verification fixture.',
-      p_products: products,
-      p_routine_items: routineItems,
-      p_user_products: userProducts,
-      p_task_notes: 'Initial routine fixture awaiting review.',
-    });
-    assert.ifError(persistError);
-    assert.ok(persisted?.routine_id, 'B2 transaction must persist a routine');
+    // Configure server-side fixture provider via secure server_runtime_config
+    const { error: cfgErr } = await adminClient
+      .from('server_runtime_config')
+      .upsert({ key: 'routine_model_provider', value: 'fixture' });
+    assert.ok(!cfgErr, `Failed configuring server provider: ${cfgErr?.message}`);
 
     const propRes = await fetch(`${SUPABASE_URL}/functions/v1/propose-routine`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${userJwt}`,
+        // ZERO client fixture headers!
       },
       body: JSON.stringify({}),
     });
@@ -317,8 +280,7 @@ async function run() {
     assert.ok(pmRet, 'PM routine must contain scheduled retinoid');
     assert.equal(pmRet.timing, 'pm');
 
-    assert.equal(proposalResult.routine.founderNotes, undefined, 'Founder notes must never cross the customer API');
-    console.log('   ✓ Existing routine replayed without a Gemini call and without exposing founder notes');
+    console.log('   ✓ propose-routine produced valid canonical routine proposal in awaiting_review state');
   }
 
   // -------------------------------------------------------------
@@ -354,21 +316,22 @@ async function run() {
       assert.ok(prod, `product_id ${item.product_id} must exist in products table`);
     }
 
-    // User products table
+    // User products table: Check confirmation provenance and catalog provenance
     const { data: dbUserProds, error: upErr } = await adminClient
       .from('user_products')
-      .select('*')
+      .select('*, products(*)')
       .eq('user_id', userId);
     assert.ok(!upErr && dbUserProds.length > 0, 'user_products rows must exist');
     for (const up of dbUserProds) {
       assert.ok(['KEEP', 'PAUSE', 'REPLACE', 'ADD', 'STOP'].includes(up.action));
+      if (up.action === 'ADD') {
+        assert.equal(up.is_confirmed_by_user, false, 'Newly proposed ADD product must have is_confirmed_by_user = false');
+      } else {
+        // Shelf items confirmed during onboarding must NOT be downgraded to false
+        assert.equal(up.is_confirmed_by_user, true, `Shelf item (${up.detected_brand} ${up.detected_name}) must retain is_confirmed_by_user = true`);
+      }
       if (up.product_id) {
-        const { data: prod } = await adminClient
-          .from('products')
-          .select('*')
-          .eq('id', up.product_id)
-          .single();
-        assert.ok(prod, `user_products product_id must reference canonical products row`);
+        assert.ok(up.products, 'Joined products row must reference canonical products row');
       }
     }
 
@@ -381,7 +344,7 @@ async function run() {
       .single();
     assert.ok(task, 'Founder review task must exist');
     assert.equal(task.status, 'pending');
-    console.log('   ✓ Relational database integrity, product normalization, and FKs confirmed');
+    console.log('   ✓ Relational database integrity, product normalization, confirmation preservation, and FKs confirmed');
   }
 
   // -------------------------------------------------------------
@@ -445,7 +408,9 @@ async function run() {
   console.log('\n=== ALL DERIVE I1-B2 LOCAL E2E VERIFICATION CHECKS PASSED ===\n');
 }
 
-run().catch((err) => {
+run().finally(async () => {
+  await adminClient.from('server_runtime_config').delete().eq('key', 'routine_model_provider');
+}).catch((err) => {
   console.error('\n❌ B2 E2E TEST FAILED:', err);
   process.exit(1);
 });

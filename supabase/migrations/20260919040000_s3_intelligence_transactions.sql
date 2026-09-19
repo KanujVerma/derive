@@ -133,15 +133,12 @@ grant execute on function public.record_product_reaction_once(
   uuid, text, uuid, text, text, text[], text[], text, text, text, text, timestamptz
 ) to service_role;
 
--- Resolve a model-decided product to one canonical catalog row. The advisory
--- lock prevents concurrent proposals from creating duplicate catalog entries.
+-- Resolve a user-reported historical product to one canonical identity. Formula
+-- evidence remains in formula_snapshots; it is not promoted into catalog truth.
 create or replace function public.resolve_catalog_product(
   p_brand text,
   p_name text,
-  p_category text,
-  p_key_actives text[] default '{}',
-  p_full_ingredients text[] default '{}',
-  p_cautions text[] default '{}'
+  p_category text
 )
 returns public.products
 language plpgsql
@@ -189,9 +186,9 @@ begin
     trim(p_brand),
     trim(p_name),
     p_category,
-    coalesce(p_key_actives, '{}'),
-    coalesce(p_full_ingredients, '{}'),
-    coalesce(p_cautions, '{}'),
+    '{}',
+    '{}',
+    '{}',
     false
   )
   returning * into v_product;
@@ -200,127 +197,9 @@ begin
 end;
 $$;
 
-revoke all on function public.resolve_catalog_product(text, text, text, text[], text[], text[])
+revoke all on function public.resolve_catalog_product(text, text, text)
   from public, anon, authenticated;
-grant execute on function public.resolve_catalog_product(text, text, text, text[], text[], text[])
-  to service_role;
-
--- Append the validated routine and its normalized shelf actions in one
--- transaction. The S2 routine-version allocator remains the single authority.
-create or replace function public.commit_routine_proposal(
-  p_user_id uuid,
-  p_summary_sentence text,
-  p_items jsonb,
-  p_shelf_actions jsonb
-)
-returns public.routines
-language plpgsql
-security invoker
-set search_path = ''
-as $$
-declare
-  v_routine public.routines;
-  v_action jsonb;
-  v_product_id uuid;
-begin
-  if jsonb_typeof(coalesce(p_shelf_actions, '[]'::jsonb)) is distinct from 'array' then
-    raise exception 'Shelf actions must be an array';
-  end if;
-
-  select * into v_routine
-  from public.create_routine_version(
-    p_user_id,
-    p_summary_sentence,
-    p_items,
-    'awaiting_review',
-    'System-generated draft. Founder quality check required before activation.',
-    null
-  );
-
-  for v_action in select value from jsonb_array_elements(coalesce(p_shelf_actions, '[]'::jsonb))
-  loop
-    begin
-      v_product_id := nullif(v_action ->> 'product_id', '')::uuid;
-    exception when invalid_text_representation then
-      raise exception 'Shelf action product_id must be a UUID';
-    end;
-
-    if v_product_id is null or not exists (
-      select 1 from public.products where id = v_product_id
-    ) then
-      raise exception 'Every shelf action must reference a canonical product';
-    end if;
-
-    if v_action ->> 'action' not in ('KEEP', 'PAUSE', 'REPLACE', 'ADD', 'STOP') then
-      raise exception 'Invalid shelf action';
-    end if;
-
-    insert into public.user_products (
-      user_id,
-      product_id,
-      detected_brand,
-      detected_name,
-      action,
-      action_reason,
-      frequency_nights_per_week,
-      is_confirmed_by_user
-    ) values (
-      p_user_id,
-      v_product_id,
-      v_action ->> 'detected_brand',
-      v_action ->> 'detected_name',
-      v_action ->> 'action',
-      v_action ->> 'action_reason',
-      nullif(v_action ->> 'frequency_nights_per_week', '')::integer,
-      false
-    )
-    on conflict (user_id, product_id) do update set
-      detected_brand = excluded.detected_brand,
-      detected_name = excluded.detected_name,
-      action = case
-        when public.user_products.is_confirmed_by_user then public.user_products.action
-        else excluded.action
-      end,
-      action_reason = case
-        when public.user_products.is_confirmed_by_user then public.user_products.action_reason
-        else excluded.action_reason
-      end,
-      frequency_nights_per_week = case
-        when public.user_products.is_confirmed_by_user then public.user_products.frequency_nights_per_week
-        else excluded.frequency_nights_per_week
-      end,
-      is_confirmed_by_user = public.user_products.is_confirmed_by_user;
-  end loop;
-
-  if not exists (
-    select 1
-    from public.founder_review_tasks
-    where user_id = p_user_id
-      and task_type = 'initial_routine'
-      and status = 'pending'
-  ) then
-    insert into public.founder_review_tasks (
-      user_id,
-      task_type,
-      status,
-      priority,
-      notes
-    ) values (
-      p_user_id,
-      'initial_routine',
-      'pending',
-      'normal',
-      'System-generated initial routine is ready for founder quality review.'
-    );
-  end if;
-
-  return v_routine;
-end;
-$$;
-
-revoke all on function public.commit_routine_proposal(uuid, text, jsonb, jsonb)
-  from public, anon, authenticated;
-grant execute on function public.commit_routine_proposal(uuid, text, jsonb, jsonb)
+grant execute on function public.resolve_catalog_product(text, text, text)
   to service_role;
 
 -- Append only materially changed signal versions. Re-running inference against

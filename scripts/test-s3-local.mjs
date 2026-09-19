@@ -47,6 +47,7 @@ async function run() {
   const password = 'S3EdgePassword123!';
   let userId;
   let productId;
+  let priorRoutineProviderConfig;
 
   try {
     console.log('1. Creating an isolated member with canonical S1/S2 context...');
@@ -75,6 +76,22 @@ async function run() {
       onboarding_completed: true,
     });
     assert.ifError(profileError);
+
+    const { error: intakeError } = await admin.from('onboarding_submissions').insert({
+      user_id: userId,
+      status: 'committed',
+      front_storage_path: `${userId}/front/s3-edge.jpg`,
+      left_storage_path: `${userId}/left/s3-edge.jpg`,
+      right_storage_path: `${userId}/right/s3-edge.jpg`,
+      committed_at: new Date().toISOString(),
+      payload_snapshot: {
+        confirmedProducts: [],
+        productReactions: [],
+        formulaSnapshots: [],
+        pihTendencyAnswer: 'Rarely',
+      },
+    });
+    assert.ifError(intakeError);
 
     const { data: product, error: productError } = await admin.from('products').insert({
       brand: 'S3 Edge',
@@ -169,6 +186,19 @@ async function run() {
     }, 503);
     assert.equal(scanError?.code, 'INTELLIGENCE_UNAVAILABLE');
 
+    const { data: providerConfig, error: providerConfigReadError } = await admin
+      .from('server_runtime_config')
+      .select('key, value')
+      .eq('key', 'routine_model_provider')
+      .maybeSingle();
+    assert.ifError(providerConfigReadError);
+    priorRoutineProviderConfig = providerConfig;
+    const { error: providerConfigDeleteError } = await admin
+      .from('server_runtime_config')
+      .delete()
+      .eq('key', 'routine_model_provider');
+    assert.ifError(providerConfigDeleteError);
+
     const routineError = await expectFunctionStatus(owner, 'propose-routine', {
       profile: {
         primaryGoal: 'breakouts',
@@ -176,11 +206,14 @@ async function run() {
       },
       shelfProducts: [],
     }, 503);
-    assert.equal(routineError?.code, 'INTELLIGENCE_UNAVAILABLE');
-    console.log('   ✓ No client key or deterministic fallback can impersonate live Gemini');
+    assert.equal(routineError?.code, 'MODEL_UNAVAILABLE');
+    console.log('   ✓ Scan and provider-neutral routine generation fail closed when server model configuration is absent');
 
     console.log('\n=== ALL DERIVE S3 LOCAL EDGE CHECKS PASSED ===\n');
   } finally {
+    if (priorRoutineProviderConfig) {
+      await admin.from('server_runtime_config').upsert(priorRoutineProviderConfig);
+    }
     if (userId) await admin.auth.admin.deleteUser(userId);
     if (productId) await admin.from('products').delete().eq('id', productId);
   }
