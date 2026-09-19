@@ -131,6 +131,13 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
   2. **Retinoid PM Invariant**: Strong retinoids (Adapalene/Differin, Tretinoin) must NEVER appear in the morning (`amSteps`) routine.
   3. **Pregnancy / Nursing Contraindication**: Retinoids and high-strength salicylic acid are strictly excluded when `pregnancy_status === 'yes'`.
   4. **Reported Sensitivities**: Known sensitized ingredients must not be introduced in added or replacement products when `sensitivities_status === 'reported'`.
+* **Routine Proposal Pipeline (`propose-routine` Edge Function & RPC)**:
+  - Gateway JWT verification with handler defense-in-depth `auth.getUser()`.
+  - Fail-closed intake verification: rejects requests unless `public.onboarding_submissions` status is `committed`.
+  - Replay idempotency: checks for existing version-1 routine in `public.routines` and returns it without inserting duplicate rows.
+  - Server-assembled canonical context from `skin_profiles` and `payload_snapshot`.
+  - Post-generation deterministic validation enforcing AM/PM and contraindication invariants.
+  - Transactional relational persistence via `public.commit_routine_proposal(...)` RPC executed by `service_role`: normalizes products in `public.products`, inserts version-1 routine in `awaiting_review` status, inserts `routine_items` with resolved `product_id` FKs, updates `user_products`, and updates the pending `initial_routine` founder review task notes.
 * **Safety Circuit Breaker**: Pre-model regex and deterministic classifier that intercepts medical emergencies before model generation.
 
 ---

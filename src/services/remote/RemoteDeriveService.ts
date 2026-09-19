@@ -29,6 +29,8 @@ import type {
   RoutinePlan,
   RoutineStep,
   ProductCategory,
+  UserProduct,
+  RoutineAction,
   RoutineStatus,
   RefillStatus,
 } from '../../domain/types.ts';
@@ -282,29 +284,92 @@ export class RemoteDeriveService implements IDeriveService {
 
   async getRoutine(userId: string): Promise<RoutinePlan | null> {
     const client = this.getClient();
-    const { data, error } = await client
+    const { data: routineRow, error: routineError } = await client
       .from('routines')
       .select('id, user_id, version, status, summary_sentence, created_at, updated_at, published_at')
       .eq('user_id', userId)
       .order('version', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) throw new Error(`RemoteDeriveService.getRoutine failed: ${error.message}`);
-    if (!data) return null;
+    if (routineError) {
+      throw new Error(`RemoteDeriveService.getRoutine failed: ${routineError.message}`);
+    }
+    if (!routineRow) return null;
 
     const { data: itemData, error: itemError } = await client
       .from('routine_items')
       .select(
         'id, routine_id, order_index, timing, product_id, product_name, brand, category, amount, area, days, purpose, why_chosen, watch_for',
       )
-      .eq('routine_id', data.id)
-      .order('timing', { ascending: true })
+      .eq('routine_id', routineRow.id)
       .order('order_index', { ascending: true });
     if (itemError) {
       throw new Error(`RemoteDeriveService.getRoutine failed querying items: ${itemError.message}`);
     }
 
-    return mapDbRoutine(data, itemData || []);
+    return mapDbRoutine(routineRow, itemData || []);
+  }
+
+  async getUserProducts(userId: string): Promise<UserProduct[]> {
+    const client = this.getClient();
+    const { data: rows, error } = await client
+      .from('user_products')
+      .select(`
+        id,
+        user_id,
+        product_id,
+        detected_brand,
+        detected_name,
+        action,
+        action_reason,
+        frequency_nights_per_week,
+        is_confirmed_by_user,
+        created_at,
+        products (
+          id,
+          brand,
+          name,
+          category,
+          key_actives,
+          full_ingredients,
+          retail_price_approx,
+          is_catalog_standard
+        )
+      `)
+      .eq('user_id', userId);
+
+    if (error) {
+      throw new Error(`RemoteDeriveService.getUserProducts failed: ${error.message}`);
+    }
+
+    return (rows || []).map((row: any): UserProduct => {
+      if (!row.product_id || !row.products) {
+        throw new Error(
+          'RemoteDeriveService.getUserProducts cannot map a shelf item without a canonical product',
+        );
+      }
+
+      return {
+        id: row.id,
+        userId: row.user_id,
+        productId: row.product_id,
+        action: row.action as RoutineAction,
+        actionReason: row.action_reason || '',
+        frequencyNightsPerWeek: row.frequency_nights_per_week ?? undefined,
+        isConfirmedByUser: row.is_confirmed_by_user ?? true,
+        product: {
+          id: row.products.id,
+          brand: row.products.brand,
+          name: row.products.name,
+          category: row.products.category as ProductCategory,
+          keyActives: row.products.key_actives || [],
+          fullIngredients: row.products.full_ingredients || [],
+          retailPriceApprox: row.products.retail_price_approx
+            ? Number(row.products.retail_price_approx)
+            : undefined,
+        },
+      };
+    });
   }
 
   async getCustomerProfile(userId: string): Promise<CustomerProfile | null> {

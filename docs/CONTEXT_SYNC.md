@@ -39,6 +39,49 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Next Work**:
   - I1-B2/S3 consumes this substrate for authenticated context assembly, guarded routine generation, shelf-product normalization, and signal inference.
   - Production Remote mode remains disabled until the wider integration slice is complete and reviewed.
+## 2026-09-18 — Sami & Kanuj: DERIVE I1-B2 Server-Side Initial Routine Intelligence, Canonical Product Normalization & Awaiting-Review Persistence
+
+- **Agent / Workstream**: Sami (Platform + Intelligence + Operations) Primary with Kanuj Coordination
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `0bcfa42a76fb5ec1dfaf56c69cb35ab0588bd3cc`
+- **Prior Verified CI Run**: `35410180444` (on commit `0bcfa42`)
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B2 COMPLETE` (Server-Side Routine Intelligence, Canonical Product Normalization & Awaiting-Review Persistence: (1) Created additive PostgreSQL migration `20260919010000_i1_b2_routine_intelligence_and_persistence.sql` adding `routines.updated_at TIMESTAMPTZ` with `private.set_updated_at()` trigger, unique constraint `routines_user_id_version_unique UNIQUE (user_id, version)`, unique index on `products (lower(trim(brand)), lower(trim(name)))`, `routine_items.product_id UUID REFERENCES products(id)`, `user_products.user_product_idx UNIQUE (user_id, product_id) WHERE product_id IS NOT NULL`, select grant on `updated_at` to `authenticated` while strictly preserving `founder_notes` as internal to founder review operations, and atomic transactional RPC `commit_routine_proposal` restricted to `service_role`; (2) Created pgTAP test suite `supabase/tests/i1_b2_routine_persistence.test.sql` with 17 assertions, verifying 113/113 database tests passing across the 3 test suites; (3) Created Edge Function `supabase/functions/propose-routine/` with platform gateway JWT verification, uncommitted intake fail-closed defense, context assembly from `skin_profiles` and intake `payload_snapshot`, replay idempotency returning existing version-1 routine without duplicate writes, deterministic validation of AM/PM invariants [no AM retinoids, no PM sunscreen] and pregnancy contraindications, atomic persistence RPC invocation, and read-back; (4) Implemented `RemoteDeriveService.getRoutine(userId)` and `getUserProducts(userId)` assembling canonical domain structures with deterministic `scheduleText` derivation; (5) Created and verified repeatable local E2E test harness `scripts/test-i1-b2-local.mjs` exercising gateway auth rejection, uncommitted fail-closed rejection, full B1 intake commit, proposal generation, relational DB verification, replay idempotency, and authenticated client queries; (6) Added `test-i1-b2-local.mjs` to `.github/workflows/ci.yml`; (7) Verified 110/110 unit tests, 113/113 pgTAP assertions, 0 TypeScript errors across app and tests, and clean Expo web export).
+- **Ownership / Shared Contracts**: Sami delivered the server-side intelligence pipeline, additive database migration, Edge Function, and Remote service read assembly. Kanuj's mobile components and shared contracts (`src/contracts/**`, `src/domain/**`, `src/types/schema.ts`) remain strictly unmodified. Pricing (`ARCHITECTURE_CHALLENGE-01`) preserved as unresolved. `eas.json` Remote flag preserved as `false`.
+- **Durable Deliverables**:
+  1. **Additive Database Migration (`supabase/migrations/20260919010000_i1_b2_routine_intelligence_and_persistence.sql`)**:
+     - `public.routines`: added `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`, trigger `routines_set_updated_at` calling `private.set_updated_at()`, unique constraint `routines_user_id_version_unique UNIQUE (user_id, version)`.
+     - `public.products`: added `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`, unique index `products_brand_name_idx ON public.products (lower(trim(brand)), lower(trim(name)))`.
+     - `public.routine_items`: added `product_id UUID REFERENCES public.products(id) ON DELETE RESTRICT`.
+     - `public.user_products`: added unique index `user_products_user_product_idx UNIQUE (user_id, product_id) WHERE product_id IS NOT NULL`.
+     - Granted `SELECT (updated_at)` on `public.routines` to `authenticated`; strictly retained security boundary denying client access to `founder_notes`.
+     - Atomic transactional RPC `public.commit_routine_proposal(...)` executed exclusively by `service_role`.
+  2. **Deterministic Validation & Routine Intelligence (`src/services/ai-workflows/routine-intelligence.ts`)**:
+     - `validateRoutineProposal()` enforces Sunscreen AM invariant (no PM sunscreen), Retinoid PM invariant (no AM retinoids), pregnancy/nursing contraindication exclusions, action enums (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`), category enums, and required step fields.
+     - Dynamic context-grounded proposal generation formulating barrier-supportive routines from committed intake data and shelf audits.
+  3. **Edge Function (`supabase/functions/propose-routine/`)**:
+     - Configured with `verify_jwt = true` in `supabase/config.toml`.
+     - Fails closed on uncommitted intake (`400 INTAKE_NOT_COMMITTED`).
+     - Idempotent replay handling for existing version-1 routine.
+     - Assembles context, executes proposal logic, runs deterministic validation, calls `commit_routine_proposal` RPC, and returns canonical payload in status `awaiting_review`.
+  4. **`RemoteDeriveService` Implementation (`src/services/remote/RemoteDeriveService.ts`)**:
+     - `getRoutine(userId)`: reads `routines` + `routine_items`, partitions into `amSteps` and `pmSteps`, derives `scheduleText` via `formatRoutineStepSchedule`, and returns typed `RoutinePlan`.
+     - `getUserProducts(userId)`: reads `user_products` joined with `products` and returns typed `UserProduct[]` with nested `Product`.
+  5. **pgTAP Database Test Suite (`supabase/tests/i1_b2_routine_persistence.test.sql`)**:
+     - 17 test assertions covering schema extensions, triggers, client denial, RPC privileges, `awaiting_review` status, version uniqueness, and task updates.
+  6. **Local Full-Stack E2E Test Harness (`scripts/test-i1-b2-local.mjs`)**:
+     - 8 verification stages covering gateway JWT verification, uncommitted fail-closed, complete B1 onboarding commit, initial routine generation, relational persistence and FK integrity, replay idempotency, and authenticated client queries.
+- **Verification Gates**:
+  - `npm test`: 110/110 passing (100%).
+  - `supabase test db`: 113/113 passing across all 3 test suites.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `node scripts/test-i1-b1-local.mjs`: All 11 checks passed.
+  - `node scripts/test-i1-b2-local.mjs`: All 8 checks passed.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
 
 ## 2026-09-18 — Kanuj & Sami: Final I1-B2 Handoff Schema-Contract Gap Correction
 
