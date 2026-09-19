@@ -192,9 +192,34 @@ async function run() {
   }
 
   // -------------------------------------------------------------
-  // Step 5: Trigger Initial Routine Generation via propose-routine
+  // Step 5A: Verify propose-routine without key/fixture returns MODEL_UNAVAILABLE (503)
   // -------------------------------------------------------------
-  console.log('5. Triggering initial routine generation (propose-routine)...');
+  console.log('5A. Testing propose-routine live model unavailability when key absent (fail-closed check)...');
+  {
+    const propResNoFixture = await fetch(`${SUPABASE_URL}/functions/v1/propose-routine`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userJwt}`,
+      },
+      body: JSON.stringify({}),
+    });
+    // In local env without GEMINI_API_KEY, this must return 503 MODEL_UNAVAILABLE (zero hardcoded branded fallback)
+    if (!process.env.GEMINI_API_KEY) {
+      assert.equal(propResNoFixture.status, 503, 'propose-routine without key/fixture must return 503 MODEL_UNAVAILABLE');
+      const errBody = await propResNoFixture.json();
+      assert.equal(errBody.code, 'MODEL_UNAVAILABLE');
+      assert.ok(!errBody.stack, 'Error response must never contain stack traces');
+      console.log('   ✓ propose-routine strictly rejects missing model provider with 503 MODEL_UNAVAILABLE (no fake fallback)');
+    } else {
+      console.log('   (GEMINI_API_KEY detected in environment; skipping 503 assertion)');
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Step 5B: Trigger Initial Routine Generation via propose-routine in Test Fixture Mode
+  // -------------------------------------------------------------
+  console.log('5B. Triggering initial routine generation (propose-routine with x-routine-fixture)...');
   let proposalResult;
   {
     const propRes = await fetch(`${SUPABASE_URL}/functions/v1/propose-routine`, {
@@ -202,6 +227,7 @@ async function run() {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${userJwt}`,
+        'x-routine-fixture': 'true',
       },
       body: JSON.stringify({}),
     });
@@ -289,6 +315,7 @@ async function run() {
     assert.ok(!upErr && dbUserProds.length > 0, 'user_products rows must exist');
     for (const up of dbUserProds) {
       assert.ok(['KEEP', 'PAUSE', 'REPLACE', 'ADD', 'STOP'].includes(up.action));
+      assert.equal(up.is_confirmed_by_user, false, 'AI proposal products must have is_confirmed_by_user = false');
       if (up.product_id) {
         const { data: prod } = await adminClient
           .from('products')

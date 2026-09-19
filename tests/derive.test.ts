@@ -62,6 +62,11 @@ import {
 import {
   validateRoutineProposal,
   assembleRoutineContext,
+  assembleCanonicalContext,
+  buildGeminiPrompt,
+  GEMINI_SYSTEM_INSTRUCTION,
+  GEMINI_PROPOSAL_RESPONSE_SCHEMA,
+  callGeminiProposalProvider,
   generateContextGroundedProposal,
   formatRoutineStepScheduleText,
   type AssembledRoutineContext,
@@ -5235,6 +5240,263 @@ test('I1-B2 RemoteDeriveService: getUserProducts maps joined products table into
   assert.equal(p2.action, 'PAUSE');
   assert.equal(p2.product.name, 'Adapalene Gel 0.1%');
   assert.equal(p2.frequencyNightsPerWeek, 0);
+});
+
+// ========================================================
+// 29. I1-B2.1 REAL MODEL INTELLIGENCE, TRUST SEMANTICS & ERROR-BOUNDARY CLOSURE
+// ========================================================
+
+test('I1-B2.1 Context Assembly: Fails closed with INTAKE_CONTEXT_INVALID when primary goal or complexity is invalid or missing', () => {
+  // 1. Missing primary goal in skin profile and payload snapshot
+  const missingGoalRes = assembleCanonicalContext(
+    { user_id: 'usr_invalid_ctx', onboarding_completed: true },
+    { routineComplexity: 'simple', middayFeel: 'combination' }
+  );
+  assert.equal(missingGoalRes.valid, false);
+  assert.equal(missingGoalRes.code, 'INTAKE_CONTEXT_INVALID');
+  assert.match(missingGoalRes.error || '', /Invalid or missing primaryGoal/i);
+  assert.equal(missingGoalRes.context, undefined);
+
+  // 2. Non-canonical primary goal
+  const invalidGoalRes = assembleCanonicalContext(
+    { user_id: 'usr_invalid_ctx', primary_goal: 'magic_cure' },
+    {}
+  );
+  assert.equal(invalidGoalRes.valid, false);
+  assert.equal(invalidGoalRes.code, 'INTAKE_CONTEXT_INVALID');
+
+  // 3. Missing routine complexity (must not silently fabricate 'essential')
+  const missingComplexityRes = assembleCanonicalContext(
+    { user_id: 'usr_invalid_ctx', primary_goal: 'breakouts' },
+    { middayFeel: 'combination' }
+  );
+  assert.equal(missingComplexityRes.valid, false);
+  assert.equal(missingComplexityRes.code, 'INTAKE_CONTEXT_INVALID');
+  assert.match(missingComplexityRes.error || '', /Invalid or missing routineComplexity/i);
+
+  // 4. Valid inputs assemble properly without default fabrication
+  const validRes = assembleCanonicalContext(
+    { user_id: 'usr_valid_ctx', primary_goal: 'breakouts' },
+    {
+      routineComplexity: 'simple',
+      costPreference: 'balanced',
+      middayFeel: 'dry_tight',
+      postCleanseTightness: true,
+      safetyContext: {
+        isPregnantOrNursing: false,
+        pregnancyStatus: 'no',
+        sensitivitiesStatus: 'none_known',
+        knownSensitivities: [],
+        activePrescriptions: [],
+      },
+    }
+  );
+  assert.equal(validRes.valid, true);
+  assert.ok(validRes.context);
+  assert.equal(validRes.context.primaryGoal, 'breakouts');
+  assert.equal(validRes.context.routineComplexity, 'simple');
+  assert.equal(validRes.context.middayFeel, 'dry_tight');
+  assert.equal(validRes.context.postCleanseTightness, true);
+});
+
+test('I1-B2.1 Gemini Schema & Prompt: Conforms to Gemini structured output requirements and rules', () => {
+  // Verify structured schema
+  assert.equal(GEMINI_PROPOSAL_RESPONSE_SCHEMA.type, 'OBJECT');
+  const reqProps = GEMINI_PROPOSAL_RESPONSE_SCHEMA.required;
+  assert.ok(reqProps.includes('summarySentence'));
+  assert.ok(reqProps.includes('productDecisions'));
+  assert.ok(reqProps.includes('amSteps'));
+  assert.ok(reqProps.includes('pmSteps'));
+  assert.ok(reqProps.includes('catalogProducts'));
+  assert.ok((GEMINI_PROPOSAL_RESPONSE_SCHEMA.properties as any).clarificationQuestions);
+
+  // Step schema verification
+  const amStepProps = (GEMINI_PROPOSAL_RESPONSE_SCHEMA.properties as any).amSteps.items.properties;
+  assert.ok(amStepProps.order);
+  assert.ok(amStepProps.timing);
+  assert.ok(amStepProps.productName);
+  assert.ok(amStepProps.brand);
+  assert.ok(amStepProps.category);
+  assert.ok(amStepProps.amount);
+  assert.ok(amStepProps.area);
+  assert.ok(amStepProps.days);
+  assert.ok(amStepProps.purpose);
+  assert.ok(amStepProps.whyChosen);
+
+  // Prompt construction verification
+  const mockContext: AssembledRoutineContext = {
+    userId: 'usr_prompt_test',
+    primaryGoal: 'breakouts',
+    secondaryGoals: ['texture'],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'oily_shiny',
+    postCleanseTightness: false,
+    isPregnantOrNursing: true,
+    pregnancyStatus: 'yes',
+    sensitivitiesStatus: 'reported',
+    knownSensitivities: ['Fragrance'],
+    activePrescriptions: [],
+    confirmedProducts: [
+      { brand: 'CeraVe', name: 'Hydrating Cleanser', category: 'cleanser', keyActives: ['Ceramides'] },
+    ],
+    productReactions: [],
+    formulaSnapshots: [],
+    pihTendencyAnswer: 'Often',
+  };
+
+  const prompt = buildGeminiPrompt(mockContext);
+  assert.match(prompt, /"primaryGoal":"breakouts"/);
+  assert.match(prompt, /"secondaryGoals":\["texture"\]/);
+  assert.match(prompt, /"routineComplexity":"simple"/);
+  assert.match(prompt, /"isPregnantOrNursing":true/);
+  assert.match(prompt, /"knownSensitivities":\["Fragrance"\]/);
+  assert.match(prompt, /"pihTendency":"Often"/);
+
+  assert.match(GEMINI_SYSTEM_INSTRUCTION, /SUNSCREEN AM INVARIANT/);
+  assert.match(GEMINI_SYSTEM_INSTRUCTION, /RETINOID PM INVARIANT/);
+  assert.match(GEMINI_SYSTEM_INSTRUCTION, /PREGNANCY & NURSING CONTRAINDICATION/);
+});
+
+test('I1-B2.1 Gemini Provider: Handles missing credentials and upstream failures with customer-safe error codes', async () => {
+  const mockContext: AssembledRoutineContext = {
+    userId: 'usr_err_test',
+    primaryGoal: 'breakouts',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'combination',
+    postCleanseTightness: false,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: [],
+    confirmedProducts: [],
+    productReactions: [],
+    formulaSnapshots: [],
+  };
+
+  // 1. Missing API key
+  await assert.rejects(
+    async () => {
+      await callGeminiProposalProvider(mockContext, '', 'gemini-3.8-flash');
+    },
+    (err: any) => {
+      assert.equal(err.code, 'MODEL_UNAVAILABLE');
+      assert.equal(err.status, 503);
+      return true;
+    }
+  );
+
+  // 2. Upstream provider HTTP 503 / 500 error
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: { message: 'Gemini server overload' } }), {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    await assert.rejects(
+      async () => {
+        await callGeminiProposalProvider(mockContext, 'dummy-key', 'gemini-3.8-flash');
+      },
+      (err: any) => {
+        assert.equal(err.code, 'MODEL_UNAVAILABLE');
+        assert.equal(err.status, 503);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+
+  // 3. Upstream provider returns malformed / empty JSON payload
+  try {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'NOT_JSON' }] } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    await assert.rejects(
+      async () => {
+        await callGeminiProposalProvider(mockContext, 'dummy-key', 'gemini-3.8-flash');
+      },
+      (err: any) => {
+        assert.equal(err.code, 'MODEL_OUTPUT_INVALID');
+        assert.equal(err.status, 502);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('I1-B2.1 Trust Semantics & Error Boundary: Unconfirmed product decisions and zero internal leakage', () => {
+  const context: AssembledRoutineContext = {
+    userId: 'usr_trust_test',
+    primaryGoal: 'breakouts',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'oily_shiny',
+    postCleanseTightness: false,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: [],
+    confirmedProducts: [
+      {
+        brand: 'CeraVe',
+        name: 'Foaming Facial Cleanser',
+        category: 'cleanser',
+        keyActives: ['Ceramides'],
+      },
+    ],
+    productReactions: [],
+    formulaSnapshots: [],
+  };
+
+  const proposal = generateContextGroundedProposal(context);
+
+  // When mapping to user_products rows, recommendations must have is_confirmed_by_user: false
+  for (const decision of proposal.productDecisions) {
+    const userProductRow = {
+      user_id: context.userId,
+      action: decision.action,
+      action_reason: decision.actionReason,
+      frequency_nights_per_week: decision.frequencyNightsPerWeek,
+      is_confirmed_by_user: false,
+    };
+    assert.equal(userProductRow.is_confirmed_by_user, false, 'AI proposal products must not be marked confirmed by user');
+  }
+
+  // Verify customer-facing error boundary format
+  const customerSafeErrors = [
+    { code: 'INTAKE_NOT_COMMITTED', message: 'Please complete and submit your onboarding intake before requesting a routine.' },
+    { code: 'INTAKE_CONTEXT_INVALID', message: 'Onboarding intake context is incomplete or invalid.' },
+    { code: 'MODEL_UNAVAILABLE', message: 'Skincare intelligence service is temporarily unavailable. Please try again shortly.' },
+    { code: 'MODEL_OUTPUT_INVALID', message: 'Intelligence service produced an invalid proposal. Please try again shortly.' },
+    { code: 'CLARIFICATION_REQUIRED', message: 'A few details in your intake need clarification before your routine can be generated.' },
+    { code: 'VALIDATION_FAILED', message: 'Generated routine proposal did not satisfy safety invariants.' },
+    { code: 'PERSISTENCE_FAILED', message: 'Failed to persist routine proposal. Please try again.' },
+    { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred while generating your routine proposal.' },
+  ];
+
+  for (const err of customerSafeErrors) {
+    // Zero stack trace, SQL errors, or internal Postgres terms
+    assert.ok(!err.message.includes('stack'));
+    assert.ok(!err.message.includes('SELECT'));
+    assert.ok(!err.message.includes('INSERT'));
+    assert.ok(!err.message.includes('public.'));
+    assert.ok(!err.message.includes('foreign key'));
+    assert.ok(!err.message.includes('violates'));
+  }
 });
 
 

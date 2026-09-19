@@ -381,6 +381,33 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Database & integration tests automated in GitHub Actions CI (`ci.yml`).
 
+### I1-B2.1: Real Model Intelligence, Trust Semantics & Error-Boundary Closure [COMPLETE · SERVER INTELLIGENCE DELIVERED]
+* **Scope**:
+  - **Real Server-Side Gemini Structured Output (Sami Primary)**:
+    - Integrated `gemini-3.8-flash` (configurable via `GEMINI_MODEL`, secret `GEMINI_API_KEY`) via Google AI Studio REST endpoint with `responseMimeType: 'application/json'` and `responseSchema: GEMINI_PROPOSAL_RESPONSE_SCHEMA`.
+    - Removed hardcoded production branded product generator fallbacks (Vanicream, La Roche-Posay, EltaMD mock generators removed).
+    - Fails closed with `503 MODEL_UNAVAILABLE` when model credentials or network are unavailable (no silent fallback to fake routines).
+    - Single source of intelligence logic: deduplicated types, invariants, validation, context assembly, and Gemini provider between `src/services/ai-workflows/routine-intelligence.ts` and `supabase/functions/propose-routine/`.
+  - **Trust Semantics (`is_confirmed_by_user`)**:
+    - AI-generated product recommendations in `public.user_products` are persisted with `is_confirmed_by_user = false`.
+    - User-confirmed shelf audit products retain explicit user confirmation provenance.
+  - **Customer-Safe Error Boundary**:
+    - Replaced raw runtime errors with typed customer-safe error responder returning `{ error: string, code: RoutineErrorCode }`.
+    - Canonical error codes: `UNAUTHORIZED` (401), `INTAKE_NOT_COMMITTED` (400), `INTAKE_CONTEXT_INVALID` (400), `MODEL_UNAVAILABLE` (503), `MODEL_OUTPUT_INVALID` (502), `CLARIFICATION_REQUIRED` (422), `VALIDATION_FAILED` (422), `PERSISTENCE_FAILED` (500), `INTERNAL_ERROR` (500).
+    - Hardened security invariant: Zero stack traces, table names, SQL constraints, or provider internals exposed to clients.
+  - **Fail-Closed Domain Context**:
+    - Missing or non-canonical `Goal` or `RoutineComplexity` in intake context fails closed with `400 INTAKE_CONTEXT_INVALID` without fabricating arbitrary default values.
+  - **Isolated Deterministic Test Seam**:
+    - Deterministic fixture provider `createDeterministicTestProposal` isolated under test semantics (`x-routine-fixture: 'true'` header or `ROUTINE_FIXTURE_MODE = 'true'`) for CI and local test harnesses.
+* **Acceptance Criteria**:
+  - 100% test suite passing (114/114 tests in `tests/derive.test.ts`).
+  - 100% pgTAP test suite passing (113/113 assertions in `supabase/tests/**`).
+  - 100% local E2E test harness passing (8/8 stages in `scripts/test-i1-b2-local.mjs` including 5A model unavailability and 5B fixture proposal).
+  - Strict application TypeScript check: 0 errors (`npx tsc --noEmit`).
+  - Strict test TypeScript check: 0 errors (`npm run typecheck:tests`).
+  - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]

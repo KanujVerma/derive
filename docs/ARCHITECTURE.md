@@ -132,10 +132,14 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
   4. **Reported Sensitivities**: Known sensitized ingredients must not be introduced in added or replacement products when `sensitivities_status === 'reported'`.
 * **Routine Proposal Pipeline (`propose-routine` Edge Function & RPC)**:
   - Gateway JWT verification with handler defense-in-depth `auth.getUser()`.
-  - Fail-closed intake verification: rejects requests unless `public.onboarding_submissions` status is `committed`.
-  - Replay idempotency: checks for existing version-1 routine in `public.routines` and returns it without inserting duplicate rows.
-  - Server-assembled canonical context from `skin_profiles` and `payload_snapshot`.
-  - Post-generation deterministic validation enforcing AM/PM and contraindication invariants.
+  - Fail-closed intake verification: rejects requests with `400 INTAKE_NOT_COMMITTED` unless `public.onboarding_submissions` status is `committed`.
+  - Fail-closed context assembly: validates canonical domain values from `skin_profiles` and `payload_snapshot`, rejecting missing or invalid goals/complexity with `400 INTAKE_CONTEXT_INVALID` without fabricating arbitrary defaults.
+  - Replay idempotency: checks for existing version-1 routine in `public.routines` and returns it without duplicate writes or re-invoking the model provider.
+  - Production model intelligence: powered by `gemini-3.8-flash` (configurable via `GEMINI_MODEL`, authenticated via secret `GEMINI_API_KEY`) using Google AI Studio REST endpoint with `responseMimeType: 'application/json'` and `responseSchema: GEMINI_PROPOSAL_RESPONSE_SCHEMA`. Fails closed with `503 MODEL_UNAVAILABLE` when key/provider is absent (zero fake branded product generators in production).
+  - Deterministic test seam: automated CI and local test harnesses trigger `createDeterministicTestProposal` via header `x-routine-fixture: 'true'` or environment flag `ROUTINE_FIXTURE_MODE = 'true'`.
+  - Post-generation deterministic validation enforcing AM/PM invariants, pregnancy contraindications, and action/category enums.
+  - Trust semantics: AI-generated product recommendations in `public.user_products` are persisted with `is_confirmed_by_user = false`.
+  - Customer-safe error boundary: returns strictly typed domain codes (`UNAUTHORIZED`, `INTAKE_NOT_COMMITTED`, `INTAKE_CONTEXT_INVALID`, `MODEL_UNAVAILABLE`, `MODEL_OUTPUT_INVALID`, `CLARIFICATION_REQUIRED`, `VALIDATION_FAILED`, `PERSISTENCE_FAILED`, `INTERNAL_ERROR`), never leaking stack traces, Postgres internals, SQL constraints, or provider errors to clients.
   - Transactional relational persistence via `public.commit_routine_proposal(...)` RPC executed by `service_role`: normalizes products in `public.products`, inserts version-1 routine in `awaiting_review` status, inserts `routine_items` with resolved `product_id` FKs, updates `user_products`, and updates the pending `initial_routine` founder review task notes.
 * **Safety Circuit Breaker**: Pre-model regex and deterministic classifier that intercepts medical emergencies before model generation.
 

@@ -115,6 +115,13 @@ export interface IDeriveService {
   5. **Remote Routine Read Assembly [DELIVERED]**:
      - `RemoteDeriveService.getRoutine(userId)` reads `routines` + `routine_items` (ordered by `order_index`), maps headers and steps, partitions into `amSteps` and `pmSteps`, derives `scheduleText`, and returns typed `RoutinePlan`.
      - Kanuj's `hydrateRoutine()` in `src/services/deriveClient.ts` cleanly hydrates this structure into `routineStore`.
+  6. **User Confirmation Semantics (`is_confirmed_by_user`) [DELIVERED IN B2.1]**:
+     - Products recommended or substituted by the intelligence engine in `public.user_products` are persisted with `is_confirmed_by_user = false`.
+     - Only products explicitly vetted and confirmed by the member during onboarding shelf audit retain `is_confirmed_by_user = true`.
+  7. **Customer-Safe Error Boundary Contract [DELIVERED IN B2.1]**:
+     - `propose-routine` Edge Function strictly returns typed, customer-safe JSON: `{ error: string, code: RoutineErrorCode }`.
+     - Canonical error codes: `UNAUTHORIZED` (401), `INTAKE_NOT_COMMITTED` (400), `INTAKE_CONTEXT_INVALID` (400), `MODEL_UNAVAILABLE` (503), `MODEL_OUTPUT_INVALID` (502), `CLARIFICATION_REQUIRED` (422), `VALIDATION_FAILED` (422), `PERSISTENCE_FAILED` (500), `INTERNAL_ERROR` (500).
+     - Security Invariant: Zero stack traces, SQL constraints, table names, Postgres internal errors, or LLM provider errors may be emitted to the client.
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.
