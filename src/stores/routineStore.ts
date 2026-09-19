@@ -10,11 +10,17 @@ import type {
 } from '../types/schema.ts';
 import { generateRoutineProposal } from '../services/ai-workflows/routine-generator.ts';
 
+export type PlanHydrationStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 export const INITIAL_ROUTINE_STATE = {
   routine: null as Routine | null,
   userProducts: [] as UserProduct[],
   completedStepIdsToday: [] as string[],
   isPlanUnderReview: false,
+  isRoutineBeingPrepared: false,
+  planHydrationStatus: 'idle' as PlanHydrationStatus,
+  planHydrationAttempt: 0,
+  planHydrationError: null as string | null,
   checkIns: [] as CheckIn[],
   learnedInsights: [] as LearnedInsight[],
   researchInsights: [] as ResearchInsight[],
@@ -150,6 +156,10 @@ export function getArthurDemoRoutineState() {
     ],
     todayDominantStatus: 'Everything looks on track. No changes today.',
     isWeeklyCheckInDue: false,
+    isRoutineBeingPrepared: false,
+    planHydrationStatus: 'ready' as PlanHydrationStatus,
+    planHydrationAttempt: 0,
+    planHydrationError: null,
   };
 }
 
@@ -164,6 +174,10 @@ export interface RoutineState {
   todayDominantStatus: string;
   isWeeklyCheckInDue: boolean;
   isPlanUnderReview: boolean;
+  isRoutineBeingPrepared: boolean;
+  planHydrationStatus: PlanHydrationStatus;
+  planHydrationAttempt: number;
+  planHydrationError: string | null;
 
   // Actions
   resetRoutine: () => void;
@@ -174,14 +188,90 @@ export interface RoutineState {
   updateRefillStatus: (refillId: string, status: RefillStatus, trackingNumber?: string) => void;
   updateRoutineByFounder: (updatedRoutine: Routine) => void;
   setRoutineStatus: (status: Routine['status']) => void;
+  startPlanHydration: () => number;
+  setPlanHydrating: (attempt: number) => void;
+  setPlanHydrated: (
+    routine: Routine | null,
+    userProducts: UserProduct[],
+    isBeingPrepared: boolean,
+    attempt?: number
+  ) => boolean;
+  setPlanHydrationError: (errorMessage: string, attempt?: number) => boolean;
 }
 
 export const useRoutineStore = create<RoutineState>((set, get) => ({
   ...INITIAL_ROUTINE_STATE,
 
-  resetRoutine: () => set({ ...INITIAL_ROUTINE_STATE }),
+  resetRoutine: () =>
+    set((state) => ({
+      ...INITIAL_ROUTINE_STATE,
+      planHydrationAttempt: state.planHydrationAttempt + 1,
+    })),
 
   loadArthurDemoRoutine: () => set(getArthurDemoRoutineState()),
+
+  startPlanHydration: () => {
+    let nextAttempt = 1;
+    set((state) => {
+      nextAttempt = state.planHydrationAttempt + 1;
+      return {
+        planHydrationStatus: 'loading',
+        planHydrationAttempt: nextAttempt,
+        planHydrationError: null,
+      };
+    });
+    return nextAttempt;
+  },
+
+  setPlanHydrating: (attempt) =>
+    set({
+      planHydrationStatus: 'loading',
+      planHydrationAttempt: attempt,
+      planHydrationError: null,
+    }),
+
+  setPlanHydrated: (routine, userProducts, isBeingPrepared, attempt) => {
+    const current = get();
+    if (attempt !== undefined && attempt !== current.planHydrationAttempt) {
+      return false;
+    }
+    const isAwaitingReview = Boolean(routine && routine.status === 'awaiting_review');
+    let todayDominantStatus = current.todayDominantStatus;
+    if (isBeingPrepared) {
+      todayDominantStatus = 'Your routine is being prepared.';
+    } else if (isAwaitingReview) {
+      todayDominantStatus =
+        'Final review: Your first routine gets one final quality check before it goes live.';
+    } else if (routine) {
+      todayDominantStatus = 'Everything looks on track. No changes today.';
+    } else {
+      todayDominantStatus =
+        'No active routine yet. Complete setup to calibrate your routine.';
+    }
+
+    set({
+      routine,
+      userProducts,
+      isPlanUnderReview: isAwaitingReview,
+      isRoutineBeingPrepared: isBeingPrepared,
+      planHydrationStatus: 'ready',
+      planHydrationError: null,
+      todayDominantStatus,
+    });
+    return true;
+  },
+
+  setPlanHydrationError: (errorMessage, attempt) => {
+    const current = get();
+    if (attempt !== undefined && attempt !== current.planHydrationAttempt) {
+      return false;
+    }
+    set({
+      planHydrationStatus: 'error',
+      planHydrationError: errorMessage,
+    });
+    return true;
+  },
 
   toggleStepCompletion: (stepId) =>
     set((state) => {

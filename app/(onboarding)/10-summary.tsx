@@ -12,7 +12,13 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { GoalLabels } from '@/src/types/schema';
-import { submitOnboarding, buildOnboardingPayload, isRemoteMode, resolveCustomerBootstrap } from '@/src/services/deriveClient';
+import {
+  submitOnboarding,
+  buildOnboardingPayload,
+  isRemoteMode,
+  resolveCustomerBootstrap,
+  ensureInitialRoutineProposal,
+} from '@/src/services/deriveClient';
 import { useUserStore } from '@/src/stores/userStore';
 import { useAuthStore } from '@/src/stores/authStore';
 import { useBootstrapStore } from '@/src/stores/bootstrapStore';
@@ -53,11 +59,13 @@ export default function SummaryScreen() {
       await submitOnboarding(payload);
 
       // In Remote mode, verify canonical bootstrap truth through production coordinator
+      let activeUserId = useUserStore.getState().userId;
       if (isRemoteMode()) {
-        const activeUserId = useAuthStore.getState().sessionUserId;
-        if (!activeUserId) {
+        const sessionUserId = useAuthStore.getState().sessionUserId;
+        if (!sessionUserId) {
           throw new Error('No active authenticated session user');
         }
+        activeUserId = sessionUserId;
 
         const bootstrap = await resolveCustomerBootstrap(activeUserId);
         if (!bootstrap || !bootstrap.profileExists || !bootstrap.onboardingCompleted) {
@@ -69,6 +77,11 @@ export default function SummaryScreen() {
           throw new Error('Bootstrap store status failed to reach READY');
         }
       }
+
+      // Non-blocking initial routine proposal kick-off
+      ensureInitialRoutineProposal(activeUserId).catch((err) => {
+        console.warn('Non-blocking initial routine proposal kick failed:', err);
+      });
 
       analytics.track('onboarding_completed', {
         productCount: onboarding.detectedProducts.length,

@@ -19,7 +19,7 @@ import { Badge } from '@/src/components/ui/Badge';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
 import {
-  hydrateRoutine,
+  ensureInitialRoutineProposal,
   hydrateResearchInsights,
   hydrateOrders,
 } from '@/src/services/deriveClient';
@@ -34,14 +34,15 @@ export default function TodayScreen() {
     researchInsights,
     refillRequests,
     isPlanUnderReview,
+    isRoutineBeingPrepared,
+    planHydrationStatus,
+    planHydrationError,
   } = useRoutineStore();
   const { fullName } = useUserStore();
   const firstName = fullName?.trim()?.split(' ')[0] || 'there';
 
   React.useEffect(() => {
-    if (!routine) {
-      hydrateRoutine().catch((e) => console.warn('Failed to hydrate routine:', e));
-    }
+    ensureInitialRoutineProposal().catch((e) => console.warn('Failed to ensure routine proposal:', e));
     if (researchInsights.length === 0) {
       hydrateResearchInsights().catch((e) => console.warn('Failed to hydrate research:', e));
     }
@@ -128,8 +129,58 @@ export default function TodayScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* QUIET STATE DURING FIRST ROUTINE REVIEW */}
-        {isPlanUnderReview ? (
+        {/* PREPARATION STATE WHILE ROUTINE IS BEING ASSEMBLED */}
+        {isRoutineBeingPrepared ? (
+          <View style={styles.reviewPendingContainer}>
+            <View style={styles.statusSection}>
+              <Text style={styles.statusHeadline}>
+                Your routine is being prepared.
+              </Text>
+              <Text style={styles.statusSubtext}>
+                We are calibrating your morning and evening steps to your skin profile and shelf products.
+              </Text>
+            </View>
+
+            <View style={styles.draftTonightCard}>
+              <View style={styles.tonightHeaderRow}>
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Badge label="PREPARING" variant="pause" size="small" />
+                  <Text style={styles.draftTonightTitle}>
+                    Initial Routine Setup
+                  </Text>
+                </View>
+                <Icon name="sparkle" size={18} color={colors.brand} />
+              </View>
+
+              <Text style={styles.draftTonightExplanation}>
+                {planHydrationStatus === 'error'
+                  ? planHydrationError || "We couldn't refresh your routine right now. Please try again."
+                  : "We're assembling your morning and evening steps. You'll be able to preview your draft routine as soon as it's ready."}
+              </Text>
+
+              {planHydrationStatus === 'error' && (
+                <Button
+                  label="Try Again"
+                  variant="secondary"
+                  size="small"
+                  onPress={() => ensureInitialRoutineProposal().catch((e) => console.warn('Retry proposal error:', e))}
+                  style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}
+                />
+              )}
+            </View>
+
+            {/* WHAT YOU CAN DO WHILE PREPARING */}
+            <View style={styles.reviewExplainerCard}>
+              <Icon name="sparkle" size={18} color={colors.brand} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reviewExplainerTitle}>Everything else is ready</Text>
+                <Text style={styles.reviewExplainerText}>
+                  While we finish preparing your routine, you can scan bottles with camera recognition or ask Derive any skincare question.
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : isPlanUnderReview ? (
           <View style={styles.reviewPendingContainer}>
             {/* DOMINANT STATUS FOR REVIEW */}
             <View style={styles.statusSection}>

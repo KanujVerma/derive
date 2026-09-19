@@ -462,6 +462,33 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Kanuj's provider-independent mobile integration is unblocked.
 
+### I1-B3: Provider-Independent Initial Routine Mobile Integration [COMPLETE]
+* **Scope**:
+  - Connect mobile application to consume real B2 initial routine state through shared service boundary.
+  - Shared contract updates: added `getUserProducts(userId: string): Promise<UserProduct[]>` and optional `proposeRoutine(input?: RoutineProposalInput)` to `IDeriveService`.
+  - Service parity: implemented `getUserProducts` and optional `proposeRoutine` in `MockDeriveService` and `RemoteDeriveService`.
+  - Routine store state lifecycle: added `isRoutineBeingPrepared`, `planHydrationStatus` (`'idle' | 'loading' | 'ready' | 'error'`), `planHydrationAttempt`, `planHydrationError`, `startPlanHydration()`, `setPlanHydrating()`, `setPlanHydrated()`, `setPlanHydrationError()`, and monotonic `resetRoutine()`.
+  - Coordinator functions in `deriveClient.ts`:
+    - `hydratePlanState(userId?)`: concurrently queries `getRoutine` and `getUserProducts`, performs remote identity and attempt freshness checks, derives `isRoutineBeingPrepared` when onboarding is complete and routine is null, and commits atomically.
+    - `ensureInitialRoutineProposal(userId?)`: checks existing routine and preparation status, invokes `service.proposeRoutine()`, deduplicates in-flight calls, shields technical errors with customer-safe copy, and preserves pending state on failure for retry.
+    - In-flight request deduplication via module-scoped maps (`inFlightHydrations`, `inFlightProposals`).
+    - Purged in-flight maps on session reset in `sessionReset.ts`.
+  - Onboarding summary flow (`10-summary.tsx`): kicks off `ensureInitialRoutineProposal` in background upon verified onboarding completion.
+  - Consumer screens (`Today` and `Plan`):
+    - Consume `isRoutineBeingPrepared` to render calm preparation UI ("Your routine is being prepared", "Initial Routine Setup", "Preparing your routine").
+    - Hide "Start Routine Setup" and refill CTAs when routine preparation is pending.
+    - Provide empathetic retry affordance ("Try Again") upon generation error.
+    - Project canonical draft awaiting review state (`DRAFT · NOT ACTIVE`) and real `UserProduct[]` with action badges (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`) when proposal arrives.
+  - Zero provider leakage: client remains 100% provider-independent (zero references to Gemini, OpenAI, Claude, `ROUTINE_MODEL_PROVIDER`).
+* **Acceptance Criteria**:
+  - 100% test suite passing (131/131 tests in `tests/derive.test.ts`).
+  - 100% pgTAP test suite passing (126/126 assertions in `supabase/tests/**`).
+  - 100% local E2E test harness passing (`scripts/test-i1-b1-local.mjs` and `scripts/test-i1-b2-local.mjs`).
+  - Strict application TypeScript check: 0 errors (`npx tsc --noEmit`).
+  - Strict test TypeScript check: 0 errors (`npm run typecheck:tests`).
+  - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]

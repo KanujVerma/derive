@@ -6,6 +6,40 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19 — Kanuj: DERIVE I1-B3 Provider-Independent Initial Routine Mobile Integration
+
+- **Agent / Workstream**: Kanuj (Customer Experience + Mobile) Primary with Sami Server Boundary Coordination
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `cb8a3eb05408c73702bb3dddf9b05beffac8765a`
+- **Prior Verified CI Run**: `35415922852`
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B3 COMPLETE` (Provider-Independent Initial Routine Mobile Integration: (1) Connected mobile application to consume real B2 initial routine state through shared service boundary; (2) Shared contract updates: added `getUserProducts(userId: string): Promise<UserProduct[]>` and optional `proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult>` to `IDeriveService`; (3) Service parity: implemented `getUserProducts` and optional `proposeRoutine` in `MockDeriveService` and `RemoteDeriveService`; (4) Routine store state lifecycle: added `isRoutineBeingPrepared`, `planHydrationStatus` (`'idle' | 'loading' | 'ready' | 'error'`), `planHydrationAttempt`, `planHydrationError`, `startPlanHydration()`, `setPlanHydrating()`, `setPlanHydrated()`, `setPlanHydrationError()`, and monotonic `resetRoutine()`; (5) Client coordinators in `src/services/deriveClient.ts`: implemented `hydratePlanState(userId?)` and `ensureInitialRoutineProposal(userId?)` with module-scoped in-flight deduplication (`inFlightHydrations`, `inFlightProposals`), remote session identity freshness, monotonic attempt checking, and restart recovery; (6) Session reset: updated `resetCustomerSessionData` in `src/services/sessionReset.ts` to clear in-flight requests and routine store state; (7) Onboarding flow: wired `app/(onboarding)/10-summary.tsx` to kick off `ensureInitialRoutineProposal` in background upon verified onboarding completion; (8) Calm preparation UI: updated `Today` (`app/(tabs)/index.tsx`) and `Plan` (`app/(tabs)/plan.tsx`) to consume `isRoutineBeingPrepared`, rendering calm preparation status ("Your routine is being prepared", "Initial Routine Setup", "Preparing your routine"), hiding "Start Routine Setup" and refill CTAs, providing empathetic retry affordance on error, and transitioning to `DRAFT · NOT ACTIVE` and real `UserProduct[]` with action badges (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`) when proposal arrives; (9) Provider neutrality: client remains 100% provider-independent with zero references to Gemini, OpenAI, Claude, or `ROUTINE_MODEL_PROVIDER`; (10) Verified with 131/131 unit tests, 126/126 pgTAP assertions, strict 0-error TypeScript checks across app and tests, clean Expo web export, and clean local B1/B2 E2E test runs; `eas.json` Remote flag preserved as `false`).
+- **Ownership / Shared Contracts**: Kanuj delivered the client integration and coordinated additions to shared contract (`src/contracts/DeriveService.ts`). Sami-owned backend code (`supabase/**`, `supabase/functions/**`, `src/services/ai-workflows/**`) was strictly preserved without modification. Production provider selection remains explicitly `OPEN / DEFERRED` (`ARCHITECTURE_CHALLENGE-05`).
+- **Durable Deliverables**:
+  1. `src/contracts/DeriveService.ts`: Added `getUserProducts(userId: string): Promise<UserProduct[]>` and optional `proposeRoutine(input?: RoutineProposalInput)`.
+  2. `src/services/mock/MockDeriveService.ts`: Implemented `getUserProducts` and optional `proposeRoutine`.
+  3. `src/services/remote/RemoteDeriveService.ts`: Updated `proposeRoutine` body handling (`body: input || {}`).
+  4. `src/utils/customerErrors.ts`: Added `'routine'` customer-safe error copy.
+  5. `src/stores/routineStore.ts`: Added preparation lifecycle fields and attempt-safe actions (`startPlanHydration`, `setPlanHydrating`, `setPlanHydrated`, `setPlanHydrationError`, monotonic `resetRoutine`).
+  6. `src/services/deriveClient.ts`: Added `hydratePlanState`, `ensureInitialRoutineProposal`, `clearInFlightHydrations`, `clearInFlightProposals`.
+  7. `src/services/sessionReset.ts`: Wired `clearInFlightHydrations` and `clearInFlightProposals`.
+  8. `app/(onboarding)/10-summary.tsx`: Wired background `ensureInitialRoutineProposal` kick upon completion.
+  9. `app/(tabs)/index.tsx`: Rendered calm preparation card and retry affordance; hid empty setup card when pending.
+  10. `app/(tabs)/plan.tsx`: Rendered calm preparation card and products evaluation copy; hid refill CTAs and setup button when pending.
+  11. `tests/derive.test.ts`: Added Section 35 test suite covering parity, attempt freshness, identity switch race, pending generation derivation, concurrent deduplication, restart recovery, failure shielding, session reset, and provider neutrality (131/131 passing).
+  12. `docs/INTERFACES.md` & `docs/ROADMAP.md`: Documented I1-B3 deliveries and contracts.
+- **Verification Gates**:
+  - `npm test`: 131/131 passing (100%).
+  - `supabase test db`: 126/126 passing across all 3 test suites.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `node scripts/test-i1-b1-local.mjs`: All 11 checks passed.
+  - `node scripts/test-i1-b2-local.mjs`: All 8 checks passed.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+
 ## 2026-09-19 — Sami: DERIVE I1-B2.3 Final Server Boundary Cleanup
 
 - **Agent / Workstream**: Sami (Platform + Intelligence + Operations) Primary with Kanuj Coordination

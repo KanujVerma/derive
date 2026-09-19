@@ -33,6 +33,7 @@ import type {
   RoutinePlan,
   SkinProfile,
   UserProduct,
+  Product,
   CheckIn,
   LearnedInsight,
   PhotoContextEntry,
@@ -319,14 +320,42 @@ export class MockDeriveService implements IDeriveService {
     };
   }
 
-  async proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult> {
+  async proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult> {
+    if (input) {
+      const proposal = generateRoutineProposal(
+        input.profile,
+        input.shelfProducts
+      );
+      this.activeRoutine = proposal.routine;
+      this.userProducts = proposal.userProducts;
+      return proposal;
+    }
+
+    if (!this.skinProfile) {
+      throw new Error('MockDeriveService.proposeRoutine requires profile state or explicit input.');
+    }
+
+    const shelfProducts: Product[] = this.userProducts.map((up) => up.product);
     const proposal = generateRoutineProposal(
-      input.profile,
-      input.shelfProducts
+      {
+        primaryGoal: this.skinProfile.primaryGoal,
+        secondaryGoals: this.skinProfile.secondaryGoals,
+        routineComplexity: this.skinProfile.routineComplexity,
+        costPreference: this.skinProfile.costPreference,
+        middayFeel: this.skinProfile.middayFeel,
+        postCleanseTightness: this.skinProfile.postCleanseTightness,
+        activePrescriptions: this.skinProfile.activePrescriptions,
+      },
+      shelfProducts
     );
+    proposal.routine.userId = this.skinProfile.userId;
     this.activeRoutine = proposal.routine;
     this.userProducts = proposal.userProducts;
     return proposal;
+  }
+
+  async getUserProducts(userId: string): Promise<UserProduct[]> {
+    return [...this.userProducts];
   }
 
   async askDerive(request: AskRequest): Promise<AskResponse> {

@@ -22,6 +22,7 @@ import {
   type IngredientSignalConfidence,
   type Routine,
   type ResearchInsight,
+  type UserProduct,
 } from '../src/types/schema.ts';
 import { config } from '../src/constants/config.ts';
 import { useUserStore } from '../src/stores/userStore.ts';
@@ -1661,6 +1662,10 @@ import {
   hydrateRoutine,
   hydrateResearchInsights,
   hydrateCustomerProfile,
+  hydratePlanState,
+  ensureInitialRoutineProposal,
+  clearInFlightHydrations,
+  clearInFlightProposals,
   resolveCustomerBootstrap,
   getActiveUserId,
   resolveUserId,
@@ -1772,7 +1777,7 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
       };
     }
 
-    async proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult> {
+    async proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult> {
       this.calls.push('proposeRoutine');
       return {
         routine: {
@@ -1788,6 +1793,11 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
         },
         userProducts: [],
       };
+    }
+
+    async getUserProducts(userId: string): Promise<UserProduct[]> {
+      this.calls.push('getUserProducts');
+      return [];
     }
 
     async askDerive(request: AskRequest): Promise<AskResponse> {
@@ -5976,6 +5986,473 @@ test('I1-B2.3: static check - zero .server-provider-config, Deno.readTextFile, o
   assert.ok(!providerSource.includes('/Users/'), 'Must not contain /Users/ founder path');
   assert.ok(!providerSource.includes('Deno.readTextFile'), 'Must not contain Deno.readTextFile');
 });
+
+// ========================================================
+// 35. I1-B3 PROVIDER-INDEPENDENT INITIAL ROUTINE INTEGRATION
+// ========================================================
+
+test('I1-B3 Shared Service Parity: MockDeriveService and RemoteDeriveService satisfy IDeriveService getUserProducts and proposeRoutine(optional)', async () => {
+  const mockService = new MockDeriveService();
+  await mockService.onboard(
+    buildOnboardingPayload(
+      {
+        primaryGoal: 'breakouts',
+        routineComplexity: 'simple',
+        detectedProducts: [
+          {
+            id: 'p_shelf_1',
+            brand: 'CeraVe',
+            name: 'Foaming Cleanser',
+            category: 'cleanser',
+            keyActives: ['Ceramides'],
+            fullIngredients: [],
+          },
+        ],
+      },
+      'usr_beta_member'
+    )
+  );
+
+  // 1. getUserProducts returns userProducts
+  const userProducts = await mockService.getUserProducts('usr_beta_member');
+  assert.ok(Array.isArray(userProducts));
+  assert.equal(userProducts.length, 1);
+  assert.equal(userProducts[0].product.brand, 'CeraVe');
+
+  // 2. proposeRoutine works without input
+  const proposalWithoutInput = await mockService.proposeRoutine();
+  assert.ok(proposalWithoutInput.routine);
+  assert.equal(proposalWithoutInput.routine.userId, 'usr_beta_member');
+  assert.ok(proposalWithoutInput.userProducts.length > 0);
+
+  // 3. RemoteDeriveService passes body: input || {}
+  let invokedBody: any = null;
+  const mockClient = {
+    functions: {
+      invoke: async (fnName: string, options: any) => {
+        assert.equal(fnName, 'propose-routine');
+        invokedBody = options.body;
+        return {
+          data: {
+            routine: proposalWithoutInput.routine,
+            userProducts: proposalWithoutInput.userProducts,
+          },
+          error: null,
+        };
+      },
+    },
+  };
+
+  const remoteService = new RemoteDeriveService(mockClient);
+  await remoteService.proposeRoutine();
+  assert.deepEqual(invokedBody, {}, 'RemoteDeriveService.proposeRoutine with no input sends empty object body');
+
+  await remoteService.proposeRoutine({
+    profile: { primaryGoal: 'breakouts', routineComplexity: 'simple' },
+    shelfProducts: [],
+  });
+  assert.equal((invokedBody as any).profile.primaryGoal, 'breakouts', 'Explicit input is preserved in RemoteDeriveService');
+});
+
+test('I1-B3 Store & Coordinator: plan hydration state lifecycle and attempt freshness', () => {
+  const store = useRoutineStore.getState();
+  const initialAttempt = store.planHydrationAttempt;
+  store.resetRoutine();
+
+  assert.equal(useRoutineStore.getState().planHydrationStatus, 'idle');
+  assert.equal(useRoutineStore.getState().planHydrationAttempt, initialAttempt + 1);
+  assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, false);
+
+  // Start hydration attempt
+  const attempt = useRoutineStore.getState().startPlanHydration();
+  assert.equal(attempt, initialAttempt + 2);
+  assert.equal(useRoutineStore.getState().planHydrationStatus, 'loading');
+
+  // Committing with stale attempt is rejected
+  const committedStale = useRoutineStore.getState().setPlanHydrated(null, [], true, attempt - 1);
+  assert.equal(committedStale, false, 'Stale attempt must return false');
+  assert.equal(useRoutineStore.getState().planHydrationStatus, 'loading');
+
+  // Committing with valid attempt succeeds
+  const committedCurrent = useRoutineStore.getState().setPlanHydrated(null, [], true, attempt);
+  assert.equal(committedCurrent, true);
+  assert.equal(useRoutineStore.getState().planHydrationStatus, 'ready');
+  assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, true);
+  assert.equal(useRoutineStore.getState().todayDominantStatus, 'Your routine is being prepared.');
+
+  // Resetting increments attempt counter
+  useRoutineStore.getState().resetRoutine();
+  assert.equal(useRoutineStore.getState().planHydrationAttempt, initialAttempt + 3);
+  assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, false);
+
+  // Prior attempt commit fails after reset
+  const afterResetCommit = useRoutineStore.getState().setPlanHydrated(null, [], true, attempt);
+  assert.equal(afterResetCommit, false);
+});
+
+test('I1-B3 Coordinator Freshness: User A -> User B identity switch discards User A in-flight plan hydration', async () => {
+  const origRemote = process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE;
+  const origService = getDeriveService();
+  process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = 'true';
+
+  try {
+    let resolveUserA: ((val: any) => void) | null = null;
+    const delayedUserAPromise = new Promise((resolve) => {
+      resolveUserA = resolve;
+    });
+
+    class DelayedBackend extends RemoteDeriveService {
+      override async getRoutine(userId: string): Promise<any> {
+        if (userId === 'usr_user_a') {
+          await delayedUserAPromise;
+          return {
+            id: 'rt_user_a',
+            userId: 'usr_user_a',
+            status: 'published',
+            summarySentence: 'Routine for User A',
+            amSteps: [],
+            pmSteps: [],
+          };
+        }
+        return null;
+      }
+      override async getUserProducts(userId: string): Promise<any> {
+        return [];
+      }
+    }
+
+    setDeriveService(new DelayedBackend());
+    useAuthStore.getState().setSession('usr_user_a', 'user_a@example.com');
+    useRoutineStore.getState().resetRoutine();
+
+    // User A kicks off plan hydration
+    const hydrationA = hydratePlanState('usr_user_a');
+
+    // Identity switches to User B before A completes
+    useAuthStore.getState().setSession('usr_user_b', 'user_b@example.com');
+
+    // Now let User A's network request finish
+    resolveUserA!(null);
+    const resultA = await hydrationA;
+
+    // User A's hydration must be discarded
+    assert.equal(resultA, null, 'Stale user A hydration must return null');
+    assert.equal(useRoutineStore.getState().routine, null, 'Store must not be updated with User A data');
+  } finally {
+    process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = origRemote;
+    setDeriveService(origService);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-B3 Pending Generation Derivation: Onboarded member with null routine projects isRoutineBeingPrepared', async () => {
+  const origRemote = process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE;
+  const origService = getDeriveService();
+  process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = 'true';
+
+  try {
+    class NullRoutineBackend extends RemoteDeriveService {
+      override async getRoutine(): Promise<any> {
+        return null;
+      }
+      override async getUserProducts(): Promise<any> {
+        return [];
+      }
+    }
+
+    setDeriveService(new NullRoutineBackend());
+    useAuthStore.getState().setSession('usr_onboarded_null', 'onboarded@example.com');
+    useBootstrapStore.setState({
+      status: 'READY',
+      resolvedUserId: 'usr_onboarded_null',
+      bootstrapState: {
+        userId: 'usr_onboarded_null',
+        profileExists: true,
+        onboardingCompleted: true,
+        membershipStatus: 'active',
+      },
+      errorMessage: null,
+    });
+    useRoutineStore.getState().resetRoutine();
+
+    const result = await hydratePlanState('usr_onboarded_null');
+    assert.ok(result);
+    assert.equal(result.routine, null);
+    assert.equal(result.isRoutineBeingPrepared, true);
+
+    const store = useRoutineStore.getState();
+    assert.equal(store.routine, null);
+    assert.equal(store.isRoutineBeingPrepared, true);
+    assert.equal(store.isPlanUnderReview, false);
+    assert.equal(store.todayDominantStatus, 'Your routine is being prepared.');
+  } finally {
+    process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = origRemote;
+    setDeriveService(origService);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-B3 In-Flight Request Deduplication: Concurrent ensureInitialRoutineProposal calls share single execution', async () => {
+  const origService = getDeriveService();
+  let proposeCount = 0;
+
+  try {
+    const mockProposal: RoutineProposalResult = {
+      routine: {
+        id: 'rt_dedup',
+        userId: 'usr_dedup_test',
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: 'awaiting_review',
+        summarySentence: 'Dedup proposed plan',
+        amSteps: [],
+        pmSteps: [],
+      },
+      userProducts: [],
+    };
+
+    class DedupTrackingBackend extends MockDeriveService {
+      override async getRoutine(): Promise<any> {
+        return null;
+      }
+      override async getUserProducts(): Promise<any> {
+        return [];
+      }
+      override async proposeRoutine(): Promise<RoutineProposalResult> {
+        proposeCount++;
+        // Small delay to ensure concurrent call overlaps
+        await new Promise((r) => setTimeout(r, 10));
+        return mockProposal;
+      }
+    }
+
+    setDeriveService(new DedupTrackingBackend());
+    useOnboardingStore.getState().completeOnboarding();
+    useRoutineStore.getState().resetRoutine();
+
+    // Mark as pending generation (as onboarding does)
+    useRoutineStore.setState({ isRoutineBeingPrepared: true });
+
+    // Launch 3 concurrent calls (simulating Today, Plan, and background mount)
+    const [p1, p2, p3] = await Promise.all([
+      ensureInitialRoutineProposal('usr_dedup_test'),
+      ensureInitialRoutineProposal('usr_dedup_test'),
+      ensureInitialRoutineProposal('usr_dedup_test'),
+    ]);
+
+    assert.equal(proposeCount, 1, 'Exactly one proposeRoutine call should have been made');
+    assert.ok(p1);
+    assert.equal(p1?.routine.id, 'rt_dedup');
+    assert.equal(p2?.routine.id, 'rt_dedup');
+    assert.equal(p3?.routine.id, 'rt_dedup');
+
+    const store = useRoutineStore.getState();
+    assert.equal(store.routine?.id, 'rt_dedup');
+    assert.equal(store.isRoutineBeingPrepared, false);
+    assert.equal(store.isPlanUnderReview, true);
+    assert.match(store.todayDominantStatus, /Final review:/);
+  } finally {
+    setDeriveService(origService);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-B3 App Restart Recovery: ensureInitialRoutineProposal recovers pending generation to awaiting_review', async () => {
+  const origRemote = process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE;
+  const origService = getDeriveService();
+  process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = 'true';
+
+  try {
+    const recoveredProposal: RoutineProposalResult = {
+      routine: {
+        id: 'rt_recovered',
+        userId: 'usr_recovery',
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: 'awaiting_review',
+        summarySentence: 'Recovered routine',
+        amSteps: [
+          {
+            id: 's_am_1',
+            order: 1,
+            productId: 'p1',
+            productName: 'Gentle Cleanser',
+            brand: 'CeraVe',
+            category: 'cleanser',
+            amount: '1 pump',
+            area: 'Entire face',
+            timing: 'am',
+            days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+            purpose: 'Cleanse without stripping moisture',
+            whyChosen: 'Gentle and barrier-supportive',
+            scheduleText: 'Every morning',
+          },
+        ],
+        pmSteps: [],
+      },
+      userProducts: [
+        {
+          id: 'up_rec_1',
+          userId: 'usr_recovery',
+          productId: 'p1',
+          action: 'KEEP',
+          actionReason: 'Gentle morning cleanser',
+          isConfirmedByUser: true,
+          product: {
+            id: 'p1',
+            brand: 'CeraVe',
+            name: 'Gentle Cleanser',
+            category: 'cleanser',
+            keyActives: [],
+            fullIngredients: [],
+          },
+        },
+      ],
+    };
+
+    class RecoveryBackend extends RemoteDeriveService {
+      override async getRoutine(): Promise<any> {
+        return null; // Database has no routine yet
+      }
+      override async getUserProducts(): Promise<any> {
+        return [];
+      }
+      override async proposeRoutine(): Promise<RoutineProposalResult> {
+        return recoveredProposal;
+      }
+    }
+
+    setDeriveService(new RecoveryBackend());
+    useAuthStore.getState().setSession('usr_recovery', 'recovery@example.com');
+    useBootstrapStore.setState({
+      status: 'READY',
+      resolvedUserId: 'usr_recovery',
+      bootstrapState: {
+        userId: 'usr_recovery',
+        profileExists: true,
+        onboardingCompleted: true,
+        membershipStatus: 'active',
+      },
+      errorMessage: null,
+    });
+
+    // Cold start state: routine is null, isRoutineBeingPrepared is false
+    useRoutineStore.getState().resetRoutine();
+    assert.equal(useRoutineStore.getState().routine, null);
+    assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, false);
+
+    // ensureInitialRoutineProposal hydrates first, derives isRoutineBeingPrepared, then proposes routine
+    const result = await ensureInitialRoutineProposal('usr_recovery');
+    assert.ok(result);
+    assert.equal(result?.routine.id, 'rt_recovered');
+
+    const store = useRoutineStore.getState();
+    assert.equal(store.routine?.id, 'rt_recovered');
+    assert.equal(store.isRoutineBeingPrepared, false);
+    assert.equal(store.isPlanUnderReview, true);
+    assert.equal(store.userProducts.length, 1);
+    assert.equal(store.userProducts[0].action, 'KEEP');
+    assert.match(store.todayDominantStatus, /Final review:/);
+  } finally {
+    process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE = origRemote;
+    setDeriveService(origService);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-B3 Failure Shielding & Recoverability: proposeRoutine failure preserves isRoutineBeingPrepared and sets customer error', async () => {
+  const origService = getDeriveService();
+
+  try {
+    class FailingProposalBackend extends MockDeriveService {
+      override async getRoutine(): Promise<any> {
+        return null;
+      }
+      override async getUserProducts(): Promise<any> {
+        return [];
+      }
+      override async proposeRoutine(): Promise<RoutineProposalResult> {
+        throw new Error('LLM connection error 503 internal failure');
+      }
+    }
+
+    setDeriveService(new FailingProposalBackend());
+    useOnboardingStore.getState().completeOnboarding();
+    useRoutineStore.getState().resetRoutine();
+    useRoutineStore.setState({ isRoutineBeingPrepared: true });
+
+    const result = await ensureInitialRoutineProposal('usr_fail_test');
+    assert.equal(result, null);
+
+    const store = useRoutineStore.getState();
+    assert.equal(store.planHydrationStatus, 'error');
+    assert.equal(
+      store.planHydrationError,
+      "We couldn't refresh your routine right now. Please try again.",
+      'Raw error must be shielded with empathetic customer copy'
+    );
+    assert.equal(
+      store.isRoutineBeingPrepared,
+      true,
+      'isRoutineBeingPrepared must be preserved for user retry'
+    );
+  } finally {
+    setDeriveService(origService);
+    resetCustomerSessionData();
+  }
+});
+
+test('I1-B3 Session Reset: resetCustomerSessionData purges in-flight maps and resets routine state', () => {
+  useRoutineStore.setState({
+    routine: { id: 'rt_to_purge' } as any,
+    isRoutineBeingPrepared: true,
+    isPlanUnderReview: true,
+  });
+
+  resetCustomerSessionData();
+
+  const store = useRoutineStore.getState();
+  assert.equal(store.routine, null);
+  assert.equal(store.isRoutineBeingPrepared, false);
+  assert.equal(store.isPlanUnderReview, false);
+  assert.equal(store.planHydrationStatus, 'idle');
+});
+
+test('I1-B3 Provider Neutrality: Zero provider leakage in mobile app layers', () => {
+  const filesToCheck = [
+    'src/services/deriveClient.ts',
+    'src/stores/routineStore.ts',
+    'app/(tabs)/index.tsx',
+    'app/(tabs)/plan.tsx',
+    'app/(onboarding)/10-summary.tsx',
+  ];
+
+  const forbiddenTokens = [
+    'ROUTINE_MODEL_PROVIDER',
+    'Gemini',
+    'gemini',
+    'OpenAI',
+    'openai',
+    'Claude',
+    'claude',
+    'Anthropic',
+    'anthropic',
+  ];
+
+  for (const relPath of filesToCheck) {
+    const fullPath = path.resolve(relPath);
+    const content = fs.readFileSync(fullPath, 'utf8');
+    for (const token of forbiddenTokens) {
+      assert.ok(
+        !content.includes(token),
+        `Mobile file ${relPath} must not contain provider reference '${token}'`
+      );
+    }
+  }
+});
+
 
 
 
