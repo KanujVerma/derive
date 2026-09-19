@@ -73,3 +73,6 @@ jobs:
 
       - name: Run local integration E2E harness
         run: node scripts/test-i1-b1-local.mjs
+
+      - name: Run S2 persistence API integration harness
+        run: node scripts/test-s2-local.mjs

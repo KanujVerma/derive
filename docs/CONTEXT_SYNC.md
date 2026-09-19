@@ -6,6 +6,40 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Sami Platform: S2 Core Domain Persistence
+
+- **Agent / Workstream**: Sami (Platform, Persistence & Remote Mapping)
+- **Local Branch**: `sami/s2-core-domain-persistence`
+- **Starting S1 Dependency**: `a93c802` (`sami/s1-env-contract`)
+- **Reconciled origin/main Base**: `0bcfa42`
+- **Remote Push Status**: `pending commit / push` (predecessor-based bookkeeping)
+- **GitHub CI**: `pending`
+- **Milestone Status**: `S2 COMPLETE · REVIEW PENDING`; S3/I1-B2 server intelligence remains next.
+- **Ownership / Shared Contracts**: Sami-owned additive database migration, remote service mapping, tests, CI, and durable docs. Zero changes to `app/**`, `src/domain/**`, `src/contracts/**`, or Kanuj-owned UI. Production Remote mode remains `false`.
+- **Durable Deliverables**:
+  1. Audited the baseline and extended existing tables rather than recreating them.
+  2. Added immutable, owner-isolated `formula_snapshots`, `product_reactions`, and versioned `ingredient_signals`.
+  3. Added atomic service-only `record_product_reaction`, binding every reaction to the exact historical formula snapshot in the same transaction.
+  4. Added `routines.updated_at`, canonical `routine_items.product_id`, unique routine-version identity, immutable routine content/steps, and concurrency-safe `create_routine_version` append semantics.
+  5. Enriched catalog, weekly check-in, photo provenance, and refill persistence additively while preserving the sealed B1 onboarding flow.
+  6. Implemented full latest-routine header/item assembly in `RemoteDeriveService`, deterministic schedule derivation, explicit refill mapping, and RLS-protected refill writes.
+  7. Added a 40-assertion S2 pgTAP suite and a local authenticated API harness that verifies owner isolation, atomic histories, structured check-ins/refills, and state reconstruction from a fresh client session.
+- **Verification**:
+  - `npx supabase db reset`: PASS.
+  - `npx supabase test db`: 136/136 PASS.
+  - `npx supabase db lint --level warning`: zero findings.
+  - `node scripts/test-i1-b1-local.mjs`: all 13 S1 regression stages PASS.
+  - `node scripts/test-s2-local.mjs`: all 5 S2 live API stages PASS.
+  - `npm test`: 110/110 PASS.
+  - `npx tsc --noEmit`: PASS.
+  - `npm run typecheck:tests`: PASS.
+- **Decision Status**:
+  - `ADR-26: Additive, Append-Only Core Domain Persistence`: IMPLEMENTED.
+  - `ARCHITECTURE_CHALLENGE-01`: still unresolved; no pricing or membership identity changes in S2.
+- **Next Work**:
+  - I1-B2/S3 consumes this substrate for authenticated context assembly, guarded routine generation, shelf-product normalization, and signal inference.
+  - Production Remote mode remains disabled until the wider integration slice is complete and reviewed.
+
 ## 2026-09-18 — Kanuj & Sami: Final I1-B2 Handoff Schema-Contract Gap Correction
 
 - **Agent / Workstream**: Kanuj & Sami Shared Alignment (Contract Truth & Schema Realignment)

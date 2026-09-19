@@ -361,7 +361,7 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
     - Relational routine persistence: Insert generated routine into `public.routines` (`version = 1`, `status = 'awaiting_review'`) and routine steps into `public.routine_items` using actual PostgreSQL columns (`order_index`, `timing`, `product_id`, `product_name`, `brand`, `category`, `amount`, `area`, `days`, `purpose`, `why_chosen`, `watch_for`).
     - Shelf action normalization & persistence invariant (`B2_REQUIRED_PERSISTENCE_INVARIANT`): Map shelf products into `public.user_products` with canonical actions (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`). Every B2-decided product is normalized into `public.products` with `user_products.product_id` referencing that row, enabling `user_products JOIN products` $\to$ canonical `UserProduct`.
     - Founder review queue transition: Keep or update the pending `initial_routine` task in `public.founder_review_tasks` (supported DB statuses: `'pending'`, `'completed'`, `'dismissed'`; no `'awaiting_review'` status exists in DB today). If explicit routine linking via foreign key is needed, Sami will propose an additive migration.
-    - Remote routine read assembly: Implement full routine-item read assembly in `RemoteDeriveService.getRoutine()` (currently reads only the `routines` table header) to return a fully populated canonical `Routine` (`amSteps`, `pmSteps`).
+    - Remote routine read assembly: S2 now implements full routine-item assembly in `RemoteDeriveService.getRoutine()`, returning a populated canonical `Routine` (`amSteps`, `pmSteps`) for the existing hydration coordinator.
   - **Client-Side Consumption (Kanuj)**:
     - Mobile hydration: `hydrateRoutine()` in `src/services/deriveClient.ts` is the downstream consumer once Remote assembly is implemented, detecting `routine.status === 'awaiting_review'` (`isPlanUnderReview = true`). Note: `InitialRoutineState` is a shared domain type in `OnboardingResult`, not a persisted database column.
     - Quiet draft preview: Renders `DRAFT · NOT ACTIVE` indicator on Today and Plan tabs while preserving non-blocking navigation across all 5 tabs.
@@ -404,12 +404,23 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Account deletion removes private Storage objects before relational/auth deletion.
   - [x] Zero secrets are committed to version control; public and trusted-runtime environment boundaries are explicit.
 
-### S2: Core Domain Persistence
+### S2: Core Domain Persistence [COMPLETE · REVIEW PENDING]
 * **Scope**: Relational tables and queries for customer profiles, skin profiles, catalog products, formula snapshots, product reactions, ingredient signals, routine versions, weekly check-ins, photo records, and refill orders.
+* **Implemented**:
+  - Audited and extended the existing baseline through one additive migration; no baseline table was recreated or rewritten.
+  - Added immutable, owner-isolated `formula_snapshots`, `product_reactions`, and versioned `ingredient_signals` history. `record_product_reaction` atomically captures the exact formula and reaction in one server-only transaction.
+  - Added `routines.updated_at`, `routine_items.product_id`, unique `(user_id, version)` routine identity, immutable routine content/steps, and the concurrency-safe server-only `create_routine_version` append operation.
+  - Enriched existing check-ins, private photo metadata, catalog products, and refill requests with the canonical fields required by current shared domain types while preserving legacy rows and the sealed onboarding flow.
+  - Implemented full `RemoteDeriveService.getRoutine()` header/step assembly, deterministic schedule text derivation, snake_case refill mapping, and direct RLS-protected refill persistence.
+  - Added pgTAP, unit, local API integration, migration-reset, schema-lint, and S1 onboarding-regression coverage. The API integration creates a fresh authenticated client after writes and verifies canonical state reconstructs correctly.
+* **Boundaries**:
+  - Zero Kanuj-owned UI changes; `EXPO_PUBLIC_USE_REMOTE_SERVICE` remains `false`.
+  - S2 creates persistence and mapping substrate only. Gemini generation, signal inference, progress synthesis, and safety-classifier execution remain S3/I1-B2 work.
+  - `ARCHITECTURE_CHALLENGE-01` remains unresolved. No new price, tier, Stripe, or membership semantics were encoded.
 * **Acceptance Criteria**:
-  - Canonical state persists reliably across app restarts.
-  - Routine updates create new version snapshots rather than overwriting historical records.
-  - Product reactions persist historical formula snapshots at the exact time of the reaction.
+  - [x] Canonical state persists reliably across app restarts.
+  - [x] Routine updates create new version snapshots rather than overwriting historical records.
+  - [x] Product reactions persist historical formula snapshots at the exact time of the reaction.
 
 ### S3: Server-Side Intelligence Services
 * **Scope**: Edge Functions for routine proposal generation, product scan evaluation with categorical verdicts, Ask Derive conversation synthesis, safety classifier circuit breaker, and probabilistic ingredient signal inference.

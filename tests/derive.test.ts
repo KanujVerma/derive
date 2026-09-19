@@ -1791,6 +1791,8 @@ import {
   RemoteDeriveService,
   mapDbBootstrapState,
   mapDbCustomerProfile,
+  mapDbRoutine,
+  mapDbRefillRequest,
 } from '../src/services/remote/RemoteDeriveService.ts';
 import type { IDeriveService } from '../src/contracts/DeriveService.ts';
 import type {
@@ -4780,4 +4782,295 @@ test('I1-B1.1 Canonical Bootstrap Integration: resolveCustomerBootstrap updates 
   } finally {
     setDeriveService(origService);
   }
+});
+
+// ========================================================
+// 27. S2 CORE DOMAIN PERSISTENCE MAPPING
+// ========================================================
+
+test('S2 Routine Mapper: assembles immutable DB rows into ordered AM/PM domain steps', () => {
+  const routine = mapDbRoutine(
+    {
+      id: 'routine-v2',
+      user_id: 'member-1',
+      version: 2,
+      status: 'awaiting_review',
+      summary_sentence: 'A simple barrier-first plan.',
+      created_at: '2026-09-18T10:00:00.000Z',
+      updated_at: '2026-09-18T10:05:00.000Z',
+      published_at: null,
+    },
+    [
+      {
+        id: 'pm-2',
+        routine_id: 'routine-v2',
+        order_index: 2,
+        timing: 'pm',
+        product_id: 'product-moisturizer',
+        product_name: 'Barrier Cream',
+        brand: 'Derive Test',
+        category: 'moisturizer',
+        amount: 'one pump',
+        area: 'face',
+        days: ['mon', 'wed', 'fri'],
+        purpose: 'support the skin barrier',
+        why_chosen: 'A simple moisturizing step.',
+        watch_for: null,
+      },
+      {
+        id: 'am-1',
+        routine_id: 'routine-v2',
+        order_index: 1,
+        timing: 'am',
+        product_id: 'product-cleanser',
+        product_name: 'Gentle Cleanser',
+        brand: 'Derive Test',
+        category: 'cleanser',
+        amount: 'one pump',
+        area: 'face',
+        days: [],
+        purpose: 'cleanse',
+        why_chosen: 'A gentle daily base.',
+        watch_for: 'Stop if persistent stinging occurs.',
+      },
+      {
+        id: 'pm-1',
+        routine_id: 'routine-v2',
+        order_index: 1,
+        timing: 'pm',
+        product_id: 'product-cleanser',
+        product_name: 'Gentle Cleanser',
+        brand: 'Derive Test',
+        category: 'cleanser',
+        amount: 'one pump',
+        area: 'face',
+        days: [],
+        purpose: 'cleanse',
+        why_chosen: 'Remove sunscreen before moisturizing.',
+      },
+    ],
+  );
+
+  assert.equal(routine.id, 'routine-v2');
+  assert.equal(routine.userId, 'member-1');
+  assert.equal(routine.version, 2);
+  assert.equal(routine.updatedAt, '2026-09-18T10:05:00.000Z');
+  assert.deepEqual(routine.amSteps.map((step) => step.id), ['am-1']);
+  assert.deepEqual(routine.pmSteps.map((step) => step.id), ['pm-1', 'pm-2']);
+  assert.equal(routine.amSteps[0].scheduleText, 'Every morning');
+  assert.equal(routine.pmSteps[0].scheduleText, 'Every evening');
+  assert.equal(routine.pmSteps[1].scheduleText, 'Mon, Wed, Fri');
+  assert.equal(routine.amSteps[0].watchFor, 'Stop if persistent stinging occurs.');
+});
+
+test('S2 Routine Mapper: fails closed rather than fabricating missing canonical product identity', () => {
+  assert.throws(
+    () => mapDbRoutine(
+      {
+        id: 'legacy-routine',
+        user_id: 'member-1',
+        version: 1,
+        status: 'published',
+        summary_sentence: 'Legacy row',
+        created_at: '2026-09-18T10:00:00.000Z',
+        updated_at: '2026-09-18T10:00:00.000Z',
+      },
+      [{
+        id: 'legacy-step',
+        routine_id: 'legacy-routine',
+        order_index: 1,
+        timing: 'am',
+        product_id: null,
+        product_name: 'Unlinked Product',
+        brand: 'Unknown',
+        category: 'other',
+        amount: 'one',
+        area: 'face',
+        days: [],
+        purpose: 'unknown',
+        why_chosen: 'legacy',
+      }],
+    ),
+    /without a canonical product/i,
+  );
+});
+
+test('S2 Refill Mapper: maps persisted snake_case fields into the shared contract', () => {
+  assert.deepEqual(
+    mapDbRefillRequest({
+      id: 'refill-1',
+      user_id: 'member-1',
+      product_id: 'product-1',
+      product_name: 'Gentle Cleanser',
+      brand: 'Derive Test',
+      status: 'shipped',
+      requested_at: '2026-09-15T10:00:00.000Z',
+      shipped_at: '2026-09-16T10:00:00.000Z',
+      delivered_at: null,
+      estimated_delivery: '2026-09-20T10:00:00.000Z',
+      carrier: 'USPS',
+      tracking_number: 'TRACK123',
+      tracking_url: 'https://example.test/track/TRACK123',
+    }),
+    {
+      id: 'refill-1',
+      userId: 'member-1',
+      productId: 'product-1',
+      productName: 'Gentle Cleanser',
+      brand: 'Derive Test',
+      status: 'shipped',
+      requestedAt: '2026-09-15T10:00:00.000Z',
+      shippedAt: '2026-09-16T10:00:00.000Z',
+      deliveredAt: undefined,
+      estimatedDelivery: '2026-09-20T10:00:00.000Z',
+      carrier: 'USPS',
+      trackingNumber: 'TRACK123',
+      trackingUrl: 'https://example.test/track/TRACK123',
+    },
+  );
+});
+
+test('S2 Remote Routine Query: reads latest header and assembles its step snapshot', async () => {
+  const queryLog: string[] = [];
+  const header = {
+    id: 'routine-live',
+    user_id: 'member-live',
+    version: 3,
+    status: 'published',
+    summary_sentence: 'Live routine',
+    created_at: '2026-09-18T10:00:00.000Z',
+    updated_at: '2026-09-18T11:00:00.000Z',
+    published_at: '2026-09-18T11:00:00.000Z',
+  };
+  const item = {
+    id: 'step-live',
+    routine_id: 'routine-live',
+    order_index: 1,
+    timing: 'am',
+    product_id: 'product-live',
+    product_name: 'Live Cleanser',
+    brand: 'Derive Test',
+    category: 'cleanser',
+    amount: 'one pump',
+    area: 'face',
+    days: [],
+    purpose: 'cleanse',
+    why_chosen: 'simple base',
+    watch_for: null,
+  };
+
+  const mockClient = {
+    from(table: string) {
+      queryLog.push(`from:${table}`);
+      return {
+        select(columns: string) {
+          queryLog.push(`select:${table}:${columns}`);
+          if (table === 'routines') {
+            return {
+              eq(column: string, value: string) {
+                queryLog.push(`eq:${table}:${column}=${value}`);
+                return {
+                  order(columnName: string, options: { ascending: boolean }) {
+                    queryLog.push(`order:${table}:${columnName}:${options.ascending}`);
+                    return {
+                      limit(limitValue: number) {
+                        queryLog.push(`limit:${table}:${limitValue}`);
+                        return {
+                          async maybeSingle() {
+                            return { data: header, error: null };
+                          },
+                        };
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          }
+
+          return {
+            eq(column: string, value: string) {
+              queryLog.push(`eq:${table}:${column}=${value}`);
+              return {
+                order(firstColumn: string, firstOptions: { ascending: boolean }) {
+                  queryLog.push(`order:${table}:${firstColumn}:${firstOptions.ascending}`);
+                  return {
+                    async order(secondColumn: string, secondOptions: { ascending: boolean }) {
+                      queryLog.push(`order:${table}:${secondColumn}:${secondOptions.ascending}`);
+                      return { data: [item], error: null };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const service = new RemoteDeriveService(mockClient);
+  const result = await service.getRoutine('member-live');
+
+  assert.ok(result);
+  assert.equal(result?.id, 'routine-live');
+  assert.equal(result?.amSteps[0].id, 'step-live');
+  assert.equal(result?.amSteps[0].scheduleText, 'Every morning');
+  assert.ok(queryLog.includes('from:routines'));
+  assert.ok(queryLog.includes('from:routine_items'));
+  assert.ok(queryLog.includes('eq:routine_items:routine_id=routine-live'));
+});
+
+test('S2 Remote Refill Mutation: persists canonical product identity and returns mapped state', async () => {
+  let inserted: Record<string, unknown> | null = null;
+  const mockClient = {
+    from(table: string) {
+      assert.equal(table, 'refill_requests');
+      return {
+        insert(value: Record<string, unknown>) {
+          inserted = value;
+          return {
+            select(_columns: string) {
+              return {
+                async single() {
+                  return {
+                    data: {
+                      id: 'refill-live',
+                      user_id: 'member-live',
+                      product_id: 'product-live',
+                      product_name: 'Live Cleanser',
+                      brand: 'Derive Test',
+                      status: 'requested',
+                      requested_at: '2026-09-18T12:00:00.000Z',
+                    },
+                    error: null,
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const service = new RemoteDeriveService(mockClient);
+  const result = await service.requestRefill({
+    userId: 'member-live',
+    productId: 'product-live',
+    productName: 'Live Cleanser',
+    brand: 'Derive Test',
+    note: 'Running low',
+  });
+
+  assert.deepEqual(inserted, {
+    user_id: 'member-live',
+    product_id: 'product-live',
+    product_name: 'Live Cleanser',
+    brand: 'Derive Test',
+    request_note: 'Running low',
+  });
+  assert.equal(result.id, 'refill-live');
+  assert.equal(result.productId, 'product-live');
+  assert.equal(result.status, 'requested');
 });

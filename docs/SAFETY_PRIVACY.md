@@ -108,3 +108,13 @@ Derive maintains strict integrity in all customer communications.
 * **Zero Client-Local URI Leakage**: Raw local file system URIs (`file:///`, `ph://`, `content://`) are stripped on the client before network transmission and rejected/omitted in Postgres snapshot ledgers. Only server-issued opaque Storage object paths (`<userId>/<angle>/<uuid>.jpg`) are preserved.
 * **Storage Verification Before Relational Commit**: The server explicitly checks Storage existence of required baseline photos (`front`, `left`, `right`) before writing to `skin_profiles` or `user_photos`.
 * **Single Atomic Commit Marker**: The commit state `skin_profiles.onboarding_completed = true` is set strictly as the final operation in the commit sequence, preventing partially initialized accounts from being considered complete.
+
+---
+
+## 9. Immutable Reaction & Formula Provenance (S2)
+
+* **Atomic Historical Capture**: A product reaction and the exact formula known at that time are written together through the server-only `record_product_reaction` transaction. Every reaction requires a `formula_snapshot_id`; ownership and canonical product consistency are trigger-enforced.
+* **Append-Only Evidence**: Formula snapshots, reaction records, ingredient-signal versions, and routine step snapshots reject in-place updates. Corrections or evolving signals append a new version rather than rewriting history.
+* **Association, Not Diagnosis**: Ingredient signals retain categorical confidence and supporting/contradictory evidence. A reaction association never upgrades itself into a confirmed allergy; clinician- or member-reported allergy provenance remains explicit.
+* **Owner Isolation**: Members can read only their own formula, reaction, and ingredient-signal history. Direct member writes to these sensitive tables and RPC execution are denied; trusted server code performs validated writes.
+* **Deletion Completeness**: S2 relational history cascades from the member profile during the existing Storage-first account-deletion workflow, so private objects are deleted before relational evidence is removed and no member history is orphaned.

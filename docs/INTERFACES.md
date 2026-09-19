@@ -98,15 +98,15 @@ export interface IDeriveService {
   - Before proposal: no canonical routine row exists in `public.routines` $\to$ client conceptual state is `pending_generation` (`routine: null`, `isPlanUnderReview: false`, "Your routine is being prepared.").
   - After proposal persistence: routine is persisted in `public.routines` with `status = 'awaiting_review'` $\to$ client derives `awaiting_review` (`isPlanUnderReview: true`, "Final review: Your first routine gets one final quality check before it goes live.").
   - If a dedicated persisted lifecycle column or API is deemed necessary, that is a future shared architecture decision, not assumed current implementation.
-* **B2 Required Schema & Mapping Reconciliations (Sami B2 Scope)**:
+* **S2 Schema & Mapping Reconciliations (Implemented)**:
   1. **`public.routines.updated_at` Reconciliation (`B2_REQUIRED_SCHEMA_RECONCILIATION`)**:
      - Canonical `Routine` requires `createdAt: string` and `updatedAt: string`.
      - Current `public.routines` has `created_at` and `published_at`, but NO `updated_at`.
-     - Preferred direction: Sami adds `updated_at TIMESTAMPTZ DEFAULT NOW()` to `public.routines` via an additive B2 migration, ideally wired to the existing `private.set_updated_at()` trigger pattern.
+     - Implemented additively with `updated_at TIMESTAMPTZ`, the existing `private.set_updated_at()` trigger pattern, and immutable routine-content guards.
   2. **`public.routine_items.product_id` Reconciliation (`B2_REQUIRED_SCHEMA_RECONCILIATION`)**:
      - Canonical `RoutineStep` requires `productId: string`.
      - Current `public.routine_items` has NO `product_id` column (only `product_name`, `brand`, `category`, etc.).
-     - Preferred direction: Sami adds `product_id UUID REFERENCES public.products(id)` to `public.routine_items` via an additive B2 migration, allowing `routine_items.product_id` $\to$ `RoutineStep.productId`.
+     - Implemented additively as `product_id UUID REFERENCES public.products(id)`. New routine writes require a canonical product; unrepresentable legacy rows fail closed at mapping time rather than receiving a fabricated ID.
   3. **`RoutineStep.scheduleText` Derivability**:
      - `RoutineStep.scheduleText` is optional. It does NOT require a dedicated database column and should be deterministically derived during DB $\to$ domain mapping from `timing` + `days` using `formatRoutineStepSchedule`.
   4. **`UserProduct.product` Reconstruction Invariant (`B2_REQUIRED_PERSISTENCE_INVARIANT`)**:
@@ -114,11 +114,11 @@ export interface IDeriveService {
      - Current `public.user_products` stores `product_id UUID nullable`, `detected_brand`, `detected_name`, etc. `detected_brand` and `detected_name` alone cannot reconstruct canonical `Product`.
      - Preferred invariant: for B2-generated routine/shelf decisions, every canonical product is normalized into `public.products`, and `public.user_products.product_id` references that canonical product, enabling a clean `user_products JOIN products` mapping. Existing nullable `product_id` may remain for legacy/deletion semantics.
   5. **Remote Routine Read Assembly**:
-     - In `src/services/remote/RemoteDeriveService.ts`, `getRoutine(userId)` currently reads only the `routines` table header and does NOT assemble `public.routine_items`.
-     - Sami must implement full read assembly:
+     - `src/services/remote/RemoteDeriveService.ts#getRoutine(userId)` now reads the latest routine header and assembles `public.routine_items` into ordered AM/PM arrays.
+     - Implemented mapping:
        - Header: `id` $\to$ `id`, `user_id` $\to$ `userId`, `version` $\to$ `version`, `status` $\to$ `status`, `summary_sentence` $\to$ `summarySentence`, `created_at` $\to$ `createdAt`, `updated_at` $\to$ `updatedAt` (post-migration), `published_at` $\to$ `publishedAt`, `founder_notes` $\to$ `founderNotes`.
        - Steps: `id` $\to$ `id`, `order_index` $\to$ `order`, `product_id` $\to$ `productId` (post-migration), `product_name` $\to$ `productName`, `brand` $\to$ `brand`, `category` $\to$ `category`, `amount` $\to$ `amount`, `area` $\to$ `area`, `timing` $\to$ `timing`, `days` $\to$ `days`, `purpose` $\to$ `purpose`, `why_chosen` $\to$ `whyChosen`, `watch_for` $\to$ `watchFor`, `scheduleText` derived from `timing` + `days`.
-     - Kanuj's existing `hydrateRoutine()` (`src/services/deriveClient.ts`) is the downstream client consumer once that Remote mapping is implemented.
+     - Kanuj's existing `hydrateRoutine()` (`src/services/deriveClient.ts`) remains the downstream client consumer; no UI contract or screen was changed.
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.

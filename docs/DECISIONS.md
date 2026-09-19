@@ -171,6 +171,17 @@ Key technical and product decisions accepted for Derive V1.
 * **Rationale**: Guarantees zero unverified writes or corrupted state, preserves complete intake provenance, survives partial failures, lost responses, and concurrent retries, protects private customer skin photos with least privilege, and cleanly separates intake persistence (B1) from routine generation (B2).
 * **Verification**: Verified with 96 pgTAP assertions on local Supabase Postgres, 100 unit tests in `tests/derive.test.ts`, committed full-stack local E2E test harness (`scripts/test-i1-b1-local.mjs`), clean Expo web export, zero TypeScript errors, and automated GitHub CI with Supabase database testing.
 
+### ADR-26: Additive, Append-Only Core Domain Persistence (S2)
+* **Status**: IMPLEMENTED; review pending on `sami/s2-core-domain-persistence`.
+* **Decision**: Extend the already-applied baseline schema through additive migrations. Preserve routines, formula snapshots, product reactions, and evolving ingredient evidence as append-only/versioned history rather than mutable current-state rows.
+* **Routine Versioning**: `public.create_routine_version` is a service-only, transaction-safe append operation. A per-member advisory transaction lock allocates the next version; `(user_id, version)` and per-schedule step order are unique. Routine content and routine items reject in-place rewrites, while lifecycle status/publication metadata may progress.
+* **Reaction Provenance**: `public.record_product_reaction` atomically persists an immutable formula snapshot and the linked reaction. Cross-member or cross-product formula links are rejected. Ingredient signals append versions with owner-validated supporting reaction evidence and remain associations, never automatic allergy diagnoses.
+* **Least Privilege**: Members receive owner-only reads for formula, reaction, and ingredient-signal history; sensitive writes and append RPCs remain service-only. Existing owner-scoped insert permissions are extended only for self-reported check-ins, photo provenance, and refill requests.
+* **Remote Mapping**: `RemoteDeriveService.getRoutine()` now maps the latest database routine plus steps into canonical `Routine`, derives schedule copy, and fails closed on missing canonical product identity or unsupported enum values. Refill mutations persist canonical `product_id` and map snake_case records explicitly.
+* **Boundaries**: No UI, shared domain type, membership pricing, Stripe, Gemini, PostHog, or production Remote-flag changes. `ARCHITECTURE_CHALLENGE-01` remains unresolved.
+* **Rationale**: Longitudinal skincare decisions must remain auditable. Reconstructing what the member used, which formula existed, what reaction occurred, and which routine version was active is safer and more useful than destructive updates.
+* **Verification**: Fresh Supabase rebuild; 136/136 pgTAP assertions; schema lint with zero findings; S1 onboarding/photo/deletion regression E2E; S2 live API E2E including a fresh-client persistence read; 110/110 unit tests; both TypeScript checks; and production web export.
+
 ---
 
 ## Open Shared-Contract Challenges (PROPOSED · UNRESOLVED)
@@ -211,4 +222,3 @@ These findings are review evidence, not accepted contract changes. S1A does not 
    - **Native iOS Module (`modules/derive-face-capture/`)**: Local Swift Expo module using AVFoundation and Apple's native `Vision.framework` (`VNDetectFaceRectanglesRequest`, `VNDetectFaceCaptureQualityRequest`). Throttled to ~8 Hz (120ms intervals) to avoid thermal throttling. Zero third-party SDK bloat (no MLKit); zero persistent face embeddings; all metrics processed in memory on-device. Podspec and module autolinking verified (`npx expo-modules-autolinking resolve -p ios`), Swift syntax checked via `swiftc -parse`.
    - **Full Wiring & Fallback**: `DeriveFaceCaptureView` is ref-forwarded with imperative `takePhoto()`, exported with `isDeriveFaceCaptureSupported()`, and fully wired into `CameraCapture.tsx` and `app/(onboarding)/7-skin-photos.tsx`. Web and simulator platforms fall back cleanly (`DeriveFaceCaptureView.web.tsx`) to `expo-camera` with manual shutter and oval guidance reticle. Single camera view mounted at any time.
 4. **Status**: Architecture selected, Swift native module autolinked and compiled, ref-forwarded and fully wired into `CameraCapture.tsx` and onboarding photo flow (`app/(onboarding)/7-skin-photos.tsx`). Physical hardware sensor and lighting calibration explicitly scheduled for K5 on TestFlight.
-
