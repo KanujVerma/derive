@@ -52,8 +52,9 @@ Long-term product loop mental model:
 - **C1 Implementation State**: Presentation view model fallback architected in `app/(tabs)/shop.tsx`. S1 Remote auth route gating is **not** weakened. Live guest routing activation deferred to C1.5.
 
 ### B. NON-MEMBER ACCOUNT (Authenticated, No Active Membership)
-- **Target Experience**: Public shop, public product facts, physical order history, Scan general information fallback, membership upsell.
-- **Personalization Fallback**: Uses factual sections (`SHOP SKINCARE`, `ABOUT THIS PRODUCT`). Never fabricates a plan or fit score.
+- **Target Experience**: Public shop, public product facts, physical order history, a future general Scan path, and membership upsell. C1 does not enable general Scan; the current Scan requires member context.
+- **Personalization Fallback**: Shop shows a truthful limited catalog state. Product detail fails closed until an independent public product source exists. Hydrated member routine and shelf data never supplies non-member product facts.
+- **Scan**: Current personalized Scan is locked. A general factual Scan requires a separate backend path and authorization policy before public activation.
 - **Membership Upsell**: Non-coercive CTA:
   > *"Want to know how this fits your skin and routine? Derive members get personalized product-fit guidance, a managed routine, weekly check-ins, and ongoing adjustments."*
 
@@ -94,7 +95,7 @@ The single source of truth is `resolveActionCommerceSemantics(action, routineSta
 | **REPLACE** | Has recommended replacement | `view_replacement` only | `view_replacement` only | **TRUE (Never sell old product)** |
 
 ### Invariants:
-1. **Unapproved Recommendations Are Never Monetized**: If `routine.status !== 'published' && routine.status !== 'approved'`, ADD items cannot produce active purchase CTAs. Members preview recommendations during review without commercial pressure.
+1. **Unpublished Recommendations Are Never Monetized**: If `routine.status !== 'published'`, ADD items cannot produce active acquisition CTAs. Members preview recommendations during review without commercial pressure. Founder approval alone does not activate Shop acquisition.
 2. **Recommendation Independence**: Skincare decisions are 100% independent of commerce. Margin, deals, or affiliate relationships cannot alter `KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`, or Scan verdicts.
 3. **No Fake Price / No Fake Offers**: Price truth is respected. If approximate retail price is absent, it displays "Price not listed" or is omitted. Zero fabricated discounts or coupon banners.
 
@@ -168,6 +169,7 @@ Decision status: **OPEN / DEFERRED TO C1.5**.
 - Order persistence: `Order` and `OrderItem[]`.
 - Unify operational refills with physical orders.
 - Activate public/guest routing shell without compromising security.
+- Build and test a general factual Scan backend path before enabling guest or non-member Scan; never reuse member routine context for that path.
 
 ### C2 / Personalized Discovery & Cart (Later Phase)
 - Search, filter by category/concern.

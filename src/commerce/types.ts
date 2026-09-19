@@ -14,7 +14,7 @@
  * (IDeriveService.createMembershipCheckout / createMembershipPortal / HostedMembershipSession)
  */
 
-import type { RoutineAction } from '../types/schema';
+import type { Routine, RoutineAction, UserProduct } from '../types/schema';
 
 // =============================================
 // AUDIENCE
@@ -29,6 +29,41 @@ import type { RoutineAction } from '../types/schema';
  * - member: Active Derive member with canonical routine context.
  */
 export type ShopAudience = 'guest' | 'non_member' | 'member';
+
+export interface ShopAudienceInput {
+  remote: boolean;
+  sessionUserId?: string | null;
+  bootstrapUserId?: string | null;
+  bootstrapMembershipStatus?: 'active' | 'paused' | 'cancelled' | 'none';
+  mockUserId?: string | null;
+  mockMembershipStatus?: 'active' | 'trial' | 'paused' | 'cancelled' | 'none';
+}
+
+/** Select the membership authority for the active service mode. */
+export function resolveShopAudience(input: ShopAudienceInput): ShopAudience {
+  if (input.remote) {
+    if (!input.sessionUserId) return 'guest';
+    return input.bootstrapUserId === input.sessionUserId &&
+      input.bootstrapMembershipStatus === 'active' ? 'member' : 'non_member';
+  }
+  if (!input.mockUserId) return 'guest';
+  return input.mockMembershipStatus === 'active' ? 'member' : 'non_member';
+}
+
+/** Never read hydrated member product data for a guest or inactive member. */
+export function resolveShopProductContext(
+  audience: ShopAudience,
+  productId: string,
+  routine: Routine | null,
+  userProducts: UserProduct[],
+) {
+  if (audience !== 'member') return null;
+  const userProduct = userProducts.find((up) => up.productId === productId);
+  const matchingStep = [...(routine?.amSteps ?? []), ...(routine?.pmSteps ?? [])]
+    .find((step) => step.productId === productId);
+  if (!userProduct && !matchingStep) return null;
+  return { userProduct, matchingStep };
+}
 
 // =============================================
 // PURCHASE AVAILABILITY
@@ -76,8 +111,8 @@ export interface ActionCommercePresentation {
  * INVARIANTS:
  * - PAUSE and STOP never get a purchase CTA.
  * - REPLACE never sells the old product; shows "View replacement" only.
- * - ADD only becomes acquisition-eligible when the routine is published/approved.
- *   Draft routines (draft/awaiting_review) may preview the recommendation, but the
+ * - ADD only becomes acquisition-eligible when the routine is published.
+ *   Unpublished routines may preview the recommendation, but the
  *   purchase CTA remains unavailable.
  * - KEEP implies "in your plan" — not a required immediate purchase.
  */
@@ -85,7 +120,7 @@ export function resolveActionCommerceSemantics(
   action: RoutineAction,
   routineStatus: 'draft' | 'awaiting_review' | 'approved' | 'published' | null
 ): ActionCommercePresentation {
-  const isPublished = routineStatus === 'published' || routineStatus === 'approved';
+  const isPublished = routineStatus === 'published';
 
   switch (action) {
     case 'ADD':
@@ -144,7 +179,7 @@ export function resolveActionCommerceSemantics(
  * across guest, non-member, and member audiences.
  *
  * NOTE: retailPriceApprox is trusted catalog data only — never fabricated.
- * If absent, display "Price available at checkout" or omit.
+ * If absent, omit the price.
  *
  * NOTE: No Stripe/Shopify offer ID here. ProductOffer is a C1.5 concept.
  */

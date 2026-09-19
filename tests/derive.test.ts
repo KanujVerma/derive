@@ -8003,6 +8003,8 @@ test('I1-B4B Obsolete changeReason is gone and note limit is explicit', () => {
 
 import {
   resolveActionCommerceSemantics,
+  resolveShopAudience,
+  resolveShopProductContext,
 } from '../src/commerce/types.ts';
 import type { ShopAudience } from '../src/commerce/types.ts';
 
@@ -8065,10 +8067,41 @@ test('C1 Shop: null routineStatus → ADD is not acquisition-eligible', () => {
   assert.equal(sem.purchaseAvailability, 'not_applicable');
 });
 
-test('C1 Shop: approved routineStatus → ADD acquisition-eligible (founder approved)', () => {
+test('C1 Shop: approved routineStatus → ADD is not acquisition-eligible before publication', () => {
   const sem = resolveActionCommerceSemantics('ADD', 'approved');
-  assert.equal(sem.acquisitionEligible, true);
-  assert.equal(sem.purchaseAvailability, 'deferred_to_c15');
+  assert.equal(sem.acquisitionEligible, false);
+  assert.equal(sem.purchaseAvailability, 'not_applicable');
+});
+
+test('C1 Shop: audience uses Mock membership and Remote bootstrap for the matching session', () => {
+  const mock = { remote: false, mockUserId: 'member-1', mockMembershipStatus: 'active' as const };
+  assert.equal(resolveShopAudience(mock), 'member');
+  assert.equal(resolveShopAudience({ ...mock, mockMembershipStatus: 'paused' }), 'non_member');
+  assert.equal(resolveShopAudience({ ...mock, mockMembershipStatus: 'cancelled' }), 'non_member');
+  assert.equal(resolveShopAudience({ ...mock, mockUserId: '' }), 'guest');
+
+  const remote = {
+    remote: true,
+    sessionUserId: 'member-1',
+    bootstrapUserId: 'member-1',
+    bootstrapMembershipStatus: 'active' as const,
+    mockUserId: 'stale-mock',
+    mockMembershipStatus: 'active' as const,
+  };
+  assert.equal(resolveShopAudience(remote), 'member');
+  assert.equal(resolveShopAudience({ ...remote, sessionUserId: null }), 'guest');
+  assert.equal(resolveShopAudience({ ...remote, bootstrapMembershipStatus: 'none' }), 'non_member');
+  assert.equal(resolveShopAudience({ ...remote, bootstrapMembershipStatus: 'paused' }), 'non_member');
+  assert.equal(resolveShopAudience({ ...remote, bootstrapMembershipStatus: 'cancelled' }), 'non_member');
+  assert.equal(resolveShopAudience({ ...remote, bootstrapUserId: 'another-user' }), 'non_member');
+});
+
+test('C1 Shop: non-members cannot resolve stale personalized product context', () => {
+  const staleProduct = { productId: 'product-1', action: 'ADD', actionReason: 'private fit' };
+  const staleRoutine = { status: 'published', amSteps: [], pmSteps: [] };
+  assert.equal(resolveShopProductContext('non_member', 'product-1', staleRoutine as any, [staleProduct] as any), null);
+  assert.equal(resolveShopProductContext('guest', 'product-1', staleRoutine as any, [staleProduct] as any), null);
+  assert.equal(resolveShopProductContext('member', 'product-1', staleRoutine as any, [staleProduct] as any)?.userProduct?.actionReason, 'private fit');
 });
 
 test('C1 Shop: published routine allows eligible personalized commerce (ADD)', () => {
@@ -8239,6 +8272,7 @@ test('C1 Shop: Plan ADD product route is suppressed while routine is not publish
     planContent.includes("up.action === 'ADD' && isPublished && !isPlanUnderReview"),
     'ADD product link in Plan must require published routine and not under review'
   );
+  assert.ok(planContent.includes("const isPublished = routine?.status === 'published';"));
 });
 
 test('C1 Shop: Plan PAUSE/STOP have no acquisition CTA and REPLACE never sells old product', () => {
@@ -8252,6 +8286,7 @@ test('C1 Shop: Today only renders commerce module for published unconfirmed ADD'
   const todayContent = fs.readFileSync(path.resolve('app/(tabs)/index.tsx'), 'utf8');
   assert.ok(todayContent.includes("up.action === 'ADD' && !up.isConfirmedByUser"), 'Today must filter for unconfirmed ADD');
   assert.ok(todayContent.includes("routine?.status === 'published'"), 'Today must require published routine');
+  assert.ok(!todayContent.includes("routine?.status === 'published' || routine?.status === 'approved'"));
   assert.ok(todayContent.includes('YOUR PLAN NEEDS ONE PRODUCT'), 'Single product copy must be present');
   assert.ok(todayContent.includes('router.push(`/shop/${neededProducts[0].productId}`'), 'Single product must route to product detail');
   assert.ok(todayContent.includes("router.push('/(tabs)/shop')"), 'Multiple products must route to Shop tab');
@@ -8266,12 +8301,44 @@ test('C1 Shop: Today has no Shop card when no product action is needed', () => {
 
 test('C1 Shop: product detail resolves canonical member product by productId and fails honestly when unresolvable', () => {
   const detailContent = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
-  assert.ok(detailContent.includes('userProducts.find((up) => up.productId === productId)'), 'Must resolve from userProducts');
+  const selectorContent = fs.readFileSync(path.resolve('src/commerce/types.ts'), 'utf8');
+  assert.ok(detailContent.includes('resolveShopProductContext(audience, productId'), 'Detail must use audience-gated selector');
+  assert.ok(selectorContent.includes('userProducts.find((up) => up.productId === productId)'), 'Must resolve from userProducts');
   assert.ok(detailContent.includes('Product details unavailable'), 'Must fail closed with truthful unavailable state');
   assert.ok(!detailContent.includes('params.productName'), 'Must not synthesize product truth from params.productName');
   assert.ok(!detailContent.includes('params.brand'), 'Must not synthesize product truth from params.brand');
   assert.ok(!detailContent.includes('params.category'), 'Must not synthesize product truth from params.category');
   assert.ok(!detailContent.includes('params.price'), 'Must not synthesize product truth from params.price');
+});
+
+test('C1 Shop: non-member Scan entry and direct route are locked', () => {
+  const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
+  const scanContent = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  assert.ok(shopContent.includes('Available with Derive membership'));
+  assert.ok(scanContent.includes("if (audience !== 'member')"));
+  assert.ok(scanContent.includes('Personalized Scan is available with Derive membership.'));
+});
+
+test('C1 Shop: Mock Ask handoff preserves the scanned verdict', async () => {
+  const service = new MockDeriveService();
+  const scannedProduct: ProductScanResult = {
+    productName: 'Niacinamide 10% + Zinc 1%',
+    brand: 'The Ordinary',
+    category: 'serum',
+    keyActives: ['Niacinamide'],
+    verdict: 'could_work',
+    verdictLabel: 'COULD WORK',
+    verdictSummary: 'This formula could work with the current routine.',
+    factsUsedToDecide: ['No conflicting active ingredient'],
+  };
+  const response = await service.askDerive({
+    userId: 'usr_beta_member',
+    question: 'What does the scan verdict for Niacinamide mean?',
+    activeContext: { scannedProduct },
+  });
+  assert.match(response.directAnswer ?? '', /COULD WORK/);
+  assert.equal(response.whyExplanation, scannedProduct.verdictSummary);
+  assert.deepEqual(response.referencedProducts, [scannedProduct.productName]);
 });
 
 test('C1 Shop: product detail does not fabricate price and uses truthful C1 commerce language', () => {

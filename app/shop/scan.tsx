@@ -28,11 +28,13 @@ import { ProductScanResult, ProductScanVerdict } from '@/src/types/schema';
 import { normalizeBarcode } from '@/src/utils/barcode';
 import { useScanContextStore } from '@/src/stores/scanContextStore';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
+import { useShopAudience } from '@/src/commerce/useShopAudience';
 
 export default function ScanScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ sim?: string }>();
   const insets = useSafeAreaInsets();
+  const audience = useShopAudience();
   const [permission, requestPermission] = useCameraPermissions();
   const { routine, userProducts, checkIns } = useRoutineStore();
   const { productReactions, routineComplexity, primaryGoal, costPreference } = useOnboardingStore();
@@ -48,6 +50,7 @@ export default function ScanScreen() {
   const isScanningLockedRef = useRef(false);
 
   const performEvaluation = async (item: ScannableProductInput, barcode?: string) => {
+    if (audience !== 'member') throw new Error('Membership required for personalized Scan');
     setEvaluationError(null);
     try {
       const isDifferinActive = routine?.pmSteps.some((s) =>
@@ -75,6 +78,7 @@ export default function ScanScreen() {
   };
 
   useEffect(() => {
+    if (audience !== 'member') return;
     analytics.track('shop_scan_opened', { source: 'shop_tab' });
     if (__DEV__ && params?.sim) {
       const search = params.sim.toLowerCase();
@@ -94,7 +98,7 @@ export default function ScanScreen() {
         setUnknownBarcode(params.sim);
       }
     }
-  }, [params?.sim]);
+  }, [audience, params?.sim]);
 
   const handleBarcodeScanned = (scanningResult: BarcodeScanningResult) => {
     if (isScanningLockedRef.current) return;
@@ -234,6 +238,18 @@ export default function ScanScreen() {
         return 'info';
     }
   };
+
+  if (audience !== 'member') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
+        <Text style={styles.screenTitle}>Personalized Scan</Text>
+        <Text style={{ color: colors.inkMuted, marginVertical: spacing.lg }}>
+          Personalized Scan is available with Derive membership.
+        </Text>
+        <Button label="Return to Shop" variant="secondary" size="medium" onPress={() => router.replace('/(tabs)/shop')} />
+      </View>
+    );
+  }
 
   // 1. RESULT VIEW: Split FORMULA QUALITY vs FIT FOR YOU RIGHT NOW
   if (scanResult && confirmedProduct) {

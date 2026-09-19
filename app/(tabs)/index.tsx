@@ -42,7 +42,7 @@ export default function TodayScreen() {
   const { fullName } = useUserStore();
   const firstName = fullName?.trim()?.split(' ')[0] || 'there';
 
-  const isPublished = routine?.status === 'published' || routine?.status === 'approved';
+  const isPublished = routine?.status === 'published';
   const neededProducts = isPublished
     ? userProducts.filter((up) => up.action === 'ADD' && !up.isConfirmedByUser)
     : [];

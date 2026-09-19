@@ -246,7 +246,7 @@ export default function PlanScreen() {
                   (s) => s.productId === up.productId
                 );
                 const scheduleText = matchingStep?.scheduleText || (matchingStep ? (matchingStep.timing === 'am' ? 'Every morning' : 'Every evening') : undefined);
-                const isPublished = routine?.status === 'published' || routine?.status === 'approved';
+                const isPublished = routine?.status === 'published';
 
                 return (
                   <View key={up.id} style={styles.productAuditCard}>

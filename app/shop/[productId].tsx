@@ -36,12 +36,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
-import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
 import { analytics } from '@/src/services/analytics';
-import { resolveActionCommerceSemantics } from '@/src/commerce/types';
+import { resolveShopProductContext } from '@/src/commerce/types';
+import { useShopAudience } from '@/src/commerce/useShopAudience';
 
 export default function ProductDetailScreen() {
   const router = useRouter();
@@ -49,15 +49,15 @@ export default function ProductDetailScreen() {
   const params = useLocalSearchParams<{ productId: string }>();
   const productId = params.productId;
 
-  const { routine, userProducts, isPlanUnderReview } = useRoutineStore();
-  const bootstrapState = useBootstrapStore((s) => s.bootstrapState);
-  const isMember = bootstrapState?.membershipStatus === 'active';
+  const { routine, userProducts } = useRoutineStore();
+  const audience = useShopAudience();
+  const isMember = audience === 'member';
+  const memberRoutine = isMember ? routine : null;
 
   // Strict lookup from canonical client state only — never synthesize from params
-  const userProduct = userProducts.find((up) => up.productId === productId);
-  const matchingStep = [...(routine?.amSteps || []), ...(routine?.pmSteps || [])].find(
-    (s) => s.productId === productId
-  );
+  const context = resolveShopProductContext(audience, productId, memberRoutine, userProducts);
+  const userProduct = context?.userProduct;
+  const matchingStep = context?.matchingStep;
 
   const product = userProduct?.product || (matchingStep ? {
     id: matchingStep.productId,
@@ -69,7 +69,7 @@ export default function ProductDetailScreen() {
 
   const action = userProduct?.action;
   const actionReason = userProduct?.actionReason || matchingStep?.whyChosen;
-  const isPublished = routine?.status === 'published' || routine?.status === 'approved';
+  const isPublished = memberRoutine?.status === 'published';
 
   React.useEffect(() => {
     if (product) {
@@ -117,7 +117,9 @@ export default function ProductDetailScreen() {
           <Icon name="info" size={32} color={colors.inkMuted} />
           <Text style={styles.unavailableTitle}>Product details unavailable</Text>
           <Text style={styles.unavailableText}>
-            This product could not be resolved from your current routine or shelf plan.
+            {isMember
+              ? 'This product could not be resolved from your current routine or shelf plan.'
+              : 'Personalized product details are available with an active Derive membership.'}
           </Text>
           <Button
             label="Return to Shop"
@@ -130,10 +132,6 @@ export default function ProductDetailScreen() {
       </View>
     );
   }
-
-  const commerceSemantics = action
-    ? resolveActionCommerceSemantics(action, routine?.status ?? null)
-    : null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -178,7 +176,7 @@ export default function ProductDetailScreen() {
         </View>
 
         {/* 2. DERIVE'S TAKE / ACTION BADGE (Member Only) */}
-        {action && (
+        {isMember && action && (
           <View style={styles.takeCard}>
             <View style={styles.takeHeader}>
               <Text style={styles.takeOverline}>DERIVE'S TAKE</Text>
@@ -190,20 +188,20 @@ export default function ProductDetailScreen() {
           </View>
         )}
 
-        {/* 3. WHY THIS FITS YOUR PLAN (Member) vs ABOUT THIS PRODUCT (Non-Member) */}
+        {/* 3. MEMBER PRODUCT CONTEXT */}
         <View style={styles.detailSection}>
           <Text style={styles.sectionLabel}>
-            {isMember ? 'WHY THIS FITS YOUR PLAN' : 'ABOUT THIS PRODUCT'}
+            WHY THIS FITS YOUR PLAN
           </Text>
           <Text style={styles.sectionBody}>
             {actionReason
               ? actionReason
-              : 'Grounded in your skin goals and routine tolerance profile.'}
+              : 'No personalized explanation is available for this product yet.'}
           </Text>
         </View>
 
         {/* 4. HOW IT FITS YOUR ROUTINE (When matching routine step exists) */}
-        {matchingStep && (
+        {isMember && matchingStep && (
           <View style={styles.routineFitCard}>
             <Text style={styles.sectionLabel}>HOW IT FITS YOUR ROUTINE</Text>
             <View style={styles.routineFitGrid}>

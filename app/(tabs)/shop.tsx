@@ -39,30 +39,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
-import { useBootstrapStore } from '@/src/stores/bootstrapStore';
-import { useAuthStore } from '@/src/stores/authStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
 import { analytics } from '@/src/services/analytics';
 import { config } from '@/src/constants/config';
 import { membershipDisplayLabel } from '@/src/domain/types';
-import { resolveActionCommerceSemantics, type ShopAudience } from '@/src/commerce/types';
-
-// =============================================
-// AUDIENCE RESOLUTION
-// Derives shop context from canonical membership truth.
-// Does NOT create a separate membership source of truth.
-// =============================================
-
-function resolveShopAudience(
-  sessionUserId: string | null,
-  membershipStatus: 'active' | 'paused' | 'cancelled' | 'none' | undefined
-): ShopAudience {
-  if (!sessionUserId) return 'guest';
-  if (membershipStatus === 'active') return 'member';
-  return 'non_member';
-}
+import { resolveActionCommerceSemantics } from '@/src/commerce/types';
+import { useShopAudience } from '@/src/commerce/useShopAudience';
 
 export default function ShopScreen() {
   const router = useRouter();
@@ -76,11 +60,7 @@ export default function ShopScreen() {
     refillRequests,
   } = useRoutineStore();
 
-  const bootstrapStore = useBootstrapStore();
-  const sessionUserId = useAuthStore((s) => s.sessionUserId);
-  const membershipStatus = bootstrapStore.bootstrapState?.membershipStatus;
-
-  const audience = resolveShopAudience(sessionUserId, membershipStatus);
+  const audience = useShopAudience();
   const isMember = audience === 'member';
   const isPublished = routine?.status === 'published';
 
@@ -355,7 +335,7 @@ export default function ShopScreen() {
       <View style={styles.header}>
         <Text style={styles.screenTitle}>Shop</Text>
         <Text style={styles.screenSubtitle}>
-          {audience === 'guest' ? 'Explore skincare.' : 'Explore skincare.'}
+          Explore skincare.
         </Text>
       </View>
 
@@ -375,30 +355,23 @@ export default function ShopScreen() {
               Current backend does not expose a general browseable product catalog.
               Displaying an honest limited state rather than fabricated products.
             */}
-            A curated product catalog is coming soon. In the meantime, scan any product
-            for formula information and trusted category context.
+            A curated product catalog is coming soon. Personalized product scanning
+            is available with Derive membership.
           </Text>
         </View>
 
-        {/* ── SCAN ENTRY (available to all) ── */}
-        <TouchableOpacity
-          style={styles.scanCard}
-          activeOpacity={0.85}
-          onPress={handleScanPress}
-          accessibilityRole="button"
-          accessibilityLabel="Scan a product with camera or search by name"
-        >
+        {/* No general Scan service exists for guests or inactive members. */}
+        <View style={styles.scanCard}>
           <View style={styles.scanCardLeft}>
             <View style={styles.scanIconCircle}>
               <Icon name="scan" size={22} color={colors.brand} />
             </View>
             <View>
-              <Text style={styles.scanCardTitle}>Scan a Product</Text>
-              <Text style={styles.scanCardSub}>Camera · Search by name</Text>
+              <Text style={styles.scanCardTitle}>Personalized Scan</Text>
+              <Text style={styles.scanCardSub}>Available with Derive membership</Text>
             </View>
           </View>
-          <Icon name="forward" size={16} color={colors.inkMuted} />
-        </TouchableOpacity>
+        </View>
 
         {/* ── MEMBERSHIP UPSELL ── */}
         <View style={styles.membershipCard}>

@@ -379,6 +379,25 @@ export class MockDeriveService implements IDeriveService {
       };
     }
 
+    const scannedProduct = request.activeContext?.scannedProduct;
+    const question = request.question.toLowerCase();
+    if (scannedProduct && (question.includes('scan') || question.includes('verdict'))) {
+      const directAnswer = `${scannedProduct.productName}: ${scannedProduct.verdictLabel ?? scannedProduct.verdict.replaceAll('_', ' ').toUpperCase()}.`;
+      return {
+        answer: `${directAnswer} ${scannedProduct.verdictSummary}`,
+        directAnswer,
+        whyExplanation: scannedProduct.verdictSummary,
+        recommendedAction: scannedProduct.whatItWouldChangeOrReplace,
+        referencedProducts: [scannedProduct.productName],
+        safety: {
+          isMedicalEmergency: false,
+          severity: safetyCheck.severity,
+          message: safetyCheck.message,
+          recommendedAction: safetyCheck.severity === 'warning' ? 'caution_barrier' : 'continue',
+        },
+      };
+    }
+
     const advisor = await askDeriveAdvisor(
       request.question,
       this.activeRoutine,
