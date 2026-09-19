@@ -39,6 +39,109 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Next Work**:
   - I1-B2/S3 consumes this substrate for authenticated context assembly, guarded routine generation, shelf-product normalization, and signal inference.
   - Production Remote mode remains disabled until the wider integration slice is complete and reviewed.
+## 2026-09-19 — Sami: DERIVE I1-B2.3 Final Server Boundary Cleanup
+
+- **Agent / Workstream**: Sami (Platform + Intelligence + Operations) Primary with Kanuj Coordination
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `db8d3519c52b48bccdb53a8477a669ada9030333`
+- **Prior Verified CI Run**: `35415174587`
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B2.3 COMPLETE` (Final Server Boundary Cleanup: (1) Removed filesystem provider fallback and founder-machine paths (`.server-provider-config`, `/Users/kanuj/`, `Deno.readTextFile`) from `supabase/functions/propose-routine/provider.ts` and test harnesses; provider resolves strictly from `ROUTINE_MODEL_PROVIDER` process env or `public.server_runtime_config` table, failing closed with 503 `MODEL_UNAVAILABLE` when unconfigured; (2) Restored least privilege on `commit_routine_proposal` RPC via additive migration `20260919030000_i1_b2_restore_rpc_security_invoker_and_catalog_protection.sql`: redefined as `SECURITY INVOKER` with `set search_path = ''` and fully-qualified schema references, removing unnecessary `SECURITY DEFINER` and deprecated `auth.role()` check; explicit ACL strictly revokes execution from PUBLIC, anon, and authenticated, granting to service_role; (3) Hardened catalog provenance: provisional provider-proposed products (`is_catalog_standard = false`) persist only minimal review identity (`brand`, `name`, `category`) with empty `key_actives`, empty `full_ingredients`, and null `retail_price_approx`, preventing progressive accumulation of hallucinated formula facts across subsequent proposals; (4) Maintained catalog standard protection: trusted products (`is_catalog_standard = true`) retain verified category, key_actives, full_ingredients, and retail_price_approx against untrusted provider outputs; (5) Hardened confirmation fail-closed semantics in `RemoteDeriveService.getUserProducts`: null/unknown `is_confirmed_by_user` strictly resolves to `false` (`=== true`), eliminating fabricated confirmation; (6) Verified with 126/126 pgTAP assertions, 122/122 unit tests, clean strict TypeScript checks across app and tests, clean Expo web export, and clean local B1 and B2 E2E test runs; `eas.json` Remote flag strictly preserved as `false`).
+- **Ownership / Shared Contracts**: Sami closed all server boundary cleanups. Kanuj's mobile UI and shared contracts (`src/contracts/**`, `src/domain/**`, `src/types/schema.ts`) remain unmodified. Production provider selection remains explicitly `OPEN / DEFERRED` (`ARCHITECTURE_CHALLENGE-05`). Kanuj's provider-independent mobile integration is now fully unblocked.
+- **Durable Deliverables**:
+  1. `supabase/functions/propose-routine/provider.ts`: Strict server-only resolution (process env or `server_runtime_config`), zero filesystem lookup.
+  2. `supabase/migrations/20260919030000_i1_b2_restore_rpc_security_invoker_and_catalog_protection.sql`: `commit_routine_proposal` restored to `SECURITY INVOKER` with `search_path = ''`, no `auth.role()`, provisional product formula protection, and explicit ACL.
+  3. `supabase/functions/propose-routine/index.ts`: Provisional catalog payload sets empty `key_actives: []`.
+  4. `src/services/remote/RemoteDeriveService.ts`: `isConfirmedByUser: row.is_confirmed_by_user === true` (fail-closed on null).
+  5. `tests/derive.test.ts`: Added Section 31 tests verifying fail-closed confirmation, server-only provider resolution, and zero filesystem paths (122/122 passing).
+  6. `supabase/tests/i1_b2_routine_persistence.test.sql`: Added assertions for `SECURITY INVOKER`, public execute denial, trusted product formula immutability, and provisional product formula non-accumulation (126/126 passing).
+  7. `scripts/test-i1-b2-local.mjs`: Cleaned up filesystem config path references.
+- **Verification Gates**:
+  - `npm test`: 122/122 passing (100%).
+  - `supabase test db`: 126/126 passing across all 3 test suites.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `node scripts/test-i1-b1-local.mjs`: All 11 checks passed.
+  - `node scripts/test-i1-b2-local.mjs`: All 8 checks passed.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+
+## 2026-09-19 — Sami: DERIVE I1-B2.2 Provider-Neutral Intelligence Boundary, Catalog Provenance & Trust Closure
+
+- **Agent / Workstream**: Sami (Platform + Intelligence + Operations) Primary with Kanuj Coordination
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `397aa80c8eea707277160c3c13d297a72e7736e4`
+- **Prior Verified CI Run**: `35413476239`
+- **Remote Push Status**: `pushed to main`
+- **GitHub CI**: `35415174587 (SUCCESS)`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B2.2 COMPLETE` (Provider-Neutral Intelligence Boundary, Catalog Provenance & Trust Closure: (1) Decoupled routine intelligence into a provider-neutral interface `RoutineIntelligenceProvider` with `providerId` and `generateProposal(context)`; (2) Recorded production model selection as explicitly `OPEN / DEFERRED` under `ARCHITECTURE_CHALLENGE-05` in `docs/DECISIONS.md`; (3) Eliminated client-controllable provider defect: `x-routine-fixture` header removed from CORS and server routing; customer requests can never select a provider; (4) Governed provider selection strictly via server runtime configuration: `ROUTINE_MODEL_PROVIDER` process env or `public.server_runtime_config` table restricted to `service_role`; (5) Isolated deterministic `FixtureRoutineProvider` for reproducible CI and local E2E; (6) Refactored Gemini into optional `GeminiRoutineProvider` adapter with header authentication `x-goog-api-key` [zero key in URL params] and structured outputs; (7) Hardened context assembly in `context.ts` against exact canonical domain enums matching `src/types/schema.ts`, secondary goals, and whitespace product identity, failing closed with `400 INTAKE_CONTEXT_INVALID` without fabricating defaults; (8) Added additive migration `20260919020000_i1_b2_catalog_provenance_and_confirmation_preservation.sql` protecting trusted catalog standard products from being overwritten by model metadata and defaulting new products to `is_catalog_standard = false` with empty formula fields; (9) Implemented post-model sensitivity evaluation `validateSensitivities` failing closed on unverified formulas when sensitivities are reported and rejecting known allergens; (10) Clarified and enforced `is_confirmed_by_user` semantics: existing shelf items retain `true` across actions while newly recommended `ADD` products are `false`; (11) Verified with 119/119 unit tests, 119/119 pgTAP assertions, local B1 and B2 E2E test suites, clean TypeScript check, and clean Expo web export).
+- **Ownership / Shared Contracts**: Sami delivered the provider-neutral architecture, database migration, and provenance hardening. Kanuj's mobile UI and shared contracts (`src/contracts/**`, `src/domain/**`, `src/types/schema.ts`) remain strictly unmodified. Pricing (`ARCHITECTURE_CHALLENGE-01`) and model selection (`ARCHITECTURE_CHALLENGE-05`) preserved as deferred. `eas.json` Remote flag strictly preserved as `false`.
+- **Durable Deliverables**:
+  1. **Provider-Neutral Edge Function Layer (`supabase/functions/propose-routine/`)**:
+     - `types.ts`: Defined `RoutineIntelligenceProvider` interface.
+     - `provider.ts`: Implemented `resolveRoutineProvider(supabaseAdmin)` checking process env, secure `public.server_runtime_config`, or local config file; fails closed with `503 MODEL_UNAVAILABLE` when unconfigured.
+     - `fixture-provider.ts`: Implemented `FixtureRoutineProvider` and `createDeterministicTestProposal`.
+     - `gemini-adapter.ts`: Implemented `GeminiRoutineProvider` with header authentication (`x-goog-api-key`).
+     - `context.ts`: Enforces exact canonical enums matching `src/types/schema.ts`, secondary goals, and non-empty brand/name; fails closed (`INTAKE_CONTEXT_INVALID`).
+     - `validator.ts`: Added `validateSensitivities` evaluating unverified formulas and sensitized ingredients.
+     - `index.ts`: Zero client-controlled fixture header, catalog standard overwrite protection, and confirmation provenance preservation.
+  2. **Additive Migration (`supabase/migrations/20260919020000_i1_b2_catalog_provenance_and_confirmation_preservation.sql`)**:
+     - `commit_routine_proposal` RPC: Protects `is_catalog_standard = true` products from metadata overwrites; defaults new products to `is_catalog_standard = false` with empty formula fields; preserves `is_confirmed_by_user = true` across action updates.
+     - `public.server_runtime_config`: Service-role-only configuration table for server-side runtime settings.
+  3. **Verification & Test Coverage**:
+     - `tests/derive.test.ts`: Added Section 30 tests covering provider interface, header auth, non-canonical enum rejection, and sensitivity validation (119/119 passing).
+     - `supabase/tests/i1_b2_routine_persistence.test.sql`: Added assertions 18-23 covering catalog provenance, confirmation preservation, and `server_runtime_config` permissions (119/119 passing).
+     - `scripts/test-i1-b2-local.mjs`: Hardened Step 5A (client fixture attempt returns 503) and Step 5B (server-configured fixture returns 200) and Step 6 (confirmation preservation check).
+- **Verification Gates**:
+  - `npm test`: 119/119 passing (100%).
+  - `supabase test db`: 119/119 passing across all 3 test suites.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `node scripts/test-i1-b1-local.mjs`: All 11 checks passed.
+  - `node scripts/test-i1-b2-local.mjs`: All 8 checks passed.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+
+## 2026-09-19 — Sami: DERIVE I1-B2.1 Real Model Intelligence, Trust Semantics & Error-Boundary Closure
+
+- **Agent / Workstream**: Sami (Platform + Intelligence + Operations) Primary with Kanuj Coordination
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `23f8bee6c1f0b4d89fef730d1d2749f4d85f86e6`
+- **Prior Verified CI Run**: `35410180444`
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B2.1 COMPLETE` (Real Model Intelligence, Trust Semantics & Error-Boundary Closure: (1) Integrated real Gemini structured output provider with `gemini-3.8-flash` via Google AI Studio REST endpoint using `generationConfig.responseMimeType = "application/json"` and `generationConfig.responseSchema = GEMINI_PROPOSAL_RESPONSE_SCHEMA`; (2) Removed hardcoded branded product generator fallbacks [Vanicream, La Roche-Posay, EltaMD mock generators removed], failing closed with `503 MODEL_UNAVAILABLE` when model credentials or network are absent; (3) Single source of intelligence logic: deduplicated types, invariants, context assembly, and Gemini provider between `src/services/ai-workflows/routine-intelligence.ts` and `supabase/functions/propose-routine/`; (4) Enforced trust semantics: persisted AI-generated product recommendations in `public.user_products` with `is_confirmed_by_user = false` while preserving user-confirmed shelf audit products; (5) Hardened customer-safe error boundary: strictly returning typed domain codes [`UNAUTHORIZED`, `INTAKE_NOT_COMMITTED`, `INTAKE_CONTEXT_INVALID`, `MODEL_UNAVAILABLE`, `MODEL_OUTPUT_INVALID`, `CLARIFICATION_REQUIRED`, `VALIDATION_FAILED`, `PERSISTENCE_FAILED`, `INTERNAL_ERROR`], shielding clients from stack traces, table names, Postgres internals, SQL constraints, or LLM provider errors; (6) Fail-closed context assembly: invalid or missing `Goal` or `RoutineComplexity` fails closed with `400 INTAKE_CONTEXT_INVALID` without fabricating arbitrary default values; (7) Isolated deterministic test seam `createDeterministicTestProposal` under test semantics [`x-routine-fixture: 'true'` header or `ROUTINE_FIXTURE_MODE = 'true'`] for CI and local test harnesses; (8) Updated `tests/derive.test.ts` with 4 new tests [114/114 passing] and updated `scripts/test-i1-b2-local.mjs` verifying model unavailability [503] without fixture and successful routine generation with fixture; (9) Verified 114/114 unit tests, 113/113 pgTAP assertions, 0 TypeScript errors across app and tests, clean Expo web export, and `eas.json` Remote flag strictly `false`).
+- **Ownership / Shared Contracts**: Sami delivered the server-side intelligence provider, error boundary, and trust semantics. Kanuj's mobile UI and shared contracts (`src/contracts/**`, `src/domain/**`, `src/types/schema.ts`) remain strictly unmodified. Pricing (`ARCHITECTURE_CHALLENGE-01`) preserved as unresolved. `eas.json` Remote flag preserved as `false`.
+- **Durable Deliverables**:
+  1. **Modular Edge Function Architecture (`supabase/functions/propose-routine/`)**:
+     - `types.ts`: Self-contained, portable TypeScript interfaces (`AssembledRoutineContext`, `RoutineProposalStep`, `RoutineProposalProductDecision`, `CanonicalCatalogProduct`, `RoutineIntelligenceProposal`, `RoutineErrorCode`, `RoutineErrorResponse`).
+     - `validator.ts`: Deterministic invariant validator enforcing Sunscreen AM invariant, Retinoid PM invariant, pregnancy/nursing contraindications, action enums, category enums, day enums, step required fields, and catalog linkage.
+     - `context.ts`: `assembleCanonicalContext` with fail-closed validation checking canonical enums (`Goal`, `RoutineComplexity`, `ProductCostPreference`, `MiddayFeel`) and returning `INTAKE_CONTEXT_INVALID` without fabricating defaults.
+     - `gemini-provider.ts`: Production provider `callGeminiProposalProvider(context, apiKey, modelName)` calling Google AI Studio REST endpoint with `gemini-3.8-flash` structured output, bounded error logging, and isolated deterministic test seam `createDeterministicTestProposal`.
+     - `index.ts`: Customer-safe error responder, gateway JWT verification, committed intake check, replay idempotency, test seam support, validation, unconfirmed product decision persistence, and atomic RPC commitment.
+  2. **Code Deduplication (`src/services/ai-workflows/routine-intelligence.ts`)**:
+     - Re-exports all shared types, validator, context assembler, and Gemini schemas from `supabase/functions/propose-routine/`.
+     - Aliases `generateContextGroundedProposal = createDeterministicTestProposal` for automated test suites.
+  3. **Trust Semantics & Error Boundary Hardening**:
+     - Persists `user_products` recommendations with `is_confirmed_by_user: false`.
+     - Error responder shields raw database/internal errors, emitting only typed domain codes with empathetic, customer-safe Mineral copy.
+  4. **Verification & Regression Defenses**:
+     - `scripts/test-i1-b2-local.mjs`: Added Stage 5A verifying `503 MODEL_UNAVAILABLE` when key/fixture is missing (proves zero fake fallback), Stage 5B verifying proposal generation with fixture, and Stage 6 verifying `is_confirmed_by_user === false`.
+     - `tests/derive.test.ts`: Added Section 29 verifying fail-closed context assembly, schema definitions, provider error handling, trust semantics, and absence of stack traces.
+- **Verification Gates**:
+  - `npm test`: 114/114 passing (100%).
+  - `supabase test db`: 113/113 passing across all 3 test suites.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `node scripts/test-i1-b1-local.mjs`: All 11 checks passed.
+  - `node scripts/test-i1-b2-local.mjs`: All checks passed (including 5A model unavailability and 5B fixture proposal).
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+
 ## 2026-09-18 — Sami & Kanuj: DERIVE I1-B2 Server-Side Initial Routine Intelligence, Canonical Product Normalization & Awaiting-Review Persistence
 
 - **Agent / Workstream**: Sami (Platform + Intelligence + Operations) Primary with Kanuj Coordination

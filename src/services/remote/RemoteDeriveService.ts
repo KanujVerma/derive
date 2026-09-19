@@ -356,7 +356,7 @@ export class RemoteDeriveService implements IDeriveService {
         action: row.action as RoutineAction,
         actionReason: row.action_reason || '',
         frequencyNightsPerWeek: row.frequency_nights_per_week ?? undefined,
-        isConfirmedByUser: row.is_confirmed_by_user ?? true,
+        isConfirmedByUser: row.is_confirmed_by_user === true,
         product: {
           id: row.products.id,
           brand: row.products.brand,

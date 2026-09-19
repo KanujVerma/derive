@@ -37,8 +37,8 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 │              │                                              │
 │              ▼                                              │
 │  ┌────────────────────────┐    ┌─────────────────────────┐  │
-│  │ Google Gemini 2.5 Flash│    │ Stripe Commerce API     │  │
-│  │ (Structured Outputs)   │    │ (Web Checkout Personalized Plan)  │  │
+│  │ Provider-Neutral Model │    │ Stripe Commerce API     │  │
+│  │ (Adapter Layer: Gemini)│    │ (Web Checkout Plan)     │  │
 │  └────────────────────────┘    └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -117,8 +117,16 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ---
 
 ## 3. Intelligence Orchestration Layer
-* **Model**: Google Gemini 2.5 Flash via structured JSON outputs, invoked only from the trusted Supabase/server environment.
-* **Credential boundary**: Gemini API keys are server secrets. The Expo client must never read, embed, or ship a Gemini key (`EXPO_PUBLIC_*` Gemini variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning; `RemoteDeriveService` calls Edge Functions that may invoke Gemini.
+* **Provider-Neutral Architecture (`RoutineIntelligenceProvider`)**:
+  - The routine intelligence pipeline is decoupled behind a provider-neutral interface: `{ readonly providerId: string; generateProposal(context: AssembledRoutineContext): Promise<RoutineIntelligenceProposal>; }`.
+  - Production model/provider selection is explicitly OPEN / DEFERRED (`ARCHITECTURE_CHALLENGE-05`). Swapping providers requires implementing a thin adapter and verification, not a redesign of routine generation.
+  - Optional `GeminiRoutineProvider` adapter provides an initial implementation using Google AI Studio REST endpoint with structured JSON outputs and header authentication (`x-goog-api-key`, zero API key in URL query parameters).
+* **Server-Side Runtime Provider Configuration & Zero Client Selection**:
+  - Provider selection is strictly server-side runtime configuration: `ROUTINE_MODEL_PROVIDER` process env or secure `public.server_runtime_config` table restricted to `service_role`.
+  - Client requests can NEVER select a provider or activate fixtures (`x-routine-fixture` header eliminated).
+  - Unconfigured servers fail closed with HTTP 503 `MODEL_UNAVAILABLE` (zero hardcoded branded fallback).
+  - Deterministic `FixtureRoutineProvider` is isolated under server configuration for automated CI and local E2E.
+* **Credential boundary**: Model API keys are server secrets. The Expo client must never read, embed, or ship an API key (`EXPO_PUBLIC_*` key variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning; `RemoteDeriveService` calls Edge Functions.
 * **Context Assembly**: When evaluating queries or generating routine proposals, the backend injects:
   1. Customer skin profile from `public.skin_profiles` (primary goals, midday oil, tightness, `pregnancy_status`, `sensitivities_status`).
   2. Intake snapshot context from `public.onboarding_submissions.payload_snapshot` (`pihTendencyAnswer`, adverse reactions, confirmed shelf products, formula snapshots).
@@ -130,14 +138,19 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
   1. **Sunscreen AM Invariant**: Sunscreen steps must NEVER appear in the evening (`pmSteps`) routine.
   2. **Retinoid PM Invariant**: Strong retinoids (Adapalene/Differin, Tretinoin) must NEVER appear in the morning (`amSteps`) routine.
   3. **Pregnancy / Nursing Contraindication**: Retinoids and high-strength salicylic acid are strictly excluded when `pregnancy_status === 'yes'`.
-  4. **Reported Sensitivities**: Known sensitized ingredients must not be introduced in added or replacement products when `sensitivities_status === 'reported'`.
+  4. **Reported Sensitivities**: If `sensitivities_status === 'reported'`, recommendations with unverified formulas fail closed (`VALIDATION_FAILED`); trusted products containing known allergens fail closed.
 * **Routine Proposal Pipeline (`propose-routine` Edge Function & RPC)**:
   - Gateway JWT verification with handler defense-in-depth `auth.getUser()`.
-  - Fail-closed intake verification: rejects requests unless `public.onboarding_submissions` status is `committed`.
-  - Replay idempotency: checks for existing version-1 routine in `public.routines` and returns it without inserting duplicate rows.
-  - Server-assembled canonical context from `skin_profiles` and `payload_snapshot`.
-  - Post-generation deterministic validation enforcing AM/PM and contraindication invariants.
-  - Transactional relational persistence via `public.commit_routine_proposal(...)` RPC executed by `service_role`: normalizes products in `public.products`, inserts version-1 routine in `awaiting_review` status, inserts `routine_items` with resolved `product_id` FKs, updates `user_products`, and updates the pending `initial_routine` founder review task notes.
+  - Fail-closed intake verification: rejects requests with `400 INTAKE_NOT_COMMITTED` unless `public.onboarding_submissions` status is `committed`.
+  - Fail-closed context assembly: validates exact canonical domain enums matching `src/types/schema.ts`, secondary goals, and non-empty product identities, rejecting invalid inputs with `400 INTAKE_CONTEXT_INVALID` without fabricating arbitrary defaults.
+  - Replay idempotency: checks for existing version-1 routine in `public.routines` and returns it without duplicate writes or re-invoking the model provider.
+  - Provider resolution: resolves provider strictly from `ROUTINE_MODEL_PROVIDER` server environment or `public.server_runtime_config` table (service-role only). Zero filesystem or client-side provider selection.
+  - Post-generation deterministic validation: enforces AM/PM invariants, pregnancy contraindications, and action/category enums via `validateRoutineProposal`.
+  - Post-generation sensitivity validation: enforces formula verification and allergen avoidance via `validateSensitivities`.
+  - Catalog provenance: `commit_routine_proposal` RPC protects trusted products (`is_catalog_standard = true`) from metadata overwrites; defaults new proposed products to `is_catalog_standard = false` with empty `key_actives`, empty `full_ingredients`, and null `retail_price_approx`. Prevents model hallucination accumulation across proposals.
+  - Confirmation provenance: `is_confirmed_by_user` denotes having the product in inventory, NOT member approval of an AI action. Existing shelf items retain `true` across actions (`KEEP`, `PAUSE`, `REPLACE`, `STOP`); new proposed `ADD` items are `false`. Null/unknown confirmation strictly fails closed to `false`. Persistence never downgrades `true` to `false`.
+  - Customer-safe error boundary: returns strictly typed domain codes (`UNAUTHORIZED`, `INTAKE_NOT_COMMITTED`, `INTAKE_CONTEXT_INVALID`, `MODEL_UNAVAILABLE`, `MODEL_OUTPUT_INVALID`, `CLARIFICATION_REQUIRED`, `VALIDATION_FAILED`, `PERSISTENCE_FAILED`, `INTERNAL_ERROR`), never leaking stack traces, Postgres internals, SQL constraints, or provider errors to clients.
+  - Transactional relational persistence via `public.commit_routine_proposal(...)` RPC: defined with least privilege as `SECURITY INVOKER` with `set search_path = ''`, executed strictly by `service_role` (revoked from PUBLIC, anon, and authenticated). Normalizes products in `public.products`, inserts version-1 routine in `awaiting_review` status, inserts `routine_items` with resolved `product_id` FKs, updates `user_products`, and updates the pending `initial_routine` founder review task notes.
 * **Safety Circuit Breaker**: Pre-model regex and deterministic classifier that intercepts medical emergencies before model generation.
 
 ---
