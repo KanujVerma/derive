@@ -44,6 +44,7 @@ import { useOnboardingStore, type OnboardingState } from '../stores/onboardingSt
 import { useBootstrapStore } from '../stores/bootstrapStore.ts';
 import { useAuthStore } from '../stores/authStore.ts';
 import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
+import { clearManagedClientState } from './memberCache.ts';
 
 /**
  * Direct service accessor for programmatic operations
@@ -83,6 +84,16 @@ export function resolveUserId(userId?: string, overrideRemote?: boolean): string
  */
 export function getActiveUserId(): string {
   return resolveUserId();
+}
+
+function canProjectManagedData(userId: string): boolean {
+  if (!isRemoteServiceEnabled()) return true;
+  const auth = useAuthStore.getState();
+  const bootstrap = useBootstrapStore.getState();
+  return auth.status === 'SIGNED_IN' && auth.sessionUserId === userId &&
+    bootstrap.resolvedUserId === userId && !bootstrap.isRefreshing &&
+    bootstrap.bootstrapState?.membershipStatus === 'active' &&
+    (bootstrap.status === 'READY' || bootstrap.status === 'NEEDS_ONBOARDING');
 }
 
 /**
@@ -146,6 +157,7 @@ export async function createMembershipPortalSession(): Promise<HostedMembershipS
 export async function submitOnboarding(payload: OnboardingPayload): Promise<OnboardingResult> {
   const service = getDeriveService();
   const result = await service.onboard(payload);
+  if (!canProjectManagedData(result.userId)) return result;
 
   const isAwaitingReview = Boolean(
     result.proposedRoutine &&
@@ -228,6 +240,8 @@ export async function submitWeeklyCheckIn(
     primaryGoal: input.primaryGoal || primaryGoal,
   });
 
+  if (!canProjectManagedData(userId)) return result;
+
   // Project newly created check-in into store cache
   const state = useRoutineStore.getState();
   useRoutineStore.setState({
@@ -253,6 +267,8 @@ export async function requestProductRefill(input: {
     userId,
   });
 
+  if (!canProjectManagedData(userId)) return refill;
+
   const state = useRoutineStore.getState();
   useRoutineStore.setState({
     refillRequests: [refill, ...state.refillRequests],
@@ -266,6 +282,8 @@ export async function hydrateOrders(userId?: string): Promise<RefillRequest[]> {
   const id = resolveUserId(userId);
   const orders = await service.getOrders(id);
 
+  if (!canProjectManagedData(id)) return orders;
+
   useRoutineStore.setState({ refillRequests: orders });
   return orders;
 }
@@ -274,6 +292,8 @@ export async function hydrateProgress(userId?: string): Promise<ProgressData> {
   const service = getDeriveService();
   const id = resolveUserId(userId);
   const progress = await service.getProgress(id);
+
+  if (!canProjectManagedData(id)) return progress;
 
   useRoutineStore.setState({
     checkIns: progress.checkIns,
@@ -363,6 +383,7 @@ export function hydratePlanState(userId?: string): Promise<{
       if (attempt !== currentAttempt) {
         return null;
       }
+      if (!canProjectManagedData(id)) return null;
 
       const bootstrap = useBootstrapStore.getState();
       const isRemote = isRemoteServiceEnabled();
@@ -451,6 +472,7 @@ export async function ensureInitialRoutineProposal(
   userId?: string
 ): Promise<RoutineProposalResult | null> {
   const id = resolveUserId(userId);
+  if (!canProjectManagedData(id)) return null;
 
   const store = useRoutineStore.getState();
   if (store.routine !== null) {
@@ -479,6 +501,7 @@ export async function ensureInitialRoutineProposal(
   if (!stateAfterHydration.isRoutineBeingPrepared) {
     return null;
   }
+  if (!canProjectManagedData(id)) return null;
 
   // B3.1 Defect A: If canonical plan hydration itself failed (transient network/backend error),
   // do NOT treat the failure as evidence that no routine exists and do NOT call proposeRoutine.
@@ -511,6 +534,7 @@ export async function ensureInitialRoutineProposal(
       if (attempt !== currentAttempt) {
         return null;
       }
+      if (!canProjectManagedData(id)) return null;
 
       useRoutineStore.getState().setPlanHydrated(
         result.routine,
@@ -560,6 +584,8 @@ export async function hydrateResearchInsights(userId?: string): Promise<Research
   const id = resolveUserId(userId);
   const insights = await service.getResearchInsights(id);
 
+  if (!canProjectManagedData(id)) return insights;
+
   useRoutineStore.setState({ researchInsights: insights });
   return insights;
 }
@@ -576,6 +602,7 @@ export async function hydrateCustomerProfile(userId?: string): Promise<CustomerP
       if (!activeSessionUser || activeSessionUser !== profile.id) {
         return null;
       }
+      if (!canProjectManagedData(id)) return null;
     }
     useUserStore.getState().setRemoteCustomerProfile(profile);
   }
@@ -593,7 +620,10 @@ export async function hydrateCustomerProfile(userId?: string): Promise<CustomerP
  * - If service query throws/fails, shields technical details and fails closed with ERROR.
  * - Guarded against race conditions: stale results from prior requests or switched identities are discarded.
  */
-export async function resolveCustomerBootstrap(userId: string): Promise<CustomerBootstrapState | null> {
+export async function resolveCustomerBootstrap(
+  userId: string,
+  options: { refresh?: boolean } = {},
+): Promise<CustomerBootstrapState | null> {
   const bootstrapStore = useBootstrapStore.getState();
   const trimmed = typeof userId === 'string' ? userId.trim() : '';
 
@@ -602,7 +632,13 @@ export async function resolveCustomerBootstrap(userId: string): Promise<Customer
     return null;
   }
 
-  const attempt = bootstrapStore.setResolving(trimmed);
+  const preserveInactiveState = options.refresh === true &&
+    bootstrapStore.resolvedUserId === trimmed &&
+    bootstrapStore.bootstrapState !== null &&
+    bootstrapStore.bootstrapState.membershipStatus !== 'active';
+  const attempt = options.refresh
+    ? bootstrapStore.setRefreshing(trimmed)
+    : bootstrapStore.setResolving(trimmed);
 
   try {
     const service = getDeriveService();
@@ -626,6 +662,12 @@ export async function resolveCustomerBootstrap(userId: string): Promise<Customer
       return state;
     }
 
+    if (isRemoteServiceEnabled() && state.membershipStatus !== 'active') {
+      clearManagedClientState();
+      clearInFlightHydrations();
+      clearInFlightProposals();
+    }
+
     const committed = bootstrapStore.setResolved(state, attempt);
     if (!committed) {
       return null;
@@ -635,7 +677,7 @@ export async function resolveCustomerBootstrap(userId: string): Promise<Customer
     useUserStore.getState().setRemoteBootstrapMembership(state.membershipStatus);
 
     // If onboarding is completed, attempt profile hydration (non-blocking)
-    if (state.onboardingCompleted) {
+    if (state.membershipStatus === 'active' && state.onboardingCompleted) {
       try {
         await hydrateCustomerProfile(trimmed);
       } catch (profileErr) {
@@ -653,7 +695,11 @@ export async function resolveCustomerBootstrap(userId: string): Promise<Customer
       if (isRemoteServiceEnabled()) {
         const activeSessionUser = useAuthStore.getState().sessionUserId;
         if (activeSessionUser && activeSessionUser === trimmed) {
-          bootstrapStore.setError(getCustomerErrorMessage('bootstrap'), attempt);
+          if (preserveInactiveState) {
+            bootstrapStore.setRefreshError(getCustomerErrorMessage('bootstrap'), attempt);
+          } else {
+            bootstrapStore.setError(getCustomerErrorMessage('bootstrap'), attempt);
+          }
         }
       } else {
         bootstrapStore.setError(getCustomerErrorMessage('bootstrap'), attempt);
@@ -662,6 +708,25 @@ export async function resolveCustomerBootstrap(userId: string): Promise<Customer
 
     return null;
   }
+}
+
+const inFlightBootstrapRefreshes = new Map<string, Promise<CustomerBootstrapState | null>>();
+
+/** Deduplicate foreground, checkout-return, and explicit membership refreshes. */
+export function refreshCustomerBootstrap(userId: string): Promise<CustomerBootstrapState | null> {
+  const id = typeof userId === 'string' ? userId.trim() : '';
+  const existing = inFlightBootstrapRefreshes.get(id);
+  if (existing) return existing;
+  const request = resolveCustomerBootstrap(id, { refresh: true });
+  inFlightBootstrapRefreshes.set(id, request);
+  void request.finally(() => {
+    if (inFlightBootstrapRefreshes.get(id) === request) inFlightBootstrapRefreshes.delete(id);
+  });
+  return request;
+}
+
+export function clearInFlightBootstrapRefreshes(): void {
+  inFlightBootstrapRefreshes.clear();
 }
 
 // ==========================================

@@ -124,6 +124,11 @@ async function run() {
   assert.ok(!u2Err && u2Create?.user, `Failed creating user 2: ${u2Err?.message}`);
   const user2 = u2Create.user;
 
+  assert.ifError((await adminClient.from('memberships').insert([
+    { user_id: user1.id, tier: 'founding_beta', status: 'active' },
+    { user_id: user2.id, tier: 'founding_beta', status: 'active' },
+  ])).error);
+
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });

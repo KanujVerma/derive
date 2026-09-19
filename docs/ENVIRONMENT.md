@@ -76,10 +76,13 @@ Dashboard to include `{{ .Token }}` and verify the OTP length is six before the
 Remote activation smoke. Local CLI template configuration does not deploy to
 the hosted project.
 
-Before production Remote activation, decide and verify which Today, Plan, and
-Ask capabilities a profile-ready but inactive member may use. Current routing
-admits that user to the root tabs. C1 guards Shop personalization and Scan but
-does not redefine the broader membership entitlement policy.
+E1 resolves the managed-app entitlement policy: Remote accounts need canonical
+active membership before sensitive onboarding and the member tabs. A signed-in
+inactive account uses `/membership` for trusted Checkout or billing management.
+Profile readiness alone cannot grant access. Public Shop routing remains
+separate, unopened C1.5 work. Keep `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`
+until hosted migrations/functions, six-digit OTP email, Gemini secret, and the
+test-mode Checkout to signed webhook to membership to Portal smoke all pass.
 
 For a developer workstation, prefer interactive authentication:
 

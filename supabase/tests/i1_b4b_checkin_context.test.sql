@@ -81,6 +81,10 @@ values
     '{"full_name":"Member B4B Other"}'::jsonb
   );
 
+-- The owner exercises paid check-in writes under E1; the other user stays inactive.
+insert into public.memberships (user_id, tier, status)
+values ('b4b11111-1111-1111-1111-111111111111', 'founding_beta', 'active');
+
 select results_eq(
   $$
     insert into public.check_ins (user_id, skin_state, irritation)

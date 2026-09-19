@@ -448,7 +448,7 @@ export class RemoteDeriveService implements IDeriveService {
     const { data, error } = await client
       .from('profiles')
       .select(
-        'id, email, full_name, phone, created_at, updated_at, memberships(id, user_id, tier, status, created_at)',
+        'id, email, full_name, phone, created_at, updated_at, memberships(id, user_id, tier, status, created_at, last_stripe_event_created_at)',
       )
       .eq('id', userId)
       .maybeSingle();
@@ -485,11 +485,12 @@ export class RemoteDeriveService implements IDeriveService {
       throw new Error(`RemoteDeriveService.getCustomerBootstrapState failed querying skin profile: ${skinProfileError.message}`);
     }
 
-    // 3. Query current membership status deterministically (latest by created_at)
+    // 3. Match S5's canonical ordering: latest Stripe event, then row creation.
     const { data: membershipData, error: membershipError } = await client
       .from('memberships')
-      .select('status, created_at')
+      .select('status, created_at, last_stripe_event_created_at')
       .eq('user_id', userId)
+      .order('last_stripe_event_created_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -604,14 +605,27 @@ export function mapDbRefillRequest(row: DbRefillRequestRow): RefillRequest {
   };
 }
 
-/**
- * Pure mapping helper: maps raw database rows to canonical CustomerBootstrapState.
- */
+interface MembershipOrderRow {
+  created_at?: string | null;
+  last_stripe_event_created_at?: string | null;
+}
+
+function compareCurrentMembership(a: MembershipOrderRow, b: MembershipOrderRow): number {
+  const instant = (value?: string | null) => value ? Date.parse(value) : Number.NEGATIVE_INFINITY;
+  const eventA = instant(a.last_stripe_event_created_at);
+  const eventB = instant(b.last_stripe_event_created_at);
+  if (eventA !== eventB) return eventA > eventB ? -1 : 1;
+  const createdA = instant(a.created_at);
+  const createdB = instant(b.created_at);
+  return createdA === createdB ? 0 : createdA > createdB ? -1 : 1;
+}
+
+/** Pure mapping helper: maps raw database rows to canonical CustomerBootstrapState. */
 export function mapDbBootstrapState(
   userId: string,
   profileRow: { id: string } | null,
   skinProfileRow: { onboarding_completed?: boolean | null } | null,
-  membershipRows: Array<{ status?: string | null; created_at?: string | null }> | { status?: string | null; created_at?: string | null } | null
+  membershipRows: Array<MembershipOrderRow & { status?: string | null }> | (MembershipOrderRow & { status?: string | null }) | null
 ): CustomerBootstrapState {
   if (!profileRow) {
     return {
@@ -626,11 +640,7 @@ export function mapDbBootstrapState(
 
   const rawMemberships = Array.isArray(membershipRows)
     ? (membershipRows.length > 1
-        ? [...membershipRows].sort((a, b) => {
-            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-            return timeB - timeA;
-          })
+        ? [...membershipRows].sort(compareCurrentMembership)
         : membershipRows)
     : (membershipRows ? [membershipRows] : []);
 
@@ -698,12 +708,12 @@ export function mapDbCustomerProfile(data: {
   phone?: string | null;
   created_at: string;
   updated_at: string;
-  memberships?: Array<{ id: string; user_id: string; tier?: string | null; status?: string | null; created_at: string }> | { id: string; user_id: string; tier?: string | null; status?: string | null; created_at: string } | null;
+  memberships?: Array<MembershipOrderRow & { id: string; user_id: string; tier?: string | null; status?: string | null }> | (MembershipOrderRow & { id: string; user_id: string; tier?: string | null; status?: string | null }) | null;
 } | null): CustomerProfile | null {
   if (!data) return null;
 
   const rawMemberships = Array.isArray(data.memberships)
-    ? [...data.memberships].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    ? [...data.memberships].sort(compareCurrentMembership)
     : (data.memberships ? [data.memberships] : []);
 
   const latest = rawMemberships[0];

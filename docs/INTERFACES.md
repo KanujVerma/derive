@@ -342,7 +342,7 @@ To truthfully determine whether an authenticated user requires onboarding or is 
 - **Invariants**:
   - `profileExists`: Verified via `public.profiles`. The presence of a profile row (auto-provisioned by auth triggers) does NOT mean onboarding is complete. If absent, bootstrap fails closed (`profileExists: false`) to catch provisioning failures.
   - `onboardingCompleted`: Read strictly from `public.skin_profiles.onboarding_completed`. Missing skin profile or false means `NEEDS_ONBOARDING`; true means `READY`.
-  - `membershipStatus`: Queried from `public.memberships` deterministically (latest row by `created_at` descending; absent row maps to `'none'`). Membership state is purely informational in this slice and does NOT gate onboarding navigation.
+  - `membershipStatus`: Queried from owner-readable `public.memberships` in S5 order (latest Stripe event timestamp, then row creation; absent row maps to `'none'`). E1 requires `active` before Remote onboarding and managed tabs. `profileExists`, `onboardingCompleted`, and membership are independent facts. The event timestamp is server-written and owner-readable only for ordering; Stripe IDs and Price remain server-only.
   - Tier and pricing fields are strictly excluded from bootstrap. I1-B4A migrated `CustomerProfile.tier` from historical `'founding_beta_129'` to price-neutral `'founding_beta'`. Display price is `config.betaPriceMonthly` (`25`); Stripe's configured recurring Price is the S5 charge authority.
 
 ### H. S5 Membership Commerce Contract
@@ -352,6 +352,11 @@ To truthfully determine whether an authenticated user requires onboarding or is 
 - Canonical `membershipStatus` remains `active | paused | cancelled`; raw Stripe status is server-only evidence and never expands the shared customer enum.
 - Money is not duplicated in `MembershipTier`, `CustomerProfile`, or the database tier identity. Changing the Stripe Price requires an explicit commercial/configuration review, not a tier rename.
 - Product purchasing/refills remain outside this contract.
+
+### H1. E1 Membership Access and Refresh
+- `resolveAuthRoute` consumes the canonical bootstrap for the authenticated session. Missing, stale, or unresolved evidence stays on Holding; `none`/`paused`/`cancelled` goes to Membership; active plus incomplete onboarding goes to Onboarding; active plus completed onboarding enters member tabs.
+- `/membership` uses existing S5 Checkout and Portal session coordinators and receives only validated HTTPS destinations. A success URL or local pending state cannot grant access; bounded retries and foreground refresh read backend status again.
+- A downgrade retains Auth identity and historical server records while clearing local managed caches. The root navigator prevents paid deep links from mounting. Mock routing remains billing-free.
 
 ### I. I1-B4 Contract Status
 - **B4A membership (IMPLEMENTED)**: `CustomerProfile.tier` is `'founding_beta'`. Display price is $25/month membership, products separate. `src/pricing/**` all-in engine removed. Mock/Remote map canonical `founding_beta` and fail closed otherwise.

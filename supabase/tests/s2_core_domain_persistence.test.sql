@@ -100,6 +100,10 @@ values
   ('b1111111-1111-1111-1111-111111111111', 's2_owner@example.test', '{"full_name":"S2 Owner"}'::jsonb),
   ('b2222222-2222-2222-2222-222222222222', 's2_other@example.test', '{"full_name":"S2 Other"}'::jsonb);
 
+-- Owner-scoped photo, check-in, and refill writes now require active membership.
+insert into public.memberships (user_id, tier, status)
+values ('b1111111-1111-1111-1111-111111111111', 'founding_beta', 'active');
+
 insert into public.products (id, brand, name, category, key_actives, full_ingredients)
 values
   (

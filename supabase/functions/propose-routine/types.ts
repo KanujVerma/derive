@@ -39,6 +39,8 @@ export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 export type RoutineErrorCode =
   | 'UNAUTHORIZED'
+  | 'MEMBERSHIP_REQUIRED'
+  | 'MEMBERSHIP_UNAVAILABLE'
   | 'INTAKE_NOT_COMMITTED'
   | 'INTAKE_CONTEXT_INVALID'
   | 'MODEL_UNAVAILABLE'

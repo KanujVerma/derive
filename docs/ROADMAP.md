@@ -615,6 +615,16 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Recommendation and safety decisions remain independent of commercial inputs.
   - [x] C1 adds no backend migration or physical-commerce shared contract.
 
+### E1: Membership Entitlements and Checkout UX [IMPLEMENTED LOCALLY; HOSTED ACTIVATION PENDING]
+* **Scope**: Sign in, activate the Founding Beta membership through S5 Checkout, then onboard. Canonical active membership gates the managed app; profile readiness is a separate dimension. Paused, cancelled, and not-yet-active accounts receive one Membership screen with trusted Checkout or Portal links where S5 supports them.
+* **Acceptance**:
+  - [x] Root and direct routes enforce member access, while Mock mode remains billing-free.
+  - [x] Checkout, Portal return, foreground, and explicit retry refresh backend membership truth; a Checkout success URL never grants access.
+  - [x] Downgrades clear local paid projections while preserving Auth identity and owner-readable history.
+  - [x] Edge functions and RLS require active membership for paid onboarding, model operations, Check-In, refills, and new private photo writes.
+  - [x] Local unit, pgTAP, OTP, E1 lifecycle, and S1-S5 integration tests cover the boundary.
+  - [ ] Configure and smoke the hosted six-digit OTP template, Supabase functions/migrations, Gemini secret, and test-mode Stripe Checkout to signed webhook to Portal lifecycle before enabling production Remote mode.
+
 ### C1.5: Physical Product Commerce Integration [NOT STARTED]
 * **Scope**: Future physical product checkout, offers, order persistence, fulfillment, and public Shop activation.
 * **Prerequisites**: Choose a physical-commerce provider and approve a separate contract and data model.

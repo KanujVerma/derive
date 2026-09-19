@@ -6,6 +6,15 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19: E1 membership entitlement integration checkpoint
+
+- **Branch / predecessor**: `kanuj/e1-membership-entitlements` from shared `main` at `e661f71c54f67e740c7987f76f2f6dc671603ae2` (CI `35471149916` success). PR and final CI remain separate acceptance gates at this checkpoint.
+- **Decision**: Auth identity, onboarding readiness, and canonical membership status are separate. In Remote mode, active membership precedes onboarding and is required for Today, Plan, personalized Shop and Scan, Ask, Progress, Check-In, managed Refills, and routine generation. Inactive accounts route to `/membership`. Mock mode remains billing-free; production Remote remains `false`.
+- **Billing authority**: The customer membership screen uses existing S5 Checkout and Portal sessions. Stripe-hosted navigation and local activation-pending UI never assert entitlement. Bounded retries and foreground/web-focus refresh read backend bootstrap; only the signed webhook changes membership.
+- **Security and privacy**: Root protected routes deny inactive deep links. Downgrade clears local managed data but retains Auth identity and owner-readable history. E1's additive RLS policies require active membership for new skin-profile, shelf, photo, check-in, refill, and private Storage writes. JWT-gated Edge functions recheck the latest canonical membership before paid onboarding, routine generation, Scan, ordinary Ask, ingredient inference, and Check-In. Emergency Ask safety hard-stop and account deletion remain accessible without managed entitlement.
+- **Verification so far**: 236 unit tests, 303 pgTAP assertions, both TypeScript checks, web export, all existing local integration harnesses, local OTP, and the new E1 lifecycle harness passed. A disposable local Remote UI account moved through none, active/incomplete, active/complete, and paused routing; a paused direct Check-In link returned to Membership. Hosted Stripe/Supabase activation smoke remains pending.
+- **Unopened**: C1.5 physical-product commerce, public catalog/Shop routing, and general factual Scan.
+
 ## 2026-09-19: S5 landing and C1 integration checkpoint
 
 - Shared `main` received S5 membership billing through PR #18 at `1c44e43cbf2e21ca8c454186076c32af50c45180`. Both jobs of resulting CI run `35468937292` passed.

@@ -5,6 +5,7 @@ import type {
   MemberIntelligenceContext,
 } from "./intelligence.ts";
 import { inferIngredientSignals } from "../../../src/services/ai-workflows/ingredient-intelligence.ts";
+import { MembershipEntitlementError, requireActiveMembership } from "./entitlement.ts";
 import type {
   FormulaSnapshot,
   IngredientSignal,
@@ -91,6 +92,17 @@ export async function authenticate(req: Request): Promise<AuthenticatedRuntime> 
       auth: { autoRefreshToken: false, persistSession: false },
     }),
   };
+}
+
+export async function requireMemberEntitlement(admin: SupabaseClient, userId: string): Promise<void> {
+  try {
+    await requireActiveMembership(admin, userId);
+  } catch (error) {
+    if (error instanceof MembershipEntitlementError) {
+      throw new ServiceError(error.code, error.message, error.status);
+    }
+    throw error;
+  }
 }
 
 export async function generateStructuredJson(

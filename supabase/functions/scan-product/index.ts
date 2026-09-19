@@ -16,6 +16,7 @@ import {
   jsonResponse,
   loadMemberContext,
   readJsonObject,
+  requireMemberEntitlement,
 } from "../_shared/runtime.ts";
 
 const optionalShortString = (value: unknown, field: string, max: number): string | undefined => {
@@ -32,6 +33,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { userId, admin } = await authenticate(req);
+    await requireMemberEntitlement(admin, userId);
     const body = await readJsonObject(req);
     const productName = optionalShortString(body.productName, "productName", 180);
     if (!productName) {

@@ -77,6 +77,11 @@ async function run() {
     assert.ifError(otherCreateError);
     otherId = otherCreate.user.id;
 
+    assert.ifError((await admin.from('memberships').insert([
+      { user_id: ownerId, tier: 'founding_beta', status: 'active' },
+      { user_id: otherId, tier: 'founding_beta', status: 'active' },
+    ])).error);
+
     const { data: product, error: productError } = await admin
       .from('products')
       .insert({

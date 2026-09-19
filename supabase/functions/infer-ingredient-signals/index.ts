@@ -7,6 +7,7 @@ import {
   jsonResponse,
   loadMemberContext,
   readJsonObject,
+  requireMemberEntitlement,
 } from "../_shared/runtime.ts";
 
 Deno.serve(async (req: Request) => {
@@ -15,6 +16,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { userId, admin } = await authenticate(req);
+    await requireMemberEntitlement(admin, userId);
     await readJsonObject(req);
     const loaded = await loadMemberContext(admin, userId);
     const signals = await inferAndPersistIngredientSignals(admin, userId, loaded);

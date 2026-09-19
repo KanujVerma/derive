@@ -222,6 +222,14 @@ Key technical and product decisions accepted for Derive V1.
 * **Scope Boundary**: S5 covers membership billing only. Products remain separately purchased; SKU checkout, Shop, coupons, affiliates, and product-margin logic are deferred.
 * **Verification**: Fresh local migration rebuild; 277/277 pgTAP assertions; 186/186 unit tests; both TypeScript checks; S5 authenticated boundary/lifecycle integration harness; signed-handler bundle execution; production web export; and full S1–S5/B4B integration chain.
 
+### ADR-31: Membership Entitlement Boundary and Pre-Onboarding Activation (E1)
+* **Status**: IMPLEMENTED LOCALLY; hosted activation smoke pending.
+* **Decision**: The paid managed-skincare application requires canonical `membershipStatus === 'active'`. Sign-in proves identity, profile and skin-profile rows prove onboarding readiness, and neither proves entitlement. The Founding Beta sequence is sign in, activate membership through S5 Checkout and signed webhook, complete onboarding, then enter the five member tabs.
+* **Routing**: A signed-in inactive account goes to one Membership screen for trusted Checkout or Portal options and sign-out. Active plus incomplete onboarding goes to Onboarding; active plus complete goes to the member app. Root protected routes deny inactive deep links to managed surfaces. Mock mode remains billing-free.
+* **Billing authority**: Stripe's configured Price remains the charge authority. Hosted Checkout and Portal return only validated HTTPS destinations. Success URLs, local pending UI, and foreground events trigger bounded canonical reads but never mutate membership to active. Webhook projection remains the sole lifecycle writer.
+* **Revocation and privacy**: Foreground refresh can revoke access when billing status changes. The client clears managed caches while retaining Auth identity. Service-role Edge functions and owner-scoped RLS enforce active membership for paid operations and new sensitive writes. Owner-readable history and account deletion remain available. Emergency Ask hard-stops remain available before model work.
+* **Public Shop**: A future public or non-member Shop is a separate C1.5 catalog and routing milestone. E1 does not expose C1's limited fallback as a public product experience or implement physical-product commerce.
+
 ---
 
 ## Open Shared-Contract Challenges (PROPOSED · UNRESOLVED)

@@ -16,6 +16,7 @@ import {
   loadMemberContext,
   readJsonObject,
   recordSafetyEscalation,
+  requireMemberEntitlement,
 } from "../_shared/runtime.ts";
 
 Deno.serve(async (req: Request) => {
@@ -37,6 +38,8 @@ Deno.serve(async (req: Request) => {
       await recordSafetyEscalation(admin, userId, safetyResponse.safety.severity as "warning" | "emergency");
       return jsonResponse(safetyResponse);
     }
+
+    await requireMemberEntitlement(admin, userId);
 
     const loaded = await loadMemberContext(admin, userId);
     await inferAndPersistIngredientSignals(admin, userId, loaded);

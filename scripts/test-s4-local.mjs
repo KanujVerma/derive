@@ -60,6 +60,9 @@ async function run() {
     });
     assert.ifError(memberCreated.error);
     memberId = memberCreated.data.user.id;
+    assert.ifError((await admin.from('memberships').insert({
+      user_id: memberId, tier: 'founding_beta', status: 'active',
+    })).error);
     assert.ifError((await admin.from('founder_accounts').insert({ user_id: founderId, role: 'founder' })).error);
     assert.ifError((await admin.from('skin_profiles').insert({
       user_id: memberId,

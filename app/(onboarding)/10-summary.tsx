@@ -65,6 +65,10 @@ export default function SummaryScreen() {
         if (!bootstrap || !bootstrap.profileExists || !bootstrap.onboardingCompleted) {
           throw new Error('Onboarding completion verification failed on server');
         }
+        if (bootstrap.membershipStatus !== 'active') {
+          router.replace('/membership');
+          return;
+        }
 
         const storeStatus = useBootstrapStore.getState().status;
         if (storeStatus !== 'READY') {

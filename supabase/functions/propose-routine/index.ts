@@ -3,6 +3,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
+import { MembershipEntitlementError, requireActiveMembership } from "../_shared/entitlement.ts";
 
 import type {
   RoutineErrorCode,
@@ -100,6 +101,14 @@ Deno.serve(async (req: Request) => {
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+    try {
+      await requireActiveMembership(adminClient, userId);
+    } catch (error) {
+      if (error instanceof MembershipEntitlementError) {
+        return errorResponse(error.code, error.message, error.status);
+      }
+      throw error;
+    }
 
     // 2. Fail closed unless customer has committed onboarding intake
     const { data: submission, error: subErr } = await adminClient

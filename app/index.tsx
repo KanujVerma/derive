@@ -12,6 +12,10 @@ export default function Index() {
   const isCompleted = useOnboardingStore((s) => s.isCompleted);
   const authStatus = useAuthStore((s) => s.status);
   const profileResolution = useBootstrapStore((s) => s.status);
+  const resolvedUserId = useBootstrapStore((s) => s.resolvedUserId);
+  const bootstrapState = useBootstrapStore((s) => s.bootstrapState);
+  const bootstrapRefreshing = useBootstrapStore((s) => s.isRefreshing);
+  const sessionUserId = useAuthStore((s) => s.sessionUserId);
   const remoteEnabled = isRemoteServiceEnabled();
 
   const destination = resolveAuthRoute({
@@ -19,6 +23,10 @@ export default function Index() {
     authStatus,
     isOnboardingCompleted: isCompleted,
     profileResolution,
+    sessionUserId,
+    resolvedUserId,
+    bootstrapState,
+    bootstrapRefreshing,
   });
 
   if (destination.type === 'AUTH_LOADING') {
