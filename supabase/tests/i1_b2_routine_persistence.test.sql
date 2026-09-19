@@ -1,6 +1,6 @@
 begin;
 
-select plan(17);
+select plan(23);
 
 -- 1. routines.updated_at exists and defaults correctly
 select ok(
@@ -261,6 +261,170 @@ select ok(
       and pg_get_constraintdef(c.oid) like '%status = ANY (%pending%completed%dismissed%)%'
   ),
   'founder_review_tasks status constraint permits only pending, completed, dismissed'
+);
+
+-- 11. commit_routine_proposal: catalog provenance and confirmation preservation
+insert into auth.users (id, email, raw_user_meta_data)
+values ('b3333333-3333-3333-3333-333333333333', 'member_b2_commit@example.test', '{"full_name":"Member B2 Commit Test"}'::jsonb);
+
+insert into public.products (id, brand, name, category, key_actives, full_ingredients, is_catalog_standard)
+values (
+  'c2222222-2222-2222-2222-222222222222',
+  'SkinCeuticals',
+  'C E Ferulic',
+  'treatment',
+  '{"Vitamin C", "Vitamin E", "Ferulic Acid"}',
+  '{"Water", "Ethoxydiglycol", "L-Ascorbic Acid", "Propylene Glycol", "Glycerin", "Laureth-23", "Alpha Tocopherol", "Phenoxyethanol", "Triethanolamine", "Ferulic Acid", "Panthenol", "Sodium Hyaluronate"}',
+  true
+);
+
+insert into public.user_products (
+  user_id,
+  product_id,
+  detected_brand,
+  detected_name,
+  action,
+  action_reason,
+  is_confirmed_by_user
+) values (
+  'b3333333-3333-3333-3333-333333333333',
+  'c2222222-2222-2222-2222-222222222222',
+  'SkinCeuticals',
+  'C E Ferulic',
+  'KEEP',
+  'Active morning antioxidant',
+  true
+);
+
+set local role service_role;
+
+select public.commit_routine_proposal(
+  'b3333333-3333-3333-3333-333333333333'::uuid,
+  1,
+  'Barrier recovery proposal',
+  'Test founder notes',
+  '[
+    {
+      "brand": "SkinCeuticals",
+      "name": "C E Ferulic",
+      "category": "cleanser",
+      "key_actives": ["Fake Active"],
+      "full_ingredients": ["Fake Ingredient"],
+      "is_catalog_standard": false
+    },
+    {
+      "brand": "Brand X",
+      "name": "Barrier Cream",
+      "category": "moisturizer",
+      "key_actives": ["Ceramides"],
+      "full_ingredients": ["Unverified Formula"],
+      "is_catalog_standard": false
+    }
+  ]'::jsonb,
+  '[
+    {
+      "order_index": 1,
+      "timing": "am",
+      "brand": "SkinCeuticals",
+      "product_name": "C E Ferulic",
+      "category": "treatment",
+      "amount": "4 drops",
+      "area": "face",
+      "days": ["mon", "wed", "fri"],
+      "purpose": "Antioxidant protection",
+      "why_chosen": "Proven efficacy"
+    }
+  ]'::jsonb,
+  '[
+    {
+      "product_id": "c2222222-2222-2222-2222-222222222222",
+      "detected_brand": "SkinCeuticals",
+      "detected_name": "C E Ferulic",
+      "action": "PAUSE",
+      "action_reason": "Paused while healing",
+      "frequency_nights_per_week": 0,
+      "is_confirmed_by_user": false
+    },
+    {
+      "detected_brand": "Brand X",
+      "detected_name": "Barrier Cream",
+      "action": "ADD",
+      "action_reason": "Support barrier",
+      "frequency_nights_per_week": 7,
+      "is_confirmed_by_user": false
+    }
+  ]'::jsonb,
+  'Pending review task notes'
+);
+
+-- 18. Check that user_products.is_confirmed_by_user was NOT downgraded to false for SkinCeuticals
+select is(
+  (
+    select is_confirmed_by_user
+    from public.user_products
+    where user_id = 'b3333333-3333-3333-3333-333333333333'
+      and product_id = 'c2222222-2222-2222-2222-222222222222'
+  ),
+  true,
+  'Existing confirmed product maintains is_confirmed_by_user = true across action change to PAUSE'
+);
+
+-- 19. Check that new ADD product has is_confirmed_by_user = false
+select is(
+  (
+    select is_confirmed_by_user
+    from public.user_products
+    where user_id = 'b3333333-3333-3333-3333-333333333333'
+      and detected_brand = 'Brand X'
+  ),
+  false,
+  'Newly proposed ADD product has is_confirmed_by_user = false'
+);
+
+-- 20. Check that SkinCeuticals category was NOT overwritten by provider
+select is(
+  (
+    select category
+    from public.products
+    where id = 'c2222222-2222-2222-2222-222222222222'
+  ),
+  'treatment',
+  'Trusted catalog standard product category is preserved and not overwritten'
+);
+
+-- 21. Check that Brand X was inserted with is_catalog_standard = false and empty full_ingredients
+select ok(
+  exists (
+    select 1
+    from public.products
+    where brand = 'Brand X'
+      and name = 'Barrier Cream'
+      and is_catalog_standard = false
+      and full_ingredients = '{}'::text[]
+  ),
+  'New model-proposed product is inserted with is_catalog_standard = false and empty full_ingredients'
+);
+
+-- 22. Client roles have zero access to public.server_runtime_config
+select ok(
+  not has_table_privilege('anon', 'public.server_runtime_config', 'select')
+    and not has_table_privilege('anon', 'public.server_runtime_config', 'insert')
+    and not has_table_privilege('anon', 'public.server_runtime_config', 'update')
+    and not has_table_privilege('anon', 'public.server_runtime_config', 'delete')
+    and not has_table_privilege('authenticated', 'public.server_runtime_config', 'select')
+    and not has_table_privilege('authenticated', 'public.server_runtime_config', 'insert')
+    and not has_table_privilege('authenticated', 'public.server_runtime_config', 'update')
+    and not has_table_privilege('authenticated', 'public.server_runtime_config', 'delete'),
+  'Neither anon nor authenticated has privileges on public.server_runtime_config'
+);
+
+-- 23. service_role has privileges on public.server_runtime_config
+select ok(
+  has_table_privilege('service_role', 'public.server_runtime_config', 'select')
+    and has_table_privilege('service_role', 'public.server_runtime_config', 'insert')
+    and has_table_privilege('service_role', 'public.server_runtime_config', 'update')
+    and has_table_privilege('service_role', 'public.server_runtime_config', 'delete'),
+  'service_role has full select, insert, update, delete on public.server_runtime_config'
 );
 
 select * from finish();

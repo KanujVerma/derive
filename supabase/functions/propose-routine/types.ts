@@ -135,5 +135,7 @@ export interface RoutineIntelligenceProposal {
 }
 
 export interface RoutineIntelligenceProvider {
+  readonly providerId: string;
   generateProposal(context: AssembledRoutineContext): Promise<RoutineIntelligenceProposal>;
 }
+

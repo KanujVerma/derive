@@ -1,5 +1,5 @@
 // Canonical Context Assembler & Fail-Closed Validation
-// Part of DERIVE I1-B2.1: Real Model Intelligence, Trust Semantics & Error-Boundary Closure
+// Part of DERIVE I1-B2.2: Provider-Neutral Intelligence Boundary, Catalog Provenance & Trust Closure
 
 import type {
   AssembledRoutineContext,
@@ -11,6 +11,7 @@ import type {
 } from './types.ts';
 import { VALID_CATEGORIES } from './validator.ts';
 
+// Exact canonical enums strictly matching src/types/schema.ts
 const ALLOWED_PRIMARY_GOALS = new Set<string>([
   'breakouts',
   'dark_spots',
@@ -21,22 +22,18 @@ const ALLOWED_PRIMARY_GOALS = new Set<string>([
   'fine_lines',
   'simplify',
   'maintain',
-  'aging', // Database enum includes 'aging'
 ]);
 
 const ALLOWED_COMPLEXITY = new Set<string>([
   'simple',
   'balanced',
   'maximize',
-  'moderate',   // Database enum includes 'moderate'
-  'multi_step', // Database enum includes 'multi_step'
 ]);
 
 const ALLOWED_COST = new Set<string>([
-  'essential',
+  'value',
   'balanced',
   'premium',
-  'value',
 ]);
 
 const ALLOWED_MIDDAY_FEEL = new Set<string>([
@@ -45,9 +42,19 @@ const ALLOWED_MIDDAY_FEEL = new Set<string>([
   'oily_shiny',
   'combination',
   'unsure',
-  'dry',      // Database enum includes 'dry'
-  'balanced', // Database enum includes 'balanced'
-  'oily',     // Database enum includes 'oily'
+]);
+
+const ALLOWED_PREGNANCY_STATUS = new Set<string>([
+  'yes',
+  'no',
+  'prefer_not_to_say',
+  'unanswered',
+]);
+
+const ALLOWED_SENSITIVITIES_STATUS = new Set<string>([
+  'none_known',
+  'reported',
+  'unanswered',
 ]);
 
 export interface ContextAssemblyResult {
@@ -70,6 +77,7 @@ export function assembleCanonicalContext(
     };
   }
 
+  // 1. Primary Goal (Required)
   const primaryGoal = skinProfile?.primary_goal || payloadSnapshot?.primaryGoal;
   if (!primaryGoal || !ALLOWED_PRIMARY_GOALS.has(primaryGoal)) {
     return {
@@ -79,6 +87,7 @@ export function assembleCanonicalContext(
     };
   }
 
+  // 2. Routine Complexity (Required)
   const routineComplexity = skinProfile?.routine_complexity || payloadSnapshot?.routineComplexity;
   if (!routineComplexity || !ALLOWED_COMPLEXITY.has(routineComplexity)) {
     return {
@@ -88,57 +97,112 @@ export function assembleCanonicalContext(
     };
   }
 
-  const costPreference = skinProfile?.cost_preference || payloadSnapshot?.costPreference || 'balanced';
-  if (!ALLOWED_COST.has(costPreference)) {
+  // 3. Product Cost Preference (Required - Fail closed, no silent default)
+  const costPreference = skinProfile?.cost_preference || payloadSnapshot?.costPreference;
+  if (!costPreference || !ALLOWED_COST.has(costPreference)) {
     return {
       valid: false,
       code: 'INTAKE_CONTEXT_INVALID',
-      error: `Invalid costPreference '${costPreference}'.`,
+      error: `Invalid or missing costPreference '${costPreference}'. Must be one of canonical cost preferences.`,
     };
   }
 
-  const middayFeel = skinProfile?.midday_feel || payloadSnapshot?.middayFeel || 'comfortable';
-  if (!ALLOWED_MIDDAY_FEEL.has(middayFeel)) {
+  // 4. Midday Feel (Required - Fail closed, no silent default)
+  const middayFeel = skinProfile?.midday_feel || payloadSnapshot?.middayFeel;
+  if (!middayFeel || !ALLOWED_MIDDAY_FEEL.has(middayFeel)) {
     return {
       valid: false,
       code: 'INTAKE_CONTEXT_INVALID',
-      error: `Invalid middayFeel '${middayFeel}'.`,
+      error: `Invalid or missing middayFeel '${middayFeel}'. Must be one of canonical midday feel values.`,
     };
   }
 
+  // 5. Secondary Goals (All must be canonical goals)
+  const rawSecondary = Array.isArray(skinProfile?.secondary_goals)
+    ? skinProfile.secondary_goals
+    : Array.isArray(payloadSnapshot?.secondaryGoals)
+    ? payloadSnapshot.secondaryGoals
+    : [];
+
+  for (const g of rawSecondary) {
+    if (!ALLOWED_PRIMARY_GOALS.has(g)) {
+      return {
+        valid: false,
+        code: 'INTAKE_CONTEXT_INVALID',
+        error: `Invalid secondary goal '${g}'. Must be one of canonical goals.`,
+      };
+    }
+  }
+
+  // 6. Safety Context
   const safety = payloadSnapshot?.safetyContext || {};
   const isPregnant =
     skinProfile?.is_pregnant_or_nursing === true ||
     safety.isPregnantOrNursing === true ||
     skinProfile?.pregnancy_status === 'yes';
 
-  const confirmedProducts = (payloadSnapshot?.confirmedProducts || []).map((p: any) => {
+  const rawPregStatus = skinProfile?.pregnancy_status || safety.pregnancyStatus || (isPregnant ? 'yes' : 'unanswered');
+  if (!ALLOWED_PREGNANCY_STATUS.has(rawPregStatus)) {
+    return {
+      valid: false,
+      code: 'INTAKE_CONTEXT_INVALID',
+      error: `Invalid pregnancyStatus '${rawPregStatus}'.`,
+    };
+  }
+
+  const rawSensStatus = skinProfile?.sensitivities_status || safety.sensitivitiesStatus || 'unanswered';
+  if (!ALLOWED_SENSITIVITIES_STATUS.has(rawSensStatus)) {
+    return {
+      valid: false,
+      code: 'INTAKE_CONTEXT_INVALID',
+      error: `Invalid sensitivitiesStatus '${rawSensStatus}'.`,
+    };
+  }
+
+  // 7. Confirmed Products (Must have valid non-empty identity, zero fake fallback)
+  const confirmedRaw = payloadSnapshot?.confirmedProducts || skinProfile?.confirmed_products || skinProfile?.confirmedProducts || [];
+  const confirmedProducts: Array<{
+    brand: string;
+    name: string;
+    category?: ProductCategory | string;
+    keyActives?: string[];
+  }> = [];
+
+  for (const p of confirmedRaw) {
+    const brand = (p.brand || p.detectedBrand || '').trim();
+    const name = (p.name || p.detectedName || p.productName || '').trim();
+
+    if (!brand || !name) {
+      return {
+        valid: false,
+        code: 'INTAKE_CONTEXT_INVALID',
+        error: 'Confirmed shelf product has malformed identity: missing non-empty brand or product name.',
+      };
+    }
+
     const rawCat = (p.category || 'other').toLowerCase();
     const category = VALID_CATEGORIES.has(rawCat) ? (rawCat as ProductCategory) : 'other';
-    return {
-      brand: p.brand || p.detectedBrand || 'Unknown Brand',
-      name: p.name || p.detectedName || p.productName || 'Unknown Product',
+
+    confirmedProducts.push({
+      brand,
+      name,
       category,
       keyActives: Array.isArray(p.keyActives) ? p.keyActives : [],
-    };
-  });
+    });
+  }
 
   const context: AssembledRoutineContext = {
     userId: skinProfile?.user_id || payloadSnapshot?.userId || '',
     primaryGoal: primaryGoal as Goal,
-    secondaryGoals: Array.isArray(skinProfile?.secondary_goals)
-      ? skinProfile.secondary_goals
-      : Array.isArray(payloadSnapshot?.secondaryGoals)
-      ? payloadSnapshot.secondaryGoals
-      : [],
+    secondaryGoals: rawSecondary as Goal[],
     routineComplexity: routineComplexity as RoutineComplexity,
     costPreference: costPreference as ProductCostPreference,
     middayFeel: middayFeel as MiddayFeel,
     postCleanseTightness:
       skinProfile?.post_cleanse_tightness ?? payloadSnapshot?.postCleanseTightness ?? false,
     isPregnantOrNursing: isPregnant,
-    pregnancyStatus: (skinProfile?.pregnancy_status || safety.pregnancyStatus || (isPregnant ? 'yes' : 'unanswered')) as any,
-    sensitivitiesStatus: (skinProfile?.sensitivities_status || safety.sensitivitiesStatus || 'unanswered') as any,
+    pregnancyStatus: rawPregStatus as 'yes' | 'no' | 'prefer_not_to_say' | 'unanswered',
+    sensitivitiesStatus: rawSensStatus as 'none_known' | 'reported' | 'unanswered',
     knownSensitivities: Array.isArray(skinProfile?.known_sensitivities)
       ? skinProfile.known_sensitivities
       : Array.isArray(safety.knownSensitivities)

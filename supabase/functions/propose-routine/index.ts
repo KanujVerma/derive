@@ -1,5 +1,5 @@
 // Supabase Edge Function: propose-routine
-// DERIVE I1-B2.1 Real Model Intelligence, Trust Semantics & Error-Boundary Closure
+// DERIVE I1-B2.2: Provider-Neutral Intelligence Boundary, Catalog Provenance & Trust Closure
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
@@ -9,17 +9,19 @@ import type {
   RoutineErrorResponse,
   RoutineIntelligenceProposal,
 } from './types.ts';
-import { formatRoutineStepScheduleText, validateRoutineProposal } from './validator.ts';
-import { assembleCanonicalContext } from './context.ts';
 import {
-  DEFAULT_GEMINI_MODEL,
-  callGeminiProposalProvider,
-  createDeterministicTestProposal,
-} from './gemini-provider.ts';
+  formatRoutineStepScheduleText,
+  validateRoutineProposal,
+  validateSensitivities,
+  type TrustedProductInfo,
+} from './validator.ts';
+import { assembleCanonicalContext } from './context.ts';
+import { resolveRoutineProvider } from './provider.ts';
 
+// Section 10: x-routine-fixture completely removed from CORS and request inspection
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-routine-fixture",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -61,34 +63,42 @@ Deno.serve(async (req: Request) => {
     }
 
     const userId = user.id;
-    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // 2. Verify committed onboarding intake
+    // Service-role client for verified data pipeline execution
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // 2. Fail closed unless customer has committed onboarding intake
     const { data: submission, error: subErr } = await adminClient
       .from("onboarding_submissions")
-      .select("*")
+      .select("id, status, payload_snapshot")
       .eq("user_id", userId)
       .eq("status", "committed")
       .maybeSingle();
 
-    if (subErr || !submission) {
+    if (subErr) {
+      console.error(`[propose-routine] Error querying onboarding_submissions: ${subErr.message}`);
+      return errorResponse("INTERNAL_ERROR", "Failed to verify onboarding intake status.", 500);
+    }
+
+    if (!submission) {
       return errorResponse(
         "INTAKE_NOT_COMMITTED",
-        "Cannot generate routine proposal: onboarding intake has not been committed.",
+        "Please complete and submit your onboarding intake before requesting a routine.",
         400
       );
     }
 
-    // 3. Replay Idempotency: Check if version-1 routine ALREADY exists
+    // 3. Replay Idempotency: if version-1 routine already exists, assemble and return it directly
     const { data: existingRoutine } = await adminClient
       .from("routines")
-      .select("*")
+      .select("id, version, status, summary_sentence, created_at, updated_at, published_at")
       .eq("user_id", userId)
       .eq("version", 1)
       .maybeSingle();
 
     if (existingRoutine) {
-      // Replay existing routine and its items + user_products
       const { data: items } = await adminClient
         .from("routine_items")
         .select("*")
@@ -97,21 +107,20 @@ Deno.serve(async (req: Request) => {
 
       const { data: upRows } = await adminClient
         .from("user_products")
-        .select("*, products(*)")
+        .select("id, product_id, action, action_reason, frequency_nights_per_week, is_confirmed_by_user, products(id, brand, name, category, key_actives, full_ingredients, retail_price_approx)")
         .eq("user_id", userId);
 
       const amSteps = (items || [])
-        .filter((item: any) => item.timing === "am")
+        .filter((i: any) => i.timing === "am")
         .map((item: any) => ({
-          id: item.id,
           order: item.order_index,
-          productId: item.product_id || "",
+          timing: "am" as const,
+          productId: item.product_id,
           productName: item.product_name,
           brand: item.brand,
           category: item.category,
           amount: item.amount,
           area: item.area,
-          timing: item.timing,
           days: item.days || [],
           purpose: item.purpose,
           whyChosen: item.why_chosen,
@@ -120,17 +129,16 @@ Deno.serve(async (req: Request) => {
         }));
 
       const pmSteps = (items || [])
-        .filter((item: any) => item.timing === "pm")
+        .filter((i: any) => i.timing === "pm")
         .map((item: any) => ({
-          id: item.id,
           order: item.order_index,
-          productId: item.product_id || "",
+          timing: "pm" as const,
+          productId: item.product_id,
           productName: item.product_name,
           brand: item.brand,
           category: item.category,
           amount: item.amount,
           area: item.area,
-          timing: item.timing,
           days: item.days || [],
           purpose: item.purpose,
           whyChosen: item.why_chosen,
@@ -140,8 +148,8 @@ Deno.serve(async (req: Request) => {
 
       const userProducts = (upRows || []).map((row: any) => ({
         id: row.id,
-        userId: row.user_id,
-        productId: row.product_id || "",
+        userId,
+        productId: row.product_id,
         action: row.action,
         actionReason: row.action_reason || "",
         frequencyNightsPerWeek: row.frequency_nights_per_week ?? undefined,
@@ -160,9 +168,9 @@ Deno.serve(async (req: Request) => {
             }
           : {
               id: row.product_id || row.id,
-              brand: row.detected_brand || "Unknown",
-              name: row.detected_name || "Unknown Product",
-              category: "other",
+              brand: "",
+              name: "",
+              category: "other" as const,
               keyActives: [],
             },
       }));
@@ -171,7 +179,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           routine: {
             id: existingRoutine.id,
-            userId: existingRoutine.user_id,
+            userId,
             version: existingRoutine.version,
             status: existingRoutine.status,
             summarySentence: existingRoutine.summary_sentence,
@@ -191,7 +199,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 4. Assemble canonical context & Fail-Closed Validation
+    // 4. Assemble canonical context & fail closed on invalid or missing data
     const { data: skinProfile } = await adminClient
       .from("skin_profiles")
       .select("*")
@@ -209,43 +217,35 @@ Deno.serve(async (req: Request) => {
 
     const context = assemblyResult.context;
 
-    // 5. Generate Routine Proposal via Model or Test Seam
+    // 5. Resolve Provider-Neutral Routine Intelligence Provider
+    // Selection is strictly server-side runtime configuration. Customer requests cannot select a provider.
+    const provider = await resolveRoutineProvider(adminClient);
+    if (!provider) {
+      console.error("[propose-routine] No model provider configured (ROUTINE_MODEL_PROVIDER is unset)");
+      return errorResponse(
+        "MODEL_UNAVAILABLE",
+        "Routine intelligence service is temporarily unavailable.",
+        503
+      );
+    }
+
     let proposal: RoutineIntelligenceProposal;
-
-    const isFixtureMode =
-      req.headers.get("x-routine-fixture") === "true" ||
-      Deno.env.get("ROUTINE_FIXTURE_MODE") === "true";
-
-    if (isFixtureMode) {
-      proposal = createDeterministicTestProposal(context);
-    } else {
-      const apiKey = Deno.env.get("GEMINI_API_KEY");
-      if (!apiKey) {
-        console.error("[propose-routine] Missing GEMINI_API_KEY server secret");
+    try {
+      proposal = await provider.generateProposal(context);
+    } catch (provErr: any) {
+      console.error(`[propose-routine] Provider '${provider.providerId}' execution failed: ${provErr?.message}`);
+      if (provErr?.code === "MODEL_OUTPUT_INVALID") {
         return errorResponse(
-          "MODEL_UNAVAILABLE",
-          "Routine intelligence service is temporarily unavailable.",
-          503
+          "MODEL_OUTPUT_INVALID",
+          "Routine intelligence returned an invalid response structure.",
+          502
         );
       }
-
-      const model = Deno.env.get("GEMINI_MODEL") || DEFAULT_GEMINI_MODEL;
-      try {
-        proposal = await callGeminiProposalProvider(context, apiKey, model);
-      } catch (provErr: any) {
-        if (provErr.code === "MODEL_OUTPUT_INVALID") {
-          return errorResponse(
-            "MODEL_OUTPUT_INVALID",
-            "Routine intelligence returned an invalid response structure.",
-            502
-          );
-        }
-        return errorResponse(
-          "MODEL_UNAVAILABLE",
-          "Routine intelligence service is temporarily unavailable.",
-          503
-        );
-      }
+      return errorResponse(
+        "MODEL_UNAVAILABLE",
+        "Routine intelligence service is temporarily unavailable.",
+        503
+      );
     }
 
     // 6. Check for Clarification Questions
@@ -274,7 +274,93 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 8. Atomic Relational Persistence RPC
+    // 8. Catalog Provenance & Sensitivity Evaluation against Trusted Database Records
+    const { data: dbCatalogRows, error: catErr } = await adminClient
+      .from("products")
+      .select("id, brand, name, category, key_actives, full_ingredients, retail_price_approx, is_catalog_standard");
+
+    if (catErr) {
+      console.error(`[propose-routine] Failed reading products catalog: ${catErr.message}`);
+      return errorResponse("INTERNAL_ERROR", "Failed to verify catalog products.", 500);
+    }
+
+    const trustedMap = new Map<string, TrustedProductInfo>();
+    for (const p of dbCatalogRows || []) {
+      const key = `${p.brand.trim().toLowerCase()}::${p.name.trim().toLowerCase()}`;
+      trustedMap.set(key, {
+        brand: p.brand,
+        name: p.name,
+        category: p.category,
+        isCatalogStandard: p.is_catalog_standard === true,
+        fullIngredients: Array.isArray(p.full_ingredients) ? p.full_ingredients : [],
+        keyActives: Array.isArray(p.key_actives) ? p.key_actives : [],
+      });
+    }
+
+    // Section 21: Reported Sensitivities Verification
+    const sensValidation = validateSensitivities(proposal, context, trustedMap);
+    if (!sensValidation.valid) {
+      console.error(`[propose-routine] Sensitivity validation failed: ${sensValidation.errors.join("; ")}`);
+      return errorResponse(
+        "VALIDATION_FAILED",
+        `Routine validation failed: ${sensValidation.errors.join("; ")}`,
+        422
+      );
+    }
+
+    // 9. Prepare Catalog Products Payload with Provenance Protection
+    // Section 18 & 19: Trusted catalog rows cannot be overwritten; new proposed products are non-catalog-standard
+    const catalogProductsPayload = proposal.catalogProducts.map((cp: any) => {
+      const key = `${cp.brand.trim().toLowerCase()}::${cp.name.trim().toLowerCase()}`;
+      const trusted = trustedMap.get(key);
+
+      if (trusted && trusted.isCatalogStandard) {
+        return {
+          brand: trusted.brand,
+          name: trusted.name,
+          category: trusted.category,
+          key_actives: trusted.keyActives,
+          full_ingredients: trusted.fullIngredients,
+          is_catalog_standard: true,
+        };
+      }
+
+      // New or unverified product proposal
+      return {
+        brand: cp.brand.trim(),
+        name: cp.name.trim(),
+        category: cp.category,
+        key_actives: cp.keyActives || cp.key_actives || [],
+        full_ingredients: [],
+        retail_price_approx: null,
+        is_catalog_standard: false,
+      };
+    });
+
+    // 10. Prepare User Products Payload with Provenance Preservation
+    // Section 22 & 23: Onboarding-confirmed shelf products retain is_confirmed_by_user = true across action updates.
+    // New provider-proposed additions are is_confirmed_by_user = false.
+    const confirmedShelfKeys = new Set(
+      context.confirmedProducts.map((p) => `${p.brand.trim().toLowerCase()}::${p.name.trim().toLowerCase()}`)
+    );
+
+    const userProductsPayload = proposal.productDecisions.map((d: any) => {
+      const brand = (d.brand || '').trim();
+      const name = (d.productName ?? d.product_name ?? '').trim();
+      const key = `${brand.toLowerCase()}::${name.toLowerCase()}`;
+      const isConfirmed = confirmedShelfKeys.has(key) && d.action !== 'ADD';
+
+      return {
+        detected_brand: brand,
+        detected_name: name,
+        action: d.action,
+        action_reason: d.actionReason ?? d.action_reason,
+        frequency_nights_per_week: d.frequencyNightsPerWeek ?? d.frequency_nights_per_week,
+        is_confirmed_by_user: isConfirmed,
+      };
+    });
+
+    // 11. Prepare Routine Items Payload
     const routineItemsPayload = [
       ...proposal.amSteps.map((s: any) => ({
         order_index: s.order_index ?? s.order,
@@ -304,31 +390,13 @@ Deno.serve(async (req: Request) => {
       })),
     ];
 
-    // DEFECT D Fix: AI recommendations are proposals, NOT member-confirmed truth.
-    // Set is_confirmed_by_user = false for persisted recommendation rows.
-    const userProductsPayload = proposal.productDecisions.map((d: any) => ({
-      detected_brand: d.brand,
-      detected_name: d.productName ?? d.product_name,
-      action: d.action,
-      action_reason: d.actionReason ?? d.action_reason,
-      frequency_nights_per_week: d.frequencyNightsPerWeek ?? d.frequency_nights_per_week,
-      is_confirmed_by_user: false,
-    }));
-
+    // 12. Execute Atomic Relational Persistence RPC
     const { data: rpcResult, error: rpcErr } = await adminClient.rpc("commit_routine_proposal", {
       p_user_id: userId,
       p_version: 1,
       p_summary_sentence: proposal.summarySentence,
       p_founder_notes: null,
-      p_products: proposal.catalogProducts.map((cp: any) => ({
-        brand: cp.brand,
-        name: cp.name,
-        category: cp.category,
-        key_actives: cp.keyActives || cp.key_actives || [],
-        full_ingredients: cp.fullIngredients || cp.full_ingredients || [],
-        retail_price_approx: cp.retailPriceApprox ?? cp.retail_price_approx,
-        is_catalog_standard: cp.isCatalogStandard ?? true,
-      })),
+      p_products: catalogProductsPayload,
       p_routine_items: routineItemsPayload,
       p_user_products: userProductsPayload,
       p_task_notes: "Initial routine generated (v1). Awaiting founder review.",
@@ -345,7 +413,7 @@ Deno.serve(async (req: Request) => {
 
     const routineId = rpcResult.routine_id;
 
-    // 9. Read back persisted canonical structure
+    // 13. Read back persisted canonical structure
     const { data: routineRow } = await adminClient
       .from("routines")
       .select("id, user_id, version, status, summary_sentence, created_at, updated_at, published_at")
@@ -360,21 +428,20 @@ Deno.serve(async (req: Request) => {
 
     const { data: upRows } = await adminClient
       .from("user_products")
-      .select("*, products(*)")
+      .select("id, product_id, action, action_reason, frequency_nights_per_week, is_confirmed_by_user, products(id, brand, name, category, key_actives, full_ingredients, retail_price_approx)")
       .eq("user_id", userId);
 
     const amSteps = (items || [])
-      .filter((item: any) => item.timing === "am")
+      .filter((i: any) => i.timing === "am")
       .map((item: any) => ({
-        id: item.id,
         order: item.order_index,
-        productId: item.product_id || "",
+        timing: "am" as const,
+        productId: item.product_id,
         productName: item.product_name,
         brand: item.brand,
         category: item.category,
         amount: item.amount,
         area: item.area,
-        timing: item.timing,
         days: item.days || [],
         purpose: item.purpose,
         whyChosen: item.why_chosen,
@@ -383,17 +450,16 @@ Deno.serve(async (req: Request) => {
       }));
 
     const pmSteps = (items || [])
-      .filter((item: any) => item.timing === "pm")
+      .filter((i: any) => i.timing === "pm")
       .map((item: any) => ({
-        id: item.id,
         order: item.order_index,
-        productId: item.product_id || "",
+        timing: "pm" as const,
+        productId: item.product_id,
         productName: item.product_name,
         brand: item.brand,
         category: item.category,
         amount: item.amount,
         area: item.area,
-        timing: item.timing,
         days: item.days || [],
         purpose: item.purpose,
         whyChosen: item.why_chosen,
@@ -403,8 +469,8 @@ Deno.serve(async (req: Request) => {
 
     const userProducts = (upRows || []).map((row: any) => ({
       id: row.id,
-      userId: row.user_id,
-      productId: row.product_id || "",
+      userId,
+      productId: row.product_id,
       action: row.action,
       actionReason: row.action_reason || "",
       frequencyNightsPerWeek: row.frequency_nights_per_week ?? undefined,
@@ -423,9 +489,9 @@ Deno.serve(async (req: Request) => {
           }
         : {
             id: row.product_id || row.id,
-            brand: row.detected_brand || "Unknown",
-            name: row.detected_name || "Unknown Product",
-            category: "other",
+            brand: "",
+            name: "",
+            category: "other" as const,
             keyActives: [],
           },
     }));
@@ -434,7 +500,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         routine: {
           id: routineRow.id,
-          userId: routineRow.user_id,
+          userId,
           version: routineRow.version,
           status: routineRow.status,
           summarySentence: routineRow.summary_sentence,
@@ -453,7 +519,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (err: any) {
-    // DEFECT E Fix: Customer-safe error boundary. Do NOT leak stacks or provider errors.
+    // Customer-safe error boundary. Zero internal leakages.
     console.error(`[propose-routine] Internal error: ${err?.message}`);
     return errorResponse("INTERNAL_ERROR", "An unexpected internal error occurred.", 500);
   }

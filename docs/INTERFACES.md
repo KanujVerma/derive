@@ -122,6 +122,18 @@ export interface IDeriveService {
      - `propose-routine` Edge Function strictly returns typed, customer-safe JSON: `{ error: string, code: RoutineErrorCode }`.
      - Canonical error codes: `UNAUTHORIZED` (401), `INTAKE_NOT_COMMITTED` (400), `INTAKE_CONTEXT_INVALID` (400), `MODEL_UNAVAILABLE` (503), `MODEL_OUTPUT_INVALID` (502), `CLARIFICATION_REQUIRED` (422), `VALIDATION_FAILED` (422), `PERSISTENCE_FAILED` (500), `INTERNAL_ERROR` (500).
      - Security Invariant: Zero stack traces, SQL constraints, table names, Postgres internal errors, or LLM provider errors may be emitted to the client.
+  8. **Provider-Neutral Intelligence Boundary (`RoutineIntelligenceProvider`) [DELIVERED IN B2.2]**:
+     - Edge Function decoupled behind provider interface: `{ readonly providerId: string; generateProposal(context: AssembledRoutineContext): Promise<RoutineIntelligenceProposal>; }`.
+     - Commercial provider selection is explicitly OPEN / DEFERRED (`ARCHITECTURE_CHALLENGE-05`). Swapping providers requires an adapter + verification, not a pipeline refactor.
+  9. **Zero Client-Side Provider Selection & Server Runtime Configuration [DELIVERED IN B2.2]**:
+     - Client-controllable provider defect removed: `x-routine-fixture` header completely eliminated. Clients can never select a provider or force fixture mode.
+     - Provider selection is strictly server-side runtime configuration: `ROUTINE_MODEL_PROVIDER` process env or secure `public.server_runtime_config` table restricted to `service_role`. Fails closed with 503 `MODEL_UNAVAILABLE` when unconfigured.
+     - Isolated `FixtureRoutineProvider` for reproducible CI and local E2E. Optional `GeminiRoutineProvider` adapter with header auth (`x-goog-api-key`).
+  10. **Catalog Provenance & Sensitivity Hardening [DELIVERED IN B2.2]**:
+      - Model output is untrusted. `commit_routine_proposal` RPC prevents overwriting `is_catalog_standard = true` products; new model-proposed products default to `is_catalog_standard = false` with empty formula fields.
+      - Post-model sensitivity evaluation (`validateSensitivities`): if member reported sensitivities, unverified formulas fail closed with `VALIDATION_FAILED`; trusted products containing known allergens fail closed.
+  11. **Confirmation Provenance Preservation [DELIVERED IN B2.2]**:
+      - `is_confirmed_by_user` semantics: denotes member confirmed having product in inventory, NOT member approval of an AI action. Existing shelf items retain `true` across actions (`KEEP`, `PAUSE`, `REPLACE`, `STOP`); new `ADD` items are `false`. Persistence never downgrades `true` to `false`.
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.

@@ -208,3 +208,82 @@ export function validateRoutineProposal(
     errors,
   };
 }
+
+export interface TrustedProductInfo {
+  brand: string;
+  name: string;
+  isCatalogStandard: boolean;
+  fullIngredients: string[];
+  keyActives: string[];
+}
+
+/**
+ * Validates proposed ADD/REPLACE products against member reported sensitivities.
+ * Section 21: If sensitivitiesStatus is 'reported', any added/replaced product
+ * must have verified trusted formula data; if unverified, fails closed.
+ * For trusted products, deterministically rejects ingredient matches.
+ */
+export function validateSensitivities(
+  proposal: RoutineIntelligenceProposal,
+  context: Partial<AssembledRoutineContext>,
+  trustedProducts: Map<string, TrustedProductInfo> | Record<string, TrustedProductInfo>
+): { valid: boolean; errors: string[]; error?: string } {
+  const errors: string[] = [];
+  const hasReportedSensitivities =
+    context?.sensitivitiesStatus === 'reported' &&
+    Array.isArray(context?.knownSensitivities) &&
+    context.knownSensitivities.length > 0;
+
+  if (!hasReportedSensitivities) {
+    return { valid: true, errors: [], error: '' };
+  }
+
+  const sensitivities = context.knownSensitivities!
+    .map((s) => (s ?? '').trim().toLowerCase())
+    .filter(Boolean);
+
+  for (const dec of proposal.productDecisions || []) {
+    if (dec.action === 'ADD' || dec.action === 'REPLACE') {
+      const brand = (dec.brand || '').trim().toLowerCase();
+      const displayName = ((dec as any).name || (dec as any).productName || (dec as any).product_name || '').trim();
+      const name = displayName.toLowerCase();
+      const key = `${brand}::${name}`;
+      const trusted = trustedProducts instanceof Map ? trustedProducts.get(key) : (trustedProducts as any)?.[key];
+
+      // Fail closed if formula is unverified for member with reported sensitivities
+      if (
+        !trusted ||
+        trusted.isCatalogStandard !== true ||
+        !trusted.fullIngredients ||
+        trusted.fullIngredients.length === 0
+      ) {
+        errors.push(
+          `Sensitivity safety invariant: Recommended product '${dec.brand} ${displayName}' has unverified formula and cannot be evaluated against reported sensitivities.`
+        );
+        continue;
+      }
+
+      // Check trusted ingredients for conflict
+      const allIngredients = [
+        ...(trusted.fullIngredients || []),
+        ...(trusted.keyActives || []),
+      ].map((i) => (i ?? '').toLowerCase());
+
+      for (const sens of sensitivities) {
+        const matched = allIngredients.find((ing) => ing.includes(sens) || sens.includes(ing));
+        if (matched) {
+          errors.push(
+            `Sensitivity safety invariant: Recommended product '${dec.brand} ${displayName}' contains sensitized ingredient matching '${sens}'.`
+          );
+          break;
+        }
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    error: errors.join('; '),
+  };
+}

@@ -6,10 +6,14 @@
 
 import { createClient } from '@supabase/supabase-js';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+
+const CONFIG_PATH = path.resolve('supabase/functions/propose-routine/.server-provider-config');
 
 const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -192,42 +196,51 @@ async function run() {
   }
 
   // -------------------------------------------------------------
-  // Step 5A: Verify propose-routine without key/fixture returns MODEL_UNAVAILABLE (503)
+  // Step 5A: Client cannot select provider; missing provider returns 503 MODEL_UNAVAILABLE
   // -------------------------------------------------------------
-  console.log('5A. Testing propose-routine live model unavailability when key absent (fail-closed check)...');
+  console.log('5A. Testing propose-routine client cannot select provider via x-routine-fixture (fail-closed check)...');
   {
-    const propResNoFixture = await fetch(`${SUPABASE_URL}/functions/v1/propose-routine`, {
+    await adminClient.from('server_runtime_config').delete().eq('key', 'routine_model_provider');
+
+    const propResWithClientHeader = await fetch(`${SUPABASE_URL}/functions/v1/propose-routine`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${userJwt}`,
+        'x-routine-fixture': 'true', // Client attempts to force fixture
       },
       body: JSON.stringify({}),
     });
-    // In local env without GEMINI_API_KEY, this must return 503 MODEL_UNAVAILABLE (zero hardcoded branded fallback)
-    if (!process.env.GEMINI_API_KEY) {
-      assert.equal(propResNoFixture.status, 503, 'propose-routine without key/fixture must return 503 MODEL_UNAVAILABLE');
-      const errBody = await propResNoFixture.json();
+    // Server must ignore client fixture header and fail closed if no server provider is configured
+    if (!process.env.ROUTINE_MODEL_PROVIDER && !process.env.GEMINI_API_KEY) {
+      assert.equal(propResWithClientHeader.status, 503, 'propose-routine with client fixture header on unconfigured server must return 503 MODEL_UNAVAILABLE');
+      const errBody = await propResWithClientHeader.json();
       assert.equal(errBody.code, 'MODEL_UNAVAILABLE');
       assert.ok(!errBody.stack, 'Error response must never contain stack traces');
-      console.log('   ✓ propose-routine strictly rejects missing model provider with 503 MODEL_UNAVAILABLE (no fake fallback)');
+      console.log('   ✓ propose-routine strictly rejects client-side provider selection; unconfigured server returns 503 MODEL_UNAVAILABLE');
     } else {
-      console.log('   (GEMINI_API_KEY detected in environment; skipping 503 assertion)');
+      console.log('   (Server-level provider env detected; skipping 503 assertion)');
     }
   }
 
   // -------------------------------------------------------------
-  // Step 5B: Trigger Initial Routine Generation via propose-routine in Test Fixture Mode
+  // Step 5B: Trigger Initial Routine Generation via Server-Configured Fixture Provider
   // -------------------------------------------------------------
-  console.log('5B. Triggering initial routine generation (propose-routine with x-routine-fixture)...');
+  console.log('5B. Triggering initial routine generation via server-configured fixture provider (no client fixture header)...');
   let proposalResult;
   {
+    // Configure server-side fixture provider via secure server_runtime_config
+    const { error: cfgErr } = await adminClient
+      .from('server_runtime_config')
+      .upsert({ key: 'routine_model_provider', value: 'fixture' });
+    assert.ok(!cfgErr, `Failed configuring server provider: ${cfgErr?.message}`);
+
     const propRes = await fetch(`${SUPABASE_URL}/functions/v1/propose-routine`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${userJwt}`,
-        'x-routine-fixture': 'true',
+        // ZERO client fixture headers!
       },
       body: JSON.stringify({}),
     });
@@ -307,22 +320,22 @@ async function run() {
       assert.ok(prod, `product_id ${item.product_id} must exist in products table`);
     }
 
-    // User products table
+    // User products table: Check confirmation provenance and catalog provenance
     const { data: dbUserProds, error: upErr } = await adminClient
       .from('user_products')
-      .select('*')
+      .select('*, products(*)')
       .eq('user_id', userId);
     assert.ok(!upErr && dbUserProds.length > 0, 'user_products rows must exist');
     for (const up of dbUserProds) {
       assert.ok(['KEEP', 'PAUSE', 'REPLACE', 'ADD', 'STOP'].includes(up.action));
-      assert.equal(up.is_confirmed_by_user, false, 'AI proposal products must have is_confirmed_by_user = false');
+      if (up.action === 'ADD') {
+        assert.equal(up.is_confirmed_by_user, false, 'Newly proposed ADD product must have is_confirmed_by_user = false');
+      } else {
+        // Shelf items confirmed during onboarding must NOT be downgraded to false
+        assert.equal(up.is_confirmed_by_user, true, `Shelf item (${up.detected_brand} ${up.detected_name}) must retain is_confirmed_by_user = true`);
+      }
       if (up.product_id) {
-        const { data: prod } = await adminClient
-          .from('products')
-          .select('*')
-          .eq('id', up.product_id)
-          .single();
-        assert.ok(prod, `user_products product_id must reference canonical products row`);
+        assert.ok(up.products, 'Joined products row must reference canonical products row');
       }
     }
 
@@ -335,7 +348,7 @@ async function run() {
       .single();
     assert.ok(task, 'Founder review task must exist');
     assert.equal(task.status, 'pending');
-    console.log('   ✓ Relational database integrity, product normalization, and FKs confirmed');
+    console.log('   ✓ Relational database integrity, product normalization, confirmation preservation, and FKs confirmed');
   }
 
   // -------------------------------------------------------------
@@ -399,7 +412,12 @@ async function run() {
   console.log('\n=== ALL DERIVE I1-B2 LOCAL E2E VERIFICATION CHECKS PASSED ===\n');
 }
 
-run().catch((err) => {
+run().finally(async () => {
+  if (fs.existsSync(CONFIG_PATH)) {
+    fs.unlinkSync(CONFIG_PATH);
+  }
+  await adminClient.from('server_runtime_config').delete().eq('key', 'routine_model_provider');
+}).catch((err) => {
   console.error('\n❌ B2 E2E TEST FAILED:', err);
   process.exit(1);
 });

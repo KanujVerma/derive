@@ -26,6 +26,9 @@ export {
   callGeminiProposalProvider,
   createDeterministicTestProposal,
 } from '../../../supabase/functions/propose-routine/gemini-provider.ts';
+export { FixtureRoutineProvider } from '../../../supabase/functions/propose-routine/fixture-provider.ts';
+export { GeminiRoutineProvider } from '../../../supabase/functions/propose-routine/gemini-adapter.ts';
+export { resolveRoutineProvider } from '../../../supabase/functions/propose-routine/provider.ts';
 
 import {
   assembleCanonicalContext,

@@ -61,6 +61,7 @@ import {
 } from '../src/phenotype/index.ts';
 import {
   validateRoutineProposal,
+  validateSensitivities,
   assembleRoutineContext,
   assembleCanonicalContext,
   buildGeminiPrompt,
@@ -69,8 +70,13 @@ import {
   callGeminiProposalProvider,
   generateContextGroundedProposal,
   formatRoutineStepScheduleText,
+  FixtureRoutineProvider,
+  GeminiRoutineProvider,
+  resolveRoutineProvider,
   type AssembledRoutineContext,
   type RoutineIntelligenceProposal,
+  type RoutineIntelligenceProvider,
+  type TrustedProductInfo,
 } from '../src/services/ai-workflows/routine-intelligence.ts';
 
 // ========================================================
@@ -5497,6 +5503,381 @@ test('I1-B2.1 Trust Semantics & Error Boundary: Unconfirmed product decisions an
     assert.ok(!err.message.includes('foreign key'));
     assert.ok(!err.message.includes('violates'));
   }
+});
+
+// ========================================================
+// 30. I1-B2.2 PROVIDER-NEUTRAL BOUNDARY, CATALOG PROVENANCE & TRUST CLOSURE TESTS
+// ========================================================
+
+test('I1-B2.2: RoutineIntelligenceProvider interface and deterministic FixtureRoutineProvider', async () => {
+  const provider: RoutineIntelligenceProvider = new FixtureRoutineProvider();
+  assert.equal(provider.providerId, 'fixture');
+
+  const context: AssembledRoutineContext = {
+    userId: 'usr_b2_provider_test',
+    primaryGoal: 'breakouts',
+    secondaryGoals: ['texture'],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'combination',
+    postCleanseTightness: false,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: [],
+    confirmedProducts: [
+      {
+        brand: 'CeraVe',
+        name: 'Foaming Facial Cleanser',
+        category: 'cleanser',
+        keyActives: ['Ceramides', 'Niacinamide'],
+      },
+    ],
+    productReactions: [],
+    formulaSnapshots: [],
+  };
+
+  const proposal = await provider.generateProposal(context);
+  assert.ok(proposal.summarySentence);
+  assert.ok(proposal.amSteps.length > 0);
+  assert.ok(proposal.pmSteps.length > 0);
+  assert.ok(proposal.productDecisions.length > 0);
+});
+
+test('I1-B2.2: Optional GeminiRoutineProvider uses header auth and fails closed without API key', async () => {
+  const provider = new GeminiRoutineProvider('');
+  assert.equal(provider.providerId, 'gemini');
+
+  const context: AssembledRoutineContext = {
+    userId: 'usr_gemini_key_test',
+    primaryGoal: 'breakouts',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'combination',
+    postCleanseTightness: false,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: [],
+    confirmedProducts: [],
+    productReactions: [],
+    formulaSnapshots: [],
+  };
+
+  await assert.rejects(
+    async () => {
+      await provider.generateProposal(context);
+    },
+    (err: any) => {
+      assert.equal(err.code, 'MODEL_UNAVAILABLE');
+      assert.equal(err.status, 503);
+      return true;
+    }
+  );
+});
+
+test('I1-B2.2: GeminiRoutineProvider sends API key in header, never in URL query parameters', async () => {
+  const origFetch = globalThis.fetch;
+  let interceptedUrl = '';
+  let interceptedHeaders: any = {};
+
+  try {
+    globalThis.fetch = async (input: any, init?: any) => {
+      interceptedUrl = typeof input === 'string' ? input : input.url;
+      interceptedHeaders = init?.headers || {};
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      summarySentence: 'Structured test summary.',
+                      amSteps: [
+                        {
+                          order: 1,
+                          timing: 'am',
+                          brand: 'EltaMD',
+                          productName: 'UV Clear Broad-Spectrum SPF 46',
+                          category: 'sunscreen',
+                          amount: '2 finger lengths',
+                          area: 'Face and neck',
+                          days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+                          purpose: 'Daily broad-spectrum UV protection',
+                          whyChosen: 'Oil-free soothing formula with niacinamide',
+                        },
+                      ],
+                      pmSteps: [
+                        {
+                          order: 1,
+                          timing: 'pm',
+                          brand: 'CeraVe',
+                          productName: 'Foaming Facial Cleanser',
+                          category: 'cleanser',
+                          amount: '1 pump',
+                          area: 'Face',
+                          days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+                          purpose: 'Gentle evening cleanse',
+                          whyChosen: 'Removes excess oil without disrupting barrier',
+                        },
+                      ],
+                      productDecisions: [
+                        {
+                          brand: 'EltaMD',
+                          name: 'UV Clear Broad-Spectrum SPF 46',
+                          category: 'sunscreen',
+                          keyActives: ['Zinc Oxide', 'Niacinamide'],
+                          action: 'ADD',
+                          actionReason: 'Non-comedogenic daily UV defense',
+                        },
+                      ],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    };
+
+    const dummyKey = 'secret_test_key_12345';
+    const provider = new GeminiRoutineProvider(dummyKey, 'gemini-3.8-flash');
+    const context: AssembledRoutineContext = {
+      userId: 'usr_header_auth',
+      primaryGoal: 'breakouts',
+      secondaryGoals: [],
+      routineComplexity: 'simple',
+      costPreference: 'balanced',
+      middayFeel: 'combination',
+      postCleanseTightness: false,
+      isPregnantOrNursing: false,
+      pregnancyStatus: 'no',
+      sensitivitiesStatus: 'none_known',
+      knownSensitivities: [],
+      activePrescriptions: [],
+      confirmedProducts: [],
+      productReactions: [],
+      formulaSnapshots: [],
+    };
+
+    const res = await provider.generateProposal(context);
+    assert.ok(res);
+
+    // Assert zero key leakage in URL query parameters
+    assert.ok(!interceptedUrl.includes(dummyKey), 'API key must NEVER be passed in URL query parameters');
+    assert.ok(!interceptedUrl.includes('key='), 'URL must not have key= query parameter');
+
+    // Assert key passed in x-goog-api-key header
+    assert.equal(interceptedHeaders['x-goog-api-key'], dummyKey, 'API key must be passed in x-goog-api-key header');
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('I1-B2.2: Context validation fails closed on non-canonical enum values (zero fabricated defaults)', () => {
+  const baseProfile = {
+    user_id: 'usr_canonical_enum',
+    primary_goal: 'breakouts',
+    routine_complexity: 'simple',
+    cost_preference: 'balanced',
+    midday_feel: 'combination',
+    post_cleanse_tightness: false,
+    pregnancy_status: 'no',
+    sensitivities_status: 'none_known',
+    known_sensitivities: [],
+    active_prescriptions: [],
+    confirmed_products: [],
+  };
+
+  // 1. Non-canonical primaryGoal 'aging' (canonical is 'anti_aging')
+  const r1 = assembleCanonicalContext({ ...baseProfile, primary_goal: 'aging' }, null, []);
+  assert.equal(r1.valid, false);
+  assert.equal(r1.code, 'INTAKE_CONTEXT_INVALID');
+
+  // 2. Non-canonical routineComplexity 'moderate' (canonical is 'balanced')
+  const r2 = assembleCanonicalContext({ ...baseProfile, routine_complexity: 'moderate' }, null, []);
+  assert.equal(r2.valid, false);
+  assert.equal(r2.code, 'INTAKE_CONTEXT_INVALID');
+
+  // 3. Non-canonical routineComplexity 'multi_step' (canonical is 'maximize')
+  const r3 = assembleCanonicalContext({ ...baseProfile, routine_complexity: 'multi_step' }, null, []);
+  assert.equal(r3.valid, false);
+  assert.equal(r3.code, 'INTAKE_CONTEXT_INVALID');
+
+  // 4. Non-canonical costPreference 'essential' (canonical is 'value' | 'balanced' | 'premium')
+  const r4 = assembleCanonicalContext({ ...baseProfile, cost_preference: 'essential' }, null, []);
+  assert.equal(r4.valid, false);
+  assert.equal(r4.code, 'INTAKE_CONTEXT_INVALID');
+
+  // 5. Non-canonical middayFeel 'dry' or 'oily' (canonical is 'dry_tight', 'oily_shiny', 'combination')
+  const r5 = assembleCanonicalContext({ ...baseProfile, midday_feel: 'dry' }, null, []);
+  assert.equal(r5.valid, false);
+  assert.equal(r5.code, 'INTAKE_CONTEXT_INVALID');
+
+  // 6. Invalid secondaryGoal
+  const r6 = assembleCanonicalContext(
+    { ...baseProfile },
+    { secondaryGoals: ['invalid_goal_value'] },
+    []
+  );
+  assert.equal(r6.valid, false);
+  assert.equal(r6.code, 'INTAKE_CONTEXT_INVALID');
+
+  // 7. Confirmed product with empty/whitespace brand or name
+  const r7 = assembleCanonicalContext(
+    {
+      ...baseProfile,
+      confirmed_products: [{ brand: '   ', name: 'Some Product', category: 'cleanser' }],
+    },
+    null,
+    []
+  );
+  assert.equal(r7.valid, false);
+  assert.equal(r7.code, 'INTAKE_CONTEXT_INVALID');
+});
+
+test('I1-B2.2: Sensitivity validation fails closed on unverified formula and rejects known allergens', () => {
+  const mockContext: AssembledRoutineContext = {
+    userId: 'usr_sens_test',
+    primaryGoal: 'breakouts',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'combination',
+    postCleanseTightness: false,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'reported',
+    knownSensitivities: ['Fragrance', 'Niacinamide'],
+    activePrescriptions: [],
+    confirmedProducts: [],
+    productReactions: [],
+    formulaSnapshots: [],
+  };
+
+  const trustedCatalog: Record<string, TrustedProductInfo> = {
+    'cerave::foaming facial cleanser': {
+      brand: 'CeraVe',
+      name: 'Foaming Facial Cleanser',
+      keyActives: ['Ceramides', 'Niacinamide'],
+      isCatalogStandard: true,
+      fullIngredients: ['Water', 'Glycerin', 'Niacinamide', 'Ceramides'],
+    },
+    'vanicream::gentle facial cleanser': {
+      brand: 'Vanicream',
+      name: 'Gentle Facial Cleanser',
+      keyActives: [],
+      isCatalogStandard: true,
+      fullIngredients: ['Purified Water', 'Glycerin', 'Coco-Glucoside'],
+    },
+  };
+
+  // 1. Proposal with unverified formula product when member reported sensitivities -> fails closed
+  const proposalWithUntrusted: RoutineIntelligenceProposal = {
+    summarySentence: 'Gentle test routine.',
+    amSteps: [
+      {
+        order: 1,
+        timing: 'am',
+        brand: 'UnknownBrand',
+        productName: 'Mystery Cream',
+        category: 'moisturizer',
+        amount: 'Pea size',
+        area: 'Face',
+        days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+        purpose: 'Hydrate',
+        whyChosen: 'Gentle',
+      },
+    ],
+    pmSteps: [],
+    productDecisions: [
+      {
+        brand: 'UnknownBrand',
+        productName: 'Mystery Cream',
+        category: 'moisturizer',
+        action: 'ADD',
+        actionReason: 'Hydration',
+      },
+    ],
+    catalogProducts: [],
+  };
+
+  const v1 = validateSensitivities(proposalWithUntrusted, mockContext, trustedCatalog);
+  assert.equal(v1.valid, false);
+  assert.match(v1.error || '', /unverified formula/i);
+
+  // 2. Proposal with trusted product containing known sensitivity (Niacinamide) -> rejected
+  const proposalWithAllergen: RoutineIntelligenceProposal = {
+    summarySentence: 'Gentle test routine.',
+    amSteps: [
+      {
+        order: 1,
+        timing: 'am',
+        brand: 'CeraVe',
+        productName: 'Foaming Facial Cleanser',
+        category: 'cleanser',
+        amount: '1 pump',
+        area: 'Face',
+        days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+        purpose: 'Cleanse',
+        whyChosen: 'Gentle',
+      },
+    ],
+    pmSteps: [],
+    productDecisions: [
+      {
+        brand: 'CeraVe',
+        productName: 'Foaming Facial Cleanser',
+        category: 'cleanser',
+        action: 'ADD',
+        actionReason: 'Cleanse',
+      },
+    ],
+    catalogProducts: [],
+  };
+
+  const v2 = validateSensitivities(proposalWithAllergen, mockContext, trustedCatalog);
+  assert.equal(v2.valid, false);
+  assert.match(v2.error || '', /niacinamide/i);
+
+  // 3. Proposal with safe trusted product (Vanicream) -> passes
+  const proposalSafe: RoutineIntelligenceProposal = {
+    summarySentence: 'Gentle test routine.',
+    amSteps: [
+      {
+        order: 1,
+        timing: 'am',
+        brand: 'Vanicream',
+        productName: 'Gentle Facial Cleanser',
+        category: 'cleanser',
+        amount: '1 pump',
+        area: 'Face',
+        days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+        purpose: 'Cleanse',
+        whyChosen: 'Gentle',
+      },
+    ],
+    pmSteps: [],
+    productDecisions: [
+      {
+        brand: 'Vanicream',
+        productName: 'Gentle Facial Cleanser',
+        category: 'cleanser',
+        action: 'ADD',
+        actionReason: 'Cleanse',
+      },
+    ],
+    catalogProducts: [],
+  };
+
+  const v3 = validateSensitivities(proposalSafe, mockContext, trustedCatalog);
+  assert.equal(v3.valid, true);
 });
 
 
