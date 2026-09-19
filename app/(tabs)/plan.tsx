@@ -18,6 +18,7 @@ import { SegmentedControl } from '@/src/components/ui/SegmentedControl';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
 import { ensureInitialRoutineProposal } from '@/src/services/deriveClient';
+import { useShopAudience } from '@/src/commerce/useShopAudience';
 
 export default function PlanScreen() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function PlanScreen() {
     planHydrationError,
   } = useRoutineStore();
   const [activeTab, setActiveTab] = useState<'routine' | 'products'>('routine');
+  const isShopMember = useShopAudience() === 'member';
 
   React.useEffect(() => {
     ensureInitialRoutineProposal().catch((e) => console.warn('Failed to ensure routine proposal:', e));
@@ -207,7 +209,21 @@ export default function PlanScreen() {
           <>
             {/* PRODUCTS LIST */}
             <View style={styles.shelfIntro}>
-              <Text style={styles.shelfIntroTitle}>We reviewed what you're using now.</Text>
+              <View style={styles.shelfIntroHeaderRow}>
+                <Text style={styles.shelfIntroTitle}>We reviewed what you're using now.</Text>
+                {isShopMember && routine?.status === 'published' && (
+                  <TouchableOpacity
+                    style={styles.shopPlanLink}
+                    onPress={() => router.push('/(tabs)/shop')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Shop your plan"
+                  >
+                    <Icon name="shop" size={13} color={colors.brand} />
+                    <Text style={styles.shopPlanLinkText}>Shop your plan</Text>
+                    <Icon name="forward" size={11} color={colors.brand} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.shelfIntroText}>
                 We prioritize products you already tolerate well, pause redundancies, and only add essentials when needed.
               </Text>
@@ -232,6 +248,7 @@ export default function PlanScreen() {
                   (s) => s.productId === up.productId
                 );
                 const scheduleText = matchingStep?.scheduleText || (matchingStep ? (matchingStep.timing === 'am' ? 'Every morning' : 'Every evening') : undefined);
+                const isPublished = routine?.status === 'published';
 
                 return (
                   <View key={up.id} style={styles.productAuditCard}>
@@ -254,6 +271,29 @@ export default function PlanScreen() {
                         Scheduled: {scheduleText}
                       </Text>
                     )}
+
+                    {/* Plan -> Shop Integration: Restrained Product Detail Access */}
+                    {up.action === 'ADD' && isShopMember && isPublished && !isPlanUnderReview ? (
+                      <TouchableOpacity
+                        style={styles.auditActionRow}
+                        onPress={() => router.push(`/shop/${up.productId}` as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`View ${up.product.name} in Shop`}
+                      >
+                        <Text style={styles.auditActionText}>View product</Text>
+                        <Icon name="forward" size={12} color={colors.brand} />
+                      </TouchableOpacity>
+                    ) : up.action === 'KEEP' && isShopMember ? (
+                      <TouchableOpacity
+                        style={styles.auditActionRow}
+                        onPress={() => router.push(`/shop/${up.productId}` as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`View ${up.product.name} details`}
+                      >
+                        <Text style={styles.auditActionMutedText}>View product</Text>
+                        <Icon name="forward" size={12} color={colors.inkMuted} />
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 );
               })
@@ -364,11 +404,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: spacing.sm,
   },
+  shelfIntroHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   shelfIntroTitle: {
     fontSize: typography.sizes.bodyRegular,
     fontWeight: typography.weights.bold,
     color: colors.ink,
-    marginBottom: 4,
+    flex: 1,
+  },
+  shopPlanLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
+  },
+  shopPlanLinkText: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.semibold,
+    color: colors.brand,
   },
   shelfIntroText: {
     fontSize: typography.sizes.caption,
@@ -384,6 +442,25 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     ...shadows.subtle,
   },
+  auditActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSubtle,
+  },
+  auditActionText: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.semibold,
+    color: colors.brand,
+  },
+  auditActionMutedText: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+  },
+
   productAuditHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

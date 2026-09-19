@@ -8,7 +8,7 @@ Derive eliminates the cognitive overhead of skincare ("Your skincare, handled").
 "Autopilot vs. Depth" is an overarching product design philosophy, **never a settings toggle or separate user modes**:
 - **Default Experience (Autopilot)**: For members who want skincare off their mind, Derive requires only Today + Plan + lightweight check-ins + explicit routine/refill approvals. The system manages scheduling, monitors barrier stability, and coordinates replenishment in the background.
 - **Optional Depth**: Members desiring deeper agency or understanding can explore Scan (viewfinder product evaluations), Ask (grounded conversational intelligence), Progress (longitudinal photo comparisons and learned observations), and clinical research cards at their own pace.
-- **Same Unified Product**: Every member has access to the same 5 canonical native tabs (`Today` | `Plan` | `Scan` | `Ask` | `Progress`).
+- **Same Unified Product**: Every member has access to the same 5 canonical native tabs (`Today` | `Plan` | `Shop` | `Ask` | `Progress`).
 
 ---
 
@@ -39,19 +39,21 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
   - `REPLACE`: Quality formula, but redundant with an existing step.
   - `ADD`: Missing step recommended to fulfill a goal (e.g. daily morning SPF).
 
-### 3. Scan ("Does this product fit me?")
-- **Center Native Tab**: Accessible via viewfinder icon at position 3.
-- **Pure Camera-First Viewfinder**: Uncluttered camera surface without artificial mode tabs (Front / Barcode / Ingredients eliminated). Automatic multi-attribute recognition analyzes whichever visual cue is in frame.
-- **Fallback Search**: Subtle secondary link ("Can't scan? Search by name") for manual product lookup.
-- **Split Evaluation Presentation**:
-  - **FIT FOR YOU RIGHT NOW**: Categorical verdict (`GREAT FIT`, `COULD WORK`, `NOT NEEDED`, `BETTER AS A REPLACEMENT`, `USE WITH CAUTION`, `NOT A GOOD FIT RIGHT NOW`), active routine impact (*what it changes or replaces*), and 2-3 personalized rationale bullets.
-  - **FORMULA QUALITY**: Objective product classification, key active ingredients, and formulation standard.
-- **Handoff to Ask**: 1-tap `[Ask Derive About This]` button routes into Ask pre-seeded with context banner without re-scanning.
+### 3. Shop ("What can I get or repurchase?")
+- **Center Native Tab**: Accessible via Shop bag icon at position 3.
+- **Member Personalization**:
+  - **NEEDED FOR YOUR PLAN**: Products recommended for acquisition (`ADD` action on a published routine). Unapproved draft routines never generate active purchase CTAs.
+  - **YOUR ROUTINE**: Instant overview of active `KEEP` routine products.
+  - **SCAN A PRODUCT**: Prominent camera & search scan entry point.
+  - **ORDERS & REFILLS**: Direct path to active shipment tracking and refill requests.
+- **Nested Scan Capability**: Camera and barcode evaluation lives canonically under `/shop/scan` (`app/shop/scan.tsx`) with split categorical verdicts (`FIT FOR YOU RIGHT NOW` vs `FORMULA QUALITY`) and 1-tap handoff to Ask.
+- **Calm Invariant**: When no products are needed, Shop shows "Your current plan is covered" — never manufacturing shopping urgency.
+- **Non-Member / Guest Fallback**: General skincare presentation and membership upsell without fabricated plans or scores.
 
 ### 4. Ask ("Contextual skincare conversation")
 - **Grounding Context**: Explicit context indicator: *"Answers based on your routine, skin history, and what we've learned about you."*
 - **Scanned Product Context Banner**: Displayed when routed from Scan or when a product is attached.
-- **Unified Starter Chips**: Starter chips include "Scan a product", which routes directly to the `/scan` tab rather than maintaining duplicate camera code inside chat.
+- **Unified Starter Chips**: Starter chips include "Scan a product", which routes directly to the `/shop/scan` tab rather than maintaining duplicate camera code inside chat.
 - **Refined Composer (`GlassComposer`)**: Camera/attachment on the far left, expandable input in center, dedicated 44x44 tactile voice microphone button, and prominent send action.
 - **Multiline Action Callouts**: Full-width wrapping action callouts prevent text overflow when the AI proposes concrete routine adjustments.
 - **Clinical Safety Circuit Breaker**: Severe allergic symptoms immediately halt chat and surface emergency guidance.

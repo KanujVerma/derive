@@ -68,6 +68,19 @@ from `.env.example`.
 
 ## Supabase CLI and hosted-project access
 
+The mobile sign-in screen expects a six-digit email OTP. Local Supabase uses
+`supabase/templates/magic_link.html` with `{{ .Token }}` and an explicit six-digit
+OTP length. The default Supabase Magic Link email does not satisfy this UI.
+For a hosted project, set its Magic Link / OTP email template in the Supabase
+Dashboard to include `{{ .Token }}` and verify the OTP length is six before the
+Remote activation smoke. Local CLI template configuration does not deploy to
+the hosted project.
+
+Before production Remote activation, decide and verify which Today, Plan, and
+Ask capabilities a profile-ready but inactive member may use. Current routing
+admits that user to the root tabs. C1 guards Shop personalization and Scan but
+does not redefine the broader membership entitlement policy.
+
 For a developer workstation, prefer interactive authentication:
 
 ```bash

@@ -54,7 +54,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
   - **Weekly check-in context (I1-B4B)**: optional tags + one note are history for comparison, not proven causes. No food diary or period tracker.
   - **Commercial Independence**: Monetization must not silently change recommendations.
 * **Historical (do not delete)**: ADR-21 $100/month all-in/products-included experiment; ADR-10 $129; ADR-15 Arthur $96/mo routine-derived prototype. All superseded as commercial direction.
-* **Long-Term Commerce**: Stripe membership checkout in S5. Separate product commerce v0 after membership. Full Shop later / evidence-driven. No sixth tab.
+* **Commerce State**: S5 membership Checkout and Portal are implemented, with hosted activation pending. C1 member Shop V1 is implemented with Scan inside Shop. Physical-product checkout and provider selection remain unopened C1.5 work. No sixth tab.
 
 ---
 
@@ -67,7 +67,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
 * **Optional Depth**:
   Members who want deeper understanding can explore Scan (viewfinder evaluation), Ask (grounded conversational intelligence), Progress (longitudinal photo comparisons and insights), and research cards at their own pace.
 * **Canonical Navigation Preserved**:
-  All members navigate the same 5 primary native tabs: `Today` | `Plan` | `Scan` | `Ask` | `Progress`.
+  All members navigate the same 5 primary native tabs: `Today` | `Plan` | `Shop` | `Ask` | `Progress`.
 
 ---
 
@@ -75,7 +75,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
 The Founding Beta delivers:
 1. **Audited Canonical Routine**: Morning and evening sequences with personalized dosage amounts, application zones, and active schedules.
 2. **Bathroom Shelf Audit**: Evaluation of counter bottles into KEEP, PAUSE, REPLACE, and ADD.
-3. **Dedicated Viewfinder Scanner**: In-store and counter evaluation verifying whether prospective products fit their active barrier and routine.
+3. **Shop & Dedicated Viewfinder Scanner**: In-store and counter evaluation verifying whether prospective products fit their active barrier and routine, plus acquisition for recommended steps.
 4. **Contextual Ask Derive**: Conversational intelligence grounded in active products, retinoid schedules, and tolerance history.
 5. **Weekly Check-Ins & Progress**: Longitudinal tracking of tolerance, barrier stability, and photo comparison.
 6. **Managed Refills**: Low-friction replenishment of standard routine products without automated depletion illusions.

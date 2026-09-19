@@ -69,6 +69,9 @@ jobs:
       - name: Reset database and verify migrations
         run: supabase db reset
 
+      - name: Verify six-digit email OTP sign-in
+        run: node scripts/test-auth-otp-local.mjs
+
       - name: Run Supabase pgTAP database tests
         run: supabase test db
 

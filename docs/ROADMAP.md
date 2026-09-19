@@ -589,17 +589,45 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
-### S5: Commerce & Remote Service Integration [IMPLEMENTED; HOSTED ACTIVATION PENDING]
-* **Status**: IMPLEMENTED LOCALLY · HOSTED STRIPE/SUPABASE CONFIGURATION PENDING.
-* **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership** (target $25/month after B4A; Stripe Price owns live money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` hosted-session adapters. Separate product commerce v0 may follow membership checkout. Full personalized Shop is later / evidence-driven.
+### S5: Membership Billing Integration [IMPLEMENTED; HOSTED ACTIVATION PENDING]
+* **Status**: Membership billing implementation merged on `main` through PR #18. Hosted Stripe/Supabase activation smoke remains pending. Production Remote mode remains disabled.
+* **Scope**: Trusted Stripe-hosted Founding Beta membership Checkout and Billing Portal, signed webhook lifecycle projection, and `RemoteDeriveService` hosted-session adapters. The server-configured Stripe Price owns the charge; `config.betaPriceMonthly` is display only. Products remain separate purchases.
 * **Acceptance Criteria**:
-  - [x] Signed Stripe webhook maps immutable `derive_user_id` metadata or an existing Stripe binding first, with normalized customer email as the compatibility fallback, then projects subscription lifecycle to Supabase.
-  - [x] Duplicate deliveries are idempotent and older out-of-order events cannot regress newer membership state.
-  - [x] `RemoteDeriveService` exposes validated hosted Checkout and customer-portal sessions; Mock mode fails closed for billing.
-  - [x] Mobile app retains the single `EXPO_PUBLIC_USE_REMOTE_SERVICE` Mock → Remote flag.
-  - [x] Stripe secret key, webhook secret, price ID, and redirect URLs remain server-only and absent from Expo.
-  - [x] Product SKU checkout is not required to close S5 membership; Shop is explicitly deferred.
-  - [ ] Configure a hosted Supabase project and Stripe test-mode product/price/webhook, then run one real test-mode Checkout → webhook → portal smoke test before production Remote mode is enabled.
+  - [x] Checkout and Portal derive member identity from the authenticated session; callers cannot choose a customer, Price, or amount.
+  - [x] Signed webhook uses the raw body, current Stripe subscription truth, a service-only idempotent ledger, and fail-closed identity reconciliation.
+  - [x] `HostedMembershipSession`, `createMembershipCheckout`, and `createMembershipPortal` remain membership-specific shared contracts.
+  - [x] Stripe secrets, webhook secret, and service-role credential remain server-side.
+  - [x] Product SKU checkout, ProductOffer, cart, and physical orders are outside S5.
+  - [ ] Run hosted test-mode Checkout to signed webhook to membership state to Billing Portal smoke before claiming billing is live.
+
+---
+
+## Kanuj Commerce Stream (Shop & Customer Acquisition)
+
+### C1: Shop V1 Personalized Commerce UX [IMPLEMENTED]
+* **Scope**: Five member root tabs (`Today · Plan · Shop · Ask · Progress`) with one Scan implementation inside Shop. A canonical product detail route uses member context only. Shop, Today, and Plan commerce entry points require active membership; ADD acquisition and managed refills require a published routine.
+* **Acceptance Criteria**:
+  - [x] Shop replaces Scan as a root tab; legacy and Ask Scan links reach `/shop/scan`.
+  - [x] Shop, product detail, Today, and Plan use the same Mock-versus-Remote audience resolution.
+  - [x] Inactive audiences see no member product detail, personalized Scan, or Shop acquisition links.
+  - [x] No fabricated public catalog, physical offer, price, discount, or checkout is shown.
+  - [x] Mock Scan-to-Ask preserves the scanned verdict.
+  - [x] Recommendation and safety decisions remain independent of commercial inputs.
+  - [x] C1 adds no backend migration or physical-commerce shared contract.
+
+### C1.5: Physical Product Commerce Integration [NOT STARTED]
+* **Scope**: Future physical product checkout, offers, order persistence, fulfillment, and public Shop activation.
+* **Prerequisites**: Choose a physical-commerce provider and approve a separate contract and data model.
+* **Candidate deliverables**:
+  - `ProductOffer` contract and database schema, separate from Product and Recommendation.
+  - Single-item checkout and physical `Order` / `OrderItem` persistence.
+  - Public catalog reads and guest/non-member Shop routing without member data leakage.
+  - A separate factual non-member Scan backend path and authorization policy before enabling public Scan.
+  - Verified offer-backed benefits, if any, without influencing recommendations.
+
+### C2: Personalized Discovery & Cart [DEFERRED]
+* **Scope**: Search, categories, alternatives, and multi-item cart only after customer evidence supports them.
+
 
 ---
 

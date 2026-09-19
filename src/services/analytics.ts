@@ -92,6 +92,29 @@ export interface AllowedAnalyticsEvents {
     context: 'ask' | 'photo_note' | 'reaction_note' | 'checkin_note';
     wordCountBucket: 'under_10' | '10_30' | 'over_30';
   };
+  // C1 Shop events — no health/personal data included
+  shop_opened: {
+    source: 'tab_navigation';
+  };
+  shop_scan_opened: {
+    source: 'shop_home' | 'shop_tab' | 'today_shortcut';
+    entryPoint?: 'ask_starter_pill' | 'shop_cta';
+  };
+  shop_product_viewed: {
+    productId: string;
+    productName: string;
+    source: 'shop_home' | 'plan_tab' | 'today_module';
+  };
+  orders_opened: {
+    source: 'shop_home' | 'today_banner' | 'tab_navigation';
+  };
+  membership_shop_upsell_viewed: {
+    audience: 'guest' | 'non_member';
+  };
+  product_purchase_intent: {
+    productId: string;
+    action: 'ADD' | 'KEEP';
+  };
 }
 
 class PrivacySafeAnalytics {

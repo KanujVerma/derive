@@ -2,6 +2,8 @@
 
 Key technical and product decisions accepted for Derive V1.
 
+**Current navigation decision (C1)**: The five root tabs are Today, Plan, Shop, Ask, and Progress. Scan is a capability inside Shop. This supersedes the tab placement in ADR-02, ADR-03, and the IA clause of ADR-26; those records remain below as historical decisions. ADR-30 still governs membership billing only. Physical-product commerce and its provider remain undecided.
+
 ---
 
 ### ADR-01: React Native + Expo Router over Native Swift

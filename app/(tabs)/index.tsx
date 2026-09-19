@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useUserStore } from '@/src/stores/userStore';
+import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
@@ -29,6 +30,7 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const {
     routine,
+    userProducts,
     todayDominantStatus,
     isWeeklyCheckInDue,
     researchInsights,
@@ -40,6 +42,12 @@ export default function TodayScreen() {
   } = useRoutineStore();
   const { fullName } = useUserStore();
   const firstName = fullName?.trim()?.split(' ')[0] || 'there';
+
+  const isShopMember = useShopAudience() === 'member';
+  const isPublished = routine?.status === 'published';
+  const neededProducts = isShopMember && isPublished
+    ? userProducts.filter((up) => up.action === 'ADD' && !up.isConfirmedByUser)
+    : [];
 
   React.useEffect(() => {
     ensureInitialRoutineProposal().catch((e) => console.warn('Failed to ensure routine proposal:', e));
@@ -173,9 +181,13 @@ export default function TodayScreen() {
             <View style={styles.reviewExplainerCard}>
               <Icon name="sparkle" size={18} color={colors.brand} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.reviewExplainerTitle}>Everything else is ready</Text>
+                <Text style={styles.reviewExplainerTitle}>
+                  {isShopMember ? 'Everything else is ready' : 'Personalized Scan needs membership'}
+                </Text>
                 <Text style={styles.reviewExplainerText}>
-                  While we finish preparing your routine, you can scan bottles with camera recognition or ask Derive any skincare question.
+                  {isShopMember
+                    ? 'While we finish preparing your routine, you can scan bottles with camera recognition or ask Derive any skincare question.'
+                    : 'Personalized Scan is available with an active Derive membership.'}
                 </Text>
               </View>
             </View>
@@ -225,9 +237,13 @@ export default function TodayScreen() {
             <View style={styles.reviewExplainerCard}>
               <Icon name="sparkle" size={18} color={colors.brand} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.reviewExplainerTitle}>Everything else is ready</Text>
+                <Text style={styles.reviewExplainerTitle}>
+                  {isShopMember ? 'Everything else is ready' : 'Personalized Scan needs membership'}
+                </Text>
                 <Text style={styles.reviewExplainerText}>
-                  While we finish review, you can scan bottles with camera recognition or ask Derive any skincare question.
+                  {isShopMember
+                    ? 'While we finish review, you can scan bottles with camera recognition or ask Derive any skincare question.'
+                    : 'Personalized Scan is available with an active Derive membership.'}
                 </Text>
               </View>
             </View>
@@ -346,6 +362,48 @@ export default function TodayScreen() {
                   variant="secondary"
                   size="small"
                   onPress={handleViewOrders}
+                />
+              </View>
+            )}
+
+            {/* CONTEXTUAL MODULE: NEEDED PRODUCTS IN PLAN */}
+            {neededProducts.length === 1 && (
+              <View style={styles.shopNeededBanner}>
+                <View style={styles.shopNeededIconCircle}>
+                  <Icon name="bottle" size={18} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shopNeededOverline}>YOUR PLAN NEEDS ONE PRODUCT</Text>
+                  <Text style={styles.shopNeededTitle} numberOfLines={1}>
+                    {neededProducts[0].product.name}
+                  </Text>
+                  <Text style={styles.shopNeededSub}>Recommended addition</Text>
+                </View>
+                <Button
+                  label="Review product"
+                  variant="secondary"
+                  size="small"
+                  onPress={() => router.push(`/shop/${neededProducts[0].productId}` as any)}
+                />
+              </View>
+            )}
+
+            {neededProducts.length > 1 && (
+              <View style={styles.shopNeededBanner}>
+                <View style={styles.shopNeededIconCircle}>
+                  <Icon name="shop" size={18} color={colors.brand} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shopNeededOverline}>
+                    YOUR PLAN NEEDS {neededProducts.length} PRODUCTS
+                  </Text>
+                  <Text style={styles.shopNeededSub}>Recommended additions for your active routine</Text>
+                </View>
+                <Button
+                  label="Review in Shop"
+                  variant="secondary"
+                  size="small"
+                  onPress={() => router.push('/(tabs)/shop')}
                 />
               </View>
             )}
@@ -605,6 +663,41 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   refillEta: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+  },
+  shopNeededBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.md,
+    ...shadows.subtle,
+  },
+  shopNeededIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    backgroundColor: colors.brandLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopNeededOverline: {
+    fontSize: typography.sizes.micro,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.8,
+    color: colors.brand,
+    marginBottom: 2,
+  },
+  shopNeededTitle: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+  },
+  shopNeededSub: {
     fontSize: typography.sizes.caption,
     color: colors.inkMuted,
   },

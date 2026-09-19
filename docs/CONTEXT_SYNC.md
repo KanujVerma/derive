@@ -6,6 +6,41 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19: S5 landing and C1 integration checkpoint
+
+- Shared `main` received S5 membership billing through PR #18 at `1c44e43cbf2e21ca8c454186076c32af50c45180`. Both jobs of resulting CI run `35468937292` passed.
+- S5 charges only the server-configured Founding Beta Stripe Price. A later webhook for an older subscription now projects the customer's current Stripe subscription, preserving an active replacement entitlement. Hosted Stripe/Supabase Checkout, signed webhook, and Portal smoke remains pending; production Remote mode remains disabled.
+- C1 Shop V1 is implemented on PR #19 with one audience boundary for Mock and Remote membership. Inactive audiences cannot read hydrated member product detail or enter personalized Scan; Today and Plan hide Shop commerce links, and Today/Ask do not advertise an enabled Scan. ADD acquisition and managed refill presentation require a published routine. Mock Scan-to-Ask preserves the scanned verdict.
+- Remote sign-in expects a six-digit email OTP. The local Supabase Magic Link template now emits `{{ .Token }}`, with a live local OTP harness in CI. The hosted Supabase email template and OTP length must be set and smoked separately before Remote activation.
+- Current Remote routing sends profile-ready inactive members to root tabs. C1 protects Shop, product detail, its Today/Plan commerce links, and Scan; the entitlement policy for other Today, Plan, and Ask capabilities remains a production Remote activation decision. This integration does not change that broader route boundary.
+- Physical-product commerce, ProductOffer, product Order schema, provider selection, public catalog activation, and general public Scan remain unopened C1.5 work. Historical entries below retain their original checkpoint claims.
+
+## 2026-09-19 — Kanuj Mobile: C1 Shop V1 Personalized Commerce UX & Architecture (Draft PR)
+
+- **Agent / Workstream**: Kanuj (Customer Experience + Mobile)
+- **Local Branch**: `kanuj/c1-shop-v1`
+- **Starting Shared HEAD / origin/main**: `d5214e8564a0004f177156552b492aa27c315ed6`
+- **Remote Push Status**: draft PR pending push
+- **GitHub CI**: pending
+- **Milestone Status**: `C1 IMPLEMENTED · DRAFT PR OPEN`; S5 active on PR #18 (`sami/s5-commerce-remote-integration`); C1.5 deferred to post-S5 merge.
+- **Ownership / Shared Contracts**: Kanuj-owned mobile changes strictly in `app/**`, `src/components/**`, `src/commerce/**`, `src/services/analytics.ts`, `tests/**`, and docs. Zero modifications to `src/contracts/**`, `src/domain/**`, `src/types/schema.ts`, or backend `supabase/**`.
+- **Durable Deliverables**:
+  1. Approved 5-tab member navigation implemented: `Today · Plan · Shop · Ask · Progress`. Shop replaces Scan as root tab; Scan is nested as a capability under `/shop/scan` (`app/shop/scan.tsx`).
+  2. Single canonical scanner invariant maintained at `app/shop/scan.tsx`. Route compatibility redirect shim at `app/(tabs)/scan.tsx` redirects directly to `/shop/scan`. Ask Scan starter pill navigates directly to `/shop/scan`.
+  3. Canonical reusable product detail destination implemented at `app/shop/[productId].tsx`, resolving strictly from hydrated canonical client state (`userProducts` and routine steps). Truthful unavailable fallback; no synthetic param models; no fabricated pricing.
+  4. Plan → Shop integration: Products tab links ADD and KEEP items to `/shop/[productId]`. ADD acquisition CTA is strictly suppressed while routine is draft or under review. Subtle "Shop your plan" link in shelf header.
+  5. Today contextual integration: surfaces needed-products card strictly when published routine has unconfirmed ADD items (1 item -> product detail; multiple -> Shop tab). Zero cards when plan is covered.
+  6. Action-to-commerce semantics formalized in `src/commerce/types.ts` (`resolveActionCommerceSemantics`): ADD eligible only on routine publish/approval; PAUSE/STOP never eligible; KEEP non-urgent in-plan status; REPLACE never sells old product. False offer copy (`Available at checkout`) removed in favor of truthful `Purchase through Derive coming soon`.
+  7. Personalized member Shop home (`app/(tabs)/shop.tsx`) with `NEEDED FOR YOUR PLAN`, `YOUR ROUTINE`, `SCAN A PRODUCT`, and `ORDERS & REFILLS`.
+  8. Calm empty states: "Your current plan is covered" when no items needed; review pending explainer when routine unconfirmed.
+  9. Non-member and guest fallback view models without fabricated routine context or scores.
+  10. Comprehensive commerce documentation in `docs/COMMERCE.md` covering audience states, Stripe vs Shopify evaluation, Product/Recommendation/Offer separation, and open business questions.
+  11. 28 focused regression tests in `tests/derive.test.ts` verifying commerce invariants, boundary protection, navigation truth, and integration routes (221/221 tests pass).
+- **PR Disposition**:
+  - Closed superseded PR #17 (`docs(i1-b4): close reconciliation bookkeeping`).
+  - Inspected and protected open PR #18 (`sami/s5-commerce-remote-integration` @ `f9e76a1`). C1 isolates physical commerce in draft branch without touching S5 membership billing.
+  - Draft PR #19 updated with final closure commit.
+
 ## 2026-09-19 — Sami Platform: S5 Membership Commerce & Remote Billing Integration
 
 - **Agent / Workstream**: Sami (Platform, Commerce & Remote Integration)

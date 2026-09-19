@@ -14,6 +14,7 @@ import { colors, typography, spacing, radii } from '@/src/constants/theme';
 import { ChatMessage, ProductScanResult } from '@/src/types/schema';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useScanContextStore } from '@/src/stores/scanContextStore';
+import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import {
   resolveAskDisplayBanner,
@@ -32,6 +33,7 @@ export default function AskScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams() as AskRouteParams;
   const { routine } = useRoutineStore();
+  const shopAudience = useShopAudience();
   const flatListRef = useRef<FlatList>(null);
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -52,9 +54,9 @@ export default function AskScreen() {
       'Can I add this vitamin C?',
       'Why this moisturizer?',
       'My cheeks feel dry.',
-      'Scan a product',
+      ...(shopAudience === 'member' ? ['Scan a product'] : []),
     ];
-  }, [routine]);
+  }, [routine, shopAudience]);
 
   const hasInteracted = messages.length > 0;
 
@@ -143,8 +145,9 @@ export default function AskScreen() {
   const handleStarterPress = (prompt: string) => {
     Haptics.selectionAsync();
     if (prompt === 'Scan a product') {
-      analytics.track('product_scan_started', { entryPoint: 'starter_pill' });
-      router.push('/(tabs)/scan');
+      if (shopAudience !== 'member') return;
+      analytics.track('shop_scan_opened', { source: 'shop_tab', entryPoint: 'ask_starter_pill' });
+      router.push('/shop/scan');
     } else {
       handleSendMessage(prompt);
     }

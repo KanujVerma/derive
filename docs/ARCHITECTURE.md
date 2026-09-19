@@ -8,7 +8,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ┌─────────────────────────────────────────────────────────────┐
 │                 MOBILE CLIENT (Kanuj Lane)                  │
 │       Expo Router • React Native • TypeScript • Zustand     │
-│   Today  •  Plan  •  Scan (Viewfinder)  •  Ask  •  Progress │
+│   Today  •  Plan  •  Shop  •  Ask  •  Progress              │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                ┌───────────────┴───────────────┐
@@ -171,8 +171,8 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 * **Platform**: S5 implements hosted Stripe Checkout and Billing Portal sessions for the Founding Beta **membership**. Implemented display truth is **$25/month** Derive-management (ADR-26 / I1-B4A), while `STRIPE_FOUNDING_BETA_PRICE_ID` is the server-side charged-price authority. `config.betaPriceMonthly` remains display-only.
 * **Trust Boundary**: Authenticated checkout/portal functions re-verify the member session and derive user/email server-side. The mobile app receives only a short-lived HTTPS destination; Stripe secret key, webhook secret, customer ID, subscription ID, and price ID never cross into Expo.
 * **Lifecycle**: `stripe-membership-webhook` has Supabase JWT verification disabled because Stripe sends no Supabase JWT, but it verifies the raw body against `Stripe-Signature` before mutation. It handles Checkout completion and subscription create/update/delete/pause/resume events. `active`/`trialing` map to canonical `active`; `canceled`/`incomplete_expired` map to `cancelled`; other non-entitled billing states map conservatively to `paused`.
-* **Ordering & Identity**: `public.apply_stripe_membership_event` is service-role-only, serializes event IDs, records a minimal event ledger, ignores stale older events, and resolves members by server-authored UUID metadata or established Stripe IDs before normalized-email fallback. Conflicting bindings fail closed.
-* **Membership vs products**: Membership does not include products. Product commerce is separate (Plan → Products, Orders, Refill as near-term entry points). Full Shop and a sixth tab are deferred.
+* **Ordering & Identity**: `public.apply_stripe_membership_event` is service-role-only, serializes event IDs, records a minimal event ledger, and ignores stale older events. The webhook reads current Stripe subscription truth before projection, so an event for an older subscription cannot revoke a newer active replacement. Member resolution prefers server-authored UUID metadata or established Stripe IDs before normalized-email fallback; conflicting bindings fail closed.
+* **Membership vs products**: Membership does not include products. C1 provides a five-tab member Shop with Scan inside Shop. Physical-product checkout, ProductOffer, and product orders remain deferred to C1.5.
 * **Identity**: Canonical default is `founding_beta` (I1-B4A additive migration from historical `founding_beta_129`).
 * **Weekly check-in persistence (I1-B4B)**: `public.check_ins` stores optional `context_tags` / `context_note`, nullable `adherence`, and nullable historical `primary_goal`. Remote progress reads this table through owner RLS. There is no `get-progress` function. Remote `learnedInsights` stay empty until S3 creates durable insight persistence. Remote `recentPhotos` stay empty until a JWT-bound signer exists; private storage paths are never returned as customer URLs.
 * **Historical**: $100 all-in/products-included (ADR-21), $129 identity (ADR-10), routine-derived $96 Arthur prototype (ADR-15) are superseded as commercial direction.
