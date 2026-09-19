@@ -3,8 +3,9 @@ name: CI
 on:
   push:
     branches: [ main ]
+  # Stacked workstream PRs target the immediately preceding reviewed branch.
+  # Verify every PR regardless of its base; pushes remain limited to main.
   pull_request:
-    branches: [ main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
