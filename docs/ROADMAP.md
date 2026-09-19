@@ -381,6 +381,87 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Database & integration tests automated in GitHub Actions CI (`ci.yml`).
 
+### I1-B2.1: Real Model Intelligence, Trust Semantics & Error-Boundary Closure [COMPLETE · SERVER INTELLIGENCE DELIVERED]
+* **Scope**:
+  - **Real Server-Side Gemini Structured Output (Sami Primary)**:
+    - Integrated `gemini-3.8-flash` (configurable via `GEMINI_MODEL`, secret `GEMINI_API_KEY`) via Google AI Studio REST endpoint with `responseMimeType: 'application/json'` and `responseSchema: GEMINI_PROPOSAL_RESPONSE_SCHEMA`.
+    - Removed hardcoded production branded product generator fallbacks (Vanicream, La Roche-Posay, EltaMD mock generators removed).
+    - Fails closed with `503 MODEL_UNAVAILABLE` when model credentials or network are unavailable (no silent fallback to fake routines).
+    - Single source of intelligence logic: deduplicated types, invariants, validation, context assembly, and Gemini provider between `src/services/ai-workflows/routine-intelligence.ts` and `supabase/functions/propose-routine/`.
+  - **Trust Semantics (`is_confirmed_by_user`)**:
+    - AI-generated product recommendations in `public.user_products` are persisted with `is_confirmed_by_user = false`.
+    - User-confirmed shelf audit products retain explicit user confirmation provenance.
+  - **Customer-Safe Error Boundary**:
+    - Replaced raw runtime errors with typed customer-safe error responder returning `{ error: string, code: RoutineErrorCode }`.
+    - Canonical error codes: `UNAUTHORIZED` (401), `INTAKE_NOT_COMMITTED` (400), `INTAKE_CONTEXT_INVALID` (400), `MODEL_UNAVAILABLE` (503), `MODEL_OUTPUT_INVALID` (502), `CLARIFICATION_REQUIRED` (422), `VALIDATION_FAILED` (422), `PERSISTENCE_FAILED` (500), `INTERNAL_ERROR` (500).
+    - Hardened security invariant: Zero stack traces, table names, SQL constraints, or provider internals exposed to clients.
+  - **Fail-Closed Domain Context**:
+    - Missing or non-canonical `Goal` or `RoutineComplexity` in intake context fails closed with `400 INTAKE_CONTEXT_INVALID` without fabricating arbitrary default values.
+  - **Isolated Deterministic Test Seam**:
+    - Deterministic fixture provider `createDeterministicTestProposal` isolated under test semantics (`x-routine-fixture: 'true'` header or `ROUTINE_FIXTURE_MODE = 'true'`) for CI and local test harnesses.
+* **Acceptance Criteria**:
+  - 100% test suite passing (114/114 tests in `tests/derive.test.ts`).
+  - 100% pgTAP test suite passing (113/113 assertions in `supabase/tests/**`).
+  - 100% local E2E test harness passing (8/8 stages in `scripts/test-i1-b2-local.mjs` including 5A model unavailability and 5B fixture proposal).
+  - Strict application TypeScript check: 0 errors (`npx tsc --noEmit`).
+  - Strict test TypeScript check: 0 errors (`npm run typecheck:tests`).
+  - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
+### I1-B2.2: Provider-Neutral Intelligence Boundary, Catalog Provenance & Trust Closure [COMPLETE · SERVER INTELLIGENCE DELIVERED]
+* **Scope**:
+  - **Provider-Neutral Intelligence Boundary (Sami Primary)**:
+    - Decoupled routine generation behind the `RoutineIntelligenceProvider` interface (`providerId`, `generateProposal(context)`).
+    - Production AI model/provider selection is explicitly OPEN / DEFERRED (`ARCHITECTURE_CHALLENGE-05`). Swapping providers requires a thin adapter, not a pipeline refactor.
+  - **Defect Closure (Zero Client-Side Provider Selection)**:
+    - `x-routine-fixture` header completely eliminated from CORS, request parsing, and routing. Client requests can never select a provider or force fixture mode.
+  - **Server-Side Runtime Provider Configuration**:
+    - Provider selection governed strictly via server-side configuration: `ROUTINE_MODEL_PROVIDER` process env or secure `public.server_runtime_config` table restricted to `service_role`.
+    - Fails closed with HTTP 503 `MODEL_UNAVAILABLE` when no provider is configured (zero hardcoded branded fallback).
+  - **Deterministic Test Isolation**:
+    - `FixtureRoutineProvider` isolated under server-only configuration for CI and local E2E.
+  - **Optional Gemini Evaluation Adapter**:
+    - `GeminiRoutineProvider` adapter requires header authentication (`x-goog-api-key`, zero API key leakage in URL query parameters) and conforms to canonical domain response types.
+  - **Canonical Domain Enum Hardening**:
+    - Enforced exact match with `src/types/schema.ts` in `context.ts` (`ALLOWED_PRIMARY_GOALS`, `ALLOWED_COMPLEXITY`, `ALLOWED_COST`, `ALLOWED_MIDDAY_FEEL`, `ALLOWED_PREGNANCY_STATUS`, `ALLOWED_SENSITIVITIES_STATUS`).
+    - Added secondary goals validation and non-empty brand/name validation for confirmed shelf items. Fails closed with `400 INTAKE_CONTEXT_INVALID` without default fabrication.
+  - **Catalog Provenance Invariants**:
+    - Additive migration `20260919020000_i1_b2_catalog_provenance_and_confirmation_preservation.sql`: `commit_routine_proposal` RPC protects trusted products (`is_catalog_standard = true`) from metadata overwrites; defaults new proposed products to `is_catalog_standard = false` with empty formula fields.
+    - Post-model sensitivity evaluation (`validateSensitivities`): if member reported sensitivities, recommendations with unverified formulas fail closed with `VALIDATION_FAILED`; trusted products containing known allergens fail closed.
+  - **Confirmation Provenance Invariants**:
+    - `is_confirmed_by_user` semantics: denotes member confirmed having the product in inventory, NOT member approval of an AI action. Existing shelf items retain `true` across actions (`KEEP`, `PAUSE`, `REPLACE`, `STOP`); new proposed `ADD` items are `false`. Persistence never downgrades `true` to `false`.
+* **Acceptance Criteria**:
+  - 100% test suite passing (119/119 tests in `tests/derive.test.ts`).
+  - 100% pgTAP test suite passing (119/119 assertions in `supabase/tests/**`).
+  - 100% local E2E test harness passing (8/8 stages in `scripts/test-i1-b2-local.mjs` including 5A client fixture rejection and 5B server-configured fixture proposal).
+  - Strict application TypeScript check: 0 errors (`npx tsc --noEmit`).
+  - Strict test TypeScript check: 0 errors (`npm run typecheck:tests`).
+  - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+
+### I1-B2.3: Final Server Boundary Cleanup [COMPLETE · B2 SERVER LANE CLOSED]
+* **Scope**:
+  - **Removal of Filesystem Fallback**:
+    - Eliminated `.server-provider-config`, founder-machine `/Users/` paths, and `Deno.readTextFile` lookups from `supabase/functions/propose-routine/provider.ts` and test harnesses.
+    - Server provider resolution is strictly bounded to `ROUTINE_MODEL_PROVIDER` process env or `public.server_runtime_config` table (service-role only).
+  - **Restoration of RPC Least Privilege**:
+    - Additive migration `20260919030000_i1_b2_restore_rpc_security_invoker_and_catalog_protection.sql` restored `public.commit_routine_proposal` to `SECURITY INVOKER` with `set search_path = ''` and fully-qualified schema references.
+    - Removed deprecated `auth.role()` check while maintaining explicit ACL: EXECUTE granted strictly to `service_role`; revoked from `PUBLIC`, `anon`, and `authenticated`.
+  - **Provisional Catalog Formula Protection**:
+    - Model outputs cannot promote hallucinated `key_actives`, `full_ingredients`, or `retail_price_approx` into provisional (`is_catalog_standard = false`) products, preventing accumulation of hallucinated formula facts across subsequent proposals.
+    - Trusted catalog standard products (`is_catalog_standard = true`) remain immutable to provider metadata.
+  - **Fail-Closed Confirmation Mapping**:
+    - `RemoteDeriveService.getUserProducts` maps null/unknown `is_confirmed_by_user` strictly to `false` (`=== true`), eliminating fabricated confirmation.
+* **Acceptance Criteria**:
+  - 100% test suite passing (122/122 tests in `tests/derive.test.ts`).
+  - 100% pgTAP test suite passing (126/126 assertions in `supabase/tests/**`).
+  - 100% local E2E test harness passing (`scripts/test-i1-b1-local.mjs` and `scripts/test-i1-b2-local.mjs`).
+  - Strict application TypeScript check: 0 errors (`npx tsc --noEmit`).
+  - Strict test TypeScript check: 0 errors (`npm run typecheck:tests`).
+  - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - Kanuj's provider-independent mobile integration is unblocked.
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [COMPLETE]
