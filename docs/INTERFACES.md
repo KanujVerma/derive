@@ -15,7 +15,8 @@ Code definitions:
 ```typescript
 export interface IDeriveService {
   onboard(payload: OnboardingPayload): Promise<OnboardingResult>;
-  proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult>;
+  proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult>;
+  getUserProducts(userId: string): Promise<UserProduct[]>;
   askDerive(request: AskRequest): Promise<AskResponse>;
   scanProduct(input: ScanProductInput): Promise<ProductScanResult>;
   submitCheckIn(input: CheckInInput): Promise<CheckInResult>;
@@ -141,6 +142,18 @@ export interface IDeriveService {
       - Zero filesystem fallback in provider resolution (`.server-provider-config`, founder paths, and `Deno.readTextFile` eliminated).
       - Model outputs cannot promote `key_actives`, `full_ingredients`, or `retail_price_approx` to provisional (`is_catalog_standard = false`) products, preventing accumulation of hallucinated facts across subsequent proposals.
       - Null/unknown `is_confirmed_by_user` strictly fails closed to `false` in client mapping (`row.is_confirmed_by_user === true`).
+  13. **Mobile Initial Routine Integration & Parity [DELIVERED IN I1-B3]**:
+      - `IDeriveService`: `proposeRoutine(input?: RoutineProposalInput)` optional input parameter and `getUserProducts(userId: string): Promise<UserProduct[]>`.
+      - `deriveClient.ts`: `hydratePlanState(userId?)` and `ensureInitialRoutineProposal(userId?)` coordinators with in-flight request deduplication (`inFlightHydrations`, `inFlightProposals`), remote session identity freshness, attempt monotonicity, and restart recovery.
+      - `routineStore.ts`: `isRoutineBeingPrepared`, `planHydrationStatus` (`'idle' | 'loading' | 'ready' | 'error'`), `planHydrationAttempt`, `planHydrationError`, `startPlanHydration()`, `setPlanHydrated()`, `setPlanHydrationError()`, and monotonic `resetRoutine()`.
+      - Calm preparation UI on Today and Plan tabs: renders "Your routine is being prepared" while generation is pending; hides "Start Routine Setup" and refill CTAs; recovers automatically upon completion.
+
+### `getUserProducts(userId: string): Promise<UserProduct[]>`
+* **Input**: `userId`: string
+* **Output**: `UserProduct[]` (with actions: `'KEEP'` | `'PAUSE'` | `'REPLACE'` | `'ADD'` | `'STOP'`).
+* **Semantics**:
+  - In Mock mode: returns member shelf and recommended products.
+  - In Remote mode: queries `public.user_products` joined with `public.products`, mapping `row.is_confirmed_by_user === true` (fail-closed on null/unknown).
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.
@@ -302,9 +315,9 @@ To enforce strict boundary isolation between presentation and backend implementa
   - `submitOnboarding(payload)`: Onboards new member, maps canonical `OnboardingResult` (`proposedRoutine: null` and `initialRoutineState: 'pending_generation'` sets `isPlanUnderReview: false` with "Your routine is being prepared"; only `awaiting_review` sets `isPlanUnderReview: true` with "Final review"), preserves proven remote membership, and relies on `resolveCustomerBootstrap` to verify `READY` status before navigation.
   - `askQuestion(question, context)`: Dispatches contextual question to service intelligence.
   - `evaluateProduct(input)`: Evaluates scanned item against user routine.
-  - `submitWeeklyCheckIn(input)`: Records longitudinal observation and syncs store cache.
+  - `submitWeeklyCheckIn(input)`: Records longitudinal observation and syncs the canonical returned `CheckIn` into store cache exactly once. Optional `contextTags` + `contextNote` flow through unchanged. Legacy `notes` remains on the contract for historical callers; the new UI submits `contextNote`.
   - `requestProductRefill(input)`: Submits replenishment request.
-  - `hydrateOrders()`, `hydrateProgress()`, `hydrateRoutine()`, `hydrateResearchInsights()`, `hydrateCustomerProfile()`: Pull state from the active backend. `hydrateRoutine()` explicitly sets `routine: null, isPlanUnderReview: false` if backend returns null.
+  - `hydrateOrders()`, `hydrateProgress()`, `hydratePlanState()`, `hydrateRoutine()`, `hydrateResearchInsights()`, `hydrateCustomerProfile()`: Pull state from the active backend. Canonical plan hydration is `hydratePlanState()` (Routine + `UserProduct[]` atomically). Legacy `hydrateRoutine()` is a compatibility wrapper that returns `result?.routine ?? null`. On hydration error for an onboarded member, the client preserves `isRoutineBeingPrepared = true` rather than un-onboarded empty-state.
   - `resolveUserId(userId?)`: Validates user identity. When `isRemoteServiceEnabled()` is true, fails closed (throws error) if user ID is missing, empty, whitespace-only (`'   '`), or matches mock IDs (`usr_beta_member`, `usr_beta_001`). Note: this is a client-side non-mock presence guard to prevent mock data leakage, distinct from server-side JWT session verification (enforced via Postgres RLS in S1/I1).
 - **Client Scanner Partition (`src/services/catalog.ts`)**: Camera viewfinder and offline barcode matching rely strictly on `src/services/catalog.ts` (`findProductByBarcode`, `PROTOTYPE_CATALOG`). Production `recognizeShelfProducts()` returns empty products to fail closed, while demo fixture is isolated to `getDemoShelfRecognitionFixture()`.
 - **Zero-AI-Workflows Rule**: Client code in `app/**` is strictly forbidden from importing `src/services/ai-workflows/**`. Server workflows are invoked exclusively through `IDeriveService` implementations.
@@ -327,4 +340,8 @@ To truthfully determine whether an authenticated user requires onboarding or is 
   - `profileExists`: Verified via `public.profiles`. The presence of a profile row (auto-provisioned by auth triggers) does NOT mean onboarding is complete. If absent, bootstrap fails closed (`profileExists: false`) to catch provisioning failures.
   - `onboardingCompleted`: Read strictly from `public.skin_profiles.onboarding_completed`. Missing skin profile or false means `NEEDS_ONBOARDING`; true means `READY`.
   - `membershipStatus`: Queried from `public.memberships` deterministically (latest row by `created_at` descending; absent row maps to `'none'`). Membership state is purely informational in this slice and does NOT gate onboarding navigation.
-  - Tier and pricing fields are strictly excluded, preserving `ARCHITECTURE_CHALLENGE-01` without resolving it prematurely.
+  - Tier and pricing fields are strictly excluded from bootstrap. I1-B4A migrated `CustomerProfile.tier` from historical `'founding_beta_129'` to price-neutral `'founding_beta'`. Display price is `config.betaPriceMonthly` (`25`). Stripe remains S5.
+
+### H. I1-B4 Contract Status
+- **B4A membership (IMPLEMENTED)**: `CustomerProfile.tier` is `'founding_beta'`. Display price is $25/month membership, products separate. `src/pricing/**` all-in engine removed. Mock/Remote map canonical `founding_beta` and fail closed otherwise.
+- **B4B check-in (IMPLEMENTED)**: Canonical `CheckInContextTag` plus `contextTags` / `contextNote` on `CheckIn` / `CheckInInput`. Persisted `CheckIn.contextTags` is a required array (legacy rows map to `[]`). Input remains optional. Legacy `notes` preserved. Tags are context, not causation. Real `submit-checkin` Edge Function exists. Remote `getProgress()` reads `public.check_ins` via RLS and does not call `get-progress`. Remote `learnedInsights` and `recentPhotos` are empty until later durable insight/photo-signer milestones.

@@ -62,8 +62,8 @@ Key technical and product decisions accepted for Derive V1.
 * **Decision**: Consolidate camera scanning into a single, uncluttered camera-first viewfinder on the `Scan` tab. Remove manual mode selector buttons (Front / Barcode / Ingredients) in favor of automatic multi-attribute recognition with fallback text search. Route all scanner prompts from Ask to `/scan`. Structure product evaluations into two distinct sections: (1) `FIT FOR YOU RIGHT NOW` (categorical verdict, active routine impact, personalized rationale) and (2) `FORMULA QUALITY` (objective category, key actives, formulation standard).
 * **Rationale**: Eliminates user confusion over scanner modes, deletes redundant camera code in the Ask tab, and cleanly decouples an ingredient's objective cosmetic quality from whether it is safe and beneficial for this user's current skin barrier and prescription schedule.
 
-### ADR-15: [PROVISIONAL · PENDING COFOUNDER REVIEW] Personalized All-In Monthly Pricing Architecture & Price Stability Contract
-* **Status**: PROVISIONAL / PENDING COFOUNDER BUSINESS REVIEW (Prototyped in client/mock layer by Kanuj; not yet reviewed or accepted by Sami; Arthur's $96/mo is an illustrative deterministic demo fixture, not a commercial pricing commitment; final economics, ranges, and commercial structure pending founder alignment).
+### ADR-15: [SUPERSEDED / HISTORICAL] Personalized All-In Monthly Pricing Architecture & Price Stability Contract
+* **Status**: SUPERSEDED / HISTORICAL (Superseded by founder-approved I1-B4 direction / ADR-26. Prototype remains in `src/pricing/**` until I1-B4A removes it. Do not treat Arthur $96/mo, $39 management, $5 buffer, or routine-derived membership price as current commercial truth.)
 * **Proposal**: Explore transitioning away from universal flat-rate $129/month assumptions toward a personalized, all-in monthly plan pricing model computed from the member's active routine:
   `monthlyPlanPriceCents = PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS ($39/mo) + normalizedProductConsumptionCents + PROVISIONAL_DEMO_OPERATIONS_RISK_CENTS ($5/mo)`.
   Product consumption is normalized to a 30-day rate via `Math.round(retailPriceCents * 30 / estimatedLifespanDays)`.
@@ -118,10 +118,10 @@ Key technical and product decisions accepted for Derive V1.
 * **Rationale**: RLS policies and SQL grants are complementary controls. Exact policy-set tests detect permissive drift; explicit remote projections avoid protected-field wildcard failures; and separating immutable upload rights from trusted signing/deletion minimizes accidental exposure and orphaned objects.
 
 ### ADR-21: Founding Beta Concierge Operating Model & $100/Month First-10 Pricing Experiment (Temporary Beta Override)
-* **Status**: APPROVED BETA EXPERIMENT (Temporary Operational Override to ADR-13 & Provisional Alternative to ADR-15).
+* **Status**: APPROVED BETA OPERATING MODEL; **pricing/products-included portion SUPERSEDED** by I1-B4 / ADR-26 (not yet implemented in code).
 * **Decision**: Adopt a high-touch concierge MVP operating model for the initial 10 paying Founding Beta members at a flat $100/month experimental price point.
 * **Operational Override**: While ADR-13 defines the long-term AI-led scalable architecture, the Founding Beta temporarily overrides this with manual founder involvement where useful for learning: Kanuj will manually perform or review intake submissions, baseline photos, initial routine construction, product sourcing/fulfillment, early recommendations, and check-in logs. Biweekly-ish customer research conversations are conducted for feedback and discovery, explicitly as a beta research tool and not as a permanent personal consultation promise.
-* **Pricing Experiment**: $100/month covers Derive care management plus the standard non-prescription facial skincare products needed for the approved routine. No product wallet, credit balance, or rollover allowance. Existing working products are retained (`KEEP`); shipments follow actual consumption need rather than calendar billing theater. Prescription medications are contextual inputs only, not products Derive prescribes or supplies. Thin or negative initial unit economics are intentionally tolerated for this 10-member learning cohort. Long-term personalized pricing (ADR-15) remains provisional.
+* **Pricing Experiment (HISTORICAL for the $100 all-in/products-included clause)**: The original $100/month experiment covered Derive care management plus standard non-prescription facial skincare products. **Founder-approved successor (I1-B4A, not yet shipped):** $25/month membership for Derive management only; products purchased separately. Preserve remaining ADR-21 concierge principles: KEEP existing working products, explicit member approval for material routine/new-SKU charges, low-friction same-SKU refill confirmation, required Front/Left/Right baselines, prescription meds as context only.
 * **Required Baseline Photos**: Standardized Front/Left/Right baseline photos are required for paid Founding Beta members to establish longitudinal comparison context. Capture uses on-device quality gating (pose, distance, centering, lighting, sharpness, stability) with hands-free auto-capture and manual fallback. Photos do NOT diagnose disease or produce fake quantitative barrier metrics.
 * **Routine Approval & Refill Consent**: Material routine changes (adding/replacing products, permanent removals, strong active changes, price increases, new product shipments) require explicit member approval. Refills use low-friction confirmation ("Running low on [product]? Refill"), avoiding silent shipments based on elapsed calendar days.
 * **Rationale**: Directly addresses the 6 core beta learning hypotheses (Value, Behavior, Trust, Longitudinal, Fulfillment, Retention) with 10 real paying members without prematurely hardening operational automation or finalizing long-term company pricing.
@@ -171,7 +171,25 @@ Key technical and product decisions accepted for Derive V1.
 * **Rationale**: Guarantees zero unverified writes or corrupted state, preserves complete intake provenance, survives partial failures, lost responses, and concurrent retries, protects private customer skin photos with least privilege, and cleanly separates intake persistence (B1) from routine generation (B2).
 * **Verification**: Verified with 96 pgTAP assertions on local Supabase Postgres, 100 unit tests in `tests/derive.test.ts`, committed full-stack local E2E test harness (`scripts/test-i1-b1-local.mjs`), clean Expo web export, zero TypeScript errors, and automated GitHub CI with Supabase database testing.
 
-### ADR-26: Additive, Append-Only Core Domain Persistence (S2)
+### ADR-26: Membership + Separate Product Commerce (Founding Beta $25 Experiment)
+* **Status**: IMPLEMENTED (I1-B4A). Founding Beta display is `$25/month` (`config.betaPriceMonthly`). Canonical identity is `founding_beta`. Products are purchased separately. Stripe remains S5.
+* **Decision**: Founding Beta membership is a **$25/month** experiment that pays for Derive managing the member's skincare — personalized canonical routine, ongoing adaptation, weekly check-ins, Progress history, Scan, Ask, personalized product-fit guidance, and initial founder quality review during beta. Customer-facing framing is "Derive manages your skincare," never "$25 for AI." $25 is a current Founding Beta experiment, not a permanent lifetime company price.
+* **Products are separate**: Routine products are purchased separately. Membership price MUST NOT depend on product count, retail cost, lifespan, refill rate, routine size, or routine changes. No Basic / Pro / Premium membership tiers in V1.
+* **Price-neutral identity**: Canonical membership cohort identity is `founding_beta` (or an equivalent price-free identifier). Legacy `founding_beta_129` migrates additively to `founding_beta`. Price MUST NOT exist in tier identity. Do not encode 25 / 2500 / $25 in the tier string. Stripe owns live billing money in S5; do not invent premature Stripe amount/version schema before S5 requires it.
+* **Commercial-independence invariant**: Derive margin, affiliate commission, sponsorship, coupon availability, and commercial relationship MUST NEVER silently alter KEEP / PAUSE / REPLACE / ADD, Scan verdict, safety verdict, or recommendation ranking. New product/substitution charges require explicit customer consent. Same-SKU refills may remain low-friction.
+* **IA**: Preserve five tabs (Today, Plan, Scan, Ask, Progress). Do not add a sixth root Shop tab. Near-term commerce entry points: Plan → Products, Account / Orders, Refill. Full Shop is deferred / evidence-driven. First-10 beta may use manual/external/founder-assisted product purchasing.
+* **Supersedes**: ADR-15 in full (personalized all-in / routine-derived membership pricing). Partially supersedes ADR-21's $100 all-in / products-included pricing clause. Preserves ADR-21 concierge operating principles (KEEP working products, explicit approval for material new-SKU charges, need-based refill confirmation, required baseline photos, prescriptions as context only).
+* **Not remaining in this ADR as unimplemented**: I1-B4A applied `config.betaPriceMonthly = 25`, `CustomerProfile.tier = 'founding_beta'`, additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql`, and removed `src/pricing/**`. Shop and Stripe remain deferred.
+
+### ADR-27: Weekly Check-In Context Model (Optional Tags + One Note)
+* **Status**: IMPLEMENTED (I1-B4B).
+* **Decision**: Weekly check-in may optionally record real-world context without becoming a lifestyle tracker. Approved tags are `diet`, `sleep`, `stress`, `alcohol`, `cycle`, `travel_weather`, `new_product`, `medication_supplement`, `routine_change`, `other`. Multi-select is optional; one natural-language `contextNote` covers all selected tags. Empty selection is valid. Tags are CONTEXT, not proven causes.
+* **Persistence**: Additive `check_ins` columns `context_tags` (text[] NOT NULL default `{}`), `context_note`, nullable `adherence` (`yes`/`mostly`/`not_really`), nullable `primary_goal` using the existing Goal enum. Legacy `notes` and `ai_analysis_sentence` remain. Legacy rows map to `contextTags: []`.
+* **primaryGoal**: Persisted at check-in time because it is already part of the canonical `CheckIn` record and preserves historical context if the member's goal later changes. No second goal enum.
+* **Remote path**: Real `submit-checkin` Edge Function; Remote `getProgress()` reads `public.check_ins` via RLS. No `get-progress` function. No LLM required. Deterministic server summary only. Remote learned insights and signed check-in photos remain future work.
+* **Safety**: No period tracker. Medication context does not alter prescriptions. No causal copy from a single week's tags.
+
+### ADR-28: Additive, Append-Only Core Domain Persistence (S2)
 * **Status**: IMPLEMENTED; review pending on `sami/s2-core-domain-persistence`.
 * **Decision**: Extend the already-applied baseline schema through additive migrations. Preserve routines, formula snapshots, product reactions, and evolving ingredient evidence as append-only/versioned history rather than mutable current-state rows.
 * **Routine Versioning**: `public.create_routine_version` is a service-only, transaction-safe append operation. A per-member advisory transaction lock allocates the next version; `(user_id, version)` and per-schedule step order are unique. Routine content and routine items reject in-place rewrites, while lifecycle status/publication metadata may progress.
@@ -182,7 +200,7 @@ Key technical and product decisions accepted for Derive V1.
 * **Rationale**: Longitudinal skincare decisions must remain auditable. Reconstructing what the member used, which formula existed, what reaction occurred, and which routine version was active is safer and more useful than destructive updates.
 * **Verification**: Fresh Supabase rebuild; 136/136 pgTAP assertions; schema lint with zero findings; S1 onboarding/photo/deletion regression E2E; S2 live API E2E including a fresh-client persistence read; 110/110 unit tests; both TypeScript checks; and production web export.
 
-### ADR-27: Guarded Server Intelligence & Transactional Model Outputs (S3)
+### ADR-29: Guarded Server Intelligence & Transactional Model Outputs (S3)
 * **Status**: IMPLEMENTED; review pending on `sami/s3-server-intelligence`.
 * **Decision**: Run routine generation, categorical product scanning, and Ask synthesis only in JWT-gated Supabase Edge Functions. Routine generation remains behind the provider-neutral `RoutineIntelligenceProvider` boundary; scan and Ask currently use a guarded server-side Gemini adapter. Treat every model response as untrusted input: parse it, apply deterministic safety/contract guards, and use service-only database transactions for any persistence.
 * **Identity & Context Boundary**: Each handler re-verifies the bearer token and derives the member UUID from Supabase Auth. Canonical context is assembled server-side from committed intake, profile safety states, prescriptions, routine/shelf state, formula/reaction history, ingredient signals, check-ins, and minimum-necessary photo metadata. Caller-supplied profile truth, cross-member identifiers, Storage paths, signed URLs, local image URIs, and photo bytes are not trusted prompt context.
@@ -198,14 +216,15 @@ Key technical and product decisions accepted for Derive V1.
 
 These findings are review evidence, not accepted contract changes. S1A does not modify Kanuj-owned UI or shared TypeScript contracts.
 
-### ARCHITECTURE_CHALLENGE-01: Price Is Embedded in Membership Identity
-1. **Existing Decision**: ADR-10 and current schema/type literals encode `$129` as `founding_beta_129`, while ADR-15 proposes routine-derived pricing and remains pending cofounder review.
-2. **Exact Evidence**: `supabase/migrations/20260915_init.sql` defaults `memberships.tier` to `founding_beta_129`; `src/domain/types.ts` narrows `CustomerProfile.tier` to that literal; README and client configuration still state `$129`.
-3. **Why It Matters**: Membership identity, commercial price, and future Stripe state are coupled. The database accepts arbitrary text while the shared type claims one literal, so remote casts are unsound.
-4. **Recommended Change**: After founders decide fixed versus routine-derived pricing, use a neutral cohort/plan identity and separately version agreed monetary state and effective timing. Preserve legacy data during migration.
-5. **Alternatives**: Keep `$129` as an explicitly approved legacy Founding Beta contract; adopt another fixed price with a neutral plan code; or adopt the proposed routine-linked pricing ledger at S5.
-6. **Affected Workstreams**: Shared domain contract, database membership model, client presentation, operations, and S5 commerce.
-7. **Unblocked Work**: S1 security hardening can continue without persisting new pricing semantics.
+### ARCHITECTURE_CHALLENGE-01: Price Is Embedded in Membership Identity [RESOLVED & IMPLEMENTED IN I1-B4A]
+1. **Status**: RESOLVED & IMPLEMENTED (I1-B4A). Money is no longer encoded in membership identity. Stripe monetary persistence is **not** claimed here; S5 owns charged money.
+2. **Prior State**: ADR-10 and schema/type literals encoded `$129` as `founding_beta_129`. Remote `mapDbCustomerProfile()` returned null unless `tier === 'founding_beta_129'`.
+3. **Resolution Implemented (I1-B4A)**:
+   - Additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql`: fail-closed preflight on unknown/NULL tiers; backfill `founding_beta_129` → `founding_beta`; default `founding_beta`; `NOT NULL`; `CHECK (tier = 'founding_beta')`.
+   - Shared type `MembershipTier = 'founding_beta'` on `CustomerProfile.tier`.
+   - Remote mapper accepts only `founding_beta` and fails closed otherwise.
+   - Display price `$25/month` via `config.betaPriceMonthly` (customer-facing experiment, not Stripe ledger).
+4. **Affected Workstreams**: Shared domain contract, database membership model, Mock/Remote mapping, onboarding/profile/orders copy.
 
 ### ARCHITECTURE_CHALLENGE-02: Safety Unknown States Are Collapsed [RESOLVED IN I1-B0]
 1. **Status**: RESOLVED & IMPLEMENTED (I1-B0).
@@ -243,3 +262,8 @@ These findings are review evidence, not accepted contract changes. S1A does not 
    - **Deterministic Test Isolation**: Automated CI and local E2E use an isolated `FixtureRoutineProvider` under server configuration to ensure reproducible, zero-cost, network-independent verification.
    - **Optional Gemini Adapter**: `GeminiRoutineProvider` serves as an evaluation adapter, strictly requiring header-based authentication (`x-goog-api-key`, zero API key leakage in URL query parameters) and structured JSON outputs conforming to canonical domain types.
 4. **Resolution Required**: When founders conduct model evaluation, select a permanent production model provider, configure server secrets, and deploy the corresponding adapter.
+### ARCHITECTURE_CHALLENGE_NATIVE_DICTATION: Production Must Not Inject Demo Transcripts [RECORDED IN I1-B4B]
+1. **Status**: PARTIALLY MITIGATED (I1-B4B). True native iOS/Android speech recognition is not an accepted architecture in this pass. Web Speech API remains available on web.
+2. **Prior risk**: `useVoiceDictation` emitted canned `CONTEXT_SAMPLES` when native recognition was unavailable, which would have inserted fake text into production check-ins.
+3. **Mitigation implemented**: demo transcripts emit only when `__DEV__` is true. Production unsupported platforms keep typed input and do not start a fake listening session.
+4. **Remaining**: a future native transcription path requires an explicit architecture decision and accepted dependency. B4B persistence is not blocked on it.

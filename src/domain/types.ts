@@ -35,6 +35,7 @@ import type {
   SkinState,
   IrritationLevel,
   AdherenceLevel,
+  CheckInContextTag,
   CheckIn,
   InsightBasis,
   LearnedInsight,
@@ -79,6 +80,7 @@ export type {
   SkinState,
   IrritationLevel,
   AdherenceLevel,
+  CheckInContextTag,
   CheckIn,
   InsightBasis,
   LearnedInsight,
@@ -98,12 +100,22 @@ export type {
 // 1. CUSTOMER & MEMBERSHIP
 // ==========================================
 
+/** Price-neutral V1 membership identity. Do not encode 25 / $25 / 129 in this value. */
+export type MembershipTier = 'founding_beta';
+
+export function membershipDisplayLabel(tier: MembershipTier): string {
+  switch (tier) {
+    case 'founding_beta':
+      return 'Founding Beta';
+  }
+}
+
 export interface CustomerProfile {
   id: string;
   email: string;
   fullName: string;
   phone?: string;
-  tier: 'founding_beta_129';
+  tier: MembershipTier;
   membershipStatus: 'active' | 'paused' | 'cancelled';
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
@@ -185,6 +197,8 @@ export interface CheckInInput {
   irritation: IrritationLevel;
   adherence?: AdherenceLevel;
   notes?: string;
+  contextTags?: CheckInContextTag[];
+  contextNote?: string;
   photoUris?: string[];
   irritationDetails?: {
     symptoms: ReactionSymptom[];

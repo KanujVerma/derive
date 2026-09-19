@@ -88,3 +88,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/infer-ingredient-signals/deno.json"
 entrypoint = "./functions/infer-ingredient-signals/index.ts"
+
+[functions.submit-checkin]
+enabled = true
+verify_jwt = true
+import_map = "./functions/submit-checkin/deno.json"
+entrypoint = "./functions/submit-checkin/index.ts"

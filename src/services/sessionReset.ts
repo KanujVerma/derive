@@ -4,6 +4,7 @@ import { useRoutineStore } from '../stores/routineStore.ts';
 import { useScanContextStore } from '../stores/scanContextStore.ts';
 import { useOnboardingStore } from '../stores/onboardingStore.ts';
 import { useBootstrapStore } from '../stores/bootstrapStore.ts';
+import { clearInFlightHydrations, clearInFlightProposals } from './deriveClient.ts';
 
 /**
  * Resets all customer session data, caches, and active state across stores.
@@ -17,5 +18,7 @@ export function resetCustomerSessionData(): void {
   useScanContextStore.getState().clearScanContext();
   useOnboardingStore.getState().resetOnboarding();
   useBootstrapStore.getState().resetBootstrap();
+  clearInFlightHydrations();
+  clearInFlightProposals();
 }
 
