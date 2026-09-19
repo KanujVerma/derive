@@ -52,7 +52,7 @@ Derive maintains strict integrity in all customer communications.
 * **Session Replay Disabled**: PostHog session replay is strictly disabled (`disable_session_recording: true`) to prevent capturing user photos or typed text.
 * **Allowlisted Events Only**: The mobile client can only dispatch events in the typed analytics catalog:
   `onboarding_started`, `onboarding_stage_completed`, `onboarding_completed`, `today_viewed`, `routine_viewed`, `checkin_completed`, `refill_requested`, `scan_tab_opened`, `product_scan_recognized`, `scan_verdict_viewed`, `scan_ask_handoff`, `voice_input_started`, `voice_input_completed`.
-* **Zero Health Data in Telemetry**: Symptoms, diagnoses, photo URLs, full chat transcripts, and personal notes must NEVER be included in analytics properties.
+* **Zero Health Data in Telemetry**: Symptoms, diagnoses, photo URLs, full chat transcripts, personal notes, selected check-in context tags, `contextNote`, and medication/cycle details must NEVER be included in analytics properties. Check-in completion telemetry stays high-level (`outcome`, `irritationReported`, `adherenceReported`).
 
 ---
 
@@ -83,6 +83,25 @@ Derive maintains strict integrity in all customer communications.
 * **Visual Fairness Across Pigmentation Strata**: In accordance with algorithmic bias research (*Daneshjou et al. Nat Med 2022*), any computer vision system evaluated in Derive must demonstrate balanced error parity across all pigmentation strata (very light through very deep).
 * **Mechanism Over Demographics (PFB)**: Pseudofolliculitis barbae is addressed strictly through mechanical shaving practices, hair curl pattern, and follicular dynamics—never racial profiling (*Ogunbiyi PMC12360796*).
 * **No Causal Diet Interventions**: Weak population observational associations (such as dairy and acne, *Aghasi et al. 2018*) must never be converted into automated diet interventions or causal rules.
+
+## 6b. Commercial Independence of Recommendations (I1-B4A / ADR-26)
+
+Derive recommendation and safety truth must remain independent of monetization.
+
+* Commercial incentives — including Derive margin, affiliate commission, sponsorship, coupon availability, and commercial relationship — MUST NEVER silently alter KEEP, PAUSE, REPLACE, ADD, STOP, Scan fit verdict, safety classification, or recommendation ordering.
+* New product or substitution charges require explicit customer consent.
+* Same-SKU refills may remain lower-friction.
+* Membership price is independent of routine size and product cost. Products are separate commerce from the $25 Founding Beta membership experiment.
+
+## 6c. Weekly Check-In Context Is Not Causation (I1-B4B / ADR-27)
+
+Optional check-in context tags (`diet`, `sleep`, `stress`, `alcohol`, `cycle`, `travel_weather`, `new_product`, `medication_supplement`, `routine_change`, `other`) are member-reported history for later comparison.
+
+* Tags do not prove that diet, alcohol, sleep, stress, cycle, or a new product caused a skin outcome.
+* `cycle` means only that the member noted cycle-related context this week. Derive does not store cycle dates, flow, ovulation, fertility, or reminders, and is not a period tracker.
+* `medication_supplement` is contextual history only. Derive does not infer stop/change-dose/change-schedule/substitute for prescribed medication.
+* No food diary, calorie, or macronutrient tracking.
+* Server-authored check-in summaries may acknowledge that additional context was recorded; they must not output causal lifestyle claims.
 
 ---
 

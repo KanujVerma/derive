@@ -43,14 +43,20 @@ High-signal findings synthesized from founder research, customer discovery conve
 
 ## 3. Founding Beta Learning Hypotheses (6 Core Success Questions)
 
-The Founding Beta (10 paying members at $25/month, with products purchased separately) is explicitly designed to test six learning hypotheses. The beta fails its primary purpose if it does not generate concrete qualitative and behavioral evidence against these questions:
+The Founding Beta (10 paying members) is explicitly designed to test these learning hypotheses. The beta fails its primary purpose if it does not generate concrete qualitative and behavioral evidence against these questions.
 
-1. **VALUE**: Will a qualified customer pay $25 recurring for Derive's management layer independent of product cost?
-2. **BEHAVIOR**: Will members actually follow a Derive-managed routine consistently over weeks?
-3. **TRUST**: Will members accept `KEEP` / `PAUSE` / `REPLACE` / `ADD` and *"don't buy this"* recommendations?
-4. **LONGITUDINAL**: Does accumulated history and context make Derive meaningfully more useful over time?
-5. **COMMERCE**: Will members choose to purchase or refill Derive-recommended products through Derive when those products are separate transactions?
+**Implemented successor hypotheses (ADR-26 / I1-B4A):**
+
+1. **VALUE**: Will a qualified customer pay **$25 recurring** for Derive management **independent of product cost**?
+2. **BEHAVIOR**: Will members follow a Derive-managed routine?
+3. **TRUST**: Will members accept KEEP / PAUSE / REPLACE / ADD / "don't buy this" recommendations?
+4. **LONGITUDINAL**: Does accumulated history/context make Derive more useful over time?
+5. **COMMERCE**: Will members buy/refill Derive-recommended products **through Derive** when products are separate transactions?
 6. **RETENTION**: Will members voluntarily renew the Derive membership in Month 2?
+
+**Historical $100 all-in hypotheses (SUPERSEDED as commercial framing; preserve as research history):** Will someone pay $100/mo including products to stop managing their own skincare? Does bundled fulfillment increase retention enough to justify operational complexity?
+
+*Founder interpretation of N=31:* the student-heavy Wave 1 sample is an **acquisition/research convenience sample**, not evidence that the median student is Derive's ICP. Initial beta recruiting should favor people with an active skin concern, recent skincare experimentation/spend, meaningful uncertainty, and a desire to offload skincare management. Do not fabricate evidence. Preserve all N=31 methodology caveats below.
 
 *Operating Rule*: Do not optimize for vanity engagement metrics (daily active opens, session duration) at the expense of evaluating these six core hypotheses.
 
@@ -62,7 +68,6 @@ The Founding Beta (10 paying members at $25/month, with products purchased separ
 - **Sample Nature**: Convenience sample of 31 respondents recruited primarily from a University of Wisconsin–Madison / Computer Science-heavy campus environment.
 - **Demographic Bias**: The sample appears male-skewed and engineering-heavy.
 - **Non-Representativeness**: This sample **MUST NOT** be described as representative of UW–Madison students, general skincare consumers, or the broader target market.
-- **Founder Interpretation**: This student-heavy group is an acquisition and research convenience sample, not evidence that the median student is Derive's ideal customer. Initial recruiting should qualify for an active skin concern, recent product experimentation or spend, meaningful uncertainty, and a genuine desire to offload skincare management.
 - **Survey Configuration Limitation (Q5 Multi-Select)**: Question 5 ("What is the most annoying part of taking care of your skin?") appears configured in the survey tool as multi-select despite the singular wording "most annoying." Percentages for Q5 reflect selections across respondents and are **not mutually exclusive**. Do not treat them as a single-choice distribution.
 - **No Manufactured Statistical Significance**: Findings are directional pilot signals only.
 
@@ -91,8 +96,8 @@ The Founding Beta (10 paying members at $25/month, with products purchased separ
   - Open-ended qualitative responses highlighted routine simplicity, understanding what skin genuinely needs, information reliability, and more visible skin results.
 
 ### C. Interpretation & Strategic Implications
-- **Primary Positioning Wedge**: Directional evidence favors positioning longitudinal management, routine adaptation, and progress tracking over treating Scan (in-store lookup) or commerce as the primary customer acquisition hook.
-- **Preserve Scan & Separate Commerce**: Do **NOT** remove Scan or product purchase/refill pathways based on N=31. While replenishment was not an initial acquisition hook for low-involvement users, convenient, separately priced product purchases may still influence retention and service defensibility once a qualified member is active. This remains a hypothesis, not an observed result.
+- **Primary Positioning Wedge**: Directional evidence favors positioning longitudinal management, routine adaptation, and progress tracking over treating Scan (in-store lookup) or fulfillment as the primary customer acquisition hook.
+- **Preserve Scan & Fulfillment**: Do **NOT** remove Scan or managed refills based on N=31. While replenishment is not an initial acquisition hook for low-involvement users, physical product delivery and reliable replenishments may be decisive drivers of month-two retention and service defensibility once a member is active.
 - **Expanded Research Plan**:
   - Treat the first 31 responses as **Wave 1 / pilot**.
   - Continue toward 50–100 customer discovery conversations with a more diverse campus intercept sample (campus libraries, student unions, non-CS majors, balanced gender mix).

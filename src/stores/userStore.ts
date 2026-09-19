@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CustomerProfile } from '../domain/types.ts';
+import { membershipDisplayLabel, type CustomerProfile } from '../domain/types.ts';
 
 export interface UserState {
   userId: string;
@@ -63,7 +63,7 @@ export const useUserStore = create<UserState>((set) => ({
       email: profile.email,
       fullName: profile.fullName,
       membershipStatus: profile.membershipStatus,
-      tier: profile.tier,
+      tier: membershipDisplayLabel(profile.tier),
     }),
 
   toggleFounderMode: () =>

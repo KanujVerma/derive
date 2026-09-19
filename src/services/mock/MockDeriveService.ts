@@ -49,6 +49,7 @@ import {
 } from '../catalog.ts';
 import { checkSkincareSafety } from '../ai-workflows/safety-classifier.ts';
 import { askDeriveAdvisor } from '../ai-workflows/chat-advisor.ts';
+import { authorCheckInAnalysis, isCheckInDueFromLatest } from '../../domain/checkIn.ts';
 
 function inferProductCategory(name: string): ProductCategory {
   const lower = name.toLowerCase();
@@ -146,6 +147,7 @@ export class MockDeriveService implements IDeriveService {
         irritation: 'none',
         adherence: 'yes',
         notes: 'Skin felt comfortable. No redness from Differin.',
+        contextTags: [],
         aiAnalysisSentence: 'Good adherence. Differin on Monday, Wednesday, and Friday is performing well.',
         adjustmentProposed: false,
         createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
@@ -430,10 +432,12 @@ export class MockDeriveService implements IDeriveService {
   }
 
   async submitCheckIn(input: CheckInInput): Promise<CheckInResult> {
-    const isIrritated = input.irritation === 'lot' || input.irritation === 'little';
-    const analysisSentence = isIrritated
-      ? 'Mild sensitivity noted. Maintain barrier hydration and pause any optional exfoliating treatments.'
-      : 'Skin responding steadily. Continue the current schedule.';
+    const contextTags = input.contextTags ?? [];
+    const analysis = authorCheckInAnalysis({
+      skinState: input.skinState,
+      irritation: input.irritation,
+      hasContext: contextTags.length > 0 || Boolean(input.contextNote?.trim()),
+    });
 
     const newCheckIn: CheckIn = {
       id: `ci_${Date.now()}`,
@@ -442,13 +446,13 @@ export class MockDeriveService implements IDeriveService {
       skinState: input.skinState,
       irritation: input.irritation,
       adherence: input.adherence || 'yes',
-      contextTags: [...(input.contextTags || [])],
-      contextNote: input.contextNote,
       notes: input.notes,
+      contextTags,
+      contextNote: input.contextNote,
       photoUrls: input.photoUris,
       irritationDetails: input.irritationDetails,
-      aiAnalysisSentence: analysisSentence,
-      adjustmentProposed: isIrritated,
+      aiAnalysisSentence: analysis.sentence,
+      adjustmentProposed: analysis.adjustmentProposed,
       createdAt: new Date().toISOString(),
     };
 
@@ -456,9 +460,9 @@ export class MockDeriveService implements IDeriveService {
 
     return {
       checkIn: newCheckIn,
-      aiAnalysisSentence: analysisSentence,
-      adjustmentProposed: isIrritated,
-      proposedAdjustmentSummary: isIrritated
+      aiAnalysisSentence: analysis.sentence,
+      adjustmentProposed: analysis.adjustmentProposed,
+      proposedAdjustmentSummary: analysis.adjustmentProposed
         ? 'Consider pausing active exfoliation for 48 hours to allow barrier recovery.'
         : undefined,
     };
@@ -472,7 +476,7 @@ export class MockDeriveService implements IDeriveService {
       routineHistorySummary: this.activeRoutine
         ? 'Active managed routine.'
         : 'No active routine yet. Complete setup to calibrate your routine.',
-      isCheckInDue: false,
+      isCheckInDue: isCheckInDueFromLatest(this.checkIns[0]?.createdAt),
     };
   }
 

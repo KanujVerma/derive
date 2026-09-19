@@ -77,5 +77,5 @@ jobs:
       - name: Run local B2 routine integration E2E harness
         run: node scripts/test-i1-b2-local.mjs
 
-      - name: Run local I1-B4 membership and check-in E2E harness
-        run: node scripts/test-i1-b4-local.mjs
+      - name: Run local B4B check-in context E2E harness
+        run: node scripts/test-i1-b4b-local.mjs

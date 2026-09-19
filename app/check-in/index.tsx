@@ -13,30 +13,23 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { submitWeeklyCheckIn } from '@/src/services/deriveClient';
 import {
+  CHECK_IN_CONTEXT_TAGS,
+  CheckInContextTagLabels,
   SkinState,
   IrritationLevel,
   AdherenceLevel,
   CheckInContextTag,
-  CheckInContextTagLabels,
 } from '@/src/types/schema';
+import {
+  buildCheckInSubmission,
+  CHECK_IN_NOTE_MAX_LENGTH,
+  toggleContextTag,
+} from '@/src/domain/checkIn';
 import { Button } from '@/src/components/ui/Button';
-import { VoiceTextArea } from '@/src/components/ui/VoiceTextArea';
 import { Icon } from '@/src/components/ui/Icon';
+import { VoiceTextArea } from '@/src/components/ui/VoiceTextArea';
 import { analytics } from '@/src/services/analytics';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
-
-const CHECK_IN_CONTEXT_TAGS: CheckInContextTag[] = [
-  'diet',
-  'sleep',
-  'stress',
-  'alcohol',
-  'cycle',
-  'travel_weather',
-  'new_product',
-  'medication_supplement',
-  'routine_change',
-  'other',
-];
 
 export default function CheckInModal() {
   const router = useRouter();
@@ -52,7 +45,6 @@ export default function CheckInModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Goal-specific questions
   const getGoalQuestion = () => {
     if (primaryGoal === 'breakouts') {
       return {
@@ -90,14 +82,16 @@ export default function CheckInModal() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await submitWeeklyCheckIn({
-        primaryGoal: primaryGoal || 'breakouts',
-        skinState,
-        irritation,
-        adherence,
-        contextTags,
-        contextNote: contextNote.trim() || undefined,
-      });
+      await submitWeeklyCheckIn(
+        buildCheckInSubmission({
+          primaryGoal: primaryGoal || 'breakouts',
+          skinState,
+          irritation,
+          adherence,
+          contextTags,
+          contextNote,
+        })
+      );
 
       try {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -149,7 +143,6 @@ export default function CheckInModal() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-      {/* Modal Header */}
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.screenTitle}>Weekly Check-in</Text>
@@ -173,7 +166,6 @@ export default function CheckInModal() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* QUESTION 1: GOAL-SPECIFIC OUTCOME */}
         <Text style={styles.questionLabel}>{goalQ.title}</Text>
         <View style={styles.optionsColumn}>
           {goalQ.options.map((item) => {
@@ -205,7 +197,6 @@ export default function CheckInModal() {
           })}
         </View>
 
-        {/* QUESTION 2: ROUTINE ADHERENCE */}
         <Text style={[styles.questionLabel, { marginTop: spacing.xl }]}>
           Were you able to follow your plan most days?
         </Text>
@@ -239,7 +230,6 @@ export default function CheckInModal() {
           })}
         </View>
 
-        {/* QUESTION 3: IRRITATION */}
         <Text style={[styles.questionLabel, { marginTop: spacing.xl }]}>
           Any irritation or stinging?
         </Text>
@@ -273,14 +263,11 @@ export default function CheckInModal() {
           })}
         </View>
 
-        {/* OPTIONAL OBSERVATIONAL CONTEXT */}
-        <View style={styles.followUpSection}>
+        <View style={styles.contextSection}>
           <Text style={styles.questionLabel}>
-            Anything different this week that might be useful context? (Optional)
+            Anything different this week that might be useful context?
           </Text>
-          <Text style={styles.contextHelper}>
-            Select any that apply. These are observations, not assumptions about what caused a change.
-          </Text>
+          <Text style={styles.optionalHint}>Optional · choose any that apply</Text>
           <View style={styles.chipsWrap}>
             {CHECK_IN_CONTEXT_TAGS.map((tag) => {
               const isSelected = contextTags.includes(tag);
@@ -289,17 +276,14 @@ export default function CheckInModal() {
                   key={tag}
                   onPress={() => {
                     Haptics.selectionAsync();
-                    setContextTags((current) => (
-                      current.includes(tag)
-                        ? current.filter((item) => item !== tag)
-                        : [...current, tag]
-                    ));
+                    setContextTags((current) => toggleContextTag(current, tag));
                   }}
                   style={[styles.followUpChip, isSelected && styles.followUpChipSelected]}
                   activeOpacity={0.7}
                   accessible={true}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: isSelected }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={CheckInContextTagLabels[tag]}
                 >
                   <Text style={[styles.followUpText, isSelected && styles.followUpTextSelected]}>
                     {CheckInContextTagLabels[tag]}
@@ -308,19 +292,18 @@ export default function CheckInModal() {
               );
             })}
           </View>
-          <VoiceTextArea
-            label="Add one note (optional)"
-            value={contextNote}
-            onChangeText={setContextNote}
-            placeholder="e.g., Ate differently, traveled, and barely slept."
-            hint="Type or dictate"
-            context="checkin_note"
-            minHeight={92}
-            style={styles.contextNote}
-          />
         </View>
 
-        {/* ERROR BANNER */}
+        <VoiceTextArea
+          value={contextNote}
+          onChangeText={setContextNote}
+          context="checkin_note"
+          placeholder="Anything you want to add? You can type or talk."
+          maxLength={CHECK_IN_NOTE_MAX_LENGTH}
+          minHeight={88}
+          hint="Optional. One note covers any tags you selected."
+        />
+
         {submitError && (
           <View style={styles.errorBanner}>
             <Icon name="warning" size={16} color={colors.actionStop.text} />
@@ -328,7 +311,6 @@ export default function CheckInModal() {
           </View>
         )}
 
-        {/* SUBMIT BUTTON */}
         <Button
           label={isSubmitting ? 'Submitting...' : 'Submit Check-in'}
           variant="primary"
@@ -380,6 +362,12 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     color: colors.ink,
     marginBottom: spacing.sm,
+  },
+  optionalHint: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    marginBottom: spacing.sm,
+    marginTop: -spacing.xs,
   },
   optionsColumn: {
     gap: spacing.xs,
@@ -453,23 +441,14 @@ const styles = StyleSheet.create({
     color: colors.brand,
     fontWeight: typography.weights.bold,
   },
-  followUpSection: {
+  contextSection: {
     marginTop: spacing.xl,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
-  },
-  contextHelper: {
-    fontSize: typography.sizes.caption,
-    lineHeight: typography.lineHeights.caption,
-    color: colors.inkMuted,
-    marginTop: -spacing.xs,
-    marginBottom: spacing.sm,
   },
   chipsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+    marginBottom: spacing.md,
   },
   followUpChip: {
     backgroundColor: colors.surface,
@@ -491,10 +470,6 @@ const styles = StyleSheet.create({
   followUpTextSelected: {
     color: colors.brand,
     fontWeight: typography.weights.semibold,
-  },
-  contextNote: {
-    marginTop: spacing.md,
-    marginBottom: 0,
   },
   errorBanner: {
     flexDirection: 'row',

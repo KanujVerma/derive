@@ -70,7 +70,7 @@ export default function RefillModal() {
           </View>
           <Text style={styles.successHeadline}>Refill Requested</Text>
           <Text style={styles.successMessage}>
-            We received your request. We will confirm the product and price with you before it is purchased.
+            We received your request and will notify you as soon as it ships.
           </Text>
           <Button
             label="Done"
@@ -91,7 +91,7 @@ export default function RefillModal() {
         <View>
           <Text style={styles.screenTitle}>Running Low?</Text>
           <Text style={styles.screenSubtitle}>
-            Select the product you need. Products are purchased separately, and we will confirm the price before any charge.
+            Select the product you need replenished. Product purchases and refills are separate from your Derive membership.
           </Text>
         </View>
         <TouchableOpacity

@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
+import { useRoutineStore } from '@/src/stores/routineStore';
 import { GoalLabels } from '@/src/types/schema';
 import {
   submitOnboarding,
@@ -136,7 +137,7 @@ export default function SummaryScreen() {
               <Text style={styles.pricingBadge}>FOUNDING BETA MEMBERSHIP</Text>
               <View style={styles.priceRow}>
                 <Text style={styles.pricingAmount}>
-                  ${config.foundingBetaMembershipMonthlyCents / 100}
+                  ${config.betaPriceMonthly}
                 </Text>
                 <Text style={styles.pricingCadence}>/month</Text>
               </View>
@@ -144,16 +145,17 @@ export default function SummaryScreen() {
             <Badge label="FIRST 10 MEMBERS" variant="keep" size="small" />
           </View>
           <Text style={styles.pricingSubtext}>
-            Covers Derive managing your skincare. Routine products are purchased separately at their applicable prices, only after you approve them.
+            Derive manages your skincare: your personalized plan, weekly check-ins, adjustments, progress tracking, Scan, and Ask.
           </Text>
 
           <View style={styles.pricingDivider} />
 
           <View style={styles.includesBlock}>
-            <Text style={styles.includesHeading}>Includes:</Text>
-            <Text style={styles.includesItem}>• A personalized canonical routine and initial founder quality review</Text>
-            <Text style={styles.includesItem}>• Weekly check-ins, progress history, and ongoing routine management</Text>
-            <Text style={styles.includesItem}>• Scan, Ask, and personalized product-fit guidance</Text>
+            <Text style={styles.includesHeading}>Membership covers:</Text>
+            <Text style={styles.includesItem}>• Personalized routine and ongoing management</Text>
+            <Text style={styles.includesItem}>• Weekly check-ins, Progress, Scan, and Ask</Text>
+            <Text style={styles.includesItem}>• Founder quality review during Founding Beta</Text>
+            <Text style={styles.includesItem}>Routine products are purchased separately.</Text>
           </View>
         </View>
 

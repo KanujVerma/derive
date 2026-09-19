@@ -27,7 +27,6 @@ import {
 import { config } from '../src/constants/config.ts';
 import { useUserStore } from '../src/stores/userStore.ts';
 import { useRoutineStore } from '../src/stores/routineStore.ts';
-import { useOnboardingStore } from '../src/stores/onboardingStore.ts';
 import {
   normalizeBarcode,
   getBarcodeLookupKeys,
@@ -720,13 +719,9 @@ test('DeriveService: MockDeriveService satisfies the IDeriveService contract', a
     skinState: 'better',
     irritation: 'none',
     adherence: 'yes',
-    contextTags: ['sleep', 'travel_weather'],
-    contextNote: 'Barely slept while traveling.',
   });
   assert.equal(checkInRes.adjustmentProposed, false);
   assert.ok(checkInRes.aiAnalysisSentence);
-  assert.deepEqual(checkInRes.checkIn.contextTags, ['sleep', 'travel_weather']);
-  assert.equal(checkInRes.checkIn.contextNote, 'Barely slept while traveling.');
 });
 
 // ========================================================
@@ -790,6 +785,167 @@ test('Guard: Expo client must not ship a Gemini API key', () => {
     [],
     `Client-visible Gemini secret path found in: ${offenders.join(', ')}`
   );
+});
+
+// ========================================================
+// 10. I1-B4A MEMBERSHIP + SEPARATE PRODUCT COMMERCE
+// ========================================================
+
+import { useOnboardingStore } from '../src/stores/onboardingStore.ts';
+import { membershipDisplayLabel } from '../src/domain/types.ts';
+
+test('I1-B4A Display Price: Client configuration centralizes Founding Beta at $25/mo', () => {
+  assert.equal(config.betaPriceMonthly, 25);
+  assert.equal(config.currency, 'USD');
+});
+
+test('I1-B4A Canonical Membership Identity: CustomerProfile.tier is price-neutral founding_beta', () => {
+  assert.equal(membershipDisplayLabel('founding_beta'), 'Founding Beta');
+  const profile: CustomerProfile = {
+    id: 'usr_b4a',
+    email: 'member@derive.skin',
+    fullName: 'Beta Member',
+    tier: 'founding_beta',
+    membershipStatus: 'active',
+    createdAt: '2026-09-19T00:00:00.000Z',
+    updatedAt: '2026-09-19T00:00:00.000Z',
+  };
+  assert.equal(profile.tier, 'founding_beta');
+  assert.ok(!profile.tier.includes('129'));
+  assert.ok(!profile.tier.includes('25'));
+});
+
+test('I1-B4A Mock Parity: MockDeriveService seeds founding_beta', async () => {
+  const service = new MockDeriveService();
+  service.seedArthurDemoData();
+  const arthur = await service.getCustomerProfile('usr_arthur_1');
+  assert.ok(arthur);
+  assert.equal(arthur!.tier, 'founding_beta');
+});
+
+test('I1-B4A Remote Mapper: accepts founding_beta and fails closed on unknown or legacy 129', () => {
+  const mapped = mapDbCustomerProfile({
+    id: 'u_b4a',
+    email: 'mapped@example.com',
+    full_name: 'Mapped Member',
+    phone: '+15550001111',
+    created_at: '2026-09-19T12:00:00Z',
+    updated_at: '2026-09-19T14:00:00Z',
+    memberships: [
+      {
+        id: 'm_b4a',
+        user_id: 'u_b4a',
+        tier: 'founding_beta',
+        status: 'active',
+        created_at: '2026-09-19T12:00:00Z',
+      },
+    ],
+  });
+  assert.equal(mapped?.tier, 'founding_beta');
+  assert.equal(mapped?.membershipStatus, 'active');
+
+  const legacy = mapDbCustomerProfile({
+    id: 'u_legacy',
+    email: 'legacy@example.com',
+    full_name: 'Legacy Member',
+    created_at: '2026-09-19T12:00:00Z',
+    updated_at: '2026-09-19T12:00:00Z',
+    memberships: [
+      {
+        id: 'm_legacy',
+        user_id: 'u_legacy',
+        tier: 'founding_beta_129',
+        status: 'active',
+        created_at: '2026-09-19T12:00:00Z',
+      },
+    ],
+  });
+  assert.equal(legacy, null, 'legacy founding_beta_129 is not canonical after B4A');
+
+  const unknown = mapDbCustomerProfile({
+    id: 'u_unknown',
+    email: 'unknown@example.com',
+    full_name: 'Unknown Tier',
+    created_at: '2026-09-19T12:00:00Z',
+    updated_at: '2026-09-19T12:00:00Z',
+    memberships: [
+      {
+        id: 'm_unknown',
+        user_id: 'u_unknown',
+        tier: 'pro_96_monthly',
+        status: 'active',
+        created_at: '2026-09-19T12:00:00Z',
+      },
+    ],
+  });
+  assert.equal(unknown, null, 'unknown tier must fail closed');
+});
+
+test('I1-B4A Pricing Engine Removed: no active src/pricing imports or all-in calculations', () => {
+  const activeSurfaces = [
+    'src/services/deriveClient.ts',
+    'src/services/mock/MockDeriveService.ts',
+    'src/services/remote/RemoteDeriveService.ts',
+    'src/stores/userStore.ts',
+    'app/(onboarding)/10-summary.tsx',
+    'app/profile/index.tsx',
+    'app/orders/index.tsx',
+    'app/refill/index.tsx',
+    'app/(tabs)/plan.tsx',
+  ];
+  const forbidden = [
+    "from '@/src/pricing'",
+    'from "../pricing',
+    'calculateMonthlyPlanPrice',
+    'calculateProductMonthlyConsumption',
+    'evaluatePriceAdjustment',
+    'PROVISIONAL_DEMO_MANAGEMENT_FEE',
+    'PROVISIONAL_DEMO_OPERATIONS_RISK',
+  ];
+  for (const relPath of activeSurfaces) {
+    const content = fs.readFileSync(path.resolve(relPath), 'utf8');
+    for (const token of forbidden) {
+      assert.ok(!content.includes(token), `${relPath} must not contain ${token}`);
+    }
+  }
+  assert.equal(fs.existsSync(path.resolve('src/pricing')), false, 'src/pricing directory must be removed');
+});
+
+test('I1-B4A Customer Copy: membership is $25 management; products are separate', () => {
+  const summary = fs.readFileSync(path.resolve('app/(onboarding)/10-summary.tsx'), 'utf8');
+  const profile = fs.readFileSync(path.resolve('app/profile/index.tsx'), 'utf8');
+  const orders = fs.readFileSync(path.resolve('app/orders/index.tsx'), 'utf8');
+  const refill = fs.readFileSync(path.resolve('app/refill/index.tsx'), 'utf8');
+  const combined = `${summary}\n${profile}\n${orders}\n${refill}`;
+
+  assert.ok(summary.includes('config.betaPriceMonthly'), 'onboarding uses centralized display price');
+  assert.ok(summary.includes('purchased separately'), 'onboarding states products are purchased separately');
+  assert.ok(!summary.includes('products included'), 'onboarding must not claim products are included');
+  assert.ok(!summary.includes('OTC products'), 'onboarding must not imply bundled OTC products');
+  assert.ok(profile.includes('purchased separately'));
+  assert.ok(orders.includes('separate from your Derive membership'));
+  assert.ok(refill.includes('separate from your Derive membership'));
+  assert.ok(!combined.includes('$100'));
+  assert.ok(!combined.includes('$129'));
+  assert.ok(!combined.includes('$96'));
+  assert.ok(!combined.includes('96/mo'));
+  assert.ok(!combined.toLowerCase().includes('$25 for ai'));
+});
+
+test('I1-B4A UserStore Display Label: canonical founding_beta projects to Founding Beta', () => {
+  useUserStore.getState().resetToDefault();
+  useUserStore.getState().setRemoteCustomerProfile({
+    id: 'usr_label',
+    email: 'label@derive.skin',
+    fullName: 'Label Member',
+    tier: 'founding_beta',
+    membershipStatus: 'active',
+    createdAt: '2026-09-19T00:00:00.000Z',
+    updatedAt: '2026-09-19T00:00:00.000Z',
+  });
+  assert.equal(useUserStore.getState().tier, 'Founding Beta');
+  assert.ok(!useUserStore.getState().tier.includes('129'));
+  useUserStore.getState().resetToDefault();
 });
 
 // ========================================================
@@ -1071,8 +1227,8 @@ test('Safety & Privacy: Zero race, ethnicity, or ancestry classifiers in phenoty
 // 16. K4.3 FOUNDING BETA CLIENT READINESS INVARIANTS
 // ========================================================
 
-test('I1-B4 Pricing Truth: Client displays a price-independent $25 Founding Beta membership', () => {
-  assert.equal(config.foundingBetaMembershipMonthlyCents, 2500);
+test('K4.3 Pricing Truth: Client configuration centralizes beta price at $25/mo', () => {
+  assert.equal(config.betaPriceMonthly, 25);
   assert.equal(config.currency, 'USD');
   assert.equal(config.founderSupportEmail, 'concierge@derive.skin');
 });
@@ -1703,6 +1859,8 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
           skinState: input.skinState,
           irritation: input.irritation,
           adherence: input.adherence || 'yes',
+          contextTags: input.contextTags ?? [],
+          contextNote: input.contextNote,
           aiAnalysisSentence: 'Remote analysis recorded.',
           adjustmentProposed: false,
           createdAt: new Date().toISOString(),
@@ -6319,81 +6477,382 @@ test('I1-B3 Provider Neutrality: Zero provider leakage in mobile app layers', ()
   }
 });
 
+
+
+
+
 // ========================================================
-// 36. I1-B4 MEMBERSHIP, COMMERCE & CHECK-IN RECONCILIATION
+// 36. I1-B3.1 CLIENT LIFECYCLE HARDENING REGRESSIONS
 // ========================================================
 
-test('I1-B4 Membership identity is price-neutral and legacy price-coded tiers fail closed', () => {
-  const canonical = mapDbCustomerProfile({
-    id: 'u_i1b4',
-    email: 'member@example.com',
-    created_at: '2026-09-18T00:00:00Z',
-    updated_at: '2026-09-18T00:00:00Z',
-    memberships: {
-      id: 'm_i1b4',
-      user_id: 'u_i1b4',
-      tier: 'founding_beta',
-      status: 'active',
-      created_at: '2026-09-18T00:00:00Z',
+function b31OnboardedRemote(userId: string) {
+  useAuthStore.getState().setSession(userId, `${userId}@derive.skin`);
+  useBootstrapStore.setState({
+    status: 'READY',
+    bootstrapState: {
+      userId,
+      profileExists: true,
+      onboardingCompleted: true,
+      membershipStatus: 'active',
     },
+    errorMessage: null,
+    resolvedUserId: userId,
+    resolutionAttempt: 1,
   });
-  assert.equal(canonical?.tier, 'founding_beta');
+  useRoutineStore.setState({
+    routine: null,
+    userProducts: [],
+    isRoutineBeingPrepared: false,
+    isPlanUnderReview: false,
+    planHydrationStatus: 'idle',
+    planHydrationError: null,
+  });
+  clearInFlightHydrations();
+  clearInFlightProposals();
+}
 
-  const legacy = mapDbCustomerProfile({
-    id: 'u_legacy',
-    email: 'legacy@example.com',
-    created_at: '2026-09-18T00:00:00Z',
-    updated_at: '2026-09-18T00:00:00Z',
-    memberships: {
-      id: 'm_legacy',
-      user_id: 'u_legacy',
-      tier: 'founding_beta_129',
-      status: 'active',
-      created_at: '2026-09-18T00:00:00Z',
+async function withB31RemoteService<T>(
+  service: RemoteDeriveService,
+  run: () => Promise<T> | T
+): Promise<T> {
+  const origService = getDeriveService();
+  setDeriveService(service);
+  try {
+    return await run();
+  } finally {
+    setDeriveService(origService);
+  }
+}
+
+test('I1-B3.1 Cold Restart + Hydration Error: Remote onboarded member preserves isRoutineBeingPrepared=true on transient failure', async () => {
+  class FailingHydrationRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { throw new Error('Network timeout'); }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { throw new Error('Network timeout'); }
+  }
+  await withB31RemoteService(new FailingHydrationRemote(), async () => {
+    b31OnboardedRemote('usr_cold_restart_1');
+    await hydratePlanState('usr_cold_restart_1');
+    const state = useRoutineStore.getState();
+    assert.equal(state.routine, null, 'routine must remain null');
+    assert.equal(state.isRoutineBeingPrepared, true, 'isRoutineBeingPrepared must be preserved true for onboarded member on error');
+    assert.equal(state.isPlanUnderReview, false, 'isPlanUnderReview must stay false');
+    assert.equal(state.planHydrationStatus, 'error', 'planHydrationStatus must be error');
+    assert.ok(state.planHydrationError, 'planHydrationError must be set');
+  });
+});
+
+test('I1-B3.1 Onboarded Member Cannot Fall into Start Routine Setup on Hydration Error', async () => {
+  class ErroringRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { throw new Error('backend error'); }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { throw new Error('backend error'); }
+  }
+  await withB31RemoteService(new ErroringRemote(), async () => {
+    b31OnboardedRemote('usr_no_setup_1');
+    await hydratePlanState('usr_no_setup_1');
+    const state = useRoutineStore.getState();
+    assert.equal(state.isRoutineBeingPrepared, true, 'Must show preparation state, not setup CTA');
+    assert.equal(state.isPlanUnderReview, false);
+    assert.equal(state.routine, null);
+  });
+});
+
+test('I1-B3.1 Failed Hydration Does NOT Call proposeRoutine: error gate prevents model invocation', async () => {
+  let proposalCalled = false;
+  class ErrorWithSpy extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { throw new Error('read error'); }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { throw new Error('read error'); }
+    async proposeRoutine(_input?: any): Promise<RoutineProposalResult> {
+      proposalCalled = true;
+      throw new Error('should not be called');
+    }
+  }
+  await withB31RemoteService(new ErrorWithSpy(), async () => {
+    b31OnboardedRemote('usr_nodepropo_1');
+    await ensureInitialRoutineProposal('usr_nodepropo_1');
+    assert.equal(proposalCalled, false, 'proposeRoutine must NOT be called when hydration itself failed');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'error');
+    assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, true);
+  });
+});
+
+test('I1-B3.1 Retry Hydration Succeeds with Null Routine: then proposal occurs', async () => {
+  let hydrationAttempts = 0;
+  let proposalCalled = false;
+  class RetryableRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> {
+      hydrationAttempts++;
+      if (hydrationAttempts === 1) throw new Error('first attempt fails');
+      return null;
+    }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> {
+      if (hydrationAttempts <= 1) throw new Error('first attempt fails');
+      return [];
+    }
+    async proposeRoutine(_input?: any): Promise<RoutineProposalResult> {
+      proposalCalled = true;
+      const { generateRoutineProposal: gen } = await import('../src/services/ai-workflows/routine-generator.ts');
+      const { routine, userProducts } = gen({ primaryGoal: 'breakouts', routineComplexity: 'simple' }, []);
+      return { routine: { ...routine, userId: 'usr_retry_b31', status: 'awaiting_review' } as any, userProducts };
+    }
+  }
+  await withB31RemoteService(new RetryableRemote(), async () => {
+    b31OnboardedRemote('usr_retry_b31');
+    await ensureInitialRoutineProposal('usr_retry_b31');
+    assert.equal(proposalCalled, false, 'No proposal on first (error) hydration');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'error');
+    assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, true);
+
+    clearInFlightHydrations();
+    clearInFlightProposals();
+    await ensureInitialRoutineProposal('usr_retry_b31');
+    assert.equal(proposalCalled, true, 'Proposal must fire after successful retry hydration');
+    assert.ok(hydrationAttempts >= 2, 'Retry must re-run hydration even though isRoutineBeingPrepared was already true');
+  });
+});
+
+test('I1-B3.1 Old Hydration Promise Cannot Delete Newer Same-User Entry (Promise Identity)', async () => {
+  let resolveFirst!: (v: RoutinePlan | null) => void;
+  let resolveSecond!: (v: RoutinePlan | null) => void;
+  const firstHeld = new Promise<RoutinePlan | null>((res) => { resolveFirst = res; });
+  const secondHeld = new Promise<RoutinePlan | null>((res) => { resolveSecond = res; });
+  let callCount = 0;
+  class RacyRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> {
+      callCount++;
+      if (callCount === 1) return firstHeld;
+      if (callCount === 2) return secondHeld;
+      throw new Error('third getRoutine must not start; old finally deleted the newer in-flight entry');
+    }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+  }
+  await withB31RemoteService(new RacyRemote(), async () => {
+    b31OnboardedRemote('usr_race_b31');
+    const a1 = hydratePlanState('usr_race_b31');
+    clearInFlightHydrations();
+    useRoutineStore.getState().resetRoutine();
+    useAuthStore.getState().setSession('usr_race_b31', 'usr_race_b31@derive.skin');
+    const a2 = hydratePlanState('usr_race_b31');
+    resolveFirst(null);
+    await a1;
+    const a3 = hydratePlanState('usr_race_b31');
+    assert.equal(a3, a2, 'Third hydrate must join the still-in-flight second promise');
+    assert.equal(callCount, 2, 'Old finally must not drop the newer map entry');
+    resolveSecond(null);
+    await a2;
+    await a3;
+  });
+});
+
+test('I1-B3.1 Old Proposal Promise Cannot Delete Newer Same-User Proposal Entry (Promise Identity)', async () => {
+  let resolveFirstProposal!: (v: RoutineProposalResult) => void;
+  let resolveSecondProposal!: (v: RoutineProposalResult) => void;
+  const firstProposalHeld = new Promise<RoutineProposalResult>((res) => { resolveFirstProposal = res; });
+  const secondProposalHeld = new Promise<RoutineProposalResult>((res) => { resolveSecondProposal = res; });
+  let proposalCount = 0;
+  class RacyPropRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return null; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+    async proposeRoutine(_input?: any): Promise<RoutineProposalResult> {
+      proposalCount++;
+      if (proposalCount === 1) return firstProposalHeld;
+      if (proposalCount === 2) return secondProposalHeld;
+      throw new Error('third proposeRoutine must not start; old finally deleted the newer proposal entry');
+    }
+  }
+  await withB31RemoteService(new RacyPropRemote(), async () => {
+    b31OnboardedRemote('usr_propr_b31');
+    useRoutineStore.setState({
+      routine: null,
+      isRoutineBeingPrepared: true,
+      planHydrationStatus: 'ready',
+      planHydrationError: null,
+    });
+    const p1 = ensureInitialRoutineProposal('usr_propr_b31');
+    clearInFlightProposals();
+    useRoutineStore.getState().resetRoutine();
+    useAuthStore.getState().setSession('usr_propr_b31', 'usr_propr_b31@derive.skin');
+    useRoutineStore.setState({
+      routine: null,
+      isRoutineBeingPrepared: true,
+      planHydrationStatus: 'ready',
+      planHydrationError: null,
+      planHydrationAttempt: useRoutineStore.getState().planHydrationAttempt,
+    });
+    const p2 = ensureInitialRoutineProposal('usr_propr_b31');
+    const { generateRoutineProposal: gen3 } = await import('../src/services/ai-workflows/routine-generator.ts');
+    const { routine: r3, userProducts: up3 } = gen3({ primaryGoal: 'breakouts', routineComplexity: 'simple' }, []);
+    resolveFirstProposal({
+      routine: { ...r3, userId: 'usr_propr_b31', status: 'awaiting_review' } as any,
+      userProducts: up3,
+    });
+    await p1;
+    const p3 = ensureInitialRoutineProposal('usr_propr_b31');
+    assert.equal(proposalCount, 2, 'Old finally must not drop the newer proposal map entry');
+    resolveSecondProposal({
+      routine: { ...r3, userId: 'usr_propr_b31', status: 'awaiting_review' } as any,
+      userProducts: up3,
+    });
+    await p2;
+    await p3;
+  });
+});
+
+test('I1-B3.1 Logout/Re-login Same User: dedupe correctness preserved across session boundary', async () => {
+  class StableRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return null; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+  }
+  await withB31RemoteService(new StableRemote(), async () => {
+    b31OnboardedRemote('usr_relogin_b31');
+    await hydratePlanState('usr_relogin_b31');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'ready');
+
+    useAuthStore.getState().setSignedOut();
+    clearInFlightHydrations();
+    useRoutineStore.getState().resetRoutine();
+
+    useAuthStore.getState().setSession('usr_relogin_b31', 'relogin@derive.skin');
+    useBootstrapStore.setState({
+      status: 'READY',
+      bootstrapState: {
+        userId: 'usr_relogin_b31',
+        profileExists: true,
+        onboardingCompleted: true,
+        membershipStatus: 'active',
+      },
+      errorMessage: null,
+      resolvedUserId: 'usr_relogin_b31',
+      resolutionAttempt: 2,
+    });
+    await hydratePlanState('usr_relogin_b31');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'ready', 'Second hydration after re-login must complete cleanly');
+  });
+});
+
+test('I1-B3.1 hydrateRoutine Compatibility: delegates to hydratePlanState, populates userProducts atomically', async () => {
+  const wrapProducts: UserProduct[] = [{
+    id: 'up_wrap_1',
+    userId: 'usr_wrap_b31',
+    productId: 'p_wrap_1',
+    product: {
+      id: 'p_wrap_1',
+      brand: 'CeraVe',
+      name: 'Hydrating Cleanser',
+      category: 'cleanser',
+      keyActives: ['Ceramides'],
+      fullIngredients: ['Water'],
     },
+    action: 'KEEP',
+    actionReason: 'Keep cleanser during review.',
+    isConfirmedByUser: true,
+  }];
+  class HydrateWrapRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return null; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return wrapProducts; }
+  }
+  await withB31RemoteService(new HydrateWrapRemote(), async () => {
+    b31OnboardedRemote('usr_wrap_b31');
+    const result = await hydrateRoutine('usr_wrap_b31');
+    assert.equal(result, null, 'Returns routine (null) via wrapper');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'ready', 'hydratePlanState must have committed status');
+    assert.equal(useRoutineStore.getState().userProducts.length, 1, 'userProducts must hydrate atomically through hydratePlanState');
+    assert.equal(useRoutineStore.getState().userProducts[0].product.name, 'Hydrating Cleanser');
+    assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, true);
   });
-  assert.equal(legacy, null);
 });
 
-test('I1-B4 Check-in row mapping preserves valid multi-select context and filters unknown tags', () => {
-  const checkIn = mapDbCheckIn({
-    id: 'ci_i1b4',
-    user_id: 'u_i1b4',
-    primary_goal: 'breakouts',
-    skin_state: 'same',
-    irritation: 'none',
-    adherence: 'mostly',
-    notes: null,
-    context_tags: ['diet', 'alcohol', 'sleep', 'not_canonical'],
-    context_note: 'Ate differently, drank Friday, and barely slept.',
-    ai_analysis_sentence: null,
-    created_at: '2026-09-18T00:00:00Z',
+test('I1-B3.1 awaiting_review Behavior Unchanged after B3.1 changes', async () => {
+  const { generateRoutineProposal: genDraft } = await import('../src/services/ai-workflows/routine-generator.ts');
+  const { routine: draftBase } = genDraft({ primaryGoal: 'breakouts', routineComplexity: 'simple' }, []);
+  const awaitingRoutine = { ...draftBase, userId: 'usr_draft_b31', status: 'awaiting_review' as const };
+  class DraftRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return awaitingRoutine; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+  }
+  await withB31RemoteService(new DraftRemote(), async () => {
+    b31OnboardedRemote('usr_draft_b31');
+    await hydratePlanState('usr_draft_b31');
+    const state = useRoutineStore.getState();
+    assert.ok(state.routine);
+    assert.equal(state.routine!.status, 'awaiting_review');
+    assert.equal(state.isPlanUnderReview, true);
+    assert.equal(state.isRoutineBeingPrepared, false);
   });
-
-  assert.deepEqual(checkIn.contextTags, ['diet', 'alcohol', 'sleep']);
-  assert.equal(checkIn.contextNote, 'Ate differently, drank Friday, and barely slept.');
-  assert.equal(checkIn.adjustmentProposed, false);
 });
 
-test('I1-B4 removes routine-derived membership pricing and keeps customer copy commercially truthful', () => {
-  assert.equal(fs.existsSync(path.join(REPO_ROOT, 'src/pricing')), false);
-  assert.equal(config.foundingBetaMembershipMonthlyCents, 2500);
-
-  const customerFiles = [
-    'app/(onboarding)/10-summary.tsx',
-    'app/profile/index.tsx',
-    'app/orders/index.tsx',
-    'app/refill/index.tsx',
-  ].map((relativePath) => readFileSync(path.join(REPO_ROOT, relativePath), 'utf8')).join('\n');
-
-  assert.match(customerFiles, /purchased separately/i);
-  assert.doesNotMatch(customerFiles, /products? included|included with your/i);
-  assert.doesNotMatch(customerFiles, /calculateMonthlyPlanPrice|monthlyProductConsumption/i);
+test('I1-B3.1 Published Routine Behavior Unchanged after B3.1 changes', async () => {
+  const { generateRoutineProposal: genPub } = await import('../src/services/ai-workflows/routine-generator.ts');
+  const { routine: pubBase } = genPub({ primaryGoal: 'breakouts', routineComplexity: 'simple' }, []);
+  const publishedRoutine = { ...pubBase, userId: 'usr_pub_b31', status: 'published' as const };
+  class PublishedRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return publishedRoutine; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+  }
+  await withB31RemoteService(new PublishedRemote(), async () => {
+    b31OnboardedRemote('usr_pub_b31');
+    await hydratePlanState('usr_pub_b31');
+    const state = useRoutineStore.getState();
+    assert.ok(state.routine);
+    assert.equal(state.routine!.status, 'published');
+    assert.equal(state.isPlanUnderReview, false);
+    assert.equal(state.isRoutineBeingPrepared, false);
+    assert.equal(state.planHydrationStatus, 'ready');
+  });
 });
 
-test('I1-B4 check-in UX uses canonical multi-select context and the established voice note primitive', () => {
-  const source = readFileSync(path.join(REPO_ROOT, 'app/check-in/index.tsx'), 'utf8');
-  for (const tag of [
+test('I1-B3.1 Provider Neutrality Unchanged: zero provider references in deriveClient.ts', () => {
+  const content = fs.readFileSync(path.resolve('src/services/deriveClient.ts'), 'utf8');
+  for (const token of ['Gemini', 'gemini', 'OpenAI', 'openai', 'Claude', 'claude', 'Anthropic', 'anthropic', 'ROUTINE_MODEL_PROVIDER']) {
+    assert.ok(!content.includes(token), `deriveClient.ts must not contain provider reference '${token}'`);
+  }
+});
+
+test('I1-B3.1 Session Reset Invalidates Stale Projections: clears maps and increments attempt', () => {
+  useRoutineStore.setState({
+    routine: null,
+    isRoutineBeingPrepared: true,
+    planHydrationStatus: 'loading',
+    planHydrationAttempt: 5,
+    planHydrationError: null,
+  });
+  const attemptBefore = useRoutineStore.getState().planHydrationAttempt;
+  clearInFlightHydrations();
+  clearInFlightProposals();
+  useRoutineStore.getState().resetRoutine();
+  assert.ok(useRoutineStore.getState().planHydrationAttempt > attemptBefore, 'Attempt counter must increment on reset');
+  assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, false);
+  assert.equal(useRoutineStore.getState().routine, null);
+  assert.equal(useRoutineStore.getState().planHydrationStatus, 'idle');
+});
+
+// ========================================================
+// I1-B4B WEEKLY CHECK-IN CONTEXT MODEL
+// ========================================================
+
+import {
+  CheckInContextTagSchema,
+  CHECK_IN_CONTEXT_TAGS,
+  CheckInContextTagLabels,
+} from '../src/types/schema.ts';
+import {
+  authorCheckInAnalysis,
+  buildCheckInSubmission,
+  CHECK_IN_NOTE_MAX_LENGTH,
+  containsForbiddenCausalCheckInCopy,
+  formatCheckInContextLine,
+  isCheckInDueFromLatest,
+  mapCheckInResult,
+  memberReportedContextText,
+  normalizeContextTags,
+  toggleContextTag,
+} from '../src/domain/checkIn.ts';
+import {
+  shouldEmitDemoVoiceTranscript,
+  selectDemoVoiceTranscript,
+} from '../src/components/ui/voiceDictationSafety.ts';
+
+test('I1-B4B Canonical context tags: all 10 approved values, invalid rejected', () => {
+  assert.deepEqual([...CHECK_IN_CONTEXT_TAGS], [
     'diet',
     'sleep',
     'stress',
@@ -6404,11 +6863,276 @@ test('I1-B4 check-in UX uses canonical multi-select context and the established 
     'medication_supplement',
     'routine_change',
     'other',
-  ]) {
-    assert.match(source, new RegExp(`['\"]${tag}['\"]`));
+  ]);
+  for (const tag of CHECK_IN_CONTEXT_TAGS) {
+    assert.equal(CheckInContextTagSchema.safeParse(tag).success, true);
   }
-  assert.match(source, /VoiceTextArea/);
-  assert.match(source, /context="checkin_note"/);
-  assert.match(source, /accessibilityRole="checkbox"/);
-  assert.doesNotMatch(source, /Did anything change this week\?/);
+  assert.equal(CheckInContextTagSchema.safeParse('hormonal_imbalance').success, false);
+  assert.equal(CheckInContextTagSchema.safeParse('caused').success, false);
+  assert.equal(CheckInContextTagLabels.travel_weather, 'Travel / weather');
+  assert.equal(CheckInContextTagLabels.medication_supplement, 'Medication / supplement');
+});
+
+test('I1-B4B CheckIn mapping: missing tags become [], invalid tags fail closed', () => {
+  const legacy = mapDbCheckIn({
+    id: 'ci_legacy',
+    user_id: 'usr_1',
+    skin_state: 'same',
+    irritation: 'none',
+    notes: 'legacy note',
+    created_at: '2026-09-01T00:00:00.000Z',
+  });
+  assert.ok(legacy);
+  assert.deepEqual(legacy.contextTags, []);
+  assert.equal(legacy.contextNote, undefined);
+  assert.equal(legacy.notes, 'legacy note');
+  assert.equal(legacy.adherence, undefined);
+  assert.equal(legacy.primaryGoal, undefined);
+
+  const mapped = mapDbCheckIn({
+    id: 'ci_full',
+    user_id: 'usr_1',
+    skin_state: 'better',
+    irritation: 'little',
+    context_tags: ['sleep', 'sleep', 'stress'],
+    context_note: 'Slept poorly.',
+    adherence: 'mostly',
+    primary_goal: 'breakouts',
+    ai_analysis_sentence: 'Check-in recorded.',
+    created_at: '2026-09-19T00:00:00.000Z',
+  });
+  assert.ok(mapped);
+  assert.deepEqual(mapped.contextTags, ['sleep', 'stress']);
+  assert.equal(mapped.contextNote, 'Slept poorly.');
+  assert.equal(mapped.adherence, 'mostly');
+  assert.equal(mapped.primaryGoal, 'breakouts');
+  assert.equal(mapped.adjustmentProposed, true);
+
+  assert.equal(
+    mapDbCheckIn({
+      id: 'ci_bad',
+      user_id: 'usr_1',
+      skin_state: 'same',
+      irritation: 'none',
+      context_tags: ['sleep', 'unknown_tag'],
+      created_at: '2026-09-19T00:00:00.000Z',
+    }),
+    null
+  );
+});
+
+test('I1-B4B CheckInInput helpers: optional tags/note, multi-select, no per-tag notes', () => {
+  const empty = buildCheckInSubmission({
+    skinState: 'same',
+    irritation: 'none',
+    adherence: 'yes',
+    contextTags: [],
+    contextNote: '   ',
+  });
+  assert.deepEqual(empty.contextTags, []);
+  assert.equal(empty.contextNote, undefined);
+
+  const filled = buildCheckInSubmission({
+    primaryGoal: 'breakouts',
+    skinState: 'worse',
+    irritation: 'little',
+    adherence: 'mostly',
+    contextTags: ['sleep', 'travel_weather'],
+    contextNote: 'One note for all tags.',
+  });
+  assert.deepEqual(filled.contextTags, ['sleep', 'travel_weather']);
+  assert.equal(filled.contextNote, 'One note for all tags.');
+  assert.equal('notes' in filled, false);
+
+  assert.deepEqual(normalizeContextTags(undefined), []);
+  assert.deepEqual(normalizeContextTags(['other', 'diet', 'other']), ['diet', 'other']);
+  assert.equal(normalizeContextTags(['diet', 'not_a_tag']), null);
+
+  const selected = toggleContextTag(toggleContextTag([], 'sleep'), 'stress');
+  assert.deepEqual(selected, ['sleep', 'stress']);
+  assert.deepEqual(toggleContextTag(selected, 'sleep'), ['stress']);
+});
+
+test('I1-B4B Mock round-trip preserves context, notes, and non-causal analysis', async () => {
+  const service = new MockDeriveService();
+  const withTags = await service.submitCheckIn({
+    userId: 'mock_user_1',
+    skinState: 'same',
+    irritation: 'none',
+    adherence: 'yes',
+    contextTags: ['sleep', 'stress', 'travel_weather'],
+    contextNote: 'Slept less while traveling.',
+    notes: 'legacy notes still stored',
+  });
+  assert.deepEqual(withTags.checkIn.contextTags, ['sleep', 'stress', 'travel_weather']);
+  assert.equal(withTags.checkIn.contextNote, 'Slept less while traveling.');
+  assert.equal(withTags.checkIn.notes, 'legacy notes still stored');
+  assert.equal(withTags.adjustmentProposed, false);
+  assert.equal(containsForbiddenCausalCheckInCopy(withTags.aiAnalysisSentence), false);
+  assert.match(withTags.aiAnalysisSentence, /Additional context recorded/);
+
+  const empty = await service.submitCheckIn({
+    userId: 'mock_user_1',
+    skinState: 'better',
+    irritation: 'none',
+    adherence: 'yes',
+  });
+  assert.deepEqual(empty.checkIn.contextTags, []);
+  assert.equal(empty.checkIn.contextNote, undefined);
+
+  const meds = await service.submitCheckIn({
+    userId: 'mock_user_1',
+    skinState: 'same',
+    irritation: 'none',
+    contextTags: ['medication_supplement', 'cycle'],
+    contextNote: 'Started a vitamin and noted cycle context.',
+  });
+  assert.equal(meds.adjustmentProposed, false);
+  assert.equal(containsForbiddenCausalCheckInCopy(meds.aiAnalysisSentence), false);
+  assert.doesNotMatch(meds.aiAnalysisSentence, /stop medication|dose|prescription|ovulation|fertility|period tracker/i);
+
+  const progress = await service.getProgress('mock_user_1');
+  assert.equal(progress.checkIns[0].contextTags.includes('medication_supplement'), true);
+  assert.equal(progress.checkIns[2].contextTags.length, 3);
+});
+
+test('I1-B4B Server analysis is deterministic and non-causal', () => {
+  const stable = authorCheckInAnalysis({
+    skinState: 'same',
+    irritation: 'none',
+    hasContext: false,
+  });
+  assert.equal(stable.adjustmentProposed, false);
+  assert.match(stable.sentence, /stable/);
+
+  const irritated = authorCheckInAnalysis({
+    skinState: 'better',
+    irritation: 'little',
+    hasContext: true,
+  });
+  assert.equal(irritated.adjustmentProposed, true);
+  assert.match(irritated.sentence, /irritation/);
+  assert.match(irritated.sentence, /longitudinal comparison/);
+  assert.equal(containsForbiddenCausalCheckInCopy(irritated.sentence), false);
+});
+
+test('I1-B4B Weekly due logic is UTC-safe and injectable', () => {
+  const now = new Date('2026-09-19T12:00:00.000Z');
+  assert.equal(isCheckInDueFromLatest(undefined, now), true);
+  assert.equal(isCheckInDueFromLatest('2026-09-13T12:00:00.000Z', now), false);
+  assert.equal(isCheckInDueFromLatest('2026-09-12T12:00:00.000Z', now), true);
+  assert.equal(isCheckInDueFromLatest('2026-09-11T12:00:00.000Z', now), true);
+});
+
+test('I1-B4B Progress copy prefers contextNote and never implies causation', () => {
+  assert.equal(
+    formatCheckInContextLine(['sleep', 'stress', 'travel_weather']),
+    'Context: Sleep · Stress · Travel / weather'
+  );
+  assert.equal(
+    memberReportedContextText({ contextNote: 'Slept less.', notes: 'legacy' }),
+    'Slept less.'
+  );
+  assert.equal(
+    memberReportedContextText({ contextNote: undefined, notes: 'legacy' }),
+    'legacy'
+  );
+  assert.equal(containsForbiddenCausalCheckInCopy('You logged alcohol and less sleep during this week.'), false);
+  assert.equal(containsForbiddenCausalCheckInCopy('Alcohol caused your breakout'), true);
+});
+
+test('I1-B4B Check-in UI: always-on multi-select, VoiceTextArea, no CHANGE_REASONS', () => {
+  const screen = fs.readFileSync(path.resolve('app/check-in/index.tsx'), 'utf8');
+  assert.equal(screen.includes('CHANGE_REASONS'), false);
+  assert.equal(screen.includes('selectedChange'), false);
+  assert.equal(screen.includes('isFollowUpNeeded'), false);
+  assert.equal(screen.includes('Anything different this week that might be useful context?'), true);
+  assert.equal(screen.includes("context=\"checkin_note\""), true);
+  assert.equal(screen.includes('VoiceTextArea'), true);
+  assert.equal(screen.includes('toggleContextTag'), true);
+  assert.equal(screen.includes('buildCheckInSubmission'), true);
+  assert.equal(screen.includes('CHECK_IN_CONTEXT_TAGS'), true);
+  assert.equal(screen.includes('notes:'), false);
+  assert.match(screen, /accessibilityState=\{\{\s*selected: isSelected\s*\}\}/);
+});
+
+test('I1-B4B Production voice fallback cannot inject canned transcripts', () => {
+  assert.equal(shouldEmitDemoVoiceTranscript(false), false);
+  assert.equal(shouldEmitDemoVoiceTranscript(true), true);
+  assert.ok(selectDemoVoiceTranscript('checkin_note', 0).length > 0);
+  const hookSource = fs.readFileSync(path.resolve('src/components/ui/useVoiceDictation.ts'), 'utf8');
+  assert.equal(hookSource.includes('shouldEmitDemoVoiceTranscript'), true);
+  assert.equal(hookSource.includes("typeof __DEV__ !== 'undefined' && __DEV__"), true);
+});
+
+test('I1-B4B deriveClient hydrates returned context fields exactly once', async () => {
+  const captured: CheckInInput[] = [];
+  class ContextBackend extends MockDeriveService {
+    override async submitCheckIn(input: CheckInInput) {
+      captured.push(input);
+      return super.submitCheckIn(input);
+    }
+  }
+  const backend = new ContextBackend();
+  setDeriveService(backend);
+  useRoutineStore.getState().resetRoutine();
+  const result = await submitWeeklyCheckIn({
+    skinState: 'same',
+    irritation: 'none',
+    adherence: 'yes',
+    contextTags: ['alcohol', 'sleep'],
+    contextNote: 'Late nights after a dinner.',
+  });
+  assert.equal(captured.length, 1);
+  assert.deepEqual(captured[0].contextTags, ['alcohol', 'sleep']);
+  assert.equal(captured[0].contextNote, 'Late nights after a dinner.');
+  const stored = useRoutineStore.getState().checkIns;
+  assert.equal(stored.length, 1);
+  assert.deepEqual(stored[0].contextTags, ['alcohol', 'sleep']);
+  assert.equal(stored[0].contextNote, 'Late nights after a dinner.');
+  assert.equal(result.checkIn.id, stored[0].id);
+
+  useRoutineStore.getState().resetRoutine();
+  const progress = await hydrateProgress();
+  assert.ok(progress.checkIns.some((row) => row.contextNote === 'Late nights after a dinner.'));
+  setDeriveService(new MockDeriveService());
+});
+
+test('I1-B4B Remote mapper snake_case to canonical CheckIn', () => {
+  const mapped = mapDbCheckIn({
+    id: 'ci_remote_map',
+    user_id: 'usr_remote',
+    skin_state: 'worse',
+    irritation: 'lot',
+    notes: null,
+    context_tags: ['new_product', 'routine_change'],
+    context_note: 'Swapped moisturizer.',
+    adherence: 'not_really',
+    primary_goal: 'texture',
+    ai_analysis_sentence: 'Check-in recorded. You reported some irritation, so Derive will treat this as a tolerance signal.',
+    created_at: '2026-09-19T08:00:00.000Z',
+  });
+  assert.ok(mapped);
+  assert.equal(mapped.userId, 'usr_remote');
+  assert.equal(mapped.skinState, 'worse');
+  assert.deepEqual(mapped.contextTags, ['new_product', 'routine_change']);
+  assert.equal(mapped.contextNote, 'Swapped moisturizer.');
+  assert.equal(mapped.adherence, 'not_really');
+  assert.equal(mapped.primaryGoal, 'texture');
+  const result = mapCheckInResult({
+    checkIn: mapped,
+    aiAnalysisSentence: mapped.aiAnalysisSentence,
+    adjustmentProposed: true,
+  });
+  assert.ok(result);
+  assert.equal(result.adjustmentProposed, true);
+});
+
+test('I1-B4B Obsolete changeReason is gone and note limit is explicit', () => {
+  const schema = fs.readFileSync(path.resolve('src/types/schema.ts'), 'utf8');
+  assert.equal(schema.includes('changeReason'), false);
+  assert.equal(CHECK_IN_NOTE_MAX_LENGTH, 4000);
+  const remote = fs.readFileSync(path.resolve('src/services/remote/RemoteDeriveService.ts'), 'utf8');
+  assert.equal(remote.includes('get-progress'), false);
+  assert.equal(remote.includes("from('check_ins')"), true);
 });

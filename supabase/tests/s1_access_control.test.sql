@@ -289,7 +289,7 @@ insert into public.memberships (
 )
 values (
   '11111111-1111-1111-1111-111111111111',
-  'test_membership',
+  'founding_beta',
   'active',
   'cus_server_only',
   'sub_server_only'
@@ -471,7 +471,7 @@ select throws_ok(
 
 select results_eq(
   $$select tier from public.memberships$$,
-  array['test_membership'],
+  array['founding_beta'],
   'a member reads their own non-secret membership fields'
 );
 

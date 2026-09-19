@@ -41,15 +41,18 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - All interactive controls satisfy 44pt minimum touch target.
   - Cleaned profile dedicated strictly to member account and history.
 
-### K4.1: Personalized Pricing Prototype & Tab UX Refinements [HISTORICAL · PRICING PORTION SUPERSEDED]
+### K4.1: Personalized Pricing Architecture & Tab UX Refinements [COMPLETE]
 * **Scope**:
-  - Historical note: this milestone prototyped a routine-derived all-in pricing engine. ADR-26/I1-B4 superseded that model and removed `src/pricing/**`; it is not active product direction.
+  - Prototype personalized all-in monthly pricing engine in `src/pricing/**` (provisional client simulation pending co-founder review with Sami).
+  - Explicitly distinguish steady-state consumption, current inventory, and initial fulfillment.
+  - Price stability evaluation rule (`requiresMemberApproval: true` for cost increases).
+  - Customer sees ONE all-in price; internal pricing components ($39 management, $5 risk buffer) hidden.
   - Isolate initial onboarding state (`onboardingStore`) from demo fixture data (`loadArthurDemoState()`).
   - Standardize 44x44 pt Account affordance on all 5 root tabs.
   - Implement quiet draft preview mode on Today and Plan during review (`DRAFT · NOT ACTIVE`).
   - Accordion disclosure chevrons (`up`/`down`) and multiline wrapping chat callouts.
-* **Historical Acceptance Criteria**:
-  - Pricing calculation tests passed at delivery; those obsolete tests were removed with the superseded engine in I1-B4.
+* **Acceptance Criteria**:
+  - Pricing calculation unit tests pass 100% (24/24 tests).
   - Full TypeScript typecheck passes with 0 errors.
   - Zero arbitrary subscription tiers.
 
@@ -67,7 +70,7 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 
 ### K4.3: Founding Beta Client Readiness [COMPLETE]
 * **Scope**:
-  - Historical pricing note: this milestone centralized the then-current first-10 beta price. ADR-26/I1-B4 later replaced it with the approved $25/month membership and separate product commerce.
+  - Customer-facing first-10 beta pricing truth ($100/mo) centralized via `src/constants/config.ts` across Account Profile, Managed Orders, and Onboarding Summary.
   - UserStore demo isolation: decoupled tier string from price literals (`Founding Beta`), isolated Arthur demo identity in explicit `loadArthurDemoUser()`, default state initialized cleanly to `Beta Member`.
   - Truthful onboarding trust copy: removed unsupported "pick up where you left off" resumability, "end-to-end encryption", and "medical context"; framed assisted setup as operational concierge support (`concierge@derive.skin`).
   - Mandatory Founding Beta baseline photos: Front, Left, and Right captures required; skip bypass removed; Continue button strictly gated on all 3 captures; right profile subtext clarified to cosmetic texture/clarity.
@@ -486,20 +489,32 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
 
-### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [COMPLETE]
+### I1-B3.1: Client Hardening — Cold-Restart Hydration, Read-Failure Generation Guard, Promise-Identity In-Flight Cleanup [COMPLETE]
 * **Scope**:
-  - Reconcile the cofounder-approved **$25/month Founding Beta membership** with products purchased separately.
-  - Replace price-coded membership identity with canonical `founding_beta` through an additive legacy-data migration and coherent shared/Mock/Remote contract updates.
-  - Remove the superseded routine-derived all-in pricing engine and customer calculations.
-  - Add optional weekly multi-select context tags plus one voice/text note with durable, owner-scoped persistence and Mock/Remote parity.
-  - Reconcile active customer copy, architecture, decision, research, interface, and roadmap truth without rewriting applied migration history.
+  - Cold Remote restart: authenticated + bootstrap `READY` + `onboardingCompleted === true` + failed plan read preserves `routine = null`, `isRoutineBeingPrepared = true`, `isPlanUnderReview = false`, `planHydrationStatus = 'error'`, customer-safe `planHydrationError`. Onboarded members do not fall into "Start Routine Setup" empty-state.
+  - Read failure must not call `proposeRoutine()`. Retry with `planHydrationStatus === 'error'` re-runs hydration first even if `isRoutineBeingPrepared` is already true. Proposal runs only after successful hydration proves `routine === null` and pending-generation is still true.
+  - In-flight maps use per-request ownership tokens so an older request's `finally` cannot delete a newer same-user hydration or proposal. `hydratePlanState` returns the map Promise directly (not an extra `async` wrapper) so same-user joins keep Promise identity.
+  - Legacy `hydrateRoutine()` is a compatibility wrapper over `hydratePlanState()` and hydrates Routine + `UserProduct[]` atomically.
 * **Acceptance Criteria**:
-  - No active customer-facing all-in pricing promise or product-inclusion claim remains.
-  - No active code derives membership price from routine composition or product consumption.
-  - Canonical membership identity is price-neutral; legacy rows transition conservatively.
-  - Context tags/notes survive persistence and service mapping; unknown tags fail closed.
-  - Full unit, TypeScript, Expo export, Supabase reset, pgTAP, and local E2E verification passes.
-* **Explicit Non-Scope**: Stripe checkout/webhooks, a complete product payment flow, a sixth root tab, full Shop, coupons, affiliate infrastructure, food tracking, period tracking, and membership tiers.
+  - Section 36 in `tests/derive.test.ts` covers cold-restart error, no false generation, retry-then-propose, genuine in-flight races, atomic `hydrateRoutine`, awaiting_review, published, provider neutrality, and session reset.
+  - Unit tests, app/test typecheck, and Expo web export remain green. Backend schema unchanged.
+  - `eas.json` Remote flag remains `false`.
+
+### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [COMPLETE]
+* **Implemented in I1-B4A**:
+  - Founding Beta membership display is **$25/month** (`config.betaPriceMonthly`). Membership pays for Derive managing skincare. Products are purchased separately. Membership price does not depend on routine size or product cost.
+  - Canonical identity `founding_beta` via additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql` (legacy `founding_beta_129` backfilled; unknown tiers fail closed). `src/pricing/**` all-in engine removed.
+  - Onboarding, Profile, Orders, and Refill copy state products are separate. ADR-26 implemented. ARCHITECTURE_CHALLENGE-01 resolved. Remote mapper accepts `founding_beta`.
+* **Implemented in I1-B4B**:
+  - Optional multi-select `CheckInContextTag` + one optional context note every weekly check-in. Tags are context, not causation. `cycle` is not a period tracker. Medication/supplement context does not alter prescriptions.
+  - Additive `check_ins` migration, real `submit-checkin` Edge Function, RLS-backed Remote progress reads (no phantom `get-progress`). Learned insights remain empty in Remote until S3. Next milestone is **S4**.
+* **Approved product truth**:
+  - Do **not** frame as "$25 for AI". $25 is a current Founding Beta experiment, not a lifetime company price.
+  - Commercial-independence invariant: margin, affiliate, sponsorship, and coupons must never silently alter KEEP / PAUSE / REPLACE / ADD, Scan, safety, or ranking. New SKU charges require explicit consent; same-SKU refills may stay low-friction.
+  - Five-tab IA preserved. Full Shop deferred. Stripe billing deferred to S5.
+* **B4A — Membership & Product Commerce Model Reconciliation** [COMPLETE]
+* **B4B — Weekly Check-In Context Model & Persistence** [COMPLETE]
+* **Not in B4**: Shop tab, Stripe checkout amounts, coupons, affiliates, food diary, period tracker, membership tiers, provider selection.
 
 ## Sami Workstream (Platform + Intelligence + Operations)
 
@@ -541,24 +556,19 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Ingredient signals update confidence based on multi-product overlap and tolerated exposure discounting.
 
 ### S4: Founder Operations Console
-* **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta members ($25/month membership; products purchased separately). Routine review queue, separately purchased product/refill status updater, product formula auditor, and internal clinical notes.
+* **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta members. After I1-B4A, customer-facing membership truth is the $25/month Derive-management experiment with products purchased separately; S4 itself remains founder review/edit/publish of routines, refill status, formula audit, and internal notes. Do not treat full Shop as an S4 acceptance criterion.
 * **Acceptance Criteria**:
   - Founders can review, edit, and publish routine proposals before member notification.
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
 ### S5: Commerce & Remote Service Integration
-* **Scope**:
-  - **Founding Beta Membership Checkout**: Trusted Stripe `$25/month` subscription price, customer portal, and webhook-driven membership lifecycle. Client display constants are never payment authority.
-  - **Product Commerce v0**: Separate, consent-gated product purchase/refill transactions with price, tax/shipping, charge/order state, and audit history.
-  - **Remote Integration**: Complete remaining `RemoteDeriveService` live endpoints and production-readiness verification.
-  - **Deferred Full Shop**: Broader personalized browse/search, alternatives, deals/coupons, and a dedicated Shop surface remain later work gated on beta evidence.
+* **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership** (target $25/month after B4A; Stripe owns live money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` against live Edge Functions. Separate product commerce v0 may follow membership checkout. Full personalized Shop is later / evidence-driven.
 * **Acceptance Criteria**:
-  - Stripe webhook maps a trusted Stripe customer to the correct Supabase member without trusting client-supplied amounts or email alone.
-  - Membership and product payments remain distinct; no product charge occurs without explicit consent.
+  - Stripe webhook maps customer email to Supabase member record and membership lifecycle.
   - `RemoteDeriveService` passes the full test suite against live Supabase Edge Functions.
   - Mobile app can toggle from `MockDeriveService` to `RemoteDeriveService` via a single environment flag.
-  - Full Shop implementation is not required for Founding Beta launch.
+  - Product SKU checkout is not required to close S5 membership; Shop is explicitly deferred.
 
 ---
 

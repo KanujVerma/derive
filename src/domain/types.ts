@@ -100,7 +100,15 @@ export type {
 // 1. CUSTOMER & MEMBERSHIP
 // ==========================================
 
+/** Price-neutral V1 membership identity. Do not encode 25 / $25 / 129 in this value. */
 export type MembershipTier = 'founding_beta';
+
+export function membershipDisplayLabel(tier: MembershipTier): string {
+  switch (tier) {
+    case 'founding_beta':
+      return 'Founding Beta';
+  }
+}
 
 export interface CustomerProfile {
   id: string;
@@ -188,9 +196,9 @@ export interface CheckInInput {
   skinState: SkinState;
   irritation: IrritationLevel;
   adherence?: AdherenceLevel;
+  notes?: string;
   contextTags?: CheckInContextTag[];
   contextNote?: string;
-  notes?: string;
   photoUris?: string[];
   irritationDetails?: {
     symptoms: ReactionSymptom[];

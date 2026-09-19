@@ -156,8 +156,11 @@ export default function ProfileScreen() {
             <Text style={styles.memberEmail}>{email || 'member@derive.skin'}</Text>
             <View style={styles.badgeRow}>
               <Badge label="FOUNDING BETA" variant="keep" size="small" />
-              <Text style={styles.memberPrice}>${config.foundingBetaMembershipMonthlyCents / 100}/mo</Text>
+              <Text style={styles.memberPrice}>${config.betaPriceMonthly}/mo</Text>
             </View>
+            <Text style={styles.memberClarification}>
+              Membership covers Derive's ongoing skincare management. Products are purchased separately.
+            </Text>
           </View>
         </View>
 
@@ -393,6 +396,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: colors.inkMuted,
     fontWeight: typography.weights.medium,
+  },
+  memberClarification: {
+    fontSize: typography.sizes.micro,
+    color: colors.inkMuted,
+    lineHeight: typography.lineHeights.caption,
+    marginTop: 8,
   },
   groupedRow: {
     flexDirection: 'row',

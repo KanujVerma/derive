@@ -3,7 +3,7 @@
 ## The Customer Promise
 **"Your skincare, handled."**
 
-Derive is a managed skincare membership. Customers provide their observations, bathroom counter bottles, and skin history; Derive performs the interpretation, establishes and manages a single canonical routine, answers questions, and checks in weekly. Products and refills may be purchased separately with explicit price approval.
+Derive is a managed skincare service. Customers provide their observations, bathroom counter bottles, and skin history; Derive performs the interpretation, establishes and manages a single canonical routine, answers questions, checks in weekly, and replenishes verified products.
 
 ---
 
@@ -18,7 +18,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
 - Manually reviewing intake submissions and baseline skin photos.
 - Manually constructing or deeply reviewing the initial routine proposal.
 - Manually checking early system-generated recommendations and verdicts.
-- Manually sourcing and fulfilling separately purchased, explicitly approved routine products.
+- Manually sourcing, purchasing, and fulfilling approved routine products.
 - Manually reviewing weekly check-in logs when necessary.
 - Manually monitoring product refill timing and operational exceptions.
 - Conducting biweekly-ish customer research and feedback conversations.
@@ -32,25 +32,29 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
   3. Derive helps the member know what to keep, pause, replace, or add.
   4. Derive learns what happens over time and proposes justified adaptations.
   5. Derive prevents wasteful, incompatible, or redundant product purchases.
-  6. Members can approve separately priced OTC product purchases and refills without researching the market again.
+  6. Approved managed OTC products are fulfilled and replenished according to beta terms.
 
 ---
 
-## 2. Founding Beta Membership & Separate Product Commerce
+## 2. Founding Beta Pricing — Approved $25 Management Membership (Products Separate)
 
-* **Status**: **APPROVED BETA EXPERIMENT** for the initial 10 paying members.
-* **Membership Price**: **$25/month** for the managed Derive experience: audited routine, check-ins and longitudinal history, Scan/Ask product-fit guidance, and ongoing routine management.
-* **Products Are Purchased Separately**: OTC products, replacements, and refills are not included in the membership fee. The member sees and approves the applicable product price before any charge, purchase, or shipment.
-* **Price-Neutral Membership Identity**: Shared contracts and persistence use `founding_beta`; the amount belongs to trusted server-side billing configuration and later Stripe price IDs.
-* **No Routine-Derived Membership Price**: Routine complexity, bottle lifespan, product selection, tax, and shipping do not dynamically change the membership price.
+* **Status**: **IMPLEMENTED (I1-B4A / ADR-26)**. Current runtime uses `config.betaPriceMonthly = 25` and `founding_beta`.
+* **Price Point**: Flat **$25/month** Founding Beta experiment for Derive managing the member's skincare. Not "$25 for AI." Not a lifetime company price.
+* **Products**: Purchased separately. Membership price is independent of routine size, retail cost, lifespan, and refill rate. No V1 membership tiers.
 * **Strategic Rationale**:
-  - Separates willingness-to-pay for the Derive service from willingness-to-buy a particular product basket.
-  - Keeps recommendations independent from commerce economics.
-  - Makes product costs and consent explicit while preserving a low-friction Founding Beta experiment.
-* **Internal Beta Economics**: Membership revenue, product revenue/cost, tax, shipping, founder time, replacements, and refunds are tracked separately. Mature unit economics are not claimed from a 10-member cohort.
-* **Preserve Working Products**: Existing counter products that work are retained (`KEEP`); Derive does not create unnecessary purchases.
-* **Refills by Need, Not Calendar Theater**: Refill prompts follow actual depletion need rather than the membership billing date.
-* **Prescriptions Are Contextual Only**: Prescription treatments inform compatibility but are never prescribed, modified, or supplied by Derive.
+  - Validates genuine recurring willingness-to-pay **for management**, independent of product cost.
+  - Preserves KEEP / consent / need-based refill operating principles from ADR-21.
+  - Thin or negative first-basket unit economics remain possible while founders assist product purchasing; mature unit economics are NOT claimed.
+* **Customer-Facing Concept**:
+  - Membership pays for Derive managing skincare (routine, check-ins, Scan, Ask, Progress, beta founder review).
+  - Products are separate transactions. No product wallet, credit balance, or rollover allowance.
+  - **Preserve Working Products**: Existing counter products that already work are retained (`KEEP`).
+  - **Refills by Need, Not Calendar Theater**: Same-SKU refills may stay low-friction; new SKUs require explicit consent.
+  - **Prescriptions Are Contextual Only**.
+  - **Weekly check-in context (I1-B4B)**: optional tags + one note are history for comparison, not proven causes. No food diary or period tracker.
+  - **Commercial Independence**: Monetization must not silently change recommendations.
+* **Historical (do not delete)**: ADR-21 $100/month all-in/products-included experiment; ADR-10 $129; ADR-15 Arthur $96/mo routine-derived prototype. All superseded as commercial direction.
+* **Long-Term Commerce**: Stripe membership checkout in S5. Separate product commerce v0 after membership. Full Shop later / evidence-driven. No sixth tab.
 
 ---
 
@@ -59,7 +63,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
 "Autopilot vs. Depth" is a core product philosophy, **NOT a user settings toggle or separate app modes**.
 
 * **Default Derive Experience (Autopilot)**:
-  A member who does not want to think about skincare should only need Today + Plan + lightweight check-ins + approvals. Derive handles scheduling, monitoring, and timely separate-purchase refill prompts in the background.
+  A member who does not want to think about skincare should only need Today + Plan + lightweight check-ins + approvals. Derive handles scheduling, monitoring, and replenishment in the background.
 * **Optional Depth**:
   Members who want deeper understanding can explore Scan (viewfinder evaluation), Ask (grounded conversational intelligence), Progress (longitudinal photo comparisons and insights), and research cards at their own pace.
 * **Canonical Navigation Preserved**:
@@ -74,7 +78,7 @@ The Founding Beta delivers:
 3. **Dedicated Viewfinder Scanner**: In-store and counter evaluation verifying whether prospective products fit their active barrier and routine.
 4. **Contextual Ask Derive**: Conversational intelligence grounded in active products, retinoid schedules, and tolerance history.
 5. **Weekly Check-Ins & Progress**: Longitudinal tracking of tolerance, barrier stability, and photo comparison.
-6. **Separate-Purchase Refills**: Low-friction, need-based replenishment with the applicable price shown and approved before charge or shipment.
+6. **Managed Refills**: Low-friction replenishment of standard routine products without automated depletion illusions.
 
 ---
 
