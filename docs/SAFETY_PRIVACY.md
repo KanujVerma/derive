@@ -103,6 +103,10 @@ Optional check-in context tags (`diet`, `sleep`, `stress`, `alcohol`, `cycle`, `
 * No food diary, calorie, or macronutrient tracking.
 * Server-authored check-in summaries may acknowledge that additional context was recorded; they must not output causal lifestyle claims.
 
+## 6d. Paid Managed Access and Historical Ownership (E1 / ADR-31)
+
+Active membership gates Remote managed skincare and new paid-service writes. Inactive accounts cannot start sensitive onboarding, upload new private baseline photos, obtain routine generation or personalized Scan/ordinary Ask, submit managed Check-Ins, or request managed Refills. The authenticated customer's owner-readable historical records and account deletion remain available at their existing trust boundary; the paid UI is still closed. The deterministic emergency Ask safety hard-stop remains available before any model call, including when membership is inactive. Only the signed Stripe webhook projects membership status; Checkout success navigation and client state do not grant entitlement.
+
 ---
 
 ## 7. Safety Disclosure Provenance & Epistemic Non-Coercion (I1-B0)

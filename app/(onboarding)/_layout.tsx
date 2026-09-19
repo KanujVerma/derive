@@ -1,9 +1,11 @@
 import React from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Alert, Platform, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii } from '@/src/constants/theme';
 import { Icon } from '@/src/components/ui/Icon';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { signOutSession } from '@/src/services/authClient';
 
 const STAGES = [
   { index: 1, name: 'Goals', patterns: ['2-goals'] },
@@ -18,8 +20,24 @@ export default function OnboardingLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+  const remoteEnabled = isRemoteServiceEnabled();
 
   const isWelcome = pathname.includes('1-welcome');
+
+  const handleExit = async () => {
+    if (!remoteEnabled) {
+      router.replace('/(tabs)');
+      return;
+    }
+    const result = await signOutSession();
+    if (result.success) {
+      router.replace('/(auth)/login');
+    } else if (Platform.OS === 'web') {
+      window.alert(result.error || 'Sign out could not be completed.');
+    } else {
+      Alert.alert('Sign Out', result.error || 'Sign out could not be completed.');
+    }
+  };
 
   // Find active stage
   const matchedStage = STAGES.find((stage) =>
@@ -28,6 +46,16 @@ export default function OnboardingLayout() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {isWelcome && remoteEnabled && (
+        <TouchableOpacity
+          onPress={() => void handleExit()}
+          style={styles.welcomeSignOut}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
+          <Text style={styles.closeText}>Sign Out</Text>
+        </TouchableOpacity>
+      )}
       {/* Top Header with 6 Perceived Stages (hidden on clean welcome screen) */}
       {!isWelcome && (
         <View style={styles.topBar}>
@@ -65,13 +93,13 @@ export default function OnboardingLayout() {
           </View>
 
           <TouchableOpacity
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => void handleExit()}
             style={styles.closeButton}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel="Exit onboarding"
+            accessibilityLabel={remoteEnabled ? 'Sign out' : 'Exit onboarding'}
           >
-            <Text style={styles.closeText}>Exit</Text>
+            <Text style={styles.closeText}>{remoteEnabled ? 'Sign Out' : 'Exit'}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -92,6 +120,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.canvas,
+  },
+  welcomeSignOut: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.lg,
+    zIndex: 1,
+    padding: spacing.sm,
   },
   topBar: {
     flexDirection: 'row',

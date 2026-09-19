@@ -60,6 +60,10 @@ async function run() {
     assert.ifError(createError);
     userId = created.user.id;
 
+    assert.ifError((await admin.from('memberships').insert({
+      user_id: userId, tier: 'founding_beta', status: 'active',
+    })).error);
+
     const { error: profileError } = await admin.from('skin_profiles').insert({
       user_id: userId,
       primary_goal: 'breakouts',

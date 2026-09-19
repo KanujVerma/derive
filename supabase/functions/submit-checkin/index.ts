@@ -3,6 +3,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
+import { MembershipEntitlementError, requireActiveMembership } from "../_shared/entitlement.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -119,6 +120,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const userId = user.id;
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    try {
+      await requireActiveMembership(adminClient, userId);
+    } catch (error) {
+      if (error instanceof MembershipEntitlementError) {
+        return errorResponse(error.code, error.message, error.status);
+      }
+      throw error;
+    }
     let body: Record<string, unknown>;
     try {
       body = await req.json();
@@ -174,7 +184,6 @@ Deno.serve(async (req: Request) => {
       hasContext,
     });
 
-    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
     const { data: inserted, error: insertError } = await adminClient
       .from("check_ins")
       .insert({

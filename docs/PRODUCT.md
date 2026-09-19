@@ -10,6 +10,10 @@ Derive eliminates the cognitive overhead of skincare ("Your skincare, handled").
 - **Optional Depth**: Members desiring deeper agency or understanding can explore Scan (viewfinder product evaluations), Ask (grounded conversational intelligence), Progress (longitudinal photo comparisons and learned observations), and clinical research cards at their own pace.
 - **Same Unified Product**: Every member has access to the same 5 canonical native tabs (`Today` | `Plan` | `Shop` | `Ask` | `Progress`).
 
+### Founding Beta access order
+
+In Remote mode, the customer signs in with a six-digit code, activates the $25/month Founding Beta membership through Stripe-hosted Checkout, and then completes sensitive onboarding. Only the signed webhook's canonical active membership unlocks onboarding or the managed app. A paused or cancelled member sees billing management and sign-out instead of the five member tabs. Products remain separate purchases. Mock mode keeps its local demo flow, and the future public Shop is separate C1.5 work.
+
 ---
 
 ## Canonical V1 Navigation (5 Native Tabs)
@@ -48,7 +52,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
   - **ORDERS & REFILLS**: Direct path to active shipment tracking and refill requests.
 - **Nested Scan Capability**: Camera and barcode evaluation lives canonically under `/shop/scan` (`app/shop/scan.tsx`) with split categorical verdicts (`FIT FOR YOU RIGHT NOW` vs `FORMULA QUALITY`) and 1-tap handoff to Ask.
 - **Calm Invariant**: When no products are needed, Shop shows "Your current plan is covered" — never manufacturing shopping urgency.
-- **Non-Member / Guest Fallback**: General skincare presentation and membership upsell without fabricated plans or scores.
+- **Non-Member / Guest Fallback**: C1's limited presentation model exists, but E1 does not expose it through Remote paid-app routing. A factual public catalog and guest Shop belong to C1.5.
 
 ### 4. Ask ("Contextual skincare conversation")
 - **Grounding Context**: Explicit context indicator: *"Answers based on your routine, skin history, and what we've learned about you."*

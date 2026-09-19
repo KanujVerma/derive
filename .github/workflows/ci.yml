@@ -93,5 +93,8 @@ jobs:
       - name: Run S5 membership commerce integration harness
         run: node scripts/test-s5-local.mjs
 
+      - name: Run E1 membership entitlement lifecycle harness
+        run: node --experimental-strip-types scripts/test-e1-local.mjs
+
       - name: Run local B4B check-in context E2E harness
         run: node scripts/test-i1-b4b-local.mjs

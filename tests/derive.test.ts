@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { selectCurrentMembershipSubscription } from '../supabase/functions/_shared/subscriptions.ts';
+import { pollForActiveMembership } from '../src/services/membershipActivation.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -2194,6 +2195,7 @@ import {
   clearInFlightHydrations,
   clearInFlightProposals,
   resolveCustomerBootstrap,
+  refreshCustomerBootstrap,
   getActiveUserId,
   resolveUserId,
   buildOnboardingPayload,
@@ -3903,6 +3905,16 @@ test('I1-A2 Database Mapping: canonical PostgREST projections and deterministic 
   const stateMultiple = mapDbBootstrapState('u6', { id: 'u6' }, null, multipleMemberships);
   assert.equal(stateMultiple.membershipStatus, 'active', 'Must pick latest membership by created_at');
 
+  const stripeOrdered = [
+    { status: 'active', created_at: '2026-09-19T12:00:00Z', last_stripe_event_created_at: '2026-09-18T12:00:00Z' },
+    { status: 'paused', created_at: '2026-09-18T12:00:00Z', last_stripe_event_created_at: '2026-09-19T12:00:00Z' },
+  ];
+  assert.equal(
+    mapDbBootstrapState('u6', { id: 'u6' }, null, stripeOrdered).membershipStatus,
+    'paused',
+    'Stripe event order outranks row creation time for the current entitlement',
+  );
+
   // 12. Profile mapping: snake_case maps to camelCase CustomerProfile
   const mappedProfile = mapDbCustomerProfile({
     id: 'u7',
@@ -3936,6 +3948,16 @@ test('I1-A2 Database Mapping: canonical PostgREST projections and deterministic 
   assert.equal((mappedProfile as any).stripeCustomerId, undefined);
   assert.equal((mappedProfile as any).stripe_customer_id, undefined);
 
+  const eventOrderedProfile = mapDbCustomerProfile({
+    id: 'u7', email: 'sarah@example.com', created_at: '2026-09-10T12:00:00Z',
+    updated_at: '2026-09-10T14:00:00Z',
+    memberships: [
+      { id: 'm-new-row', user_id: 'u7', tier: 'founding_beta', status: 'active', created_at: '2026-09-19T12:00:00Z', last_stripe_event_created_at: '2026-09-18T12:00:00Z' },
+      { id: 'm-current-event', user_id: 'u7', tier: 'founding_beta', status: 'paused', created_at: '2026-09-18T12:00:00Z', last_stripe_event_created_at: '2026-09-19T12:00:00Z' },
+    ],
+  });
+  assert.equal(eventOrderedProfile?.membershipStatus, 'paused');
+
   // 14. Profile mapping: invalid/unrepresentable tier returns null (does not fabricate fake tier)
   const invalidTierProfile = mapDbCustomerProfile({
     id: 'u8',
@@ -3967,6 +3989,16 @@ test('I1-A2 Database Mapping: canonical PostgREST projections and deterministic 
 });
 
 test('I1-A2 Client Profile Resolution & Routing Policy: pure routing rules and holding lifecycle', () => {
+  const activeBootstrap = (onboardingCompleted: boolean, isOnboardingCompleted = !onboardingCompleted) =>
+    resolveAuthRoute({
+      remoteEnabled: true,
+      authStatus: 'SIGNED_IN',
+      sessionUserId: 'u1',
+      resolvedUserId: 'u1',
+      profileResolution: onboardingCompleted ? 'READY' : 'NEEDS_ONBOARDING',
+      bootstrapState: { userId: 'u1', profileExists: true, onboardingCompleted, membershipStatus: 'active' },
+      isOnboardingCompleted,
+    });
   // 16. Remote SIGNED_IN + profile RESOLVING -> /holding
   assert.deepEqual(
     resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_IN', profileResolution: 'RESOLVING' }),
@@ -3987,34 +4019,24 @@ test('I1-A2 Client Profile Resolution & Routing Policy: pure routing rules and h
 
   // 19. Remote SIGNED_IN + profile NEEDS_ONBOARDING -> /(onboarding)/1-welcome
   assert.deepEqual(
-    resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_IN', profileResolution: 'NEEDS_ONBOARDING' }),
+    activeBootstrap(false),
     { type: 'REMOTE_ONBOARDING', route: '/(onboarding)/1-welcome' }
   );
 
   // 20. Remote SIGNED_IN + profile READY -> /(tabs)
   assert.deepEqual(
-    resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_IN', profileResolution: 'READY' }),
+    activeBootstrap(true),
     { type: 'REMOTE_TABS', route: '/(tabs)' }
   );
 
   // 21. Local onboardingStore.isCompleted cannot alter Remote bootstrap routing
   assert.deepEqual(
-    resolveAuthRoute({
-      remoteEnabled: true,
-      authStatus: 'SIGNED_IN',
-      isOnboardingCompleted: true,
-      profileResolution: 'NEEDS_ONBOARDING',
-    }),
+    activeBootstrap(false, true),
     { type: 'REMOTE_ONBOARDING', route: '/(onboarding)/1-welcome' },
     'Remote NEEDS_ONBOARDING must not be overridden by local isCompleted: true'
   );
   assert.deepEqual(
-    resolveAuthRoute({
-      remoteEnabled: true,
-      authStatus: 'SIGNED_IN',
-      isOnboardingCompleted: false,
-      profileResolution: 'READY',
-    }),
+    activeBootstrap(true, false),
     { type: 'REMOTE_TABS', route: '/(tabs)' },
     'Remote READY must not be overridden by local isCompleted: false'
   );
@@ -4022,11 +4044,7 @@ test('I1-A2 Client Profile Resolution & Routing Policy: pure routing rules and h
   // 22. Membership status does not determine onboarding completion
   // An active membership with NEEDS_ONBOARDING routes to onboarding
   assert.deepEqual(
-    resolveAuthRoute({
-      remoteEnabled: true,
-      authStatus: 'SIGNED_IN',
-      profileResolution: 'NEEDS_ONBOARDING',
-    }),
+    activeBootstrap(false),
     { type: 'REMOTE_ONBOARDING', route: '/(onboarding)/1-welcome' }
   );
 
@@ -4187,7 +4205,7 @@ test('I1-A2 RemoteDeriveService PostgREST query execution: typed client double v
           return {
             eq(col: string, val: string) {
               queryLog.push(`eq:${col}=${val}`);
-              return {
+              const chain = {
                 async maybeSingle() {
                   if (table === 'profiles') {
                     return { data: { id: val }, error: null };
@@ -4195,22 +4213,15 @@ test('I1-A2 RemoteDeriveService PostgREST query execution: typed client double v
                   if (table === 'skin_profiles') {
                     return { data: { onboarding_completed: true }, error: null };
                   }
-                  return { data: null, error: null };
+                  return { data: { status: 'active', created_at: '2026-09-18T00:00:00Z' }, error: null };
                 },
                 order(orderCol: string, opts: any) {
                   queryLog.push(`order:${orderCol},asc=${opts?.ascending}`);
-                  return {
-                    limit(n: number) {
-                      queryLog.push(`limit:${n}`);
-                      return {
-                        async maybeSingle() {
-                          return { data: { status: 'active', created_at: '2026-09-18T00:00:00Z' }, error: null };
-                        },
-                      };
-                    },
-                  };
+                  return chain;
                 },
+                limit(n: number) { queryLog.push(`limit:${n}`); return chain; },
               };
+              return chain;
             },
           };
         },
@@ -4232,6 +4243,7 @@ test('I1-A2 RemoteDeriveService PostgREST query execution: typed client double v
   assert.ok(queryLog.includes('from:profiles'));
   assert.ok(queryLog.includes('from:skin_profiles'));
   assert.ok(queryLog.includes('from:memberships'));
+  assert.ok(queryLog.includes('order:last_stripe_event_created_at,asc=false'));
   assert.ok(queryLog.includes('order:created_at,asc=false'));
   assert.ok(queryLog.includes('limit:1'));
 });
@@ -8530,4 +8542,164 @@ test('S5: current paid membership survives later delivery for an older canceled 
   assert.equal(selectCurrentMembershipSubscription([
     subscription('sub_other', 30, 'active', 'price_other'),
   ], 'price_founding'), null);
+});
+
+// E1: Auth identity, onboarding readiness, and membership are independent.
+test('E1 routing: inactive Remote accounts enter membership before onboarding or tabs', () => {
+  const route = (membershipStatus: 'none' | 'paused' | 'cancelled' | 'active', onboardingCompleted: boolean) =>
+    resolveAuthRoute({
+      remoteEnabled: true,
+      authStatus: 'SIGNED_IN',
+      sessionUserId: 'e1-user',
+      resolvedUserId: 'e1-user',
+      profileResolution: onboardingCompleted ? 'READY' : 'NEEDS_ONBOARDING',
+      bootstrapState: { userId: 'e1-user', profileExists: true, onboardingCompleted, membershipStatus },
+      isOnboardingCompleted: !onboardingCompleted,
+    });
+
+  for (const status of ['none', 'paused', 'cancelled'] as const) {
+    assert.deepEqual(route(status, false), { type: 'REMOTE_MEMBERSHIP', route: '/membership' });
+    assert.deepEqual(route(status, true), { type: 'REMOTE_MEMBERSHIP', route: '/membership' });
+  }
+  assert.deepEqual(route('active', false), { type: 'REMOTE_ONBOARDING', route: '/(onboarding)/1-welcome' });
+  assert.deepEqual(route('active', true), { type: 'REMOTE_TABS', route: '/(tabs)' });
+
+  const inactive = route('paused', true);
+  for (const segments of [
+    ['(tabs)', 'index'], ['(tabs)', 'plan'], ['(tabs)', 'ask'], ['(tabs)', 'progress'],
+    ['shop', 'scan'], ['shop', 'product-id'], ['check-in'], ['refill'], ['orders'],
+    ['insights', 'id'], ['(onboarding)', '5-photos'], ['founder'], ['profile'],
+  ]) {
+    assert.equal(getAuthRedirectRoute(segments, inactive), '/membership');
+  }
+  assert.equal(getAuthRedirectRoute(['membership'], inactive), null);
+  assert.equal(getAuthRedirectRoute(['membership'], route('active', true)), '/(tabs)');
+  assert.equal(getAuthRedirectRoute(['membership'], route('active', false)), '/(onboarding)/1-welcome');
+});
+
+test('E1 routing: unresolved or stale bootstrap cannot grant paid access', () => {
+  const active = { userId: 'e1-user', profileExists: true, onboardingCompleted: true, membershipStatus: 'active' as const };
+  const base = { remoteEnabled: true, authStatus: 'SIGNED_IN' as const, sessionUserId: 'e1-user', resolvedUserId: 'e1-user', profileResolution: 'READY' as const, bootstrapState: active };
+  assert.deepEqual(resolveAuthRoute({ ...base, profileResolution: 'RESOLVING' }), { type: 'REMOTE_HOLDING', route: '/holding' });
+  assert.deepEqual(resolveAuthRoute({ ...base, resolvedUserId: 'other-user' }), { type: 'REMOTE_HOLDING', route: '/holding' });
+  assert.deepEqual(resolveAuthRoute({ ...base, bootstrapState: { ...active, userId: 'other-user' } }), { type: 'REMOTE_HOLDING', route: '/holding' });
+  assert.deepEqual(resolveAuthRoute({ ...base, bootstrapState: null }), { type: 'REMOTE_HOLDING', route: '/holding' });
+  assert.deepEqual(resolveAuthRoute({ ...base, bootstrapRefreshing: true }), { type: 'REMOTE_HOLDING', route: '/holding' });
+  assert.deepEqual(resolveAuthRoute({ ...base, bootstrapRefreshing: true, bootstrapState: { ...active, membershipStatus: 'paused' } }), { type: 'REMOTE_MEMBERSHIP', route: '/membership' });
+  const checkoutReturn = resolveAuthRoute({ ...base, bootstrapState: { ...active, membershipStatus: 'none' } });
+  assert.deepEqual(checkoutReturn, { type: 'REMOTE_MEMBERSHIP', route: '/membership' });
+  assert.equal(getAuthRedirectRoute('/(tabs)/index?checkout=success', checkoutReturn), '/membership');
+  assert.deepEqual(resolveAuthRoute({ remoteEnabled: true, authStatus: 'SIGNED_OUT' }), { type: 'AUTH_LOGIN', route: '/(auth)/login' });
+  assert.deepEqual(resolveAuthRoute({ remoteEnabled: false, authStatus: 'SIGNED_OUT', isOnboardingCompleted: true }), { type: 'MOCK_TABS', route: '/(tabs)' });
+});
+
+test('E1 bootstrap: an inactive membership stays visible during authoritative refresh and stale attempts lose', () => {
+  const store = useBootstrapStore.getState();
+  store.resetBootstrap();
+  const none = { userId: 'e1-user', profileExists: true, onboardingCompleted: false, membershipStatus: 'none' as const };
+  const initial = useBootstrapStore.getState().setResolving('e1-user');
+  assert.equal(useBootstrapStore.getState().setResolved(none, initial), true);
+  const refresh = useBootstrapStore.getState().setRefreshing('e1-user');
+  assert.equal(useBootstrapStore.getState().status, 'NEEDS_ONBOARDING');
+  assert.deepEqual(useBootstrapStore.getState().bootstrapState, none);
+  assert.equal(useBootstrapStore.getState().isRefreshing, true);
+  assert.equal(useBootstrapStore.getState().setResolved({ ...none, membershipStatus: 'active' }, initial), false);
+  assert.equal(useBootstrapStore.getState().setResolved({ ...none, membershipStatus: 'active' }, refresh), true);
+  assert.equal(useBootstrapStore.getState().isRefreshing, false);
+  assert.equal(useBootstrapStore.getState().bootstrapState?.membershipStatus, 'active');
+  useBootstrapStore.getState().resetBootstrap();
+});
+
+test('E1 downgrade: authoritative refresh revokes managed caches without signing out', async () => {
+  try {
+    resetCustomerSessionData();
+    let finishDowngrade!: (state: CustomerBootstrapState) => void;
+    const downgrade = new Promise<CustomerBootstrapState>((resolve) => { finishDowngrade = resolve; });
+    let reads = 0;
+    const remote = Object.create(RemoteDeriveService.prototype) as RemoteDeriveService;
+    remote.getCustomerBootstrapState = async () => ++reads === 1
+      ? { userId: 'e1-user', profileExists: true, onboardingCompleted: true, membershipStatus: 'active' }
+      : downgrade;
+    remote.getCustomerProfile = async () => null;
+    setDeriveService(remote);
+    useAuthStore.getState().setSession('e1-user', 'e1@example.test');
+    useUserStore.getState().setRemoteSessionUser('e1-user', 'e1@example.test');
+    await resolveCustomerBootstrap('e1-user');
+    useRoutineStore.getState().loadArthurDemoRoutine();
+    useOnboardingStore.setState({ isCompleted: true });
+
+    const refresh = refreshCustomerBootstrap('e1-user');
+    assert.equal(useBootstrapStore.getState().isRefreshing, true);
+    assert.ok(useRoutineStore.getState().routine);
+    finishDowngrade({ userId: 'e1-user', profileExists: true, onboardingCompleted: true, membershipStatus: 'paused' });
+    await refresh;
+
+    assert.equal(useBootstrapStore.getState().bootstrapState?.membershipStatus, 'paused');
+    assert.equal(useRoutineStore.getState().routine, null);
+    assert.equal(useRoutineStore.getState().userProducts.length, 0);
+    assert.equal(useOnboardingStore.getState().isCompleted, false);
+    assert.equal(useAuthStore.getState().sessionUserId, 'e1-user');
+    assert.equal(useUserStore.getState().userId, 'e1-user');
+    assert.equal(useUserStore.getState().membershipStatus, 'paused');
+  } finally {
+    setDeriveService(null);
+    resetCustomerSessionData();
+  }
+});
+
+test('E1 downgrade: an older order read cannot refill a revoked member cache', async () => {
+  try {
+    resetCustomerSessionData();
+    let finishOrders!: (orders: RefillRequest[]) => void;
+    const orders = new Promise<RefillRequest[]>((resolve) => { finishOrders = resolve; });
+    let membershipStatus: 'active' | 'paused' = 'active';
+    const remote = Object.create(RemoteDeriveService.prototype) as RemoteDeriveService;
+    remote.getCustomerBootstrapState = async () => ({
+      userId: 'e1-user', profileExists: true, onboardingCompleted: true, membershipStatus,
+    });
+    remote.getCustomerProfile = async () => null;
+    remote.getOrders = async () => orders;
+    setDeriveService(remote);
+    useAuthStore.getState().setSession('e1-user', 'e1@example.test');
+    useUserStore.getState().setRemoteSessionUser('e1-user', 'e1@example.test');
+    await resolveCustomerBootstrap('e1-user');
+
+    const oldRead = hydrateOrders('e1-user');
+    membershipStatus = 'paused';
+    await refreshCustomerBootstrap('e1-user');
+    finishOrders([{ id: 'stale-refill', userId: 'e1-user', productId: 'p1', productName: 'Cleanser', brand: 'Brand', status: 'requested', requestedAt: '2026-09-19T00:00:00Z' }]);
+    await oldRead;
+    assert.deepEqual(useRoutineStore.getState().refillRequests, []);
+  } finally {
+    setDeriveService(null);
+    resetCustomerSessionData();
+  }
+});
+
+test('E1 activation: bounded backend reads, never a client-side entitlement assertion', async () => {
+  let reads = 0;
+  const delays: number[] = [];
+  const pending = { userId: 'e1-user', profileExists: true, onboardingCompleted: false, membershipStatus: 'paused' as const };
+  const outcome = await pollForActiveMembership({
+    attempts: 4,
+    delaysMs: [1, 2, 4],
+    read: async () => ++reads === 3 ? { ...pending, membershipStatus: 'active' } : pending,
+    wait: async (ms) => { delays.push(ms); },
+    isCurrent: () => true,
+  });
+  assert.equal(outcome, 'active');
+  assert.equal(reads, 3);
+  assert.deepEqual(delays, [1, 2]);
+
+  reads = 0;
+  assert.equal(await pollForActiveMembership({
+    attempts: 2, delaysMs: [1], read: async () => { reads++; return pending; },
+    wait: async () => {}, isCurrent: () => true,
+  }), 'pending');
+  assert.equal(reads, 2);
+
+  assert.equal(await pollForActiveMembership({
+    attempts: 2, delaysMs: [1], read: async () => pending,
+    wait: async () => {}, isCurrent: () => false,
+  }), 'aborted');
 });

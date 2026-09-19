@@ -13,12 +13,12 @@
  * - Real ProductOffer DB records
  * - Real member pricing or coupons (none invented)
  * - Public browseable product catalog (no real backend catalog API exists yet)
- * - Guest route activation (auth gating remains unchanged from S1)
+ * - Guest route activation (E1 keeps inactive accounts on Membership)
  *
  * NON-MEMBER ROUTING:
- * Remote auth blocks signed-out users. Profile-ready inactive members can reach
- * tabs, so this component uses the canonical membership audience before reading
- * personalized Shop data. Public guest routing remains future work.
+ * E1 routes inactive Remote accounts to Membership before they can mount this tab.
+ * The limited non-member presentation remains a C1 foundation for future public
+ * routing, with its own audience guard if that route is activated in C1.5.
  *
  * SCAN: Tapping "Scan a Product" navigates to app/shop/scan.tsx.
  *

@@ -1,10 +1,8 @@
 import { useAuthStore } from '../stores/authStore.ts';
 import { useUserStore } from '../stores/userStore.ts';
-import { useRoutineStore } from '../stores/routineStore.ts';
-import { useScanContextStore } from '../stores/scanContextStore.ts';
-import { useOnboardingStore } from '../stores/onboardingStore.ts';
 import { useBootstrapStore } from '../stores/bootstrapStore.ts';
-import { clearInFlightHydrations, clearInFlightProposals } from './deriveClient.ts';
+import { clearInFlightBootstrapRefreshes, clearInFlightHydrations, clearInFlightProposals } from './deriveClient.ts';
+import { clearManagedClientState } from './memberCache.ts';
 
 /**
  * Resets all customer session data, caches, and active state across stores.
@@ -14,11 +12,9 @@ import { clearInFlightHydrations, clearInFlightProposals } from './deriveClient.
 export function resetCustomerSessionData(): void {
   useAuthStore.getState().setSignedOut();
   useUserStore.getState().logout();
-  useRoutineStore.getState().resetRoutine();
-  useScanContextStore.getState().clearScanContext();
-  useOnboardingStore.getState().resetOnboarding();
+  clearManagedClientState();
   useBootstrapStore.getState().resetBootstrap();
   clearInFlightHydrations();
   clearInFlightProposals();
+  clearInFlightBootstrapRefreshes();
 }
-

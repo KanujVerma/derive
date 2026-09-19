@@ -64,6 +64,10 @@ async function run() {
   const user = uCreate.user;
   const userId = user.id;
 
+  assert.ifError((await adminClient.from('memberships').insert({
+    user_id: userId, tier: 'founding_beta', status: 'active',
+  })).error);
+
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });

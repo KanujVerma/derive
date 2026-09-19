@@ -1,15 +1,18 @@
+import type { CustomerBootstrapState } from '../domain/types.ts';
+
 export type AuthRouteType =
   | 'MOCK_TABS'
   | 'MOCK_ONBOARDING'
   | 'AUTH_LOADING'
   | 'AUTH_LOGIN'
   | 'REMOTE_HOLDING'
+  | 'REMOTE_MEMBERSHIP'
   | 'REMOTE_ONBOARDING'
   | 'REMOTE_TABS';
 
 export interface AuthRouteDestination {
   type: AuthRouteType;
-  route: '/(tabs)' | '/(onboarding)/1-welcome' | '/(auth)/login' | '/holding' | null;
+  route: '/(tabs)' | '/(onboarding)/1-welcome' | '/(auth)/login' | '/holding' | '/membership' | null;
 }
 
 export type ProfileResolutionStatus =
@@ -24,6 +27,10 @@ export interface ResolveRouteOptions {
   authStatus: 'INITIALIZING' | 'SIGNED_OUT' | 'SIGNED_IN';
   isOnboardingCompleted?: boolean;
   profileResolution?: ProfileResolutionStatus;
+  sessionUserId?: string | null;
+  resolvedUserId?: string | null;
+  bootstrapState?: CustomerBootstrapState | null;
+  bootstrapRefreshing?: boolean;
 }
 
 /**
@@ -39,9 +46,10 @@ export interface ResolveRouteOptions {
  *    - authStatus === 'INITIALIZING' -> AUTH_LOADING (null route / show loading canvas)
  *    - authStatus === 'SIGNED_OUT'   -> /(auth)/login
  *    - authStatus === 'SIGNED_IN'    ->
- *        - profileResolution === 'NEEDS_ONBOARDING' -> REMOTE_ONBOARDING (/(onboarding)/1-welcome)
- *        - profileResolution === 'READY'            -> REMOTE_TABS (/(tabs))
- *        - UNRESOLVED, RESOLVING, or ERROR          -> REMOTE_HOLDING (/holding)
+ *        - unresolved or mismatched canonical bootstrap -> REMOTE_HOLDING
+ *        - inactive membership -> REMOTE_MEMBERSHIP (/membership)
+ *        - active + onboarding incomplete -> REMOTE_ONBOARDING
+ *        - active + onboarding complete -> REMOTE_TABS
  *    CRITICAL: Remote signed-in state MUST NOT inspect local isOnboardingCompleted!
  *    Canonical onboarding and membership status belong strictly to canonical remote bootstrap resolution (I1-A2).
  */
@@ -51,6 +59,10 @@ export function resolveAuthRoute(options: ResolveRouteOptions): AuthRouteDestina
     authStatus,
     isOnboardingCompleted = false,
     profileResolution = 'UNRESOLVED',
+    sessionUserId,
+    resolvedUserId,
+    bootstrapState,
+    bootstrapRefreshing = false,
   } = options;
 
   if (!remoteEnabled) {
@@ -67,17 +79,24 @@ export function resolveAuthRoute(options: ResolveRouteOptions): AuthRouteDestina
     return { type: 'AUTH_LOGIN', route: '/(auth)/login' };
   }
 
-  // authStatus === 'SIGNED_IN' in Remote Mode
-  if (profileResolution === 'NEEDS_ONBOARDING') {
-    return { type: 'REMOTE_ONBOARDING', route: '/(onboarding)/1-welcome' };
+  // Auth identity and profile readiness do not prove membership entitlement.
+  if (
+    !sessionUserId || !bootstrapState?.profileExists ||
+    bootstrapState.userId !== sessionUserId || resolvedUserId !== sessionUserId ||
+    (profileResolution !== 'READY' && profileResolution !== 'NEEDS_ONBOARDING')
+  ) {
+    return { type: 'REMOTE_HOLDING', route: '/holding' };
   }
 
-  if (profileResolution === 'READY') {
-    return { type: 'REMOTE_TABS', route: '/(tabs)' };
+  if (bootstrapState.membershipStatus !== 'active') {
+    return { type: 'REMOTE_MEMBERSHIP', route: '/membership' };
   }
-
-  // UNRESOLVED, RESOLVING, or ERROR: route to /holding
-  return { type: 'REMOTE_HOLDING', route: '/holding' };
+  if (bootstrapRefreshing) {
+    return { type: 'REMOTE_HOLDING', route: '/holding' };
+  }
+  return bootstrapState.onboardingCompleted
+    ? { type: 'REMOTE_TABS', route: '/(tabs)' }
+    : { type: 'REMOTE_ONBOARDING', route: '/(onboarding)/1-welcome' };
 }
 
 /**
@@ -115,6 +134,10 @@ export function getAuthRedirectRoute(
     return onHolding ? null : destination.route;
   }
 
+  if (destination.type === 'REMOTE_MEMBERSHIP') {
+    return segment0 === 'membership' ? null : '/membership';
+  }
+
   if (destination.type === 'REMOTE_ONBOARDING') {
     // In Remote mode when signed in and profile resolution is NEEDS_ONBOARDING:
     // Any route outside the (onboarding) group must redirect to /(onboarding)/1-welcome.
@@ -131,7 +154,8 @@ export function getAuthRedirectRoute(
     // If on (tabs) or standard member screens (profile, orders, check-in, refill, insights), return null.
     const isFounderRoute = segment0 === 'founder';
     const onHoldingOrAuthOrOnboardingOrRoot =
-      segment0 === '' || segment0 === 'holding' || segment0 === '(auth)' || segment0 === '(onboarding)';
+      segment0 === '' || segment0 === 'holding' || segment0 === '(auth)' ||
+      segment0 === '(onboarding)' || segment0 === 'membership';
     return isFounderRoute || onHoldingOrAuthOrOnboardingOrRoot ? destination.route : null;
   }
 

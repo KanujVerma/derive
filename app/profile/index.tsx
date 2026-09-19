@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,10 +20,11 @@ import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { config } from '@/src/constants/config';
-import { hydrateCustomerProfile } from '@/src/services/deriveClient';
+import { createMembershipPortalSession, hydrateCustomerProfile, refreshCustomerBootstrap } from '@/src/services/deriveClient';
 import { signOutSession } from '@/src/services/authClient';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
+import { useAuthStore } from '@/src/stores/authStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -30,6 +32,8 @@ export default function ProfileScreen() {
   const { fullName, email, loadArthurDemoUser, resetToDefault } = useUserStore();
   const { productReactions, loadArthurDemoState, resetOnboarding } = useOnboardingStore();
   const { loadArthurDemoRoutine, resetRoutine } = useRoutineStore();
+  const [billingBusy, setBillingBusy] = React.useState(false);
+  const [billingError, setBillingError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     hydrateCustomerProfile().catch((err) => {
@@ -121,6 +125,22 @@ export default function ProfileScreen() {
         },
       ]
     );
+  };
+
+  const handleManageMembership = async () => {
+    if (billingBusy) return;
+    setBillingBusy(true);
+    setBillingError(null);
+    try {
+      const session = await createMembershipPortalSession();
+      await Linking.openURL(session.url);
+      const id = useAuthStore.getState().sessionUserId;
+      if (id && isRemoteServiceEnabled()) void refreshCustomerBootstrap(id);
+    } catch {
+      setBillingError('Billing settings could not be opened. Please try again or contact member support.');
+    } finally {
+      setBillingBusy(false);
+    }
   };
 
   return (
@@ -245,6 +265,23 @@ export default function ProfileScreen() {
 
         {/* Section 3: Account & Session */}
         <GroupedSection header="Account">
+          {isRemoteServiceEnabled() && (
+            <TouchableOpacity
+              style={styles.groupedRow}
+              onPress={() => void handleManageMembership()}
+              disabled={billingBusy}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Manage Membership"
+            >
+              <Icon name="shield" size={18} color={colors.brand} />
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>Manage Membership</Text>
+                <Text style={styles.rowSubtitle}>{billingBusy ? 'Opening billing settings…' : 'Open secure billing settings'}</Text>
+              </View>
+              <Icon name="forward" size={16} color={colors.inkMuted} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.groupedRow}
             onPress={handleSignOut}
@@ -258,6 +295,7 @@ export default function ProfileScreen() {
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </TouchableOpacity>
         </GroupedSection>
+        {billingError ? <Text style={{ color: colors.actionPause.text, marginTop: spacing.sm }}>{billingError}</Text> : null}
 
         {/* Section 4: Demo & Development Controls (dev only) */}
         {__DEV__ && (

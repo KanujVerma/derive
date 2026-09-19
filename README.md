@@ -62,6 +62,7 @@ developer/CI, and trusted-server credential boundaries.
 - **Platform / Backend**: Supabase PostgreSQL, Row-Level Security, Auth, private Storage, and Edge Functions are implemented through S5. Hosted activation remains pending.
 - **Intelligence**: S3 server intelligence uses a server-side Gemini provider when configured and deterministic safety circuit breakers. The mobile app remains in Mock mode by default.
 - **Commerce**: S5 membership Checkout, Billing Portal, and signed subscription webhooks are implemented; hosted test-mode activation remains pending. C1 member Shop V1 is implemented. Products are separate purchases, with physical checkout deferred to C1.5.
+- **Member Access**: E1 requires canonical active membership before Remote onboarding and the managed app. Unpaid, paused, and cancelled accounts reach Membership for trusted billing actions. Mock remains the default and production Remote activation awaits hosted end-to-end smoke.
 - **Telemetry**: Planned privacy-safe telemetry (PostHog with session replay strictly disabled; typed navigation allowlist only; zero health data/photos/symptoms).
 
 ---
