@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  formatMember,
+  nextRefillStatus,
+  parseList,
+  validateHttpsUrl,
+} from '../admin/lib/validation.mjs';
 
 import { checkSkincareSafety } from '../src/services/ai-workflows/safety-classifier.ts';
 import { generateRoutineProposal } from '../src/services/ai-workflows/routine-generator.ts';
@@ -34,10 +40,21 @@ import {
 } from '../src/utils/barcode.ts';
 import { findProductByBarcode } from '../src/services/ai-workflows/scan-evaluator.ts';
 import {
+  enforceRoutineSafety,
+  enforceScanIdentity,
+  enforceScanSafety,
+  parseAskResponse,
+  parseProductScan,
+  parseRoutineProposal,
+  safetyCircuitBreaker,
+  type MemberIntelligenceContext,
+} from '../supabase/functions/_shared/intelligence.ts';
+import {
   AutoCaptureStateMachine,
   evaluateFrameCriteria,
   type FrameQualityMetrics,
 } from '../src/components/camera/AutoCaptureStateMachine.ts';
+import { resolvePublicEnvironment } from '../src/config/environment.ts';
 import {
   createProvenancedValue,
   setOrConfirmPhenotypeValue,
@@ -116,6 +133,27 @@ test('Safety Classifier: Flags barrier sensitization warning', () => {
   assert.equal(r.isMedicalEmergency, false);
   assert.equal(r.severity, 'warning');
   assert.match(r.message || '', /sensitized/i);
+});
+
+test('S3 Safety Circuit Breaker: Every mandatory red-flag fixture hard-stops before model use', () => {
+  const mandatoryFixtures = [
+    'My face is swollen after using this cream',
+    'Both eyelids are puffy and closing',
+    'I have trouble breathing and my throat is tightening',
+    'There is a blistering rash with yellow fluid oozing',
+    'Hot hives are spreading quickly all over my body',
+  ];
+
+  for (const fixture of mandatoryFixtures) {
+    const result = checkSkincareSafety(fixture);
+    assert.equal(result.isMedicalEmergency, true, fixture);
+    assert.equal(result.severity, 'emergency', fixture);
+    assert.equal(result.recommendedAction, 'immediate_medical_care', fixture);
+
+    const response = safetyCircuitBreaker(fixture);
+    assert.ok(response, fixture);
+    assert.equal(response.safety.severity, 'emergency', fixture);
+  }
 });
 
 // ========================================================
@@ -344,6 +382,268 @@ test('Ingredient Intelligence: Tolerated exposures weaken naive suspicion', () =
   assert.ok(niacinamideSignal);
   assert.equal(niacinamideSignal.confidence, 'weak_signal');
   assert.equal(niacinamideSignal.contradictoryToleranceEvidence.length, 2);
+});
+
+test('S3 Ingredient Intelligence: Repeat incidents from one bottle do not masquerade as multi-product overlap', () => {
+  const reactions: ProductReaction[] = [
+    {
+      id: 'rx_same_1',
+      userId: 'u_1',
+      productId: 'same_product',
+      productNameSnapshot: 'Same Serum',
+      formulaSnapshotId: 'same_formula',
+      symptoms: ['itching'],
+      bodyArea: 'face',
+      severity: 'moderate',
+    },
+    {
+      id: 'rx_same_2',
+      userId: 'u_1',
+      productId: 'same_product',
+      productNameSnapshot: 'Same Serum',
+      formulaSnapshotId: 'same_formula',
+      symptoms: ['redness_rash'],
+      bodyArea: 'face',
+      severity: 'moderate',
+    },
+  ];
+  const formulaSnapshots: FormulaSnapshot[] = [{
+    id: 'same_formula',
+    productId: 'same_product',
+    productName: 'Same Serum',
+    ingredients: ['Water', 'Fragrance'],
+    capturedAt: '2026-09-01',
+  }];
+  const signal = inferIngredientSignals({ reactions, formulaSnapshots })
+    .find((candidate) => candidate.ingredientName === 'Fragrance');
+  assert.ok(signal);
+  assert.notEqual(signal.confidence, 'strong_signal');
+  assert.equal(signal.evidenceCount, 2);
+});
+
+const s3ContextFixture: MemberIntelligenceContext = {
+  profile: {
+    primaryGoal: 'breakouts',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'combination',
+    postCleanseTightness: false,
+    knownSensitivities: [],
+    sensitivitiesStatus: 'none_known',
+    activePrescriptions: ['Differin adapalene 0.1% — Mon/Wed/Fri PM'],
+    pregnancyStatus: 'no',
+  },
+  shelfProducts: [],
+  activeRoutine: {
+    version: 1,
+    status: 'published',
+    summarySentence: 'Differin three nights weekly',
+    steps: [{
+      id: 'step_diff',
+      productId: 'product_diff',
+      brand: 'Differin',
+      productName: 'Differin Adapalene Gel 0.1%',
+      category: 'treatment',
+      timing: 'pm',
+      days: ['mon', 'wed', 'fri'],
+    }],
+  },
+  reactions: [],
+  ingredientSignals: [],
+  recentCheckIns: [],
+  photoContext: [],
+};
+
+test('S3 Structured Routine: Canonical parser accepts safe output and rejects AM retinoids', () => {
+  const raw = {
+    summarySentence: 'Cleanser and sunscreen by day; Differin Mon/Wed/Fri at night',
+    products: [
+      {
+        key: 'cleanser', brand: 'CeraVe', name: 'Hydrating Facial Cleanser', category: 'cleanser',
+        keyActives: ['Ceramides'], fullIngredients: [], cautions: [],
+      },
+      {
+        key: 'differin', brand: 'Differin', name: 'Differin Adapalene Gel 0.1%', category: 'treatment',
+        keyActives: ['Adapalene 0.1%'], fullIngredients: [], cautions: [],
+      },
+    ],
+    steps: [
+      {
+        productKey: 'cleanser', order: 1, timing: 'am', days: [], amount: 'one pump',
+        area: 'face', purpose: 'cleanse', whyChosen: 'Gentle baseline cleanser.',
+      },
+      {
+        productKey: 'differin', order: 1, timing: 'pm', days: ['mon', 'wed', 'fri'],
+        amount: 'pea-sized', area: 'face', purpose: 'retain prescription schedule',
+        whyChosen: 'Preserves the existing prescription context without changing it.',
+      },
+    ],
+    shelfActions: [
+      { productKey: 'cleanser', action: 'KEEP', actionReason: 'Already tolerated.' },
+      { productKey: 'differin', action: 'KEEP', actionReason: 'Preserve the existing schedule.', frequencyNightsPerWeek: 3 },
+    ],
+    clarificationQuestions: [],
+  };
+  const proposal = parseRoutineProposal(raw);
+  assert.doesNotThrow(() => enforceRoutineSafety(proposal, s3ContextFixture));
+
+  const unsafe = parseRoutineProposal({
+    ...raw,
+    steps: raw.steps.map((step) => step.productKey === 'differin' ? { ...step, timing: 'am', order: 2 } : step),
+  });
+  assert.throws(() => enforceRoutineSafety(unsafe, s3ContextFixture), /retinoids cannot be scheduled/i);
+});
+
+test('S3 Structured Routine: Pregnancy unknown fails closed for a generated retinoid', () => {
+  const context: MemberIntelligenceContext = {
+    ...s3ContextFixture,
+    profile: { ...s3ContextFixture.profile, pregnancyStatus: 'unanswered', activePrescriptions: [] },
+    activeRoutine: null,
+  };
+  const proposal = parseRoutineProposal({
+    summarySentence: 'Unsafe draft',
+    products: [{
+      key: 'retinol', brand: 'Example', name: 'Retinol Serum', category: 'serum',
+      keyActives: ['Retinol'], fullIngredients: [], cautions: [],
+    }],
+    steps: [{
+      productKey: 'retinol', order: 1, timing: 'pm', days: [], amount: 'one drop',
+      area: 'face', purpose: 'texture', whyChosen: 'Model suggestion.',
+    }],
+    shelfActions: [{ productKey: 'retinol', action: 'ADD', actionReason: 'Model suggestion.' }],
+    clarificationQuestions: [],
+  });
+  assert.throws(() => enforceRoutineSafety(proposal, context), /pregnancy status/i);
+
+  const shelfOnlyUnsafe = parseRoutineProposal({
+    summarySentence: 'Unsafe shelf-only draft',
+    products: [
+      {
+        key: 'cleanser', brand: 'Example', name: 'Gentle Cleanser', category: 'cleanser',
+        keyActives: [], fullIngredients: [], cautions: [],
+      },
+      {
+        key: 'hydroquinone', brand: 'Example', name: 'Dark Spot Serum', category: 'serum',
+        keyActives: ['Hydroquinone'], fullIngredients: [], cautions: [],
+      },
+    ],
+    steps: [{
+      productKey: 'cleanser', order: 1, timing: 'am', days: [], amount: 'one pump',
+      area: 'face', purpose: 'cleanse', whyChosen: 'Gentle baseline.',
+    }],
+    shelfActions: [{
+      productKey: 'hydroquinone', action: 'ADD', actionReason: 'Model suggestion.',
+    }],
+    clarificationQuestions: [],
+  });
+  assert.throws(() => enforceRoutineSafety(shelfOnlyUnsafe, context), /pregnancy status/i);
+});
+
+test('S3 Structured Routine: Active prescription steps cannot be omitted or invented without a verifiable schedule', () => {
+  const cleanserOnly = parseRoutineProposal({
+    summarySentence: 'Incomplete draft',
+    products: [{
+      key: 'cleanser', brand: 'Example', name: 'Gentle Cleanser', category: 'cleanser',
+      keyActives: [], fullIngredients: [], cautions: [],
+    }],
+    steps: [{
+      productKey: 'cleanser', order: 1, timing: 'am', days: [], amount: 'one pump',
+      area: 'face', purpose: 'cleanse', whyChosen: 'Gentle baseline.',
+    }],
+    shelfActions: [{ productKey: 'cleanser', action: 'KEEP', actionReason: 'Already tolerated.' }],
+    clarificationQuestions: [],
+  });
+  assert.throws(() => enforceRoutineSafety(cleanserOnly, s3ContextFixture), /prescription step was omitted/i);
+
+  const unverifiableContext: MemberIntelligenceContext = {
+    ...s3ContextFixture,
+    activeRoutine: null,
+  };
+  const proposedRetinoid = parseRoutineProposal({
+    summarySentence: 'Unverifiable draft',
+    products: [{
+      key: 'differin', brand: 'Differin', name: 'Differin Adapalene Gel 0.1%', category: 'treatment',
+      keyActives: ['Adapalene 0.1%'], fullIngredients: [], cautions: [],
+    }],
+    steps: [{
+      productKey: 'differin', order: 1, timing: 'pm', days: ['mon'], amount: 'pea-sized',
+      area: 'face', purpose: 'prescription context', whyChosen: 'Model suggestion.',
+    }],
+    shelfActions: [{ productKey: 'differin', action: 'KEEP', actionReason: 'Model suggestion.' }],
+    clarificationQuestions: [],
+  });
+  assert.throws(() => enforceRoutineSafety(proposedRetinoid, unverifiableContext), /cannot be verified/i);
+});
+
+test('S3 Product Scan: Deterministic guard downgrades a second retinoid regardless of model verdict', () => {
+  const parsed = parseProductScan({
+    productName: 'Retinol 1% Serum',
+    brand: 'Example',
+    category: 'serum',
+    keyActives: ['Retinol 1%'],
+    verdict: 'great_fit',
+    verdictSummary: 'Model claimed this was a great fit.',
+    factsUsedToDecide: ['Targets texture'],
+  });
+  const guarded = enforceScanSafety(parsed, s3ContextFixture);
+  assert.equal(guarded.verdict, 'use_with_caution');
+  assert.match(guarded.verdictSummary, /second retinoid/i);
+});
+
+test('S3 Product Scan: Identity, unresolved pregnancy, and reported sensitivities fail conservatively', () => {
+  const hydroquinone = parseProductScan({
+    productName: 'Dark Spot Serum',
+    brand: 'Example',
+    category: 'serum',
+    keyActives: ['Hydroquinone 4%'],
+    verdict: 'great_fit',
+    verdictSummary: 'Model claimed this was a great fit.',
+    factsUsedToDecide: ['Targets visible discoloration'],
+  });
+  const unknownPregnancyContext: MemberIntelligenceContext = {
+    ...s3ContextFixture,
+    profile: { ...s3ContextFixture.profile, pregnancyStatus: 'prefer_not_to_say' },
+  };
+  assert.equal(enforceScanSafety(hydroquinone, unknownPregnancyContext).verdict, 'use_with_caution');
+
+  const sensitivityContext: MemberIntelligenceContext = {
+    ...s3ContextFixture,
+    profile: {
+      ...s3ContextFixture.profile,
+      knownSensitivities: ['hydroquinone'],
+      sensitivitiesStatus: 'reported',
+    },
+  };
+  assert.equal(enforceScanSafety(hydroquinone, sensitivityContext).verdict, 'not_good_fit');
+  assert.throws(
+    () => enforceScanIdentity(hydroquinone, { productName: 'Different Serum', brand: 'Example' }),
+    /identity does not match/i,
+  );
+});
+
+test('S3 Ask: Safe structured answers cannot claim diagnosis or AI dermatologist status', () => {
+  const safe = parseAskResponse({
+    directAnswer: 'Keep tonight simple.',
+    whyExplanation: 'Your current routine already includes a scheduled active.',
+    recommendedAction: 'Use your normal moisturizer.',
+    suggestedFollowUps: [],
+    referencedProducts: ['Differin'],
+  });
+  assert.equal(safe.safety.severity, 'safe');
+  assert.throws(() => parseAskResponse({
+    directAnswer: 'I am your AI dermatologist.',
+    whyExplanation: 'I diagnose this as eczema.',
+    suggestedFollowUps: [],
+    referencedProducts: [],
+  }), /cosmetic-guidance boundary/i);
+  assert.throws(() => parseAskResponse({
+    directAnswer: 'Keep tonight simple.',
+    whyExplanation: 'A conservative routine is appropriate.',
+    recommendedAction: 'I diagnose this as rosacea.',
+    suggestedFollowUps: [],
+    referencedProducts: [],
+  }), /cosmetic-guidance boundary/i);
 });
 
 // ========================================================
@@ -785,6 +1085,170 @@ test('Guard: Expo client must not ship a Gemini API key', () => {
     [],
     `Client-visible Gemini secret path found in: ${offenders.join(', ')}`
   );
+});
+
+test('Environment contract: Prefers publishable keys and preserves a legacy anon-key fallback', () => {
+  const current = resolvePublicEnvironment({
+    supabaseUrl: ' https://project.supabase.co ',
+    supabasePublishableKey: ' sb_publishable_current ',
+    legacySupabaseAnonKey: 'legacy-key',
+    useRemoteService: ' true ',
+  });
+
+  assert.deepEqual(current, {
+    supabaseUrl: 'https://project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_current',
+    supabaseKeySource: 'publishable',
+    useRemoteService: true,
+  });
+
+  const legacy = resolvePublicEnvironment({
+    supabaseUrl: 'http://127.0.0.1:54321',
+    legacySupabaseAnonKey: 'legacy-local-key',
+  });
+  assert.equal(legacy.supabasePublishableKey, 'legacy-local-key');
+  assert.equal(legacy.supabaseKeySource, 'legacy_anon');
+  assert.equal(legacy.useRemoteService, false);
+});
+
+test('Environment contract: Remote mode fails closed on missing or malformed configuration', () => {
+  assert.throws(
+    () => resolvePublicEnvironment({ useRemoteService: 'true' }),
+    /EXPO_PUBLIC_SUPABASE_URL.*EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/,
+  );
+  assert.throws(
+    () => resolvePublicEnvironment({ useRemoteService: '1' }),
+    /must be either "true" or "false"/,
+  );
+  assert.throws(
+    () => resolvePublicEnvironment({ supabaseUrl: 'http://project.supabase.co' }),
+    /must use HTTPS/,
+  );
+  assert.throws(
+    () => resolvePublicEnvironment({ supabasePublishableKey: 'sb_secret_server_only' }),
+    /publishable key|must never be embedded/,
+  );
+  assert.throws(
+    () => resolvePublicEnvironment({ supabasePublishableKey: 'placeholder-key' }),
+    /must be a Supabase publishable key/,
+  );
+  const serviceRolePayload = Buffer.from(JSON.stringify({ role: 'service_role' }))
+    .toString('base64url');
+  assert.throws(
+    () => resolvePublicEnvironment({ legacySupabaseAnonKey: `header.${serviceRolePayload}.sig` }),
+    /service-role keys must never be embedded/,
+  );
+});
+
+test('Environment template: Lists only approved names and contains zero credential values', () => {
+  const template = readFileSync(join(REPO_ROOT, '.env.example'), 'utf8');
+  const assignments = [...template.matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)];
+  const names = assignments.map((match) => match[1]).sort();
+
+  assert.deepEqual(names, [
+    'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'EXPO_PUBLIC_USE_REMOTE_SERVICE',
+  ]);
+
+  const approvedPublicNames = new Set([
+    'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'EXPO_PUBLIC_USE_REMOTE_SERVICE',
+  ]);
+  for (const [name, value] of assignments.map((match) => [match[1], match[2]])) {
+    if (name.startsWith('EXPO_PUBLIC_')) {
+      assert.ok(approvedPublicNames.has(name), `Unexpected public variable: ${name}`);
+    }
+    if (name !== 'EXPO_PUBLIC_USE_REMOTE_SERVICE') {
+      assert.equal(value, '', `${name} must not contain a committed value`);
+    }
+  }
+
+  assert.doesNotMatch(template, /EXPO_PUBLIC_.*(?:SECRET|SERVICE_ROLE|DB_PASSWORD|ACCESS_TOKEN)/);
+  assert.doesNotMatch(template, /(?:sb_secret_|sk_live_|sk_test_)/);
+});
+
+test('Environment guard: Mobile source references only approved public variables', () => {
+  const approved = new Set([
+    'EXPO_PUBLIC_SUPABASE_ANON_KEY', // Temporary compatibility fallback only.
+    'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'EXPO_PUBLIC_USE_REMOTE_SERVICE',
+  ]);
+  const files = [
+    ...collectTextFiles(join(REPO_ROOT, 'app')),
+    ...collectTextFiles(join(REPO_ROOT, 'src')),
+    join(REPO_ROOT, 'app.json'),
+    join(REPO_ROOT, 'eas.json'),
+  ];
+  const offenders = new Set<string>();
+
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8');
+    for (const match of text.matchAll(/EXPO_PUBLIC_[A-Z0-9_]+/g)) {
+      if (!approved.has(match[0])) {
+        offenders.add(`${file.slice(REPO_ROOT.length + 1)}:${match[0]}`);
+      }
+    }
+  }
+
+  assert.deepEqual([...offenders], []);
+});
+
+test('S1 private-photo endpoints preserve JWT ownership, 900-second signing, and Storage-first deletion', () => {
+  const signer = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/photo-url/index.ts'),
+    'utf8',
+  );
+  const deletion = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/delete-customer-account/index.ts'),
+    'utf8',
+  );
+  const supabaseConfig = readFileSync(join(REPO_ROOT, 'supabase/config.toml'), 'utf8');
+
+  assert.match(signer, /SIGNED_URL_TTL_SECONDS = 900/);
+  assert.match(signer, /\.eq\("user_id", user\.id\)/);
+  assert.match(signer, /unexpectedFields/);
+  assert.match(signer, /"Cache-Control": "private, no-store, max-age=0"/);
+
+  const storageRemoval = deletion.indexOf('.remove(paths.slice(');
+  const authDeletion = deletion.indexOf('auth.admin.deleteUser(user.id)');
+  assert.ok(storageRemoval >= 0, 'Deletion must remove Storage objects through the Storage API');
+  assert.ok(authDeletion > storageRemoval, 'Auth deletion must occur strictly after Storage removal');
+  assert.match(deletion, /unexpectedFields/);
+  assert.match(deletion, /listNamespaceObjects\(adminClient, user\.id\)/);
+
+  assert.match(supabaseConfig, /\[functions\.photo-url\][\s\S]*?verify_jwt = true/);
+  assert.match(
+    supabaseConfig,
+    /\[functions\.delete-customer-account\][\s\S]*?verify_jwt = true/,
+  );
+});
+
+test('S3 endpoint guard: replay precedes provider resolution and founder notes stay server-internal', () => {
+  const proposeRoutine = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/propose-routine/index.ts'),
+    'utf8',
+  );
+  const provider = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/propose-routine/provider.ts'),
+    'utf8',
+  );
+  const runtime = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/_shared/runtime.ts'),
+    'utf8',
+  );
+  const replayLookup = proposeRoutine.indexOf('.eq("version", 1)');
+  const providerResolution = proposeRoutine.indexOf('resolveRoutineProvider(adminClient)');
+
+  assert.ok(replayLookup >= 0, 'Routine endpoint must check for a replayable initial routine');
+  assert.ok(providerResolution > replayLookup, 'Replay lookup must occur before provider resolution');
+  assert.doesNotMatch(proposeRoutine, /\.select\([^)]*founder_notes/);
+  assert.doesNotMatch(runtime, /founder_notes/, 'Customer response hydration must not query founder notes');
+  assert.match(runtime, /Deno\.env\.get\("GEMINI_API_KEY"\)/);
+  assert.match(provider, /ROUTINE_MODEL_PROVIDER/);
+  assert.doesNotMatch(proposeRoutine, /req\.headers\.get\([^)]*x-routine-fixture/i);
 });
 
 // ========================================================
@@ -1698,6 +2162,8 @@ import {
   RemoteDeriveService,
   mapDbBootstrapState,
   mapDbCustomerProfile,
+  mapDbRoutine,
+  mapDbRefillRequest,
   mapDbCheckIn,
 } from '../src/services/remote/RemoteDeriveService.ts';
 import type { IDeriveService } from '../src/contracts/DeriveService.ts';
@@ -4698,6 +5164,291 @@ test('I1-B1.1 Canonical Bootstrap Integration: resolveCustomerBootstrap updates 
 });
 
 // ========================================================
+// 27. S2 CORE DOMAIN PERSISTENCE MAPPING
+// ========================================================
+
+test('S2 Routine Mapper: assembles immutable DB rows into ordered AM/PM domain steps', () => {
+  const routine = mapDbRoutine(
+    {
+      id: 'routine-v2',
+      user_id: 'member-1',
+      version: 2,
+      status: 'awaiting_review',
+      summary_sentence: 'A simple barrier-first plan.',
+      created_at: '2026-09-18T10:00:00.000Z',
+      updated_at: '2026-09-18T10:05:00.000Z',
+      published_at: null,
+    },
+    [
+      {
+        id: 'pm-2',
+        routine_id: 'routine-v2',
+        order_index: 2,
+        timing: 'pm',
+        product_id: 'product-moisturizer',
+        product_name: 'Barrier Cream',
+        brand: 'Derive Test',
+        category: 'moisturizer',
+        amount: 'one pump',
+        area: 'face',
+        days: ['mon', 'wed', 'fri'],
+        purpose: 'support the skin barrier',
+        why_chosen: 'A simple moisturizing step.',
+        watch_for: null,
+      },
+      {
+        id: 'am-1',
+        routine_id: 'routine-v2',
+        order_index: 1,
+        timing: 'am',
+        product_id: 'product-cleanser',
+        product_name: 'Gentle Cleanser',
+        brand: 'Derive Test',
+        category: 'cleanser',
+        amount: 'one pump',
+        area: 'face',
+        days: [],
+        purpose: 'cleanse',
+        why_chosen: 'A gentle daily base.',
+        watch_for: 'Stop if persistent stinging occurs.',
+      },
+      {
+        id: 'pm-1',
+        routine_id: 'routine-v2',
+        order_index: 1,
+        timing: 'pm',
+        product_id: 'product-cleanser',
+        product_name: 'Gentle Cleanser',
+        brand: 'Derive Test',
+        category: 'cleanser',
+        amount: 'one pump',
+        area: 'face',
+        days: [],
+        purpose: 'cleanse',
+        why_chosen: 'Remove sunscreen before moisturizing.',
+      },
+    ],
+  );
+
+  assert.equal(routine.id, 'routine-v2');
+  assert.equal(routine.userId, 'member-1');
+  assert.equal(routine.version, 2);
+  assert.equal(routine.updatedAt, '2026-09-18T10:05:00.000Z');
+  assert.deepEqual(routine.amSteps.map((step) => step.id), ['am-1']);
+  assert.deepEqual(routine.pmSteps.map((step) => step.id), ['pm-1', 'pm-2']);
+  assert.equal(routine.amSteps[0].scheduleText, 'Every morning');
+  assert.equal(routine.pmSteps[0].scheduleText, 'Every evening');
+  assert.equal(routine.pmSteps[1].scheduleText, 'Mon, Wed, Fri');
+  assert.equal(routine.amSteps[0].watchFor, 'Stop if persistent stinging occurs.');
+});
+
+test('S2 Routine Mapper: fails closed rather than fabricating missing canonical product identity', () => {
+  assert.throws(
+    () => mapDbRoutine(
+      {
+        id: 'legacy-routine',
+        user_id: 'member-1',
+        version: 1,
+        status: 'published',
+        summary_sentence: 'Legacy row',
+        created_at: '2026-09-18T10:00:00.000Z',
+        updated_at: '2026-09-18T10:00:00.000Z',
+      },
+      [{
+        id: 'legacy-step',
+        routine_id: 'legacy-routine',
+        order_index: 1,
+        timing: 'am',
+        product_id: null,
+        product_name: 'Unlinked Product',
+        brand: 'Unknown',
+        category: 'other',
+        amount: 'one',
+        area: 'face',
+        days: [],
+        purpose: 'unknown',
+        why_chosen: 'legacy',
+      }],
+    ),
+    /without a canonical product/i,
+  );
+});
+
+test('S2 Refill Mapper: maps persisted snake_case fields into the shared contract', () => {
+  assert.deepEqual(
+    mapDbRefillRequest({
+      id: 'refill-1',
+      user_id: 'member-1',
+      product_id: 'product-1',
+      product_name: 'Gentle Cleanser',
+      brand: 'Derive Test',
+      status: 'shipped',
+      requested_at: '2026-09-15T10:00:00.000Z',
+      shipped_at: '2026-09-16T10:00:00.000Z',
+      delivered_at: null,
+      estimated_delivery: '2026-09-20T10:00:00.000Z',
+      carrier: 'USPS',
+      tracking_number: 'TRACK123',
+      tracking_url: 'https://example.test/track/TRACK123',
+    }),
+    {
+      id: 'refill-1',
+      userId: 'member-1',
+      productId: 'product-1',
+      productName: 'Gentle Cleanser',
+      brand: 'Derive Test',
+      status: 'shipped',
+      requestedAt: '2026-09-15T10:00:00.000Z',
+      shippedAt: '2026-09-16T10:00:00.000Z',
+      deliveredAt: undefined,
+      estimatedDelivery: '2026-09-20T10:00:00.000Z',
+      carrier: 'USPS',
+      trackingNumber: 'TRACK123',
+      trackingUrl: 'https://example.test/track/TRACK123',
+    },
+  );
+});
+
+test('S2 Remote Routine Query: reads latest header and assembles its step snapshot', async () => {
+  const queryLog: string[] = [];
+  const header = {
+    id: 'routine-live',
+    user_id: 'member-live',
+    version: 3,
+    status: 'published',
+    summary_sentence: 'Live routine',
+    created_at: '2026-09-18T10:00:00.000Z',
+    updated_at: '2026-09-18T11:00:00.000Z',
+    published_at: '2026-09-18T11:00:00.000Z',
+  };
+  const item = {
+    id: 'step-live',
+    routine_id: 'routine-live',
+    order_index: 1,
+    timing: 'am',
+    product_id: 'product-live',
+    product_name: 'Live Cleanser',
+    brand: 'Derive Test',
+    category: 'cleanser',
+    amount: 'one pump',
+    area: 'face',
+    days: [],
+    purpose: 'cleanse',
+    why_chosen: 'simple base',
+    watch_for: null,
+  };
+
+  const mockClient = {
+    from(table: string) {
+      queryLog.push(`from:${table}`);
+      return {
+        select(columns: string) {
+          queryLog.push(`select:${table}:${columns}`);
+          if (table === 'routines') {
+            return {
+              eq(column: string, value: string) {
+                queryLog.push(`eq:${table}:${column}=${value}`);
+                return {
+                  order(columnName: string, options: { ascending: boolean }) {
+                    queryLog.push(`order:${table}:${columnName}:${options.ascending}`);
+                    return {
+                      limit(limitValue: number) {
+                        queryLog.push(`limit:${table}:${limitValue}`);
+                        return {
+                          async maybeSingle() {
+                            return { data: header, error: null };
+                          },
+                        };
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          }
+
+          return {
+            eq(column: string, value: string) {
+              queryLog.push(`eq:${table}:${column}=${value}`);
+              return {
+                async order(columnName: string, options: { ascending: boolean }) {
+                  queryLog.push(`order:${table}:${columnName}:${options.ascending}`);
+                  return { data: [item], error: null };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const service = new RemoteDeriveService(mockClient);
+  const result = await service.getRoutine('member-live');
+
+  assert.ok(result);
+  assert.equal(result?.id, 'routine-live');
+  assert.equal(result?.amSteps[0].id, 'step-live');
+  assert.equal(result?.amSteps[0].scheduleText, 'Every morning');
+  assert.ok(queryLog.includes('from:routines'));
+  assert.ok(queryLog.includes('from:routine_items'));
+  assert.ok(queryLog.includes('eq:routine_items:routine_id=routine-live'));
+});
+
+test('S2 Remote Refill Mutation: persists canonical product identity and returns mapped state', async () => {
+  let inserted: Record<string, unknown> | null = null;
+  const mockClient = {
+    from(table: string) {
+      assert.equal(table, 'refill_requests');
+      return {
+        insert(value: Record<string, unknown>) {
+          inserted = value;
+          return {
+            select(_columns: string) {
+              return {
+                async single() {
+                  return {
+                    data: {
+                      id: 'refill-live',
+                      user_id: 'member-live',
+                      product_id: 'product-live',
+                      product_name: 'Live Cleanser',
+                      brand: 'Derive Test',
+                      status: 'requested',
+                      requested_at: '2026-09-18T12:00:00.000Z',
+                    },
+                    error: null,
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const service = new RemoteDeriveService(mockClient);
+  const result = await service.requestRefill({
+    userId: 'member-live',
+    productId: 'product-live',
+    productName: 'Live Cleanser',
+    brand: 'Derive Test',
+    note: 'Running low',
+  });
+
+  assert.deepEqual(inserted, {
+    user_id: 'member-live',
+    product_id: 'product-live',
+    product_name: 'Live Cleanser',
+    brand: 'Derive Test',
+    request_note: 'Running low',
+  });
+  assert.equal(result.id, 'refill-live');
+  assert.equal(result.productId, 'product-live');
+  assert.equal(result.status, 'requested');
+});
+
 // 28. I1-B2 SERVER INITIAL ROUTINE INTELLIGENCE & DETERMINISTIC VALIDATION
 // ========================================================
 
@@ -4970,6 +5721,78 @@ test('I1-B2 Safety: Validator strictly excludes retinoids and contraindicated ac
   assert.equal(safeValidation.valid, true);
 });
 
+test('S3 routine safety: unknown pregnancy state rejects explicitly high-strength salicylic acid', () => {
+  const proposal: RoutineIntelligenceProposal = {
+    summarySentence: 'Unsafe unresolved safety context.',
+    productDecisions: [{
+      productName: 'Clear Treatment',
+      brand: 'Example',
+      category: 'treatment',
+      action: 'ADD',
+      actionReason: 'Treat breakouts',
+    }],
+    amSteps: [],
+    pmSteps: [{
+      order: 1,
+      timing: 'pm',
+      productName: 'Clear Treatment',
+      brand: 'Example',
+      category: 'treatment',
+      amount: 'Two drops',
+      area: 'Face',
+      days: ['tue'],
+      purpose: 'Exfoliate',
+      whyChosen: 'Treat breakouts',
+    }],
+    catalogProducts: [{
+      brand: 'Example',
+      name: 'Clear Treatment',
+      category: 'treatment',
+      keyActives: ['Salicylic Acid 2%'],
+    }],
+  };
+
+  const validation = validateRoutineProposal(proposal, {
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'unanswered',
+  });
+  assert.equal(validation.valid, false);
+  assert.ok(validation.errors.some((error) => error.includes('Pregnancy safety invariant')));
+});
+
+test('S3 routine safety: an active prescription schedule must be preserved exactly', () => {
+  const context: AssembledRoutineContext = {
+    userId: 'usr_prescription_schedule',
+    primaryGoal: 'breakouts',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'comfortable',
+    postCleanseTightness: false,
+    isPregnantOrNursing: false,
+    pregnancyStatus: 'no',
+    sensitivitiesStatus: 'none_known',
+    knownSensitivities: [],
+    activePrescriptions: ['Differin adapalene 0.1% — Monday / Wednesday / Friday PM'],
+    confirmedProducts: [{
+      brand: 'Differin',
+      name: 'Adapalene Gel 0.1%',
+      category: 'treatment',
+      keyActives: ['Adapalene'],
+    }],
+    productReactions: [],
+    formulaSnapshots: [],
+  };
+  const proposal = generateContextGroundedProposal(context);
+  assert.equal(validateRoutineProposal(proposal, context).valid, true);
+
+  const retinoid = proposal.pmSteps.find((step) => step.productName.includes('Adapalene'))!;
+  retinoid.days = ['tue', 'thu'];
+  const changed = validateRoutineProposal(proposal, context);
+  assert.equal(changed.valid, false);
+  assert.ok(changed.errors.some((error) => error.includes('prescription schedule') || error.includes('Prescription safety invariant')));
+});
+
 test('I1-B2 Invariants: Validator strictly rejects invalid action and category enums', () => {
   const invalidProposal: RoutineIntelligenceProposal = {
     summarySentence: 'Invalid enums proposal.',
@@ -5180,7 +6003,7 @@ test('I1-B2 RemoteDeriveService: getRoutine assembles routines + routine_items i
   assert.equal(routine.version, 1);
   assert.equal(routine.status, 'awaiting_review');
   assert.equal(routine.updatedAt, '2026-09-18T12:05:00.000Z');
-  assert.equal(routine.founderNotes, 'Reviewed initial proposal');
+  assert.equal(routine.founderNotes, undefined);
 
   // amSteps assembly
   assert.equal(routine.amSteps.length, 2);
@@ -6011,6 +6834,13 @@ test('I1-B2.3: static check - zero .server-provider-config, Deno.readTextFile, o
   assert.ok(!providerSource.includes('Deno.readTextFile'), 'Must not contain Deno.readTextFile');
 });
 
+test('S4 admin validation: refill transitions are strictly sequential', () => {
+  assert.equal(nextRefillStatus('requested'), 'ordered');
+  assert.equal(nextRefillStatus('ordered'), 'shipped');
+  assert.equal(nextRefillStatus('shipped'), 'delivered');
+  assert.equal(nextRefillStatus('delivered'), null);
+  assert.equal(nextRefillStatus('unknown'), null);
+});
 // ========================================================
 // 35. I1-B3 PROVIDER-INDEPENDENT INITIAL ROUTINE INTEGRATION
 // ========================================================
@@ -6478,7 +7308,37 @@ test('I1-B3 Provider Neutrality: Zero provider leakage in mobile app layers', ()
 });
 
 
+test('S4 admin validation: formula list parsing trims, deduplicates, and limits input', () => {
+  assert.deepEqual(parseList('Water\nGlycerin, water\nCeramide NP'), ['Water', 'Glycerin', 'Ceramide NP']);
+  assert.throws(() => parseList('a,b,c', 2), /no more than 2/i);
+  assert.throws(() => parseList('a'.repeat(301)), /300 characters/i);
+});
 
+test('S4 admin validation: tracking links require HTTPS', () => {
+  assert.equal(validateHttpsUrl(''), null);
+  assert.equal(validateHttpsUrl('https://carrier.example/track'), 'https://carrier.example/track');
+  assert.throws(() => validateHttpsUrl('http://carrier.example/track'), /HTTPS/i);
+  assert.throws(() => validateHttpsUrl('not-a-url'), /valid URL/i);
+});
+
+test('S4 admin validation: member display prefers name, then email, without fabricating identity', () => {
+  assert.equal(formatMember({ full_name: 'Sami', email: 'sami@example.test' }), 'Sami');
+  assert.equal(formatMember({ full_name: null, email: 'sami@example.test' }), 'sami@example.test');
+  assert.equal(formatMember(null), 'Unknown member');
+});
+
+test('S4 static security boundary: admin browser code contains no service-role access', () => {
+  const adminFiles = [
+    'admin/index.html',
+    'admin/app.mjs',
+    'admin/lib/api.mjs',
+    'admin/lib/validation.mjs',
+    'admin/config.example.js',
+  ].map((file) => fs.readFileSync(path.resolve(file), 'utf8')).join('\n');
+  assert.ok(!adminFiles.includes('SUPABASE_SERVICE_ROLE_KEY'));
+  assert.ok(!adminFiles.includes('sb_secret_') || adminFiles.includes('startsWith("sb_secret_")'));
+  assert.ok(adminFiles.includes('/functions/v1/founder-operations'));
+});
 
 
 // ========================================================

@@ -33,9 +33,41 @@ function errorResponse(code: RoutineErrorCode, message: string, status = 400): R
   });
 }
 
+function hydrateUserProducts(rows: any[], userId: string): { ok: true; value: any[] } | { ok: false } {
+  const value: any[] = [];
+  for (const row of rows) {
+    const product = Array.isArray(row.products) ? row.products[0] : row.products;
+    if (!row.product_id || !product?.id) return { ok: false };
+    value.push({
+      id: row.id,
+      userId,
+      productId: row.product_id,
+      action: row.action,
+      actionReason: row.action_reason || "",
+      frequencyNightsPerWeek: row.frequency_nights_per_week ?? undefined,
+      isConfirmedByUser: row.is_confirmed_by_user === true,
+      product: {
+        id: product.id,
+        brand: product.brand,
+        name: product.name,
+        category: product.category,
+        keyActives: product.key_actives || [],
+        fullIngredients: product.full_ingredients || [],
+        retailPriceApprox: product.retail_price_approx == null
+          ? undefined
+          : Number(product.retail_price_approx),
+      },
+    });
+  }
+  return { ok: true, value };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return errorResponse("INTERNAL_ERROR", "Method not allowed.", 405);
   }
 
   try {
@@ -99,13 +131,13 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (existingRoutine) {
-      const { data: items } = await adminClient
+      const { data: items, error: itemsError } = await adminClient
         .from("routine_items")
         .select("*")
         .eq("routine_id", existingRoutine.id)
         .order("order_index", { ascending: true });
 
-      const { data: upRows } = await adminClient
+      const { data: upRows, error: userProductsError } = await adminClient
         .from("user_products")
         .select("id, product_id, action, action_reason, frequency_nights_per_week, is_confirmed_by_user, products(id, brand, name, category, key_actives, full_ingredients, retail_price_approx)")
         .eq("user_id", userId);
@@ -146,34 +178,12 @@ Deno.serve(async (req: Request) => {
           scheduleText: formatRoutineStepScheduleText(item.timing, item.days || []),
         }));
 
-      const userProducts = (upRows || []).map((row: any) => ({
-        id: row.id,
-        userId,
-        productId: row.product_id,
-        action: row.action,
-        actionReason: row.action_reason || "",
-        frequencyNightsPerWeek: row.frequency_nights_per_week ?? undefined,
-        isConfirmedByUser: row.is_confirmed_by_user ?? false,
-        product: row.products
-          ? {
-              id: row.products.id,
-              brand: row.products.brand,
-              name: row.products.name,
-              category: row.products.category,
-              keyActives: row.products.key_actives || [],
-              fullIngredients: row.products.full_ingredients || [],
-              retailPriceApprox: row.products.retail_price_approx
-                ? Number(row.products.retail_price_approx)
-                : undefined,
-            }
-          : {
-              id: row.product_id || row.id,
-              brand: "",
-              name: "",
-              category: "other" as const,
-              keyActives: [],
-            },
-      }));
+      const hydratedProducts = hydrateUserProducts(upRows || [], userId);
+      if (itemsError || userProductsError || !hydratedProducts.ok) {
+        console.error("[propose-routine] Existing routine hydration failed");
+        return errorResponse("INTERNAL_ERROR", "Existing routine could not be loaded.", 500);
+      }
+      const userProducts = hydratedProducts.value;
 
       return new Response(
         JSON.stringify({
@@ -414,19 +424,19 @@ Deno.serve(async (req: Request) => {
     const routineId = rpcResult.routine_id;
 
     // 13. Read back persisted canonical structure
-    const { data: routineRow } = await adminClient
+    const { data: routineRow, error: routineReadError } = await adminClient
       .from("routines")
       .select("id, user_id, version, status, summary_sentence, created_at, updated_at, published_at")
       .eq("id", routineId)
       .single();
 
-    const { data: items } = await adminClient
+    const { data: items, error: itemsReadError } = await adminClient
       .from("routine_items")
       .select("*")
       .eq("routine_id", routineId)
       .order("order_index", { ascending: true });
 
-    const { data: upRows } = await adminClient
+    const { data: upRows, error: userProductsReadError } = await adminClient
       .from("user_products")
       .select("id, product_id, action, action_reason, frequency_nights_per_week, is_confirmed_by_user, products(id, brand, name, category, key_actives, full_ingredients, retail_price_approx)")
       .eq("user_id", userId);
@@ -467,34 +477,18 @@ Deno.serve(async (req: Request) => {
         scheduleText: formatRoutineStepScheduleText(item.timing, item.days || []),
       }));
 
-    const userProducts = (upRows || []).map((row: any) => ({
-      id: row.id,
-      userId,
-      productId: row.product_id,
-      action: row.action,
-      actionReason: row.action_reason || "",
-      frequencyNightsPerWeek: row.frequency_nights_per_week ?? undefined,
-      isConfirmedByUser: row.is_confirmed_by_user ?? false,
-      product: row.products
-        ? {
-            id: row.products.id,
-            brand: row.products.brand,
-            name: row.products.name,
-            category: row.products.category,
-            keyActives: row.products.key_actives || [],
-            fullIngredients: row.products.full_ingredients || [],
-            retailPriceApprox: row.products.retail_price_approx
-              ? Number(row.products.retail_price_approx)
-              : undefined,
-          }
-        : {
-            id: row.product_id || row.id,
-            brand: "",
-            name: "",
-            category: "other" as const,
-            keyActives: [],
-          },
-    }));
+    const hydratedProducts = hydrateUserProducts(upRows || [], userId);
+    if (
+      routineReadError ||
+      itemsReadError ||
+      userProductsReadError ||
+      !routineRow ||
+      !hydratedProducts.ok
+    ) {
+      console.error("[propose-routine] Persisted routine hydration failed");
+      return errorResponse("PERSISTENCE_FAILED", "Routine proposal could not be loaded.", 500);
+    }
+    const userProducts = hydratedProducts.value;
 
     return new Response(
       JSON.stringify({

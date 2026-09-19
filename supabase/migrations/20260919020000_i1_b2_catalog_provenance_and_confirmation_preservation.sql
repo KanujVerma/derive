@@ -250,4 +250,3 @@ alter table public.server_runtime_config enable row level security;
 
 revoke all on public.server_runtime_config from anon, authenticated;
 grant select, insert, update, delete on public.server_runtime_config to service_role;
-

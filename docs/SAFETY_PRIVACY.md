@@ -40,11 +40,11 @@ Derive maintains strict integrity in all customer communications.
 * **Photo Capture Quality vs. Biometrics**:
   - Camera quality gating during intake evaluates **photographic capture quality only** (single face presence, pose/orientation, face distance, centering, lighting/exposure, sharpness, stability).
   - **Zero Persistent Biometrics**: Derive strictly prohibits generating or storing persistent face embeddings, facial recognition models, or biometric identity templates.
-* **Private Photo Storage (S1A Enforced)**: `customer-skin-photos` is provisioned with `public = false`, a 10 MiB limit, and an image MIME allowlist. Authenticated uploads are isolated under a first path segment equal to the caller's immutable Auth UUID.
-* **Zero Public or Direct Customer Reads (S1A Enforced)**: Customers can create immutable objects only under their Auth UUID namespace, but cannot list, download, sign, replace, or delete objects directly. The next S1 slice must add a trusted JWT-bound endpoint that issues 15-minute signed URLs; until it exists, the live signed-photo delivery path is not complete.
+* **Private Photo Storage (S1 Enforced)**: `customer-skin-photos` is provisioned with `public = false`, a 10 MiB limit, and an image MIME allowlist. Authenticated uploads are isolated under a first path segment equal to the caller's immutable Auth UUID.
+* **Zero Public or Direct Customer Reads (S1 Enforced)**: Customers can create immutable objects only under their Auth UUID namespace, but cannot list, download, sign, replace, or delete objects directly. The JWT-gated `photo-url` endpoint derives identity from `auth.getUser()`, validates both metadata ownership and the canonical member-owned path, and issues an exact 900-second signed URL with private/no-store caching.
 * **Immutable Uploads**: The bucket has no authenticated `UPDATE` policy. Clients must use unique opaque filenames and `upsert: false` so a later capture cannot silently overwrite an earlier longitudinal record.
 * **Zero Model Training**: Customer photos, symptom descriptions, and conversation histories are never used for public model training or third-party data broker sharing.
-* **Data Deletion Contract**: A complete deletion must first remove every object through the Supabase Storage API, then remove relational/auth records, and finally purge any conversation data that exists. Customers deliberately lack independent blob or photo-metadata deletion rights because partial client workflows can orphan one side. This orchestration is still an S1 implementation requirement and must not be represented as automated until the endpoint is shipped and tested; existing signed URLs may remain valid only until their maximum 15-minute expiry.
+* **Data Deletion Contract (S1 Enforced)**: `delete-customer-account` authenticates the caller from the JWT, requires exact confirmation, rejects supplied identity fields, recursively inventories and removes the caller's complete Storage namespace through the Storage API, verifies it is empty, and deletes the Auth user last so relational cascades cannot orphan private objects. Existing signed URLs may remain valid only until their maximum 15-minute expiry.
 
 ---
 
@@ -128,3 +128,23 @@ Optional check-in context tags (`diet`, `sleep`, `stress`, `alcohol`, `cycle`, `
 * **Storage Verification Before Relational Commit**: The server explicitly checks Storage existence of required baseline photos (`front`, `left`, `right`) before writing to `skin_profiles` or `user_photos`.
 * **Single Atomic Commit Marker**: The commit state `skin_profiles.onboarding_completed = true` is set strictly as the final operation in the commit sequence, preventing partially initialized accounts from being considered complete.
 
+---
+
+## 9. Immutable Reaction & Formula Provenance (S2)
+
+* **Atomic Historical Capture**: A product reaction and the exact formula known at that time are written together through the server-only `record_product_reaction` transaction. Every reaction requires a `formula_snapshot_id`; ownership and canonical product consistency are trigger-enforced.
+* **Append-Only Evidence**: Formula snapshots, reaction records, ingredient-signal versions, and routine step snapshots reject in-place updates. Corrections or evolving signals append a new version rather than rewriting history.
+* **Association, Not Diagnosis**: Ingredient signals retain categorical confidence and supporting/contradictory evidence. A reaction association never upgrades itself into a confirmed allergy; clinician- or member-reported allergy provenance remains explicit.
+* **Owner Isolation**: Members can read only their own formula, reaction, and ingredient-signal history. Direct member writes to these sensitive tables and RPC execution are denied; trusted server code performs validated writes.
+* **Deletion Completeness**: S2 relational history cascades from the member profile during the existing Storage-first account-deletion workflow, so private objects are deleted before relational evidence is removed and no member history is orphaned.
+
+---
+
+## 10. Guarded Server Intelligence (S3)
+
+* **Pre-Model Emergency Stop**: `ask-derive` evaluates mandatory red flags before contacting Gemini. Facial/eye/lip/tongue swelling, respiratory or throat distress, severe blistering/oozing/pus, and rapidly spreading hot hives return an immediate non-diagnostic escalation response. The urgent founder task stores category/severity metadata only—not the member's question or transcript.
+* **Server Truth Over Request Truth**: Every S3 handler re-verifies the bearer token and loads prescriptions, safety status, routine schedule, reactions, and signals from owner-bound database rows. The model cannot be steered with a forged client profile or another member ID.
+* **Structured Output Is Untrusted Input**: Gemini output must satisfy a provider schema, server parser, and deterministic safety guard before it can be returned or persisted. Violations fail closed; generated routines remain `awaiting_review` for a founder quality check.
+* **Conservative Unknown States**: Pregnancy/nursing values of `unanswered` or `prefer_not_to_say` never become a silent `no`. Generated pregnancy-excluded actives are rejected under those states. Reported sensitivities and existing prescription schedules are preserved rather than silently overridden.
+* **Minimum-Necessary Photo Context**: S3 context includes only photo provenance metadata needed to know that approved baseline/progress evidence exists. Storage paths, signed URLs, local URIs, image bytes, and biometric identity data are excluded from model prompts.
+* **Probabilistic Ingredient Signals**: A strong signal requires overlap across distinct reacted products, not repeated incidents from one product. Tolerated exposures reduce suspicion. The system never upgrades an inferred association to `confirmed_allergy` without explicit confirmed provenance.

@@ -53,15 +53,50 @@ entrypoint = "./functions/onboard-customer/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/onboard-customer/*.html" ]
 
+[functions.photo-url]
+enabled = true
+verify_jwt = true
+import_map = "./functions/photo-url/deno.json"
+entrypoint = "./functions/photo-url/index.ts"
+
+[functions.delete-customer-account]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-customer-account/deno.json"
+entrypoint = "./functions/delete-customer-account/index.ts"
+
 [functions.propose-routine]
 enabled = true
 verify_jwt = true
 import_map = "./functions/propose-routine/deno.json"
 entrypoint = "./functions/propose-routine/index.ts"
 
+[functions.scan-product]
+enabled = true
+verify_jwt = true
+import_map = "./functions/scan-product/deno.json"
+entrypoint = "./functions/scan-product/index.ts"
+
+[functions.ask-derive]
+enabled = true
+verify_jwt = true
+import_map = "./functions/ask-derive/deno.json"
+entrypoint = "./functions/ask-derive/index.ts"
+
+[functions.infer-ingredient-signals]
+enabled = true
+verify_jwt = true
+import_map = "./functions/infer-ingredient-signals/deno.json"
+entrypoint = "./functions/infer-ingredient-signals/index.ts"
+
+[functions.founder-operations]
+enabled = true
+verify_jwt = true
+import_map = "./functions/founder-operations/deno.json"
+entrypoint = "./functions/founder-operations/index.ts"
+
 [functions.submit-checkin]
 enabled = true
 verify_jwt = true
 import_map = "./functions/submit-checkin/deno.json"
 entrypoint = "./functions/submit-checkin/index.ts"
-

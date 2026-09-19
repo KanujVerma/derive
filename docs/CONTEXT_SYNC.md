@@ -6,6 +6,79 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Sami Platform: S3 Server-Side Intelligence Services
+
+- **Agent / Workstream**: Sami (Platform, Intelligence & Safety Orchestration)
+- **Local Branch**: `sami/s3-server-intelligence`
+- **Starting S2 Dependency**: `8c66a74` (`sami/s2-core-domain-persistence`, reconciled through S1 `05aa196`)
+- **Reconciled origin/main Base**: `cb8a3eb05408c73702bb3dddf9b05beffac8765a`
+- **Remote Push Status**: `pending commit / push` (predecessor-based bookkeeping)
+- **GitHub CI**: `pending`
+- **Milestone Status**: `S3 COMPLETE · REVIEW PENDING`; mobile endpoint wiring and production Remote enablement remain S5/I1.
+- **Ownership / Shared Contracts**: Sami-owned Edge Functions, shared function runtime, additive transaction migration, intelligence workflows, tests, CI, and durable docs. Zero changes to `app/**`, `src/domain/**`, `src/contracts/**`, or Kanuj-owned UI. Production Remote mode remains `false`.
+- **Durable Deliverables**:
+  1. Added JWT-gated `propose-routine`, `scan-product`, `ask-derive`, and `infer-ingredient-signals` Edge Functions with defense-in-depth token verification and canonical server context assembly.
+  2. Preserved the provider-neutral `RoutineIntelligenceProvider` boundary for routine generation, including server-only provider selection and a deterministic CI fixture. Scan and Ask use server-side Gemini structured outputs with explicit schemas, timeouts, parsing, sanitized errors, and deterministic post-model validation. All model credentials remain server-only; missing configuration fails closed.
+  3. Added mandatory pre-model emergency circuit breakers and privacy-minimized urgent founder tasks. Red-flag Ask requests never call the model and never persist transcript text.
+  4. Reused the single canonical B2 routine+shelf transaction instead of retaining a competing S3 overload. Added service-only user-reported product identity resolution, immutable ingredient-signal versioning, and idempotent normalization of sealed B1 onboarding reaction/formula evidence into S2 history without promoting user/model formula claims into trusted catalog truth.
+  5. Corrected ingredient overlap semantics: repeated incidents from one product cannot produce a strong multi-product signal; tolerated exposures reduce suspicion; confirmed-allergy status is never synthesized.
+  6. Context assembly includes prescriptions, routine/Differin schedule, safety unknown-state provenance, reactions/formulas, signals, check-ins, and private photo metadata. It excludes private Storage paths, signed URLs, image bytes, and client-local URIs from prompts.
+  7. Reconciled the independently landed I1-B2.1–B2.3 implementation: preserved provider-neutral routine generation, canonical Remote read adapters, catalog provenance, version-1 replay, S2 immutable history, founder-note privacy, and fail-closed product hydration.
+  8. Added S3 unit, pgTAP, and authenticated Edge integration coverage; CI now exercises the complete S1 onboarding, I1-B2 replay, S2 persistence, and S3 intelligence chain on a fresh local Supabase database.
+  9. Resolved migration ordering by keeping S2 at `20260919011000_s2_core_domain_persistence.sql` and moving S3 to `20260919040000_s3_intelligence_transactions.sql`, after upstream B2 migrations `20000` and `30000`.
+  10. Hardened the canonical routine validator so unresolved/withheld pregnancy state fails closed for retinoids, hydroquinone, and explicitly high-strength salicylic acid, while recognized active prescription schedules must be preserved exactly or clarified.
+- **Verification**:
+  - `npx supabase db reset`: PASS across S1 + B1/B1.1 + S2 + S3 migrations.
+  - `npx supabase test db`: 187/187 PASS.
+  - `npx supabase db lint --level warning`: zero findings.
+  - `node scripts/test-i1-b1-local.mjs`: all 13 S1 stages PASS.
+  - `node scripts/test-i1-b2-local.mjs`: all 8 B2 persistence/replay stages PASS.
+  - `node scripts/test-s2-local.mjs`: all 5 S2 stages PASS.
+  - `node scripts/test-s3-local.mjs`: all 5 S3 stages PASS.
+  - `npm test`: 143/143 PASS.
+  - `npx tsc --noEmit`: PASS.
+  - `npm run typecheck:tests`: PASS.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: PASS.
+- **Decision Status**:
+  - `ADR-29: Guarded Server Intelligence & Transactional Model Outputs`: IMPLEMENTED.
+  - `ARCHITECTURE_CHALLENGE-01`: still unresolved; no pricing, tier, Stripe, or membership identity changes in S3.
+- **Next Work**:
+  - Cofounder/agent review of the stacked draft PR, followed by S5/I1 client adapter wiring and a reviewed hosted Supabase deployment with server secrets.
+  - Do not enable production Remote mode until the integration slice is reviewed end to end.
+
+## 2026-09-18 — Sami Platform: S2 Core Domain Persistence
+
+- **Agent / Workstream**: Sami (Platform, Persistence & Remote Mapping)
+- **Local Branch**: `sami/s2-core-domain-persistence`
+- **Starting S1 Dependency**: `a93c802` (`sami/s1-env-contract`)
+- **Reconciled origin/main Base**: `0bcfa42`
+- **Remote Push Status**: `pending commit / push` (predecessor-based bookkeeping)
+- **GitHub CI**: `pending`
+- **Milestone Status**: `S2 COMPLETE · REVIEW PENDING`; S3/I1-B2 server intelligence remains next.
+- **Ownership / Shared Contracts**: Sami-owned additive database migration, remote service mapping, tests, CI, and durable docs. Zero changes to `app/**`, `src/domain/**`, `src/contracts/**`, or Kanuj-owned UI. Production Remote mode remains `false`.
+- **Durable Deliverables**:
+  1. Audited the baseline and extended existing tables rather than recreating them.
+  2. Added immutable, owner-isolated `formula_snapshots`, `product_reactions`, and versioned `ingredient_signals`.
+  3. Added atomic service-only `record_product_reaction`, binding every reaction to the exact historical formula snapshot in the same transaction.
+  4. Added `routines.updated_at`, canonical `routine_items.product_id`, unique routine-version identity, immutable routine content/steps, and concurrency-safe `create_routine_version` append semantics.
+  5. Enriched catalog, weekly check-in, photo provenance, and refill persistence additively while preserving the sealed B1 onboarding flow.
+  6. Implemented full latest-routine header/item assembly in `RemoteDeriveService`, deterministic schedule derivation, explicit refill mapping, and RLS-protected refill writes.
+  7. Added a 40-assertion S2 pgTAP suite and a local authenticated API harness that verifies owner isolation, atomic histories, structured check-ins/refills, and state reconstruction from a fresh client session.
+- **Verification**:
+  - `npx supabase db reset`: PASS.
+  - `npx supabase test db`: 136/136 PASS.
+  - `npx supabase db lint --level warning`: zero findings.
+  - `node scripts/test-i1-b1-local.mjs`: all 13 S1 regression stages PASS.
+  - `node scripts/test-s2-local.mjs`: all 5 S2 live API stages PASS.
+  - `npm test`: 110/110 PASS.
+  - `npx tsc --noEmit`: PASS.
+  - `npm run typecheck:tests`: PASS.
+- **Decision Status**:
+  - `ADR-28: Additive, Append-Only Core Domain Persistence`: IMPLEMENTED.
+  - `ARCHITECTURE_CHALLENGE-01`: still unresolved; no pricing or membership identity changes in S2.
+- **Next Work**:
+  - I1-B2/S3 consumes this substrate for authenticated context assembly, guarded routine generation, shelf-product normalization, and signal inference.
+  - Production Remote mode remains disabled until the wider integration slice is complete and reviewed.
 ## 2026-09-19 — Kanuj: DERIVE I1-B4B Weekly Check-In Context Model, Real Remote Persistence & Longitudinal Read Path
 
 - **Agent / Workstream**: Kanuj (Customer Experience + Mobile) primary with shared-contract + Sami-owned additive `check_ins` migration and `submit-checkin` Edge Function
@@ -429,6 +502,34 @@ This ledger tracks durable architectural, product, and contract decisions across
   - `npx tsc --noEmit`: 0 errors.
   - `npm run typecheck:tests`: 0 errors.
   - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` strictly preserved.
+
+## 2026-09-18 — Sami Platform: S1 Platform Foundation Complete
+
+- **Agent / Workstream**: Sami (Platform Foundation, Private Data Lifecycle & Environment Security)
+- **Local Branch**: `sami/s1-env-contract`
+- **Starting Shared HEAD / origin/main**: `de507dda2dd45d46845d7bd22a0f958058f1eb0f`
+- **Final Reconciled origin/main Base**: `b3d4fb1` (I1-B2 contract-truth correction preserved before checkpoint)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Milestone Status**: `S1 COMPLETE` (Consolidated the already-landed migration/RLS/auth/onboarding platform with the final environment, private-photo delivery, and account-deletion controls; production Remote mode remains deliberately disabled.)
+- **Ownership / Shared Contracts**: Sami-owned platform, service configuration, Edge Functions, tests, and durable documentation only. Zero changes to Kanuj-owned UI and zero changes to `src/domain/types.ts`. `ARCHITECTURE_CHALLENGE-01` pricing remains unresolved; no new price semantics were introduced.
+- **Durable Deliverables**:
+  1. **Fail-Closed Mobile Environment Contract**: Added `src/config/environment.ts` with static Expo environment references, exact boolean parsing, HTTPS/local URL validation, canonical `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, a transitional legacy anon-key fallback, and rejection of secret or malformed canonical keys. Remote mode refuses to initialize without valid public client values.
+  2. **Public-Only Template & Runtime Documentation**: Reduced root `.env.example` to the three approved public mobile names and documented the separate Expo, CLI/CI, local Edge, and trusted-server credential boundaries in `docs/ENVIRONMENT.md`. Stripe and PostHog remain outside S1.
+  3. **Persistent Auth Compatibility Preserved**: Reconciled the environment resolver with the current `AsyncStorage` Supabase client, app-lifecycle refresh, and authenticated Remote client path; no rollback of the landed I1 Auth spine.
+  4. **JWT-Bound Private Photo Delivery**: Added `photo-url` with platform `verify_jwt = true` plus handler `auth.getUser()` verification, caller-owned `user_photos` lookup, canonical path validation, no caller-supplied identity/path authority, exact 900-second signing, and private/no-store response caching. Hosted signed origins are unchanged; local internal `kong` URLs are rewritten only to an explicit or loopback public local Supabase origin.
+  5. **Storage-First Account Deletion**: Added `delete-customer-account` with platform and handler JWT verification, exact destructive confirmation, unexpected-field rejection, recursive caller-namespace inventory, bounded deletion, empty-namespace verification, and Auth-user deletion strictly last so relational cascades cannot orphan private Storage objects.
+  6. **Canonical Upload Boundary**: Removed the obsolete arbitrary/upserting photo uploader. The established onboarding uploader remains the sole client upload helper, restricted to server-issued paths in `customer-skin-photos` with `upsert: false`.
+  7. **Regression & Full-Stack Proof**: Expanded unit/static guards for the environment allowlist and S1 endpoint invariants, and extended the local full-stack harness through owner/cross-owner signing, exact TTL, signed-object retrieval, identity-spoof rejection, destructive-confirmation enforcement, complete Storage cleanup, Auth deletion ordering, and other-member isolation.
+- **Verification**:
+  - `npm test`: 105/105 passing.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: clean export.
+  - `npx supabase db reset`: clean rebuild through the full additive migration chain.
+  - `npx supabase test db`: 96/96 pgTAP assertions passing.
+  - `node scripts/test-i1-b1-local.mjs`: all 13 S1 full-stack stages passing.
   - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` strictly preserved.
 
 ## 2026-09-18 — Kanuj & Sami: B1.1 Final Coordination & Sami I1-B2 Intelligence Handoff

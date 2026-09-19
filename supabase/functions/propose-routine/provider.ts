@@ -11,7 +11,7 @@ export type { RoutineIntelligenceProvider } from './types.ts';
 
 /**
  * Resolves the configured server-side routine intelligence provider.
- * 
+ *
  * Rules:
  * 1. Provider selection is strictly server-side configuration.
  * 2. Client requests (headers, query parameters, bodies) can NEVER select a provider.

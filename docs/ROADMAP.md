@@ -364,6 +364,7 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
       7. Created atomic transactional RPC `public.commit_routine_proposal(...)` executed exclusively by `service_role`.
     - Relational routine persistence: Inserts generated routine into `public.routines` (`version = 1`, `status = 'awaiting_review'`) and routine steps into `public.routine_items` with resolved `product_id` foreign keys.
     - Shelf action normalization & persistence invariant: Decided products normalized into `public.products` with `user_products.product_id` referencing that row, enabling `user_products JOIN products` $\to$ canonical `UserProduct`.
+    - S2 persistence hardening: Routine/formula/reaction/signal history is append-only or immutable where appropriate; remote mapping fails closed when canonical product relationships or required timestamps are absent.
     - Founder review queue transition: Updates pending `initial_routine` task in `public.founder_review_tasks` with v1 generation notes.
     - Remote routine read assembly: Implemented full routine-item read assembly in `RemoteDeriveService.getRoutine()` (partitions into `amSteps` and `pmSteps`, derives `scheduleText` via `formatRoutineStepSchedule`) and `getUserProducts()`.
   - **Client-Side Consumption (Kanuj)**:
@@ -518,42 +519,67 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 
 ## Sami Workstream (Platform + Intelligence + Operations)
 
-### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]
+### S1: Platform Foundation [COMPLETE]
 * **Scope**: Supabase setup, baseline PostgreSQL schema, reproducible migration scripts, customer authentication, private photo storage buckets, Row-Level Security (RLS) policies, and secure environment secrets management.
-* **Implemented in S1A**:
+* **Implemented**:
   - Committed local Supabase configuration and an additive migration chain.
   - Auth-user profile provisioning with a hardened trigger and backfill.
   - Explicit grants plus operation-specific RLS on every existing public application table.
   - Private `customer-skin-photos` bucket, member-ID path isolation, immutable uploads, and no client download/list/sign/update/delete permission.
   - pgTAP coverage for exact policy/grant shape, auth provisioning and synchronization, anonymous denial, owner/cross-owner access, server-owned fields, and private Storage policy behavior.
   - Explicit safe-column projections in the Sami-owned remote adapter, avoiding wildcard expansion across protected membership and routine fields.
-* **Remaining Before S1 Is Complete**:
-  - Run `supabase db reset` and `supabase test db` against a Docker-backed official local stack and make that verification repeatable in CI.
-  - Implement persistent Expo auth sessions and authenticated route/callback handling in a coordinated shared/mobile change.
-  - Implement a JWT-bound server signer that issues 15-minute photo URLs without trusting caller-supplied user IDs or paths.
-  - Implement idempotent Storage-API deletion before relational/auth deletion; database cascades alone do not delete physical objects.
-  - Replace the unused arbitrary/upserting client upload helper with the canonical bucket and member-owned path convention, then run an API-level upload smoke test in a coordinated change.
-  - Finish remote row-to-domain mapping, routine-item assembly, live function coverage, and integration tests before enabling the remote service in production.
+  - Official Docker-backed `supabase db reset`, pgTAP, and API-level integration verification in local development and CI.
+  - Persistent Expo Auth sessions with app-lifecycle token refresh and authenticated route gating.
+  - Canonical non-upserting client photo upload helper restricted to server-issued member-owned paths; the obsolete arbitrary/upserting helper was removed.
+  - JWT-gated `photo-url` Edge Function that derives the caller from `auth.getUser()`, verifies the caller-owned photo metadata/path, and issues an exact 900-second signed URL with `Cache-Control: private, no-store`.
+  - JWT-gated `delete-customer-account` Edge Function that requires exact destructive confirmation, rejects caller-supplied identity, inventories and deletes the caller's complete Storage namespace first, verifies it is empty, and deletes the Auth user last.
+  - Fail-closed public mobile environment validation with a canonical Supabase publishable-key contract and a documented separation between public Expo values, local CLI values, CI secrets, and trusted server-only secrets.
+* **Boundary After S1**:
+  - The production Remote service flag remains `false`. Remote row-to-domain mapping, routine-item assembly, model execution, normalized reaction/formula persistence, and commerce belong to I1-B2/S2/S3/S5 and do not reopen S1.
+  - `ARCHITECTURE_CHALLENGE-01` remains unresolved; S1 does not encode a new price or change Kanuj-owned UI.
 * **Acceptance Criteria**:
-  - Migrations run cleanly from a fresh Supabase database.
-  - RLS strictly isolates member data: customer can only read/write their own records.
-  - Customer skin photos accessible solely via short-lived signed URLs (no public URLs).
-  - Zero secrets committed to version control.
+  - [x] Migrations run cleanly from a fresh Supabase database.
+  - [x] RLS strictly isolates member data: customer can only read/write their own records.
+  - [x] Customer skin photos are accessible solely through short-lived signed URLs; no public URL path exists.
+  - [x] Account deletion removes private Storage objects before relational/auth deletion.
+  - [x] Zero secrets are committed to version control; public and trusted-runtime environment boundaries are explicit.
 
-### S2: Core Domain Persistence
+### S2: Core Domain Persistence [COMPLETE · REVIEW PENDING]
 * **Scope**: Relational tables and queries for customer profiles, skin profiles, catalog products, formula snapshots, product reactions, ingredient signals, routine versions, weekly check-ins, photo records, and refill orders.
+* **Implemented**:
+  - Audited and extended the existing baseline through one additive migration; no baseline table was recreated or rewritten.
+  - Added immutable, owner-isolated `formula_snapshots`, `product_reactions`, and versioned `ingredient_signals` history. `record_product_reaction` atomically captures the exact formula and reaction in one server-only transaction.
+  - Added `routines.updated_at`, `routine_items.product_id`, unique `(user_id, version)` routine identity, immutable routine content/steps, and the concurrency-safe server-only `create_routine_version` append operation.
+  - Enriched existing check-ins, private photo metadata, catalog products, and refill requests with the canonical fields required by current shared domain types while preserving legacy rows and the sealed onboarding flow.
+  - Implemented full `RemoteDeriveService.getRoutine()` header/step assembly, deterministic schedule text derivation, snake_case refill mapping, and direct RLS-protected refill persistence.
+  - Added pgTAP, unit, local API integration, migration-reset, schema-lint, and S1 onboarding-regression coverage. The API integration creates a fresh authenticated client after writes and verifies canonical state reconstructs correctly.
+* **Boundaries**:
+  - Zero Kanuj-owned UI changes; `EXPO_PUBLIC_USE_REMOTE_SERVICE` remains `false`.
+  - S2 creates persistence and mapping substrate only. Gemini generation, signal inference, progress synthesis, and safety-classifier execution remain S3/I1-B2 work.
+  - `ARCHITECTURE_CHALLENGE-01` remains unresolved. No new price, tier, Stripe, or membership semantics were encoded.
 * **Acceptance Criteria**:
-  - Canonical state persists reliably across app restarts.
-  - Routine updates create new version snapshots rather than overwriting historical records.
-  - Product reactions persist historical formula snapshots at the exact time of the reaction.
+  - [x] Canonical state persists reliably across app restarts.
+  - [x] Routine updates create new version snapshots rather than overwriting historical records.
+  - [x] Product reactions persist historical formula snapshots at the exact time of the reaction.
 
-### S3: Server-Side Intelligence Services
+### S3: Server-Side Intelligence Services [COMPLETE · REVIEW PENDING]
 * **Scope**: Edge Functions for routine proposal generation, product scan evaluation with categorical verdicts, Ask Derive conversation synthesis, safety classifier circuit breaker, and probabilistic ingredient signal inference.
+* **Implemented**:
+  - Added JWT-gated `propose-routine`, `scan-product`, `ask-derive`, and `infer-ingredient-signals` Edge Functions. Handler identity is derived from the verified token; caller-supplied profile truth and spoofed member IDs are rejected or ignored.
+  - Added trusted server context assembly across committed intake, canonical safety states, prescriptions, latest routine and shelf, immutable formula/reaction history, latest ingredient signals, recent check-ins, and private-photo metadata only. Storage paths and customer images are not sent to Gemini in S3.
+  - Preserved provider-neutral routine generation with server-only provider selection and a deterministic CI fixture. Added guarded server-side Gemini structured-output orchestration for scan and Ask with explicit JSON schemas, parsing, post-model safety validation, timeouts, and sanitized fail-closed errors. No model credential enters the Expo bundle.
+  - Added pre-model emergency and barrier-warning circuit breakers. Emergency Ask requests never reach the model and create privacy-minimized urgent founder tasks without storing the customer transcript.
+  - Reused the canonical B2 transaction for awaiting-review routine versions and shelf actions. Added service-only historical product identity resolution, idempotent sealed-intake reaction normalization, and immutable ingredient-signal versions without creating a competing routine RPC or treating unverified formulas as catalog truth.
+  - Hardened ingredient inference so repeated incidents from one bottle cannot mimic multi-product overlap; tolerated exposures discount naive suspicion; inference never auto-creates a confirmed allergy.
+* **Boundaries**:
+  - No Kanuj-owned UI or shared domain/service contracts changed. Typed `RemoteDeriveService` endpoint adapters exist, but Remote mode remains disabled; full mobile lifecycle activation remains S5/I1.
+  - Production Remote mode remains `false`. No hosted deployment, Gemini secret, Stripe, pricing, or PostHog SDK is introduced.
 * **Acceptance Criteria**:
-  - Edge Function endpoints satisfy `IDeriveService` shared contracts.
-  - Prompt context includes user's active prescriptions, Differin schedule, and reaction history.
-  - All mandatory emergency/red-flag fixtures escalate correctly; no known mandatory-escalation fixture is missed; the classifier remains conservative under uncertainty.
-  - Ingredient signals update confidence based on multi-product overlap and tolerated exposure discounting.
+  - [x] Edge Function endpoints validate and return the existing `IDeriveService` shared contract shapes without changing those contracts.
+  - [x] Prompt context includes the member's active prescriptions, Differin/routine schedule, and reaction history.
+  - [x] All mandatory emergency/red-flag fixtures hard-stop before model use; uncertain safety states fail conservatively.
+  - [x] Ingredient signals update confidence using distinct multi-product overlap and tolerated-exposure discounting.
+  - [x] Unknown/withheld pregnancy status fails closed for pregnancy-excluded actives, and recognized prescription schedules are preserved exactly or require clarification.
 
 ### S4: Founder Operations Console
 * **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta members. After I1-B4A, customer-facing membership truth is the $25/month Derive-management experiment with products purchased separately; S4 itself remains founder review/edit/publish of routines, refill status, formula audit, and internal notes. Do not treat full Shop as an S4 acceptance criterion.

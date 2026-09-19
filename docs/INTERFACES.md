@@ -91,6 +91,7 @@ export interface IDeriveService {
     - `public.user_photos`: baseline photo metadata (angles: `front`, `left`, `right`).
 * **Output Contract (`RoutineProposalResult` in `src/domain/types.ts`)**:
   - `routine`: `Routine` (`id`, `userId`, `version`, `status: 'awaiting_review'`, `summarySentence`, `amSteps`, `pmSteps`, `createdAt`, `updatedAt`, `publishedAt?`, `founderNotes?`).
+    - `founderNotes` exists on the shared internal type but is intentionally omitted from customer-facing Remote and Edge responses.
     - *Contract Truth*: `Routine` has NO `rationales` property. Step-level personalized rationale is captured on individual `RoutineStep` items via `whyChosen`, `purpose`, `watchFor?`, and optional `scheduleText?`.
   - `userProducts`: `UserProduct[]` (with actions: `'KEEP'` | `'PAUSE'` | `'REPLACE'` | `'ADD'` | `'STOP'`).
   - `clarificationQuestions`?: string[]
@@ -99,20 +100,21 @@ export interface IDeriveService {
   - Before proposal: no canonical routine row exists in `public.routines` $\to$ client conceptual state is `pending_generation` (`routine: null`, `isPlanUnderReview: false`, "Your routine is being prepared.").
   - After proposal persistence: routine is persisted in `public.routines` with `status = 'awaiting_review'` $\to$ client derives `awaiting_review` (`isPlanUnderReview: true`, "Final review: Your first routine gets one final quality check before it goes live.").
   - If a dedicated persisted lifecycle column or API is deemed necessary, that is a future shared architecture decision, not assumed current implementation.
-* **B2 Delivered Schema & Mapping Reconciliations (Sami B2 Implementation)**:
+* **S2/B2 Delivered Schema & Mapping Reconciliations**:
   1. **`public.routines.updated_at` Reconciliation [DELIVERED]**:
      - Added `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` to `public.routines` via migration `20260919010000_i1_b2_routine_intelligence_and_persistence.sql`.
-     - Wired to `routines_set_updated_at` trigger calling `private.set_updated_at()`.
+     - Wired to `routines_set_updated_at` calling `private.set_updated_at()`; S2 additionally protects immutable routine content and steps.
      - Granted `SELECT (updated_at)` on `public.routines` to `authenticated` while retaining `founder_notes` as founder-only.
   2. **`public.routine_items.product_id` Reconciliation [DELIVERED]**:
      - Added `product_id UUID REFERENCES public.products(id) ON DELETE RESTRICT` to `public.routine_items`.
      - Transactional RPC `commit_routine_proposal` resolves or upserts canonical products and populates `product_id`.
+     - New rows that cannot be represented with a canonical product fail closed at the remote mapping boundary rather than receiving a fabricated ID.
   3. **`RoutineStep.scheduleText` Derivability [DELIVERED]**:
      - Derived deterministically during read assembly from `timing` + `days` using `formatRoutineStepSchedule` from `src/types/schema.ts` without database bloat.
   4. **`UserProduct.product` Reconstruction Invariant [DELIVERED]**:
      - All B2-decided products are normalized and upserted into `public.products`.
      - `public.user_products.product_id` references the normalized catalog row, and a unique constraint `user_products_user_product_idx` prevents duplicate user-product pairs.
-     - `RemoteDeriveService.getUserProducts()` executes `user_products JOIN products` to hydrate full canonical `UserProduct` objects with nested `Product`.
+     - `RemoteDeriveService.getUserProducts()` executes `user_products JOIN products` to hydrate full canonical `UserProduct` objects; rows lacking that canonical relationship fail closed instead of manufacturing placeholder products.
   5. **Remote Routine Read Assembly [DELIVERED]**:
      - `RemoteDeriveService.getRoutine(userId)` reads `routines` + `routine_items` (ordered by `order_index`), maps headers and steps, partitions into `amSteps` and `pmSteps`, derives `scheduleText`, and returns typed `RoutinePlan`.
      - Kanuj's `hydrateRoutine()` in `src/services/deriveClient.ts` cleanly hydrates this structure into `routineStore`.
@@ -177,6 +179,24 @@ export interface IDeriveService {
   - `recommendedAction`: Next step for the user
   - `safety`: `SafetyClassification`
 
+### S3 Edge Endpoint Binding (Implemented, Client Wiring Pending)
+
+All S3 functions require a valid Supabase bearer token at the gateway and
+re-verify it in the handler. The authenticated UUID is canonical; request-body
+identity cannot select another member's context.
+
+| Edge Function | Contract role | Current behavior |
+| --- | --- | --- |
+| `propose-routine` | `proposeRoutine` | Loads canonical server context, runs/persists a validated `awaiting_review` proposal, and returns `RoutineProposalResult`. Caller-supplied profile/shelf truth is not trusted. |
+| `scan-product` | `scanProduct` | Requires product name/brand context, returns a categorical `ProductScanResult`, and deterministically downgrades conflicts. `imageUri` is not fetched or sent to Gemini in S3. |
+| `ask-derive` | `askDerive` | Enforces request `userId` equality, hard-stops mandatory red flags before model use, and returns `AskResponse`. `photoAttachmentUri` is deliberately excluded from model context. |
+| `infer-ingredient-signals` | Internal S3 operation | Infers and appends owner-readable signal versions from canonical formula/reaction history; it is not an `IDeriveService` client method. |
+
+These endpoints establish the server implementation boundary but do not, by
+themselves, enable the production mobile Remote path. Wiring the existing
+`RemoteDeriveService` methods to them and enabling Remote mode remains a
+coordinated S5/I1 integration change.
+
 ---
 
 ## 3. Safety & Escalation Model
@@ -212,8 +232,8 @@ export interface SafetyClassification {
 - Canonical object paths are `<authenticated-member-uuid>/<photo-type>/<opaque-file-name>`; metadata rows must use the same member-owned prefix.
 - Uploads are immutable: use unique names with `upsert: false`. The mobile client must **never** store or display public S3/Supabase URLs.
 - The mobile client can upload to its own member namespace but cannot list, directly download, sign, replace, or delete photo objects. It also cannot delete photo metadata directly.
-- The future signer must derive identity from the verified JWT, verify that both the metadata row and object path belong to that identity, and issue a signed URL with a 15-minute (900-second) expiration. It must ignore caller-supplied `userId` values for authorization.
-- Full deletion must use the Storage API before deleting the auth/profile record; deleting rows from `storage.objects` or relying on relational cascades would orphan the physical object.
+- `photo-url` is the only customer photo delivery interface. It derives identity from the verified JWT, rejects caller-supplied `userId` or path values, verifies that both the metadata row and canonical object path belong to the caller, and issues a signed URL with an exact 15-minute (900-second) expiration and private/no-store caching.
+- `delete-customer-account` is the destructive lifecycle interface. It requires the exact `DELETE_MY_DERIVE_ACCOUNT` confirmation, rejects caller-supplied identity, recursively inventories and removes the authenticated caller's Storage namespace through the Storage API, verifies the namespace is empty, and deletes the Auth user last. Deleting rows from `storage.objects` directly or relying only on relational cascades is forbidden because it can orphan physical objects.
 
 ---
 
@@ -225,7 +245,7 @@ EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 ```
 The factory in `src/services/DeriveService.ts` then instantiates `RemoteDeriveService` for callers of that factory. Current screens still operate primarily through local Zustand stores, and the remote adapter still lacks complete row-to-domain mapping and live function coverage; therefore this flag alone does **not** make the current app a production-ready remote experience. Client/service wiring requires a coordinated integration slice.
 
-Live Gemini invocation happens only behind `RemoteDeriveService` on the server. `MockDeriveService` uses deterministic local reasoning and never requires a client Gemini key.
+Live model invocation happens only in trusted server Edge Functions. Routine generation resolves a server-configured `RoutineIntelligenceProvider`; scan and Ask currently use the guarded Gemini adapter. `MockDeriveService` uses deterministic local reasoning and never requires a client model key.
 
 ---
 

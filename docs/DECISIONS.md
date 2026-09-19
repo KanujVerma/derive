@@ -109,11 +109,12 @@ Key technical and product decisions accepted for Derive V1.
 * **Iron Oxide Photoprotection**: Detect and highlight iron-oxide benefits (HEV / visible light blocking) ONLY when a member has confirmed post-inflammatory hyperpigmentation tendency (sometimes or often); never infer treatment benefits from pigmentation depth alone.
 * **White Cast Assessment**: Assesses white-cast friction using verified catalog or member observation matched against member cast concern; strictly avoids speculative formula-only prediction algorithms.
 
-### ADR-20: S1A Least-Privilege Supabase Data Plane
-* **Status**: IMPLEMENTED (database policy/config/test layer); full S1 remains in progress.
-* **Decision**: Harden the existing baseline through an additive migration rather than rewriting potentially applied history. Provision Auth profiles through locked-down, Derive-namespaced triggers; revoke implicit `anon`/`authenticated` grants; establish fail-closed defaults for future public objects; grant customers only explicit owner-scoped operations; keep founder/payment/server-generated fields inaccessible; and store photos in one canonical private bucket under member-ID path prefixes.
-* **Signed-URL Boundary**: Customers have no direct photo download/list/sign capability. A trusted server endpoint will issue 900-second signed URLs after JWT and path ownership validation.
-* **Deletion Boundary**: Customers have immutable insert rights but no direct object or photo-metadata deletion rights. A trusted Storage-API-first workflow must delete physical objects before relational metadata/auth state so a partial client request cannot orphan private health data.
+### ADR-20: S1 Least-Privilege Supabase Platform
+* **Status**: IMPLEMENTED; S1 complete.
+* **Decision**: Harden the existing baseline through additive migrations rather than rewriting potentially applied history. Provision Auth profiles through locked-down, Derive-namespaced triggers; revoke implicit `anon`/`authenticated` grants; establish fail-closed defaults for future public objects; grant customers only explicit owner-scoped operations; keep founder/payment/server-generated fields inaccessible; store photos in one canonical private bucket under member-ID path prefixes; and separate public mobile configuration from trusted-runtime secrets.
+* **Signed-URL Boundary**: Customers have no direct photo download/list/sign capability. The JWT-gated `photo-url` Edge Function derives caller identity through `auth.getUser()`, verifies both the metadata row and canonical member-owned path, and issues an exact 900-second signed URL with private/no-store caching.
+* **Deletion Boundary**: Customers have immutable insert rights but no direct object or photo-metadata deletion rights. The JWT-gated `delete-customer-account` Edge Function requires exact confirmation, recursively inventories and removes the authenticated caller's Storage namespace, verifies it is empty, and only then deletes the Auth user so relational cascades cannot orphan private objects.
+* **Environment Boundary**: The mobile bundle contains only the Remote flag, Supabase URL, and publishable key. Service-role, database, model-provider, and CI credentials remain outside `EXPO_PUBLIC_*`; Remote mode fails closed when its public configuration is absent or invalid.
 * **Rationale**: RLS policies and SQL grants are complementary controls. Exact policy-set tests detect permissive drift; explicit remote projections avoid protected-field wildcard failures; and separating immutable upload rights from trusted signing/deletion minimizes accidental exposure and orphaned objects.
 
 ### ADR-21: Founding Beta Concierge Operating Model & $100/Month First-10 Pricing Experiment (Temporary Beta Override)
@@ -188,6 +189,27 @@ Key technical and product decisions accepted for Derive V1.
 * **Remote path**: Real `submit-checkin` Edge Function; Remote `getProgress()` reads `public.check_ins` via RLS. No `get-progress` function. No LLM required. Deterministic server summary only. Remote learned insights and signed check-in photos remain future work.
 * **Safety**: No period tracker. Medication context does not alter prescriptions. No causal copy from a single week's tags.
 
+### ADR-28: Additive, Append-Only Core Domain Persistence (S2)
+* **Status**: IMPLEMENTED; review pending on `sami/s2-core-domain-persistence`.
+* **Decision**: Extend the already-applied baseline schema through additive migrations. Preserve routines, formula snapshots, product reactions, and evolving ingredient evidence as append-only/versioned history rather than mutable current-state rows.
+* **Routine Versioning**: `public.create_routine_version` is a service-only, transaction-safe append operation. A per-member advisory transaction lock allocates the next version; `(user_id, version)` and per-schedule step order are unique. Routine content and routine items reject in-place rewrites, while lifecycle status/publication metadata may progress.
+* **Reaction Provenance**: `public.record_product_reaction` atomically persists an immutable formula snapshot and the linked reaction. Cross-member or cross-product formula links are rejected. Ingredient signals append versions with owner-validated supporting reaction evidence and remain associations, never automatic allergy diagnoses.
+* **Least Privilege**: Members receive owner-only reads for formula, reaction, and ingredient-signal history; sensitive writes and append RPCs remain service-only. Existing owner-scoped insert permissions are extended only for self-reported check-ins, photo provenance, and refill requests.
+* **Remote Mapping**: `RemoteDeriveService.getRoutine()` now maps the latest database routine plus steps into canonical `Routine`, derives schedule copy, and fails closed on missing canonical product identity or unsupported enum values. Refill mutations persist canonical `product_id` and map snake_case records explicitly.
+* **Boundaries**: No UI, shared domain type, membership pricing, Stripe, Gemini, PostHog, or production Remote-flag changes. `ARCHITECTURE_CHALLENGE-01` remains unresolved.
+* **Rationale**: Longitudinal skincare decisions must remain auditable. Reconstructing what the member used, which formula existed, what reaction occurred, and which routine version was active is safer and more useful than destructive updates.
+* **Verification**: Fresh Supabase rebuild; 136/136 pgTAP assertions; schema lint with zero findings; S1 onboarding/photo/deletion regression E2E; S2 live API E2E including a fresh-client persistence read; 110/110 unit tests; both TypeScript checks; and production web export.
+
+### ADR-29: Guarded Server Intelligence & Transactional Model Outputs (S3)
+* **Status**: IMPLEMENTED; review pending on `sami/s3-server-intelligence`.
+* **Decision**: Run routine generation, categorical product scanning, and Ask synthesis only in JWT-gated Supabase Edge Functions. Routine generation remains behind the provider-neutral `RoutineIntelligenceProvider` boundary; scan and Ask currently use a guarded server-side Gemini adapter. Treat every model response as untrusted input: parse it, apply deterministic safety/contract guards, and use service-only database transactions for any persistence.
+* **Identity & Context Boundary**: Each handler re-verifies the bearer token and derives the member UUID from Supabase Auth. Canonical context is assembled server-side from committed intake, profile safety states, prescriptions, routine/shelf state, formula/reaction history, ingredient signals, check-ins, and minimum-necessary photo metadata. Caller-supplied profile truth, cross-member identifiers, Storage paths, signed URLs, local image URIs, and photo bytes are not trusted prompt context.
+* **Safety Boundary**: Mandatory emergency patterns hard-stop `ask-derive` before a model call and create a privacy-minimized urgent review task without transcript content. Structured routine/scan/Ask output is rejected or downgraded when it violates AM/PM active rules, existing prescription schedules, reported sensitivities, conservative pregnancy states, categorical-verdict policy, or non-diagnostic scope.
+* **Persistence Boundary**: `resolve_catalog_product`, the canonical eight-argument `commit_routine_proposal`, `record_product_reaction_once`, and `append_ingredient_signal_versions` are service-role-only operations. There is one canonical routine-plus-shelf transaction; normalized onboarding reactions are idempotent; ingredient evidence appends immutable versions. User-reported reaction formulas remain historical snapshots and are not promoted into trusted catalog facts. Existing version-one routines replay before provider resolution, and founder-only routine notes never cross the customer response boundary.
+* **Inference Semantics**: Multi-product overlap means distinct reacted products, not multiple incidents from one bottle. Tolerated exposures discount naive suspicion. Probabilistic inference cannot create a `confirmed_allergy`; existing explicitly confirmed provenance is preserved.
+* **Operational Boundary**: The root mobile `.env.example` remains public-only. Routine provider configuration (`ROUTINE_MODEL_PROVIDER`) and provider credentials, including `GEMINI_API_KEY` when the Gemini adapter is selected, live only in the trusted function environment or service-role-only runtime configuration. Missing configuration returns sanitized `503` responses rather than deterministic output disguised as live AI. Production Remote mode remains disabled and mobile adapter wiring remains S5/I1.
+* **Verification**: Fresh database rebuild; 187/187 pgTAP assertions; clean schema lint; 143/143 unit tests; application and test TypeScript checks; S1, B2 replay, S2, and S3 authenticated local integration harnesses; and production web export.
+
 ---
 
 ## Open Shared-Contract Challenges (PROPOSED · UNRESOLVED)
@@ -240,12 +262,8 @@ These findings are review evidence, not accepted contract changes. S1A does not 
    - **Deterministic Test Isolation**: Automated CI and local E2E use an isolated `FixtureRoutineProvider` under server configuration to ensure reproducible, zero-cost, network-independent verification.
    - **Optional Gemini Adapter**: `GeminiRoutineProvider` serves as an evaluation adapter, strictly requiring header-based authentication (`x-goog-api-key`, zero API key leakage in URL query parameters) and structured JSON outputs conforming to canonical domain types.
 4. **Resolution Required**: When founders conduct model evaluation, select a permanent production model provider, configure server secrets, and deploy the corresponding adapter.
-
 ### ARCHITECTURE_CHALLENGE_NATIVE_DICTATION: Production Must Not Inject Demo Transcripts [RECORDED IN I1-B4B]
 1. **Status**: PARTIALLY MITIGATED (I1-B4B). True native iOS/Android speech recognition is not an accepted architecture in this pass. Web Speech API remains available on web.
 2. **Prior risk**: `useVoiceDictation` emitted canned `CONTEXT_SAMPLES` when native recognition was unavailable, which would have inserted fake text into production check-ins.
 3. **Mitigation implemented**: demo transcripts emit only when `__DEV__` is true. Production unsupported platforms keep typed input and do not start a fake listening session.
 4. **Remaining**: a future native transcription path requires an explicit architecture decision and accepted dependency. B4B persistence is not blocked on it.
-
-
-

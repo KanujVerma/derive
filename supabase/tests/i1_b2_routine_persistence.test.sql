@@ -123,23 +123,25 @@ select lives_ok(
   'Server can insert routine in awaiting_review status'
 );
 
--- 6. routines.updated_at trigger works
-select lives_ok(
+-- 6. S2 hardening keeps generated routine snapshots immutable
+select throws_ok(
   $$
     update public.routines
     set summary_sentence = 'Updated barrier-supportive routine summary.'
     where id = 'd1111111-1111-1111-1111-111111111111';
   $$,
-  'Can update routine row'
+  'P0001',
+  'Routine snapshots are immutable; create a new routine version',
+  'Existing routine snapshots cannot be edited in place'
 );
 
 select ok(
   (
-    select updated_at > created_at
+    select updated_at = created_at
     from public.routines
     where id = 'd1111111-1111-1111-1111-111111111111'
   ),
-  'routines.updated_at trigger automatically advances updated_at on modification'
+  'Rejected updates leave the immutable routine timestamp unchanged'
 );
 
 -- 7. Version-1 duplicate protection (unique user_id, version)

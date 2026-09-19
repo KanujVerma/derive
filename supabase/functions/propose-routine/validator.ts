@@ -27,6 +27,8 @@ export const VALID_CATEGORIES = new Set<string>([
 export const VALID_ACTIONS = new Set<string>(['KEEP', 'PAUSE', 'REPLACE', 'ADD', 'STOP']);
 export const VALID_DAYS = new Set<string>(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
 
+const PROHIBITED_ROUTINE_CLAIMS = /\b(?:ai dermatologist|diagnos(?:e|is|ed)|cure[sd]?|guarante(?:e|ed|es)|you (?:have|definitely have) (?:eczema|rosacea|psoriasis|melanoma|dermatitis|cystic acne))\b/i;
+
 export const RETINOID_TERMS = [
   'adapalene',
   'differin',
@@ -40,6 +42,32 @@ export const RETINOID_TERMS = [
 
 export const CONTRAINDICATED_PREGNANCY_TERMS = [...RETINOID_TERMS, 'hydroquinone'];
 
+const DAY_ALIASES: Record<string, DayOfWeek> = {
+  mon: 'mon', monday: 'mon',
+  tue: 'tue', tues: 'tue', tuesday: 'tue',
+  wed: 'wed', wednesday: 'wed',
+  thu: 'thu', thur: 'thu', thurs: 'thu', thursday: 'thu',
+  fri: 'fri', friday: 'fri',
+  sat: 'sat', saturday: 'sat',
+  sun: 'sun', sunday: 'sun',
+};
+
+function normalizedDaySet(days: DayOfWeek[]): string {
+  return [...new Set(days)].sort().join(',');
+}
+
+export function parsePrescriptionDays(prescription: string): DayOfWeek[] {
+  const tokens = (prescription.toLowerCase().match(/\b(?:mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/g) ?? []);
+  return [...new Set(tokens.map((token) => DAY_ALIASES[token]).filter(Boolean))];
+}
+
+export function isHighStrengthSalicylic(name: string, actives: string[] = []): boolean {
+  const values = [name, ...actives].map((value) => (value ?? '').toLowerCase());
+  return values.some((value) =>
+    /(?:\b2(?:\.0+)?\s*%\s*salicylic\b|\bsalicylic(?:\s+acid)?[^,;]{0,24}\b2(?:\.0+)?\s*%)/i.test(value)
+  );
+}
+
 export function isRetinoid(name: string, actives: string[] = []): boolean {
   const lower = (name ?? '').toLowerCase();
   if (RETINOID_TERMS.some((term) => lower.includes(term))) return true;
@@ -48,12 +76,18 @@ export function isRetinoid(name: string, actives: string[] = []): boolean {
   );
 }
 
+function retinoidTerms(name: string, actives: string[] = []): string[] {
+  const haystack = [name, ...actives].map((value) => (value ?? '').toLowerCase()).join(' ');
+  return RETINOID_TERMS.filter((term) => haystack.includes(term));
+}
+
 export function isContraindicatedInPregnancy(name: string, actives: string[] = []): boolean {
   const lower = (name ?? '').toLowerCase();
   if (CONTRAINDICATED_PREGNANCY_TERMS.some((term) => lower.includes(term))) return true;
-  return (actives || []).some((active) =>
+  if ((actives || []).some((active) =>
     CONTRAINDICATED_PREGNANCY_TERMS.some((term) => (active ?? '').toLowerCase().includes(term))
-  );
+  )) return true;
+  return isHighStrengthSalicylic(name, actives);
 }
 
 export function isSunscreen(name: string, category?: string): boolean {
@@ -92,10 +126,14 @@ export function validateRoutineProposal(
     errors.push('Proposal summarySentence must be a non-empty string.');
   }
 
-  const isPregnancyConcern = context?.isPregnantOrNursing === true || context?.pregnancyStatus === 'yes';
+  const isPregnancyConcern =
+    context?.isPregnantOrNursing === true ||
+    context?.pregnancyStatus === 'yes' ||
+    context?.pregnancyStatus === 'unanswered' ||
+    context?.pregnancyStatus === 'prefer_not_to_say';
 
   // 1. Validate catalogProducts
-  const catalogMap = new Set<string>();
+  const catalogMap = new Map<string, RoutineIntelligenceProposal['catalogProducts'][number]>();
   for (const prod of proposal.catalogProducts || []) {
     if (!prod.brand || typeof prod.brand !== 'string' || prod.brand.trim().length === 0) {
       errors.push('Catalog product brand cannot be empty.');
@@ -107,15 +145,25 @@ export function validateRoutineProposal(
       errors.push(`Catalog product category '${prod.category}' is not a valid ProductCategory.`);
     }
     if (prod.brand && prod.name) {
-      catalogMap.add(`${prod.brand.trim().toLowerCase()}::${prod.name.trim().toLowerCase()}`);
+      const key = `${prod.brand.trim().toLowerCase()}::${prod.name.trim().toLowerCase()}`;
+      if (catalogMap.has(key)) errors.push(`Catalog product '${prod.brand} ${prod.name}' is duplicated.`);
+      catalogMap.set(key, prod);
     }
   }
 
   // 2. Validate amSteps
+  const amOrders = new Set<number>();
   for (let i = 0; i < (proposal.amSteps || []).length; i++) {
     const step = proposal.amSteps[i];
     const prodName = step.productName ?? (step as any).product_name ?? '';
     const timing = step.timing;
+    const key = `${(step.brand || '').trim().toLowerCase()}::${prodName.trim().toLowerCase()}`;
+    const keyActives = catalogMap.get(key)?.keyActives || [];
+
+    if (!Number.isInteger(step.order) || step.order < 1 || amOrders.has(step.order)) {
+      errors.push(`AM step '${prodName}' must have a unique positive integer order.`);
+    }
+    amOrders.add(step.order);
 
     if (timing !== 'am') {
       errors.push(`Step '${prodName}' in amSteps has timing '${timing}', expected 'am'.`);
@@ -124,11 +172,11 @@ export function validateRoutineProposal(
       errors.push(`AM step '${prodName}' has invalid category '${step.category}'.`);
     }
     // Retinoid PM Invariant
-    if (isRetinoid(prodName, (step as any).keyActives || [])) {
+    if (isRetinoid(prodName, keyActives)) {
       errors.push(`Active retinoid invariant: Retinoid (${prodName}) must NOT be in the AM routine.`);
     }
     // Pregnancy Contraindication Invariant
-    if (isPregnancyConcern && isContraindicatedInPregnancy(prodName, (step as any).keyActives || [])) {
+    if (isPregnancyConcern && isContraindicatedInPregnancy(prodName, keyActives)) {
       errors.push(`Pregnancy safety invariant: Contraindicated active (${prodName}) must NOT be in the routine.`);
     }
     // Days Invariant
@@ -142,17 +190,24 @@ export function validateRoutineProposal(
       errors.push(`AM step ${i + 1} is missing one or more required fields (brand, productName, amount, area, purpose, whyChosen).`);
     }
     // Catalog linkage
-    const key = `${(step.brand || '').trim().toLowerCase()}::${prodName.trim().toLowerCase()}`;
     if (!catalogMap.has(key)) {
       errors.push(`AM step '${prodName}' by '${step.brand}' is missing from catalogProducts.`);
     }
   }
 
   // 3. Validate pmSteps
+  const pmOrders = new Set<number>();
   for (let i = 0; i < (proposal.pmSteps || []).length; i++) {
     const step = proposal.pmSteps[i];
     const prodName = step.productName ?? (step as any).product_name ?? '';
     const timing = step.timing;
+    const key = `${(step.brand || '').trim().toLowerCase()}::${prodName.trim().toLowerCase()}`;
+    const keyActives = catalogMap.get(key)?.keyActives || [];
+
+    if (!Number.isInteger(step.order) || step.order < 1 || pmOrders.has(step.order)) {
+      errors.push(`PM step '${prodName}' must have a unique positive integer order.`);
+    }
+    pmOrders.add(step.order);
 
     if (timing !== 'pm') {
       errors.push(`Step '${prodName}' in pmSteps has timing '${timing}', expected 'pm'.`);
@@ -165,7 +220,7 @@ export function validateRoutineProposal(
       errors.push(`Sunscreen invariant: Sunscreen (${prodName}) cannot be in the PM routine.`);
     }
     // Pregnancy Contraindication Invariant
-    if (isPregnancyConcern && isContraindicatedInPregnancy(prodName, (step as any).keyActives || [])) {
+    if (isPregnancyConcern && isContraindicatedInPregnancy(prodName, keyActives)) {
       errors.push(`Pregnancy safety invariant: Contraindicated active (${prodName}) must NOT be in the routine.`);
     }
     // Days Invariant
@@ -179,7 +234,6 @@ export function validateRoutineProposal(
       errors.push(`PM step ${i + 1} is missing one or more required fields (brand, productName, amount, area, purpose, whyChosen).`);
     }
     // Catalog linkage
-    const key = `${(step.brand || '').trim().toLowerCase()}::${prodName.trim().toLowerCase()}`;
     if (!catalogMap.has(key)) {
       errors.push(`PM step '${prodName}' by '${step.brand}' is missing from catalogProducts.`);
     }
@@ -188,6 +242,8 @@ export function validateRoutineProposal(
   // 4. Validate productDecisions
   for (const dec of proposal.productDecisions || []) {
     const prodName = dec.productName ?? (dec as any).product_name ?? '';
+    const key = `${(dec.brand || '').trim().toLowerCase()}::${prodName.trim().toLowerCase()}`;
+    const keyActives = catalogMap.get(key)?.keyActives || [];
     if (!VALID_ACTIONS.has(dec.action)) {
       errors.push(`Product decision for '${prodName}' has invalid action '${dec.action}'.`);
     }
@@ -198,9 +254,57 @@ export function validateRoutineProposal(
     if (!reason || reason.trim().length === 0) {
       errors.push(`Product decision for '${prodName}' must include a non-empty actionReason.`);
     }
-    if (isPregnancyConcern && isContraindicatedInPregnancy(prodName) && dec.action === 'KEEP') {
+    if (!catalogMap.has(key)) {
+      errors.push(`Product decision '${prodName}' by '${dec.brand}' is missing from catalogProducts.`);
+    }
+    if (
+      isPregnancyConcern &&
+      isContraindicatedInPregnancy(prodName, keyActives) &&
+      dec.action !== 'PAUSE' &&
+      dec.action !== 'STOP'
+    ) {
       errors.push(`Pregnancy safety invariant: Contraindicated active (${prodName}) must be PAUSE or STOP during pregnancy.`);
     }
+  }
+
+  // 5. Existing active prescriptions are safety context, not recommendations.
+  // Recognized retinoid schedules must be preserved exactly; if a schedule is
+  // not explicit, the model must ask for clarification rather than invent it.
+  for (const prescription of context?.activePrescriptions || []) {
+    if (!isRetinoid(prescription)) continue;
+
+    const prescribedDays = parsePrescriptionDays(prescription);
+    const prescribedTerms = retinoidTerms(prescription);
+    if (prescribedDays.length === 0) {
+      errors.push(`Prescription safety invariant: Schedule for '${prescription}' cannot be verified.`);
+      continue;
+    }
+
+    const matchingSteps = (proposal.pmSteps || []).filter((step) =>
+      retinoidTerms(
+        `${step.brand || ''} ${step.productName ?? (step as any).product_name ?? ''}`,
+        catalogMap.get(`${(step.brand || '').trim().toLowerCase()}::${(step.productName ?? (step as any).product_name ?? '').trim().toLowerCase()}`)?.keyActives || [],
+      ).some((term) => prescribedTerms.includes(term))
+    );
+    if (matchingSteps.length !== 1) {
+      errors.push(`Prescription safety invariant: Active prescription '${prescription}' must appear exactly once in the PM routine.`);
+      continue;
+    }
+
+    const proposedDays = matchingSteps[0].days || [];
+    if (normalizedDaySet(proposedDays) !== normalizedDaySet(prescribedDays)) {
+      errors.push(`Prescription safety invariant: Active prescription schedule for '${prescription}' was changed.`);
+    }
+  }
+
+  const customerFacingText = [
+    proposal.summarySentence,
+    ...(proposal.amSteps || []).flatMap((step) => [step.purpose, step.whyChosen, step.watchFor || '']),
+    ...(proposal.pmSteps || []).flatMap((step) => [step.purpose, step.whyChosen, step.watchFor || '']),
+    ...(proposal.productDecisions || []).map((decision) => decision.actionReason),
+  ].join(' ');
+  if (PROHIBITED_ROUTINE_CLAIMS.test(customerFacingText)) {
+    errors.push('Scope safety invariant: Routine content cannot diagnose, claim clinical identity, cure, or guarantee outcomes.');
   }
 
   return {

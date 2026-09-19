@@ -20,8 +20,8 @@ cd derive
 # 2. Install dependencies
 npm install
 
-# 3. Environment configuration
-cp .env.example .env
+# 3. Environment configuration (fill only the mobile-client section)
+cp .env.example .env.local
 
 # 4. Run test suite & strict typecheck
 npm test
@@ -50,6 +50,8 @@ npx supabase test db
 
 Before linking a hosted project, confirm its PostgreSQL major version matches
 `supabase/config.toml`. Never run a linked reset against production.
+See [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) for the public-client,
+developer/CI, and trusted-server credential boundaries.
 
 ---
 
@@ -93,6 +95,7 @@ Before beginning substantial feature work, consult the core documentation:
 * [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md): Strategic context, target customers, Founding Beta concierge operating model, and business hypotheses.
 * [`docs/PRODUCT.md`](docs/PRODUCT.md): Full product specification, navigation, autopilot vs. depth philosophy, baseline photo capture, and care loop.
 * [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md): Granular file ownership and contract change rules.
+* [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md): Environment-variable inventory, credential boundaries, and safe Supabase setup workflow.
 * [`docs/ROADMAP.md`](docs/ROADMAP.md): Independent sprint milestones (K1–K5 and S1–S5).
 * [`docs/INTERFACES.md`](docs/INTERFACES.md): Runtime contract specifications, error models, and semantic requirements for backend evolution.
 * [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): System topology, security boundaries, and data flow.

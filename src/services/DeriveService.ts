@@ -7,6 +7,7 @@
  */
 
 import type { IDeriveService } from '../contracts/DeriveService.ts';
+import { publicEnvironment } from '../config/environment.ts';
 import { MockDeriveService } from './mock/MockDeriveService.ts';
 import { RemoteDeriveService } from './remote/RemoteDeriveService.ts';
 
@@ -14,8 +15,9 @@ let serviceInstance: IDeriveService | null = null;
 
 export function getDeriveService(): IDeriveService {
   if (!serviceInstance) {
-    const useRemote = process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE === 'true';
-    serviceInstance = useRemote ? new RemoteDeriveService() : new MockDeriveService();
+    serviceInstance = publicEnvironment.useRemoteService
+      ? new RemoteDeriveService()
+      : new MockDeriveService();
   }
   return serviceInstance;
 }
@@ -24,7 +26,7 @@ export function isRemoteServiceEnabled(): boolean {
   if (serviceInstance) {
     return serviceInstance instanceof RemoteDeriveService;
   }
-  return process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE === 'true';
+  return publicEnvironment.useRemoteService;
 }
 
 /**

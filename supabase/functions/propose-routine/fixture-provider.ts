@@ -12,7 +12,7 @@ import type {
   RoutineProposalProductDecision,
   RoutineProposalStep,
 } from './types.ts';
-import { isRetinoid, isSunscreen } from './validator.ts';
+import { isRetinoid, isSunscreen, parsePrescriptionDays } from './validator.ts';
 
 export class FixtureRoutineProvider implements RoutineIntelligenceProvider {
   readonly providerId = 'fixture';
@@ -30,7 +30,11 @@ export class FixtureRoutineProvider implements RoutineIntelligenceProvider {
 export function createDeterministicTestProposal(
   context: AssembledRoutineContext
 ): RoutineIntelligenceProposal {
-  const isPregnant = context.isPregnantOrNursing || context.pregnancyStatus === 'yes';
+  const isPregnancyConcern =
+    context.isPregnantOrNursing ||
+    context.pregnancyStatus === 'yes' ||
+    context.pregnancyStatus === 'unanswered' ||
+    context.pregnancyStatus === 'prefer_not_to_say';
   const hasPihSignal = context.pihTendencyAnswer === 'Often' || context.pihTendencyAnswer === 'Sometimes';
 
   const productDecisions: RoutineProposalProductDecision[] = [];
@@ -53,7 +57,7 @@ export function createDeterministicTestProposal(
     let frequency = 7;
 
     if (isActRet) {
-      if (isPregnant) {
+      if (isPregnancyConcern) {
         action = 'PAUSE';
         actionReason = 'Pause during pregnancy and nursing. Retinoids are clinically contraindicated.';
         frequency = 0;
@@ -184,6 +188,14 @@ export function createDeterministicTestProposal(
     }
   };
 
+  for (const product of context.confirmedProducts) {
+    addCatalog({
+      brand: product.brand,
+      name: product.name,
+      category: (product.category || 'other') as ProductCategory,
+      keyActives: product.keyActives || [],
+    });
+  }
   addCatalog(effectiveCleanser);
   addCatalog(effectiveMoisturizer);
   addCatalog(effectiveSunscreen);
@@ -246,7 +258,9 @@ export function createDeterministicTestProposal(
     whyChosen: 'Thorough evening cleanse to dissolve daily sunscreen and environmental particulates.',
   });
 
-  if (!isPregnant && userRetinoid) {
+  if (!isPregnancyConcern && userRetinoid) {
+    const prescription = context.activePrescriptions.find((item) => isRetinoid(item));
+    const prescriptionDays = prescription ? parsePrescriptionDays(prescription) : [];
     addCatalog(userRetinoid);
     pmSteps.push({
       order: pmOrder++,
@@ -256,7 +270,7 @@ export function createDeterministicTestProposal(
       category: 'treatment',
       amount: 'Pea-sized amount',
       area: 'Entire face avoiding eye contours and corners of mouth',
-      days: ['mon', 'wed', 'fri'],
+      days: prescription ? prescriptionDays : ['mon', 'wed', 'fri'],
       purpose: 'Targeted Cellular Renewal',
       whyChosen: 'Scheduled 3 nights/week to provide cell turnover with built-in barrier recovery nights.',
       watchFor: 'Mild tingling or initial flaking. Buffer with moisturizer if needed.',
@@ -276,11 +290,18 @@ export function createDeterministicTestProposal(
     whyChosen: 'Overnight lipid replenishment to reinforce barrier recovery during sleep.',
   });
 
-  const summarySentence = isPregnant
+  const summarySentence = isPregnancyConcern
     ? `Pregnancy-safe barrier-supportive routine focused on ${context.primaryGoal.replace(/_/g, ' ')} with gentle hydration and daily UV defense.`
     : userRetinoid
     ? `Targeted 3-night active routine balancing cellular renewal with barrier protection for ${context.primaryGoal.replace(/_/g, ' ')}.`
     : `Balanced barrier-stabilizing routine designed for ${context.primaryGoal.replace(/_/g, ' ')} and ${context.middayFeel} skin comfort.`;
+
+  const unresolvedPrescription = context.activePrescriptions.find((item) =>
+    isRetinoid(item) && (
+      !userRetinoid ||
+      parsePrescriptionDays(item).length === 0
+    )
+  );
 
   return {
     summarySentence,
@@ -288,5 +309,8 @@ export function createDeterministicTestProposal(
     amSteps,
     pmSteps,
     catalogProducts,
+    clarificationQuestions: unresolvedPrescription
+      ? ['Please confirm the exact product and prescribed days for your active retinoid before a routine is generated.']
+      : undefined,
   };
 }

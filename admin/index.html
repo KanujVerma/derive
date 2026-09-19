@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Derive · Founder Operations</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23345447'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Georgia' font-size='30' fill='white'%3ED%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+    <main id="root" class="site-shell" aria-live="polite">
+      <section id="login-view" class="login-card">
+        <div class="wordmark"><span>D</span> DERIVE</div>
+        <p class="eyebrow">FOUNDER OPERATIONS</p>
+        <h1>Quiet control for the care loop.</h1>
+        <p class="subtle">Review what needs judgment. Move fulfillment forward. Keep every sensitive action accountable.</p>
+        <form id="login-form" class="stack">
+          <label>Email<input id="email" type="email" autocomplete="username" required /></label>
+          <label>Password<input id="password" type="password" autocomplete="current-password" required /></label>
+          <button class="primary" type="submit">Sign in securely</button>
+          <p id="login-error" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="console-view" class="console hidden">
+        <header class="topbar">
+          <div><div class="wordmark"><span>D</span> DERIVE</div><p>Founder operations</p></div>
+          <div class="header-actions"><span id="founder-role" class="role-pill"></span><button id="refresh" class="ghost">Refresh</button><button id="logout" class="ghost">Sign out</button></div>
+        </header>
+        <section id="status-banner" class="status-banner hidden" role="status"></section>
+        <section id="metrics" class="metrics"></section>
+        <nav class="section-nav" aria-label="Operations queues">
+          <button data-view="safety" class="active">Safety</button>
+          <button data-view="routines">Routines</button>
+          <button data-view="refills">Refills</button>
+          <button data-view="formulas">Formulas</button>
+        </nav>
+        <section id="queue" class="queue"></section>
+      </section>
+    </main>
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-panel"><button class="modal-close" data-close-modal aria-label="Close">×</button><div id="modal-content"></div></div>
+    </div>
+    <script src="./config.js"></script>
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>

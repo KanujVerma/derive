@@ -155,12 +155,13 @@ You formulate evidence-grounded, personalized daily skincare routines based stri
 DETERMINISTIC CLINICAL INVARIANTS YOU MUST STRICTLY OBEY:
 1. SUNSCREEN AM INVARIANT: Sunscreen steps MUST ONLY appear in the morning ('amSteps'). Sunscreens must NEVER appear in the evening ('pmSteps').
 2. RETINOID PM INVARIANT: Topical retinoids (adapalene, tretinoin, retinol, retinal, tazarotene, trifarotene) MUST ONLY appear in the evening ('pmSteps') on a recovery schedule (e.g. 3 nights per week). Retinoids must NEVER appear in the morning ('amSteps').
-3. PREGNANCY & NURSING CONTRAINDICATION: If the member is pregnant or nursing (isPregnantOrNursing is true or pregnancyStatus is 'yes'), topical retinoids and hydroquinone are strictly contraindicated. Any shelf retinoid must be marked PAUSE with an explicit pregnancy contraindication reason, and no retinoids may appear in the proposed routine.
+3. PREGNANCY & NURSING CONTRAINDICATION: If the member is pregnant or nursing, or pregnancyStatus is 'unanswered' or 'prefer_not_to_say', do not introduce retinoids, hydroquinone, or explicitly high-strength salicylic acid. Any shelf retinoid must be marked PAUSE with a clear safety reason. Ask for clarification instead of guessing a safety-critical status.
 4. SENSITIVITY PROTECTION: Never recommend or add products containing ingredients matching the member's known sensitivities.
 5. PRESERVE WORKING SHELF PRODUCTS: Prioritize keeping compatible barrier products already on the member's shelf (action: 'KEEP').
 6. REMOVE HARSH ABRASIVES: Physical scrubs (apricot scrubs, walnut shell) and drying astringents (high alcohol denat) must be marked PAUSE or STOP to preserve barrier lipids.
 7. PHOTOPROTECTION RATIONALE: If the member has dark spots or reports PIH tendency (pihTendency is 'Often' or 'Sometimes'), emphasize diligent daily photoprotection in the sunscreen rationale to prevent UV-mediated reactive hyperpigmentation.
-8. PROPOSALS ARE NOT PRODUCT DATABASES: Only propose brand, productName, category, and keyActives. Do not invent pricing or full ingredient lists.`;
+8. PROPOSALS ARE NOT PRODUCT DATABASES: Only propose brand, productName, category, and keyActives. Do not invent pricing or full ingredient lists.
+9. PRESCRIPTION PRESERVATION: Never start, stop, substitute, or reschedule a prescription. If an active prescription has an explicit schedule, reproduce it exactly in the PM routine. If its identity or schedule is unclear, return a clarification question instead of generating a routine.`;
 
 export function buildGeminiPrompt(context: AssembledRoutineContext): string {
   return JSON.stringify({

@@ -1,15 +1,15 @@
 /**
  * Server-Side Initial Routine Intelligence & Deterministic Validation
- * 
+ *
  * Part of DERIVE I1-B2.1: Real Model Intelligence, Trust Semantics & Error-Boundary Closure.
- * 
- * Single source of truth for routine intelligence types, validation, and Gemini integration.
- * In production: Orchestrated via Supabase Edge Function with Gemini structured output.
+ *
+ * Single source of truth for routine intelligence types, validation, and provider integration.
+ * In production: Orchestrated via a Supabase Edge Function and a server-selected provider.
  * In tests: Deterministic fixture factories provide verified test proposals.
- * 
+ *
  * Rules:
- * - Production proposal is formulated via real Gemini structured outputs.
- * - Zero client secrets or Gemini API keys in the mobile bundle.
+ * - Production proposal generation is provider-neutral and server configured.
+ * - Zero provider secrets or API keys in the mobile bundle.
  * - Deterministic validation enforces AM/PM invariants, pregnancy contraindications, and action enums.
  */
 

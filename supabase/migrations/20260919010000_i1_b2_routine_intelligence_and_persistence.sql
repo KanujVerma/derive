@@ -257,4 +257,3 @@ grant execute on function public.commit_routine_proposal to service_role;
 
 -- 8. Grant select on newly added routine columns to authenticated (founder_notes remains founder-only)
 grant select (updated_at) on table public.routines to authenticated;
-

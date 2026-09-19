@@ -1,16 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { publicEnvironment } from '../config/environment.ts';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  '';
+const { supabaseUrl, supabasePublishableKey } = publicEnvironment;
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+  ? createClient(supabaseUrl, supabasePublishableKey, {
       auth: {
         storage: AsyncStorage,
         autoRefreshToken: true,
@@ -35,33 +32,5 @@ export function startAuthAutoRefresh(): void {
 export function stopAuthAutoRefresh(): void {
   if (supabase) {
     supabase.auth.stopAutoRefresh();
-  }
-}
-
-/**
- * Storage helper for private photo upload.
- * Strictly respects INSERT-only RLS policy on customer-skin-photos bucket (upsert: false).
- */
-export async function uploadPrivatePhoto(
-  uri: string,
-  bucket: string,
-  path: string
-): Promise<{ path: string; error: Error | null }> {
-  if (!isSupabaseConfigured || !supabase) {
-    // In mock mode, return the local file URI directly
-    return { path: uri, error: null };
-  }
-
-  try {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const { data, error } = await supabase.storage.from(bucket).upload(path, blob, {
-      upsert: false,
-    });
-    if (error) throw error;
-    return { path: data.path, error: null };
-  } catch (err: any) {
-    console.error('Photo upload failed:', err);
-    return { path: uri, error: err };
   }
 }
