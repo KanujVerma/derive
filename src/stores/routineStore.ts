@@ -88,6 +88,7 @@ export function getArthurDemoRoutineState() {
         irritation: 'none' as const,
         adherence: 'yes' as const,
         notes: 'Skin felt comfortable. No redness from Differin.',
+        contextTags: [],
         aiAnalysisSentence: 'Good adherence. Differin on Monday, Wednesday, and Friday is performing well.',
         adjustmentProposed: false,
         createdAt: '2026-09-08T10:00:00Z',
@@ -287,6 +288,7 @@ export const useRoutineStore = create<RoutineState>((set, get) => ({
     set((state) => {
       const newCheckIn: CheckIn = {
         ...data,
+        contextTags: data.contextTags ?? [],
         id: `ci_${Date.now()}`,
         createdAt: new Date().toISOString(),
       };

@@ -51,6 +51,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
   - **Preserve Working Products**: Existing counter products that already work are retained (`KEEP`).
   - **Refills by Need, Not Calendar Theater**: Same-SKU refills may stay low-friction; new SKUs require explicit consent.
   - **Prescriptions Are Contextual Only**.
+  - **Weekly check-in context (I1-B4B)**: optional tags + one note are history for comparison, not proven causes. No food diary or period tracker.
   - **Commercial Independence**: Monetization must not silently change recommendations.
 * **Historical (do not delete)**: ADR-21 $100/month all-in/products-included experiment; ADR-10 $129; ADR-15 Arthur $96/mo routine-derived prototype. All superseded as commercial direction.
 * **Long-Term Commerce**: Stripe membership checkout in S5. Separate product commerce v0 after membership. Full Shop later / evidence-driven. No sixth tab.

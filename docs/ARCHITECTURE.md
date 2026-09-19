@@ -68,7 +68,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
   - `expo-camera` / viewfinder for shelf scanning and zero-shutter continuous barcode scanning.
   - Native Swift face capture module (`modules/derive-face-capture/`) utilizing Apple's `Vision.framework` with a deterministic 750ms hold state machine (`AutoCaptureStateMachine.ts`).
   - `expo-haptics` for tactile confirmations.
-  - Native Web Speech API / native voice dictation for hands-free notes.
+  - Native Web Speech API on web for hands-free notes. Production native platforms do not inject canned demo transcripts; typed input remains available (`ARCHITECTURE_CHALLENGE_NATIVE_DICTATION`).
 
 ---
 
@@ -92,6 +92,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
     - Errors are sanitized: mobile clients receive stable error codes (`UNAUTHORIZED`, `INVALID_PAYLOAD`, `PHOTO_VERIFICATION_FAILED`, `NO_ACTIVE_DRAFT`, `ONBOARDING_COMMIT_FAILED`) without database or schema internals leakage.
     - `prepare-onboarding`: Resumes existing committed intake if already finalized (avoiding duplicate drafts on lost responses), or re-queries active draft upon concurrent insert races (`23505`), returning upload targets with storage presence flags.
     - `onboard-customer`: Checks for already-committed state and replays canonical result idempotently without re-writing rows; otherwise validates storage presence and delegates to `commit_onboarding_intake`.
+    - `submit-checkin` (I1-B4B): Authenticated weekly check-in persistence. Handler-level `auth.getUser()` is authoritative. Spoofed `userId` fails closed. No LLM/provider call. `ai_analysis_sentence` is a bounded deterministic status summary from skin state, irritation, and adherence — never a causal claim from lifestyle tags.
   - **Private Photo Upload Pipeline (`src/services/onboardingPhotoUpload.ts`)**: Direct upload to private `customer-skin-photos` at server-issued paths with `upsert: false`. Zero public URLs and zero local URIs persisted.
   - **Canonical Bootstrap Coordination & Post-Submit Routing**: `10-summary.tsx` invokes the production coordinator `resolveCustomerBootstrap(activeUserId)` rather than querying raw backend state. Transitions to the application occur only when `useBootstrapStore` reaches `status === 'READY'`, letting root route gating maintain canonical navigation truth.
   - **Truthful Status Semantics (`pending_generation` vs `awaiting_review`)**: When `proposedRoutine === null` and `initialRoutineState === 'pending_generation'`, `isPlanUnderReview` is strictly `false` and copy reads "Your routine is being prepared." Only when a routine is proposed and `initialRoutineState === 'awaiting_review'` does `isPlanUnderReview` become `true` with "Final review" copy. Routine generation is strictly deferred to I1-B2.
@@ -168,6 +169,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 * **Lifecycle**: Webhook events (`customer.subscription.created`, `invoice.payment_succeeded`) update the member's `memberships` status in Supabase.
 * **Membership vs products**: Membership does not include products. Product commerce is separate (Plan → Products, Orders, Refill as near-term entry points). Full Shop and a sixth tab are deferred.
 * **Identity**: Canonical default is `founding_beta` (I1-B4A additive migration from historical `founding_beta_129`).
+* **Weekly check-in persistence (I1-B4B)**: `public.check_ins` stores optional `context_tags` / `context_note`, nullable `adherence`, and nullable historical `primary_goal`. Remote progress reads this table through owner RLS. There is no `get-progress` function. Remote `learnedInsights` stay empty until S3 creates durable insight persistence. Remote `recentPhotos` stay empty until a JWT-bound signer exists; private storage paths are never returned as customer URLs.
 * **Historical**: $100 all-in/products-included (ADR-21), $129 identity (ADR-10), routine-derived $96 Arthur prototype (ADR-15) are superseded as commercial direction.
 
 ---

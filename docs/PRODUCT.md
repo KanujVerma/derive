@@ -58,7 +58,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 
 ### 5. Progress ("Longitudinal skin record")
 - **100% AI-Led Longitudinal Care Loop**: Weekly check-ins are fully automated through intelligent AI assessment of skin state, barrier comfort, and product tolerance. Derive dynamically updates schedules, generates learned insights, and adapts routines without requiring recurring manual founder calls.
-- **Weekly Check-In Card**: ~30-second structured check-in (skin state, irritation, adherence, optional notes). **Implemented today:** conditional single-select `CHANGE_REASONS` is local UI only and is not persisted. **Approved I1-B4B (not implemented):** optional multi-select context tags + one optional context note every check-in; tags are context, not causation.
+- **Weekly Check-In Card**: ~30-second structured check-in (skin outcome, adherence, irritation, optional multi-select context tags, one optional context note). **Implemented (I1-B4B):** tags are context, not causation; empty selection is valid; one note covers all selected tags. No food diary. `cycle` is not a period tracker.
 - **Photo Comparison**: Side-by-side baseline vs. latest photo comparison across Front, Left, and Right angles using full-width `SegmentedControl` with friendly dates (`Sep 1`, `Sep 8`, `Sep 15`).
 - **Learned Insights**: Plain-English observations with clear provenance labels (`From your check-ins`, `From your routine history`).
 - **Timeline Events**: Milestone log of routine changes and barrier developments.

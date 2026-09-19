@@ -1698,6 +1698,7 @@ import {
   RemoteDeriveService,
   mapDbBootstrapState,
   mapDbCustomerProfile,
+  mapDbCheckIn,
 } from '../src/services/remote/RemoteDeriveService.ts';
 import type { IDeriveService } from '../src/contracts/DeriveService.ts';
 import type {
@@ -1858,6 +1859,8 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
           skinState: input.skinState,
           irritation: input.irritation,
           adherence: input.adherence || 'yes',
+          contextTags: input.contextTags ?? [],
+          contextNote: input.contextNote,
           aiAnalysisSentence: 'Remote analysis recorded.',
           adjustmentProposed: false,
           createdAt: new Date().toISOString(),
@@ -6820,4 +6823,316 @@ test('I1-B3.1 Session Reset Invalidates Stale Projections: clears maps and incre
   assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, false);
   assert.equal(useRoutineStore.getState().routine, null);
   assert.equal(useRoutineStore.getState().planHydrationStatus, 'idle');
+});
+
+// ========================================================
+// I1-B4B WEEKLY CHECK-IN CONTEXT MODEL
+// ========================================================
+
+import {
+  CheckInContextTagSchema,
+  CHECK_IN_CONTEXT_TAGS,
+  CheckInContextTagLabels,
+} from '../src/types/schema.ts';
+import {
+  authorCheckInAnalysis,
+  buildCheckInSubmission,
+  CHECK_IN_NOTE_MAX_LENGTH,
+  containsForbiddenCausalCheckInCopy,
+  formatCheckInContextLine,
+  isCheckInDueFromLatest,
+  mapCheckInResult,
+  memberReportedContextText,
+  normalizeContextTags,
+  toggleContextTag,
+} from '../src/domain/checkIn.ts';
+import {
+  shouldEmitDemoVoiceTranscript,
+  selectDemoVoiceTranscript,
+} from '../src/components/ui/voiceDictationSafety.ts';
+
+test('I1-B4B Canonical context tags: all 10 approved values, invalid rejected', () => {
+  assert.deepEqual([...CHECK_IN_CONTEXT_TAGS], [
+    'diet',
+    'sleep',
+    'stress',
+    'alcohol',
+    'cycle',
+    'travel_weather',
+    'new_product',
+    'medication_supplement',
+    'routine_change',
+    'other',
+  ]);
+  for (const tag of CHECK_IN_CONTEXT_TAGS) {
+    assert.equal(CheckInContextTagSchema.safeParse(tag).success, true);
+  }
+  assert.equal(CheckInContextTagSchema.safeParse('hormonal_imbalance').success, false);
+  assert.equal(CheckInContextTagSchema.safeParse('caused').success, false);
+  assert.equal(CheckInContextTagLabels.travel_weather, 'Travel / weather');
+  assert.equal(CheckInContextTagLabels.medication_supplement, 'Medication / supplement');
+});
+
+test('I1-B4B CheckIn mapping: missing tags become [], invalid tags fail closed', () => {
+  const legacy = mapDbCheckIn({
+    id: 'ci_legacy',
+    user_id: 'usr_1',
+    skin_state: 'same',
+    irritation: 'none',
+    notes: 'legacy note',
+    created_at: '2026-09-01T00:00:00.000Z',
+  });
+  assert.ok(legacy);
+  assert.deepEqual(legacy.contextTags, []);
+  assert.equal(legacy.contextNote, undefined);
+  assert.equal(legacy.notes, 'legacy note');
+  assert.equal(legacy.adherence, undefined);
+  assert.equal(legacy.primaryGoal, undefined);
+
+  const mapped = mapDbCheckIn({
+    id: 'ci_full',
+    user_id: 'usr_1',
+    skin_state: 'better',
+    irritation: 'little',
+    context_tags: ['sleep', 'sleep', 'stress'],
+    context_note: 'Slept poorly.',
+    adherence: 'mostly',
+    primary_goal: 'breakouts',
+    ai_analysis_sentence: 'Check-in recorded.',
+    created_at: '2026-09-19T00:00:00.000Z',
+  });
+  assert.ok(mapped);
+  assert.deepEqual(mapped.contextTags, ['sleep', 'stress']);
+  assert.equal(mapped.contextNote, 'Slept poorly.');
+  assert.equal(mapped.adherence, 'mostly');
+  assert.equal(mapped.primaryGoal, 'breakouts');
+  assert.equal(mapped.adjustmentProposed, true);
+
+  assert.equal(
+    mapDbCheckIn({
+      id: 'ci_bad',
+      user_id: 'usr_1',
+      skin_state: 'same',
+      irritation: 'none',
+      context_tags: ['sleep', 'unknown_tag'],
+      created_at: '2026-09-19T00:00:00.000Z',
+    }),
+    null
+  );
+});
+
+test('I1-B4B CheckInInput helpers: optional tags/note, multi-select, no per-tag notes', () => {
+  const empty = buildCheckInSubmission({
+    skinState: 'same',
+    irritation: 'none',
+    adherence: 'yes',
+    contextTags: [],
+    contextNote: '   ',
+  });
+  assert.deepEqual(empty.contextTags, []);
+  assert.equal(empty.contextNote, undefined);
+
+  const filled = buildCheckInSubmission({
+    primaryGoal: 'breakouts',
+    skinState: 'worse',
+    irritation: 'little',
+    adherence: 'mostly',
+    contextTags: ['sleep', 'travel_weather'],
+    contextNote: 'One note for all tags.',
+  });
+  assert.deepEqual(filled.contextTags, ['sleep', 'travel_weather']);
+  assert.equal(filled.contextNote, 'One note for all tags.');
+  assert.equal('notes' in filled, false);
+
+  assert.deepEqual(normalizeContextTags(undefined), []);
+  assert.deepEqual(normalizeContextTags(['other', 'diet', 'other']), ['diet', 'other']);
+  assert.equal(normalizeContextTags(['diet', 'not_a_tag']), null);
+
+  const selected = toggleContextTag(toggleContextTag([], 'sleep'), 'stress');
+  assert.deepEqual(selected, ['sleep', 'stress']);
+  assert.deepEqual(toggleContextTag(selected, 'sleep'), ['stress']);
+});
+
+test('I1-B4B Mock round-trip preserves context, notes, and non-causal analysis', async () => {
+  const service = new MockDeriveService();
+  const withTags = await service.submitCheckIn({
+    userId: 'mock_user_1',
+    skinState: 'same',
+    irritation: 'none',
+    adherence: 'yes',
+    contextTags: ['sleep', 'stress', 'travel_weather'],
+    contextNote: 'Slept less while traveling.',
+    notes: 'legacy notes still stored',
+  });
+  assert.deepEqual(withTags.checkIn.contextTags, ['sleep', 'stress', 'travel_weather']);
+  assert.equal(withTags.checkIn.contextNote, 'Slept less while traveling.');
+  assert.equal(withTags.checkIn.notes, 'legacy notes still stored');
+  assert.equal(withTags.adjustmentProposed, false);
+  assert.equal(containsForbiddenCausalCheckInCopy(withTags.aiAnalysisSentence), false);
+  assert.match(withTags.aiAnalysisSentence, /Additional context recorded/);
+
+  const empty = await service.submitCheckIn({
+    userId: 'mock_user_1',
+    skinState: 'better',
+    irritation: 'none',
+    adherence: 'yes',
+  });
+  assert.deepEqual(empty.checkIn.contextTags, []);
+  assert.equal(empty.checkIn.contextNote, undefined);
+
+  const meds = await service.submitCheckIn({
+    userId: 'mock_user_1',
+    skinState: 'same',
+    irritation: 'none',
+    contextTags: ['medication_supplement', 'cycle'],
+    contextNote: 'Started a vitamin and noted cycle context.',
+  });
+  assert.equal(meds.adjustmentProposed, false);
+  assert.equal(containsForbiddenCausalCheckInCopy(meds.aiAnalysisSentence), false);
+  assert.doesNotMatch(meds.aiAnalysisSentence, /stop medication|dose|prescription|ovulation|fertility|period tracker/i);
+
+  const progress = await service.getProgress('mock_user_1');
+  assert.equal(progress.checkIns[0].contextTags.includes('medication_supplement'), true);
+  assert.equal(progress.checkIns[2].contextTags.length, 3);
+});
+
+test('I1-B4B Server analysis is deterministic and non-causal', () => {
+  const stable = authorCheckInAnalysis({
+    skinState: 'same',
+    irritation: 'none',
+    hasContext: false,
+  });
+  assert.equal(stable.adjustmentProposed, false);
+  assert.match(stable.sentence, /stable/);
+
+  const irritated = authorCheckInAnalysis({
+    skinState: 'better',
+    irritation: 'little',
+    hasContext: true,
+  });
+  assert.equal(irritated.adjustmentProposed, true);
+  assert.match(irritated.sentence, /irritation/);
+  assert.match(irritated.sentence, /longitudinal comparison/);
+  assert.equal(containsForbiddenCausalCheckInCopy(irritated.sentence), false);
+});
+
+test('I1-B4B Weekly due logic is UTC-safe and injectable', () => {
+  const now = new Date('2026-09-19T12:00:00.000Z');
+  assert.equal(isCheckInDueFromLatest(undefined, now), true);
+  assert.equal(isCheckInDueFromLatest('2026-09-13T12:00:00.000Z', now), false);
+  assert.equal(isCheckInDueFromLatest('2026-09-12T12:00:00.000Z', now), true);
+  assert.equal(isCheckInDueFromLatest('2026-09-11T12:00:00.000Z', now), true);
+});
+
+test('I1-B4B Progress copy prefers contextNote and never implies causation', () => {
+  assert.equal(
+    formatCheckInContextLine(['sleep', 'stress', 'travel_weather']),
+    'Context: Sleep · Stress · Travel / weather'
+  );
+  assert.equal(
+    memberReportedContextText({ contextNote: 'Slept less.', notes: 'legacy' }),
+    'Slept less.'
+  );
+  assert.equal(
+    memberReportedContextText({ contextNote: undefined, notes: 'legacy' }),
+    'legacy'
+  );
+  assert.equal(containsForbiddenCausalCheckInCopy('You logged alcohol and less sleep during this week.'), false);
+  assert.equal(containsForbiddenCausalCheckInCopy('Alcohol caused your breakout'), true);
+});
+
+test('I1-B4B Check-in UI: always-on multi-select, VoiceTextArea, no CHANGE_REASONS', () => {
+  const screen = fs.readFileSync(path.resolve('app/check-in/index.tsx'), 'utf8');
+  assert.equal(screen.includes('CHANGE_REASONS'), false);
+  assert.equal(screen.includes('selectedChange'), false);
+  assert.equal(screen.includes('isFollowUpNeeded'), false);
+  assert.equal(screen.includes('Anything different this week that might be useful context?'), true);
+  assert.equal(screen.includes("context=\"checkin_note\""), true);
+  assert.equal(screen.includes('VoiceTextArea'), true);
+  assert.equal(screen.includes('toggleContextTag'), true);
+  assert.equal(screen.includes('buildCheckInSubmission'), true);
+  assert.equal(screen.includes('CHECK_IN_CONTEXT_TAGS'), true);
+  assert.equal(screen.includes('notes:'), false);
+  assert.match(screen, /accessibilityState=\{\{\s*selected: isSelected\s*\}\}/);
+});
+
+test('I1-B4B Production voice fallback cannot inject canned transcripts', () => {
+  assert.equal(shouldEmitDemoVoiceTranscript(false), false);
+  assert.equal(shouldEmitDemoVoiceTranscript(true), true);
+  assert.ok(selectDemoVoiceTranscript('checkin_note', 0).length > 0);
+  const hookSource = fs.readFileSync(path.resolve('src/components/ui/useVoiceDictation.ts'), 'utf8');
+  assert.equal(hookSource.includes('shouldEmitDemoVoiceTranscript'), true);
+  assert.equal(hookSource.includes("typeof __DEV__ !== 'undefined' && __DEV__"), true);
+});
+
+test('I1-B4B deriveClient hydrates returned context fields exactly once', async () => {
+  const captured: CheckInInput[] = [];
+  class ContextBackend extends MockDeriveService {
+    override async submitCheckIn(input: CheckInInput) {
+      captured.push(input);
+      return super.submitCheckIn(input);
+    }
+  }
+  const backend = new ContextBackend();
+  setDeriveService(backend);
+  useRoutineStore.getState().resetRoutine();
+  const result = await submitWeeklyCheckIn({
+    skinState: 'same',
+    irritation: 'none',
+    adherence: 'yes',
+    contextTags: ['alcohol', 'sleep'],
+    contextNote: 'Late nights after a dinner.',
+  });
+  assert.equal(captured.length, 1);
+  assert.deepEqual(captured[0].contextTags, ['alcohol', 'sleep']);
+  assert.equal(captured[0].contextNote, 'Late nights after a dinner.');
+  const stored = useRoutineStore.getState().checkIns;
+  assert.equal(stored.length, 1);
+  assert.deepEqual(stored[0].contextTags, ['alcohol', 'sleep']);
+  assert.equal(stored[0].contextNote, 'Late nights after a dinner.');
+  assert.equal(result.checkIn.id, stored[0].id);
+
+  useRoutineStore.getState().resetRoutine();
+  const progress = await hydrateProgress();
+  assert.ok(progress.checkIns.some((row) => row.contextNote === 'Late nights after a dinner.'));
+  setDeriveService(new MockDeriveService());
+});
+
+test('I1-B4B Remote mapper snake_case to canonical CheckIn', () => {
+  const mapped = mapDbCheckIn({
+    id: 'ci_remote_map',
+    user_id: 'usr_remote',
+    skin_state: 'worse',
+    irritation: 'lot',
+    notes: null,
+    context_tags: ['new_product', 'routine_change'],
+    context_note: 'Swapped moisturizer.',
+    adherence: 'not_really',
+    primary_goal: 'texture',
+    ai_analysis_sentence: 'Check-in recorded. You reported some irritation, so Derive will treat this as a tolerance signal.',
+    created_at: '2026-09-19T08:00:00.000Z',
+  });
+  assert.ok(mapped);
+  assert.equal(mapped.userId, 'usr_remote');
+  assert.equal(mapped.skinState, 'worse');
+  assert.deepEqual(mapped.contextTags, ['new_product', 'routine_change']);
+  assert.equal(mapped.contextNote, 'Swapped moisturizer.');
+  assert.equal(mapped.adherence, 'not_really');
+  assert.equal(mapped.primaryGoal, 'texture');
+  const result = mapCheckInResult({
+    checkIn: mapped,
+    aiAnalysisSentence: mapped.aiAnalysisSentence,
+    adjustmentProposed: true,
+  });
+  assert.ok(result);
+  assert.equal(result.adjustmentProposed, true);
+});
+
+test('I1-B4B Obsolete changeReason is gone and note limit is explicit', () => {
+  const schema = fs.readFileSync(path.resolve('src/types/schema.ts'), 'utf8');
+  assert.equal(schema.includes('changeReason'), false);
+  assert.equal(CHECK_IN_NOTE_MAX_LENGTH, 4000);
+  const remote = fs.readFileSync(path.resolve('src/services/remote/RemoteDeriveService.ts'), 'utf8');
+  assert.equal(remote.includes('get-progress'), false);
+  assert.equal(remote.includes("from('check_ins')"), true);
 });

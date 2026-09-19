@@ -35,6 +35,7 @@ import type {
   SkinState,
   IrritationLevel,
   AdherenceLevel,
+  CheckInContextTag,
   CheckIn,
   InsightBasis,
   LearnedInsight,
@@ -79,6 +80,7 @@ export type {
   SkinState,
   IrritationLevel,
   AdherenceLevel,
+  CheckInContextTag,
   CheckIn,
   InsightBasis,
   LearnedInsight,
@@ -195,6 +197,8 @@ export interface CheckInInput {
   irritation: IrritationLevel;
   adherence?: AdherenceLevel;
   notes?: string;
+  contextTags?: CheckInContextTag[];
+  contextNote?: string;
   photoUris?: string[];
   irritationDetails?: {
     symptoms: ReactionSymptom[];

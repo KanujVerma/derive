@@ -59,3 +59,9 @@ verify_jwt = true
 import_map = "./functions/propose-routine/deno.json"
 entrypoint = "./functions/propose-routine/index.ts"
 
+[functions.submit-checkin]
+enabled = true
+verify_jwt = true
+import_map = "./functions/submit-checkin/deno.json"
+entrypoint = "./functions/submit-checkin/index.ts"
+

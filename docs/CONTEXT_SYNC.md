@@ -6,6 +6,40 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19 — Kanuj: DERIVE I1-B4B Weekly Check-In Context Model, Real Remote Persistence & Longitudinal Read Path
+
+- **Agent / Workstream**: Kanuj (Customer Experience + Mobile) primary with shared-contract + Sami-owned additive `check_ins` migration and `submit-checkin` Edge Function
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `cac1e0508d911a58ed778883f58514b8bfc134cb`
+- **Prior Verified CI Run**: `35430738099` (SUCCESS on predecessor I1-B4A)
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required`
+- **Milestone Status**: `I1-B4A COMPLETE`. `I1-B4B COMPLETE`. `I1-B4 COMPLETE`. Next: `S4 Founder Review / Edit / Publish`. Shop, Stripe, and provider selection remain deferred.
+- **Ownership / Shared Contracts**: Shared `CheckIn` / `CheckInInput` / `CheckInContextTag`. Sami-owned additive migration and `submit-checkin`. Kanuj-owned check-in/progress UI and voice fallback gating. Remote progress reads use owner-scoped RLS, not a `get-progress` function.
+- **Durable Deliverables**:
+  1. Canonical `CheckInContextTag` enum (10 tags) + `CheckInContextTagLabels`. `CheckIn.contextTags` required array; `contextNote` optional. `CheckInInput` both optional. Obsolete unused `changeReason` removed.
+  2. Additive migration `20260919081450_i1_b4b_checkin_context.sql`: `context_tags text[] not null default '{}'`, `context_note`, nullable `adherence` (`yes`/`mostly`/`not_really`), nullable `primary_goal` (existing `Goal` values). CHECK on allowed tags, no NULL array entries, 4000-char note limits.
+  3. **primaryGoal persistence decision**: persist nullable `primary_goal` because `CheckIn`/`CheckInInput` already treat it as part of the canonical record; this preserves historical goal context if the member's goal changes later. No second goal enum.
+  4. **adherence persistence decision**: persist nullable `adherence` so the existing UI field is not discarded on the first real Remote write path. Legacy rows remain NULL; no backfill default.
+  5. Real `submit-checkin` Edge Function (`verify_jwt = true` + `auth.getUser()`). Authenticated identity is authoritative; spoofed `userId` fails closed. Deterministic server-authored `ai_analysis_sentence` (no LLM). Context tags never drive causal claims.
+  6. `RemoteDeriveService.getProgress()` reads `public.check_ins` via RLS. No `get-progress` Edge Function. `learnedInsights: []` until S3 insight persistence. `recentPhotos: []` until JWT-bound signed photo URLs exist.
+  7. Weekly due derived from latest check-in using a 7-day UTC cadence.
+  8. Check-in UI: always-on optional multi-select chips + one `VoiceTextArea` `checkin_note`. Production cannot inject canned demo transcripts (`ARCHITECTURE_CHALLENGE_NATIVE_DICTATION` recorded).
+- **Explicitly NOT done**: S4 founder review/publish; Shop; Stripe; provider selection; food diary; period tracker; prescription changes; fake learned insights; private photo path leakage.
+- **Verification Gates**:
+  - `npm test`: 158/158 passing.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: clean export.
+  - `npx supabase db reset`: applied 10 migrations including `20260919081450_i1_b4b_checkin_context.sql`.
+  - `npx supabase test db`: 160/160 pgTAP (5 files).
+  - `node scripts/test-i1-b1-local.mjs`: 11/11.
+  - `node scripts/test-i1-b2-local.mjs`: 8/8.
+  - `node scripts/test-i1-b4b-local.mjs`: passed.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+  - S4 / Shop / Stripe not started.
+
 ## 2026-09-19 — Kanuj: DERIVE I1-B4A Membership & Separate Product Commerce Model Reconciliation
 
 - **Agent / Workstream**: Kanuj (Customer Experience + Mobile) Primary with shared-contract + Sami-owned additive membership migration

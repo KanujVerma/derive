@@ -180,6 +180,14 @@ Key technical and product decisions accepted for Derive V1.
 * **Supersedes**: ADR-15 in full (personalized all-in / routine-derived membership pricing). Partially supersedes ADR-21's $100 all-in / products-included pricing clause. Preserves ADR-21 concierge operating principles (KEEP working products, explicit approval for material new-SKU charges, need-based refill confirmation, required baseline photos, prescriptions as context only).
 * **Not remaining in this ADR as unimplemented**: I1-B4A applied `config.betaPriceMonthly = 25`, `CustomerProfile.tier = 'founding_beta'`, additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql`, and removed `src/pricing/**`. Shop and Stripe remain deferred.
 
+### ADR-27: Weekly Check-In Context Model (Optional Tags + One Note)
+* **Status**: IMPLEMENTED (I1-B4B).
+* **Decision**: Weekly check-in may optionally record real-world context without becoming a lifestyle tracker. Approved tags are `diet`, `sleep`, `stress`, `alcohol`, `cycle`, `travel_weather`, `new_product`, `medication_supplement`, `routine_change`, `other`. Multi-select is optional; one natural-language `contextNote` covers all selected tags. Empty selection is valid. Tags are CONTEXT, not proven causes.
+* **Persistence**: Additive `check_ins` columns `context_tags` (text[] NOT NULL default `{}`), `context_note`, nullable `adherence` (`yes`/`mostly`/`not_really`), nullable `primary_goal` using the existing Goal enum. Legacy `notes` and `ai_analysis_sentence` remain. Legacy rows map to `contextTags: []`.
+* **primaryGoal**: Persisted at check-in time because it is already part of the canonical `CheckIn` record and preserves historical context if the member's goal later changes. No second goal enum.
+* **Remote path**: Real `submit-checkin` Edge Function; Remote `getProgress()` reads `public.check_ins` via RLS. No `get-progress` function. No LLM required. Deterministic server summary only. Remote learned insights and signed check-in photos remain future work.
+* **Safety**: No period tracker. Medication context does not alter prescriptions. No causal copy from a single week's tags.
+
 ---
 
 ## Open Shared-Contract Challenges (PROPOSED · UNRESOLVED)
@@ -232,6 +240,12 @@ These findings are review evidence, not accepted contract changes. S1A does not 
    - **Deterministic Test Isolation**: Automated CI and local E2E use an isolated `FixtureRoutineProvider` under server configuration to ensure reproducible, zero-cost, network-independent verification.
    - **Optional Gemini Adapter**: `GeminiRoutineProvider` serves as an evaluation adapter, strictly requiring header-based authentication (`x-goog-api-key`, zero API key leakage in URL query parameters) and structured JSON outputs conforming to canonical domain types.
 4. **Resolution Required**: When founders conduct model evaluation, select a permanent production model provider, configure server secrets, and deploy the corresponding adapter.
+
+### ARCHITECTURE_CHALLENGE_NATIVE_DICTATION: Production Must Not Inject Demo Transcripts [RECORDED IN I1-B4B]
+1. **Status**: PARTIALLY MITIGATED (I1-B4B). True native iOS/Android speech recognition is not an accepted architecture in this pass. Web Speech API remains available on web.
+2. **Prior risk**: `useVoiceDictation` emitted canned `CONTEXT_SAMPLES` when native recognition was unavailable, which would have inserted fake text into production check-ins.
+3. **Mitigation implemented**: demo transcripts emit only when `__DEV__` is true. Production unsupported platforms keep typed input and do not start a fake listening session.
+4. **Remaining**: a future native transcription path requires an explicit architecture decision and accepted dependency. B4B persistence is not blocked on it.
 
 
 

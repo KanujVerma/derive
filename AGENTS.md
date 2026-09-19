@@ -22,8 +22,8 @@ Read documents relevant to your specific task rather than loading all documentat
 
 ## Commercial truth
 - **Implemented (I1-B4A)**: Founding Beta membership display is `$25/month` via `config.betaPriceMonthly` (display only; Stripe/S5 owns charged money). Canonical identity is `founding_beta`. Products are purchased separately. Routine-derived all-in pricing (`src/pricing/**`) has been removed.
-- **Approved, not implemented (I1-B4B)**: optional multi-select check-in context tags + one optional context note.
-- Do not implement B4B, Shop, Stripe, or a sixth tab unless that pass is explicitly opened.
+- **Implemented (I1-B4B)**: optional multi-select weekly check-in context tags + one optional context note, persisted through real `submit-checkin` and RLS-backed progress reads. Tags are context, not causation.
+- Do not implement Shop, Stripe, a sixth tab, or S4 founder review unless that pass is explicitly opened.
 
 Never silently cross founder ownership boundaries. For shared-contract modifications or cross-boundary integrations, document rationale and changes in `docs/CONTEXT_SYNC.md`.
 

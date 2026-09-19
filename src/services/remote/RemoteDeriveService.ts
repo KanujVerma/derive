@@ -29,6 +29,7 @@ import type {
   RoutinePlan,
 } from '../../domain/types.ts';
 import type {
+  CheckIn,
   Routine,
   RoutineStep,
   ProductCategory,
@@ -37,6 +38,7 @@ import type {
   RoutineAction,
 } from '../../types/schema.ts';
 import { formatRoutineStepSchedule } from '../../types/schema.ts';
+import { isCheckInDueFromLatest, mapCheckInResult, mapDbCheckIn, type DbCheckInRow } from '../../domain/checkIn.ts';
 import { supabase } from '../supabase.ts';
 import { uploadPhotoToStorage } from '../onboardingPhotoUpload.ts';
 
@@ -158,16 +160,61 @@ export class RemoteDeriveService implements IDeriveService {
       body: input,
     });
     if (error) throw new Error(`RemoteDeriveService.submitCheckIn failed: ${error.message}`);
-    return data as CheckInResult;
+    const mapped = mapCheckInResult(data);
+    if (!mapped) {
+      throw new Error('RemoteDeriveService.submitCheckIn failed: invalid check-in response');
+    }
+    return mapped;
   }
 
   async getProgress(userId: string): Promise<ProgressData> {
     const client = this.getClient();
-    const { data, error } = await client.functions.invoke('get-progress', {
-      body: { userId },
-    });
+    const {
+      data: { user },
+      error: authError,
+    } = await client.auth.getUser();
+    if (authError || !user) {
+      throw new Error('RemoteDeriveService.getProgress failed: unauthenticated');
+    }
+    if (userId && userId !== user.id) {
+      throw new Error('RemoteDeriveService.getProgress failed: user mismatch');
+    }
+
+    const { data, error } = await client
+      .from('check_ins')
+      .select(
+        'id, user_id, skin_state, irritation, notes, context_tags, context_note, adherence, primary_goal, ai_analysis_sentence, created_at'
+      )
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
     if (error) throw new Error(`RemoteDeriveService.getProgress failed: ${error.message}`);
-    return data as ProgressData;
+
+    const checkIns: CheckIn[] = (data || [])
+      .map((row: DbCheckInRow) => mapDbCheckIn(row))
+      .filter((row: CheckIn | null): row is CheckIn => row !== null);
+
+    const { data: publishedRoutine, error: routineError } = await client
+      .from('routines')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('status', 'published')
+      .limit(1)
+      .maybeSingle();
+    if (routineError) {
+      throw new Error(`RemoteDeriveService.getProgress failed: ${routineError.message}`);
+    }
+
+    return {
+      checkIns,
+      // B4B: no durable learned-insight table yet. Do not invent insights in Remote.
+      learnedInsights: [],
+      // Private check-in photos still lack a JWT-bound signer; do not leak storage paths.
+      recentPhotos: [],
+      routineHistorySummary: publishedRoutine
+        ? 'A published managed routine is in place.'
+        : 'No published routine yet.',
+      isCheckInDue: isCheckInDueFromLatest(checkIns[0]?.createdAt),
+    };
   }
 
   async requestRefill(input: RefillRequestInput): Promise<RefillRequest> {
@@ -448,6 +495,8 @@ export function mapDbBootstrapState(
     membershipStatus,
   };
 }
+
+export { mapDbCheckIn, mapCheckInResult } from '../../domain/checkIn.ts';
 
 /**
  * Pure mapping helper: maps raw database profile + membership rows to canonical CustomerProfile.

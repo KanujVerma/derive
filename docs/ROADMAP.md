@@ -500,18 +500,20 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Unit tests, app/test typecheck, and Expo web export remain green. Backend schema unchanged.
   - `eas.json` Remote flag remains `false`.
 
-### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [B4A COMPLETE · B4B NEXT]
+### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [COMPLETE]
 * **Implemented in I1-B4A**:
   - Founding Beta membership display is **$25/month** (`config.betaPriceMonthly`). Membership pays for Derive managing skincare. Products are purchased separately. Membership price does not depend on routine size or product cost.
   - Canonical identity `founding_beta` via additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql` (legacy `founding_beta_129` backfilled; unknown tiers fail closed). `src/pricing/**` all-in engine removed.
   - Onboarding, Profile, Orders, and Refill copy state products are separate. ADR-26 implemented. ARCHITECTURE_CHALLENGE-01 resolved. Remote mapper accepts `founding_beta`.
+* **Implemented in I1-B4B**:
+  - Optional multi-select `CheckInContextTag` + one optional context note every weekly check-in. Tags are context, not causation. `cycle` is not a period tracker. Medication/supplement context does not alter prescriptions.
+  - Additive `check_ins` migration, real `submit-checkin` Edge Function, RLS-backed Remote progress reads (no phantom `get-progress`). Learned insights remain empty in Remote until S3. Next milestone is **S4**.
 * **Approved product truth**:
   - Do **not** frame as "$25 for AI". $25 is a current Founding Beta experiment, not a lifetime company price.
   - Commercial-independence invariant: margin, affiliate, sponsorship, and coupons must never silently alter KEEP / PAUSE / REPLACE / ADD, Scan, safety, or ranking. New SKU charges require explicit consent; same-SKU refills may stay low-friction.
   - Five-tab IA preserved. Full Shop deferred. Stripe billing deferred to S5.
 * **B4A — Membership & Product Commerce Model Reconciliation** [COMPLETE]
-* **B4B — Weekly Check-In Context Model & Persistence** [NEXT / NOT IMPLEMENTED]:
-  - Optional multi-select `CheckInContextTag` + one optional context note every check-in; persist additively; reuse VoiceTextArea; tags are context not causation; `cycle` is not a period tracker.
+* **B4B — Weekly Check-In Context Model & Persistence** [COMPLETE]
 * **Not in B4**: Shop tab, Stripe checkout amounts, coupons, affiliates, food diary, period tracker, membership tiers, provider selection.
 
 ## Sami Workstream (Platform + Intelligence + Operations)
