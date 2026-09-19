@@ -181,9 +181,13 @@ export default function TodayScreen() {
             <View style={styles.reviewExplainerCard}>
               <Icon name="sparkle" size={18} color={colors.brand} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.reviewExplainerTitle}>Everything else is ready</Text>
+                <Text style={styles.reviewExplainerTitle}>
+                  {isShopMember ? 'Everything else is ready' : 'Personalized Scan needs membership'}
+                </Text>
                 <Text style={styles.reviewExplainerText}>
-                  While we finish preparing your routine, you can scan bottles with camera recognition or ask Derive any skincare question.
+                  {isShopMember
+                    ? 'While we finish preparing your routine, you can scan bottles with camera recognition or ask Derive any skincare question.'
+                    : 'Personalized Scan is available with an active Derive membership.'}
                 </Text>
               </View>
             </View>
@@ -233,9 +237,13 @@ export default function TodayScreen() {
             <View style={styles.reviewExplainerCard}>
               <Icon name="sparkle" size={18} color={colors.brand} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.reviewExplainerTitle}>Everything else is ready</Text>
+                <Text style={styles.reviewExplainerTitle}>
+                  {isShopMember ? 'Everything else is ready' : 'Personalized Scan needs membership'}
+                </Text>
                 <Text style={styles.reviewExplainerText}>
-                  While we finish review, you can scan bottles with camera recognition or ask Derive any skincare question.
+                  {isShopMember
+                    ? 'While we finish review, you can scan bottles with camera recognition or ask Derive any skincare question.'
+                    : 'Personalized Scan is available with an active Derive membership.'}
                 </Text>
               </View>
             </View>

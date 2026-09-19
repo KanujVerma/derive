@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -87,31 +88,36 @@ export default function ProfileScreen() {
     );
   };
 
+  const completeSignOut = async () => {
+    const res = await signOutSession();
+    if (res.success) {
+      if (isRemoteServiceEnabled()) {
+        router.replace('/(auth)/login');
+      } else {
+        router.replace('/(onboarding)/1-welcome');
+      }
+    } else if (Platform.OS === 'web') {
+      window.alert(res.error || getCustomerErrorMessage('auth_signout'));
+    } else {
+      Alert.alert('Sign Out', res.error || getCustomerErrorMessage('auth_signout'), [{ text: 'OK' }]);
+    }
+  };
+
   const handleSignOut = () => {
+    const message = 'Are you sure you want to sign out? Your stored routine and session data on this device will be cleared.';
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) void completeSignOut();
+      return;
+    }
     Alert.alert(
       'Sign Out',
-      'Are you sure you want to sign out? Your stored routine and session data on this device will be cleared.',
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Sign Out',
           style: 'destructive',
-          onPress: async () => {
-            const res = await signOutSession();
-            if (res.success) {
-              if (isRemoteServiceEnabled()) {
-                router.replace('/(auth)/login');
-              } else {
-                router.replace('/(onboarding)/1-welcome');
-              }
-            } else {
-              Alert.alert(
-                'Sign Out',
-                res.error || getCustomerErrorMessage('auth_signout'),
-                [{ text: 'OK' }]
-              );
-            }
-          },
+          onPress: () => void completeSignOut(),
         },
       ]
     );

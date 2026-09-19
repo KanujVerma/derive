@@ -55,6 +55,7 @@ Long-term product loop mental model:
 - **Target Experience**: Public shop, public product facts, physical order history, a future general Scan path, and membership upsell. C1 does not enable general Scan; the current Scan requires member context.
 - **Personalization Fallback**: Shop shows a truthful limited catalog state. Product detail fails closed until an independent public product source exists. Hydrated member routine and shelf data never supplies non-member product facts.
 - **Scan**: Current personalized Scan is locked. A general factual Scan requires a separate backend path and authorization policy before public activation.
+- **Current Remote routing**: A signed-in user with a completed profile can reach root tabs even when membership is inactive. C1 guards Shop personalization, product detail, its Today/Plan commerce links, and Scan. Entitlement policy for the other root surfaces must be resolved before production Remote activation.
 - **Membership Upsell**: Non-coercive CTA:
   > *"Want to know how this fits your skin and routine? Derive members get personalized product-fit guidance, a managed routine, weekly check-ins, and ongoing adjustments."*
 

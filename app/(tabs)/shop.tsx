@@ -16,9 +16,9 @@
  * - Guest route activation (auth gating remains unchanged from S1)
  *
  * NON-MEMBER ROUTING:
- * Current Remote auth gating prevents non-members from reaching member tabs.
- * This component architects the non-member fallback UI for future public routing
- * (C1.5 activation) without weakening S1 auth gating.
+ * Remote auth blocks signed-out users. Profile-ready inactive members can reach
+ * tabs, so this component uses the canonical membership audience before reading
+ * personalized Shop data. Public guest routing remains future work.
  *
  * SCAN: Tapping "Scan a Product" navigates to app/shop/scan.tsx.
  *
@@ -118,7 +118,7 @@ export default function ShopScreen() {
       'Personalized canonical routine',
       'Weekly check-ins and ongoing adjustments',
       'Personalized product-fit guidance',
-      'Personalized Scan and Ask',
+      'Personalized Scan',
       'Founder quality review during beta',
     ],
   };
@@ -322,10 +322,8 @@ export default function ShopScreen() {
   // =============================================
   // RENDER: NON-MEMBER / GUEST FALLBACK
   //
-  // NOTE: Current S1 auth gating prevents non-members from reaching member
-  // tabs in Remote production mode. This UI exists for:
-  // 1. Mock/dev state testing of the non-member presentation
-  // 2. Future C1.5 public route activation (without weakening S1 gating)
+  // Signed-in inactive members may reach tabs after profile bootstrap.
+  // Guest routing remains blocked by the existing auth boundary.
   //
   // No fake personalized products. No fake plan context.
   // =============================================
