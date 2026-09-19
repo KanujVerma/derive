@@ -99,14 +99,20 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 * **Initial Routine Intelligence Pipeline & Domain Persistence (I1-B2 Planned / Sami Scope)**:
   - **Lifecycle Progression & Durability Truth**:
     1. **B1 Commit (`pending_generation`)**: Intake finalized in database; member skin profile and photo metadata committed; pending `initial_routine` founder review task created in `public.founder_review_tasks` (`status = 'pending'`); `isPlanUnderReview: false`.
-    2. **B2 Server Generation (`awaiting_review`)**: Server context assembly ingests committed intake (`payload_snapshot JSONB` + canonical `skin_profiles` columns including `pregnancy_status` and `sensitivities_status`), invokes Gemini 2.5 Flash with structured schema, validates clinical invariants, persists proposal to `public.routines` (`version = 1`, `status = 'awaiting_review'`) and `public.routine_items`, and normalizes shelf actions into `public.user_products`. Preserves or updates the pending `initial_routine` review task (which uses `status = 'pending'`; supported DB task statuses are strictly `'pending'`, `'completed'`, `'dismissed'` — there is NO `'awaiting_review'` task status). If explicit routine linking is required (e.g. `routine_id` on `founder_review_tasks`), that is a Sami-owned additive migration.
+    2. **B2 Server Generation (`awaiting_review`)**: Server context assembly ingests committed intake (`payload_snapshot JSONB` + canonical `skin_profiles` columns including `pregnancy_status` and `sensitivities_status`; PIH tendency is read from `payload_snapshot.pihTendencyAnswer`), invokes Gemini 2.5 Flash with structured schema, validates clinical invariants, persists proposal to `public.routines` (`version = 1`, `status = 'awaiting_review'`) and `public.routine_items`, and normalizes shelf actions into `public.user_products`. Preserves or updates the pending `initial_routine` review task (which uses `status = 'pending'`; supported DB task statuses are strictly `'pending'`, `'completed'`, `'dismissed'` — there is NO `'awaiting_review'` task status). If explicit routine linking is required (e.g. `routine_id` on `founder_review_tasks`), that is a Sami-owned additive migration.
     3. **B2 Client Hydration**: Once `RemoteDeriveService.getRoutine()` implements routine-item read assembly (currently it queries only the `routines` table header), the mobile client calls `hydrateRoutine()`, detects `routine.status === 'awaiting_review'`, sets `isPlanUnderReview: true`, and displays quiet draft preview (`DRAFT · NOT ACTIVE`) on Today and Plan. Note: `InitialRoutineState` is a shared domain type in `OnboardingResult`, not a persisted database column.
-  - **Relational Domain Persistence (S2/B2 - PostgreSQL Implementation Truth)**:
+  - **Relational Domain Persistence & Required Schema Reconciliations (S2/B2)**:
     - `public.routines`: Canonical routine header (`id`, `user_id`, `version = 1`, `status = 'awaiting_review'`, `summary_sentence`, `founder_notes`, `created_at`, `published_at`).
-    - `public.routine_items`: Step items using actual schema columns (`id`, `routine_id`, `order_index`, `timing` [`'am'` | `'pm'`], `product_name`, `brand`, `category`, `amount`, `area`, `days` [`TEXT[]`], `purpose`, `why_chosen`, `watch_for`, `created_at`). Note: `step_name`, `step_order`, `frequency`, `step_type`, and `product_id` do not exist in the baseline schema; any additions require an explicit additive migration by Sami.
+      - *Schema Reconciliation (`B2_REQUIRED_SCHEMA_RECONCILIATION`)*: Canonical `Routine` requires `createdAt` and `updatedAt`. Current schema lacks `updated_at`. Sami should add `updated_at TIMESTAMPTZ DEFAULT NOW()` via an additive B2 migration (with `private.set_updated_at()` trigger pattern).
+    - `public.routine_items`: Step items using actual schema columns (`id`, `routine_id`, `order_index`, `timing` [`'am'` | `'pm'`], `product_name`, `brand`, `category`, `amount`, `area`, `days` [`TEXT[]`], `purpose`, `why_chosen`, `watch_for`, `created_at`).
+      - *Schema Reconciliation (`B2_REQUIRED_SCHEMA_RECONCILIATION`)*: Canonical `RoutineStep` requires `productId: string`. Current schema lacks `product_id`. Sami should add `product_id UUID REFERENCES public.products(id)` via an additive B2 migration to enable deterministic mapping to `RoutineStep.productId`.
+      - *Derivability*: `RoutineStep.scheduleText` is optional and should be derived during DB $\to$ domain mapping from `timing` + `days` using `formatRoutineStepSchedule` rather than adding a redundant DB column.
     - `public.user_products`: Normalization of member counter products with canonical actions (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`).
-  - **Staging vs. Relational Normalization**:
-    - Product reactions (`product_reactions`) and formula snapshots (`formula_snapshots`) are currently preserved in `onboarding_submissions.payload_snapshot` JSONB during B1; relational table normalization is scheduled under S2.
+      - *Persistence Invariant (`B2_REQUIRED_PERSISTENCE_INVARIANT`)*: Canonical `UserProduct` requires full canonical `product: Product`. Every B2-decided product should be normalized into `public.products`, with `user_products.product_id` referencing that row, allowing `user_products JOIN products` $\to$ canonical `UserProduct`.
+  - **Current B2 Context Sources**:
+    - `public.skin_profiles` provides normalized profile/safety fields: `primary_goal`, `secondary_goals`, `routine_complexity`, `cost_preference`, `midday_feel`, `post_cleanse_tightness`, `known_sensitivities`, `sensitivities_status`, `active_prescriptions`, `is_pregnant_or_nursing`, `pregnancy_status`. *(Note: `skin_profiles.pih_tendency` does NOT exist).*
+    - `public.onboarding_submissions.payload_snapshot` JSONB preserves richer intake context: `confirmedProducts`, `productReactions`, `formulaSnapshots`, `adaptiveFollowUps`, `pihTendencyAnswer` (PIH answer is read from here), `hasBadReactions`, photo context, canonical Storage paths.
+    - `public.user_photos` provides baseline photo metadata (`photo_type`, `storage_path`).
 
 ---
 
@@ -114,16 +120,24 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 * **Model**: Google Gemini 2.5 Flash via structured JSON outputs, invoked only from the trusted Supabase/server environment.
 * **Credential boundary**: Gemini API keys are server secrets. The Expo client must never read, embed, or ship a Gemini key (`EXPO_PUBLIC_*` Gemini variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning; `RemoteDeriveService` calls Edge Functions that may invoke Gemini.
 * **Context Assembly**: When evaluating queries or generating routine proposals, the backend injects:
-  1. Customer skin profile (primary goals, midday oil, tightness, `pregnancy_status`, `sensitivities_status`).
-  2. Active prescription products (e.g. Differin 0.1% schedule: Mon/Wed/Fri).
-  3. Tolerated shelf products vs. past adverse reactions.
-  4. Most recent weekly check-in skin state and barrier symptoms.
-  5. Standardized baseline photos metadata (angles, capture timestamps).
+  1. Customer skin profile from `public.skin_profiles` (primary goals, midday oil, tightness, `pregnancy_status`, `sensitivities_status`).
+  2. Intake snapshot context from `public.onboarding_submissions.payload_snapshot` (`pihTendencyAnswer`, adverse reactions, confirmed shelf products, formula snapshots).
+  3. Active prescription products (e.g. Differin 0.1% schedule: Mon/Wed/Fri).
+  4. Tolerated shelf products vs. past adverse reactions.
+  5. Most recent weekly check-in skin state and barrier symptoms.
+  6. Standardized baseline photos metadata (angles, capture timestamps).
 * **Clinical & Safety Invariants (Enforced in Intelligence & Persistence)**:
   1. **Sunscreen AM Invariant**: Sunscreen steps must NEVER appear in the evening (`pmSteps`) routine.
   2. **Retinoid PM Invariant**: Strong retinoids (Adapalene/Differin, Tretinoin) must NEVER appear in the morning (`amSteps`) routine.
   3. **Pregnancy / Nursing Contraindication**: Retinoids and high-strength salicylic acid are strictly excluded when `pregnancy_status === 'yes'`.
   4. **Reported Sensitivities**: Known sensitized ingredients must not be introduced in added or replacement products when `sensitivities_status === 'reported'`.
+* **Routine Proposal Pipeline (`propose-routine` Edge Function & RPC)**:
+  - Gateway JWT verification with handler defense-in-depth `auth.getUser()`.
+  - Fail-closed intake verification: rejects requests unless `public.onboarding_submissions` status is `committed`.
+  - Replay idempotency: checks for existing version-1 routine in `public.routines` and returns it without inserting duplicate rows.
+  - Server-assembled canonical context from `skin_profiles` and `payload_snapshot`.
+  - Post-generation deterministic validation enforcing AM/PM and contraindication invariants.
+  - Transactional relational persistence via `public.commit_routine_proposal(...)` RPC executed by `service_role`: normalizes products in `public.products`, inserts version-1 routine in `awaiting_review` status, inserts `routine_items` with resolved `product_id` FKs, updates `user_products`, and updates the pending `initial_routine` founder review task notes.
 * **Safety Circuit Breaker**: Pre-model regex and deterministic classifier that intercepts medical emergencies before model generation.
 
 ---

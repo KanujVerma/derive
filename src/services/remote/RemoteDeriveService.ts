@@ -28,6 +28,15 @@ import type {
   CustomerBootstrapState,
   RoutinePlan,
 } from '../../domain/types.ts';
+import type {
+  Routine,
+  RoutineStep,
+  ProductCategory,
+  RoutineStatus,
+  UserProduct,
+  RoutineAction,
+} from '../../types/schema.ts';
+import { formatRoutineStepSchedule } from '../../types/schema.ts';
 import { supabase } from '../supabase.ts';
 import { uploadPhotoToStorage } from '../onboardingPhotoUpload.ts';
 
@@ -196,15 +205,144 @@ export class RemoteDeriveService implements IDeriveService {
 
   async getRoutine(userId: string): Promise<RoutinePlan | null> {
     const client = this.getClient();
-    const { data, error } = await client
+    const { data: routineRow, error: routineError } = await client
       .from('routines')
-      .select('id, user_id, version, status, summary_sentence, created_at, published_at')
+      .select('id, user_id, version, status, summary_sentence, created_at, updated_at, published_at')
       .eq('user_id', userId)
       .order('version', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) throw new Error(`RemoteDeriveService.getRoutine failed: ${error.message}`);
-    return data as unknown as RoutinePlan | null;
+
+    if (routineError) {
+      throw new Error(`RemoteDeriveService.getRoutine failed: ${routineError.message}`);
+    }
+    if (!routineRow) {
+      return null;
+    }
+
+    const { data: itemRows, error: itemsError } = await client
+      .from('routine_items')
+      .select('id, order_index, timing, product_id, product_name, brand, category, amount, area, days, purpose, why_chosen, watch_for')
+      .eq('routine_id', routineRow.id)
+      .order('order_index', { ascending: true });
+
+    if (itemsError) {
+      throw new Error(`RemoteDeriveService.getRoutine failed fetching items: ${itemsError.message}`);
+    }
+
+    const mapStep = (row: any): RoutineStep => {
+      const timing = row.timing === 'am' ? 'am' : 'pm';
+      const days = (row.days || []) as any[];
+      return {
+        id: row.id,
+        order: row.order_index,
+        productId: row.product_id || '',
+        productName: row.product_name,
+        brand: row.brand,
+        category: row.category as ProductCategory,
+        amount: row.amount,
+        area: row.area,
+        timing,
+        days,
+        purpose: row.purpose,
+        whyChosen: row.why_chosen,
+        watchFor: row.watch_for || undefined,
+        scheduleText: formatRoutineStepSchedule({
+          id: row.id,
+          order: row.order_index,
+          productId: row.product_id || '',
+          productName: row.product_name,
+          brand: row.brand,
+          category: row.category as ProductCategory,
+          amount: row.amount,
+          area: row.area,
+          timing,
+          days,
+          purpose: row.purpose,
+          whyChosen: row.why_chosen,
+        }),
+      };
+    };
+
+    const allSteps: RoutineStep[] = (itemRows || []).map(mapStep);
+    const amSteps = allSteps.filter((s: RoutineStep) => s.timing === 'am').sort((a: RoutineStep, b: RoutineStep) => a.order - b.order);
+    const pmSteps = allSteps.filter((s: RoutineStep) => s.timing === 'pm').sort((a: RoutineStep, b: RoutineStep) => a.order - b.order);
+
+    const routine: Routine = {
+      id: routineRow.id,
+      userId: routineRow.user_id,
+      version: routineRow.version,
+      status: routineRow.status as RoutineStatus,
+      summarySentence: routineRow.summary_sentence,
+      amSteps,
+      pmSteps,
+      createdAt: routineRow.created_at,
+      updatedAt: routineRow.updated_at || routineRow.created_at,
+      publishedAt: routineRow.published_at || undefined,
+      founderNotes: routineRow.founder_notes || undefined,
+    };
+
+    return routine;
+  }
+
+  async getUserProducts(userId: string): Promise<UserProduct[]> {
+    const client = this.getClient();
+    const { data: rows, error } = await client
+      .from('user_products')
+      .select(`
+        id,
+        user_id,
+        product_id,
+        detected_brand,
+        detected_name,
+        action,
+        action_reason,
+        frequency_nights_per_week,
+        is_confirmed_by_user,
+        created_at,
+        products (
+          id,
+          brand,
+          name,
+          category,
+          key_actives,
+          full_ingredients,
+          retail_price_approx,
+          is_catalog_standard
+        )
+      `)
+      .eq('user_id', userId);
+
+    if (error) {
+      throw new Error(`RemoteDeriveService.getUserProducts failed: ${error.message}`);
+    }
+
+    return (rows || []).map((row: any): UserProduct => ({
+      id: row.id,
+      userId: row.user_id,
+      productId: row.product_id || '',
+      action: row.action as RoutineAction,
+      actionReason: row.action_reason || '',
+      frequencyNightsPerWeek: row.frequency_nights_per_week ?? undefined,
+      isConfirmedByUser: row.is_confirmed_by_user ?? true,
+      product: row.products
+        ? {
+            id: row.products.id,
+            brand: row.products.brand,
+            name: row.products.name,
+            category: row.products.category as ProductCategory,
+            keyActives: row.products.key_actives || [],
+            fullIngredients: row.products.full_ingredients || [],
+            retailPriceApprox: row.products.retail_price_approx ? Number(row.products.retail_price_approx) : undefined,
+          }
+        : {
+            id: row.product_id || row.id,
+            brand: row.detected_brand || 'Unknown',
+            name: row.detected_name || 'Unknown Product',
+            category: 'other',
+            keyActives: [],
+          },
+    }));
   }
 
   async getCustomerProfile(userId: string): Promise<CustomerProfile | null> {

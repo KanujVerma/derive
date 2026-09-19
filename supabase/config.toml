@@ -64,3 +64,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/delete-customer-account/deno.json"
 entrypoint = "./functions/delete-customer-account/index.ts"
+
+[functions.propose-routine]
+enabled = true
+verify_jwt = true
+import_map = "./functions/propose-routine/deno.json"
+entrypoint = "./functions/propose-routine/index.ts"

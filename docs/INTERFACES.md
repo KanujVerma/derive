@@ -85,12 +85,12 @@ export interface IDeriveService {
   - *Note*: The current TypeScript `RoutineProposalInput.profile` does NOT contain `pregnancyStatus` or `sensitivitiesStatus`. If B2 requires these fields directly on the input contract, that is a future coordinated shared-contract change requiring mutual founder review.
 * **B2 Richer Context Available Server-Side**:
   - Server-side context assembly reads richer canonical safety and history signals directly from the database:
-    - `public.skin_profiles`: `pregnancy_status`, `sensitivities_status`, `known_sensitivities`, `pih_tendency`.
-    - `public.onboarding_submissions.payload_snapshot` JSONB: full raw intake snapshot (formula snapshots, adaptive follow-ups, photo context notes).
+    - `public.skin_profiles`: `primary_goal`, `secondary_goals`, `routine_complexity`, `cost_preference`, `midday_feel`, `post_cleanse_tightness`, `known_sensitivities`, `sensitivities_status`, `active_prescriptions`, `is_pregnant_or_nursing`, `pregnancy_status`. *(Note: `skin_profiles` does NOT have a `pih_tendency` column).*
+    - `public.onboarding_submissions.payload_snapshot` JSONB: full raw intake snapshot, including `confirmedProducts`, `productReactions`, `formulaSnapshots`, `adaptiveFollowUps`, `pihTendencyAnswer` (PIH tendency is durably read from here), `hasBadReactions`, photo context notes, and canonical Storage paths.
     - `public.user_photos`: baseline photo metadata (angles: `front`, `left`, `right`).
 * **Output Contract (`RoutineProposalResult` in `src/domain/types.ts`)**:
   - `routine`: `Routine` (`id`, `userId`, `version`, `status: 'awaiting_review'`, `summarySentence`, `amSteps`, `pmSteps`, `createdAt`, `updatedAt`, `publishedAt?`, `founderNotes?`).
-    - *Contract Truth*: `Routine` has NO `rationales` property. Step-level personalized rationale is captured on individual `RoutineStep` items via `whyChosen`, `purpose`, `watchFor?`, and `scheduleText?`.
+    - *Contract Truth*: `Routine` has NO `rationales` property. Step-level personalized rationale is captured on individual `RoutineStep` items via `whyChosen`, `purpose`, `watchFor?`, and optional `scheduleText?`.
   - `userProducts`: `UserProduct[]` (with actions: `'KEEP'` | `'PAUSE'` | `'REPLACE'` | `'ADD'` | `'STOP'`).
   - `clarificationQuestions`?: string[]
 * **Lifecycle State & Durability Truth**:
@@ -98,10 +98,23 @@ export interface IDeriveService {
   - Before proposal: no canonical routine row exists in `public.routines` $\to$ client conceptual state is `pending_generation` (`routine: null`, `isPlanUnderReview: false`, "Your routine is being prepared.").
   - After proposal persistence: routine is persisted in `public.routines` with `status = 'awaiting_review'` $\to$ client derives `awaiting_review` (`isPlanUnderReview: true`, "Final review: Your first routine gets one final quality check before it goes live.").
   - If a dedicated persisted lifecycle column or API is deemed necessary, that is a future shared architecture decision, not assumed current implementation.
-* **Remote Routine Read Assembly Dependency**:
-  - In `src/services/remote/RemoteDeriveService.ts`, `getRoutine(userId)` currently reads only the `routines` table header and does NOT yet query or assemble `public.routine_items` into `amSteps` and `pmSteps`.
-  - Sami's B2 server scope must implement this routine-item read assembly mapper so `RemoteDeriveService.getRoutine()` returns a valid canonical `Routine`.
-  - Kanuj's existing `hydrateRoutine()` (`src/services/deriveClient.ts`) is the downstream client consumer once that Remote mapping is implemented.
+* **B2 Delivered Schema & Mapping Reconciliations (Sami B2 Implementation)**:
+  1. **`public.routines.updated_at` Reconciliation [DELIVERED]**:
+     - Added `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` to `public.routines` via migration `20260919010000_i1_b2_routine_intelligence_and_persistence.sql`.
+     - Wired to `routines_set_updated_at` trigger calling `private.set_updated_at()`.
+     - Granted `SELECT (updated_at)` on `public.routines` to `authenticated` while retaining `founder_notes` as founder-only.
+  2. **`public.routine_items.product_id` Reconciliation [DELIVERED]**:
+     - Added `product_id UUID REFERENCES public.products(id) ON DELETE RESTRICT` to `public.routine_items`.
+     - Transactional RPC `commit_routine_proposal` resolves or upserts canonical products and populates `product_id`.
+  3. **`RoutineStep.scheduleText` Derivability [DELIVERED]**:
+     - Derived deterministically during read assembly from `timing` + `days` using `formatRoutineStepSchedule` from `src/types/schema.ts` without database bloat.
+  4. **`UserProduct.product` Reconstruction Invariant [DELIVERED]**:
+     - All B2-decided products are normalized and upserted into `public.products`.
+     - `public.user_products.product_id` references the normalized catalog row, and a unique constraint `user_products_user_product_idx` prevents duplicate user-product pairs.
+     - `RemoteDeriveService.getUserProducts()` executes `user_products JOIN products` to hydrate full canonical `UserProduct` objects with nested `Product`.
+  5. **Remote Routine Read Assembly [DELIVERED]**:
+     - `RemoteDeriveService.getRoutine(userId)` reads `routines` + `routine_items` (ordered by `order_index`), maps headers and steps, partitions into `amSteps` and `pmSteps`, derives `scheduleText`, and returns typed `RoutinePlan`.
+     - Kanuj's `hydrateRoutine()` in `src/services/deriveClient.ts` cleanly hydrates this structure into `routineStore`.
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.
