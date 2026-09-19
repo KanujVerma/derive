@@ -589,13 +589,17 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
-### S5: Commerce & Remote Service Integration
-* **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership** (target $25/month after B4A; Stripe owns live money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` against live Edge Functions. Separate product commerce v0 may follow membership checkout. Full personalized Shop is later / evidence-driven.
+### S5: Commerce & Remote Service Integration [IMPLEMENTED; HOSTED ACTIVATION PENDING]
+* **Status**: IMPLEMENTED LOCALLY · HOSTED STRIPE/SUPABASE CONFIGURATION PENDING.
+* **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership** (target $25/month after B4A; Stripe Price owns live money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` hosted-session adapters. Separate product commerce v0 may follow membership checkout. Full personalized Shop is later / evidence-driven.
 * **Acceptance Criteria**:
-  - Stripe webhook maps customer email to Supabase member record and membership lifecycle.
-  - `RemoteDeriveService` passes the full test suite against live Supabase Edge Functions.
-  - Mobile app can toggle from `MockDeriveService` to `RemoteDeriveService` via a single environment flag.
-  - Product SKU checkout is not required to close S5 membership; Shop is explicitly deferred.
+  - [x] Signed Stripe webhook maps immutable `derive_user_id` metadata or an existing Stripe binding first, with normalized customer email as the compatibility fallback, then projects subscription lifecycle to Supabase.
+  - [x] Duplicate deliveries are idempotent and older out-of-order events cannot regress newer membership state.
+  - [x] `RemoteDeriveService` exposes validated hosted Checkout and customer-portal sessions; Mock mode fails closed for billing.
+  - [x] Mobile app retains the single `EXPO_PUBLIC_USE_REMOTE_SERVICE` Mock → Remote flag.
+  - [x] Stripe secret key, webhook secret, price ID, and redirect URLs remain server-only and absent from Expo.
+  - [x] Product SKU checkout is not required to close S5 membership; Shop is explicitly deferred.
+  - [ ] Configure a hosted Supabase project and Stripe test-mode product/price/webhook, then run one real test-mode Checkout → webhook → portal smoke test before production Remote mode is enabled.
 
 ---
 

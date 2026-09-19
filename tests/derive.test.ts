@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { selectCurrentMembershipSubscription } from '../supabase/functions/_shared/subscriptions.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -1196,6 +1197,47 @@ test('Environment guard: Mobile source references only approved public variables
   assert.deepEqual([...offenders], []);
 });
 
+test('S5 environment boundary: trusted Stripe names are empty and absent from Expo source', () => {
+  const template = readFileSync(join(REPO_ROOT, 'supabase/.env.example'), 'utf8');
+  const assignments = [...template.matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)];
+  const names = new Set(assignments.map((match) => match[1]));
+  for (const required of [
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_FOUNDING_BETA_PRICE_ID',
+    'DERIVE_CHECKOUT_SUCCESS_URL',
+    'DERIVE_CHECKOUT_CANCEL_URL',
+    'DERIVE_PORTAL_RETURN_URL',
+  ]) {
+    assert.ok(names.has(required), `${required} must be documented in the trusted-server template`);
+  }
+  for (const [, , value] of assignments) assert.equal(value, '');
+  assert.doesNotMatch(template, /(?:sk_live_|sk_test_|whsec_|price_[A-Za-z0-9])/);
+
+  const mobile = [
+    ...collectTextFiles(join(REPO_ROOT, 'app')),
+    ...collectTextFiles(join(REPO_ROOT, 'src')),
+  ].map((file) => readFileSync(file, 'utf8')).join('\n');
+  assert.doesNotMatch(mobile, /STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|STRIPE_FOUNDING_BETA_PRICE_ID/);
+
+  const config = readFileSync(join(REPO_ROOT, 'supabase/config.toml'), 'utf8');
+  assert.match(config, /\[functions\.create-membership-checkout\][\s\S]*?verify_jwt = true/);
+  assert.match(config, /\[functions\.create-membership-portal\][\s\S]*?verify_jwt = true/);
+  assert.match(config, /\[functions\.stripe-membership-webhook\][\s\S]*?verify_jwt = false/);
+
+  const checkout = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/create-membership-checkout/index.ts'),
+    'utf8',
+  );
+  const webhook = readFileSync(
+    join(REPO_ROOT, 'supabase/functions/stripe-membership-webhook/index.ts'),
+    'utf8',
+  );
+  assert.match(checkout, /existingSubscriptions[\s\S]*?STRIPE_FOUNDING_BETA_PRICE_ID|existingSubscriptions[\s\S]*?priceId/);
+  assert.match(webhook, /constructEventAsync\([\s\S]*?createSubtleCryptoProvider/);
+  assert.match(webhook, /item\.price\.id === expectedPriceId/);
+});
+
 test('S1 private-photo endpoints preserve JWT ownership, 900-second signing, and Storage-first deletion', () => {
   const signer = readFileSync(
     join(REPO_ROOT, 'supabase/functions/photo-url/index.ts'),
@@ -2155,6 +2197,8 @@ import {
   getActiveUserId,
   resolveUserId,
   buildOnboardingPayload,
+  createMembershipCheckoutSession,
+  createMembershipPortalSession,
 } from '../src/services/deriveClient.ts';
 import { uploadPhotoToStorage } from '../src/services/onboardingPhotoUpload.ts';
 import { useBootstrapStore } from '../src/stores/bootstrapStore.ts';
@@ -2165,6 +2209,7 @@ import {
   mapDbRoutine,
   mapDbRefillRequest,
   mapDbCheckIn,
+  mapHostedMembershipSession,
 } from '../src/services/remote/RemoteDeriveService.ts';
 import type { IDeriveService } from '../src/contracts/DeriveService.ts';
 import type {
@@ -2222,10 +2267,65 @@ test('K6 Service Boundary: MockDeriveService initializes strictly clean with zer
   assert.deepEqual(await service.getOrders('usr_arthur_1'), []);
 });
 
+test('S5 Commerce Service Boundary: remote hosted billing sessions are validated and mock mode fails closed', async () => {
+  assert.deepEqual(
+    mapHostedMembershipSession({ url: 'https://checkout.stripe.com/c/pay/test' }, 'checkout'),
+    { url: 'https://checkout.stripe.com/c/pay/test' },
+  );
+  assert.throws(
+    () => mapHostedMembershipSession({ url: 'http://checkout.stripe.com/c/pay/test' }, 'checkout'),
+    /insecure checkout URL/,
+  );
+  assert.throws(
+    () => mapHostedMembershipSession({ url: 'javascript:alert(1)' }, 'portal'),
+    /insecure portal URL/,
+  );
+
+  const calls: Array<{ name: string; body: unknown }> = [];
+  const remote = new RemoteDeriveService({
+    functions: {
+      async invoke(name: string, options: { body: unknown }) {
+        calls.push({ name, body: options.body });
+        return {
+          data: {
+            url: name === 'create-membership-checkout'
+              ? 'https://checkout.stripe.com/c/pay/session'
+              : 'https://billing.stripe.com/p/session',
+          },
+          error: null,
+        };
+      },
+    },
+  });
+  assert.match((await remote.createMembershipCheckout('11111111-1111-4111-8111-111111111111')).url, /checkout\.stripe\.com/);
+  assert.match((await remote.createMembershipPortal()).url, /billing\.stripe\.com/);
+  assert.deepEqual(calls, [
+    {
+      name: 'create-membership-checkout',
+      body: { requestId: '11111111-1111-4111-8111-111111111111' },
+    },
+    { name: 'create-membership-portal', body: {} },
+  ]);
+
+  const mock = new MockDeriveService();
+  await assert.rejects(() => mock.createMembershipCheckout(), /RemoteDeriveService/);
+  await assert.rejects(() => mock.createMembershipPortal(), /RemoteDeriveService/);
+});
+
 test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService', async () => {
   // Build a test double representing a remote backend
   class RemoteBackendMock implements IDeriveService {
     calls: string[] = [];
+
+    async createMembershipCheckout(): Promise<{ url: string }> {
+      this.calls.push('createMembershipCheckout');
+      return { url: 'https://checkout.stripe.test/session' };
+    }
+
+    async createMembershipPortal(): Promise<{ url: string }> {
+      this.calls.push('createMembershipPortal');
+      return { url: 'https://billing.stripe.test/session' };
+    }
 
     async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
       this.calls.push('onboard');
@@ -2401,6 +2501,11 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
 
   const backend = new RemoteBackendMock();
   setDeriveService(backend);
+
+  assert.match((await createMembershipCheckoutSession()).url, /checkout\.stripe\.test/);
+  assert.match((await createMembershipPortalSession()).url, /billing\.stripe\.test/);
+  assert.ok(backend.calls.includes('createMembershipCheckout'));
+  assert.ok(backend.calls.includes('createMembershipPortal'));
 
   // 1. Verify askQuestion reaches swappable backend
   const askRes = await askQuestion('How do I apply this?');
@@ -7995,4 +8100,21 @@ test('I1-B4B Obsolete changeReason is gone and note limit is explicit', () => {
   const remote = fs.readFileSync(path.resolve('src/services/remote/RemoteDeriveService.ts'), 'utf8');
   assert.equal(remote.includes('get-progress'), false);
   assert.equal(remote.includes("from('check_ins')"), true);
+});
+test('S5: current paid membership survives later delivery for an older canceled subscription', () => {
+  const subscription = (id: string, created: number, status: string, priceId = 'price_founding') => ({
+    id, created, status, items: { data: [{ price: { id: priceId } }] },
+  });
+  const current = selectCurrentMembershipSubscription([
+    subscription('sub_old', 10, 'canceled'),
+    subscription('sub_new', 20, 'active'),
+  ], 'price_founding');
+  assert.equal(current?.id, 'sub_new');
+  assert.equal(selectCurrentMembershipSubscription([
+    subscription('sub_old', 10, 'active'),
+    subscription('sub_new', 20, 'canceled'),
+  ], 'price_founding')?.id, 'sub_old');
+  assert.equal(selectCurrentMembershipSubscription([
+    subscription('sub_other', 30, 'active', 'price_other'),
+  ], 'price_founding'), null);
 });

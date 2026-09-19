@@ -24,7 +24,8 @@ Read documents relevant to your specific task rather than loading all documentat
 - **Implemented (I1-B4A)**: Founding Beta membership display is `$25/month` via `config.betaPriceMonthly` (display only; Stripe/S5 owns charged money). Canonical identity is `founding_beta`. Products are purchased separately. Routine-derived all-in pricing (`src/pricing/**`) has been removed.
 - **Implemented (I1-B4B)**: optional multi-select weekly check-in context tags + one optional context note, persisted through real `submit-checkin` and RLS-backed progress reads. Tags are context, not causation.
 - **Implemented (S1–S4)**: platform foundation, core domain persistence, server intelligence, and founder operations console are on `main`.
-- Do not implement Shop, Stripe, a sixth tab, or S5 live billing unless that pass is explicitly opened.
+- **Implemented (S5)**: server-owned Stripe membership Checkout, Billing Portal, and signed webhook projection. Hosted Stripe/Supabase activation smoke remains pending. Production Remote mode remains disabled.
+- C1 Shop V1 remains on draft branch `kanuj/c1-shop-v1`; physical-product commerce is deferred to C1.5. Do not introduce a sixth root tab.
 
 Never silently cross founder ownership boundaries. For shared-contract modifications or cross-boundary integrations, document rationale and changes in `docs/CONTEXT_SYNC.md`.
 

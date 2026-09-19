@@ -100,3 +100,23 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/submit-checkin/deno.json"
 entrypoint = "./functions/submit-checkin/index.ts"
+
+[functions.create-membership-checkout]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-membership-checkout/deno.json"
+entrypoint = "./functions/create-membership-checkout/index.ts"
+
+[functions.create-membership-portal]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-membership-portal/deno.json"
+entrypoint = "./functions/create-membership-portal/index.ts"
+
+# Stripe sends its own signature, not a Supabase JWT. The handler verifies the
+# raw request body against STRIPE_WEBHOOK_SECRET before any database mutation.
+[functions.stripe-membership-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/stripe-membership-webhook/deno.json"
+entrypoint = "./functions/stripe-membership-webhook/index.ts"
