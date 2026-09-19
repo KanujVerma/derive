@@ -82,3 +82,6 @@ jobs:
 
       - name: Run S3 intelligence Edge integration harness
         run: node scripts/test-s3-local.mjs
+
+      - name: Run S4 founder operations integration harness
+        run: node scripts/test-s4-local.mjs

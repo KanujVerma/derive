@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  formatMember,
+  nextRefillStatus,
+  parseList,
+  validateHttpsUrl,
+} from '../admin/lib/validation.mjs';
 
 import { checkSkincareSafety } from '../src/services/ai-workflows/safety-classifier.ts';
 import { generateRoutineProposal } from '../src/services/ai-workflows/routine-generator.ts';
@@ -6792,4 +6798,44 @@ test('I1-B2.3: static check - zero .server-provider-config, Deno.readTextFile, o
   assert.ok(!providerSource.includes('.server-provider-config'), 'Must not contain .server-provider-config');
   assert.ok(!providerSource.includes('/Users/'), 'Must not contain /Users/ founder path');
   assert.ok(!providerSource.includes('Deno.readTextFile'), 'Must not contain Deno.readTextFile');
+});
+
+test('S4 admin validation: refill transitions are strictly sequential', () => {
+  assert.equal(nextRefillStatus('requested'), 'ordered');
+  assert.equal(nextRefillStatus('ordered'), 'shipped');
+  assert.equal(nextRefillStatus('shipped'), 'delivered');
+  assert.equal(nextRefillStatus('delivered'), null);
+  assert.equal(nextRefillStatus('unknown'), null);
+});
+
+test('S4 admin validation: formula list parsing trims, deduplicates, and limits input', () => {
+  assert.deepEqual(parseList('Water\nGlycerin, water\nCeramide NP'), ['Water', 'Glycerin', 'Ceramide NP']);
+  assert.throws(() => parseList('a,b,c', 2), /no more than 2/i);
+  assert.throws(() => parseList('a'.repeat(301)), /300 characters/i);
+});
+
+test('S4 admin validation: tracking links require HTTPS', () => {
+  assert.equal(validateHttpsUrl(''), null);
+  assert.equal(validateHttpsUrl('https://carrier.example/track'), 'https://carrier.example/track');
+  assert.throws(() => validateHttpsUrl('http://carrier.example/track'), /HTTPS/i);
+  assert.throws(() => validateHttpsUrl('not-a-url'), /valid URL/i);
+});
+
+test('S4 admin validation: member display prefers name, then email, without fabricating identity', () => {
+  assert.equal(formatMember({ full_name: 'Sami', email: 'sami@example.test' }), 'Sami');
+  assert.equal(formatMember({ full_name: null, email: 'sami@example.test' }), 'sami@example.test');
+  assert.equal(formatMember(null), 'Unknown member');
+});
+
+test('S4 static security boundary: admin browser code contains no service-role access', () => {
+  const adminFiles = [
+    'admin/index.html',
+    'admin/app.mjs',
+    'admin/lib/api.mjs',
+    'admin/lib/validation.mjs',
+    'admin/config.example.js',
+  ].map((file) => fs.readFileSync(path.resolve(file), 'utf8')).join('\n');
+  assert.ok(!adminFiles.includes('SUPABASE_SERVICE_ROLE_KEY'));
+  assert.ok(!adminFiles.includes('sb_secret_') || adminFiles.includes('startsWith("sb_secret_")'));
+  assert.ok(adminFiles.includes('/functions/v1/founder-operations'));
 });
