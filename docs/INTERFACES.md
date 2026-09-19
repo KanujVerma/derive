@@ -319,6 +319,9 @@ To enforce strict boundary isolation between presentation and backend implementa
   - `requestProductRefill(input)`: Submits replenishment request.
   - `hydrateOrders()`, `hydrateProgress()`, `hydratePlanState()`, `hydrateRoutine()`, `hydrateResearchInsights()`, `hydrateCustomerProfile()`: Pull state from the active backend. Canonical plan hydration is `hydratePlanState()` (Routine + `UserProduct[]` atomically). Legacy `hydrateRoutine()` is a compatibility wrapper that returns `result?.routine ?? null`. On hydration error for an onboarded member, the client preserves `isRoutineBeingPrepared = true` rather than un-onboarded empty-state.
   - `resolveUserId(userId?)`: Validates user identity. When `isRemoteServiceEnabled()` is true, fails closed (throws error) if user ID is missing, empty, whitespace-only (`'   '`), or matches mock IDs (`usr_beta_member`, `usr_beta_001`). Note: this is a client-side non-mock presence guard to prevent mock data leakage, distinct from server-side JWT session verification (enforced via Postgres RLS in S1/I1).
+  - `createMembershipCheckoutSession(requestId?)`, `createMembershipPortalSession()`: UI-safe coordinator entry points for the hosted billing methods; no UI route needs to import a concrete service implementation.
+  - `IDeriveService.createMembershipCheckout(requestId?)`: Returns only `{ url }` for a short-lived HTTPS Stripe Checkout destination. Remote mode sends an idempotency correlation UUID; the trusted function derives member identity from the JWT. Mock mode rejects billing rather than fabricating a successful payment.
+  - `IDeriveService.createMembershipPortal()`: Returns only `{ url }` for a short-lived HTTPS Stripe Billing Portal destination. The trusted function resolves the Stripe customer binding from the authenticated member; callers cannot supply a customer ID.
 - **Client Scanner Partition (`src/services/catalog.ts`)**: Camera viewfinder and offline barcode matching rely strictly on `src/services/catalog.ts` (`findProductByBarcode`, `PROTOTYPE_CATALOG`). Production `recognizeShelfProducts()` returns empty products to fail closed, while demo fixture is isolated to `getDemoShelfRecognitionFixture()`.
 - **Zero-AI-Workflows Rule**: Client code in `app/**` is strictly forbidden from importing `src/services/ai-workflows/**`. Server workflows are invoked exclusively through `IDeriveService` implementations.
 - **Swappability**: The active backend implementation can be swapped at runtime via `setDeriveService()` or via configuration flag without altering any client UI code.
@@ -340,8 +343,16 @@ To truthfully determine whether an authenticated user requires onboarding or is 
   - `profileExists`: Verified via `public.profiles`. The presence of a profile row (auto-provisioned by auth triggers) does NOT mean onboarding is complete. If absent, bootstrap fails closed (`profileExists: false`) to catch provisioning failures.
   - `onboardingCompleted`: Read strictly from `public.skin_profiles.onboarding_completed`. Missing skin profile or false means `NEEDS_ONBOARDING`; true means `READY`.
   - `membershipStatus`: Queried from `public.memberships` deterministically (latest row by `created_at` descending; absent row maps to `'none'`). Membership state is purely informational in this slice and does NOT gate onboarding navigation.
-  - Tier and pricing fields are strictly excluded from bootstrap. I1-B4A migrated `CustomerProfile.tier` from historical `'founding_beta_129'` to price-neutral `'founding_beta'`. Display price is `config.betaPriceMonthly` (`25`). Stripe remains S5.
+  - Tier and pricing fields are strictly excluded from bootstrap. I1-B4A migrated `CustomerProfile.tier` from historical `'founding_beta_129'` to price-neutral `'founding_beta'`. Display price is `config.betaPriceMonthly` (`25`); Stripe's configured recurring Price is the S5 charge authority.
 
-### H. I1-B4 Contract Status
+### H. S5 Membership Commerce Contract
+- Checkout and portal are Stripe-hosted. Derive does not collect card fields or expose Stripe secrets in mobile code.
+- Checkout input is only a request-correlation UUID. User ID, account email, tier metadata, Price ID, and redirect URLs are trusted-server values.
+- Webhook mutation requires a valid Stripe signature over the unparsed request body. Unsigned/invalid requests return `400`; incomplete server configuration returns sanitized `503` responses.
+- Canonical `membershipStatus` remains `active | paused | cancelled`; raw Stripe status is server-only evidence and never expands the shared customer enum.
+- Money is not duplicated in `MembershipTier`, `CustomerProfile`, or the database tier identity. Changing the Stripe Price requires an explicit commercial/configuration review, not a tier rename.
+- Product purchasing/refills remain outside this contract.
+
+### I. I1-B4 Contract Status
 - **B4A membership (IMPLEMENTED)**: `CustomerProfile.tier` is `'founding_beta'`. Display price is $25/month membership, products separate. `src/pricing/**` all-in engine removed. Mock/Remote map canonical `founding_beta` and fail closed otherwise.
 - **B4B check-in (IMPLEMENTED)**: Canonical `CheckInContextTag` plus `contextTags` / `contextNote` on `CheckIn` / `CheckInInput`. Persisted `CheckIn.contextTags` is a required array (legacy rows map to `[]`). Input remains optional. Legacy `notes` preserved. Tags are context, not causation. Real `submit-checkin` Edge Function exists. Remote `getProgress()` reads `public.check_ins` via RLS and does not call `get-progress`. Remote `learnedInsights` and `recentPhotos` are empty until later durable insight/photo-signer milestones.

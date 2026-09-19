@@ -589,47 +589,45 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
-### S5: Commerce & Remote Service Integration [ACTIVE ON PR #18]
-* **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership billing only** (target $25/month after B4A; Stripe owns charged money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` against live Edge Functions. S5 explicitly defers physical product checkout, Shop, product SKU commerce, and physical-product Order system.
+### S5: Membership Billing Integration [IMPLEMENTED; HOSTED ACTIVATION PENDING]
+* **Status**: Membership billing implementation merged on `main` through PR #18. Hosted Stripe/Supabase activation smoke remains pending. Production Remote mode remains disabled.
+* **Scope**: Trusted Stripe-hosted Founding Beta membership Checkout and Billing Portal, signed webhook lifecycle projection, and `RemoteDeriveService` hosted-session adapters. The server-configured Stripe Price owns the charge; `config.betaPriceMonthly` is display only. Products remain separate purchases.
 * **Acceptance Criteria**:
-  - Stripe webhook maps customer email to Supabase member record and membership lifecycle (`active` / `past_due` / `canceled`).
-  - `HostedMembershipSession` contracts (`createMembershipCheckout`, `createMembershipPortal`) live in `IDeriveService`.
-  - `RemoteDeriveService` passes the full test suite against live Supabase Edge Functions.
-  - Mobile app can toggle from `MockDeriveService` to `RemoteDeriveService` via a single environment flag.
-  - Physical product checkout, Shop catalog, and product SKU commerce remain deferred to C1.5.
+  - [x] Checkout and Portal derive member identity from the authenticated session; callers cannot choose a customer, Price, or amount.
+  - [x] Signed webhook uses the raw body, current Stripe subscription truth, a service-only idempotent ledger, and fail-closed identity reconciliation.
+  - [x] `HostedMembershipSession`, `createMembershipCheckout`, and `createMembershipPortal` remain membership-specific shared contracts.
+  - [x] Stripe secrets, webhook secret, and service-role credential remain server-side.
+  - [x] Product SKU checkout, ProductOffer, cart, and physical orders are outside S5.
+  - [ ] Run hosted test-mode Checkout to signed webhook to membership state to Billing Portal smoke before claiming billing is live.
 
 ---
 
 ## Kanuj Commerce Stream (Shop & Customer Acquisition)
 
-### C1: Shop V1 Personalized Commerce UX [DRAFT PR / IN PROGRESS]
-* **Scope**: Durable mobile foundation for Derive Shop. Member root tab replaces Scan with Shop (`Today · Plan · Shop · Ask · Progress`). Single canonical scanner nested at `app/shop/scan.tsx` with direct redirect compatibility shim. Canonical reusable product detail destination (`app/shop/[productId].tsx`) resolving strictly from hydrated client state. Plan → Shop integration with restrained "View product" links and suppressed acquisition when routine is unpublished. Today contextual card for unconfirmed ADD items on published routines. Direct Ask and legacy scan routing to `/shop/scan`. Non-member and guest fallback view models without fake personalization or fabricated scores. Action-to-commerce semantics (`resolveActionCommerceSemantics`). Invariants: unapproved recommendations never monetized, recommendation independence from commercial offers, price truth without fabricated amounts.
+### C1: Shop V1 Personalized Commerce UX [IMPLEMENTED]
+* **Scope**: Five member root tabs (`Today · Plan · Shop · Ask · Progress`) with one Scan implementation inside Shop. A canonical product detail route uses member context only. Shop, Today, and Plan commerce entry points require active membership; ADD acquisition and managed refills require a published routine.
 * **Acceptance Criteria**:
-  - [x] Target member navigation is 5 tabs: Today, Plan, Shop, Ask, Progress. No sixth tab.
-  - [x] Scan lives canonically inside Shop (`app/shop/scan.tsx`); only one scanner implementation exists.
-  - [x] Canonical product detail route exists at `app/shop/[productId].tsx` resolving from canonical client state.
-  - [x] Plan Products integrates with Shop/product detail with suppressed ADD when unpublished.
-  - [x] Today integrates contextual needed-products card for published unconfirmed ADD.
-  - [x] Ask and legacy Scan routes navigate directly to canonical `/shop/scan`.
-  - [x] Non-member and guest presentation fallbacks exist without fake routine context.
-  - [x] Action-to-commerce semantics enforce ADD eligible on publish only; PAUSE/STOP never; REPLACE never sells old product.
-  - [x] Zero physical-commerce backend or DB changes in C1 (deferred to C1.5).
-  - [x] Zero shared domain/contract modifications in `src/contracts/**` or `src/domain/**`.
-  - [x] Unit test suite, TypeScript, and web export pass 100%.
+  - [x] Shop replaces Scan as a root tab; legacy and Ask Scan links reach `/shop/scan`.
+  - [x] Shop, product detail, Today, and Plan use the same Mock-versus-Remote audience resolution.
+  - [x] Inactive audiences see no member product detail, personalized Scan, or Shop acquisition links.
+  - [x] No fabricated public catalog, physical offer, price, discount, or checkout is shown.
+  - [x] Mock Scan-to-Ask preserves the scanned verdict.
+  - [x] Recommendation and safety decisions remain independent of commercial inputs.
+  - [x] C1 adds no backend migration or physical-commerce shared contract.
 
-### C1.5: Physical Product Commerce Integration [BLOCKED ON S5 MERGE + COMMERCE PROVIDER DECISION]
-* **Scope**: Physical product checkout and fulfillment integration following S5 membership billing reconciliation.
-* **Prerequisites**: S5 merged; physical-commerce provider selected (Stripe direct vs Shopify headless vs external retailer).
-* **Deliverables**:
-  - Reconcile C1 branch onto main post-S5 merge.
-  - Introduce shared `ProductOffer` contract and DB schema.
-  - Single-item checkout with native Apple Pay / payment sheet.
-  - Physical order management (`Order`, `OrderItem[]`) converging with operational refills.
-  - Public catalog read contract and guest/non-member routing shell activation.
-  - Real member commerce benefits (member price, shipping perks) if supported by verified offers.
+### C1.5: Physical Product Commerce Integration [NOT STARTED]
+* **Scope**: Future physical product checkout, offers, order persistence, fulfillment, and public Shop activation.
+* **Prerequisites**: Choose a physical-commerce provider and approve a separate contract and data model.
+* **Candidate deliverables**:
+  - `ProductOffer` contract and database schema, separate from Product and Recommendation.
+  - Single-item checkout and physical `Order` / `OrderItem` persistence.
+  - Public catalog reads and guest/non-member Shop routing without member data leakage.
+  - A separate factual non-member Scan backend path and authorization policy before enabling public Scan.
+  - Verified offer-backed benefits, if any, without influencing recommendations.
 
-### C2: Personalized Discovery & Cart [DEFERRED / EVIDENCE DRIVEN]
-* **Scope**: Category exploration, search, personalized product alternatives for out-of-stock items, multi-merchant offers, and multi-item cart (only if customer order patterns establish multi-product demand).
+### C2: Personalized Discovery & Cart [DEFERRED]
+* **Scope**: Search, categories, alternatives, and multi-item cart only after customer evidence supports them.
+
 
 ---
 

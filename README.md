@@ -59,9 +59,9 @@ developer/CI, and trusted-server credential boundaries.
 
 - **Mobile Client**: Expo SDK 57, React Native 0.86, TypeScript (strict mode), Expo Router (file-based navigation in `app/`), Zustand state stores.
 - **Visual Design**: Direction A Mineral (Warm Ivory `#F6F3EC`, Elevated Surface `#FFFEFB`, Architectural Charcoal `#171A18`, Mineral Green `#345447`).
-- **Platform / Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Private Storage; Edge Functions planned) — S1A data plane hardened; full S1 platform in progress.
-- **Intelligence**: Planned server-side Google Gemini 2.5 Flash via structured JSON schemas (server-side only; Gemini keys are strictly server secrets; Supabase Edge Functions and live model integration are planned for S3; mobile client currently uses deterministic local reasoning via `MockDeriveService`), coupled with deterministic safety circuit breakers.
-- **Commerce**: Planned Stripe web checkout for Founding Beta **membership** ($25/month display after I1-B4A; Stripe in S5). Products are separate transactions. Full Shop is deferred.
+- **Platform / Backend**: Supabase PostgreSQL, Row-Level Security, Auth, private Storage, and Edge Functions are implemented through S5. Hosted activation remains pending.
+- **Intelligence**: S3 server intelligence uses a server-side Gemini provider when configured and deterministic safety circuit breakers. The mobile app remains in Mock mode by default.
+- **Commerce**: S5 membership Checkout, Billing Portal, and signed subscription webhooks are implemented; hosted test-mode activation remains pending. C1 member Shop V1 is implemented. Products are separate purchases, with physical checkout deferred to C1.5.
 - **Telemetry**: Planned privacy-safe telemetry (PostHog with session replay strictly disabled; typed navigation allowlist only; zero health data/photos/symptoms).
 
 ---
@@ -74,7 +74,7 @@ Derive separates development into two independent lanes connected by a thin, sta
   - Mobile screens (`app/**`), UI components (`src/components/**`), design tokens (`src/constants/theme.ts`), haptics, voice input, and client AI interactions.
   - Develops against `MockDeriveService` with zero backend blocking.
 * **Sami (Platform + Intelligence + Operations)**:
-  - Supabase database schema, migrations, RLS policies, private storage, planned Edge Functions (`supabase/**`), intelligence workflows, and founder operations console (`admin/**`).
+  - Supabase database schema, migrations, RLS policies, private storage, Edge Functions (`supabase/**`), intelligence workflows, and founder operations console (`admin/**`).
   - Implements `RemoteDeriveService` fulfilling the exact same contract.
 
 ### Toggling Between Mock and Remote Backend
@@ -83,7 +83,7 @@ The service factory supports selecting the remote backend adapter:
 # In your local .env:
 EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 ```
-*Note: The mobile client currently operates primarily against local Zustand stores and `MockDeriveService`. `RemoteDeriveService` and the Supabase platform are in active development (S1A data plane complete; S1B/S2 remote row mapping and live functions in progress). Enabling this flag alone does not make the application production-ready against a remote backend.*
+*Note: The mobile client remains in Mock mode by default. The Remote adapter and S1-S5 implementation are present, but hosted migrations, functions, provider secrets, and the Stripe test-mode lifecycle smoke must be verified before Remote production activation. Enabling this flag alone is not a production readiness check.*
 
 ---
 

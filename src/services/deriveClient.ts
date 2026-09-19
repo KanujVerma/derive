@@ -36,6 +36,7 @@ import type {
   SkinState,
   IrritationLevel,
   AdherenceLevel,
+  HostedMembershipSession,
 } from '../domain/types.ts';
 import { useRoutineStore } from '../stores/routineStore.ts';
 import { useUserStore } from '../stores/userStore.ts';
@@ -131,6 +132,16 @@ export function buildOnboardingPayload(
 // ==========================================
 // 1. COORDINATOR FUNCTIONS
 // ==========================================
+
+export async function createMembershipCheckoutSession(
+  requestId?: string,
+): Promise<HostedMembershipSession> {
+  return getDeriveService().createMembershipCheckout(requestId);
+}
+
+export async function createMembershipPortalSession(): Promise<HostedMembershipSession> {
+  return getDeriveService().createMembershipPortal();
+}
 
 export async function submitOnboarding(payload: OnboardingPayload): Promise<OnboardingResult> {
   const service = getDeriveService();

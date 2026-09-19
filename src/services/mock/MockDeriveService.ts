@@ -30,6 +30,7 @@ import type {
   ResearchInsight,
   CustomerProfile,
   CustomerBootstrapState,
+  HostedMembershipSession,
   RoutinePlan,
   SkinProfile,
   UserProduct,
@@ -75,6 +76,14 @@ export class MockDeriveService implements IDeriveService {
   private customerProfile: CustomerProfile | null = null;
   private skinProfile: SkinProfile | null = null;
   private bootstrapOverride: Partial<CustomerBootstrapState> | null = null;
+
+  async createMembershipCheckout(_requestId?: string): Promise<HostedMembershipSession> {
+    throw new Error('Membership billing is available only when RemoteDeriveService is enabled.');
+  }
+
+  async createMembershipPortal(): Promise<HostedMembershipSession> {
+    throw new Error('Membership billing is available only when RemoteDeriveService is enabled.');
+  }
 
   /**
    * Resets all internal state back to clean initial state.

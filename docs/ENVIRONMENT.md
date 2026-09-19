@@ -26,15 +26,21 @@ another.
 | `DERIVE_PUBLIC_SUPABASE_URL` | Local Edge Function runtime | Public | Optional override when testing signed photo URLs from a physical device; hosted environments do not need it |
 | `GEMINI_API_KEY` | Supabase Edge Functions / trusted server | Secret | Required for live S3 routine, scan, and Ask generation |
 | `GEMINI_MODEL` | Supabase Edge Functions / trusted server | Non-secret configuration | Optional S3 model override; defaults to `gemini-2.5-flash` |
+| `STRIPE_SECRET_KEY` | Supabase Edge Functions / trusted server | Secret | Required for Checkout, Portal, and subscription retrieval; use a test-mode key until production readiness review |
+| `STRIPE_WEBHOOK_SECRET` | Supabase Edge Functions / trusted server | Secret | Required to verify the raw Stripe webhook body; unique per webhook endpoint/listener |
+| `STRIPE_FOUNDING_BETA_PRICE_ID` | Supabase Edge Functions / trusted server | Non-secret identifier, server-only policy | Recurring monthly Stripe Price that owns the actual Founding Beta charge |
+| `DERIVE_CHECKOUT_SUCCESS_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS success destination (localhost HTTP allowed only for local development) |
+| `DERIVE_CHECKOUT_CANCEL_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS cancellation destination (localhost HTTP allowed only for local development) |
+| `DERIVE_PORTAL_RETURN_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS return destination from Stripe Billing Portal |
 
 The root `.env.example` lists only the three `EXPO_PUBLIC_*` mobile variables.
 CLI/CI and trusted-server names are documented here instead of being mixed into
 the Expo template, reducing the risk that a developer pastes a server secret
 into the mobile build environment.
 
-Stripe is intentionally excluded. It belongs to S5 and must not be introduced
-as part of the S1 platform setup. PostHog is also excluded until its SDK and
-privacy-safe event transport are implemented.
+S5 trusted-server names are listed with empty values in `supabase/.env.example`.
+They are deliberately absent from the root Expo template. PostHog remains
+excluded until its SDK and privacy-safe event transport are implemented.
 
 ## Local mobile development
 
@@ -45,8 +51,9 @@ cp .env.example .env.local
 ```
 
 Keep `EXPO_PUBLIC_USE_REMOTE_SERVICE=false` for ordinary UI development. The
-current remote adapter is incomplete, so supplying Supabase credentials does
-not make the end-to-end app production-ready.
+remote adapter is implemented, but supplying Supabase credentials alone does
+not make the end-to-end app production-ready: hosted migrations, functions,
+provider secrets, Stripe test-mode setup, and the I1 smoke test must also pass.
 
 Expo compiles every `EXPO_PUBLIC_*` value into the shipped application. These
 variables may contain only values designed to be public. A publishable key is
@@ -104,6 +111,52 @@ reviewed model override is needed; otherwise the functions use
 paths return a sanitized `503` rather than fabricating model output. The
 deterministic emergency circuit breaker and server-owned signal inference do
 not require the provider key.
+
+S5 commerce reads every Stripe value only inside Supabase Edge Functions.
+`create-membership-checkout` and `create-membership-portal` require a valid
+member JWT. `stripe-membership-webhook` intentionally does not require a
+Supabase JWT because Stripe does not send one; it verifies `Stripe-Signature`
+against the unparsed body and `STRIPE_WEBHOOK_SECRET` before any database call.
+Missing Stripe configuration fails closed with sanitized errors.
+
+## Stripe test-mode setup (required before hosted S5 smoke test)
+
+1. In Stripe test mode, create one product named `Derive Founding Beta` and one
+   recurring monthly Price at the founder-approved amount. Copy its `price_...`
+   identifier—not a dollar amount—into `STRIPE_FOUNDING_BETA_PRICE_ID`.
+2. Copy the test-mode secret API key (`sk_test_...`) into
+   `STRIPE_SECRET_KEY`. Never paste a restricted/secret key into a root Expo
+   `.env` file, source file, issue, PR, screenshot, or chat transcript.
+3. Create a webhook endpoint targeting
+   `https://<project-ref>.supabase.co/functions/v1/stripe-membership-webhook`.
+   Subscribe to `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded`, and
+   `customer.subscription.created|updated|deleted|paused|resumed`. Store that
+   endpoint's `whsec_...` value as `STRIPE_WEBHOOK_SECRET`.
+4. Set HTTPS success/cancel/portal-return destinations. These are navigation
+   destinations only; membership activation still comes exclusively from the
+   signed webhook.
+5. Store the values in the hosted function secret store, then deploy the three
+   S5 functions. Do not commit the populated file.
+
+For local development:
+
+```bash
+cp supabase/.env.example supabase/.env.local
+supabase functions serve --env-file supabase/.env.local
+```
+
+For hosted Supabase after the project is linked:
+
+```bash
+supabase secrets set --env-file supabase/.env.local
+supabase functions deploy create-membership-checkout
+supabase functions deploy create-membership-portal
+supabase functions deploy stripe-membership-webhook --no-verify-jwt
+```
+
+The committed template contains names only. Actual values belong in the
+ignored `supabase/.env.local` file or the hosted Supabase secret store.
 
 ## Explicitly forbidden
 

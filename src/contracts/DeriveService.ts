@@ -25,11 +25,18 @@ import type {
   ResearchInsight,
   CustomerProfile,
   CustomerBootstrapState,
+  HostedMembershipSession,
   RoutinePlan,
   UserProduct,
 } from '../domain/types.ts';
 
 export interface IDeriveService {
+  /** Create a short-lived hosted Stripe Checkout destination for Founding Beta. */
+  createMembershipCheckout(requestId?: string): Promise<HostedMembershipSession>;
+
+  /** Create a short-lived hosted Stripe customer-portal destination. */
+  createMembershipPortal(): Promise<HostedMembershipSession>;
+
   /**
    * Submit completed onboarding questionnaire, skin photos, and initial shelf products.
    * Generates initial customer skin profile and initial proposed routine.

@@ -2,6 +2,8 @@
 
 Key technical and product decisions accepted for Derive V1.
 
+**Current navigation decision (C1)**: The five root tabs are Today, Plan, Shop, Ask, and Progress. Scan is a capability inside Shop. This supersedes the tab placement in ADR-02, ADR-03, and the IA clause of ADR-26; those records remain below as historical decisions. ADR-30 still governs membership billing only. Physical-product commerce and its provider remain undecided.
+
 ---
 
 ### ADR-01: React Native + Expo Router over Native Swift
@@ -209,6 +211,16 @@ Key technical and product decisions accepted for Derive V1.
 * **Inference Semantics**: Multi-product overlap means distinct reacted products, not multiple incidents from one bottle. Tolerated exposures discount naive suspicion. Probabilistic inference cannot create a `confirmed_allergy`; existing explicitly confirmed provenance is preserved.
 * **Operational Boundary**: The root mobile `.env.example` remains public-only. Routine provider configuration (`ROUTINE_MODEL_PROVIDER`) and provider credentials, including `GEMINI_API_KEY` when the Gemini adapter is selected, live only in the trusted function environment or service-role-only runtime configuration. Missing configuration returns sanitized `503` responses rather than deterministic output disguised as live AI. Production Remote mode remains disabled and mobile adapter wiring remains S5/I1.
 * **Verification**: Fresh database rebuild; 187/187 pgTAP assertions; clean schema lint; 143/143 unit tests; application and test TypeScript checks; S1, B2 replay, S2, and S3 authenticated local integration harnesses; and production web export.
+
+### ADR-30: Stripe-Hosted Membership Billing & Webhook-Owned Entitlement (S5)
+* **Status**: IMPLEMENTED LOCALLY; hosted Stripe/Supabase test-mode configuration pending.
+* **Decision**: Use Stripe-hosted Checkout and Billing Portal for the `founding_beta` membership. Stripe's configured recurring Price is the charge authority; client `config.betaPriceMonthly` remains display copy and no dollar amount is encoded in the membership tier or database lifecycle projection.
+* **Identity**: Checkout and subscription metadata contain server-authored `derive_user_id`. The signed webhook resolves that UUID or an established Stripe customer/subscription binding first, then uses normalized customer email only as a compatibility fallback. Conflicting immutable bindings fail closed.
+* **Lifecycle**: Only a successfully verified raw-body Stripe webhook may change canonical membership lifecycle. `active`/`trialing` map to `active`; `canceled`/`incomplete_expired` map to `cancelled`; all other non-entitled Stripe subscription statuses map conservatively to `paused`. Checkout success-page navigation never activates membership by itself.
+* **Reliability**: `stripe_webhook_events` stores only event ID/type/time, target membership, outcome, and processing time. A service-only atomic RPC serializes duplicate delivery, makes retries idempotent, and ignores events older than the current membership projection.
+* **Secrets & Client Boundary**: Stripe secret/webhook keys and Price ID are trusted-server values. Authenticated client adapters receive only validated short-lived HTTPS redirect URLs. Authenticated customers retain safe tier/status reads but cannot select Stripe identifiers, mutate membership state, or read the webhook ledger.
+* **Scope Boundary**: S5 covers membership billing only. Products remain separately purchased; SKU checkout, Shop, coupons, affiliates, and product-margin logic are deferred.
+* **Verification**: Fresh local migration rebuild; 277/277 pgTAP assertions; 186/186 unit tests; both TypeScript checks; S5 authenticated boundary/lifecycle integration harness; signed-handler bundle execution; production web export; and full S1–S5/B4B integration chain.
 
 ---
 

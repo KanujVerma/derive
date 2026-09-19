@@ -2,7 +2,7 @@
 
 **Source of Truth**: Canonical architecture for Derive Shop, customer-facing commerce, and product acquisition.
 **Owner**: Kanuj (Customer Experience + Mobile) with Platform/Shared integration points noted.
-**Status**: C1 IMPLEMENTED on draft branch `kanuj/c1-shop-v1`; S5 membership billing integration in progress (`sami/s5-commerce-remote-integration`); physical commerce backend DEFERRED to C1.5.
+**Status**: C1 Shop V1 IMPLEMENTED; S5 membership billing implementation MERGED, with hosted Stripe/Supabase activation smoke pending; physical-product commerce C1.5 NOT STARTED.
 
 ---
 
@@ -138,7 +138,7 @@ Decision status: **OPEN / DEFERRED TO C1.5**.
 | **Primary Strength** | Custom direct payments, native Apple Pay, seamless extension of S5 Stripe billing. | Complete inventory, variants, multi-warehouse shipping, tax, returns, Shop Pay. |
 | **Complexity** | High backend effort: must build order DB, tax calculation, shipment tracking, refund ops. | Lower commerce ops effort: Shopify manages inventory, tax, fulfillment integrations. |
 | **Best Fit Scenario** | Derive holds small curated inventory (5-10 SKUs) fulfilled by founders or single 3PL. | Derive scales catalog, dropships, or supports complex catalog variants and merchant fulfillment. |
-| **Recommendation** | Keep provider-neutral in C1. Reconcile with S5 Stripe infrastructure before deciding in C1.5. |
+| **Recommendation** | Keep physical commerce provider-neutral until C1.5 is opened and its provider decision is made. S5 Stripe use is membership-specific. |
 
 ---
 
@@ -146,23 +146,23 @@ Decision status: **OPEN / DEFERRED TO C1.5**.
 
 - **S5 Scope**: Stripe-hosted $25/month membership billing only (`HostedMembershipSession`, `createMembershipCheckout`, `createMembershipPortal`, webhook entitlement).
 - **C1 Invariant**: C1 introduces **zero** shared contract modifications in `src/contracts/**` or `src/domain/**`. S5 types are not repurposed or overloaded for physical commerce.
-- **Physical Commerce**: Handled via client presentation models (`src/commerce/types.ts`) until S5 is merged and C1.5 is explicitly opened.
+- **Physical Commerce**: C1 has presentation models only (`src/commerce/types.ts`). C1.5 remains unopened; S5's Stripe integration is membership-specific.
 
 ---
 
 ## 9. Commerce Roadmap (V1 → V1.5 → V2)
 
-### C1 / Shop V1 (Current Draft PR)
+### C1 / Shop V1 (Implemented)
 - [x] Target member navigation: `Today · Plan · Shop · Ask · Progress`
 - [x] Shop root tab with personalized member home
 - [x] Single canonical scanner nested at `app/shop/scan.tsx` with redirect shim
 - [x] Action-to-commerce semantics and calm empty states
 - [x] Non-member and guest fallback view models
-- [x] Comprehensive automated unit & static boundary tests (25 tests)
+- [x] Automated unit and boundary tests for audience, publication, Scan, and member-only presentation
 - [x] Full architecture documentation (`docs/COMMERCE.md`)
 
 ### C1.5 / Physical Product Commerce Integration (Next Phase)
-- Reconcile with merged S5 Stripe infrastructure.
+- Preserve the membership and physical-product commerce separation established by S5 and C1.
 - Select physical-commerce provider (Stripe vs Shopify vs External).
 - Define shared `ProductOffer` contract and database schema.
 - Implement single-item physical checkout (Apple Pay / Payment Sheet).

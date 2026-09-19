@@ -8,7 +8,7 @@
  * - Non-member / guest: public presentation fallback (no fake personalized claims)
  * - Scan lives at app/shop/scan.tsx — ONE canonical scanner implementation.
  *
- * WHAT IS NOT BUILT HERE (deferred to C1.5 / S5):
+ * WHAT IS NOT BUILT HERE (deferred to C1.5):
  * - Physical product checkout (Stripe/Shopify/external)
  * - Real ProductOffer DB records
  * - Real member pricing or coupons (none invented)
@@ -397,7 +397,7 @@ export default function ShopScreen() {
           <Text style={styles.membershipPrice}>
             {membershipPresentation.priceDisplay} · {membershipPresentation.tierLabel}
           </Text>
-          {/* C1.5: Membership CTA connects to S5 createMembershipCheckout */}
+          {/* Hosted S5 activation is pending before membership enrollment is linked here. */}
           <View style={styles.membershipCTAPlaceholder}>
             <Text style={styles.membershipCTAText}>
               Membership enrollment available soon.

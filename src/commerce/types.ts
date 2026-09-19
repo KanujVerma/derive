@@ -7,7 +7,7 @@
  * These types live under src/commerce/ (Kanuj-owned) and are NOT in
  * src/contracts/ or src/domain/. They are presentation helpers only.
  *
- * PHYSICAL COMMERCE BACKEND: Deferred to C1.5 / S5 reconciliation.
+ * PHYSICAL COMMERCE BACKEND: Deferred to C1.5.
  * No ProductOffer DB schema, no Stripe physical checkout, no Shopify here.
  *
  * MEMBERSHIP BILLING: Strictly S5 / Sami-owned. DO NOT touch.

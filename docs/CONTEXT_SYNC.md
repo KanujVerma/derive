@@ -6,6 +6,13 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19: S5 landing and C1 integration checkpoint
+
+- Shared `main` received S5 membership billing through PR #18 at `1c44e43cbf2e21ca8c454186076c32af50c45180`. Both jobs of resulting CI run `35468937292` passed.
+- S5 charges only the server-configured Founding Beta Stripe Price. A later webhook for an older subscription now projects the customer's current Stripe subscription, preserving an active replacement entitlement. Hosted Stripe/Supabase Checkout, signed webhook, and Portal smoke remains pending; production Remote mode remains disabled.
+- C1 Shop V1 is implemented on PR #19 with one audience boundary for Mock and Remote membership. Inactive audiences cannot read hydrated member product detail or enter personalized Scan; Today and Plan hide Shop commerce links. ADD acquisition and managed refill presentation require a published routine. Mock Scan-to-Ask preserves the scanned verdict.
+- Physical-product commerce, ProductOffer, product Order schema, provider selection, public catalog activation, and general public Scan remain unopened C1.5 work. Historical entries below retain their original checkpoint claims.
+
 ## 2026-09-19 — Kanuj Mobile: C1 Shop V1 Personalized Commerce UX & Architecture (Draft PR)
 
 - **Agent / Workstream**: Kanuj (Customer Experience + Mobile)
@@ -31,6 +38,41 @@ This ledger tracks durable architectural, product, and contract decisions across
   - Closed superseded PR #17 (`docs(i1-b4): close reconciliation bookkeeping`).
   - Inspected and protected open PR #18 (`sami/s5-commerce-remote-integration` @ `f9e76a1`). C1 isolates physical commerce in draft branch without touching S5 membership billing.
   - Draft PR #19 updated with final closure commit.
+
+## 2026-09-19 — Sami Platform: S5 Membership Commerce & Remote Billing Integration
+
+- **Agent / Workstream**: Sami (Platform, Commerce & Remote Integration)
+- **Local Branch**: `sami/s5-commerce-remote-integration`
+- **Starting Reconciled S4 Dependency**: `8c02d41` (`sami/s4-founder-operations`, includes origin/main `87c6df5`)
+- **Implementation Checkpoints**: `9ebbe5b` (S5 commerce implementation), `c921348` (stacked-PR CI coverage)
+- **Remote Push Status**: `pushed / verified` on `origin/sami/s5-commerce-remote-integration`
+- **GitHub CI**: `success` (Run ID: `35463849617`; Verify & Build and Database & Integration both passed)
+- **Milestone Status**: `S5 IMPLEMENTED LOCALLY · HOSTED STRIPE/SUPABASE TEST-MODE CONFIGURATION PENDING`.
+- **Ownership / Shared Contracts**: Sami-owned additive migration, Edge Functions, Remote adapter, integration harness, CI, environment contract, and durable docs. Shared service/domain additions are minimal (`HostedMembershipSession`, checkout/portal methods). Zero changes to Kanuj-owned `app/**` UI.
+- **Durable Deliverables**:
+  1. Added Stripe-hosted Founding Beta membership Checkout and Billing Portal functions. Both re-verify the authenticated Supabase member; caller-supplied user/customer/price identity is prohibited.
+  2. Added a raw-body Stripe-signature webhook for Checkout completion and subscription created/updated/deleted/paused/resumed events. Supabase JWT verification is disabled only for this endpoint because Stripe supplies its own signature.
+  3. Added service-role-only atomic membership projection with immutable Stripe binding precedence, normalized-email compatibility fallback, identity-conflict rejection, duplicate-event idempotency, and stale-event ordering protection.
+  4. Preserved the canonical price-neutral `founding_beta` tier and three-state customer lifecycle. Stripe Price owns live money; `$25` remains display/config truth and product purchases remain separate.
+  5. Added minimal server-only billing evidence columns and a privacy-minimized webhook ledger. Authenticated members cannot read Stripe customer/subscription/price/raw-status columns or webhook records.
+  6. Added `RemoteDeriveService.createMembershipCheckout()` and `.createMembershipPortal()` returning validated HTTPS redirects only. Mock billing fails closed. The existing single `EXPO_PUBLIC_USE_REMOTE_SERVICE` flag remains the backend switch.
+  7. Added public-only root vs. trusted-server `supabase/.env.example` separation and documented the exact test-mode Stripe/Supabase configuration. No usable credential is committed.
+  8. Added S5 unit, pgTAP, authenticated Edge-boundary, and lifecycle integration coverage to CI. Product SKU checkout and full Shop remain deferred.
+- **Verification at this checkpoint**:
+  - Fresh `supabase db reset`: PASS through S1–S5 migrations.
+  - `supabase test db`: 277/277 PASS.
+  - `node scripts/test-s5-local.mjs`: all stages PASS without contacting Stripe.
+  - `npm test`: 186/186 PASS.
+  - `npx tsc --noEmit`: PASS.
+  - `npm run typecheck:tests`: PASS.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: PASS.
+  - Full S1, I1-B2, S2, S3, S4, S5, and I1-B4B local integration chain: PASS.
+  - Unsigned webhook request: deterministic `400 INVALID_SIGNATURE`; unauthenticated checkout: gateway `401`.
+- **Decision Status**:
+  - `ADR-30: Stripe-Hosted Membership Billing & Webhook-Owned Entitlement`: IMPLEMENTED LOCALLY.
+- **Next Work / External Configuration Gate**:
+  - Create/link the founders' hosted Supabase project, create the Stripe test-mode recurring Founding Beta Price, store function secrets, deploy S5 functions/migration, and run one real test-mode Checkout → signed webhook → Billing Portal smoke test.
+  - Do not enable production Remote mode or live Stripe mode until that hosted test-mode smoke test and cofounder review pass.
 
 ## 2026-09-19 — Pre-C1 integration: land cumulative S1–S4 (#16) onto B4 main
 

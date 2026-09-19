@@ -54,7 +54,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
   - **Weekly check-in context (I1-B4B)**: optional tags + one note are history for comparison, not proven causes. No food diary or period tracker.
   - **Commercial Independence**: Monetization must not silently change recommendations.
 * **Historical (do not delete)**: ADR-21 $100/month all-in/products-included experiment; ADR-10 $129; ADR-15 Arthur $96/mo routine-derived prototype. All superseded as commercial direction.
-* **Long-Term Commerce**: Stripe membership checkout in S5. Separate product commerce v0 after membership. Full Shop later / evidence-driven. No sixth tab.
+* **Commerce State**: S5 membership Checkout and Portal are implemented, with hosted activation pending. C1 member Shop V1 is implemented with Scan inside Shop. Physical-product checkout and provider selection remain unopened C1.5 work. No sixth tab.
 
 ---
 
