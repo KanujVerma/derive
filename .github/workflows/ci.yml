@@ -86,5 +86,8 @@ jobs:
       - name: Run S4 founder operations integration harness
         run: node scripts/test-s4-local.mjs
 
+      - name: Run S5 membership commerce integration harness
+        run: node scripts/test-s5-local.mjs
+
       - name: Run local B4B check-in context E2E harness
         run: node scripts/test-i1-b4b-local.mjs

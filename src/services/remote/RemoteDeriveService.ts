@@ -26,6 +26,7 @@ import type {
   ResearchInsight,
   CustomerProfile,
   CustomerBootstrapState,
+  HostedMembershipSession,
   RoutinePlan,
   CheckIn,
   Routine,
@@ -130,6 +131,28 @@ export class RemoteDeriveService implements IDeriveService {
       );
     }
     return supabase;
+  }
+
+  async createMembershipCheckout(requestId = createRequestId()): Promise<HostedMembershipSession> {
+    const client = this.getClient();
+    const { data, error } = await client.functions.invoke('create-membership-checkout', {
+      body: { requestId },
+    });
+    if (error) {
+      throw new Error(`RemoteDeriveService.createMembershipCheckout failed: ${error.message}`);
+    }
+    return mapHostedMembershipSession(data, 'checkout');
+  }
+
+  async createMembershipPortal(): Promise<HostedMembershipSession> {
+    const client = this.getClient();
+    const { data, error } = await client.functions.invoke('create-membership-portal', {
+      body: {},
+    });
+    if (error) {
+      throw new Error(`RemoteDeriveService.createMembershipPortal failed: ${error.message}`);
+    }
+    return mapHostedMembershipSession(data, 'portal');
   }
 
   async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
@@ -630,6 +653,39 @@ export function mapDbBootstrapState(
 }
 
 export { mapDbCheckIn, mapCheckInResult } from '../../domain/checkIn.ts';
+
+function createRequestId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  // Idempotency correlation only; authorization is provided by the member JWT.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+export function mapHostedMembershipSession(
+  data: unknown,
+  kind: 'checkout' | 'portal',
+): HostedMembershipSession {
+  if (!data || typeof data !== 'object' || typeof (data as { url?: unknown }).url !== 'string') {
+    throw new Error(`RemoteDeriveService received an invalid ${kind} response`);
+  }
+
+  let url: URL;
+  try {
+    url = new URL((data as { url: string }).url);
+  } catch {
+    throw new Error(`RemoteDeriveService received an invalid ${kind} URL`);
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error(`RemoteDeriveService received an insecure ${kind} URL`);
+  }
+  return { url: url.toString() };
+}
 
 /**
  * Pure mapping helper: maps raw database profile + membership rows to canonical CustomerProfile.

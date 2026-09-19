@@ -130,6 +130,11 @@ export interface CustomerBootstrapState {
   membershipStatus: 'active' | 'paused' | 'cancelled' | 'none';
 }
 
+/** Short-lived HTTPS destination returned by the trusted membership billing API. */
+export interface HostedMembershipSession {
+  url: string;
+}
+
 // Canonical aliases for clarity across workstreams
 export type RoutinePlan = Routine;
 export type RoutineItem = RoutineStep;
