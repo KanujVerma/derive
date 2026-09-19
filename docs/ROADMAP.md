@@ -351,13 +351,17 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 ### I1-B2: Initial Routine Intelligence Integration [NEXT · SAMI PRIMARY]
 * **Scope**:
   - **Server-Side Intelligence & Persistence (Sami Primary)**:
-    - Context assembly: Ingest committed intake snapshot from `public.onboarding_submissions.payload_snapshot` and canonical `skin_profiles` (goals, midday feel, tightness, plus server-available `pregnancy_status` and `sensitivities_status`), confirmed shelf products, adverse reaction history, and photo metadata. (Note: current TypeScript `RoutineProposalInput.profile` does not contain `pregnancyStatus`/`sensitivitiesStatus`; adding them to the shared contract requires future mutual founder review).
+    - Context assembly: Ingest committed intake snapshot from `public.onboarding_submissions.payload_snapshot` (including `pihTendencyAnswer` for PIH signal; `skin_profiles.pih_tendency` does NOT exist) and canonical `skin_profiles` (goals, midday feel, tightness, plus server-available `pregnancy_status` and `sensitivities_status`), confirmed shelf products, adverse reaction history, and photo metadata. (Note: current TypeScript `RoutineProposalInput.profile` does not contain `pregnancyStatus`/`sensitivitiesStatus`; adding them to the shared contract requires future mutual founder review).
     - Server-side Gemini 2.5 Flash invocation using server secrets (zero client keys) with structured JSON output enforcing canonical schema (with step-level `whyChosen`, not a root `rationales` field).
     - Deterministic clinical & safety guardrails: Sunscreen AM invariant (sunscreens never in PM), Retinoid PM invariant (adapalene/tretinoin never in AM), and strict exclusion of contra-indicated actives during pregnancy/nursing.
-    - Relational routine persistence: Insert generated routine into `public.routines` (`version = 1`, `status = 'awaiting_review'`) and routine steps into `public.routine_items` using actual PostgreSQL columns (`order_index`, `timing`, `product_name`, `brand`, `category`, `amount`, `area`, `days`, `purpose`, `why_chosen`, `watch_for`).
-    - Shelf action normalization: Map shelf products into `public.user_products` with canonical actions (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`).
+    - Required schema reconciliations (`B2_REQUIRED_SCHEMA_RECONCILIATION`):
+      1. Add `updated_at` to `public.routines` via additive migration (satisfying canonical `Routine.updatedAt`).
+      2. Add `product_id UUID REFERENCES public.products(id)` to `public.routine_items` via additive migration (satisfying canonical `RoutineStep.productId`).
+      3. Derive `RoutineStep.scheduleText` deterministically from `timing` + `days` rather than adding a redundant column.
+    - Relational routine persistence: Insert generated routine into `public.routines` (`version = 1`, `status = 'awaiting_review'`) and routine steps into `public.routine_items` using actual PostgreSQL columns (`order_index`, `timing`, `product_id`, `product_name`, `brand`, `category`, `amount`, `area`, `days`, `purpose`, `why_chosen`, `watch_for`).
+    - Shelf action normalization & persistence invariant (`B2_REQUIRED_PERSISTENCE_INVARIANT`): Map shelf products into `public.user_products` with canonical actions (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`). Every B2-decided product is normalized into `public.products` with `user_products.product_id` referencing that row, enabling `user_products JOIN products` $\to$ canonical `UserProduct`.
     - Founder review queue transition: Keep or update the pending `initial_routine` task in `public.founder_review_tasks` (supported DB statuses: `'pending'`, `'completed'`, `'dismissed'`; no `'awaiting_review'` status exists in DB today). If explicit routine linking via foreign key is needed, Sami will propose an additive migration.
-    - Remote routine read assembly: Implement routine-item read assembly in `RemoteDeriveService.getRoutine()` (currently reads only the `routines` table header) to return a fully populated canonical `Routine` (`amSteps`, `pmSteps`).
+    - Remote routine read assembly: Implement full routine-item read assembly in `RemoteDeriveService.getRoutine()` (currently reads only the `routines` table header) to return a fully populated canonical `Routine` (`amSteps`, `pmSteps`).
   - **Client-Side Consumption (Kanuj)**:
     - Mobile hydration: `hydrateRoutine()` in `src/services/deriveClient.ts` is the downstream consumer once Remote assembly is implemented, detecting `routine.status === 'awaiting_review'` (`isPlanUnderReview = true`). Note: `InitialRoutineState` is a shared domain type in `OnboardingResult`, not a persisted database column.
     - Quiet draft preview: Renders `DRAFT · NOT ACTIVE` indicator on Today and Plan tabs while preserving non-blocking navigation across all 5 tabs.
@@ -366,8 +370,9 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 * **Acceptance Criteria**:
   - Server pipeline generates valid routine proposal from committed intake data without inventing non-existent fields.
   - AM/PM invariants and pregnancy/sensitivity contraindications strictly upheld.
-  - Generated routine persisted to `public.routines` (`status = 'awaiting_review'`) and `public.routine_items` (matching actual DB schema).
-  - Shelf products normalized into `public.user_products` with valid actions.
+  - B2 additive migrations resolve `routines.updated_at` and `routine_items.product_id` schema gaps.
+  - Generated routine persisted to `public.routines` (`status = 'awaiting_review'`) and `public.routine_items` (matching reconciled DB schema).
+  - Shelf products normalized into `public.user_products` with valid actions and canonical product references.
   - `RemoteDeriveService.getRoutine()` assembles `routine_items` into `amSteps` and `pmSteps`.
   - Mobile client cleanly hydrates routine in `awaiting_review` state and displays quiet draft preview.
   - 100% tests passing, 0 TypeScript errors, clean Expo web export, `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
