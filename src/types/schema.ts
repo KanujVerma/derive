@@ -293,6 +293,33 @@ export type SkinState = 'better' | 'same' | 'worse';
 export type IrritationLevel = 'none' | 'little' | 'lot';
 export type AdherenceLevel = 'yes' | 'mostly' | 'not_really';
 
+export const CheckInContextTagSchema = z.enum([
+  'diet',
+  'sleep',
+  'stress',
+  'alcohol',
+  'cycle',
+  'travel_weather',
+  'new_product',
+  'medication_supplement',
+  'routine_change',
+  'other',
+]);
+export type CheckInContextTag = z.infer<typeof CheckInContextTagSchema>;
+
+export const CheckInContextTagLabels: Record<CheckInContextTag, string> = {
+  diet: 'Diet',
+  sleep: 'Sleep',
+  stress: 'Stress',
+  alcohol: 'Alcohol',
+  cycle: 'Cycle',
+  travel_weather: 'Travel or weather',
+  new_product: 'New product',
+  medication_supplement: 'Medication or supplement',
+  routine_change: 'Routine change',
+  other: 'Something else',
+};
+
 export interface CheckIn {
   id: string;
   userId: string;
@@ -301,6 +328,9 @@ export interface CheckIn {
   skinState: SkinState;
   irritation: IrritationLevel;
   adherence?: AdherenceLevel;
+  contextTags?: CheckInContextTag[];
+  contextNote?: string;
+  /** @deprecated Legacy single-select field retained only for historical records. */
   changeReason?: string;
   irritationDetails?: {
     symptoms: ReactionSymptom[];

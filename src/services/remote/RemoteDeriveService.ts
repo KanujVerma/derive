@@ -27,6 +27,8 @@ import type {
   CustomerProfile,
   CustomerBootstrapState,
   RoutinePlan,
+  CheckIn,
+  CheckInContextTag,
 } from '../../domain/types.ts';
 import type {
   Routine,
@@ -154,20 +156,53 @@ export class RemoteDeriveService implements IDeriveService {
 
   async submitCheckIn(input: CheckInInput): Promise<CheckInResult> {
     const client = this.getClient();
-    const { data, error } = await client.functions.invoke('submit-checkin', {
-      body: input,
-    });
+    const contextTags = [...new Set(input.contextTags || [])];
+    const contextNote = input.contextNote?.trim() || null;
+    const { data, error } = await client
+      .from('check_ins')
+      .insert({
+        user_id: input.userId,
+        primary_goal: input.primaryGoal || null,
+        skin_state: input.skinState,
+        irritation: input.irritation,
+        adherence: input.adherence || null,
+        notes: input.notes?.trim() || null,
+        context_tags: contextTags,
+        context_note: contextNote,
+      })
+      .select('id, user_id, primary_goal, skin_state, irritation, adherence, notes, context_tags, context_note, ai_analysis_sentence, created_at')
+      .single();
     if (error) throw new Error(`RemoteDeriveService.submitCheckIn failed: ${error.message}`);
-    return data as CheckInResult;
+    const checkIn = mapDbCheckIn(data);
+    return {
+      checkIn,
+      aiAnalysisSentence: checkIn.aiAnalysisSentence || 'Check-in recorded.',
+      adjustmentProposed: false,
+    };
   }
 
   async getProgress(userId: string): Promise<ProgressData> {
     const client = this.getClient();
-    const { data, error } = await client.functions.invoke('get-progress', {
-      body: { userId },
-    });
+    const { data, error } = await client
+      .from('check_ins')
+      .select('id, user_id, primary_goal, skin_state, irritation, adherence, notes, context_tags, context_note, ai_analysis_sentence, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     if (error) throw new Error(`RemoteDeriveService.getProgress failed: ${error.message}`);
-    return data as ProgressData;
+    const checkIns = (data || []).map(mapDbCheckIn);
+    const latestTimestamp = checkIns[0]?.createdAt
+      ? new Date(checkIns[0].createdAt).getTime()
+      : 0;
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    return {
+      checkIns,
+      learnedInsights: [],
+      recentPhotos: [],
+      routineHistorySummary: checkIns.length > 0
+        ? 'Weekly check-in history loaded.'
+        : 'No weekly check-ins yet.',
+      isCheckInDue: latestTimestamp === 0 || Date.now() - latestTimestamp >= oneWeekMs,
+    };
   }
 
   async requestRefill(input: RefillRequestInput): Promise<RefillRequest> {
@@ -472,7 +507,7 @@ export function mapDbCustomerProfile(data: {
 
   // If there is no membership or the tier is not representable under the frozen contract,
   // we return null rather than fabricating an arbitrary tier.
-  if (!latest || latest.tier !== 'founding_beta_129') {
+  if (!latest || latest.tier !== 'founding_beta') {
     return null;
   }
 
@@ -486,9 +521,47 @@ export function mapDbCustomerProfile(data: {
     email: data.email,
     fullName: data.full_name || '',
     phone: data.phone || undefined,
-    tier: 'founding_beta_129',
+    tier: 'founding_beta',
     membershipStatus: status,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
+  };
+}
+
+const CHECK_IN_CONTEXT_TAGS = new Set<CheckInContextTag>([
+  'diet',
+  'sleep',
+  'stress',
+  'alcohol',
+  'cycle',
+  'travel_weather',
+  'new_product',
+  'medication_supplement',
+  'routine_change',
+  'other',
+]);
+
+/** Maps an owner-readable check-in row into the canonical longitudinal contract. */
+export function mapDbCheckIn(row: any): CheckIn {
+  const contextTags = Array.isArray(row?.context_tags)
+    ? row.context_tags.filter((tag: unknown): tag is CheckInContextTag => (
+        typeof tag === 'string' && CHECK_IN_CONTEXT_TAGS.has(tag as CheckInContextTag)
+      ))
+    : [];
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    primaryGoal: row.primary_goal || undefined,
+    goalOutcome: row.skin_state,
+    skinState: row.skin_state,
+    irritation: row.irritation,
+    adherence: row.adherence || undefined,
+    contextTags,
+    contextNote: row.context_note || undefined,
+    notes: row.notes || undefined,
+    aiAnalysisSentence: row.ai_analysis_sentence || undefined,
+    adjustmentProposed: false,
+    createdAt: row.created_at,
   };
 }

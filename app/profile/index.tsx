@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,6 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useUserStore } from '@/src/stores/userStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useRoutineStore } from '@/src/stores/routineStore';
-import { calculateMonthlyPlanPrice, formatCentsToDollars } from '@/src/pricing';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
@@ -28,30 +27,14 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { fullName, email, loadArthurDemoUser, resetToDefault } = useUserStore();
-  const { detectedProducts, productReactions, loadArthurDemoState, resetOnboarding } = useOnboardingStore();
-  const { routine, isPlanUnderReview, loadArthurDemoRoutine, resetRoutine } = useRoutineStore();
+  const { productReactions, loadArthurDemoState, resetOnboarding } = useOnboardingStore();
+  const { loadArthurDemoRoutine, resetRoutine } = useRoutineStore();
 
   React.useEffect(() => {
     hydrateCustomerProfile().catch((err) => {
       console.warn('Failed to hydrate customer profile:', err);
     });
   }, []);
-
-  const activeProducts = useMemo(() => {
-    if (routine) {
-      const allSteps = [...routine.amSteps, ...routine.pmSteps];
-      return allSteps.map((s) => ({
-        id: s.productId,
-        name: s.productName,
-        brand: s.brand,
-      }));
-    }
-    return detectedProducts;
-  }, [routine, detectedProducts]);
-
-  const pricingEstimate = useMemo(() => {
-    return calculateMonthlyPlanPrice(activeProducts);
-  }, [activeProducts]);
 
   const handleBack = () => {
     router.back();
@@ -87,7 +70,7 @@ export default function ProfileScreen() {
     loadArthurDemoState();
     Alert.alert(
       'Demo Routine Loaded',
-      'Loaded Arthur Pendelton demo fixture ($96/mo illustrative plan, Differin schedule, 4 products, 1 check-in).',
+      'Loaded Arthur Pendelton demo fixture (Differin schedule, 4 products, 1 check-in).',
       [{ text: 'OK' }]
     );
   };
@@ -173,7 +156,7 @@ export default function ProfileScreen() {
             <Text style={styles.memberEmail}>{email || 'member@derive.skin'}</Text>
             <View style={styles.badgeRow}>
               <Badge label="FOUNDING BETA" variant="keep" size="small" />
-              <Text style={styles.memberPrice}>${config.betaPriceMonthly}/mo</Text>
+              <Text style={styles.memberPrice}>${config.foundingBetaMembershipMonthlyCents / 100}/mo</Text>
             </View>
           </View>
         </View>

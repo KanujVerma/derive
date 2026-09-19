@@ -35,6 +35,7 @@ import type {
   SkinState,
   IrritationLevel,
   AdherenceLevel,
+  CheckInContextTag,
   CheckIn,
   InsightBasis,
   LearnedInsight,
@@ -79,6 +80,7 @@ export type {
   SkinState,
   IrritationLevel,
   AdherenceLevel,
+  CheckInContextTag,
   CheckIn,
   InsightBasis,
   LearnedInsight,
@@ -98,12 +100,14 @@ export type {
 // 1. CUSTOMER & MEMBERSHIP
 // ==========================================
 
+export type MembershipTier = 'founding_beta';
+
 export interface CustomerProfile {
   id: string;
   email: string;
   fullName: string;
   phone?: string;
-  tier: 'founding_beta_129';
+  tier: MembershipTier;
   membershipStatus: 'active' | 'paused' | 'cancelled';
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
@@ -184,6 +188,8 @@ export interface CheckInInput {
   skinState: SkinState;
   irritation: IrritationLevel;
   adherence?: AdherenceLevel;
+  contextTags?: CheckInContextTag[];
+  contextNote?: string;
   notes?: string;
   photoUris?: string[];
   irritationDetails?: {

@@ -231,7 +231,7 @@ Live Gemini invocation happens only behind `RemoteDeriveService` on the server. 
 
 ## 7. Semantic Requirements for Backend Evolution (For Sami Review)
 
-The following semantic requirements emerge from the client prototypes (`src/phenotype/` and `src/pricing/`). They are documented here to inform backend architecture without prescribing database schemas, table layouts, or specific column designs.
+The following semantic requirements emerge from the client phenotype prototype and approved membership, commerce, and check-in contracts. They inform backend architecture without prescribing unrelated implementation details.
 
 ### A. Phenotype & PIH Signal Semantics
 The backend must preserve full evidence provenance for any captured phenotype signal, rather than flattening it to an unprovenanced string:
@@ -244,32 +244,36 @@ The backend must preserve full evidence provenance for any captured phenotype si
   - `observedAt`: ISO timestamp of observation/confirmation.
 - **Storage Decision**: Sami may persist this via JSONB attributes, relational fact tables, event ledgers, or dedicated profile columns as best fits backend normalization and RLS performance.
 
-### B. Personalized Pricing Semantics
-Pricing is dynamic, versioned relative to routine and subscription lifecycle, and requires versioned state tracking rather than a static single profile column:
-- **Semantic State Requirements**:
-  - **Draft Estimate**: Computed during onboarding and displayed under quiet review before first plan publication.
-  - **Active Agreed Price**: The monthly amount currently authorized and active.
-  - **Proposed Changed Price**: Generated when a routine adjustment or product swap changes steady-state consumption.
-  - **Routine Version Linkage**: Exact association between the pricing snapshot and the canonical routine version.
-  - **Approval State**: Explicit member confirmation state (`pending_approval`, `approved`, `rejected`) for any price increase.
-  - **Effective Timing & History**: Activation timestamp, scheduled change dates, and historical audit ledger.
-- **Storage Decision**: The database representation (e.g. subscription versioning table, routine-linked pricing snapshot, or ledger entity) belongs to backend architecture review.
+### B. Membership & Separate Product Commerce Semantics
+- **Membership Contract**: Founding Beta is `$25/month`; the shared tier is price-neutral `founding_beta`.
+- **Trusted Billing Source**: The display constant is not payment authority. Amounts, Stripe price identifiers, effective timing, and webhook state belong to the trusted server/commerce boundary.
+- **No Routine-Derived Membership Pricing**: Products, routine versions, bottle lifespan, shipping, and tax never calculate or modify membership price.
+- **Separate Product Transactions**: A product purchase or refill stores its own product/SKU, displayed amount, approval state, approval timestamp, charge/order status, tax/shipping treatment, and audit history.
+- **Consent Invariant**: No new product, substitute, or refill is charged, purchased, or shipped before applicable price disclosure and affirmative member approval, unless a future revocable standing consent applies to the exact same SKU.
+- **Recommendation Independence**: Commerce price and margin cannot promote, suppress, or reorder product-fit recommendations.
+
+### B2. Weekly Check-In Context Semantics
+- **Input**: `CheckInInput.contextTags?: CheckInContextTag[]` and `contextNote?: string` are optional member-provided observations.
+- **Canonical Tags**: `diet`, `sleep`, `stress`, `alcohol`, `cycle`, `travel_weather`, `new_product`, `medication_supplement`, `routine_change`, `other`.
+- **Persistence**: `check_ins.context_tags` defaults to an empty array and accepts at most 10 canonical values; `context_note` is nullable and limited to 2,000 characters. Owner-scoped authenticated clients may insert these fields but may not write server-generated analysis.
+- **Parity**: Mock and Remote services preserve the same tag/note shape. Unknown database tags are filtered fail-closed during remote mapping.
+- **Interpretation Boundary**: Tags and notes may inform review but do not establish causation, diagnose a condition, or activate a material routine change.
 
 ### C. Routine Change Proposal vs. Active State & Member Approval Semantics
 The data model must preserve a clean separation between the canonical *active* routine currently in use and any *proposed* routine modifications awaiting member consent:
 - **Separation of Concerns**: Proposed routine modifications formulated by system intelligence or founder review must not overwrite the active schedule until explicit member consent is obtained.
 - **Member Approval Lifecycle**:
   - `status`: Categorical proposal lifecycle (`pending_member_approval`, `member_approved`, `member_rejected`, `superseded`).
-  - `materialChanges`: Explicit diff indicating added products, replaced formulas, discontinued steps, active frequency changes, or price adjustments.
+  - `materialChanges`: Explicit diff indicating added products, replaced formulas, discontinued steps, active frequency changes, or a new separate product charge.
   - `approvalTimestamp`: Recorded timestamp of member confirmation.
 - **Invariants**:
   - Ingesting weekly check-ins and updating internal tolerance models do not alter active routines without approval.
-  - Routine adjustments that increase monthly plan price or introduce/alter strong actives remain in `pending_member_approval` until the member explicitly confirms.
+  - Routine adjustments that introduce a separately purchased product or introduce/alter strong actives remain in `pending_member_approval` until the member explicitly confirms.
 
 ### D. Standing Refill Consent & Replenishment Lifecycle Semantics
 Refill requests and recurring replenishment must respect explicit customer consent boundaries rather than simulating automatic calendar depletion:
 - **Consent Models**:
-  - **On-Demand Confirmation (Beta Baseline)**: Each refill requires a low-friction affirmative request ("Running low on [product]? Refill").
+  - **On-Demand Confirmation (Beta Baseline)**: Each refill requires a low-friction affirmative request with the applicable product price before charge or order.
   - **Standing Refill Consent (Future Opt-In)**: Members may explicitly opt a stable, previously approved SAME SKU into automatic replenishment with advance notice and a 1-tap skip affordance.
 - **Replenishment Tracking**:
   - `status`: `requested` | `ordered` | `shipped` | `delivered` | `cancelled`.
@@ -320,5 +324,4 @@ To truthfully determine whether an authenticated user requires onboarding or is 
   - `profileExists`: Verified via `public.profiles`. The presence of a profile row (auto-provisioned by auth triggers) does NOT mean onboarding is complete. If absent, bootstrap fails closed (`profileExists: false`) to catch provisioning failures.
   - `onboardingCompleted`: Read strictly from `public.skin_profiles.onboarding_completed`. Missing skin profile or false means `NEEDS_ONBOARDING`; true means `READY`.
   - `membershipStatus`: Queried from `public.memberships` deterministically (latest row by `created_at` descending; absent row maps to `'none'`). Membership state is purely informational in this slice and does NOT gate onboarding navigation.
-  - Tier and pricing fields are strictly excluded, preserving `ARCHITECTURE_CHALLENGE-01` without resolving it prematurely.
-
+  - Bootstrap intentionally excludes tier and billing amounts; membership identity and monetary terms are resolved by their dedicated boundaries. `ARCHITECTURE_CHALLENGE-01` is resolved by ADR-26/I1-B4.

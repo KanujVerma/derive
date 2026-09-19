@@ -27,6 +27,7 @@ import {
 import { config } from '../src/constants/config.ts';
 import { useUserStore } from '../src/stores/userStore.ts';
 import { useRoutineStore } from '../src/stores/routineStore.ts';
+import { useOnboardingStore } from '../src/stores/onboardingStore.ts';
 import {
   normalizeBarcode,
   getBarcodeLookupKeys,
@@ -719,9 +720,13 @@ test('DeriveService: MockDeriveService satisfies the IDeriveService contract', a
     skinState: 'better',
     irritation: 'none',
     adherence: 'yes',
+    contextTags: ['sleep', 'travel_weather'],
+    contextNote: 'Barely slept while traveling.',
   });
   assert.equal(checkInRes.adjustmentProposed, false);
   assert.ok(checkInRes.aiAnalysisSentence);
+  assert.deepEqual(checkInRes.checkIn.contextTags, ['sleep', 'travel_weather']);
+  assert.equal(checkInRes.checkIn.contextNote, 'Barely slept while traveling.');
 });
 
 // ========================================================
@@ -785,146 +790,6 @@ test('Guard: Expo client must not ship a Gemini API key', () => {
     [],
     `Client-visible Gemini secret path found in: ${offenders.join(', ')}`
   );
-});
-
-// ========================================================
-// 10. PERSONALIZED ALL-IN MONTHLY PRICING TESTS
-// ========================================================
-
-import {
-  calculateProductMonthlyConsumption,
-  calculateMonthlyPlanPrice,
-  evaluatePriceAdjustment,
-  formatCentsToDollars,
-  PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS,
-  PROVISIONAL_OPERATIONS_RISK_CENTS,
-} from '../src/pricing/index.ts';
-import { useOnboardingStore } from '../src/stores/onboardingStore.ts';
-
-test('Personalized Pricing: Normalizes retail prices into 30-day monthly consumption with deterministic rounding', () => {
-  // CeraVe Cleanser: $16 retail, 60-day lifespan -> round(1600 * 30 / 60) = 800 cents ($8.00/month)
-  const cleanserEst = calculateProductMonthlyConsumption({
-    id: 'p1',
-    name: 'Hydrating Facial Cleanser',
-    brand: 'CeraVe',
-  });
-  assert.equal(cleanserEst.retailPriceCents, 1600);
-  assert.equal(cleanserEst.estimatedLifespanDays, 60);
-  assert.equal(cleanserEst.monthlyEquivalentCents, 800);
-  assert.equal(cleanserEst.isDeriveManagedReplenishment, true);
-
-  // Differin: $15 retail, 45-day lifespan -> round(1500 * 30 / 45) = 1000 cents ($10.00/mo)
-  const differinEst = calculateProductMonthlyConsumption({
-    id: 'p2',
-    name: 'Adapalene Gel 0.1%',
-    brand: 'Differin',
-  });
-  assert.equal(differinEst.retailPriceCents, 1500);
-  assert.equal(differinEst.estimatedLifespanDays, 45);
-  assert.equal(differinEst.monthlyEquivalentCents, 1000);
-  assert.equal(differinEst.isDeriveManagedReplenishment, true);
-
-  // La Roche-Posay: $24 retail, 45-day lifespan -> round(2400 * 30 / 45) = 1600 cents ($16.00/mo)
-  const lrpEst = calculateProductMonthlyConsumption({
-    id: 'p4',
-    name: 'Toleriane Double Repair Moisturizer',
-    brand: 'La Roche-Posay',
-  });
-  assert.equal(lrpEst.retailPriceCents, 2400);
-  assert.equal(lrpEst.estimatedLifespanDays, 45);
-  assert.equal(lrpEst.monthlyEquivalentCents, 1600);
-  assert.equal(lrpEst.isDeriveManagedReplenishment, true);
-
-  // Daily Sunscreen: $18 retail, 30-day lifespan -> round(1800 * 30 / 30) = 1800 cents ($18.00/mo)
-  const spfEst = calculateProductMonthlyConsumption({
-    id: 'p5',
-    name: 'Relief Sun SPF 50+',
-    brand: 'Beauty of Joseon',
-  });
-  assert.equal(spfEst.retailPriceCents, 1800);
-  assert.equal(spfEst.estimatedLifespanDays, 30);
-  assert.equal(spfEst.monthlyEquivalentCents, 1800);
-  assert.equal(spfEst.isDeriveManagedReplenishment, true);
-
-  // Deterministic fractional rounding test: $20.00 retail, 45-day lifespan -> round(2000 * 30 / 45) = 1333 cents ($13.33/mo)
-  const defaultEst = calculateProductMonthlyConsumption({
-    id: 'custom_product',
-    name: 'Unknown Cream',
-    brand: 'Generic',
-  });
-  assert.equal(defaultEst.retailPriceCents, 2000);
-  assert.equal(defaultEst.estimatedLifespanDays, 45);
-  assert.equal(defaultEst.monthlyEquivalentCents, 1333);
-});
-
-test('Personalized Pricing: Computes exact Arthur demo monthly estimate ($96/mo) and separates inventory from consumption', () => {
-  const activeProducts = [
-    { id: 'p1', name: 'Hydrating Facial Cleanser', brand: 'CeraVe' }, // 800 cents/mo
-    { id: 'p2', name: 'Adapalene Gel 0.1%', brand: 'Differin' }, // 1000 cents/mo
-    { id: 'p4', name: 'Toleriane Double Repair Moisturizer', brand: 'La Roche-Posay' }, // 1600 cents/mo
-    { id: 'p5', name: 'Relief Sun SPF 50+', brand: 'Beauty of Joseon' }, // 1800 cents/mo
-  ];
-
-  // Arthur owns p1, p2, and p4 on his counter shelf; p5 is a new addition
-  const existingInventory = new Set(['p1', 'p2', 'p4']);
-  const planEstimate = calculateMonthlyPlanPrice(activeProducts, {
-    existingInventoryProductIds: existingInventory,
-  });
-
-  // Verify internal provisional demo assumptions
-  assert.equal(planEstimate.managementFeeCents, PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS); // 3900 cents ($39)
-  assert.equal(planEstimate.operationsRiskCents, PROVISIONAL_OPERATIONS_RISK_CENTS); // 500 cents ($5)
-
-  // Steady-state product consumption: 800 + 1000 + 1600 + 1800 = 5200 cents ($52)
-  // Existing inventory affects shipment timing, NOT steady-state consumption
-  assert.equal(planEstimate.productConsumptionCents, 5200);
-
-  // Exact Arthur demo monthly total: $39 + $52 + $5 = $96.00 / month (9600 cents)
-  assert.equal(planEstimate.monthlyTotalCents, 9600);
-  assert.equal(formatCentsToDollars(planEstimate.monthlyTotalCents), '$96');
-
-  // Verify breakdown inventory flags
-  const p1Item = planEstimate.productBreakdown.find((i) => i.productId === 'p1');
-  const p5Item = planEstimate.productBreakdown.find((i) => i.productId === 'p5');
-  assert.equal(p1Item?.hasExistingInventory, true);
-  assert.equal(p5Item?.hasExistingInventory, false);
-});
-
-test('Personalized Pricing: Excluding a product from Derive-managed replenishment changes result intentionally', () => {
-  const activeProducts = [
-    { id: 'p1', name: 'Hydrating Facial Cleanser', brand: 'CeraVe', isDeriveManagedReplenishment: true }, // 800 cents/mo
-    { id: 'p2', name: 'Adapalene Gel 0.1%', brand: 'Differin', isDeriveManagedReplenishment: false }, // Member provides own prescription
-    { id: 'p4', name: 'Toleriane Double Repair Moisturizer', brand: 'La Roche-Posay', isDeriveManagedReplenishment: true }, // 1600 cents/mo
-    { id: 'p5', name: 'Relief Sun SPF 50+', brand: 'Beauty of Joseon', isDeriveManagedReplenishment: true }, // 1800 cents/mo
-  ];
-
-  const planEstimate = calculateMonthlyPlanPrice(activeProducts);
-
-  // Product consumption excludes p2: 800 + 1600 + 1800 = 4200 cents ($42)
-  assert.equal(planEstimate.productConsumptionCents, 4200);
-
-  // Monthly Total: 3900 + 4200 + 500 = 8600 cents ($86/mo)
-  assert.equal(planEstimate.monthlyTotalCents, 8600);
-  assert.equal(formatCentsToDollars(planEstimate.monthlyTotalCents), '$86');
-});
-
-test('Personalized Pricing: Evaluates price adjustments and enforces member approval on increases', () => {
-  // Case 1: Routine change increases monthly price (e.g. $96 -> $104) -> requires approval
-  const increaseEval = evaluatePriceAdjustment(9600, 10400);
-  assert.equal(increaseEval.requiresMemberApproval, true);
-  assert.equal(increaseEval.priceDeltaCents, 800);
-  assert.match(increaseEval.explanation, /increases your plan by \$8\/mo.*confirmation required/i);
-
-  // Case 2: Routine simplification reduces monthly price (e.g. $96 -> $86) -> no approval required
-  const decreaseEval = evaluatePriceAdjustment(9600, 8600);
-  assert.equal(decreaseEval.requiresMemberApproval, false);
-  assert.equal(decreaseEval.priceDeltaCents, -1000);
-  assert.match(decreaseEval.explanation, /lowers your plan by \$10\/mo/i);
-
-  // Case 3: No price change (e.g. like-for-like swap)
-  const noChangeEval = evaluatePriceAdjustment(9600, 9600);
-  assert.equal(noChangeEval.requiresMemberApproval, false);
-  assert.equal(noChangeEval.priceDeltaCents, 0);
 });
 
 // ========================================================
@@ -1206,8 +1071,8 @@ test('Safety & Privacy: Zero race, ethnicity, or ancestry classifiers in phenoty
 // 16. K4.3 FOUNDING BETA CLIENT READINESS INVARIANTS
 // ========================================================
 
-test('K4.3 Pricing Truth: Client configuration centralizes beta price at $100/mo', () => {
-  assert.equal(config.betaPriceMonthly, 100);
+test('I1-B4 Pricing Truth: Client displays a price-independent $25 Founding Beta membership', () => {
+  assert.equal(config.foundingBetaMembershipMonthlyCents, 2500);
   assert.equal(config.currency, 'USD');
   assert.equal(config.founderSupportEmail, 'concierge@derive.skin');
 });
@@ -1677,6 +1542,7 @@ import {
   RemoteDeriveService,
   mapDbBootstrapState,
   mapDbCustomerProfile,
+  mapDbCheckIn,
 } from '../src/services/remote/RemoteDeriveService.ts';
 import type { IDeriveService } from '../src/contracts/DeriveService.ts';
 import type {
@@ -1891,7 +1757,7 @@ test('K6 Service Boundary: IDeriveService is hot-swappable via setDeriveService'
         id: userId,
         fullName: 'Remote Member',
         email: 'remote@example.com',
-        tier: 'founding_beta_129',
+        tier: 'founding_beta',
         membershipStatus: 'active',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -3320,7 +3186,7 @@ test('I1-A2 Database Mapping: canonical PostgREST projections and deterministic 
       {
         id: 'm1',
         user_id: 'u7',
-        tier: 'founding_beta_129',
+        tier: 'founding_beta',
         status: 'active',
         created_at: '2026-09-10T12:00:00Z',
       },
@@ -3331,7 +3197,7 @@ test('I1-A2 Database Mapping: canonical PostgREST projections and deterministic 
     email: 'sarah@example.com',
     fullName: 'Sarah Connor',
     phone: '+15551234567',
-    tier: 'founding_beta_129',
+    tier: 'founding_beta',
     membershipStatus: 'active',
     createdAt: '2026-09-10T12:00:00Z',
     updatedAt: '2026-09-10T14:00:00Z',
@@ -3889,7 +3755,7 @@ test('I1-A2.1 Bootstrap Freshness: Stale profile hydration discarded after ident
       email: 'a@derive.skin',
       fullName: 'Alice Anderson',
       membershipStatus: 'active',
-      tier: 'founding_beta_129',
+      tier: 'founding_beta',
       createdAt: '2026-09-18T00:00:00.000Z',
       updatedAt: '2026-09-18T00:00:00.000Z',
     });
@@ -4643,7 +4509,7 @@ test('I1-B1.1 Canonical Bootstrap Integration: resolveCustomerBootstrap updates 
         id: userId,
         email: 'test@example.com',
         fullName: 'Test User',
-        tier: 'founding_beta_129',
+        tier: 'founding_beta',
         membershipStatus: 'active',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -6453,6 +6319,96 @@ test('I1-B3 Provider Neutrality: Zero provider leakage in mobile app layers', ()
   }
 });
 
+// ========================================================
+// 36. I1-B4 MEMBERSHIP, COMMERCE & CHECK-IN RECONCILIATION
+// ========================================================
 
+test('I1-B4 Membership identity is price-neutral and legacy price-coded tiers fail closed', () => {
+  const canonical = mapDbCustomerProfile({
+    id: 'u_i1b4',
+    email: 'member@example.com',
+    created_at: '2026-09-18T00:00:00Z',
+    updated_at: '2026-09-18T00:00:00Z',
+    memberships: {
+      id: 'm_i1b4',
+      user_id: 'u_i1b4',
+      tier: 'founding_beta',
+      status: 'active',
+      created_at: '2026-09-18T00:00:00Z',
+    },
+  });
+  assert.equal(canonical?.tier, 'founding_beta');
 
+  const legacy = mapDbCustomerProfile({
+    id: 'u_legacy',
+    email: 'legacy@example.com',
+    created_at: '2026-09-18T00:00:00Z',
+    updated_at: '2026-09-18T00:00:00Z',
+    memberships: {
+      id: 'm_legacy',
+      user_id: 'u_legacy',
+      tier: 'founding_beta_129',
+      status: 'active',
+      created_at: '2026-09-18T00:00:00Z',
+    },
+  });
+  assert.equal(legacy, null);
+});
 
+test('I1-B4 Check-in row mapping preserves valid multi-select context and filters unknown tags', () => {
+  const checkIn = mapDbCheckIn({
+    id: 'ci_i1b4',
+    user_id: 'u_i1b4',
+    primary_goal: 'breakouts',
+    skin_state: 'same',
+    irritation: 'none',
+    adherence: 'mostly',
+    notes: null,
+    context_tags: ['diet', 'alcohol', 'sleep', 'not_canonical'],
+    context_note: 'Ate differently, drank Friday, and barely slept.',
+    ai_analysis_sentence: null,
+    created_at: '2026-09-18T00:00:00Z',
+  });
+
+  assert.deepEqual(checkIn.contextTags, ['diet', 'alcohol', 'sleep']);
+  assert.equal(checkIn.contextNote, 'Ate differently, drank Friday, and barely slept.');
+  assert.equal(checkIn.adjustmentProposed, false);
+});
+
+test('I1-B4 removes routine-derived membership pricing and keeps customer copy commercially truthful', () => {
+  assert.equal(fs.existsSync(path.join(REPO_ROOT, 'src/pricing')), false);
+  assert.equal(config.foundingBetaMembershipMonthlyCents, 2500);
+
+  const customerFiles = [
+    'app/(onboarding)/10-summary.tsx',
+    'app/profile/index.tsx',
+    'app/orders/index.tsx',
+    'app/refill/index.tsx',
+  ].map((relativePath) => readFileSync(path.join(REPO_ROOT, relativePath), 'utf8')).join('\n');
+
+  assert.match(customerFiles, /purchased separately/i);
+  assert.doesNotMatch(customerFiles, /products? included|included with your/i);
+  assert.doesNotMatch(customerFiles, /calculateMonthlyPlanPrice|monthlyProductConsumption/i);
+});
+
+test('I1-B4 check-in UX uses canonical multi-select context and the established voice note primitive', () => {
+  const source = readFileSync(path.join(REPO_ROOT, 'app/check-in/index.tsx'), 'utf8');
+  for (const tag of [
+    'diet',
+    'sleep',
+    'stress',
+    'alcohol',
+    'cycle',
+    'travel_weather',
+    'new_product',
+    'medication_supplement',
+    'routine_change',
+    'other',
+  ]) {
+    assert.match(source, new RegExp(`['\"]${tag}['\"]`));
+  }
+  assert.match(source, /VoiceTextArea/);
+  assert.match(source, /context="checkin_note"/);
+  assert.match(source, /accessibilityRole="checkbox"/);
+  assert.doesNotMatch(source, /Did anything change this week\?/);
+});

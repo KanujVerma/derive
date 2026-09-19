@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TextInput,
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -13,18 +12,30 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { submitWeeklyCheckIn } from '@/src/services/deriveClient';
-import { SkinState, IrritationLevel, AdherenceLevel } from '@/src/types/schema';
+import {
+  SkinState,
+  IrritationLevel,
+  AdherenceLevel,
+  CheckInContextTag,
+  CheckInContextTagLabels,
+} from '@/src/types/schema';
 import { Button } from '@/src/components/ui/Button';
+import { VoiceTextArea } from '@/src/components/ui/VoiceTextArea';
 import { Icon } from '@/src/components/ui/Icon';
 import { analytics } from '@/src/services/analytics';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
-const CHANGE_REASONS = [
-  'Tried a new product',
-  'Used an active more often',
-  'Missed several days',
-  'Travel or weather shift',
-  'Nothing I can think of',
+const CHECK_IN_CONTEXT_TAGS: CheckInContextTag[] = [
+  'diet',
+  'sleep',
+  'stress',
+  'alcohol',
+  'cycle',
+  'travel_weather',
+  'new_product',
+  'medication_supplement',
+  'routine_change',
+  'other',
 ];
 
 export default function CheckInModal() {
@@ -35,13 +46,11 @@ export default function CheckInModal() {
   const [skinState, setSkinState] = useState<SkinState>('better');
   const [adherence, setAdherence] = useState<AdherenceLevel>('yes');
   const [irritation, setIrritation] = useState<IrritationLevel>('none');
-  const [selectedChange, setSelectedChange] = useState<string>('Nothing I can think of');
-  const [notes, setNotes] = useState('');
+  const [contextTags, setContextTags] = useState<CheckInContextTag[]>([]);
+  const [contextNote, setContextNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const isFollowUpNeeded = skinState === 'worse' || irritation !== 'none';
 
   // Goal-specific questions
   const getGoalQuestion = () => {
@@ -86,7 +95,8 @@ export default function CheckInModal() {
         skinState,
         irritation,
         adherence,
-        notes: notes.trim() || undefined,
+        contextTags,
+        contextNote: contextNote.trim() || undefined,
       });
 
       try {
@@ -263,45 +273,52 @@ export default function CheckInModal() {
           })}
         </View>
 
-        {/* CONDITIONAL FOLLOW-UP (Only if worsening or irritation reported) */}
-        {isFollowUpNeeded && (
-          <View style={styles.followUpSection}>
-            <Text style={styles.questionLabel}>Did anything change this week?</Text>
-            <View style={styles.chipsWrap}>
-              {CHANGE_REASONS.map((reason) => {
-                const isSelected = selectedChange === reason;
-                return (
-                  <TouchableOpacity
-                    key={reason}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setSelectedChange(reason);
-                    }}
-                    style={[styles.followUpChip, isSelected && styles.followUpChipSelected]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.followUpText, isSelected && styles.followUpTextSelected]}>
-                      {reason}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+        {/* OPTIONAL OBSERVATIONAL CONTEXT */}
+        <View style={styles.followUpSection}>
+          <Text style={styles.questionLabel}>
+            Anything different this week that might be useful context? (Optional)
+          </Text>
+          <Text style={styles.contextHelper}>
+            Select any that apply. These are observations, not assumptions about what caused a change.
+          </Text>
+          <View style={styles.chipsWrap}>
+            {CHECK_IN_CONTEXT_TAGS.map((tag) => {
+              const isSelected = contextTags.includes(tag);
+              return (
+                <TouchableOpacity
+                  key={tag}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setContextTags((current) => (
+                      current.includes(tag)
+                        ? current.filter((item) => item !== tag)
+                        : [...current, tag]
+                    ));
+                  }}
+                  style={[styles.followUpChip, isSelected && styles.followUpChipSelected]}
+                  activeOpacity={0.7}
+                  accessible={true}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isSelected }}
+                >
+                  <Text style={[styles.followUpText, isSelected && styles.followUpTextSelected]}>
+                    {CheckInContextTagLabels[tag]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        )}
-
-        {/* OPTIONAL NOTES */}
-        <Text style={[styles.questionLabel, { marginTop: spacing.xl }]}>
-          Anything else we should know? (Optional)
-        </Text>
-        <TextInput
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="e.g., Weather got dry, skipped sunscreen once..."
-          placeholderTextColor={colors.inkSubtle}
-          multiline={true}
-          style={styles.notesInput}
-        />
+          <VoiceTextArea
+            label="Add one note (optional)"
+            value={contextNote}
+            onChangeText={setContextNote}
+            placeholder="e.g., Ate differently, traveled, and barely slept."
+            hint="Type or dictate"
+            context="checkin_note"
+            minHeight={92}
+            style={styles.contextNote}
+          />
+        </View>
 
         {/* ERROR BANNER */}
         {submitError && (
@@ -442,6 +459,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderSubtle,
   },
+  contextHelper: {
+    fontSize: typography.sizes.caption,
+    lineHeight: typography.lineHeights.caption,
+    color: colors.inkMuted,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.sm,
+  },
   chipsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -468,16 +492,9 @@ const styles = StyleSheet.create({
     color: colors.brand,
     fontWeight: typography.weights.semibold,
   },
-  notesInput: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    fontSize: typography.sizes.bodyRegular,
-    color: colors.ink,
-    minHeight: 70,
-    textAlignVertical: 'top',
+  contextNote: {
+    marginTop: spacing.md,
+    marginBottom: 0,
   },
   errorBanner: {
     flexDirection: 'row',

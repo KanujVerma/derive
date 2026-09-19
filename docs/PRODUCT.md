@@ -57,56 +57,34 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 - **Clinical Safety Circuit Breaker**: Severe allergic symptoms immediately halt chat and surface emergency guidance.
 
 ### 5. Progress ("Longitudinal skin record")
-- **100% AI-Led Longitudinal Care Loop**: Weekly check-ins are fully automated through intelligent AI assessment of skin state, barrier comfort, and product tolerance. Derive dynamically updates schedules, generates learned insights, and adapts routines without requiring recurring manual founder calls.
-- **Weekly Check-In Card**: 30-second structured check-in (skin state, irritation, adherence, optional notes/photo).
+- **AI-Led Longitudinal Care Loop**: Weekly check-ins capture member observations and may generate reviewable insights or proposed adaptations. Check-in context is observational, not proof of causation, and material routine changes still require the applicable review and consent.
+- **Weekly Check-In Card**: 30-second structured check-in (skin state, irritation, adherence, optional multi-select context tags, one voice/text note, and optional photo). Context tags include diet, sleep, stress, alcohol, cycle, travel/weather, new product, medication/supplement, routine change, and other.
 - **Photo Comparison**: Side-by-side baseline vs. latest photo comparison across Front, Left, and Right angles using full-width `SegmentedControl` with friendly dates (`Sep 1`, `Sep 8`, `Sep 15`).
 - **Learned Insights**: Plain-English observations with clear provenance labels (`From your check-ins`, `From your routine history`).
 - **Timeline Events**: Milestone log of routine changes and barrier developments.
 
 ### 6. Profile & Settings (`app/profile`)
-- **Customer Account Identity**: Member name, email, membership status derived dynamically from active plan pricing (e.g. `Founding Beta · Estimated plan: $96/mo` under review, `Current plan: $96/mo` after activation; or `$100/mo` Founding Beta experiment).
+- **Customer Account Identity**: Member name, email, and `Founding Beta · $25/mo` membership status. Product purchases are separate and never silently folded into the membership price.
 - **Clean Customer Scope**: Dedicated customer-facing sections for Care & History (Active Routine, Product Reaction History, Orders & Refills) and Support & Privacy (Member Support, Export Personal Data).
 - **No Developer Bloat**: Internal founder review desk links, dev toggles, and unsubstantiated HIPAA/GDPR regulatory claims are completely removed from customer view.
 
 ---
 
-## Founding Beta Pricing & Operating Model
+## Founding Beta Membership & Product Commerce
 
-### 1. Founding Beta Operating Experiment ($100/Month First-10) — APPROVED BETA EXPERIMENT
-* **Status**: **APPROVED BETA EXPERIMENT** (Distinct from long-term pricing architecture).
-* **Target Cohort**: First 10 paying Founding Beta members.
-* **Pricing Concept**: Flat **$100/month** covering Derive care management plus standard non-prescription facial skincare products needed for the approved routine.
-* **No Product Wallet or Rollover Allowance**: The member does NOT receive a product wallet, credit balance, rollover allowance, or "$X of products."
-* **Preserve Working Products**: Existing products that already work are retained (`KEEP`); Derive does not ship duplicate bottles merely because a member pays monthly.
-* **Need-Based Replenishment**: Replenishment shipments follow actual depletion need, not calendar billing theater.
-* **Prescriptions Are Contextual Only**: Prescription medications (e.g. Differin, Tretinoin) are contextual inputs to compatible OTC routine construction, never products Derive prescribes, modifies, or supplies.
-* **Discretionary Luxury Exclusions**: Unusually expensive discretionary/luxury products are not silently guaranteed by all-in terms.
-* **Internal Economics Tracked Privately**: First-basket wholesale cost, steady-state consumption, shipping, and replacement expenses are tracked internally; internal fee components are never exposed as a customer breakdown.
+### 1. Founding Beta Membership — APPROVED EXPERIMENT
+* **Status**: **APPROVED BETA EXPERIMENT** for the first 10 paying members.
+* **Membership Price**: **$25/month** for Derive's managed routine, ongoing check-ins and history, product-fit guidance, and app experience.
+* **Products Are Separate**: OTC products, replacements, and refills are purchased separately at the applicable price. No product allowance, hidden bundle, consumption-derived membership price, or promise that products are included.
+* **Price-Neutral Identity**: The membership tier is `founding_beta`; monetary terms belong to trusted server-side billing configuration, not the tier name or customer profile.
+* **Recommendation Independence**: A recommendation must be driven by member fit and evidence, never by product margin or the possibility of a separate sale.
 
-### 2. Long-Term Personalized All-In Monthly Pricing Architecture [PROVISIONAL · PENDING COFOUNDER REVIEW]
-> [!NOTE]
-> Prototyped in the client/mock layer (`src/pricing/**`) by Kanuj; not yet reviewed or accepted by Sami. Not a finalized company-wide pricing commitment.
-
-Derive is prototyping moving away from arbitrary subscription tiers and flat-rate assumptions toward a personalized monthly plan price derived dynamically from active routine consumption:
-- **Pricing Formula (Internal Simulation)**:
-  `monthlyPlanPriceCents = managementFeeCents + steadyStateProductConsumptionCents + operationsRiskCents`
-  - Care Management Component: Provisional software, intake, and AI check-in component (`PROVISIONAL_DEMO_MANAGEMENT_FEE_CENTS = 3900`, \$39/mo demo assumption).
-  - Normalized Product Consumption: Each active routine product managed by Derive is normalized to a 30-day consumption rate based on usage lifespan:
-    `Math.round(retailPriceCents * 30 / estimatedLifespanDays)`.
-    *Arthur's Demo Plan Breakdown:*
-    - CeraVe Cleanser (\$16 / 60 days) = \$8.00/mo
-    - Differin Gel (\$15 / 45 days) = \$10.00/mo
-    - Toleriane Double Repair (\$24 / 45 days) = \$16.00/mo
-    - Beauty of Joseon Sun (\$18 / 30 days) = \$18.00/mo
-    *Steady-State Product Consumption Total:* \$8 + \$10 + \$16 + \$18 = **\$52.00 / month**.
-  - Operations & Buffer Component: Provisional replenishment risk buffer (`PROVISIONAL_DEMO_OPERATIONS_RISK_CENTS = 500`, \$5/mo demo assumption).
-  - **Arthur's Total Demo Estimate**: \$39 + \$52 + \$5 = **\$96.00 / month**.
-- **Three Distinct Economic Concepts**:
-  1. Steady-State Monthly Product Consumption: Expected normalized cost over time.
-  2. Current Inventory / Shipment Timing: Existing counter bottles determine *when* Derive ships refills, not steady-state consumption.
-  3. Initial Fulfillment Cost: Upfront cash spent near activation for missing/replacement products.
-- **Customer Presentation**: One single all-in number ("Estimated plan: \$96/month" under review; "Current plan: \$96/month" active). Internal management fees and buffers are never itemized.
-- **Price Stability Contract**: Routine simplifications drop the price automatically; routine additions or upgrades that increase price require explicit member approval (`requiresMemberApproval: true`).
+### 2. Product Purchase & Refill Rules
+* **Preserve Working Products**: Existing products that work are retained (`KEEP`); Derive does not create unnecessary orders.
+* **Explicit Approval**: Every new product, substitute, and refill requires a clear price and affirmative approval before charge, purchase, or shipment unless the member later establishes revocable standing consent for the exact same SKU.
+* **Need-Based Replenishment**: Refill prompts follow observed depletion need, not the membership billing calendar.
+* **Prescriptions Are Contextual Only**: Prescription medications inform compatible OTC routine construction; Derive does not prescribe, modify, or supply them.
+* **Internal Economics Stay Internal**: Product cost, tax, shipping, founder time, and other operating costs may be tracked privately but do not alter the $25 membership promise.
 
 ---
 
@@ -130,7 +108,7 @@ Derive is prototyping moving away from arbitrary subscription tiers and flat-rat
    - **Privacy & Biological Invariants**:
      - Quality evaluation is on-device where practical; zero persistent face embeddings or facial recognition.
      - Baseline photos do NOT diagnose clinical conditions, determine exact skin type, measure hydration/sebum quantitatively, replace self-reported history, or infer race/ethnicity/Fitzpatrick.
-6. **Review & Audit**: Grouped review card with direct `[Edit]` links per section, understated single estimated plan price card, and reassurance that the first plan receives a final manual quality check before going live ("Your first routine gets one final quality check before it goes live"). Tapping `[Build My Plan]` transitions the user directly to the main app with `isPlanUnderReview: true`.
+6. **Review & Audit**: Grouped review card with direct `[Edit]` links per section, an understated `$25/month` Founding Beta membership card that clearly states products are purchased separately, and reassurance that the first plan receives a final manual quality check before going live. Tapping `[Build My Plan]` transitions the user directly to the main app with `isPlanUnderReview: true`.
 
 ---
 
@@ -158,7 +136,7 @@ To preserve customer agency and trust, Derive establishes an explicit boundary b
   - Materially altering the frequency or application intensity of a strong active (e.g. retinoids, exfoliating acids).
   - Introducing an additional strong active ingredient.
   - Reintroducing any ingredient or formula materially connected to a recorded past adverse reaction.
-  - Any change that increases the monthly plan price.
+  - Any new or changed product that would create a separate product charge.
   - Sourcing, purchasing, or shipping a new or substitute product not covered by existing standing consent.
 - **Prescription Boundaries**: Derive does NOT have autonomous authority to modify, prescribe, or discontinue prescription treatments. Derive manages compatible OTC skincare around member-reported prescription schedules.
 - **Safety Circuit Breaker**: Severe or emergency symptoms (facial swelling, respiratory distress, pus/oozing) bypass normal optimization and trigger immediate clinical referral.

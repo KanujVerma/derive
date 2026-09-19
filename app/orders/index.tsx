@@ -249,7 +249,7 @@ export default function OrdersScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.policyTitle}>Managed Refills</Text>
             <Text style={styles.policyText}>
-              Included with your ${config.betaPriceMonthly}/month Founding Beta membership. Running low? Tell us in one tap and we'll handle the rest.
+              Products are purchased separately from your ${config.foundingBetaMembershipMonthlyCents / 100}/month membership. Running low? Request the same product and review its price before any charge or order.
             </Text>
           </View>
         </View>

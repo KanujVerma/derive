@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
-import { useRoutineStore } from '@/src/stores/routineStore';
 import { GoalLabels } from '@/src/types/schema';
 import {
   submitOnboarding,
@@ -28,7 +27,6 @@ import { Badge } from '@/src/components/ui/Badge';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 import { analytics } from '@/src/services/analytics';
-import { calculateMonthlyPlanPrice, formatCentsToDollars } from '@/src/pricing';
 import { config } from '@/src/constants/config';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import type { OnboardingPayload } from '@/src/domain/types';
@@ -42,11 +40,6 @@ export default function SummaryScreen() {
   const goalName = onboarding.primaryGoal
     ? GoalLabels[onboarding.primaryGoal].label
     : 'Breakouts';
-
-  // Provisional monthly pricing estimate based on detected products + care fee
-  const pricingEstimate = useMemo(() => {
-    return calculateMonthlyPlanPrice(onboarding.detectedProducts);
-  }, [onboarding.detectedProducts]);
 
   const handleBuildPlan = async () => {
     setIsBuilding(true);
@@ -143,7 +136,7 @@ export default function SummaryScreen() {
               <Text style={styles.pricingBadge}>FOUNDING BETA MEMBERSHIP</Text>
               <View style={styles.priceRow}>
                 <Text style={styles.pricingAmount}>
-                  ${config.betaPriceMonthly}
+                  ${config.foundingBetaMembershipMonthlyCents / 100}
                 </Text>
                 <Text style={styles.pricingCadence}>/month</Text>
               </View>
@@ -151,16 +144,16 @@ export default function SummaryScreen() {
             <Badge label="FIRST 10 MEMBERS" variant="keep" size="small" />
           </View>
           <Text style={styles.pricingSubtext}>
-            Covers Derive care management plus all standard OTC products in your approved routine.
+            Covers Derive managing your skincare. Routine products are purchased separately at their applicable prices, only after you approve them.
           </Text>
 
           <View style={styles.pricingDivider} />
 
           <View style={styles.includesBlock}>
             <Text style={styles.includesHeading}>Includes:</Text>
-            <Text style={styles.includesItem}>• Weekly check-ins, ongoing routine management & adjustments when needed</Text>
-            <Text style={styles.includesItem}>• Standard OTC routine products included</Text>
-            <Text style={styles.includesItem}>• Managed replenishment as you run low</Text>
+            <Text style={styles.includesItem}>• A personalized canonical routine and initial founder quality review</Text>
+            <Text style={styles.includesItem}>• Weekly check-ins, progress history, and ongoing routine management</Text>
+            <Text style={styles.includesItem}>• Scan, Ask, and personalized product-fit guidance</Text>
           </View>
         </View>
 

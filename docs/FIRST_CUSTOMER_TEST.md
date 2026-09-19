@@ -167,7 +167,7 @@ Ask after the session:
 2. "What would make you trust this more?"
 3. "Was there anything that felt off or confusing?"
 4. "If you were going to tell a friend about this, what would you say?"
-5. "At $100/month, what would you need to see to feel like it's worth it?"
+5. "The Founding Beta membership is $25 a month, and any products are purchased separately. What would you need to see to feel the membership itself is worth renewing?"
 
 **Do not prime them** — let them answer before clarifying.
 
@@ -197,7 +197,7 @@ For each major step, note:
 | Cannot position face for auto-capture | Hold threshold too strict; environment too dark |
 | "What is Derive exactly?" at summary | Welcome copy needs stronger managed-service framing |
 | Skips reading reactions page | Too many disclosure steps |
-| "$100 for this?" | Perceived value not yet established by the time price appears |
+| "$25 for this, plus products?" | The management-layer value or membership/product separation is not yet clear |
 | "Can I look things up myself?" | Trust not yet established; they want to verify |
 
 ---
