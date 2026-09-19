@@ -8085,6 +8085,7 @@ test('C1 Shop: audience uses Mock membership and Remote bootstrap for the matchi
     sessionUserId: 'member-1',
     bootstrapUserId: 'member-1',
     bootstrapMembershipStatus: 'active' as const,
+    bootstrapReady: true,
     mockUserId: 'stale-mock',
     mockMembershipStatus: 'active' as const,
   };
@@ -8094,6 +8095,7 @@ test('C1 Shop: audience uses Mock membership and Remote bootstrap for the matchi
   assert.equal(resolveShopAudience({ ...remote, bootstrapMembershipStatus: 'paused' }), 'non_member');
   assert.equal(resolveShopAudience({ ...remote, bootstrapMembershipStatus: 'cancelled' }), 'non_member');
   assert.equal(resolveShopAudience({ ...remote, bootstrapUserId: 'another-user' }), 'non_member');
+  assert.equal(resolveShopAudience({ ...remote, bootstrapReady: false }), 'non_member');
 });
 
 test('C1 Shop: non-members cannot resolve stale personalized product context', () => {

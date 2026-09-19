@@ -8,6 +8,7 @@ import { resolveShopAudience } from './types';
 export function useShopAudience() {
   const sessionUserId = useAuthStore((state) => state.sessionUserId);
   const bootstrapUserId = useBootstrapStore((state) => state.resolvedUserId);
+  const bootstrapReady = useBootstrapStore((state) => state.status === 'READY');
   const bootstrapMembershipStatus = useBootstrapStore((state) => state.bootstrapState?.membershipStatus);
   const mockUserId = useUserStore((state) => state.userId);
   const mockMembershipStatus = useUserStore((state) => state.membershipStatus);
@@ -15,6 +16,7 @@ export function useShopAudience() {
     remote: isRemoteServiceEnabled(),
     sessionUserId,
     bootstrapUserId,
+    bootstrapReady,
     bootstrapMembershipStatus,
     mockUserId,
     mockMembershipStatus,

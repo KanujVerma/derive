@@ -33,6 +33,7 @@ export type ShopAudience = 'guest' | 'non_member' | 'member';
 export interface ShopAudienceInput {
   remote: boolean;
   sessionUserId?: string | null;
+  bootstrapReady?: boolean;
   bootstrapUserId?: string | null;
   bootstrapMembershipStatus?: 'active' | 'paused' | 'cancelled' | 'none';
   mockUserId?: string | null;
@@ -43,7 +44,8 @@ export interface ShopAudienceInput {
 export function resolveShopAudience(input: ShopAudienceInput): ShopAudience {
   if (input.remote) {
     if (!input.sessionUserId) return 'guest';
-    return input.bootstrapUserId === input.sessionUserId &&
+    return input.bootstrapReady === true &&
+      input.bootstrapUserId === input.sessionUserId &&
       input.bootstrapMembershipStatus === 'active' ? 'member' : 'non_member';
   }
   if (!input.mockUserId) return 'guest';
