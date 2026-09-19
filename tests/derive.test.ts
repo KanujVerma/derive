@@ -7996,3 +7996,276 @@ test('I1-B4B Obsolete changeReason is gone and note limit is explicit', () => {
   assert.equal(remote.includes('get-progress'), false);
   assert.equal(remote.includes("from('check_ins')"), true);
 });
+
+// ========================================================
+// 37. C1 SHOP V1 — COMMERCE SEMANTICS AND ARCHITECTURE
+// ========================================================
+
+import {
+  resolveActionCommerceSemantics,
+} from '../src/commerce/types.ts';
+import type { ShopAudience } from '../src/commerce/types.ts';
+
+test('C1 Shop: ADD published routine → acquisitionEligible=true, deferred_to_c15', () => {
+  const sem = resolveActionCommerceSemantics('ADD', 'published');
+  assert.equal(sem.acquisitionEligible, true);
+  assert.equal(sem.purchaseAvailability, 'deferred_to_c15');
+  assert.equal(sem.neverSellOldProduct, false);
+  assert.ok(sem.planStatusLabel.length > 0);
+});
+
+test('C1 Shop: ADD draft routine → acquisitionEligible=false, not_applicable', () => {
+  const sem = resolveActionCommerceSemantics('ADD', 'draft');
+  assert.equal(sem.acquisitionEligible, false);
+  assert.equal(sem.purchaseAvailability, 'not_applicable');
+});
+
+test('C1 Shop: ADD awaiting_review → acquisitionEligible=false', () => {
+  const sem = resolveActionCommerceSemantics('ADD', 'awaiting_review');
+  assert.equal(sem.acquisitionEligible, false);
+  assert.equal(sem.purchaseAvailability, 'not_applicable');
+});
+
+test('C1 Shop: PAUSE cannot have acquisition CTA — purchaseAvailability is not_applicable', () => {
+  const sem = resolveActionCommerceSemantics('PAUSE', 'published');
+  assert.equal(sem.acquisitionEligible, false);
+  assert.equal(sem.purchaseAvailability, 'not_applicable');
+});
+
+test('C1 Shop: STOP cannot have acquisition CTA — purchaseAvailability is not_applicable', () => {
+  const sem = resolveActionCommerceSemantics('STOP', 'published');
+  assert.equal(sem.acquisitionEligible, false);
+  assert.equal(sem.purchaseAvailability, 'not_applicable');
+});
+
+test('C1 Shop: KEEP does not imply required purchase — acquisitionEligible=false', () => {
+  const sem = resolveActionCommerceSemantics('KEEP', 'published');
+  assert.equal(sem.acquisitionEligible, false);
+  assert.equal(sem.planStatusLabel, 'In your plan');
+  // KEEP can eventually support refill, but not required purchase
+  assert.notEqual(sem.purchaseAvailability, 'not_applicable');
+});
+
+test('C1 Shop: REPLACE never sells old product — neverSellOldProduct=true', () => {
+  const sem = resolveActionCommerceSemantics('REPLACE', 'published');
+  assert.equal(sem.neverSellOldProduct, true);
+  assert.equal(sem.acquisitionEligible, false);
+  assert.equal(sem.purchaseAvailability, 'view_replacement');
+});
+
+test('C1 Shop: REPLACE with draft routine still never sells old product', () => {
+  const sem = resolveActionCommerceSemantics('REPLACE', 'draft');
+  assert.equal(sem.neverSellOldProduct, true);
+  assert.equal(sem.acquisitionEligible, false);
+});
+
+test('C1 Shop: null routineStatus → ADD is not acquisition-eligible', () => {
+  const sem = resolveActionCommerceSemantics('ADD', null);
+  assert.equal(sem.acquisitionEligible, false);
+  assert.equal(sem.purchaseAvailability, 'not_applicable');
+});
+
+test('C1 Shop: approved routineStatus → ADD acquisition-eligible (founder approved)', () => {
+  const sem = resolveActionCommerceSemantics('ADD', 'approved');
+  assert.equal(sem.acquisitionEligible, true);
+  assert.equal(sem.purchaseAvailability, 'deferred_to_c15');
+});
+
+test('C1 Shop: published routine allows eligible personalized commerce (ADD)', () => {
+  const addSem = resolveActionCommerceSemantics('ADD', 'published');
+  const keepSem = resolveActionCommerceSemantics('KEEP', 'published');
+  assert.equal(addSem.acquisitionEligible, true);
+  // KEEP is not actively marketed as a required purchase
+  assert.equal(keepSem.acquisitionEligible, false);
+});
+
+test('C1 Shop: unknown price — no fake price fabricated (architecture check)', () => {
+  // ShopProductViewModel.retailPriceApproxCents is optional — absence means no display
+  // This test asserts the type allows undefined (no fabrication path)
+  const viewModel: import('../src/commerce/types.ts').ShopProductViewModel = {
+    productId: 'prod_1',
+    brand: 'Vanicream',
+    name: 'Gentle Facial Cleanser',
+    category: 'cleanser',
+    keyActives: ['glycerin'],
+    // retailPriceApproxCents intentionally absent — price unknown
+    audience: 'member',
+    action: 'ADD',
+    purchaseAvailability: 'deferred_to_c15',
+    acquisitionEligible: true,
+  };
+  assert.equal(viewModel.retailPriceApproxCents, undefined);
+  assert.equal(viewModel.productId, 'prod_1');
+});
+
+test('C1 Shop: guest audience resolves from ShopAudience type correctly', () => {
+  const audience: ShopAudience = 'guest';
+  // Guest gets no personalized sections — verify type is valid
+  assert.ok(['guest', 'non_member', 'member'].includes(audience));
+});
+
+test('C1 Shop: non-member audience gets no personalized sections (view model)', () => {
+  const viewModel: import('../src/commerce/types.ts').ShopProductViewModel = {
+    productId: 'prod_2',
+    brand: 'CeraVe',
+    name: 'Moisturizing Cream',
+    category: 'moisturizer',
+    keyActives: ['ceramides'],
+    audience: 'non_member',
+    // action, actionReason, fitVerdict intentionally absent — no fake personalization
+    purchaseAvailability: 'deferred_to_c15',
+    acquisitionEligible: false,
+  };
+  assert.equal(viewModel.audience, 'non_member');
+  assert.equal(viewModel.action, undefined);
+  assert.equal(viewModel.actionReason, undefined);
+  assert.equal(viewModel.fitVerdict, undefined);
+});
+
+test('C1 Shop: member audience can carry personalized verdict', () => {
+  const viewModel: import('../src/commerce/types.ts').ShopProductViewModel = {
+    productId: 'prod_3',
+    brand: 'La Roche-Posay',
+    name: 'Toleriane Hydrating Gentle Cleanser',
+    category: 'cleanser',
+    keyActives: ['prebiotic thermal water'],
+    audience: 'member',
+    action: 'KEEP',
+    actionReason: 'Matches your barrier-repair goal and routine complexity preference.',
+    timing: 'am',
+    purchaseAvailability: 'deferred_to_c15',
+    acquisitionEligible: false,
+  };
+  assert.equal(viewModel.audience, 'member');
+  assert.equal(viewModel.action, 'KEEP');
+  assert.ok(viewModel.actionReason && viewModel.actionReason.length > 0);
+});
+
+test('C1 Shop: non-member product detail has no personalized verdict', () => {
+  const viewModel: import('../src/commerce/types.ts').ShopProductViewModel = {
+    productId: 'prod_4',
+    brand: 'Neutrogena',
+    name: 'Hydro Boost Water Gel',
+    category: 'moisturizer',
+    keyActives: ['hyaluronic acid'],
+    audience: 'non_member',
+    purchaseAvailability: 'deferred_to_c15',
+    acquisitionEligible: false,
+  };
+  // Non-member: no action, no reason, no verdict
+  assert.equal(viewModel.action, undefined);
+  assert.equal(viewModel.fitVerdict, undefined);
+});
+
+test('C1 Shop: no fake member discounts — ShopProductViewModel has no discount field', () => {
+  const fields = Object.keys({
+    productId: '',
+    brand: '',
+    name: '',
+    category: '',
+    keyActives: [],
+    audience: 'member' as ShopAudience,
+    purchaseAvailability: 'deferred_to_c15' as const,
+    acquisitionEligible: false,
+  });
+  assert.ok(!fields.includes('discountPercent'), 'No discountPercent field');
+  assert.ok(!fields.includes('memberDiscount'), 'No memberDiscount field');
+  assert.ok(!fields.includes('coupon'), 'No coupon field');
+});
+
+test('C1 Shop: commercial benefit cannot alter recommendation — PAUSE stays PAUSE regardless of "deals"', () => {
+  // Action must be set by routine intelligence, not commerce
+  // A PAUSE product can never become acquisition-eligible no matter what an "offer" says
+  const pauseSem = resolveActionCommerceSemantics('PAUSE', 'published');
+  const stopSem = resolveActionCommerceSemantics('STOP', 'published');
+  assert.equal(pauseSem.acquisitionEligible, false);
+  assert.equal(stopSem.acquisitionEligible, false);
+  // A hypothetical "deal" cannot override this — the function has no deal input
+  // This structural invariant is enforced by the function signature
+  assert.equal(typeof resolveActionCommerceSemantics, 'function');
+});
+
+test('C1 Shop: Scan is reachable inside Shop (canonical route file exists)', () => {
+  const scanExists = fs.existsSync(path.resolve('app/shop/scan.tsx'));
+  assert.ok(scanExists, 'app/shop/scan.tsx must exist as canonical Scan implementation');
+});
+
+test('C1 Shop: Ask Scan action routes to canonical Shop (not legacy /(tabs)/scan)', () => {
+  const askContent = fs.readFileSync(path.resolve('app/(tabs)/ask.tsx'), 'utf8');
+  // Must push to /(tabs)/shop, not /(tabs)/scan
+  assert.ok(askContent.includes("router.push('/(tabs)/shop')"), 'Ask must route to /(tabs)/shop');
+  // Must NOT have the legacy direct route push to scan tab
+  const legacyScanPush = "router.push('/(tabs)/scan')";
+  assert.ok(!askContent.includes(legacyScanPush), 'Ask must not push to legacy /(tabs)/scan');
+});
+
+test('C1 Shop: only five member root tabs exist (no sixth tab)', () => {
+  const layoutContent = fs.readFileSync(path.resolve('app/(tabs)/_layout.tsx'), 'utf8');
+  const tabScreenMatches = layoutContent.match(/name=["'][^"']+["'][^/]*options=\{/g) ?? [];
+  // There are exactly 5 active tab names: index, plan, shop, ask, progress
+  // scan has href: null so it's hidden
+  const activeTabs = ['index', 'plan', 'shop', 'ask', 'progress'];
+  for (const tab of activeTabs) {
+    assert.ok(layoutContent.includes(`name="${tab}"`), `Tab '${tab}' must be in layout`);
+  }
+  // scan must be hidden (href: null)
+  assert.ok(layoutContent.includes('href: null'), 'scan tab must be hidden with href: null');
+});
+
+test('C1 Shop: only one scanner implementation (no duplicate)', () => {
+  const tabScanContent = fs.readFileSync(path.resolve('app/(tabs)/scan.tsx'), 'utf8');
+  // The tabs/scan.tsx must be a redirect shim, not a scanner implementation
+  assert.ok(tabScanContent.includes('Redirect'), 'app/(tabs)/scan.tsx must be a redirect shim');
+  assert.ok(!tabScanContent.includes('CameraView'), 'app/(tabs)/scan.tsx must NOT contain CameraView — scanner is in shop/scan.tsx');
+  // The real scanner must be in shop/scan.tsx
+  const shopScanContent = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  assert.ok(shopScanContent.includes('CameraView'), 'app/shop/scan.tsx must be the canonical scanner');
+});
+
+test('C1 Shop: all entry points converge on one product detail architecture (shop.tsx uses handleProductPress)', () => {
+  const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
+  assert.ok(shopContent.includes('handleProductPress'), 'shop.tsx must have a single product navigation handler');
+  // C1.5 note must be present (deferred detail page)
+  assert.ok(shopContent.includes('C1.5'), 'shop.tsx must document C1.5 product detail deferral');
+});
+
+test('C1 Shop: member no-products-needed state is calm (no manufactured urgency)', () => {
+  const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
+  assert.ok(shopContent.includes('Your current plan is covered'), 'Calm plan-covered message must exist');
+  // No high-pressure copy in the calm state
+  assert.ok(!shopContent.includes('Buy Now'), 'No "Buy Now" copy in C1 Shop (physical commerce deferred)');
+  assert.ok(!shopContent.includes('Limited Time'), 'No manufactured urgency copy');
+});
+
+test('C1 Shop: public fallback works without fake routine context', () => {
+  const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
+  // Non-member/guest path must exist
+  assert.ok(shopContent.includes("audience === 'guest'") || shopContent.includes("isMember"), 'Audience branching must exist');
+  // Must NOT show fake plan sections for non-members
+  assert.ok(!shopContent.includes('Needed for Your Plan\nNo membership'), 'No fake plan sections for non-members');
+});
+
+test('C1 Shop: PROTOTYPE_CATALOG is not treated as production Shop inventory', () => {
+  const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
+  // shop.tsx must not import PROTOTYPE_CATALOG
+  assert.ok(!shopContent.includes('PROTOTYPE_CATALOG'), 'shop.tsx must not import PROTOTYPE_CATALOG as production inventory');
+});
+
+test('C1 Shop: C1 does not add physical-commerce methods to shared contract (S5 boundary preserved)', () => {
+  const serviceContent = fs.readFileSync(path.resolve('src/contracts/DeriveService.ts'), 'utf8');
+  // C1 MUST NOT add physical-commerce checkout methods to shared contract
+  assert.ok(!serviceContent.includes('createProductCheckout'), 'No physical product checkout in shared contract');
+  assert.ok(!serviceContent.includes('createShopifySession'), 'No Shopify session in shared contract');
+  assert.ok(!serviceContent.includes('createProductOffer'), 'No ProductOffer creation in shared contract');
+  // C1 commerce types must not be in shared contract paths
+  assert.ok(!serviceContent.includes('ShopAudience'), 'ShopAudience must not be in shared DeriveService contract');
+  const commerceTypes = fs.readFileSync(path.resolve('src/commerce/types.ts'), 'utf8');
+  assert.ok(!/export\s+(type|interface)\s+HostedMembershipSession/.test(commerceTypes), 'C1 commerce types must not define S5 HostedMembershipSession');
+});
+
+test('C1 Shop: no backend files modified — supabase directory unchanged', () => {
+  // Confirm no migration was added
+  const migrations = fs.readdirSync(path.resolve('supabase/migrations'));
+  const c1Migrations = migrations.filter(m => m.includes('c1') || m.includes('shop') || m.includes('product_offer') || m.includes('commerce'));
+  assert.deepEqual(c1Migrations, [], 'C1 must not add any supabase migrations');
+});

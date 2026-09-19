@@ -7,6 +7,7 @@ import { colors } from '@/src/constants/theme';
 export type IconName =
   | 'today'
   | 'plan'
+  | 'shop'
   | 'ask'
   | 'progress'
   | 'check'
@@ -42,6 +43,7 @@ interface IconConfig {
 const ICON_MAP: Record<IconName, IconConfig> = {
   today: { sfSymbol: 'sun.max', ionicon: 'sunny-outline' },
   plan: { sfSymbol: 'list.bullet.rectangle', ionicon: 'list-outline' },
+  shop: { sfSymbol: 'bag', ionicon: 'cart-outline' },
   ask: { sfSymbol: 'bubble.left.and.bubble.right', ionicon: 'chatbubbles-outline' },
   progress: { sfSymbol: 'clock.arrow.circlepath', ionicon: 'time-outline' },
   check: { sfSymbol: 'checkmark', ionicon: 'checkmark' },

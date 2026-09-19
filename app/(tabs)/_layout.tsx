@@ -80,12 +80,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="shop"
+        options={{
+          title: 'Shop',
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label="Shop" icon="shop" focused={focused} />
+          ),
+        }}
+      />
+      {/* scan is hidden from tab bar — it redirects to /(tabs)/shop */}
+      <Tabs.Screen
         name="scan"
         options={{
-          title: 'Scan',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon label="Scan" icon="scan" focused={focused} />
-          ),
+          href: null, // hide from tab bar
         }}
       />
       <Tabs.Screen

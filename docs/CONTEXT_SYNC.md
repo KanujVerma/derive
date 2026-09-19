@@ -6,6 +6,28 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19 — Kanuj Mobile: C1 Shop V1 Personalized Commerce UX & Architecture (Draft PR)
+
+- **Agent / Workstream**: Kanuj (Customer Experience + Mobile)
+- **Local Branch**: `kanuj/c1-shop-v1`
+- **Starting Shared HEAD / origin/main**: `d5214e8564a0004f177156552b492aa27c315ed6`
+- **Remote Push Status**: draft PR pending push
+- **GitHub CI**: pending
+- **Milestone Status**: `C1 IMPLEMENTED · DRAFT PR OPEN`; S5 active on PR #18 (`sami/s5-commerce-remote-integration`); C1.5 deferred to post-S5 merge.
+- **Ownership / Shared Contracts**: Kanuj-owned mobile changes strictly in `app/**`, `src/components/**`, `src/commerce/**`, `src/services/analytics.ts`, `tests/**`, and docs. Zero modifications to `src/contracts/**`, `src/domain/**`, `src/types/schema.ts`, or backend `supabase/**`.
+- **Durable Deliverables**:
+  1. Approved 5-tab member navigation implemented: `Today · Plan · Shop · Ask · Progress`. Shop replaces Scan as root tab; Scan is nested as a capability under `/shop/scan` (`app/shop/scan.tsx`).
+  2. Single canonical scanner invariant maintained at `app/shop/scan.tsx`. Route compatibility redirect shim at `app/(tabs)/scan.tsx`.
+  3. Action-to-commerce semantics formalized in `src/commerce/types.ts` (`resolveActionCommerceSemantics`): ADD eligible only on routine publish/approval; PAUSE/STOP never eligible; KEEP non-urgent in-plan status; REPLACE never sells old product.
+  4. Personalized member Shop home (`app/(tabs)/shop.tsx`) with `NEEDED FOR YOUR PLAN`, `YOUR ROUTINE`, `SCAN A PRODUCT`, and `ORDERS & REFILLS`.
+  5. Calm empty states: "Your current plan is covered" when no items needed; review pending explainer when routine unconfirmed.
+  6. Non-member and guest fallback view models without fabricated routine context or scores.
+  7. Comprehensive commerce documentation in `docs/COMMERCE.md` covering audience states, Stripe vs Shopify evaluation, Product/Recommendation/Offer separation, and open business questions.
+  8. 25 focused regression tests in `tests/derive.test.ts` verifying commerce invariants, boundary protection, and navigation truth (212/212 tests pass).
+- **PR Disposition**:
+  - Closed superseded PR #17 (`docs(i1-b4): close reconciliation bookkeeping`).
+  - Inspected and protected open PR #18 (`sami/s5-commerce-remote-integration` @ `f9e76a1`). C1 isolates physical commerce in draft branch without touching S5 membership billing.
+
 ## 2026-09-19 — Pre-C1 integration: land cumulative S1–S4 (#16) onto B4 main
 
 - **Agent / Workstream**: Kanuj integration (shared `main`)

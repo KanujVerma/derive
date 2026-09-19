@@ -8,7 +8,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ┌─────────────────────────────────────────────────────────────┐
 │                 MOBILE CLIENT (Kanuj Lane)                  │
 │       Expo Router • React Native • TypeScript • Zustand     │
-│   Today  •  Plan  •  Scan (Viewfinder)  •  Ask  •  Progress │
+│   Today  •  Plan  •  Shop  •  Ask  •  Progress              │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                ┌───────────────┴───────────────┐

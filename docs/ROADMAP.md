@@ -589,13 +589,43 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
-### S5: Commerce & Remote Service Integration
-* **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership** (target $25/month after B4A; Stripe owns live money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` against live Edge Functions. Separate product commerce v0 may follow membership checkout. Full personalized Shop is later / evidence-driven.
+### S5: Commerce & Remote Service Integration [ACTIVE ON PR #18]
+* **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership billing only** (target $25/month after B4A; Stripe owns charged money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` against live Edge Functions. S5 explicitly defers physical product checkout, Shop, product SKU commerce, and physical-product Order system.
 * **Acceptance Criteria**:
-  - Stripe webhook maps customer email to Supabase member record and membership lifecycle.
+  - Stripe webhook maps customer email to Supabase member record and membership lifecycle (`active` / `past_due` / `canceled`).
+  - `HostedMembershipSession` contracts (`createMembershipCheckout`, `createMembershipPortal`) live in `IDeriveService`.
   - `RemoteDeriveService` passes the full test suite against live Supabase Edge Functions.
   - Mobile app can toggle from `MockDeriveService` to `RemoteDeriveService` via a single environment flag.
-  - Product SKU checkout is not required to close S5 membership; Shop is explicitly deferred.
+  - Physical product checkout, Shop catalog, and product SKU commerce remain deferred to C1.5.
+
+---
+
+## Kanuj Commerce Stream (Shop & Customer Acquisition)
+
+### C1: Shop V1 Personalized Commerce UX [DRAFT PR / IN PROGRESS]
+* **Scope**: Durable mobile foundation for Derive Shop. Member root tab replaces Scan with Shop (`Today · Plan · Shop · Ask · Progress`). Single canonical scanner nested at `app/shop/scan.tsx` with redirect compatibility shim. Personalized member Shop home (`NEEDED FOR YOUR PLAN`, `YOUR ROUTINE`, `SCAN A PRODUCT`, `ORDERS & REFILLS`). Non-member and guest fallback view models without fake personalization or fabricated scores. Action-to-commerce semantics (`resolveActionCommerceSemantics`). Invariants: unapproved recommendations never monetized, recommendation independence from commercial offers, price truth without fabricated amounts.
+* **Acceptance Criteria**:
+  - [x] Target member navigation is 5 tabs: Today, Plan, Shop, Ask, Progress. No sixth tab.
+  - [x] Scan lives canonically inside Shop (`app/shop/scan.tsx`); only one scanner implementation exists.
+  - [x] Non-member and guest presentation fallbacks exist without fake routine context.
+  - [x] Action-to-commerce semantics enforce ADD eligible on publish only; PAUSE/STOP never; REPLACE never sells old product.
+  - [x] Zero physical-commerce backend or DB changes in C1 (deferred to C1.5).
+  - [x] Zero shared domain/contract modifications in `src/contracts/**` or `src/domain/**`.
+  - [x] Unit test suite, TypeScript, and web export pass 100%.
+
+### C1.5: Physical Product Commerce Integration [BLOCKED ON S5 MERGE + COMMERCE PROVIDER DECISION]
+* **Scope**: Physical product checkout and fulfillment integration following S5 membership billing reconciliation.
+* **Prerequisites**: S5 merged; physical-commerce provider selected (Stripe direct vs Shopify headless vs external retailer).
+* **Deliverables**:
+  - Reconcile C1 branch onto main post-S5 merge.
+  - Introduce shared `ProductOffer` contract and DB schema.
+  - Single-item checkout with native Apple Pay / payment sheet.
+  - Physical order management (`Order`, `OrderItem[]`) converging with operational refills.
+  - Public catalog read contract and guest/non-member routing shell activation.
+  - Real member commerce benefits (member price, shipping perks) if supported by verified offers.
+
+### C2: Personalized Discovery & Cart [DEFERRED / EVIDENCE DRIVEN]
+* **Scope**: Category exploration, search, personalized product alternatives for out-of-stock items, multi-merchant offers, and multi-item cart (only if customer order patterns establish multi-product demand).
 
 ---
 

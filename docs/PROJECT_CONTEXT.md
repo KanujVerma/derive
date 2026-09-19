@@ -67,7 +67,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
 * **Optional Depth**:
   Members who want deeper understanding can explore Scan (viewfinder evaluation), Ask (grounded conversational intelligence), Progress (longitudinal photo comparisons and insights), and research cards at their own pace.
 * **Canonical Navigation Preserved**:
-  All members navigate the same 5 primary native tabs: `Today` | `Plan` | `Scan` | `Ask` | `Progress`.
+  All members navigate the same 5 primary native tabs: `Today` | `Plan` | `Shop` | `Ask` | `Progress`.
 
 ---
 
@@ -75,7 +75,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
 The Founding Beta delivers:
 1. **Audited Canonical Routine**: Morning and evening sequences with personalized dosage amounts, application zones, and active schedules.
 2. **Bathroom Shelf Audit**: Evaluation of counter bottles into KEEP, PAUSE, REPLACE, and ADD.
-3. **Dedicated Viewfinder Scanner**: In-store and counter evaluation verifying whether prospective products fit their active barrier and routine.
+3. **Shop & Dedicated Viewfinder Scanner**: In-store and counter evaluation verifying whether prospective products fit their active barrier and routine, plus acquisition for recommended steps.
 4. **Contextual Ask Derive**: Conversational intelligence grounded in active products, retinoid schedules, and tolerance history.
 5. **Weekly Check-Ins & Progress**: Longitudinal tracking of tolerance, barrier stability, and photo comparison.
 6. **Managed Refills**: Low-friction replenishment of standard routine products without automated depletion illusions.

@@ -143,8 +143,8 @@ export default function AskScreen() {
   const handleStarterPress = (prompt: string) => {
     Haptics.selectionAsync();
     if (prompt === 'Scan a product') {
-      analytics.track('product_scan_started', { entryPoint: 'starter_pill' });
-      router.push('/(tabs)/scan');
+      analytics.track('shop_scan_opened', { source: 'shop_tab', entryPoint: 'ask_starter_pill' });
+      router.push('/(tabs)/shop');
     } else {
       handleSendMessage(prompt);
     }
