@@ -13,6 +13,7 @@ import {
   generateStructuredJson,
   inferAndPersistIngredientSignals,
   jsonResponse,
+  loadExistingInitialRoutineId,
   loadMemberContext,
   loadRoutineProposalResult,
   persistRoutineProposal,
@@ -31,6 +32,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const loaded = await loadMemberContext(admin, userId);
+    const existingRoutineId = await loadExistingInitialRoutineId(admin, userId);
+    if (existingRoutineId) {
+      return jsonResponse(
+        await loadRoutineProposalResult(admin, userId, existingRoutineId, []),
+      );
+    }
     await inferAndPersistIngredientSignals(admin, userId, loaded);
 
     const prompt = routinePrompt(loaded.context);

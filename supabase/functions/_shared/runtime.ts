@@ -575,6 +575,19 @@ export async function persistRoutineProposal(
   return data.id;
 }
 
+export async function loadExistingInitialRoutineId(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await admin.from("routines").select("id")
+    .eq("user_id", userId).eq("version", 1).maybeSingle();
+  if (error) {
+    console.error("initial routine replay lookup failed:", error.code);
+    throw new ServiceError("CONTEXT_UNAVAILABLE", "Existing routine state could not be loaded", 500);
+  }
+  return data?.id ?? null;
+}
+
 export async function loadRoutineProposalResult(
   admin: SupabaseClient,
   userId: string,
@@ -583,7 +596,7 @@ export async function loadRoutineProposalResult(
 ): Promise<Record<string, unknown>> {
   const [routineResult, itemResult, shelfResult] = await Promise.all([
     admin.from("routines").select(
-      "id, user_id, version, status, summary_sentence, created_at, updated_at, published_at, founder_notes",
+      "id, user_id, version, status, summary_sentence, created_at, updated_at, published_at",
     ).eq("id", routineId).eq("user_id", userId).single(),
     admin.from("routine_items").select(
       "id, routine_id, order_index, timing, product_id, product_name, brand, category, amount, area, days, purpose, why_chosen, watch_for",
@@ -642,7 +655,6 @@ export async function loadRoutineProposalResult(
       createdAt: routine.created_at,
       updatedAt: routine.updated_at,
       publishedAt: routine.published_at ?? undefined,
-      founderNotes: routine.founder_notes ?? undefined,
     },
     userProducts: shelfRows.flatMap((row: any) => {
       const product = productById.get(row.product_id);

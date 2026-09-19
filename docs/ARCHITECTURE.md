@@ -118,7 +118,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ## 3. Intelligence Orchestration Layer
 * **Model**: Google Gemini 2.5 Flash via structured JSON outputs, invoked only from the trusted Supabase/server environment.
-* **Credential boundary**: Gemini API keys are server secrets. The Expo client must never read, embed, or ship a Gemini key (`EXPO_PUBLIC_*` Gemini variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning. The S3 Edge Functions invoke Gemini directly from the trusted runtime; coordinated `RemoteDeriveService` endpoint wiring remains S5/I1.
+* **Credential boundary**: Gemini API keys are server secrets. The Expo client must never read, embed, or ship a Gemini key (`EXPO_PUBLIC_*` Gemini variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning. `RemoteDeriveService` has typed endpoint adapters, while production Remote activation and full lifecycle integration remain S5/I1.
 * **Context Assembly**: When evaluating queries or generating routine proposals, the backend injects:
   1. Customer skin profile from `public.skin_profiles` (primary goals, midday oil, tightness, `pregnancy_status`, `sensitivities_status`).
   2. Intake snapshot context from `public.onboarding_submissions.payload_snapshot` (`pihTendencyAnswer`, adverse reactions, confirmed shelf products, formula snapshots).
@@ -133,6 +133,13 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
   4. **Reported Sensitivities**: Known sensitized ingredients must not be introduced in added or replacement products when `sensitivities_status === 'reported'`.
 * **Safety Circuit Breaker**: `ask-derive` runs a deterministic classifier before any model call. Facial/eye/lip/tongue swelling, breathing/throat distress, severe blistering/oozing/pus, and rapidly spreading hot hives return an emergency response immediately and create only a privacy-minimized urgent founder task. Barrier warnings remain categorical and non-diagnostic.
 * **Structured-Output Gate**: Routine, scan, and Ask responses use provider JSON schemas and are parsed again on the server. Deterministic post-model guards reject invalid schedules, prescription changes, sensitivity conflicts, prohibited diagnostic claims, and unsafe pregnancy-context recommendations before persistence or response.
+* **Routine Proposal Pipeline (`propose-routine` Edge Function & RPC)**:
+  - Gateway JWT verification with handler defense-in-depth `auth.getUser()`.
+  - Fail-closed intake verification: rejects requests unless `public.onboarding_submissions` status is `committed`.
+  - Replay idempotency: checks for existing version-1 routine in `public.routines` and returns it without inserting duplicate rows.
+  - Server-assembled canonical context from `skin_profiles`, sealed intake, active routine, shelf history, reactions/formulas, ingredient signals, check-ins, and non-sensitive photo metadata.
+  - Gemini structured generation followed by deterministic validation enforcing AM/PM, prescription, sensitivity, and pregnancy contraindication invariants.
+  - Transactional relational persistence via `public.commit_routine_proposal(...)` RPC executed by `service_role`: normalizes products in `public.products`, inserts version-1 routine in `awaiting_review` status, inserts `routine_items` with resolved `product_id` FKs, updates `user_products`, and updates the pending `initial_routine` founder review task notes.
 
 ---
 
