@@ -36,25 +36,25 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
 
 ---
 
-## 2. Founding Beta Pricing Experiment — $100/Month (First 10 Only)
+## 2. Founding Beta Pricing — Approved $25 Management Membership (Products Separate)
 
-* **Status**: **APPROVED BETA EXPERIMENT** (Distinct from long-term pricing architecture).
-* **Price Point**: Flat **$100/month** for the initial 10 paying Founding Beta members.
+* **Status**: **IMPLEMENTED (I1-B4A / ADR-26)**. Current runtime uses `config.betaPriceMonthly = 25` and `founding_beta`.
+* **Price Point**: Flat **$25/month** Founding Beta experiment for Derive managing the member's skincare. Not "$25 for AI." Not a lifetime company price.
+* **Products**: Purchased separately. Membership price is independent of routine size, retail cost, lifespan, and refill rate. No V1 membership tiers.
 * **Strategic Rationale**:
-  - Validates genuine recurring willingness-to-pay, member routine adherence, and month-two retention.
-  - Lowers signup friction to secure 10 committed paying members rapidly.
-  - Thin or negative first-basket unit economics are intentionally tolerated for this 10-person learning cohort; mature unit economics are NOT claimed.
+  - Validates genuine recurring willingness-to-pay **for management**, independent of product cost.
+  - Preserves KEEP / consent / need-based refill operating principles from ADR-21.
+  - Thin or negative first-basket unit economics remain possible while founders assist product purchasing; mature unit economics are NOT claimed.
 * **Customer-Facing Concept**:
-  - One all-in monthly price covers Derive management plus the standard non-prescription facial skincare products needed for the member's approved routine.
-  - **No Product Wallet or Credit Allowance**: The member does NOT receive a product wallet, credit balance, rollover allowance, or "$X of products."
-  - **Preserve Working Products**: Existing counter products that already work are retained (`KEEP`); Derive does not ship duplicate bottles merely because someone pays monthly.
-  - **Refills by Need, Not Calendar Theater**: Replenishment shipments follow actual consumption need, never arbitrary billing calendar cadences.
-  - **Prescriptions Are Contextual Only**: Prescription medications (e.g. Tretinoin, oral treatments) are contextual inputs, never products Derive prescribes, modifies, or supplies.
-  - **Discretionary Luxury Exclusions**: Unusually expensive discretionary/luxury products are not silently guaranteed by all-in beta terms.
-* **Internal Beta Economics**:
-  Tracked privately per member (subscription payment, first-basket wholesale cost, steady-state normalized recurring product cost, shipping/tax, founder time, replacement/refund costs); internal fee structures are never exposed as a customer-facing breakdown.
-* **Long-Term Pricing Architecture**:
-  The personalized all-in monthly pricing architecture (ADR-15, prototyped in `src/pricing/` with Arthur's $96/mo illustrative demo fixture) remains **PROVISIONAL / PENDING COFOUNDER BUSINESS REVIEW** and will be informed by evidence gathered from this 10-member beta. ADR-10's historical flat $129/mo pricing is superseded.
+  - Membership pays for Derive managing skincare (routine, check-ins, Scan, Ask, Progress, beta founder review).
+  - Products are separate transactions. No product wallet, credit balance, or rollover allowance.
+  - **Preserve Working Products**: Existing counter products that already work are retained (`KEEP`).
+  - **Refills by Need, Not Calendar Theater**: Same-SKU refills may stay low-friction; new SKUs require explicit consent.
+  - **Prescriptions Are Contextual Only**.
+  - **Weekly check-in context (I1-B4B)**: optional tags + one note are history for comparison, not proven causes. No food diary or period tracker.
+  - **Commercial Independence**: Monetization must not silently change recommendations.
+* **Historical (do not delete)**: ADR-21 $100/month all-in/products-included experiment; ADR-10 $129; ADR-15 Arthur $96/mo routine-derived prototype. All superseded as commercial direction.
+* **Long-Term Commerce**: Stripe membership checkout in S5. Separate product commerce v0 after membership. Full Shop later / evidence-driven. No sixth tab.
 
 ---
 

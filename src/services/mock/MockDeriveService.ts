@@ -33,6 +33,7 @@ import type {
   RoutinePlan,
   SkinProfile,
   UserProduct,
+  Product,
   CheckIn,
   LearnedInsight,
   PhotoContextEntry,
@@ -48,6 +49,7 @@ import {
 } from '../catalog.ts';
 import { checkSkincareSafety } from '../ai-workflows/safety-classifier.ts';
 import { askDeriveAdvisor } from '../ai-workflows/chat-advisor.ts';
+import { authorCheckInAnalysis, isCheckInDueFromLatest } from '../../domain/checkIn.ts';
 
 function inferProductCategory(name: string): ProductCategory {
   const lower = name.toLowerCase();
@@ -145,6 +147,7 @@ export class MockDeriveService implements IDeriveService {
         irritation: 'none',
         adherence: 'yes',
         notes: 'Skin felt comfortable. No redness from Differin.',
+        contextTags: [],
         aiAnalysisSentence: 'Good adherence. Differin on Monday, Wednesday, and Friday is performing well.',
         adjustmentProposed: false,
         createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
@@ -217,7 +220,7 @@ export class MockDeriveService implements IDeriveService {
       id: 'usr_arthur_1',
       email: 'arthur@example.com',
       fullName: 'Arthur Pendelton',
-      tier: 'founding_beta_129',
+      tier: 'founding_beta',
       membershipStatus: 'active',
       createdAt: '2026-09-01T00:00:00Z',
       updatedAt: new Date().toISOString(),
@@ -304,7 +307,7 @@ export class MockDeriveService implements IDeriveService {
       id: userId,
       email: 'member@derive.skin',
       fullName: 'Beta Member',
-      tier: 'founding_beta_129',
+      tier: 'founding_beta',
       membershipStatus: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -319,14 +322,42 @@ export class MockDeriveService implements IDeriveService {
     };
   }
 
-  async proposeRoutine(input: RoutineProposalInput): Promise<RoutineProposalResult> {
+  async proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult> {
+    if (input) {
+      const proposal = generateRoutineProposal(
+        input.profile,
+        input.shelfProducts
+      );
+      this.activeRoutine = proposal.routine;
+      this.userProducts = proposal.userProducts;
+      return proposal;
+    }
+
+    if (!this.skinProfile) {
+      throw new Error('MockDeriveService.proposeRoutine requires profile state or explicit input.');
+    }
+
+    const shelfProducts: Product[] = this.userProducts.map((up) => up.product);
     const proposal = generateRoutineProposal(
-      input.profile,
-      input.shelfProducts
+      {
+        primaryGoal: this.skinProfile.primaryGoal,
+        secondaryGoals: this.skinProfile.secondaryGoals,
+        routineComplexity: this.skinProfile.routineComplexity,
+        costPreference: this.skinProfile.costPreference,
+        middayFeel: this.skinProfile.middayFeel,
+        postCleanseTightness: this.skinProfile.postCleanseTightness,
+        activePrescriptions: this.skinProfile.activePrescriptions,
+      },
+      shelfProducts
     );
+    proposal.routine.userId = this.skinProfile.userId;
     this.activeRoutine = proposal.routine;
     this.userProducts = proposal.userProducts;
     return proposal;
+  }
+
+  async getUserProducts(userId: string): Promise<UserProduct[]> {
+    return [...this.userProducts];
   }
 
   async askDerive(request: AskRequest): Promise<AskResponse> {
@@ -401,10 +432,12 @@ export class MockDeriveService implements IDeriveService {
   }
 
   async submitCheckIn(input: CheckInInput): Promise<CheckInResult> {
-    const isIrritated = input.irritation === 'lot' || input.irritation === 'little';
-    const analysisSentence = isIrritated
-      ? 'Mild sensitivity noted. Maintain barrier hydration and pause any optional exfoliating treatments.'
-      : 'Skin responding steadily. Continue the current schedule.';
+    const contextTags = input.contextTags ?? [];
+    const analysis = authorCheckInAnalysis({
+      skinState: input.skinState,
+      irritation: input.irritation,
+      hasContext: contextTags.length > 0 || Boolean(input.contextNote?.trim()),
+    });
 
     const newCheckIn: CheckIn = {
       id: `ci_${Date.now()}`,
@@ -414,10 +447,12 @@ export class MockDeriveService implements IDeriveService {
       irritation: input.irritation,
       adherence: input.adherence || 'yes',
       notes: input.notes,
+      contextTags,
+      contextNote: input.contextNote,
       photoUrls: input.photoUris,
       irritationDetails: input.irritationDetails,
-      aiAnalysisSentence: analysisSentence,
-      adjustmentProposed: isIrritated,
+      aiAnalysisSentence: analysis.sentence,
+      adjustmentProposed: analysis.adjustmentProposed,
       createdAt: new Date().toISOString(),
     };
 
@@ -425,9 +460,9 @@ export class MockDeriveService implements IDeriveService {
 
     return {
       checkIn: newCheckIn,
-      aiAnalysisSentence: analysisSentence,
-      adjustmentProposed: isIrritated,
-      proposedAdjustmentSummary: isIrritated
+      aiAnalysisSentence: analysis.sentence,
+      adjustmentProposed: analysis.adjustmentProposed,
+      proposedAdjustmentSummary: analysis.adjustmentProposed
         ? 'Consider pausing active exfoliation for 48 hours to allow barrier recovery.'
         : undefined,
     };
@@ -441,7 +476,7 @@ export class MockDeriveService implements IDeriveService {
       routineHistorySummary: this.activeRoutine
         ? 'Active managed routine.'
         : 'No active routine yet. Complete setup to calibrate your routine.',
-      isCheckInDue: false,
+      isCheckInDue: isCheckInDueFromLatest(this.checkIns[0]?.createdAt),
     };
   }
 

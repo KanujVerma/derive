@@ -17,7 +17,7 @@ import { Icon } from '@/src/components/ui/Icon';
 import { SegmentedControl } from '@/src/components/ui/SegmentedControl';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
-import { hydrateRoutine } from '@/src/services/deriveClient';
+import { ensureInitialRoutineProposal } from '@/src/services/deriveClient';
 
 export default function PlanScreen() {
   const router = useRouter();
@@ -28,13 +28,14 @@ export default function PlanScreen() {
     completedStepIdsToday,
     toggleStepCompletion,
     isPlanUnderReview,
+    isRoutineBeingPrepared,
+    planHydrationStatus,
+    planHydrationError,
   } = useRoutineStore();
   const [activeTab, setActiveTab] = useState<'routine' | 'products'>('routine');
 
   React.useEffect(() => {
-    if (!routine) {
-      hydrateRoutine().catch((e) => console.warn('Failed to hydrate routine:', e));
-    }
+    ensureInitialRoutineProposal().catch((e) => console.warn('Failed to ensure routine proposal:', e));
   }, []);
 
   const handleTabSwitch = (tab: 'routine' | 'products') => {
@@ -62,7 +63,9 @@ export default function PlanScreen() {
           </TouchableOpacity>
         </View>
         <Text style={styles.screenSubtitle}>
-          {isPlanUnderReview
+          {isRoutineBeingPrepared
+            ? 'Preparing your routine · Setup complete'
+            : isPlanUnderReview
             ? 'Draft routine schedule · Under final quality review'
             : routine?.summarySentence || 'Active managed skincare routine.'}
         </Text>
@@ -85,7 +88,7 @@ export default function PlanScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {isPlanUnderReview && (
+        {!isRoutineBeingPrepared && isPlanUnderReview && (
           <View style={styles.draftNoticeBanner}>
             <View style={styles.draftNoticeHeader}>
               <Badge label="DRAFT · NOT ACTIVE" variant="pause" size="small" />
@@ -98,7 +101,28 @@ export default function PlanScreen() {
         )}
 
         {activeTab === 'routine' ? (
-          amSteps.length === 0 && pmSteps.length === 0 ? (
+          isRoutineBeingPrepared ? (
+            <View style={styles.emptyPlanCard}>
+              <View style={styles.emptyPlanIconCircle}>
+                <Icon name="sparkle" size={24} color={colors.brand} />
+              </View>
+              <Text style={styles.emptyPlanTitle}>Preparing your routine</Text>
+              <Text style={styles.emptyPlanText}>
+                {planHydrationStatus === 'error'
+                  ? planHydrationError || "We couldn't refresh your routine right now. Please try again."
+                  : "Your setup is complete. We are generating your custom morning and evening steps."}
+              </Text>
+              {planHydrationStatus === 'error' && (
+                <Button
+                  label="Try Again"
+                  variant="secondary"
+                  size="medium"
+                  onPress={() => ensureInitialRoutineProposal().catch((e) => console.warn('Retry proposal error:', e))}
+                  style={{ marginTop: spacing.md }}
+                />
+              )}
+            </View>
+          ) : amSteps.length === 0 && pmSteps.length === 0 ? (
             <View style={styles.emptyPlanCard}>
               <View style={styles.emptyPlanIconCircle}>
                 <Icon name="sparkle" size={24} color={colors.brand} />
@@ -191,9 +215,15 @@ export default function PlanScreen() {
 
             {userProducts.length === 0 ? (
               <View style={styles.emptyPlanCard}>
-                <Text style={styles.emptyPlanTitle}>No shelf products yet</Text>
+                <Text style={styles.emptyPlanTitle}>
+                  {isRoutineBeingPrepared
+                    ? 'Product decisions in progress'
+                    : 'No shelf products yet'}
+                </Text>
                 <Text style={styles.emptyPlanText}>
-                  Products identified during onboarding or counter scans will appear here with KEEP, PAUSE, or REPLACE recommendations.
+                  {isRoutineBeingPrepared
+                    ? 'Product decisions will appear with your proposed routine.'
+                    : 'Products identified during onboarding or counter scans will appear here with KEEP, PAUSE, or REPLACE recommendations.'}
                 </Text>
               </View>
             ) : (

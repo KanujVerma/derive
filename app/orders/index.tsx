@@ -15,7 +15,6 @@ import { useRoutineStore } from '@/src/stores/routineStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
-import { config } from '@/src/constants/config';
 import { RefillRequest, RefillStatus } from '@/src/types/schema';
 import { hydrateOrders } from '@/src/services/deriveClient';
 
@@ -249,7 +248,7 @@ export default function OrdersScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.policyTitle}>Managed Refills</Text>
             <Text style={styles.policyText}>
-              Included with your ${config.betaPriceMonthly}/month Founding Beta membership. Running low? Tell us in one tap and we'll handle the rest.
+              Product purchases and refills are separate from your Derive membership. First-10 Founding Beta replenishment is founder-assisted — tell us in one tap and we will coordinate the rest.
             </Text>
           </View>
         </View>

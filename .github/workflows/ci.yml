@@ -79,3 +79,6 @@ jobs:
 
       - name: Run S2 persistence API integration harness
         run: node scripts/test-s2-local.mjs
+
+      - name: Run local B4B check-in context E2E harness
+        run: node scripts/test-i1-b4b-local.mjs

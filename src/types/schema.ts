@@ -289,9 +289,43 @@ export interface Routine {
 // 5. CHECK-IN & PROGRESS TYPES
 // ==========================================
 
-export type SkinState = 'better' | 'same' | 'worse';
-export type IrritationLevel = 'none' | 'little' | 'lot';
-export type AdherenceLevel = 'yes' | 'mostly' | 'not_really';
+export const SkinStateSchema = z.enum(['better', 'same', 'worse']);
+export type SkinState = z.infer<typeof SkinStateSchema>;
+
+export const IrritationLevelSchema = z.enum(['none', 'little', 'lot']);
+export type IrritationLevel = z.infer<typeof IrritationLevelSchema>;
+
+export const AdherenceLevelSchema = z.enum(['yes', 'mostly', 'not_really']);
+export type AdherenceLevel = z.infer<typeof AdherenceLevelSchema>;
+
+export const CheckInContextTagSchema = z.enum([
+  'diet',
+  'sleep',
+  'stress',
+  'alcohol',
+  'cycle',
+  'travel_weather',
+  'new_product',
+  'medication_supplement',
+  'routine_change',
+  'other',
+]);
+export type CheckInContextTag = z.infer<typeof CheckInContextTagSchema>;
+
+export const CheckInContextTagLabels: Record<CheckInContextTag, string> = {
+  diet: 'Diet',
+  sleep: 'Sleep',
+  stress: 'Stress',
+  alcohol: 'Alcohol',
+  cycle: 'Cycle',
+  travel_weather: 'Travel / weather',
+  new_product: 'New product',
+  medication_supplement: 'Medication / supplement',
+  routine_change: 'Routine change',
+  other: 'Other',
+};
+
+export const CHECK_IN_CONTEXT_TAGS = CheckInContextTagSchema.options;
 
 export interface CheckIn {
   id: string;
@@ -301,12 +335,13 @@ export interface CheckIn {
   skinState: SkinState;
   irritation: IrritationLevel;
   adherence?: AdherenceLevel;
-  changeReason?: string;
   irritationDetails?: {
     symptoms: ReactionSymptom[];
     bodyArea: BodyArea;
   };
   notes?: string;
+  contextTags: CheckInContextTag[];
+  contextNote?: string;
   photoUrls?: string[];
   aiAnalysisSentence?: string;
   adjustmentProposed: boolean;
