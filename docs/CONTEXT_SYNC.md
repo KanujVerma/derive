@@ -11,8 +11,9 @@ This ledger tracks durable architectural, product, and contract decisions across
 - **Agent / Workstream**: Sami (Platform, Commerce & Remote Integration)
 - **Local Branch**: `sami/s5-commerce-remote-integration`
 - **Starting Reconciled S4 Dependency**: `8c02d41` (`sami/s4-founder-operations`, includes origin/main `87c6df5`)
-- **Remote Push Status**: `pending commit / push` (predecessor-based bookkeeping)
-- **GitHub CI**: `pending`
+- **Implementation Checkpoints**: `9ebbe5b` (S5 commerce implementation), `c921348` (stacked-PR CI coverage)
+- **Remote Push Status**: `pushed / verified` on `origin/sami/s5-commerce-remote-integration`
+- **GitHub CI**: `success` (Run ID: `35463849617`; Verify & Build and Database & Integration both passed)
 - **Milestone Status**: `S5 IMPLEMENTED LOCALLY · HOSTED STRIPE/SUPABASE TEST-MODE CONFIGURATION PENDING`.
 - **Ownership / Shared Contracts**: Sami-owned additive migration, Edge Functions, Remote adapter, integration harness, CI, environment contract, and durable docs. Shared service/domain additions are minimal (`HostedMembershipSession`, checkout/portal methods). Zero changes to Kanuj-owned `app/**` UI.
 - **Durable Deliverables**:
