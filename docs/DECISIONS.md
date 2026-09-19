@@ -182,6 +182,16 @@ Key technical and product decisions accepted for Derive V1.
 * **Rationale**: Longitudinal skincare decisions must remain auditable. Reconstructing what the member used, which formula existed, what reaction occurred, and which routine version was active is safer and more useful than destructive updates.
 * **Verification**: Fresh Supabase rebuild; 136/136 pgTAP assertions; schema lint with zero findings; S1 onboarding/photo/deletion regression E2E; S2 live API E2E including a fresh-client persistence read; 110/110 unit tests; both TypeScript checks; and production web export.
 
+### ADR-27: Guarded Server Intelligence & Transactional Model Outputs (S3)
+* **Status**: IMPLEMENTED; review pending on `sami/s3-server-intelligence`.
+* **Decision**: Run routine generation, categorical product scanning, and Ask synthesis only in JWT-gated Supabase Edge Functions using Gemini structured outputs. Treat every model response as untrusted input: parse it, apply deterministic safety/contract guards, and use service-only database transactions for any persistence.
+* **Identity & Context Boundary**: Each handler re-verifies the bearer token and derives the member UUID from Supabase Auth. Canonical context is assembled server-side from committed intake, profile safety states, prescriptions, routine/shelf state, formula/reaction history, ingredient signals, check-ins, and minimum-necessary photo metadata. Caller-supplied profile truth, cross-member identifiers, Storage paths, signed URLs, local image URIs, and photo bytes are not trusted prompt context.
+* **Safety Boundary**: Mandatory emergency patterns hard-stop `ask-derive` before a model call and create a privacy-minimized urgent review task without transcript content. Structured routine/scan/Ask output is rejected or downgraded when it violates AM/PM active rules, existing prescription schedules, reported sensitivities, conservative pregnancy states, categorical-verdict policy, or non-diagnostic scope.
+* **Persistence Boundary**: `resolve_catalog_product`, `commit_routine_proposal`, `record_product_reaction_once`, and `append_ingredient_signal_versions` are service-role-only operations. Routine plus shelf decisions commit atomically; normalized onboarding reactions are idempotent; ingredient evidence appends immutable versions.
+* **Inference Semantics**: Multi-product overlap means distinct reacted products, not multiple incidents from one bottle. Tolerated exposures discount naive suspicion. Probabilistic inference cannot create a `confirmed_allergy`; existing explicitly confirmed provenance is preserved.
+* **Operational Boundary**: The root mobile `.env.example` remains public-only. `GEMINI_API_KEY` and optional `GEMINI_MODEL` live in the trusted function environment. Missing provider configuration returns sanitized `503` responses rather than deterministic output disguised as live AI. Production Remote mode remains disabled and mobile adapter wiring remains S5/I1.
+* **Verification**: Fresh database rebuild; 169/169 pgTAP assertions; clean schema lint; 118/118 unit tests; application and test TypeScript checks; S1, S2, and S3 authenticated local integration harnesses; and production web export.
+
 ---
 
 ## Open Shared-Contract Challenges (PROPOSED · UNRESOLVED)

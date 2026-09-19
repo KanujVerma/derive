@@ -24,7 +24,8 @@ another.
 | `SUPABASE_ACCESS_TOKEN` | CLI / CI | Secret | Headless Supabase management; interactive local login should use the CLI credential store instead |
 | `SUPABASE_DB_PASSWORD` | CLI / CI | Secret | Hosted migration and database operations |
 | `DERIVE_PUBLIC_SUPABASE_URL` | Local Edge Function runtime | Public | Optional override when testing signed photo URLs from a physical device; hosted environments do not need it |
-| `GEMINI_API_KEY` | Supabase Edge Functions / trusted server | Secret | Future S3 intelligence integration only |
+| `GEMINI_API_KEY` | Supabase Edge Functions / trusted server | Secret | Required for live S3 routine, scan, and Ask generation |
+| `GEMINI_MODEL` | Supabase Edge Functions / trusted server | Non-secret configuration | Optional S3 model override; defaults to `gemini-2.5-flash` |
 
 The root `.env.example` lists only the three `EXPO_PUBLIC_*` mobile variables.
 CLI/CI and trusted-server names are documented here instead of being mixed into
@@ -94,9 +95,15 @@ photo signer rewrites that local-only origin to `http://127.0.0.1:54321` by
 default. Set `DERIVE_PUBLIC_SUPABASE_URL` only when a physical test device needs
 the Mac's LAN-reachable Supabase URL. The signed path and token are preserved.
 
-`GEMINI_API_KEY` is reserved for S3. When implemented, store it through
-Supabase Edge Function secrets (and in an ignored function-local environment
-file for local development), never in the repository root's mobile values.
+S3 intelligence reads `GEMINI_API_KEY` only inside the trusted Edge Function
+runtime. Store it through Supabase Edge Function secrets (and in an ignored
+`supabase/.env.local` file for local development), never in the repository
+root's mobile values. `GEMINI_MODEL` may be set beside it when an explicitly
+reviewed model override is needed; otherwise the functions use
+`gemini-2.5-flash`. Without a Gemini key, live routine, scan, and safe Ask model
+paths return a sanitized `503` rather than fabricating model output. The
+deterministic emergency circuit breaker and server-owned signal inference do
+not require the provider key.
 
 ## Explicitly forbidden
 

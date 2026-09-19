@@ -62,6 +62,7 @@ export function inferIngredientSignals({
   interface Candidate {
     name: string;
     supportingReactionIds: string[];
+    supportingProductKeys: string[];
     severityCount: Record<'mild' | 'moderate' | 'severe' | 'unknown', number>;
   }
 
@@ -84,12 +85,20 @@ export function inferIngredientSignals({
       const current = candidateMap.get(norm) || {
         name: ing.trim(),
         supportingReactionIds: [],
+        supportingProductKeys: [],
         severityCount: { mild: 0, moderate: 0, severe: 0, unknown: 0 },
       };
+
+      const productEvidenceKey = rx.productId
+        || formulaMap.get(rx.formulaSnapshotId || '')?.productId
+        || `${normalizeIngredient(rx.brandSnapshot || '')}:${normalizeIngredient(rx.productNameSnapshot)}`;
 
       if (!current.supportingReactionIds.includes(rx.id)) {
         current.supportingReactionIds.push(rx.id);
         current.severityCount[rx.severity] = (current.severityCount[rx.severity] || 0) + 1;
+      }
+      if (productEvidenceKey && !current.supportingProductKeys.includes(productEvidenceKey)) {
+        current.supportingProductKeys.push(productEvidenceKey);
       }
       candidateMap.set(norm, current);
     });
@@ -120,6 +129,7 @@ export function inferIngredientSignals({
     }
 
     const reactionCount = cand.supportingReactionIds.length;
+    const reactionProductCount = cand.supportingProductKeys.length;
     const toleratedList = toleratedMap.get(norm) || [];
     const toleratedCount = toleratedList.length;
 
@@ -132,10 +142,10 @@ export function inferIngredientSignals({
       // User tolerated in 2+ products without problem
       confidence = 'weak_signal';
       rationale = `Present in ${reactionCount} reaction product(s), but also tolerated in ${toleratedCount} other products (${toleratedList.map((t) => t.productName).join(', ')}). Low probability of being causal agent.`;
-    } else if (reactionCount >= 2 && toleratedCount === 0) {
-      // Overlap across 2+ independent reaction products with ZERO tolerated exposures
+    } else if (reactionProductCount >= 2 && toleratedCount === 0) {
+      // Repeat incidents involving one bottle are not independent formula evidence.
       confidence = 'strong_signal';
-      rationale = `Repeated overlap: present in ${reactionCount} independent products that caused reactions, with zero tolerated products. High suspicion.`;
+      rationale = `Repeated overlap: present in ${reactionProductCount} distinct products associated with reactions, with zero tolerated products. Strong association, not a confirmed allergy.`;
     } else if (cand.severityCount.severe > 0 && toleratedCount === 0) {
       // Single reaction, but severe and zero tolerated exposures
       confidence = 'suspected_sensitivity';

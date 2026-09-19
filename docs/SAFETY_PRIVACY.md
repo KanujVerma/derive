@@ -118,3 +118,14 @@ Derive maintains strict integrity in all customer communications.
 * **Association, Not Diagnosis**: Ingredient signals retain categorical confidence and supporting/contradictory evidence. A reaction association never upgrades itself into a confirmed allergy; clinician- or member-reported allergy provenance remains explicit.
 * **Owner Isolation**: Members can read only their own formula, reaction, and ingredient-signal history. Direct member writes to these sensitive tables and RPC execution are denied; trusted server code performs validated writes.
 * **Deletion Completeness**: S2 relational history cascades from the member profile during the existing Storage-first account-deletion workflow, so private objects are deleted before relational evidence is removed and no member history is orphaned.
+
+---
+
+## 10. Guarded Server Intelligence (S3)
+
+* **Pre-Model Emergency Stop**: `ask-derive` evaluates mandatory red flags before contacting Gemini. Facial/eye/lip/tongue swelling, respiratory or throat distress, severe blistering/oozing/pus, and rapidly spreading hot hives return an immediate non-diagnostic escalation response. The urgent founder task stores category/severity metadata only—not the member's question or transcript.
+* **Server Truth Over Request Truth**: Every S3 handler re-verifies the bearer token and loads prescriptions, safety status, routine schedule, reactions, and signals from owner-bound database rows. The model cannot be steered with a forged client profile or another member ID.
+* **Structured Output Is Untrusted Input**: Gemini output must satisfy a provider schema, server parser, and deterministic safety guard before it can be returned or persisted. Violations fail closed; generated routines remain `awaiting_review` for a founder quality check.
+* **Conservative Unknown States**: Pregnancy/nursing values of `unanswered` or `prefer_not_to_say` never become a silent `no`. Generated pregnancy-excluded actives are rejected under those states. Reported sensitivities and existing prescription schedules are preserved rather than silently overridden.
+* **Minimum-Necessary Photo Context**: S3 context includes only photo provenance metadata needed to know that approved baseline/progress evidence exists. Storage paths, signed URLs, local URIs, image bytes, and biometric identity data are excluded from model prompts.
+* **Probabilistic Ingredient Signals**: A strong signal requires overlap across distinct reacted products, not repeated incidents from one product. Tolerated exposures reduce suspicion. The system never upgrades an inferred association to `confirmed_allergy` without explicit confirmed provenance.

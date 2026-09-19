@@ -96,7 +96,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
   - **Private Photo Upload Pipeline (`src/services/onboardingPhotoUpload.ts`)**: Direct upload to private `customer-skin-photos` at server-issued paths with `upsert: false`. Zero public URLs and zero local URIs persisted.
   - **Canonical Bootstrap Coordination & Post-Submit Routing**: `10-summary.tsx` invokes the production coordinator `resolveCustomerBootstrap(activeUserId)` rather than querying raw backend state. Transitions to the application occur only when `useBootstrapStore` reaches `status === 'READY'`, letting root route gating maintain canonical navigation truth.
   - **Truthful Status Semantics (`pending_generation` vs `awaiting_review`)**: When `proposedRoutine === null` and `initialRoutineState === 'pending_generation'`, `isPlanUnderReview` is strictly `false` and copy reads "Your routine is being prepared." Only when a routine is proposed and `initialRoutineState === 'awaiting_review'` does `isPlanUnderReview` become `true` with "Final review" copy. Routine generation is strictly deferred to I1-B2.
-* **Initial Routine Intelligence Pipeline & Domain Persistence (S2 Implemented Substrate / I1-B2 Intelligence Planned)**:
+* **Initial Routine Intelligence Pipeline & Domain Persistence (S2 + S3 Implemented / Client Integration Pending)**:
   - **Lifecycle Progression & Durability Truth**:
     1. **B1 Commit (`pending_generation`)**: Intake finalized in database; member skin profile and photo metadata committed; pending `initial_routine` founder review task created in `public.founder_review_tasks` (`status = 'pending'`); `isPlanUnderReview: false`.
     2. **B2 Server Generation (`awaiting_review`)**: Server context assembly ingests committed intake (`payload_snapshot JSONB` + canonical `skin_profiles` columns including `pregnancy_status` and `sensitivities_status`; PIH tendency is read from `payload_snapshot.pihTendencyAnswer`), invokes Gemini 2.5 Flash with structured schema, validates clinical invariants, persists proposal to `public.routines` (`version = 1`, `status = 'awaiting_review'`) and `public.routine_items`, and normalizes shelf actions into `public.user_products`. Preserves or updates the pending `initial_routine` review task (which uses `status = 'pending'`; supported DB task statuses are strictly `'pending'`, `'completed'`, `'dismissed'` — there is NO `'awaiting_review'` task status). If explicit routine linking is required (e.g. `routine_id` on `founder_review_tasks`), that is a Sami-owned additive migration.
@@ -104,8 +104,8 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
   - **Relational Domain Persistence (S2 Implemented)**:
     - `public.routines`: Canonical routine header now includes `updated_at`; `(user_id, version)` is unique. Customer-facing content and version identity cannot be rewritten in place. `public.create_routine_version` takes a per-member transaction lock, allocates the next version, and atomically appends its steps.
     - `public.routine_items`: Includes canonical `product_id UUID REFERENCES public.products(id)`. Rows are immutable after insert, and `(routine_id, timing, order_index)` is unique. `RoutineStep.scheduleText` is derived during DB $\to$ domain mapping and is not redundantly stored.
-    - `public.formula_snapshots` + `public.product_reactions`: Append-only history. `public.record_product_reaction` atomically creates the formula snapshot and its reaction link; ownership/product consistency is trigger-enforced.
-    - `public.ingredient_signals`: Append-only per-member/per-ingredient versions with categorical confidence, evidence count, owner-validated supporting reaction IDs, and contradictory-tolerance evidence. Inference execution remains S3.
+    - `public.formula_snapshots` + `public.product_reactions`: Append-only history. `public.record_product_reaction` atomically creates the formula snapshot and its reaction link; ownership/product consistency is trigger-enforced. S3's service-only `record_product_reaction_once` idempotently normalizes reaction evidence from the sealed B1 snapshot without rewriting it.
+    - `public.ingredient_signals`: Append-only per-member/per-ingredient versions with categorical confidence, evidence count, owner-validated supporting reaction IDs, and contradictory-tolerance evidence. S3 executes and persists inference through a JWT-gated Edge Function and service-only append transaction.
     - `public.check_ins`, `public.user_photos`, `public.refill_requests`: Existing baseline tables are additively enriched with routine linkage, structured check-in fields, conservative photo provenance, canonical refill product identity, and fulfillment metadata.
     - `public.user_products`: Normalization of member counter products with canonical actions (`KEEP`, `PAUSE`, `REPLACE`, `ADD`, `STOP`).
       - *Persistence Invariant (`B2_REQUIRED_PERSISTENCE_INVARIANT`)*: Canonical `UserProduct` requires full canonical `product: Product`. Every B2-decided product should be normalized into `public.products`, with `user_products.product_id` referencing that row, allowing `user_products JOIN products` $\to$ canonical `UserProduct`.
@@ -118,20 +118,21 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ## 3. Intelligence Orchestration Layer
 * **Model**: Google Gemini 2.5 Flash via structured JSON outputs, invoked only from the trusted Supabase/server environment.
-* **Credential boundary**: Gemini API keys are server secrets. The Expo client must never read, embed, or ship a Gemini key (`EXPO_PUBLIC_*` Gemini variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning; `RemoteDeriveService` calls Edge Functions that may invoke Gemini.
+* **Credential boundary**: Gemini API keys are server secrets. The Expo client must never read, embed, or ship a Gemini key (`EXPO_PUBLIC_*` Gemini variables are forbidden). Mobile talks to intelligence only through `IDeriveService`. `MockDeriveService` uses local deterministic reasoning. The S3 Edge Functions invoke Gemini directly from the trusted runtime; coordinated `RemoteDeriveService` endpoint wiring remains S5/I1.
 * **Context Assembly**: When evaluating queries or generating routine proposals, the backend injects:
   1. Customer skin profile from `public.skin_profiles` (primary goals, midday oil, tightness, `pregnancy_status`, `sensitivities_status`).
   2. Intake snapshot context from `public.onboarding_submissions.payload_snapshot` (`pihTendencyAnswer`, adverse reactions, confirmed shelf products, formula snapshots).
   3. Active prescription products (e.g. Differin 0.1% schedule: Mon/Wed/Fri).
   4. Tolerated shelf products vs. past adverse reactions.
   5. Most recent weekly check-in skin state and barrier symptoms.
-  6. Standardized baseline photos metadata (angles, capture timestamps).
+  6. Standardized baseline photos metadata (angles, capture timestamps, quality/approval state). Private Storage paths, signed URLs, local URIs, and image bytes are not placed in S3 model prompts.
 * **Clinical & Safety Invariants (Enforced in Intelligence & Persistence)**:
   1. **Sunscreen AM Invariant**: Sunscreen steps must NEVER appear in the evening (`pmSteps`) routine.
   2. **Retinoid PM Invariant**: Strong retinoids (Adapalene/Differin, Tretinoin) must NEVER appear in the morning (`amSteps`) routine.
-  3. **Pregnancy / Nursing Contraindication**: Retinoids and high-strength salicylic acid are strictly excluded when `pregnancy_status === 'yes'`.
+  3. **Pregnancy / Nursing Contraindication**: Retinoids, hydroquinone, and explicitly high-strength salicylic acid are excluded when pregnancy/nursing is `yes`; `unanswered` and `prefer_not_to_say` fail closed for generated pregnancy-excluded actives.
   4. **Reported Sensitivities**: Known sensitized ingredients must not be introduced in added or replacement products when `sensitivities_status === 'reported'`.
-* **Safety Circuit Breaker**: Pre-model regex and deterministic classifier that intercepts medical emergencies before model generation.
+* **Safety Circuit Breaker**: `ask-derive` runs a deterministic classifier before any model call. Facial/eye/lip/tongue swelling, breathing/throat distress, severe blistering/oozing/pus, and rapidly spreading hot hives return an emergency response immediately and create only a privacy-minimized urgent founder task. Barrier warnings remain categorical and non-diagnostic.
+* **Structured-Output Gate**: Routine, scan, and Ask responses use provider JSON schemas and are parsed again on the server. Deterministic post-model guards reject invalid schedules, prescription changes, sensitivity conflicts, prohibited diagnostic claims, and unsafe pregnancy-context recommendations before persistence or response.
 
 ---
 

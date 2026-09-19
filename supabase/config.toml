@@ -64,3 +64,27 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/delete-customer-account/deno.json"
 entrypoint = "./functions/delete-customer-account/index.ts"
+
+[functions.propose-routine]
+enabled = true
+verify_jwt = true
+import_map = "./functions/propose-routine/deno.json"
+entrypoint = "./functions/propose-routine/index.ts"
+
+[functions.scan-product]
+enabled = true
+verify_jwt = true
+import_map = "./functions/scan-product/deno.json"
+entrypoint = "./functions/scan-product/index.ts"
+
+[functions.ask-derive]
+enabled = true
+verify_jwt = true
+import_map = "./functions/ask-derive/deno.json"
+entrypoint = "./functions/ask-derive/index.ts"
+
+[functions.infer-ingredient-signals]
+enabled = true
+verify_jwt = true
+import_map = "./functions/infer-ingredient-signals/deno.json"
+entrypoint = "./functions/infer-ingredient-signals/index.ts"

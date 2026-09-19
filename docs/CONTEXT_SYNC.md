@@ -6,6 +6,42 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Sami Platform: S3 Server-Side Intelligence Services
+
+- **Agent / Workstream**: Sami (Platform, Intelligence & Safety Orchestration)
+- **Local Branch**: `sami/s3-server-intelligence`
+- **Starting S2 Dependency**: `1a55a5f` (`sami/s2-core-domain-persistence`)
+- **Reconciled origin/main Base**: `0bcfa42`
+- **Remote Push Status**: `pending commit / push` (predecessor-based bookkeeping)
+- **GitHub CI**: `pending`
+- **Milestone Status**: `S3 COMPLETE · REVIEW PENDING`; mobile endpoint wiring and production Remote enablement remain S5/I1.
+- **Ownership / Shared Contracts**: Sami-owned Edge Functions, shared function runtime, additive transaction migration, intelligence workflows, tests, CI, and durable docs. Zero changes to `app/**`, `src/domain/**`, `src/contracts/**`, or Kanuj-owned UI. Production Remote mode remains `false`.
+- **Durable Deliverables**:
+  1. Added JWT-gated `propose-routine`, `scan-product`, `ask-derive`, and `infer-ingredient-signals` Edge Functions with defense-in-depth token verification and canonical server context assembly.
+  2. Added Gemini 2.5 Flash structured-output calls with explicit JSON schemas, timeouts, server parsing, sanitized errors, and deterministic post-model validation. `GEMINI_API_KEY` remains server-only; missing configuration fails closed.
+  3. Added mandatory pre-model emergency circuit breakers and privacy-minimized urgent founder tasks. Red-flag Ask requests never call the model and never persist transcript text.
+  4. Added service-only transactions for catalog normalization, atomic routine+shelf proposal persistence, immutable ingredient-signal versioning, and idempotent normalization of sealed B1 onboarding reaction/formula evidence into S2 history.
+  5. Corrected ingredient overlap semantics: repeated incidents from one product cannot produce a strong multi-product signal; tolerated exposures reduce suspicion; confirmed-allergy status is never synthesized.
+  6. Context assembly includes prescriptions, routine/Differin schedule, safety unknown-state provenance, reactions/formulas, signals, check-ins, and private photo metadata. It excludes private Storage paths, signed URLs, image bytes, and client-local URIs from prompts.
+  7. Added S3 unit, pgTAP, and authenticated Edge integration coverage; CI now exercises the complete S1 onboarding, S2 persistence, and S3 intelligence chain on a fresh local Supabase database.
+- **Verification**:
+  - `npx supabase db reset`: PASS across S1 + B1/B1.1 + S2 + S3 migrations.
+  - `npx supabase test db`: 169/169 PASS.
+  - `npx supabase db lint --level warning`: zero findings.
+  - `node scripts/test-i1-b1-local.mjs`: all 13 S1 stages PASS.
+  - `node scripts/test-s2-local.mjs`: all 5 S2 stages PASS.
+  - `node scripts/test-s3-local.mjs`: all 5 S3 stages PASS.
+  - `npm test`: 118/118 PASS.
+  - `npx tsc --noEmit`: PASS.
+  - `npm run typecheck:tests`: PASS.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: PASS.
+- **Decision Status**:
+  - `ADR-27: Guarded Server Intelligence & Transactional Model Outputs`: IMPLEMENTED.
+  - `ARCHITECTURE_CHALLENGE-01`: still unresolved; no pricing, tier, Stripe, or membership identity changes in S3.
+- **Next Work**:
+  - Cofounder/agent review of the stacked draft PR, followed by S5/I1 client adapter wiring and a reviewed hosted Supabase deployment with server secrets.
+  - Do not enable production Remote mode until the integration slice is reviewed end to end.
+
 ## 2026-09-18 — Sami Platform: S2 Core Domain Persistence
 
 - **Agent / Workstream**: Sami (Platform, Persistence & Remote Mapping)

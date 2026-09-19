@@ -422,13 +422,23 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Routine updates create new version snapshots rather than overwriting historical records.
   - [x] Product reactions persist historical formula snapshots at the exact time of the reaction.
 
-### S3: Server-Side Intelligence Services
+### S3: Server-Side Intelligence Services [COMPLETE · REVIEW PENDING]
 * **Scope**: Edge Functions for routine proposal generation, product scan evaluation with categorical verdicts, Ask Derive conversation synthesis, safety classifier circuit breaker, and probabilistic ingredient signal inference.
+* **Implemented**:
+  - Added JWT-gated `propose-routine`, `scan-product`, `ask-derive`, and `infer-ingredient-signals` Edge Functions. Handler identity is derived from the verified token; caller-supplied profile truth and spoofed member IDs are rejected or ignored.
+  - Added trusted server context assembly across committed intake, canonical safety states, prescriptions, latest routine and shelf, immutable formula/reaction history, latest ingredient signals, recent check-ins, and private-photo metadata only. Storage paths and customer images are not sent to Gemini in S3.
+  - Added Gemini 2.5 Flash structured-output orchestration with explicit JSON schemas, server-side parsing, deterministic post-model safety validation, timeouts, and sanitized fail-closed errors. No model credential enters the Expo bundle.
+  - Added pre-model emergency and barrier-warning circuit breakers. Emergency Ask requests never reach the model and create privacy-minimized urgent founder tasks without storing the customer transcript.
+  - Added service-only transactional persistence for canonical product normalization, awaiting-review routine versions, shelf actions, idempotent sealed-intake reaction normalization, and immutable ingredient-signal versions.
+  - Hardened ingredient inference so repeated incidents from one bottle cannot mimic multi-product overlap; tolerated exposures discount naive suspicion; inference never auto-creates a confirmed allergy.
+* **Boundaries**:
+  - No Kanuj-owned UI or shared domain/service contracts changed. The mobile `RemoteDeriveService` is not switched to these endpoints in S3; that coordinated client integration remains S5/I1.
+  - Production Remote mode remains `false`. No hosted deployment, Gemini secret, Stripe, pricing, or PostHog SDK is introduced.
 * **Acceptance Criteria**:
-  - Edge Function endpoints satisfy `IDeriveService` shared contracts.
-  - Prompt context includes user's active prescriptions, Differin schedule, and reaction history.
-  - All mandatory emergency/red-flag fixtures escalate correctly; no known mandatory-escalation fixture is missed; the classifier remains conservative under uncertainty.
-  - Ingredient signals update confidence based on multi-product overlap and tolerated exposure discounting.
+  - [x] Edge Function endpoints validate and return the existing `IDeriveService` shared contract shapes without changing those contracts.
+  - [x] Prompt context includes the member's active prescriptions, Differin/routine schedule, and reaction history.
+  - [x] All mandatory emergency/red-flag fixtures hard-stop before model use; uncertain safety states fail conservatively.
+  - [x] Ingredient signals update confidence using distinct multi-product overlap and tolerated-exposure discounting.
 
 ### S4: Founder Operations Console
 * **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta members ($100/month concierge operating experiment; long-term personalized pricing architecture remains provisional). Routine review queue, refill replenishment status updater, product formula auditor, and internal clinical notes.

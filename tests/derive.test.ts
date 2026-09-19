@@ -31,6 +31,16 @@ import {
 } from '../src/utils/barcode.ts';
 import { findProductByBarcode } from '../src/services/ai-workflows/scan-evaluator.ts';
 import {
+  enforceRoutineSafety,
+  enforceScanIdentity,
+  enforceScanSafety,
+  parseAskResponse,
+  parseProductScan,
+  parseRoutineProposal,
+  safetyCircuitBreaker,
+  type MemberIntelligenceContext,
+} from '../supabase/functions/_shared/intelligence.ts';
+import {
   AutoCaptureStateMachine,
   evaluateFrameCriteria,
   type FrameQualityMetrics,
@@ -95,6 +105,27 @@ test('Safety Classifier: Flags barrier sensitization warning', () => {
   assert.equal(r.isMedicalEmergency, false);
   assert.equal(r.severity, 'warning');
   assert.match(r.message || '', /sensitized/i);
+});
+
+test('S3 Safety Circuit Breaker: Every mandatory red-flag fixture hard-stops before model use', () => {
+  const mandatoryFixtures = [
+    'My face is swollen after using this cream',
+    'Both eyelids are puffy and closing',
+    'I have trouble breathing and my throat is tightening',
+    'There is a blistering rash with yellow fluid oozing',
+    'Hot hives are spreading quickly all over my body',
+  ];
+
+  for (const fixture of mandatoryFixtures) {
+    const result = checkSkincareSafety(fixture);
+    assert.equal(result.isMedicalEmergency, true, fixture);
+    assert.equal(result.severity, 'emergency', fixture);
+    assert.equal(result.recommendedAction, 'immediate_medical_care', fixture);
+
+    const response = safetyCircuitBreaker(fixture);
+    assert.ok(response, fixture);
+    assert.equal(response.safety.severity, 'emergency', fixture);
+  }
 });
 
 // ========================================================
@@ -323,6 +354,268 @@ test('Ingredient Intelligence: Tolerated exposures weaken naive suspicion', () =
   assert.ok(niacinamideSignal);
   assert.equal(niacinamideSignal.confidence, 'weak_signal');
   assert.equal(niacinamideSignal.contradictoryToleranceEvidence.length, 2);
+});
+
+test('S3 Ingredient Intelligence: Repeat incidents from one bottle do not masquerade as multi-product overlap', () => {
+  const reactions: ProductReaction[] = [
+    {
+      id: 'rx_same_1',
+      userId: 'u_1',
+      productId: 'same_product',
+      productNameSnapshot: 'Same Serum',
+      formulaSnapshotId: 'same_formula',
+      symptoms: ['itching'],
+      bodyArea: 'face',
+      severity: 'moderate',
+    },
+    {
+      id: 'rx_same_2',
+      userId: 'u_1',
+      productId: 'same_product',
+      productNameSnapshot: 'Same Serum',
+      formulaSnapshotId: 'same_formula',
+      symptoms: ['redness_rash'],
+      bodyArea: 'face',
+      severity: 'moderate',
+    },
+  ];
+  const formulaSnapshots: FormulaSnapshot[] = [{
+    id: 'same_formula',
+    productId: 'same_product',
+    productName: 'Same Serum',
+    ingredients: ['Water', 'Fragrance'],
+    capturedAt: '2026-09-01',
+  }];
+  const signal = inferIngredientSignals({ reactions, formulaSnapshots })
+    .find((candidate) => candidate.ingredientName === 'Fragrance');
+  assert.ok(signal);
+  assert.notEqual(signal.confidence, 'strong_signal');
+  assert.equal(signal.evidenceCount, 2);
+});
+
+const s3ContextFixture: MemberIntelligenceContext = {
+  profile: {
+    primaryGoal: 'breakouts',
+    secondaryGoals: [],
+    routineComplexity: 'simple',
+    costPreference: 'balanced',
+    middayFeel: 'combination',
+    postCleanseTightness: false,
+    knownSensitivities: [],
+    sensitivitiesStatus: 'none_known',
+    activePrescriptions: ['Differin adapalene 0.1% — Mon/Wed/Fri PM'],
+    pregnancyStatus: 'no',
+  },
+  shelfProducts: [],
+  activeRoutine: {
+    version: 1,
+    status: 'published',
+    summarySentence: 'Differin three nights weekly',
+    steps: [{
+      id: 'step_diff',
+      productId: 'product_diff',
+      brand: 'Differin',
+      productName: 'Differin Adapalene Gel 0.1%',
+      category: 'treatment',
+      timing: 'pm',
+      days: ['mon', 'wed', 'fri'],
+    }],
+  },
+  reactions: [],
+  ingredientSignals: [],
+  recentCheckIns: [],
+  photoContext: [],
+};
+
+test('S3 Structured Routine: Canonical parser accepts safe output and rejects AM retinoids', () => {
+  const raw = {
+    summarySentence: 'Cleanser and sunscreen by day; Differin Mon/Wed/Fri at night',
+    products: [
+      {
+        key: 'cleanser', brand: 'CeraVe', name: 'Hydrating Facial Cleanser', category: 'cleanser',
+        keyActives: ['Ceramides'], fullIngredients: [], cautions: [],
+      },
+      {
+        key: 'differin', brand: 'Differin', name: 'Differin Adapalene Gel 0.1%', category: 'treatment',
+        keyActives: ['Adapalene 0.1%'], fullIngredients: [], cautions: [],
+      },
+    ],
+    steps: [
+      {
+        productKey: 'cleanser', order: 1, timing: 'am', days: [], amount: 'one pump',
+        area: 'face', purpose: 'cleanse', whyChosen: 'Gentle baseline cleanser.',
+      },
+      {
+        productKey: 'differin', order: 1, timing: 'pm', days: ['mon', 'wed', 'fri'],
+        amount: 'pea-sized', area: 'face', purpose: 'retain prescription schedule',
+        whyChosen: 'Preserves the existing prescription context without changing it.',
+      },
+    ],
+    shelfActions: [
+      { productKey: 'cleanser', action: 'KEEP', actionReason: 'Already tolerated.' },
+      { productKey: 'differin', action: 'KEEP', actionReason: 'Preserve the existing schedule.', frequencyNightsPerWeek: 3 },
+    ],
+    clarificationQuestions: [],
+  };
+  const proposal = parseRoutineProposal(raw);
+  assert.doesNotThrow(() => enforceRoutineSafety(proposal, s3ContextFixture));
+
+  const unsafe = parseRoutineProposal({
+    ...raw,
+    steps: raw.steps.map((step) => step.productKey === 'differin' ? { ...step, timing: 'am', order: 2 } : step),
+  });
+  assert.throws(() => enforceRoutineSafety(unsafe, s3ContextFixture), /retinoids cannot be scheduled/i);
+});
+
+test('S3 Structured Routine: Pregnancy unknown fails closed for a generated retinoid', () => {
+  const context: MemberIntelligenceContext = {
+    ...s3ContextFixture,
+    profile: { ...s3ContextFixture.profile, pregnancyStatus: 'unanswered', activePrescriptions: [] },
+    activeRoutine: null,
+  };
+  const proposal = parseRoutineProposal({
+    summarySentence: 'Unsafe draft',
+    products: [{
+      key: 'retinol', brand: 'Example', name: 'Retinol Serum', category: 'serum',
+      keyActives: ['Retinol'], fullIngredients: [], cautions: [],
+    }],
+    steps: [{
+      productKey: 'retinol', order: 1, timing: 'pm', days: [], amount: 'one drop',
+      area: 'face', purpose: 'texture', whyChosen: 'Model suggestion.',
+    }],
+    shelfActions: [{ productKey: 'retinol', action: 'ADD', actionReason: 'Model suggestion.' }],
+    clarificationQuestions: [],
+  });
+  assert.throws(() => enforceRoutineSafety(proposal, context), /pregnancy status/i);
+
+  const shelfOnlyUnsafe = parseRoutineProposal({
+    summarySentence: 'Unsafe shelf-only draft',
+    products: [
+      {
+        key: 'cleanser', brand: 'Example', name: 'Gentle Cleanser', category: 'cleanser',
+        keyActives: [], fullIngredients: [], cautions: [],
+      },
+      {
+        key: 'hydroquinone', brand: 'Example', name: 'Dark Spot Serum', category: 'serum',
+        keyActives: ['Hydroquinone'], fullIngredients: [], cautions: [],
+      },
+    ],
+    steps: [{
+      productKey: 'cleanser', order: 1, timing: 'am', days: [], amount: 'one pump',
+      area: 'face', purpose: 'cleanse', whyChosen: 'Gentle baseline.',
+    }],
+    shelfActions: [{
+      productKey: 'hydroquinone', action: 'ADD', actionReason: 'Model suggestion.',
+    }],
+    clarificationQuestions: [],
+  });
+  assert.throws(() => enforceRoutineSafety(shelfOnlyUnsafe, context), /pregnancy status/i);
+});
+
+test('S3 Structured Routine: Active prescription steps cannot be omitted or invented without a verifiable schedule', () => {
+  const cleanserOnly = parseRoutineProposal({
+    summarySentence: 'Incomplete draft',
+    products: [{
+      key: 'cleanser', brand: 'Example', name: 'Gentle Cleanser', category: 'cleanser',
+      keyActives: [], fullIngredients: [], cautions: [],
+    }],
+    steps: [{
+      productKey: 'cleanser', order: 1, timing: 'am', days: [], amount: 'one pump',
+      area: 'face', purpose: 'cleanse', whyChosen: 'Gentle baseline.',
+    }],
+    shelfActions: [{ productKey: 'cleanser', action: 'KEEP', actionReason: 'Already tolerated.' }],
+    clarificationQuestions: [],
+  });
+  assert.throws(() => enforceRoutineSafety(cleanserOnly, s3ContextFixture), /prescription step was omitted/i);
+
+  const unverifiableContext: MemberIntelligenceContext = {
+    ...s3ContextFixture,
+    activeRoutine: null,
+  };
+  const proposedRetinoid = parseRoutineProposal({
+    summarySentence: 'Unverifiable draft',
+    products: [{
+      key: 'differin', brand: 'Differin', name: 'Differin Adapalene Gel 0.1%', category: 'treatment',
+      keyActives: ['Adapalene 0.1%'], fullIngredients: [], cautions: [],
+    }],
+    steps: [{
+      productKey: 'differin', order: 1, timing: 'pm', days: ['mon'], amount: 'pea-sized',
+      area: 'face', purpose: 'prescription context', whyChosen: 'Model suggestion.',
+    }],
+    shelfActions: [{ productKey: 'differin', action: 'KEEP', actionReason: 'Model suggestion.' }],
+    clarificationQuestions: [],
+  });
+  assert.throws(() => enforceRoutineSafety(proposedRetinoid, unverifiableContext), /cannot be verified/i);
+});
+
+test('S3 Product Scan: Deterministic guard downgrades a second retinoid regardless of model verdict', () => {
+  const parsed = parseProductScan({
+    productName: 'Retinol 1% Serum',
+    brand: 'Example',
+    category: 'serum',
+    keyActives: ['Retinol 1%'],
+    verdict: 'great_fit',
+    verdictSummary: 'Model claimed this was a great fit.',
+    factsUsedToDecide: ['Targets texture'],
+  });
+  const guarded = enforceScanSafety(parsed, s3ContextFixture);
+  assert.equal(guarded.verdict, 'use_with_caution');
+  assert.match(guarded.verdictSummary, /second retinoid/i);
+});
+
+test('S3 Product Scan: Identity, unresolved pregnancy, and reported sensitivities fail conservatively', () => {
+  const hydroquinone = parseProductScan({
+    productName: 'Dark Spot Serum',
+    brand: 'Example',
+    category: 'serum',
+    keyActives: ['Hydroquinone 4%'],
+    verdict: 'great_fit',
+    verdictSummary: 'Model claimed this was a great fit.',
+    factsUsedToDecide: ['Targets visible discoloration'],
+  });
+  const unknownPregnancyContext: MemberIntelligenceContext = {
+    ...s3ContextFixture,
+    profile: { ...s3ContextFixture.profile, pregnancyStatus: 'prefer_not_to_say' },
+  };
+  assert.equal(enforceScanSafety(hydroquinone, unknownPregnancyContext).verdict, 'use_with_caution');
+
+  const sensitivityContext: MemberIntelligenceContext = {
+    ...s3ContextFixture,
+    profile: {
+      ...s3ContextFixture.profile,
+      knownSensitivities: ['hydroquinone'],
+      sensitivitiesStatus: 'reported',
+    },
+  };
+  assert.equal(enforceScanSafety(hydroquinone, sensitivityContext).verdict, 'not_good_fit');
+  assert.throws(
+    () => enforceScanIdentity(hydroquinone, { productName: 'Different Serum', brand: 'Example' }),
+    /identity does not match/i,
+  );
+});
+
+test('S3 Ask: Safe structured answers cannot claim diagnosis or AI dermatologist status', () => {
+  const safe = parseAskResponse({
+    directAnswer: 'Keep tonight simple.',
+    whyExplanation: 'Your current routine already includes a scheduled active.',
+    recommendedAction: 'Use your normal moisturizer.',
+    suggestedFollowUps: [],
+    referencedProducts: ['Differin'],
+  });
+  assert.equal(safe.safety.severity, 'safe');
+  assert.throws(() => parseAskResponse({
+    directAnswer: 'I am your AI dermatologist.',
+    whyExplanation: 'I diagnose this as eczema.',
+    suggestedFollowUps: [],
+    referencedProducts: [],
+  }), /cosmetic-guidance boundary/i);
+  assert.throws(() => parseAskResponse({
+    directAnswer: 'Keep tonight simple.',
+    whyExplanation: 'A conservative routine is appropriate.',
+    recommendedAction: 'I diagnose this as rosacea.',
+    suggestedFollowUps: [],
+    referencedProducts: [],
+  }), /cosmetic-guidance boundary/i);
 });
 
 // ========================================================

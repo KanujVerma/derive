@@ -144,6 +144,24 @@ export interface IDeriveService {
   - `recommendedAction`: Next step for the user
   - `safety`: `SafetyClassification`
 
+### S3 Edge Endpoint Binding (Implemented, Client Wiring Pending)
+
+All S3 functions require a valid Supabase bearer token at the gateway and
+re-verify it in the handler. The authenticated UUID is canonical; request-body
+identity cannot select another member's context.
+
+| Edge Function | Contract role | Current behavior |
+| --- | --- | --- |
+| `propose-routine` | `proposeRoutine` | Loads canonical server context, runs/persists a validated `awaiting_review` proposal, and returns `RoutineProposalResult`. Caller-supplied profile/shelf truth is not trusted. |
+| `scan-product` | `scanProduct` | Requires product name/brand context, returns a categorical `ProductScanResult`, and deterministically downgrades conflicts. `imageUri` is not fetched or sent to Gemini in S3. |
+| `ask-derive` | `askDerive` | Enforces request `userId` equality, hard-stops mandatory red flags before model use, and returns `AskResponse`. `photoAttachmentUri` is deliberately excluded from model context. |
+| `infer-ingredient-signals` | Internal S3 operation | Infers and appends owner-readable signal versions from canonical formula/reaction history; it is not an `IDeriveService` client method. |
+
+These endpoints establish the server implementation boundary but do not, by
+themselves, enable the production mobile Remote path. Wiring the existing
+`RemoteDeriveService` methods to them and enabling Remote mode remains a
+coordinated S5/I1 integration change.
+
 ---
 
 ## 3. Safety & Escalation Model
