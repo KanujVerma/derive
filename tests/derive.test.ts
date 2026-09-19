@@ -6456,3 +6456,347 @@ test('I1-B3 Provider Neutrality: Zero provider leakage in mobile app layers', ()
 
 
 
+
+// ========================================================
+// 36. I1-B3.1 CLIENT LIFECYCLE HARDENING REGRESSIONS
+// ========================================================
+
+function b31OnboardedRemote(userId: string) {
+  useAuthStore.getState().setSession(userId, `${userId}@derive.skin`);
+  useBootstrapStore.setState({
+    status: 'READY',
+    bootstrapState: {
+      userId,
+      profileExists: true,
+      onboardingCompleted: true,
+      membershipStatus: 'active',
+    },
+    errorMessage: null,
+    resolvedUserId: userId,
+    resolutionAttempt: 1,
+  });
+  useRoutineStore.setState({
+    routine: null,
+    userProducts: [],
+    isRoutineBeingPrepared: false,
+    isPlanUnderReview: false,
+    planHydrationStatus: 'idle',
+    planHydrationError: null,
+  });
+  clearInFlightHydrations();
+  clearInFlightProposals();
+}
+
+async function withB31RemoteService<T>(
+  service: RemoteDeriveService,
+  run: () => Promise<T> | T
+): Promise<T> {
+  const origService = getDeriveService();
+  setDeriveService(service);
+  try {
+    return await run();
+  } finally {
+    setDeriveService(origService);
+  }
+}
+
+test('I1-B3.1 Cold Restart + Hydration Error: Remote onboarded member preserves isRoutineBeingPrepared=true on transient failure', async () => {
+  class FailingHydrationRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { throw new Error('Network timeout'); }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { throw new Error('Network timeout'); }
+  }
+  await withB31RemoteService(new FailingHydrationRemote(), async () => {
+    b31OnboardedRemote('usr_cold_restart_1');
+    await hydratePlanState('usr_cold_restart_1');
+    const state = useRoutineStore.getState();
+    assert.equal(state.routine, null, 'routine must remain null');
+    assert.equal(state.isRoutineBeingPrepared, true, 'isRoutineBeingPrepared must be preserved true for onboarded member on error');
+    assert.equal(state.isPlanUnderReview, false, 'isPlanUnderReview must stay false');
+    assert.equal(state.planHydrationStatus, 'error', 'planHydrationStatus must be error');
+    assert.ok(state.planHydrationError, 'planHydrationError must be set');
+  });
+});
+
+test('I1-B3.1 Onboarded Member Cannot Fall into Start Routine Setup on Hydration Error', async () => {
+  class ErroringRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { throw new Error('backend error'); }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { throw new Error('backend error'); }
+  }
+  await withB31RemoteService(new ErroringRemote(), async () => {
+    b31OnboardedRemote('usr_no_setup_1');
+    await hydratePlanState('usr_no_setup_1');
+    const state = useRoutineStore.getState();
+    assert.equal(state.isRoutineBeingPrepared, true, 'Must show preparation state, not setup CTA');
+    assert.equal(state.isPlanUnderReview, false);
+    assert.equal(state.routine, null);
+  });
+});
+
+test('I1-B3.1 Failed Hydration Does NOT Call proposeRoutine: error gate prevents model invocation', async () => {
+  let proposalCalled = false;
+  class ErrorWithSpy extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { throw new Error('read error'); }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { throw new Error('read error'); }
+    async proposeRoutine(_input?: any): Promise<RoutineProposalResult> {
+      proposalCalled = true;
+      throw new Error('should not be called');
+    }
+  }
+  await withB31RemoteService(new ErrorWithSpy(), async () => {
+    b31OnboardedRemote('usr_nodepropo_1');
+    await ensureInitialRoutineProposal('usr_nodepropo_1');
+    assert.equal(proposalCalled, false, 'proposeRoutine must NOT be called when hydration itself failed');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'error');
+    assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, true);
+  });
+});
+
+test('I1-B3.1 Retry Hydration Succeeds with Null Routine: then proposal occurs', async () => {
+  let hydrationAttempts = 0;
+  let proposalCalled = false;
+  class RetryableRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> {
+      hydrationAttempts++;
+      if (hydrationAttempts === 1) throw new Error('first attempt fails');
+      return null;
+    }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> {
+      if (hydrationAttempts <= 1) throw new Error('first attempt fails');
+      return [];
+    }
+    async proposeRoutine(_input?: any): Promise<RoutineProposalResult> {
+      proposalCalled = true;
+      const { generateRoutineProposal: gen } = await import('../src/services/ai-workflows/routine-generator.ts');
+      const { routine, userProducts } = gen({ primaryGoal: 'breakouts', routineComplexity: 'simple' }, []);
+      return { routine: { ...routine, userId: 'usr_retry_b31', status: 'awaiting_review' } as any, userProducts };
+    }
+  }
+  await withB31RemoteService(new RetryableRemote(), async () => {
+    b31OnboardedRemote('usr_retry_b31');
+    await ensureInitialRoutineProposal('usr_retry_b31');
+    assert.equal(proposalCalled, false, 'No proposal on first (error) hydration');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'error');
+    assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, true);
+
+    clearInFlightHydrations();
+    clearInFlightProposals();
+    await ensureInitialRoutineProposal('usr_retry_b31');
+    assert.equal(proposalCalled, true, 'Proposal must fire after successful retry hydration');
+    assert.ok(hydrationAttempts >= 2, 'Retry must re-run hydration even though isRoutineBeingPrepared was already true');
+  });
+});
+
+test('I1-B3.1 Old Hydration Promise Cannot Delete Newer Same-User Entry (Promise Identity)', async () => {
+  let resolveFirst!: (v: RoutinePlan | null) => void;
+  let resolveSecond!: (v: RoutinePlan | null) => void;
+  const firstHeld = new Promise<RoutinePlan | null>((res) => { resolveFirst = res; });
+  const secondHeld = new Promise<RoutinePlan | null>((res) => { resolveSecond = res; });
+  let callCount = 0;
+  class RacyRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> {
+      callCount++;
+      if (callCount === 1) return firstHeld;
+      if (callCount === 2) return secondHeld;
+      throw new Error('third getRoutine must not start; old finally deleted the newer in-flight entry');
+    }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+  }
+  await withB31RemoteService(new RacyRemote(), async () => {
+    b31OnboardedRemote('usr_race_b31');
+    const a1 = hydratePlanState('usr_race_b31');
+    clearInFlightHydrations();
+    useRoutineStore.getState().resetRoutine();
+    useAuthStore.getState().setSession('usr_race_b31', 'usr_race_b31@derive.skin');
+    const a2 = hydratePlanState('usr_race_b31');
+    resolveFirst(null);
+    await a1;
+    const a3 = hydratePlanState('usr_race_b31');
+    assert.equal(a3, a2, 'Third hydrate must join the still-in-flight second promise');
+    assert.equal(callCount, 2, 'Old finally must not drop the newer map entry');
+    resolveSecond(null);
+    await a2;
+    await a3;
+  });
+});
+
+test('I1-B3.1 Old Proposal Promise Cannot Delete Newer Same-User Proposal Entry (Promise Identity)', async () => {
+  let resolveFirstProposal!: (v: RoutineProposalResult) => void;
+  let resolveSecondProposal!: (v: RoutineProposalResult) => void;
+  const firstProposalHeld = new Promise<RoutineProposalResult>((res) => { resolveFirstProposal = res; });
+  const secondProposalHeld = new Promise<RoutineProposalResult>((res) => { resolveSecondProposal = res; });
+  let proposalCount = 0;
+  class RacyPropRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return null; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+    async proposeRoutine(_input?: any): Promise<RoutineProposalResult> {
+      proposalCount++;
+      if (proposalCount === 1) return firstProposalHeld;
+      if (proposalCount === 2) return secondProposalHeld;
+      throw new Error('third proposeRoutine must not start; old finally deleted the newer proposal entry');
+    }
+  }
+  await withB31RemoteService(new RacyPropRemote(), async () => {
+    b31OnboardedRemote('usr_propr_b31');
+    useRoutineStore.setState({
+      routine: null,
+      isRoutineBeingPrepared: true,
+      planHydrationStatus: 'ready',
+      planHydrationError: null,
+    });
+    const p1 = ensureInitialRoutineProposal('usr_propr_b31');
+    clearInFlightProposals();
+    useRoutineStore.getState().resetRoutine();
+    useAuthStore.getState().setSession('usr_propr_b31', 'usr_propr_b31@derive.skin');
+    useRoutineStore.setState({
+      routine: null,
+      isRoutineBeingPrepared: true,
+      planHydrationStatus: 'ready',
+      planHydrationError: null,
+      planHydrationAttempt: useRoutineStore.getState().planHydrationAttempt,
+    });
+    const p2 = ensureInitialRoutineProposal('usr_propr_b31');
+    const { generateRoutineProposal: gen3 } = await import('../src/services/ai-workflows/routine-generator.ts');
+    const { routine: r3, userProducts: up3 } = gen3({ primaryGoal: 'breakouts', routineComplexity: 'simple' }, []);
+    resolveFirstProposal({
+      routine: { ...r3, userId: 'usr_propr_b31', status: 'awaiting_review' } as any,
+      userProducts: up3,
+    });
+    await p1;
+    const p3 = ensureInitialRoutineProposal('usr_propr_b31');
+    assert.equal(proposalCount, 2, 'Old finally must not drop the newer proposal map entry');
+    resolveSecondProposal({
+      routine: { ...r3, userId: 'usr_propr_b31', status: 'awaiting_review' } as any,
+      userProducts: up3,
+    });
+    await p2;
+    await p3;
+  });
+});
+
+test('I1-B3.1 Logout/Re-login Same User: dedupe correctness preserved across session boundary', async () => {
+  class StableRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return null; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+  }
+  await withB31RemoteService(new StableRemote(), async () => {
+    b31OnboardedRemote('usr_relogin_b31');
+    await hydratePlanState('usr_relogin_b31');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'ready');
+
+    useAuthStore.getState().setSignedOut();
+    clearInFlightHydrations();
+    useRoutineStore.getState().resetRoutine();
+
+    useAuthStore.getState().setSession('usr_relogin_b31', 'relogin@derive.skin');
+    useBootstrapStore.setState({
+      status: 'READY',
+      bootstrapState: {
+        userId: 'usr_relogin_b31',
+        profileExists: true,
+        onboardingCompleted: true,
+        membershipStatus: 'active',
+      },
+      errorMessage: null,
+      resolvedUserId: 'usr_relogin_b31',
+      resolutionAttempt: 2,
+    });
+    await hydratePlanState('usr_relogin_b31');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'ready', 'Second hydration after re-login must complete cleanly');
+  });
+});
+
+test('I1-B3.1 hydrateRoutine Compatibility: delegates to hydratePlanState, populates userProducts atomically', async () => {
+  const wrapProducts: UserProduct[] = [{
+    id: 'up_wrap_1',
+    userId: 'usr_wrap_b31',
+    productId: 'p_wrap_1',
+    product: {
+      id: 'p_wrap_1',
+      brand: 'CeraVe',
+      name: 'Hydrating Cleanser',
+      category: 'cleanser',
+      keyActives: ['Ceramides'],
+      fullIngredients: ['Water'],
+    },
+    action: 'KEEP',
+    actionReason: 'Keep cleanser during review.',
+    isConfirmedByUser: true,
+  }];
+  class HydrateWrapRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return null; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return wrapProducts; }
+  }
+  await withB31RemoteService(new HydrateWrapRemote(), async () => {
+    b31OnboardedRemote('usr_wrap_b31');
+    const result = await hydrateRoutine('usr_wrap_b31');
+    assert.equal(result, null, 'Returns routine (null) via wrapper');
+    assert.equal(useRoutineStore.getState().planHydrationStatus, 'ready', 'hydratePlanState must have committed status');
+    assert.equal(useRoutineStore.getState().userProducts.length, 1, 'userProducts must hydrate atomically through hydratePlanState');
+    assert.equal(useRoutineStore.getState().userProducts[0].product.name, 'Hydrating Cleanser');
+    assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, true);
+  });
+});
+
+test('I1-B3.1 awaiting_review Behavior Unchanged after B3.1 changes', async () => {
+  const { generateRoutineProposal: genDraft } = await import('../src/services/ai-workflows/routine-generator.ts');
+  const { routine: draftBase } = genDraft({ primaryGoal: 'breakouts', routineComplexity: 'simple' }, []);
+  const awaitingRoutine = { ...draftBase, userId: 'usr_draft_b31', status: 'awaiting_review' as const };
+  class DraftRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return awaitingRoutine; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+  }
+  await withB31RemoteService(new DraftRemote(), async () => {
+    b31OnboardedRemote('usr_draft_b31');
+    await hydratePlanState('usr_draft_b31');
+    const state = useRoutineStore.getState();
+    assert.ok(state.routine);
+    assert.equal(state.routine!.status, 'awaiting_review');
+    assert.equal(state.isPlanUnderReview, true);
+    assert.equal(state.isRoutineBeingPrepared, false);
+  });
+});
+
+test('I1-B3.1 Published Routine Behavior Unchanged after B3.1 changes', async () => {
+  const { generateRoutineProposal: genPub } = await import('../src/services/ai-workflows/routine-generator.ts');
+  const { routine: pubBase } = genPub({ primaryGoal: 'breakouts', routineComplexity: 'simple' }, []);
+  const publishedRoutine = { ...pubBase, userId: 'usr_pub_b31', status: 'published' as const };
+  class PublishedRemote extends RemoteDeriveService {
+    async getRoutine(_userId: string): Promise<RoutinePlan | null> { return publishedRoutine; }
+    async getUserProducts(_userId: string): Promise<UserProduct[]> { return []; }
+  }
+  await withB31RemoteService(new PublishedRemote(), async () => {
+    b31OnboardedRemote('usr_pub_b31');
+    await hydratePlanState('usr_pub_b31');
+    const state = useRoutineStore.getState();
+    assert.ok(state.routine);
+    assert.equal(state.routine!.status, 'published');
+    assert.equal(state.isPlanUnderReview, false);
+    assert.equal(state.isRoutineBeingPrepared, false);
+    assert.equal(state.planHydrationStatus, 'ready');
+  });
+});
+
+test('I1-B3.1 Provider Neutrality Unchanged: zero provider references in deriveClient.ts', () => {
+  const content = fs.readFileSync(path.resolve('src/services/deriveClient.ts'), 'utf8');
+  for (const token of ['Gemini', 'gemini', 'OpenAI', 'openai', 'Claude', 'claude', 'Anthropic', 'anthropic', 'ROUTINE_MODEL_PROVIDER']) {
+    assert.ok(!content.includes(token), `deriveClient.ts must not contain provider reference '${token}'`);
+  }
+});
+
+test('I1-B3.1 Session Reset Invalidates Stale Projections: clears maps and increments attempt', () => {
+  useRoutineStore.setState({
+    routine: null,
+    isRoutineBeingPrepared: true,
+    planHydrationStatus: 'loading',
+    planHydrationAttempt: 5,
+    planHydrationError: null,
+  });
+  const attemptBefore = useRoutineStore.getState().planHydrationAttempt;
+  clearInFlightHydrations();
+  clearInFlightProposals();
+  useRoutineStore.getState().resetRoutine();
+  assert.ok(useRoutineStore.getState().planHydrationAttempt > attemptBefore, 'Attempt counter must increment on reset');
+  assert.equal(useRoutineStore.getState().isRoutineBeingPrepared, false);
+  assert.equal(useRoutineStore.getState().routine, null);
+  assert.equal(useRoutineStore.getState().planHydrationStatus, 'idle');
+});

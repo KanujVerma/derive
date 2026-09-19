@@ -489,6 +489,29 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
 
+### I1-B3.1: Client Hardening — Cold-Restart Hydration, Read-Failure Generation Guard, Promise-Identity In-Flight Cleanup [COMPLETE]
+* **Scope**:
+  - Cold Remote restart: authenticated + bootstrap `READY` + `onboardingCompleted === true` + failed plan read preserves `routine = null`, `isRoutineBeingPrepared = true`, `isPlanUnderReview = false`, `planHydrationStatus = 'error'`, customer-safe `planHydrationError`. Onboarded members do not fall into "Start Routine Setup" empty-state.
+  - Read failure must not call `proposeRoutine()`. Retry with `planHydrationStatus === 'error'` re-runs hydration first even if `isRoutineBeingPrepared` is already true. Proposal runs only after successful hydration proves `routine === null` and pending-generation is still true.
+  - In-flight maps use per-request ownership tokens so an older request's `finally` cannot delete a newer same-user hydration or proposal. `hydratePlanState` returns the map Promise directly (not an extra `async` wrapper) so same-user joins keep Promise identity.
+  - Legacy `hydrateRoutine()` is a compatibility wrapper over `hydratePlanState()` and hydrates Routine + `UserProduct[]` atomically.
+* **Acceptance Criteria**:
+  - Section 36 in `tests/derive.test.ts` covers cold-restart error, no false generation, retry-then-propose, genuine in-flight races, atomic `hydrateRoutine`, awaiting_review, published, provider neutrality, and session reset.
+  - Unit tests, app/test typecheck, and Expo web export remain green. Backend schema unchanged.
+  - `eas.json` Remote flag remains `false`.
+
+### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [PLANNED — NOT IMPLEMENTED]
+* **Approved product truth (founder/orchestrator; not yet in code)**:
+  - Founding Beta membership is **$25/month** for Derive managing the member's skincare (routine, adaptations, weekly check-ins, Progress, Scan, Ask, product-fit guidance, beta founder quality review). Do **not** frame as "$25 for AI". $25 is a current Founding Beta experiment, not a lifetime company price.
+  - Routine products are purchased separately. Membership price does **not** depend on product count, retail cost, lifespan, refill rate, or routine size. No Basic/Pro/Premium V1 tiers.
+  - Commercial-independence invariant: margin, affiliate, sponsorship, and coupons must never silently alter KEEP / PAUSE / REPLACE / ADD, Scan, safety, or ranking. New SKU charges require explicit consent; same-SKU refills may stay low-friction.
+  - Five-tab IA preserved. Full Shop deferred. Stripe billing deferred to S5 except architecture/docs truth.
+* **B4A — Membership & Product Commerce Model Reconciliation** (do not start until orchestrator opens the pass):
+  - Display truth $25/month; remove active dynamic all-in membership pricing and obsolete `src/pricing/**` if unused; price-neutral identity `founding_beta_129` → `founding_beta` via additive migration; Mock/Remote/profile/onboarding/orders copy; supersede ADR-15; partially supersede ADR-21 pricing; add ADR-26.
+* **B4B — Weekly Check-In Context Model & Persistence** (separate pass after B4A or as sequenced by orchestrator):
+  - Optional multi-select `CheckInContextTag` + one optional context note every check-in; persist additively; reuse VoiceTextArea; tags are context not causation; `cycle` is not a period tracker.
+* **Not in B4**: Shop tab, Stripe checkout amounts, coupons, affiliates, food diary, period tracker, membership tiers, provider selection.
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]
@@ -529,18 +552,19 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Ingredient signals update confidence based on multi-product overlap and tolerated exposure discounting.
 
 ### S4: Founder Operations Console
-* **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta members ($100/month concierge operating experiment; long-term personalized pricing architecture remains provisional). Routine review queue, refill replenishment status updater, product formula auditor, and internal clinical notes.
+* **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta members. After I1-B4A, customer-facing membership truth is the $25/month Derive-management experiment with products purchased separately; S4 itself remains founder review/edit/publish of routines, refill status, formula audit, and internal notes. Do not treat full Shop as an S4 acceptance criterion.
 * **Acceptance Criteria**:
   - Founders can review, edit, and publish routine proposals before member notification.
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
 ### S5: Commerce & Remote Service Integration
-* **Scope**: Stripe checkout / customer portal integration for Founding Beta memberships ($100/month approved first-10 beta experiment; long-term personalized pricing architecture remains provisional), webhook listeners for subscription lifecycle, and `RemoteDeriveService` client adapter implementation.
+* **Scope**: Trusted Stripe checkout / customer portal for Founding Beta **membership** (target $25/month after B4A; Stripe owns live money, not client `config.betaPriceMonthly`), webhook-driven membership lifecycle, and `RemoteDeriveService` against live Edge Functions. Separate product commerce v0 may follow membership checkout. Full personalized Shop is later / evidence-driven.
 * **Acceptance Criteria**:
-  - Stripe webhook maps customer email to Supabase member record.
+  - Stripe webhook maps customer email to Supabase member record and membership lifecycle.
   - `RemoteDeriveService` passes the full test suite against live Supabase Edge Functions.
   - Mobile app can toggle from `MockDeriveService` to `RemoteDeriveService` via a single environment flag.
+  - Product SKU checkout is not required to close S5 membership; Shop is explicitly deferred.
 
 ---
 

@@ -58,13 +58,13 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 
 ### 5. Progress ("Longitudinal skin record")
 - **100% AI-Led Longitudinal Care Loop**: Weekly check-ins are fully automated through intelligent AI assessment of skin state, barrier comfort, and product tolerance. Derive dynamically updates schedules, generates learned insights, and adapts routines without requiring recurring manual founder calls.
-- **Weekly Check-In Card**: 30-second structured check-in (skin state, irritation, adherence, optional notes/photo).
+- **Weekly Check-In Card**: ~30-second structured check-in (skin state, irritation, adherence, optional notes). **Implemented today:** conditional single-select `CHANGE_REASONS` is local UI only and is not persisted. **Approved I1-B4B (not implemented):** optional multi-select context tags + one optional context note every check-in; tags are context, not causation.
 - **Photo Comparison**: Side-by-side baseline vs. latest photo comparison across Front, Left, and Right angles using full-width `SegmentedControl` with friendly dates (`Sep 1`, `Sep 8`, `Sep 15`).
 - **Learned Insights**: Plain-English observations with clear provenance labels (`From your check-ins`, `From your routine history`).
 - **Timeline Events**: Milestone log of routine changes and barrier developments.
 
 ### 6. Profile & Settings (`app/profile`)
-- **Customer Account Identity**: Member name, email, membership status derived dynamically from active plan pricing (e.g. `Founding Beta · Estimated plan: $96/mo` under review, `Current plan: $96/mo` after activation; or `$100/mo` Founding Beta experiment).
+- **Customer Account Identity**: Member name, email, Founding Beta badge, and membership price. **Implemented today:** `${config.betaPriceMonthly}/mo` (`100`) plus unused `calculateMonthlyPlanPrice` imports. **Approved I1-B4A (not implemented):** `$25/mo` Derive-management membership; products purchased separately; no routine-derived plan price.
 - **Clean Customer Scope**: Dedicated customer-facing sections for Care & History (Active Routine, Product Reaction History, Orders & Refills) and Support & Privacy (Member Support, Export Personal Data).
 - **No Developer Bloat**: Internal founder review desk links, dev toggles, and unsubstantiated HIPAA/GDPR regulatory claims are completely removed from customer view.
 
@@ -72,10 +72,19 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 
 ## Founding Beta Pricing & Operating Model
 
-### 1. Founding Beta Operating Experiment ($100/Month First-10) — APPROVED BETA EXPERIMENT
-* **Status**: **APPROVED BETA EXPERIMENT** (Distinct from long-term pricing architecture).
+### 1. Founding Beta Membership — APPROVED SUCCESSOR ($25/Month Management; Products Separate) [I1-B4A · NOT IMPLEMENTED]
+* **Status**: **APPROVED PRODUCT DIRECTION** (ADR-26). Code still shows `$100` / `founding_beta_129` until I1-B4A.
 * **Target Cohort**: First 10 paying Founding Beta members.
-* **Pricing Concept**: Flat **$100/month** covering Derive care management plus standard non-prescription facial skincare products needed for the approved routine.
+* **Pricing Concept**: Flat **$25/month** Founding Beta experiment that pays for Derive **managing** the member's skincare (canonical routine, ongoing adaptation, weekly check-ins, Progress, Scan, Ask, product-fit guidance, beta founder quality review). Do **not** frame as "$25 for AI". $25 is not a lifetime company price.
+* **Products Are Separate**: Routine products are purchased separately. Membership price does not depend on product count, retail cost, lifespan, refill rate, or routine size. No V1 membership tiers.
+* **Preserve Working Products**: Existing products that already work are retained (`KEEP`); Derive does not ship duplicate bottles merely because a member pays monthly.
+* **Need-Based Replenishment / Consent**: Same-SKU refills may stay low-friction. New product/substitution charges require explicit member approval.
+* **Commercial Independence**: Margin, affiliate, sponsorship, and coupons must never silently alter KEEP / PAUSE / REPLACE / ADD, Scan, safety, or ranking.
+* **Prescriptions Are Contextual Only**: Prescription medications are contextual inputs, never products Derive prescribes, modifies, or supplies.
+
+### 1b. Historical: $100/Month All-In First-10 Experiment — SUPERSEDED
+* **Status**: **HISTORICAL / SUPERSEDED** by §1 / ADR-26. Remaining in current UI copy and `config.betaPriceMonthly = 100` until I1-B4A.
+* **Historical Pricing Concept**: Flat **$100/month** covering Derive care management plus standard non-prescription facial skincare products needed for the approved routine.
 * **No Product Wallet or Rollover Allowance**: The member does NOT receive a product wallet, credit balance, rollover allowance, or "$X of products."
 * **Preserve Working Products**: Existing products that already work are retained (`KEEP`); Derive does not ship duplicate bottles merely because a member pays monthly.
 * **Need-Based Replenishment**: Replenishment shipments follow actual depletion need, not calendar billing theater.
@@ -83,9 +92,9 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 * **Discretionary Luxury Exclusions**: Unusually expensive discretionary/luxury products are not silently guaranteed by all-in terms.
 * **Internal Economics Tracked Privately**: First-basket wholesale cost, steady-state consumption, shipping, and replacement expenses are tracked internally; internal fee components are never exposed as a customer breakdown.
 
-### 2. Long-Term Personalized All-In Monthly Pricing Architecture [PROVISIONAL · PENDING COFOUNDER REVIEW]
+### 2. Long-Term Personalized All-In Monthly Pricing Architecture [SUPERSEDED / HISTORICAL]
 > [!NOTE]
-> Prototyped in the client/mock layer (`src/pricing/**`) by Kanuj; not yet reviewed or accepted by Sami. Not a finalized company-wide pricing commitment.
+> SUPERSEDED by ADR-26. Prototype remains in `src/pricing/**` until I1-B4A removes it. Arthur $96/mo, $39 management, and $5 buffer are historical simulation fixtures, not commercial truth.
 
 Derive is prototyping moving away from arbitrary subscription tiers and flat-rate assumptions toward a personalized monthly plan price derived dynamically from active routine consumption:
 - **Pricing Formula (Internal Simulation)**:
@@ -130,7 +139,7 @@ Derive is prototyping moving away from arbitrary subscription tiers and flat-rat
    - **Privacy & Biological Invariants**:
      - Quality evaluation is on-device where practical; zero persistent face embeddings or facial recognition.
      - Baseline photos do NOT diagnose clinical conditions, determine exact skin type, measure hydration/sebum quantitatively, replace self-reported history, or infer race/ethnicity/Fitzpatrick.
-6. **Review & Audit**: Grouped review card with direct `[Edit]` links per section, understated single estimated plan price card, and reassurance that the first plan receives a final manual quality check before going live ("Your first routine gets one final quality check before it goes live"). Tapping `[Build My Plan]` transitions the user directly to the main app with `isPlanUnderReview: true`.
+6. **Review & Audit**: Grouped review card with direct `[Edit]` links per section, Founding Beta membership price card (`config.betaPriceMonthly` today; approved $25 after I1-B4A), and reassurance that the first plan receives a final manual quality check before going live. Tapping `[Build My Plan]` completes onboarding and starts background initial-routine preparation (`isRoutineBeingPrepared`); it does not imply the draft is already under founder review.
 
 ---
 
