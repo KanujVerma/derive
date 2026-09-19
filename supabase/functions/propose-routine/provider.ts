@@ -44,27 +44,6 @@ export async function resolveRoutineProvider(supabaseAdmin?: any): Promise<Routi
     }
   }
 
-  // 3. Fallback: check trusted server-side config file
-  if (!providerName && typeof Deno !== 'undefined') {
-    const candidatePaths = [
-      '/Users/kanuj/Documents/projects/derive/supabase/functions/propose-routine/.server-provider-config',
-      'supabase/functions/propose-routine/.server-provider-config',
-      './supabase/functions/propose-routine/.server-provider-config',
-      './.server-provider-config',
-    ];
-    for (const candidate of candidatePaths) {
-      try {
-        const content = await Deno.readTextFile(candidate);
-        if (content && content.trim()) {
-          providerName = content.trim().toLowerCase();
-          break;
-        }
-      } catch {
-        // Try next candidate
-      }
-    }
-  }
-
   if (providerName === 'fixture') {
     return new FixtureRoutineProvider();
   }

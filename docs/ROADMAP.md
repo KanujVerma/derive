@@ -439,6 +439,29 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
 
+### I1-B2.3: Final Server Boundary Cleanup [COMPLETE · B2 SERVER LANE CLOSED]
+* **Scope**:
+  - **Removal of Filesystem Fallback**:
+    - Eliminated `.server-provider-config`, founder-machine `/Users/` paths, and `Deno.readTextFile` lookups from `supabase/functions/propose-routine/provider.ts` and test harnesses.
+    - Server provider resolution is strictly bounded to `ROUTINE_MODEL_PROVIDER` process env or `public.server_runtime_config` table (service-role only).
+  - **Restoration of RPC Least Privilege**:
+    - Additive migration `20260919030000_i1_b2_restore_rpc_security_invoker_and_catalog_protection.sql` restored `public.commit_routine_proposal` to `SECURITY INVOKER` with `set search_path = ''` and fully-qualified schema references.
+    - Removed deprecated `auth.role()` check while maintaining explicit ACL: EXECUTE granted strictly to `service_role`; revoked from `PUBLIC`, `anon`, and `authenticated`.
+  - **Provisional Catalog Formula Protection**:
+    - Model outputs cannot promote hallucinated `key_actives`, `full_ingredients`, or `retail_price_approx` into provisional (`is_catalog_standard = false`) products, preventing accumulation of hallucinated formula facts across subsequent proposals.
+    - Trusted catalog standard products (`is_catalog_standard = true`) remain immutable to provider metadata.
+  - **Fail-Closed Confirmation Mapping**:
+    - `RemoteDeriveService.getUserProducts` maps null/unknown `is_confirmed_by_user` strictly to `false` (`=== true`), eliminating fabricated confirmation.
+* **Acceptance Criteria**:
+  - 100% test suite passing (122/122 tests in `tests/derive.test.ts`).
+  - 100% pgTAP test suite passing (126/126 assertions in `supabase/tests/**`).
+  - 100% local E2E test harness passing (`scripts/test-i1-b1-local.mjs` and `scripts/test-i1-b2-local.mjs`).
+  - Strict application TypeScript check: 0 errors (`npx tsc --noEmit`).
+  - Strict test TypeScript check: 0 errors (`npm run typecheck:tests`).
+  - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
+  - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
+  - Kanuj's provider-independent mobile integration is unblocked.
+
 ## Sami Workstream (Platform + Intelligence + Operations)
 
 ### S1: Platform Foundation [IN PROGRESS — S1A DATA PLANE HARDENED]

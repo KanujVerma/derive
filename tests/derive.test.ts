@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { checkSkincareSafety } from '../src/services/ai-workflows/safety-classifier.ts';
 import { generateRoutineProposal } from '../src/services/ai-workflows/routine-generator.ts';
@@ -5879,5 +5881,101 @@ test('I1-B2.2: Sensitivity validation fails closed on unverified formula and rej
   const v3 = validateSensitivities(proposalSafe, mockContext, trustedCatalog);
   assert.equal(v3.valid, true);
 });
+
+// ---------------------------------------------------------------------------
+// SECTION 31: I1-B2.3 Final Server Boundary Cleanup Tests
+// ---------------------------------------------------------------------------
+
+test('I1-B2.3 RemoteDeriveService: getUserProducts maps null/undefined is_confirmed_by_user to false (fail closed)', async () => {
+  const mockRows = [
+    {
+      id: 'up_row_null_conf',
+      user_id: 'usr_b2_null_test',
+      product_id: 'prod_uuid_null',
+      detected_brand: null,
+      detected_name: null,
+      action: 'ADD',
+      action_reason: 'Proposed by AI',
+      frequency_nights_per_week: 7,
+      is_confirmed_by_user: null, // null confirmation
+      created_at: '2026-09-18T12:00:00.000Z',
+      products: {
+        id: 'prod_uuid_null',
+        brand: 'Vanicream',
+        name: 'Moisturizing Cream',
+        category: 'moisturizer',
+        key_actives: [],
+        full_ingredients: [],
+        retail_price_approx: 14.99,
+        is_catalog_standard: false,
+      },
+    },
+  ];
+
+  const mockSupabaseClient = {
+    from: (table: string) => ({
+      select: () => ({
+        eq: async () => ({ data: mockRows, error: null }),
+      }),
+    }),
+  };
+
+  const service = new RemoteDeriveService(mockSupabaseClient);
+  const userProducts = await service.getUserProducts('usr_b2_null_test');
+  assert.equal(userProducts.length, 1);
+  assert.equal(userProducts[0].isConfirmedByUser, false, 'Null is_confirmed_by_user must fail closed to false');
+});
+
+test('I1-B2.3: resolveRoutineProvider has no filesystem fallback and enforces server-only resolution', async () => {
+  const origEnv = process.env.ROUTINE_MODEL_PROVIDER;
+  try {
+    delete process.env.ROUTINE_MODEL_PROVIDER;
+
+    // 1. Unconfigured provider returns null (fails closed)
+    const providerNone = await resolveRoutineProvider();
+    assert.equal(providerNone, null, 'Unconfigured provider must return null');
+
+    // 2. Resolved via process.env
+    process.env.ROUTINE_MODEL_PROVIDER = 'fixture';
+    const providerEnv = await resolveRoutineProvider();
+    assert.ok(providerEnv);
+    assert.equal(providerEnv.providerId, 'fixture');
+
+    // 3. Resolved via mock supabaseAdmin server_runtime_config
+    delete process.env.ROUTINE_MODEL_PROVIDER;
+    const mockAdmin = {
+      from: (table: string) => {
+        assert.equal(table, 'server_runtime_config');
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: { value: 'fixture' } }),
+            }),
+          }),
+        };
+      },
+    };
+    const providerDb = await resolveRoutineProvider(mockAdmin);
+    assert.ok(providerDb);
+    assert.equal(providerDb.providerId, 'fixture');
+  } finally {
+    if (origEnv !== undefined) {
+      process.env.ROUTINE_MODEL_PROVIDER = origEnv;
+    } else {
+      delete process.env.ROUTINE_MODEL_PROVIDER;
+    }
+  }
+});
+
+test('I1-B2.3: static check - zero .server-provider-config, Deno.readTextFile, or founder paths in provider.ts', async () => {
+  const providerSource = fs.readFileSync(
+    path.resolve('supabase/functions/propose-routine/provider.ts'),
+    'utf8'
+  );
+  assert.ok(!providerSource.includes('.server-provider-config'), 'Must not contain .server-provider-config');
+  assert.ok(!providerSource.includes('/Users/'), 'Must not contain /Users/ founder path');
+  assert.ok(!providerSource.includes('Deno.readTextFile'), 'Must not contain Deno.readTextFile');
+});
+
 
 

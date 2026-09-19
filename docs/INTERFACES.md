@@ -134,6 +134,11 @@ export interface IDeriveService {
       - Post-model sensitivity evaluation (`validateSensitivities`): if member reported sensitivities, unverified formulas fail closed with `VALIDATION_FAILED`; trusted products containing known allergens fail closed.
   11. **Confirmation Provenance Preservation [DELIVERED IN B2.2]**:
       - `is_confirmed_by_user` semantics: denotes member confirmed having product in inventory, NOT member approval of an AI action. Existing shelf items retain `true` across actions (`KEEP`, `PAUSE`, `REPLACE`, `STOP`); new `ADD` items are `false`. Persistence never downgrades `true` to `false`.
+  12. **Server Boundary Least Privilege & Catalog Provisional Protection [DELIVERED IN B2.3]**:
+      - `commit_routine_proposal` restored to `SECURITY INVOKER` with explicit service-role execution ACL; deprecated `auth.role()` check removed.
+      - Zero filesystem fallback in provider resolution (`.server-provider-config`, founder paths, and `Deno.readTextFile` eliminated).
+      - Model outputs cannot promote `key_actives`, `full_ingredients`, or `retail_price_approx` to provisional (`is_catalog_standard = false`) products, preventing accumulation of hallucinated facts across subsequent proposals.
+      - Null/unknown `is_confirmed_by_user` strictly fails closed to `false` in client mapping (`row.is_confirmed_by_user === true`).
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.

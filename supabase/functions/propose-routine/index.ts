@@ -325,12 +325,12 @@ Deno.serve(async (req: Request) => {
         };
       }
 
-      // New or unverified product proposal
+      // New or unverified product proposal: persist minimal identity for review; do not promote model inference to catalog truth
       return {
         brand: cp.brand.trim(),
         name: cp.name.trim(),
         category: cp.category,
-        key_actives: cp.keyActives || cp.key_actives || [],
+        key_actives: [],
         full_ingredients: [],
         retail_price_approx: null,
         is_catalog_standard: false,
