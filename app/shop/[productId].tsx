@@ -285,7 +285,7 @@ export default function ProductDetailScreen() {
                 </Text>
               </>
             )
-          ) : action === 'KEEP' ? (
+          ) : action === 'KEEP' && isPublished ? (
             <>
               <View style={styles.commerceHeader}>
                 <Icon name="checkCircle" size={18} color={colors.brand} />
@@ -302,6 +302,10 @@ export default function ProductDetailScreen() {
                 style={{ marginTop: spacing.xs, alignSelf: 'flex-start' }}
               />
             </>
+          ) : action === 'KEEP' ? (
+            <Text style={styles.commerceBody}>
+              This product is still under routine review. Managed refills are available after publication.
+            </Text>
           ) : action === 'PAUSE' ? (
             <>
               <View style={styles.commerceHeader}>

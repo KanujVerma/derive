@@ -8048,6 +8048,15 @@ test('C1 Shop: KEEP does not imply required purchase — acquisitionEligible=fal
   assert.notEqual(sem.purchaseAvailability, 'not_applicable');
 });
 
+test('C1 Shop: draft and approved KEEP products cannot offer a refill', () => {
+  for (const status of ['draft', 'awaiting_review', 'approved'] as const) {
+    const semantics = resolveActionCommerceSemantics('KEEP', status);
+    assert.equal(semantics.purchaseAvailability, 'not_applicable');
+  }
+  const detailContent = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
+  assert.ok(detailContent.includes("action === 'KEEP' && isPublished"));
+});
+
 test('C1 Shop: REPLACE never sells old product — neverSellOldProduct=true', () => {
   const sem = resolveActionCommerceSemantics('REPLACE', 'published');
   assert.equal(sem.neverSellOldProduct, true);

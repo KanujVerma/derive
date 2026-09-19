@@ -116,7 +116,7 @@ export interface ActionCommercePresentation {
  * - ADD only becomes acquisition-eligible when the routine is published.
  *   Unpublished routines may preview the recommendation, but the
  *   purchase CTA remains unavailable.
- * - KEEP implies "in your plan" — not a required immediate purchase.
+ * - KEEP permits a managed refill only after publication, never a required purchase.
  */
 export function resolveActionCommerceSemantics(
   action: RoutineAction,
@@ -138,7 +138,7 @@ export function resolveActionCommerceSemantics(
         planStatusLabel: 'In your plan',
         // KEEP = already owned / in use. Repurchase is optional / future refill.
         acquisitionEligible: false,
-        purchaseAvailability: 'deferred_to_c15',
+        purchaseAvailability: isPublished ? 'deferred_to_c15' : 'not_applicable',
         neverSellOldProduct: false,
       };
 
