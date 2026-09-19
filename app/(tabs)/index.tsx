@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useUserStore } from '@/src/stores/userStore';
+import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
@@ -42,8 +43,9 @@ export default function TodayScreen() {
   const { fullName } = useUserStore();
   const firstName = fullName?.trim()?.split(' ')[0] || 'there';
 
+  const isShopMember = useShopAudience() === 'member';
   const isPublished = routine?.status === 'published';
-  const neededProducts = isPublished
+  const neededProducts = isShopMember && isPublished
     ? userProducts.filter((up) => up.action === 'ADD' && !up.isConfirmedByUser)
     : [];
 

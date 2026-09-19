@@ -8271,7 +8271,7 @@ test('C1 Shop: Plan Products contains Shop/product-detail integration', () => {
 test('C1 Shop: Plan ADD product route is suppressed while routine is not published', () => {
   const planContent = fs.readFileSync(path.resolve('app/(tabs)/plan.tsx'), 'utf8');
   assert.ok(
-    planContent.includes("up.action === 'ADD' && isPublished && !isPlanUnderReview"),
+    planContent.includes("up.action === 'ADD' && isShopMember && isPublished && !isPlanUnderReview"),
     'ADD product link in Plan must require published routine and not under review'
   );
   assert.ok(planContent.includes("const isPublished = routine?.status === 'published';"));
@@ -8286,12 +8286,22 @@ test('C1 Shop: Plan PAUSE/STOP have no acquisition CTA and REPLACE never sells o
 
 test('C1 Shop: Today only renders commerce module for published unconfirmed ADD', () => {
   const todayContent = fs.readFileSync(path.resolve('app/(tabs)/index.tsx'), 'utf8');
+  assert.ok(todayContent.includes("const isShopMember = useShopAudience() === 'member';"));
+  assert.ok(todayContent.includes('const neededProducts = isShopMember && isPublished'));
   assert.ok(todayContent.includes("up.action === 'ADD' && !up.isConfirmedByUser"), 'Today must filter for unconfirmed ADD');
   assert.ok(todayContent.includes("routine?.status === 'published'"), 'Today must require published routine');
   assert.ok(!todayContent.includes("routine?.status === 'published' || routine?.status === 'approved'"));
   assert.ok(todayContent.includes('YOUR PLAN NEEDS ONE PRODUCT'), 'Single product copy must be present');
   assert.ok(todayContent.includes('router.push(`/shop/${neededProducts[0].productId}`'), 'Single product must route to product detail');
   assert.ok(todayContent.includes("router.push('/(tabs)/shop')"), 'Multiple products must route to Shop tab');
+});
+
+test('C1 Shop: Plan commerce links require an active member audience', () => {
+  const planContent = fs.readFileSync(path.resolve('app/(tabs)/plan.tsx'), 'utf8');
+  assert.ok(planContent.includes("const isShopMember = useShopAudience() === 'member';"));
+  assert.ok(planContent.includes("isShopMember && routine?.status === 'published'"));
+  assert.ok(planContent.includes("up.action === 'ADD' && isShopMember && isPublished"));
+  assert.ok(planContent.includes("up.action === 'KEEP' && isShopMember"));
 });
 
 test('C1 Shop: Today has no Shop card when no product action is needed', () => {

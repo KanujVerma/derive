@@ -18,6 +18,7 @@ import { SegmentedControl } from '@/src/components/ui/SegmentedControl';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
 import { ensureInitialRoutineProposal } from '@/src/services/deriveClient';
+import { useShopAudience } from '@/src/commerce/useShopAudience';
 
 export default function PlanScreen() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function PlanScreen() {
     planHydrationError,
   } = useRoutineStore();
   const [activeTab, setActiveTab] = useState<'routine' | 'products'>('routine');
+  const isShopMember = useShopAudience() === 'member';
 
   React.useEffect(() => {
     ensureInitialRoutineProposal().catch((e) => console.warn('Failed to ensure routine proposal:', e));
@@ -209,7 +211,7 @@ export default function PlanScreen() {
             <View style={styles.shelfIntro}>
               <View style={styles.shelfIntroHeaderRow}>
                 <Text style={styles.shelfIntroTitle}>We reviewed what you're using now.</Text>
-                {routine?.status === 'published' && (
+                {isShopMember && routine?.status === 'published' && (
                   <TouchableOpacity
                     style={styles.shopPlanLink}
                     onPress={() => router.push('/(tabs)/shop')}
@@ -271,7 +273,7 @@ export default function PlanScreen() {
                     )}
 
                     {/* Plan -> Shop Integration: Restrained Product Detail Access */}
-                    {up.action === 'ADD' && isPublished && !isPlanUnderReview ? (
+                    {up.action === 'ADD' && isShopMember && isPublished && !isPlanUnderReview ? (
                       <TouchableOpacity
                         style={styles.auditActionRow}
                         onPress={() => router.push(`/shop/${up.productId}` as any)}
@@ -281,7 +283,7 @@ export default function PlanScreen() {
                         <Text style={styles.auditActionText}>View product</Text>
                         <Icon name="forward" size={12} color={colors.brand} />
                       </TouchableOpacity>
-                    ) : up.action === 'KEEP' ? (
+                    ) : up.action === 'KEEP' && isShopMember ? (
                       <TouchableOpacity
                         style={styles.auditActionRow}
                         onPress={() => router.push(`/shop/${up.productId}` as any)}
