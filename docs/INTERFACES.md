@@ -69,27 +69,39 @@ export interface IDeriveService {
   - `initialRoutineState`: `InitialRoutineState` (`'pending_generation'` | `'awaiting_review'`)
 
 ### `proposeRoutine(input: RoutineProposalInput)`
-* **Input**: `RoutineProposalInput`:
-  - `profile`:
-    - `primaryGoal`: Goal
-    - `secondaryGoals`?: Goal[]
-    - `routineComplexity`: RoutineComplexity (`simple` | `balanced` | `maximize`)
-    - `costPreference`?: ProductCostPreference
-    - `middayFeel`?: MiddayFeel
-    - `postCleanseTightness`?: boolean
-    - `activePrescriptions`?: string[]
-    - `isPregnantOrNursing`?: boolean
-    - `pregnancyStatus`?: `PregnancyStatus` (`'yes'` | `'no'` | `'prefer_not_to_say'` | `'unanswered'`)
-    - `sensitivitiesStatus`?: `SensitivitiesStatus` (`'none_known'` | `'reported'` | `'unanswered'`)
-  - `shelfProducts`: Product[]
-  - `reactions`?: ProductReaction[]
-* **Output**: `RoutineProposalResult`:
-  - `routine`: `Routine` (`id`, `version`, `status: 'awaiting_review'`, `amSteps`, `pmSteps`, `rationales`)
-  - `userProducts`: `UserProduct[]` (with actions: `'KEEP'` | `'PAUSE'` | `'REPLACE'` | `'ADD'` | `'STOP'`)
+* **Current Shared Contract (`src/domain/types.ts`)**:
+  - `input`: `RoutineProposalInput`:
+    - `profile`:
+      - `primaryGoal`: Goal
+      - `secondaryGoals`?: Goal[]
+      - `routineComplexity`: RoutineComplexity (`'simple'` | `'balanced'` | `'maximize'`)
+      - `costPreference`?: ProductCostPreference
+      - `middayFeel`?: MiddayFeel
+      - `postCleanseTightness`?: boolean
+      - `activePrescriptions`?: string[]
+      - `isPregnantOrNursing`?: boolean
+    - `shelfProducts`: Product[]
+    - `reactions`?: ProductReaction[]
+  - *Note*: The current TypeScript `RoutineProposalInput.profile` does NOT contain `pregnancyStatus` or `sensitivitiesStatus`. If B2 requires these fields directly on the input contract, that is a future coordinated shared-contract change requiring mutual founder review.
+* **B2 Richer Context Available Server-Side**:
+  - Server-side context assembly reads richer canonical safety and history signals directly from the database:
+    - `public.skin_profiles`: `pregnancy_status`, `sensitivities_status`, `known_sensitivities`, `pih_tendency`.
+    - `public.onboarding_submissions.payload_snapshot` JSONB: full raw intake snapshot (formula snapshots, adaptive follow-ups, photo context notes).
+    - `public.user_photos`: baseline photo metadata (angles: `front`, `left`, `right`).
+* **Output Contract (`RoutineProposalResult` in `src/domain/types.ts`)**:
+  - `routine`: `Routine` (`id`, `userId`, `version`, `status: 'awaiting_review'`, `summarySentence`, `amSteps`, `pmSteps`, `createdAt`, `updatedAt`, `publishedAt?`, `founderNotes?`).
+    - *Contract Truth*: `Routine` has NO `rationales` property. Step-level personalized rationale is captured on individual `RoutineStep` items via `whyChosen`, `purpose`, `watchFor?`, and `scheduleText?`.
+  - `userProducts`: `UserProduct[]` (with actions: `'KEEP'` | `'PAUSE'` | `'REPLACE'` | `'ADD'` | `'STOP'`).
   - `clarificationQuestions`?: string[]
-* **Lifecycle State Transition**:
-  - B1 intake commit leaves `initialRoutineState: 'pending_generation'` with `proposedRoutine: null` and `isPlanUnderReview: false`.
-  - Once routine proposal is generated and persisted by server intelligence (I1-B2), the state transitions to `awaiting_review` with `isPlanUnderReview: true`, enabling quiet draft preview on the mobile client.
+* **Lifecycle State & Durability Truth**:
+  - `InitialRoutineState` (`'pending_generation'` | `'awaiting_review'`) is a shared domain type returned via `OnboardingResult`. There is NO persisted `initial_routine_state` column in PostgreSQL today.
+  - Before proposal: no canonical routine row exists in `public.routines` $\to$ client conceptual state is `pending_generation` (`routine: null`, `isPlanUnderReview: false`, "Your routine is being prepared.").
+  - After proposal persistence: routine is persisted in `public.routines` with `status = 'awaiting_review'` $\to$ client derives `awaiting_review` (`isPlanUnderReview: true`, "Final review: Your first routine gets one final quality check before it goes live.").
+  - If a dedicated persisted lifecycle column or API is deemed necessary, that is a future shared architecture decision, not assumed current implementation.
+* **Remote Routine Read Assembly Dependency**:
+  - In `src/services/remote/RemoteDeriveService.ts`, `getRoutine(userId)` currently reads only the `routines` table header and does NOT yet query or assemble `public.routine_items` into `amSteps` and `pmSteps`.
+  - Sami's B2 server scope must implement this routine-item read assembly mapper so `RemoteDeriveService.getRoutine()` returns a valid canonical `Routine`.
+  - Kanuj's existing `hydrateRoutine()` (`src/services/deriveClient.ts`) is the downstream client consumer once that Remote mapping is implemented.
 
 ### `scanProduct(input: ScanProductInput)`
 * **Input**: `productName`, `brand`, optional `imageUri`, `userRoutineContext`.

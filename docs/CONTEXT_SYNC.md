@@ -6,14 +6,64 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-18 — Kanuj & Sami: I1-B2 Handoff Contract-Truth Correction
+
+- **Agent / Workstream**: Kanuj & Sami Shared Alignment (Contract Truth & Schema Realignment)
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `de507dda2dd45d46845d7bd22a0f958058f1eb0f`
+- **Prior Verified CI Run**: `35403266620` (on commit `de507dd`)
+- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**: `I1-B2 CONTRACT TRUTH ALIGNED` (Docs-only correction pass aligning B2 intelligence handoff documentation with actual repository implementation truth across TypeScript contracts, PostgreSQL schemas, and Remote service limits: resolved discrepancy 1 by restoring `RoutineProposalInput` to actual TypeScript fields [`primaryGoal`, `secondaryGoals?`, `routineComplexity`, `costPreference?`, `middayFeel?`, `postCleanseTightness?`, `activePrescriptions?`, `isPregnantOrNursing?`], distinguishing it from richer server-side context available in `public.skin_profiles` [`pregnancy_status`, `sensitivities_status`, `known_sensitivities`]; resolved discrepancy 2 by eradicating fictitious `rationales` property from `Routine`, clarifying that step reasoning belongs on `RoutineStep` via `whyChosen`; resolved discrepancy 3 by correcting `public.routine_items` database shape to actual columns [`order_index`, `timing`, `product_name`, `brand`, `category`, `amount`, `area`, `days`, `purpose`, `why_chosen`, `watch_for`], removing non-existent column references; resolved discrepancy 4 by explicitly recording the `RemoteDeriveService.getRoutine()` read-assembly dependency, noting it currently queries only the `routines` table header without assembling `routine_items` into `amSteps`/`pmSteps`; resolved discrepancy 5 by clarifying that `InitialRoutineState` is a shared domain type in `OnboardingResult` rather than a persisted DB column; resolved discrepancy 6 by correcting `public.founder_review_tasks` statuses to actual schema [`pending`, `completed`, `dismissed`], eliminating fictional `awaiting_review` task status; and established explicit three-way distinction between Current Shared Contract, Current Database Contract, and B2 Desired Semantics).
+- **Ownership / Shared Contracts**: Coordinated documentation updates (`docs/INTERFACES.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/CONTEXT_SYNC.md`). Zero code changes across `app/**`, `src/**`, `supabase/**`, `admin/**`, or `scripts/**`. Pricing (`ARCHITECTURE_CHALLENGE-01`) preserved as unresolved. `eas.json` Remote flag preserved as `false`.
+- **Durable Deliverables**:
+  1. **RoutineProposalInput Contract Truth**:
+     - Current TypeScript contract (`src/domain/types.ts`): `profile` includes `primaryGoal`, `secondaryGoals?`, `routineComplexity`, `costPreference?`, `middayFeel?`, `postCleanseTightness?`, `activePrescriptions?`, `isPregnantOrNursing?`.
+     - It does NOT include `pregnancyStatus` or `sensitivitiesStatus`.
+     - Richer safety context (`pregnancy_status`, `sensitivities_status`, `known_sensitivities`) is available server-side in `public.skin_profiles` and `onboarding_submissions.payload_snapshot` JSONB.
+     - Any future addition of these fields to `RoutineProposalInput` is explicitly documented as a future coordinated shared-contract change.
+  2. **Routine Output Contract Truth**:
+     - Canonical `Routine` (`src/types/schema.ts`) has NO `rationales` property.
+     - Personalized reasoning lives strictly on individual `RoutineStep` items via `whyChosen`, `purpose`, `watchFor?`, and `scheduleText?`.
+  3. **`public.routine_items` Database Shape Truth**:
+     - Actual PostgreSQL schema (`supabase/migrations/20260915_init.sql`): `id`, `routine_id`, `order_index`, `timing` (`'am'` | `'pm'`), `product_name`, `brand`, `category`, `amount`, `area`, `days` (`TEXT[]`), `purpose`, `why_chosen`, `watch_for`, `created_at`.
+     - Eliminated non-existent columns (`step_name`, `step_order`, `frequency`, `step_type`, `product_id`). Any relational schema changes belong to Sami's B2 additive migrations.
+  4. **Remote Routine Read Assembly Dependency**:
+     - `RemoteDeriveService.getRoutine(userId)` currently reads only the `routines` table header and does not assemble `routine_items` into `amSteps` and `pmSteps`.
+     - B2 server scope explicitly includes implementing this read assembly mapper.
+     - Kanuj's `hydrateRoutine()` in `deriveClient.ts` is the downstream client consumer once Remote assembly is implemented.
+  5. **`InitialRoutineState` Durability Clarification**:
+     - `InitialRoutineState` (`'pending_generation'` | `'awaiting_review'`) is returned in `OnboardingResult` and is not a persisted DB column.
+     - Prior to proposal, no routine exists in `public.routines` $\to$ client conceptual state is `pending_generation`.
+     - After proposal persistence, routine exists with `status = 'awaiting_review'` $\to$ client derives `awaiting_review` (`isPlanUnderReview: true`).
+  6. **`public.founder_review_tasks` Status Truth**:
+     - Supported PostgreSQL check constraint statuses: `'pending'`, `'completed'`, `'dismissed'`.
+     - There is NO `'awaiting_review'` or `'in_review'` task status in PostgreSQL today.
+     - Initial routine review task is created and maintained in `'pending'` status; any routine linking via foreign key requires a Sami-owned additive migration.
+  7. **Three-Way Distinction Codified**:
+     - A. Current Shared Contract (TypeScript today)
+     - B. Current Database Contract (PostgreSQL today)
+     - C. B2 Desired Semantics (Sami implementation targets; any contract/schema additions noted as future work)
+  8. **Preserved Boundaries**:
+     - Sami Primary: Server-side context assembly, model invocation, routine persistence, shelf action normalization, routine-item read assembly, founder ops.
+     - Kanuj: Downstream client hydration, quiet draft preview, non-blocking navigation, customer-safe error sanitization.
+     - All B1/B1.1 DO NOT REIMPLEMENT directives remain sealed.
+- **Verification**:
+  - `npm test`: 100/100 passing (100%).
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Clean export.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` strictly preserved.
+
 ## 2026-09-18 — Kanuj & Sami: B1.1 Final Coordination & Sami I1-B2 Intelligence Handoff
 
 - **Agent / Workstream**: Kanuj & Sami Shared Coordination (Platform Intelligence Handoff & Boundary Alignment)
 - **Local Branch**: `main`
 - **Starting Shared HEAD / origin/main**: `9a056bd42748257ff72474c7a8785fe4a613e90d`
 - **Prior Verified CI Run**: `35399275112` (on commit `9a056bd`)
-- **Remote Push Status**: `pending commit / push` (Predecessor-based bookkeeping; zero self-referencing predicted commit loops)
-- **GitHub CI**: `pending`
+- **Remote Push Status**: `pushed` (`de507dda2dd45d46845d7bd22a0f958058f1eb0f`)
+- **GitHub CI**: `35403266620 — SUCCESS` (on commit `de507dd`)
 - **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
 - **Milestone Status**: `B1/B1.1 CLOSED & SEALED · I1-B2 HANDOFF ESTABLISHED` (Formal handoff from closed B1/B1.1 onboarding persistence to Sami's I1-B2 server intelligence stream: established explicit coordination rules and boundary definitions to prevent duplicate work or premature implementation; verified that B1/B1.1 mechanisms are fully landed, passing 100/100 unit tests, 96/96 pgTAP assertions, and clean CI 35399275112; audited existing routine intelligence prototypes and categorized server vs. client responsibilities; documented the DO NOT REIMPLEMENT canonical mechanisms; framed the I1-B2 input and output contracts; defined the normalization dependencies for product reactions, formula snapshots, and ingredient signals; and reaffirmed ARCHITECTURE_CHALLENGE-01 as unresolved so B2 does not encode commercial pricing).
 - **Ownership / Shared Contracts**: Coordinated documentation updates (`docs/ROADMAP.md`, `docs/CONTEXT_SYNC.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`). Zero code changes across `app/**`, `src/**`, `supabase/**`, `admin/**`, or `scripts/**`. Pricing (`ARCHITECTURE_CHALLENGE-01`) preserved as unresolved. `eas.json` Remote flag preserved as `false`.
