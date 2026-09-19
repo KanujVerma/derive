@@ -22,6 +22,10 @@ import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import { SegmentedControl } from '@/src/components/ui/SegmentedControl';
 import { InsightBasisLabels } from '@/src/types/schema';
 import { hydrateProgress } from '@/src/services/deriveClient';
+import {
+  formatCheckInContextLine,
+  memberReportedContextText,
+} from '@/src/domain/checkIn';
 
 type AngleKey = 'front' | 'left' | 'right';
 
@@ -77,6 +81,8 @@ export default function ProgressScreen() {
       title: string;
       description: string;
       badge: string;
+      contextLine?: string;
+      contextNote?: string;
     }> = [];
 
     // Map check-ins in reverse chronological order
@@ -88,11 +94,12 @@ export default function ProgressScreen() {
         title: `Weekly Check-in #${checkInNum}`,
         description:
           checkIn.aiAnalysisSentence ||
-          checkIn.notes ||
           (checkIn.irritation === 'none'
             ? 'Skin tolerance confirmed with no flaking or stinging reported.'
             : 'Sensitivity noted during check-in.'),
         badge: checkIn.adjustmentProposed ? 'Adjustment' : 'Stable',
+        contextLine: formatCheckInContextLine(checkIn.contextTags ?? []),
+        contextNote: memberReportedContextText(checkIn),
       });
     });
 
@@ -307,6 +314,14 @@ export default function ProgressScreen() {
                     </View>
                     <Text style={styles.eventTitle}>{event.title}</Text>
                     <Text style={styles.eventDesc}>{event.description}</Text>
+                    {event.contextLine ? (
+                      <Text style={styles.eventContextLine}>{event.contextLine}</Text>
+                    ) : null}
+                    {event.contextNote ? (
+                      <Text style={styles.eventContextNote}>
+                        Context you logged: {event.contextNote}
+                      </Text>
+                    ) : null}
                   </View>
                 </View>
               ))}
@@ -660,6 +675,18 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: colors.inkMuted,
     lineHeight: 18,
+  },
+  eventContextLine: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    lineHeight: 18,
+    marginTop: spacing.xs,
+  },
+  eventContextNote: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    lineHeight: 18,
+    marginTop: 2,
   },
   photoImage: {
     width: '100%',

@@ -94,3 +94,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/founder-operations/deno.json"
 entrypoint = "./functions/founder-operations/index.ts"
+
+[functions.submit-checkin]
+enabled = true
+verify_jwt = true
+import_map = "./functions/submit-checkin/deno.json"
+entrypoint = "./functions/submit-checkin/index.ts"

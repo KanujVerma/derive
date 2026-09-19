@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -28,7 +28,6 @@ import { Badge } from '@/src/components/ui/Badge';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 import { analytics } from '@/src/services/analytics';
-import { calculateMonthlyPlanPrice, formatCentsToDollars } from '@/src/pricing';
 import { config } from '@/src/constants/config';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import type { OnboardingPayload } from '@/src/domain/types';
@@ -42,11 +41,6 @@ export default function SummaryScreen() {
   const goalName = onboarding.primaryGoal
     ? GoalLabels[onboarding.primaryGoal].label
     : 'Breakouts';
-
-  // Provisional monthly pricing estimate based on detected products + care fee
-  const pricingEstimate = useMemo(() => {
-    return calculateMonthlyPlanPrice(onboarding.detectedProducts);
-  }, [onboarding.detectedProducts]);
 
   const handleBuildPlan = async () => {
     setIsBuilding(true);
@@ -151,16 +145,17 @@ export default function SummaryScreen() {
             <Badge label="FIRST 10 MEMBERS" variant="keep" size="small" />
           </View>
           <Text style={styles.pricingSubtext}>
-            Covers Derive care management plus all standard OTC products in your approved routine.
+            Derive manages your skincare: your personalized plan, weekly check-ins, adjustments, progress tracking, Scan, and Ask.
           </Text>
 
           <View style={styles.pricingDivider} />
 
           <View style={styles.includesBlock}>
-            <Text style={styles.includesHeading}>Includes:</Text>
-            <Text style={styles.includesItem}>• Weekly check-ins, ongoing routine management & adjustments when needed</Text>
-            <Text style={styles.includesItem}>• Standard OTC routine products included</Text>
-            <Text style={styles.includesItem}>• Managed replenishment as you run low</Text>
+            <Text style={styles.includesHeading}>Membership covers:</Text>
+            <Text style={styles.includesItem}>• Personalized routine and ongoing management</Text>
+            <Text style={styles.includesItem}>• Weekly check-ins, Progress, Scan, and Ask</Text>
+            <Text style={styles.includesItem}>• Founder quality review during Founding Beta</Text>
+            <Text style={styles.includesItem}>Routine products are purchased separately.</Text>
           </View>
         </View>
 

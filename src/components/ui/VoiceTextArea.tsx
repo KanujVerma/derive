@@ -22,6 +22,7 @@ interface VoiceTextAreaProps {
   context?: VoiceContext;
   minHeight?: number;
   hint?: string;
+  maxLength?: number;
   style?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
   editable?: boolean;
@@ -37,6 +38,7 @@ export const VoiceTextArea: React.FC<VoiceTextAreaProps> = ({
   context = 'ask',
   minHeight = 100,
   hint,
+  maxLength,
   style,
   inputStyle,
   editable = true,
@@ -85,6 +87,7 @@ export const VoiceTextArea: React.FC<VoiceTextAreaProps> = ({
               placeholder={placeholder}
               placeholderTextColor={colors.inkSubtle}
               multiline
+              maxLength={maxLength}
               editable={editable}
               inputAccessoryViewID={KEYBOARD_DONE_NATIVE_ID}
               onFocus={() => {

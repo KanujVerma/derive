@@ -17,3 +17,12 @@ Internal console for the first Founding Beta cohort. It covers routine review an
 4. Serve this directory on `http://127.0.0.1:4173` (for example, `npx serve admin -l 4173`) and add the deployed production origin to the server secret `ADMIN_ALLOWED_ORIGINS`.
 
 Never put `SUPABASE_SERVICE_ROLE_KEY` in `config.js`, browser storage, an Expo variable, or any static hosting configuration.
+
+## Supported operations
+
+Lightweight administrative tools for operating the first 10 Founding Beta customers ($25/mo Derive-management membership; products purchased separately):
+- **Routine Review Queue**: Review and publish AI-generated routine proposals before customer notification.
+- **Safety Escalation Queue**: Inspect flagged medical/sensitization warnings from Ask conversations.
+- **Managed Refill Operations**: Track replenishment requests, mark as ordered/shipped, and assign tracking numbers.
+- **Product & Formula Verification**: Review user-scanned counter products and audited formula snapshots.
+- **Internal Clinical Notes**: Record observations and customer feedback without customer visibility.

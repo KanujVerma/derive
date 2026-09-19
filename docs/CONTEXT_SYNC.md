@@ -40,7 +40,7 @@ This ledger tracks durable architectural, product, and contract decisions across
   - `npm run typecheck:tests`: PASS.
   - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: PASS.
 - **Decision Status**:
-  - `ADR-27: Guarded Server Intelligence & Transactional Model Outputs`: IMPLEMENTED.
+  - `ADR-29: Guarded Server Intelligence & Transactional Model Outputs`: IMPLEMENTED.
   - `ARCHITECTURE_CHALLENGE-01`: still unresolved; no pricing, tier, Stripe, or membership identity changes in S3.
 - **Next Work**:
   - Cofounder/agent review of the stacked draft PR, followed by S5/I1 client adapter wiring and a reviewed hosted Supabase deployment with server secrets.
@@ -74,11 +74,159 @@ This ledger tracks durable architectural, product, and contract decisions across
   - `npx tsc --noEmit`: PASS.
   - `npm run typecheck:tests`: PASS.
 - **Decision Status**:
-  - `ADR-26: Additive, Append-Only Core Domain Persistence`: IMPLEMENTED.
+  - `ADR-28: Additive, Append-Only Core Domain Persistence`: IMPLEMENTED.
   - `ARCHITECTURE_CHALLENGE-01`: still unresolved; no pricing or membership identity changes in S2.
 - **Next Work**:
   - I1-B2/S3 consumes this substrate for authenticated context assembly, guarded routine generation, shelf-product normalization, and signal inference.
   - Production Remote mode remains disabled until the wider integration slice is complete and reviewed.
+## 2026-09-19 — Kanuj: DERIVE I1-B4B Weekly Check-In Context Model, Real Remote Persistence & Longitudinal Read Path
+
+- **Agent / Workstream**: Kanuj (Customer Experience + Mobile) primary with shared-contract + Sami-owned additive `check_ins` migration and `submit-checkin` Edge Function
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `cac1e0508d911a58ed778883f58514b8bfc134cb`
+- **Prior Verified CI Run**: `35430738099` (SUCCESS on predecessor I1-B4A)
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required`
+- **Milestone Status**: `I1-B4A COMPLETE`. `I1-B4B COMPLETE`. `I1-B4 COMPLETE`. Next: `S4 Founder Review / Edit / Publish`. Shop, Stripe, and provider selection remain deferred.
+- **Ownership / Shared Contracts**: Shared `CheckIn` / `CheckInInput` / `CheckInContextTag`. Sami-owned additive migration and `submit-checkin`. Kanuj-owned check-in/progress UI and voice fallback gating. Remote progress reads use owner-scoped RLS, not a `get-progress` function.
+- **Durable Deliverables**:
+  1. Canonical `CheckInContextTag` enum (10 tags) + `CheckInContextTagLabels`. `CheckIn.contextTags` required array; `contextNote` optional. `CheckInInput` both optional. Obsolete unused `changeReason` removed.
+  2. Additive migration `20260919081450_i1_b4b_checkin_context.sql`: `context_tags text[] not null default '{}'`, `context_note`, nullable `adherence` (`yes`/`mostly`/`not_really`), nullable `primary_goal` (existing `Goal` values). CHECK on allowed tags, no NULL array entries, 4000-char note limits.
+  3. **primaryGoal persistence decision**: persist nullable `primary_goal` because `CheckIn`/`CheckInInput` already treat it as part of the canonical record; this preserves historical goal context if the member's goal changes later. No second goal enum.
+  4. **adherence persistence decision**: persist nullable `adherence` so the existing UI field is not discarded on the first real Remote write path. Legacy rows remain NULL; no backfill default.
+  5. Real `submit-checkin` Edge Function (`verify_jwt = true` + `auth.getUser()`). Authenticated identity is authoritative; spoofed `userId` fails closed. Deterministic server-authored `ai_analysis_sentence` (no LLM). Context tags never drive causal claims.
+  6. `RemoteDeriveService.getProgress()` reads `public.check_ins` via RLS. No `get-progress` Edge Function. `learnedInsights: []` until S3 insight persistence. `recentPhotos: []` until JWT-bound signed photo URLs exist.
+  7. Weekly due derived from latest check-in using a 7-day UTC cadence.
+  8. Check-in UI: always-on optional multi-select chips + one `VoiceTextArea` `checkin_note`. Production cannot inject canned demo transcripts (`ARCHITECTURE_CHALLENGE_NATIVE_DICTATION` recorded).
+- **Explicitly NOT done**: S4 founder review/publish; Shop; Stripe; provider selection; food diary; period tracker; prescription changes; fake learned insights; private photo path leakage.
+- **Verification Gates**:
+  - `npm test`: 158/158 passing.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: clean export.
+  - `npx supabase db reset`: applied 10 migrations including `20260919081450_i1_b4b_checkin_context.sql`.
+  - `npx supabase test db`: 160/160 pgTAP (5 files).
+  - `node scripts/test-i1-b1-local.mjs`: 11/11.
+  - `node scripts/test-i1-b2-local.mjs`: 8/8.
+  - `node scripts/test-i1-b4b-local.mjs`: passed.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+  - S4 / Shop / Stripe not started.
+
+## 2026-09-19 — Kanuj: DERIVE I1-B4A Membership & Separate Product Commerce Model Reconciliation
+
+- **Agent / Workstream**: Kanuj (Customer Experience + Mobile) Primary with shared-contract + Sami-owned additive membership migration
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `c7f0778498f53e2ce34c54d43dc839671f24ed2c`
+- **Prior Verified CI Run**: `35429680035` (SUCCESS on predecessor)
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required`
+- **Milestone Status**: `I1-B4A COMPLETE` (membership $25 display, products separate, `founding_beta` identity, pricing engine removed). `I1-B4B NEXT / NOT IMPLEMENTED`.
+- **Ownership / Shared Contracts**: Shared `CustomerProfile.tier` / `MembershipTier`. Sami-owned additive migration on `public.memberships` with no customer write grant change. Kanuj-owned customer copy. No check-in schema/UI (B4B). No Shop. No Stripe.
+- **Durable Deliverables**:
+  1. `config.betaPriceMonthly = 25` (display/config only; Stripe/S5 owns charged money).
+  2. `MembershipTier = 'founding_beta'` on `CustomerProfile`; `membershipDisplayLabel` projects `Founding Beta` in `userStore`.
+  3. Additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql`: fail-closed preflight on unknown/NULL tiers; backfill `founding_beta_129` → `founding_beta`; default `founding_beta`; NOT NULL; CHECK `tier = 'founding_beta'`. `20260915_init.sql` untouched.
+  4. Removed `src/pricing/**` (plan-pricing, fixtures, types, index) and all-in tests.
+  5. Remote `mapDbCustomerProfile` accepts only `founding_beta`; fails closed on legacy `founding_beta_129` and unknown tiers.
+  6. Mock default + onboard profiles use `founding_beta`.
+  7. Onboarding / Profile / Orders / Refill copy: membership is Derive management; products purchased separately.
+  8. ADR-26 marked implemented; ADR-15 remains SUPERSEDED/HISTORICAL; ADR-21 concierge kept, $100 all-in superseded; ARCHITECTURE_CHALLENGE-01 RESOLVED & IMPLEMENTED.
+  9. Commercial-independence invariant recorded in ADR-26 and `docs/SAFETY_PRIVACY.md`.
+- **Explicitly NOT done**: B4B check-in tags/note; Shop; Stripe checkout/webhooks; sixth tab; coupons/affiliates; provider selection.
+- **Verification Gates**:
+  - `npm test`: 146/146 passing.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: clean export.
+  - `npx supabase db reset`: applied 9 migrations including `20260919075053_i1_b4_membership_identity_reconciliation.sql`.
+  - `npx supabase test db`: 138/138 pgTAP (4 files).
+  - `node scripts/test-i1-b1-local.mjs`: 11/11.
+  - `node scripts/test-i1-b2-local.mjs`: 8/8.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+  - B4B not started. Shop/Stripe not started.
+
+## 2026-09-19 — Kanuj: DERIVE I1-B3.1 Client Hardening + I1-B4 Impact Map (Decision Recorded, Not Implemented)
+
+- **Agent / Workstream**: Kanuj (Customer Experience + Mobile) Primary
+- **Local Branch**: `main`
+- **Starting Shared HEAD / origin/main**: `89d69d68cbf174969942c6b95853ec9236edaaf1`
+- **Prior Verified CI Run**: pending this push
+- **Remote Push Status**: `pending commit / push`
+- **GitHub CI**: `pending`
+- **Drive Status**: `sync-required` (`DRIVE_SYNC_PAYLOAD` emitted in completion report)
+- **Milestone Status**:
+  - `I1-B3.1 COMPLETE` (client lifecycle hardening only; recorded after verification).
+  - `I1-B4 PLANNED / NOT IMPLEMENTED` (membership $25 + separate products + check-in context tags are founder-approved direction; code/schema still $100 / `founding_beta_129` / no context tags).
+- **Ownership / Shared Contracts**: Kanuj-owned client (`src/services/deriveClient.ts`, tests) plus docs. No B4A/B4B schema, type, pricing-engine deletion, check-in UI, Shop, or Stripe changes in this pass. Sami-owned `supabase/**` runtime code unchanged.
+- **I1-B3.1 Durable Deliverables**:
+  1. Cold Remote restart: authenticated + bootstrap `READY` + `onboardingCompleted === true` + failed plan read preserves `routine = null`, `isRoutineBeingPrepared = true`, `isPlanUnderReview = false`, `planHydrationStatus = 'error'`, customer-safe `planHydrationError`.
+  2. `ensureInitialRoutineProposal` does not call `proposeRoutine()` when hydration status is `error`. Retry with `planHydrationStatus === 'error'` re-runs hydration even if `isRoutineBeingPrepared` is already true.
+  3. In-flight hydration/proposal maps use per-request ownership tokens; `hydratePlanState` is a non-async function that returns the stored Promise so same-user joins keep identity.
+  4. `hydrateRoutine()` is a compatibility wrapper over `hydratePlanState()` and hydrates Routine + `UserProduct[]` atomically.
+  5. `tests/derive.test.ts` Section 36 covers genuine races (held first+second requests; third join must not increment call/proposal count).
+- **I1-B4 Approved Direction (do not treat as shipped)**:
+  - Founding Beta membership **$25/month** for Derive managing skincare. Products purchased separately. No routine-derived all-in membership price. Identity `founding_beta_129` → `founding_beta` (additive). ADR-15 SUPERSEDED; ADR-21 pricing portion SUPERSEDED; ADR-26 recorded as approved/not implemented.
+  - Check-in: optional multi-select context tags + one optional context note, persisted additively; tags are context not causation; `cycle` is not a period tracker.
+- **Explicitly NOT done in this pass**: `config.betaPriceMonthly` still 100; pricing engine still present; no membership or check-in migrations; no Shop; no Stripe; no sixth tab.
+
+### I1-B4 Impact Map (design only)
+
+| Path | Current behavior | Target behavior | Action | Owner | Shared contract? | Migration? | Tests affected | Pass |
+|---|---|---|---|---|---|---|---|---|
+| `src/constants/config.ts` | `betaPriceMonthly: 100` | `25` display constant; Stripe still S5 | MODIFY | Kanuj | no | no | `tests/derive.test.ts` asserts 100 | B4A |
+| `src/domain/types.ts` `CustomerProfile.tier` | `'founding_beta_129'` literal | `'founding_beta'` (+ legacy alias during migrate) | MODIFY | Shared | yes | yes | Mock/Remote/profile tests | B4A |
+| `src/types/schema.ts` | no membership enum; CheckIn has unused `changeReason?` | Add `CheckInContextTag`; optional context fields; drop unused `changeReason` or leave unused | MODIFY | Shared | yes | no (TS) | schema/check-in tests | B4A+B4B |
+| `src/contracts/DeriveService.ts` | `submitCheckIn(CheckInInput)` unchanged | Input/result include context tags/note | MODIFY | Shared | yes | no | contract tests | B4B |
+| `src/pricing/plan-pricing.ts` | $39+$5+product consumption all-in engine | Delete; no independent remaining use | REMOVE | Kanuj | no | no | pricing tests in `tests/derive.test.ts` | B4A |
+| `src/pricing/product-pricing-fixtures.ts` | Arthur retail/lifespan fixtures for membership math | Delete with engine | REMOVE | Kanuj | no | no | same | B4A |
+| `src/pricing/types.ts` | all-in estimate types | Delete | REMOVE | Kanuj | no | no | same | B4A |
+| `src/pricing/index.ts` | barrel export | Delete directory | REMOVE | Kanuj | no | no | same | B4A |
+| `app/profile/index.tsx` | shows `$100/mo`; unused `calculateMonthlyPlanPrice`; Arthur `$96/mo` demo copy | `$25/mo`; products-separate copy; remove pricing import; rewrite Arthur copy | MODIFY | Kanuj | no | no | none dedicated | B4A |
+| `app/(onboarding)/10-summary.tsx` | `$100` + "OTC products included"; unused pricing import | `$25` + management-only includes | MODIFY | Kanuj | no | no | none dedicated | B4A |
+| `app/orders/index.tsx` | "Included with your $100/month" | Membership does not include products; refill is separate commerce | MODIFY | Kanuj | no | no | none dedicated | B4A |
+| `app/refill/index.tsx` | no membership price copy | Keep need-based refill; no all-in wording | DEFER | Kanuj | no | no | none | B4A |
+| `app/(tabs)/plan.tsx` | KEEP/PAUSE/REPLACE/ADD; no membership price | Commerce entry via Products; no Shop tab | DEFER | Kanuj | no | no | none | DEFERRED |
+| `src/services/mock/MockDeriveService.ts` | seeds `tier: 'founding_beta_129'` | `founding_beta`; check-in persist tags/note | MODIFY | Kanuj | yes | no | derive tests | B4A+B4B |
+| `src/services/remote/RemoteDeriveService.ts` | profile map requires `founding_beta_129` else null; `submitCheckIn` invokes missing `submit-checkin` fn | Accept `founding_beta` (+ legacy during migrate); map new check-in columns/fn body | MODIFY | Shared (Kanuj adapter / Sami fn) | yes | yes | derive + pgTAP | B4A+B4B |
+| `src/services/deriveClient.ts` | `submitWeeklyCheckIn` forwards current input; B3.1 hydration sealed | Pass context tags/note; no pricing change | MODIFY | Kanuj | yes | no | Section 36 stay; new check-in tests | B4B |
+| `src/stores/**` | no membership price store; check-ins in routineStore | Hydrate new CheckIn fields | MODIFY | Kanuj | no | no | progress tests | B4B |
+| `supabase/migrations/20260915_init.sql` | `tier` default `founding_beta_129`; check_ins has notes only | Never rewrite init; additive later migration | HISTORICAL-PRESERVE | Sami | yes | no | pgTAP historical | HISTORICAL |
+| New membership migration (not created) | n/a | `UPDATE` 129→`founding_beta`; default `founding_beta`; preserve IDs/status/Stripe/timestamps | MIGRATE | Sami | yes | yes | pgTAP membership | B4A |
+| New check_ins migration (not created) | n/a | `context_tags text[] not null default '{}'`; `context_note text`; keep `notes` | MIGRATE | Sami | yes | yes | pgTAP check_ins | B4B |
+| `supabase/migrations/202609160001_s1_auth_rls_private_storage.sql` | insert grant `(user_id, skin_state, irritation, notes)` | Additive grant for `context_tags`, `context_note` | MODIFY | Sami | no | yes | `s1_access_control.test.sql` | B4B |
+| `supabase/tests/**` | 126 pgTAP; memberships/check_ins grants | New assertions for default/backfill/grants | MODIFY | Sami | no | yes | pgTAP totals | B4A+B4B |
+| `app/check-in/index.tsx` | conditional single-select CHANGE_REASONS; not submitted; TextInput notes | Multi-select chips every check-in; VoiceTextArea context note; remove CHANGE_REASONS | MODIFY | Kanuj | yes | no | new UI/contract tests | B4B |
+| `src/components/ui/VoiceTextArea.tsx` | used by Ask composer | Reuse for optional check-in context note | MODIFY | Kanuj | no | no | reuse existing primitive | B4B |
+| `app/(tabs)/progress.tsx` | timeline uses `notes` / `aiAnalysisSentence` | Show tags + context note cautiously; no causation copy | MODIFY | Kanuj | no | no | progress tests | B4B |
+| `admin/README.md` | `$129/mo` | Historical or update to $25 management | DOC-ONLY | Sami | no | no | none | B4A |
+| `AGENTS.md` | documents implemented vs approved | Keep distinguishing until B4A ships | DOC-ONLY | Shared | no | no | none | B4A |
+| `docs/CONTEXT_SYNC.md` | this entry | Update to IMPLEMENTED after B4A/B4B | DOC-ONLY | Shared | no | no | none | B4A+B4B |
+| `docs/ROADMAP.md` | I1-B4 PLANNED; S4/S5 rescope | Mark B4A/B4B complete only after those passes | DOC-ONLY | Shared | no | no | none | B4A+B4B |
+| `docs/PRODUCT.md` / `PROJECT_CONTEXT.md` / `ARCHITECTURE.md` / `README.md` | $25 recorded as approved-not-implemented | Flip to implemented after B4A | DOC-ONLY | Shared | no | no | none | B4A |
+| `docs/DECISIONS.md` ADR-15 | SUPERSEDED / HISTORICAL | Keep historical body | HISTORICAL-PRESERVE | Shared | no | no | none | HISTORICAL |
+| `docs/DECISIONS.md` ADR-21 | concierge kept; $100 pricing superseded | Keep operational clauses | HISTORICAL-PRESERVE | Shared | no | no | none | HISTORICAL |
+| `docs/DECISIONS.md` ADR-26 | approved / not implemented | Mark implemented after B4A | DOC-ONLY | Shared | no | no | none | B4A |
+| `docs/RESEARCH.md` | hypotheses updated to $25 / commerce split | Keep N=31 caveats | DOC-ONLY | Shared | no | no | none | B4A |
+| `docs/INTERFACES.md` | planned B4 contract note | Implement contract text when types change | DOC-ONLY now | Shared | yes | no | none | B4A+B4B |
+| Full Shop / 6th tab | five tabs | Still five tabs | DEFER | Kanuj | no | no | n/a | DEFERRED |
+| Stripe checkout / webhooks | planned S5; `webCheckoutUrl` placeholder | $25 membership then product commerce v0 | DEFER | Sami | no | maybe S5 | n/a | DEFERRED |
+| Coupons / affiliates / ranking bias | none | Forbidden as silent rank/verdict input | DEFER | Shared | yes (invariant) | no | future invariant tests | DEFERRED |
+| Provider/model selection | OPEN / DEFERRED | Still not next required milestone | DEFER | Sami | no | no | n/a | DEFERRED |
+
+- **Verification Gates**:
+  - `npm test`: 143/143 passing.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run typecheck:tests`: 0 errors.
+  - `EXPO_NO_TELEMETRY=1 npx expo export -p web`: clean export.
+  - `npx supabase db reset`: applied existing 8 migrations; no new B4 migrations.
+  - `npx supabase test db`: 126/126 pgTAP.
+  - `node scripts/test-i1-b1-local.mjs`: 11/11.
+  - `node scripts/test-i1-b2-local.mjs`: 8/8.
+  - `eas.json`: `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"` preserved.
+  - `config.betaPriceMonthly` remains `100`. No membership/check-in schema or pricing-engine deletion.
+
 ## 2026-09-19 — Kanuj: DERIVE I1-B3 Provider-Independent Initial Routine Mobile Integration
 
 - **Agent / Workstream**: Kanuj (Customer Experience + Mobile) Primary with Sami Server Boundary Coordination
