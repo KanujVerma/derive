@@ -7,15 +7,14 @@ This opening section is the current execution plan. Earlier delivery records bel
 ## Current milestone sequence
 
 ```text
-Kanuj  V1A ────────────────────────┐
-                                   ▼
-Sami   H1 ─────► F1 ─────────────► L1 (Kanuj) ─────► L2 (Kanuj) ─────► customer #1
-                                                                        │
-                                                                        ▼
-Sami                                            S6 after manual customer flow is proven
+Kanuj  V1A ──► L0 ──► H1A (temporary platform assignment)
+                         │
+                         ├──► L1 customer acceptance (Kanuj, consumes L0 build)
+                         └──► F1 founder fallback (Sami) ──► full L1/L2 launch gates
+Sami   H1E email + H1B billing remain separate provider activation work
 ```
 
-V1A and H1 occupy separate lanes and may run in parallel. F1 needs H1's backend baseline. L1 needs both H1 and F1 ready. L2 needs L1 plus Sami's declared production readiness. S6 does not block customer #1 when manual recovery works. Waiting never transfers a milestone to the other founder.
+L0 lands before H1A begins. H1A is a one-time reassignment to Kanuj for this run; normal platform ownership returns to Sami afterward. H1A proves hosted post-auth core only, without claiming email or Stripe activation. F1 needs H1A's backend baseline. Device acceptance consumes the already-defined L0 build; real-money launch additionally needs H1E, H1B, F1 and production readiness. S6 does not block customer #1 when manual recovery works.
 
 ### V1A: First-Customer Intake Integrity
 
@@ -23,19 +22,34 @@ V1A and H1 occupy separate lanes and may run in parallel. F1 needs H1's backend 
 - **Owned surfaces:** customer mobile onboarding/Shelf, client recovery/support presentation, acceptance documentation, repository roadmap and ownership docs.
 - **Explicit non-scope:** H1, backend, founder operations, F1, S6, hosted configuration, physical commerce.
 - **Outcome / acceptance:** customer-entered brand, exact product name, and category can be added, edited, viewed, removed, and retained through an empty or failed recognition/retake; no canned product or invented actives/formula/catalog provenance; truthful Shelf and support copy; current first-customer acceptance script.
-- **Handoff to:** H1/F1 supply hosted and founder-operation baselines; Kanuj takes L1 when both are ready.
+- **Handoff to:** L0 prepares an explicit Remote staging customer build; hosted and founder-operation baselines follow separately.
 
-### H1: Hosted Remote Activation
+### L0: Remote Customer Build Readiness
 
-- **Owner:** Sami. **Status:** separate draft PR #21 at the last repository checkpoint; verify its current PR state before continuing. **Prerequisites:** current `main` reconciliation before landing.
-- **Owned surfaces:** `supabase/**`, Remote service, hosted Auth/Stripe/Gemini configuration, founder platform smoke.
-- **Explicit non-scope:** V1A mobile changes, customer UX redesign, L1 device acceptance.
-- **Outcome / acceptance:** hosted six-digit OTP; Stripe test Checkout, signed webhook and Portal/downgrade lifecycle; real Gemini call; founder account; Remote onboarding/photo lifecycle; founder review/publish; member surfaces; cross-user/security smoke.
-- **Handoff to:** F1 with tested backend baseline and L1 with a stable Remote interface. Kanuj does not implement H1.
+- **Owner:** Kanuj. **Status:** COMPLETE. **Prerequisites:** V1A landed.
+- **Owned surfaces:** `eas.json`, public mobile environment validation, staging-only build diagnostics, Remote client route/state tests, and build documentation.
+- **Explicit non-scope:** hosted Supabase mutation, Auth/email activation, Stripe, Gemini, founder operations, production Remote enablement, L1 device acceptance.
+- **Outcome / acceptance:** `remote-staging` is a store-signed, TestFlight-capable profile selecting the EAS `preview` environment and compiling Remote mode. Development and production profiles remain Mock. Invalid flavor, missing hosted URL/publishable key, local URL, or inconsistent Remote mode fail closed. The staging bundle displays its flavor, service mode, safe backend host and app version without any key. EAS preview public URL/key are currently absent and must be supplied only after H1A verifies the hosted project; this is an environment handoff, not a completed staging build.
+- **Handoff to:** H1A verifies the hosted project and configures its public EAS preview client values; L1 later builds and installs from this profile without new build architecture.
+
+### H1A: Hosted Remote Core
+
+- **Owner:** Kanuj for this single milestone by founder authorization. **Status:** NEXT after L0 lands. **Prerequisites:** current `main` reconciliation and verified hosted project identity.
+- **Owned surfaces:** hosted Supabase readback, guarded post-auth staging fixture/entitlement, Remote onboarding/photo/routine/member lifecycle, real Gemini attempt, founder review, security smoke, and still-valid evidence from old draft PR #21.
+- **Explicit non-scope:** real email delivery and six-digit OTP proof (H1E), Stripe Checkout/webhook proof (H1B), F1 founder-from-scratch routine creation, production Remote enablement, customer mobile redesign.
+- **Outcome / acceptance:** demonstrate the hosted authenticated and entitled customer core with disposable staging identities. Record each pass, warning or blocker without calling a synthetic entitlement billing proof. Preserve valid #21 evidence on a fresh branch and only then supersede old PR #21.
+- **Handoff to:** Sami resumes platform ownership for F1, H1E and H1B; Kanuj consumes the stable core in later device acceptance.
+
+### H1E and H1B: External Activation
+
+- **Owner:** Sami. **Status:** PLANNED after H1A as separate provider work. **Prerequisites:** verified H1A core and respective sender/account readiness.
+- **Owned surfaces:** H1E owns sender/domain, SMTP, hosted six-digit OTP template and real inbox delivery. H1B owns the Derive Stripe account, test Price, Checkout, signed webhook, canonical entitlement and Portal lifecycle.
+- **Explicit non-scope:** H1A synthetic entitlement as billing evidence or Kanuj mobile build work.
+- **Handoff to:** later device and real-money launch acceptance after each provider lifecycle is proven.
 
 ### F1: Founder Manual Routine Fallback
 
-- **Owner:** Sami. **Status:** PLANNED, blocked on H1 being landed or sufficiently reconciled and green.
+- **Owner:** Sami. **Status:** PLANNED, blocked on H1A's hosted core baseline.
 - **Owned surfaces:** `admin/**`, founder operations, backend routine validation and publication.
 - **Explicit non-scope:** customer mobile UX and L1 device acceptance.
 - **Outcome / acceptance:** when automation has no usable proposal, an authorized founder can construct, validate, and publish a complete routine inside Derive through the same safety/publication pipeline. Current founder publication begins from an `awaiting_review` proposal with known product references; F1 must resolve that limitation without bypassing validation.
@@ -43,10 +57,10 @@ V1A and H1 occupy separate lanes and may run in parallel. F1 needs H1's backend 
 
 ### L1: First-Customer Remote Acceptance
 
-- **Owner:** Kanuj. **Status:** PLANNED, waiting on H1 and F1 readiness.
-- **Owned surfaces:** Remote-enabled staging/TestFlight customer build, physical-device journey, customer UX/state/recovery fixes, acceptance checklist.
+- **Owner:** Kanuj. **Status:** PLANNED, staged acceptance begins after H1A; full manual-fallback acceptance also needs F1.
+- **Owned surfaces:** consume the L0 Remote staging/TestFlight build, physical-device journey, customer UX/state/recovery fixes, acceptance checklist.
 - **Explicit non-scope:** backend, Stripe, Gemini, RLS/storage, Remote service, and founder-operation implementation.
-- **Outcome / acceptance:** real customer-facing Remote path works on device; each failure has a truthful recovery or an explicit blocker. Record backend defects with evidence as Sami tickets and stop at the ownership boundary.
+- **Outcome / acceptance:** real customer-facing Remote core works on device using the L0 build; each failure has a truthful recovery or an explicit blocker. Email/Stripe and founder fallback are separate gates. Record backend defects with evidence as Sami tickets and stop at the ownership boundary.
 - **Handoff to:** L2 after customer acceptance passes and Sami receives any platform blockers.
 
 ### L2: Customer #1 Launch Gate
@@ -82,8 +96,8 @@ When reopened, split each implementation:
 
 ## Next action by founder
 
-- **Kanuj:** prepare the L1 customer-device acceptance plan and wait for H1 and F1 readiness before executing it; stay within customer/mobile ownership.
-- **Sami:** continue H1 on its separate branch, reconcile with current `main`, then own F1. Do not take V1A/L1/L2 mobile implementation.
+- **Kanuj:** after L0 lands, start H1A on a fresh branch from latest `main` under this one-time founder assignment; do not continue stale PR #21 directly.
+- **Sami:** platform implementation returns after H1A for F1 and the separately gated H1E email and H1B billing work. Do not take L1/L2 mobile implementation.
 
 Future tickets use: **Milestone, Owner, Status, Prerequisites, Owned surfaces, Explicit non-scope, Outcome, Acceptance criteria, Handoff to.**
 

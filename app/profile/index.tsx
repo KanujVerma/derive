@@ -17,6 +17,7 @@ import { useUserStore } from '@/src/stores/userStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { Icon } from '@/src/components/ui/Icon';
+import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
 import { Badge } from '@/src/components/ui/Badge';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { config } from '@/src/constants/config';
@@ -327,6 +328,7 @@ export default function ProfileScreen() {
         )}
 
         {/* Footer Note */}
+        <BuildDiagnostics />
         <Text style={styles.footerText}>
           Derive Version 1.0 · "Your skincare, handled."
         </Text>

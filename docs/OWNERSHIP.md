@@ -14,6 +14,8 @@ Owns `supabase/**`, `supabase/functions/**`, `admin/**`, `src/services/remote/**
 
 `src/contracts/**`, `src/domain/**`, `src/types/schema.ts`, package manifests, CI, and durable architecture docs are integration boundaries. The milestone that needs a change owns it, keeps it minimal, preserves the other lane's expectations, documents the interface, and hands it off before dependent work starts. Avoid parallel conflicting edits. A deliberate milestone reassignment must be recorded in the roadmap.
 
+The L0/H1A founder authorization makes H1A a single temporary exception: Kanuj owns the hosted post-auth core implementation on a fresh H1A branch after L0 lands. This does not transfer H1E email, H1B Stripe, F1 founder operations, or ongoing platform ownership; those remain Sami work. H1A must hand tested interfaces and evidence back to Sami before the next platform milestone.
+
 ## Cross-lane defects
 
 When work exposes a defect in the other founder's lane, record the exact reproduction/evidence, affected interface, owning founder, and whether it blocks the current milestone in the PR or `docs/CONTEXT_SYNC.md`. Continue around it if safe; otherwise stop at that boundary. Kanuj routes backend/platform defects to Sami. Sami routes mobile/customer defects to Kanuj. Neither silently fixes or redesigns the other's implementation.

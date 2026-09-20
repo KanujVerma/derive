@@ -68,7 +68,7 @@ import {
   evaluateFrameCriteria,
   type FrameQualityMetrics,
 } from '../src/components/camera/AutoCaptureStateMachine.ts';
-import { resolvePublicEnvironment } from '../src/config/environment.ts';
+import { resolvePublicEnvironment, getBuildDiagnostics } from '../src/config/environment.ts';
 import {
   createProvenancedValue,
   setOrConfirmPhenotypeValue,
@@ -1110,6 +1110,7 @@ test('Environment contract: Prefers publishable keys and preserves a legacy anon
   });
 
   assert.deepEqual(current, {
+    buildFlavor: 'development',
     supabaseUrl: 'https://project.supabase.co',
     supabasePublishableKey: 'sb_publishable_current',
     supabaseKeySource: 'publishable',
@@ -1154,12 +1155,72 @@ test('Environment contract: Remote mode fails closed on missing or malformed con
   );
 });
 
+test('L0 build flavor: remote staging requires a hosted Remote client with a publishable key', () => {
+  const hosted = {
+    buildFlavor: 'remote-staging',
+    useRemoteService: 'true',
+    supabaseUrl: 'https://staging-project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_staging',
+  };
+  const resolved = resolvePublicEnvironment(hosted);
+  assert.equal(resolved.buildFlavor, 'remote-staging');
+  assert.equal(resolved.useRemoteService, true);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, useRemoteService: 'false' }), /remote-staging.*Remote/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: '' }), /EXPO_PUBLIC_SUPABASE_URL/);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabasePublishableKey: '' }), /EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'http://127.0.0.1:54321' }), /hosted HTTPS/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://unrelated.example.com' }), /Supabase host/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://project.supabase.co.evil.test' }), /Supabase host/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://staging-project.supabase.co/auth/v1' }), /base URL/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://staging-project.supabase.co/?redirect=other' }), /base URL/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabasePublishableKey: '', legacySupabaseAnonKey: 'legacy-anon-key' }), /publishable key/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, buildFlavor: 'unknown' }), /build flavor/i);
+  assert.equal(resolvePublicEnvironment({ ...hosted, buildFlavor: 'production' }).buildFlavor, 'production');
+});
+
+test('L0 EAS profiles: store-signed Remote staging selects preview environment without changing production', () => {
+  const eas = JSON.parse(readFileSync(join(REPO_ROOT, 'eas.json'), 'utf8'));
+  assert.equal(eas.build['remote-staging'].environment, 'preview');
+  assert.equal(eas.build['remote-staging'].distribution, 'store');
+  assert.equal(eas.build['remote-staging'].autoIncrement, true);
+  assert.equal(eas.build['remote-staging'].env.EXPO_PUBLIC_USE_REMOTE_SERVICE, 'true');
+  assert.equal(eas.build['remote-staging'].env.EXPO_PUBLIC_BUILD_FLAVOR, 'remote-staging');
+  assert.equal(eas.build.development.environment, 'development');
+  assert.equal(eas.build.development.env.EXPO_PUBLIC_USE_REMOTE_SERVICE, 'false');
+  assert.equal(eas.build.development.env.EXPO_PUBLIC_BUILD_FLAVOR, 'development');
+  assert.equal(eas.build.production.environment, 'production');
+  assert.equal(eas.build.production.env.EXPO_PUBLIC_USE_REMOTE_SERVICE, 'false');
+  assert.equal(eas.build.production.env.EXPO_PUBLIC_BUILD_FLAVOR, 'production');
+  assert.ok(!JSON.stringify(eas).includes('EXPO_PUBLIC_SUPABASE_URL'));
+  assert.ok(!JSON.stringify(eas).includes('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'));
+});
+
+test('L0 diagnostics: only Remote staging reveals safe build identity, never a key', () => {
+  const staging = resolvePublicEnvironment({
+    buildFlavor: 'remote-staging',
+    useRemoteService: 'true',
+    supabaseUrl: 'https://staging-project.supabase.co',
+    supabasePublishableKey: 'sb_publishable_do_not_render',
+  });
+  const details = getBuildDiagnostics(staging);
+  assert.deepEqual(details, {
+    buildFlavor: 'Remote Staging',
+    serviceMode: 'Remote',
+    backendHost: 'staging-project.supabase.co',
+    backendConfiguration: 'Valid',
+  });
+  assert.equal(JSON.stringify(details).includes('sb_publishable'), false);
+  assert.equal(getBuildDiagnostics(resolvePublicEnvironment({})), null);
+  assert.equal(getBuildDiagnostics(resolvePublicEnvironment({ buildFlavor: 'production' })), null);
+});
+
 test('Environment template: Lists only approved names and contains zero credential values', () => {
   const template = readFileSync(join(REPO_ROOT, '.env.example'), 'utf8');
   const assignments = [...template.matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)];
   const names = assignments.map((match) => match[1]).sort();
 
   assert.deepEqual(names, [
+    'EXPO_PUBLIC_BUILD_FLAVOR',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'EXPO_PUBLIC_SUPABASE_URL',
@@ -1167,6 +1228,7 @@ test('Environment template: Lists only approved names and contains zero credenti
   ]);
 
   const approvedPublicNames = new Set([
+    'EXPO_PUBLIC_BUILD_FLAVOR',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'EXPO_PUBLIC_SUPABASE_URL',
@@ -1187,6 +1249,7 @@ test('Environment template: Lists only approved names and contains zero credenti
 
 test('Environment guard: Mobile source references only approved public variables', () => {
   const approved = new Set([
+    'EXPO_PUBLIC_BUILD_FLAVOR',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_ANON_KEY', // Temporary compatibility fallback only.
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
