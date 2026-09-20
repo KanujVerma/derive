@@ -25,7 +25,7 @@ import {
 } from '@/src/services/catalog';
 import { evaluateProduct } from '@/src/services/deriveClient';
 import { ProductScanResult, ProductScanVerdict } from '@/src/types/schema';
-import { resolveScanVerdictLabel } from '@/src/commerce/scanPresentation';
+import { resolveScanResultPresentation, resolveScanVerdictLabel } from '@/src/commerce/scanPresentation';
 import { normalizeBarcode } from '@/src/utils/barcode';
 import { useScanContextStore } from '@/src/stores/scanContextStore';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
@@ -243,6 +243,9 @@ export default function ScanScreen() {
     }
   };
 
+  const resultPresentation = resolveScanResultPresentation(scanResult);
+  const invalidResult = Boolean(scanResult && confirmedProduct && resultPresentation.kind === 'invalid');
+
   if (audience !== 'member') {
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
@@ -255,10 +258,38 @@ export default function ScanScreen() {
     );
   }
 
+  if (invalidResult || (evaluationError && !scanResult)) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.screenTitle}>Scan Result</Text>
+        </View>
+        <View style={styles.permissionContainer}>
+          <View style={styles.permissionCard}>
+            <View style={styles.permissionIconCircle}>
+              <Icon name="info" size={30} color={colors.brand} />
+            </View>
+            <Text style={styles.permissionTitle}>We couldn't verify this product result</Text>
+            <Text style={styles.permissionSubtitle}>
+              {evaluationError || 'Please scan it again.'}
+            </Text>
+            <Button
+              label="Scan Again"
+              variant="brand"
+              size="large"
+              onPress={handleResetScan}
+              style={{ width: '100%', marginTop: spacing.lg }}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   // 1. RESULT VIEW: Split FORMULA QUALITY vs FIT FOR YOU RIGHT NOW
-  if (scanResult && confirmedProduct) {
+  if (scanResult && confirmedProduct && resultPresentation.kind === 'ready') {
     const verdictTone = getVerdictTone(scanResult.verdict);
-    const verdictLabel = resolveScanVerdictLabel(scanResult.verdict)!;
+    const verdictLabel = resultPresentation.label;
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
@@ -647,36 +678,6 @@ export default function ScanScreen() {
         </View>
       )}
 
-      {/* Evaluation Error Modal Sheet */}
-      {evaluationError && !scanResult && (
-        <View
-          style={[
-            styles.unknownOverlay,
-            { paddingBottom: 88 + insets.bottom },
-          ]}
-        >
-          <View style={styles.unknownCard}>
-            <View style={styles.unknownIconCircle}>
-              <Icon name="warning" size={24} color={colors.actionStop.text} />
-            </View>
-            <Text style={styles.unknownTitle}>Evaluation Failed</Text>
-            <Text style={styles.unknownText}>
-              {evaluationError}
-            </Text>
-            <View style={styles.unknownButtons}>
-              <Button
-                label="Try Again"
-                variant="brand"
-                size="medium"
-                onPress={() => {
-                  setEvaluationError(null);
-                  handleResetScan();
-                }}
-              />
-            </View>
-          </View>
-        </View>
-      )}
     </View>
   );
 }

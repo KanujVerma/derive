@@ -350,8 +350,8 @@ export default function ShopScreen() {
   // =============================================
   // RENDER: NON-MEMBER / GUEST FALLBACK
   //
-  // Signed-in inactive members may reach tabs after profile bootstrap.
-  // Guest routing remains blocked by the existing auth boundary.
+  // E1 routes inactive Remote accounts to /membership before this tab mounts.
+  // This fallback is dormant presentation groundwork for future C1.5 routing.
   //
   // No fake personalized products. No fake plan context.
   // =============================================

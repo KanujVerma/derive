@@ -615,7 +615,7 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Recommendation and safety decisions remain independent of commercial inputs.
   - [x] C1 adds no backend migration or physical-commerce shared contract.
 
-### C1.1: Shop and Scan Experience Hardening [SHOP-ONLY DRAFT]
+### C1.1: Shop and Scan Experience Hardening [IMPLEMENTED]
 * **Scope**: Make Scan a visible one-tap utility from the active-member Today
   and Shop headers while keeping one `/shop/scan` implementation and five root
   tabs. Clarify Shop state and product-detail presentation without physical
@@ -629,8 +629,10 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Shop distinguishes loading, error, preparation, review, needs,
     covered, and empty from canonical plan hydration. Product detail has a
     presentation-only future-offer seam and preserves action semantics.
-  - [x] 242 unit tests, both TypeScript checks, web export, and phone review
-    passed. Exact-head draft PR CI remains a separate gate.
+  - [x] Invalid runtime verdicts show a truthful retry state without a crash
+    or invented fit label. Stale pre-E1 inactive Shop comment corrected.
+  - [x] 245 unit tests, both TypeScript checks, web export, and phone review
+    passed.
 * **Non-overlap**: No H1, Sami backend, Stripe, SMTP, membership, shared contract,
   ProductOffer, physical checkout, or app-wide UI cleanup.
 

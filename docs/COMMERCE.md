@@ -2,7 +2,7 @@
 
 **Source of Truth**: Canonical architecture for Derive Shop, customer-facing commerce, and product acquisition.
 **Owner**: Kanuj (Customer Experience + Mobile) with Platform/Shared integration points noted.
-**Status**: C1 Shop V1 implemented; C1.1 Shop and Scan experience hardening on an isolated draft branch. S5 membership billing is separate; physical-product commerce C1.5 is not started.
+**Status**: C1 Shop V1 and C1.1 Shop and Scan experience hardening implemented. S5 membership billing is separate; physical-product commerce C1.5 is not started.
 
 ---
 
@@ -95,6 +95,9 @@ Today · Plan · Shop · Ask · Progress
   `Scan Another` returns to the same scanner. `Ask Derive About This` passes
   the full typed result through the transient store. Unknown products get a
   no-match path, not invented identity or evaluation.
+- A runtime result with an unrecognized verdict cannot become a trusted label.
+  Scan shows a recoverable, truthful failure and Scan Again, including when
+  camera permission is denied.
 - Scan history and iOS app-icon Quick Actions remain future opportunities.
   Neither has persistence or native implementation in C1.1.
 
@@ -190,15 +193,15 @@ Decision status: **OPEN / DEFERRED TO C1.5**.
 - [x] Automated unit and boundary tests for audience, publication, Scan, and member-only presentation
 - [x] Full architecture documentation (`docs/COMMERCE.md`)
 
-### C1.1 / Shop and Scan experience hardening (Shop-only draft)
+### C1.1 / Shop and Scan experience hardening (Implemented)
 - [x] Today and Shop header Scan accelerators route to the one scanner; Ask
   shortcut remains direct.
 - [x] Result shows an immediate categorical verdict before formula facts;
   repeated Scan and unknown-product return paths remain direct and truthful.
 - [x] Shop loading/error/review/covered states and product-detail action
   presentation are separated without backend or shared-contract changes.
-- [x] 242 unit tests, both TypeScript checks, web export, and 390/320-pixel
-  Mock phone review passed. Draft PR CI is a separate gate.
+- [x] 245 unit tests, both TypeScript checks, web export, and 390/320-pixel
+  Mock phone review passed. Unknown verdicts fail closed with Scan Again.
 
 ### C1.5 / Physical Product Commerce Integration (Next Phase)
 - Preserve the membership and physical-product commerce separation established by S5 and C1.

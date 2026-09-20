@@ -8774,12 +8774,15 @@ test('C1.1 Scan access: Today and Shop headers expose the canonical scanner', ()
 
 test('C1.1 Scan result: product identity and verdict precede formula detail', () => {
   const scan = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
-  const result = scan.slice(scan.indexOf('if (scanResult && confirmedProduct)'), scan.indexOf('if (isSearching)'));
+  const invalidBranch = scan.indexOf("resultPresentation.kind === 'invalid'");
+  const readyBranch = scan.indexOf("resultPresentation.kind === 'ready'");
+  const result = scan.slice(readyBranch, scan.indexOf('if (isSearching)'));
   const identity = result.indexOf('styles.productNameText');
   const verdict = result.indexOf('styles.verdictHeadline');
   const formula = result.indexOf('styles.formulaCard');
+  assert.ok(invalidBranch > 0 && invalidBranch < readyBranch, 'Invalid result must be handled before the verdict view');
   assert.ok(identity >= 0 && verdict > identity && formula > verdict);
-  assert.match(scan, /resolveScanVerdictLabel\(scanResult\.verdict\)/);
+  assert.match(scan, /resolveScanResultPresentation\(scanResult\)/);
   assert.match(result, /onPress=\{handleResetScan\}/);
   assert.match(result, /onPress=\{handleHandoffToAsk\}/);
 });
@@ -8791,4 +8794,47 @@ test('C1.1 Scan verdict: only canonical categorical labels reach the UI', async 
   assert.equal(presentation.resolveScanVerdictLabel('not_good_fit'), 'NOT A GOOD FIT RIGHT NOW');
   assert.equal(presentation.resolveScanVerdictLabel('92% match'), null);
   assert.equal(presentation.resolveScanVerdictLabel(''), null);
+});
+
+test('C1.1 Scan result boundary: unknown runtime verdict has no trusted label', async () => {
+  const presentation: any = await import('../src/commerce/scanPresentation.ts');
+  assert.equal(typeof presentation.resolveScanResultPresentation, 'function');
+  assert.deepEqual(presentation.resolveScanResultPresentation(null), { kind: 'waiting' });
+  assert.deepEqual(
+    presentation.resolveScanResultPresentation({
+      verdict: 'totally_unknown_verdict',
+      verdictLabel: 'GREAT FIT',
+      score: 50,
+    }),
+    { kind: 'invalid' },
+  );
+  assert.deepEqual(
+    presentation.resolveScanResultPresentation({ verdict: '50/100' }),
+    { kind: 'invalid' },
+  );
+});
+
+test('C1.1 Scan result boundary: every canonical verdict keeps its category label', async () => {
+  const { resolveScanResultPresentation } = await import('../src/commerce/scanPresentation.ts') as any;
+  const labels = [
+    ['great_fit', 'GREAT FIT'],
+    ['fits_plan', 'GREAT FIT'],
+    ['could_work', 'COULD WORK'],
+    ['not_needed', 'NOT NEEDED'],
+    ['better_replacement', 'BETTER AS A REPLACEMENT'],
+    ['use_with_caution', 'USE WITH CAUTION'],
+    ['not_good_fit', 'NOT A GOOD FIT RIGHT NOW'],
+  ];
+  for (const [verdict, label] of labels) {
+    assert.deepEqual(resolveScanResultPresentation({ verdict }), { kind: 'ready', label });
+  }
+});
+
+test('C1.1 Scan failure remains recoverable when camera permission is denied', () => {
+  const scan = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  const failureBranch = scan.indexOf('if (invalidResult || (evaluationError && !scanResult))');
+  const permissionBranch = scan.indexOf('if (permission && !permission.granted)');
+  assert.ok(failureBranch > 0 && failureBranch < permissionBranch,
+    'Evaluation failure must render before the camera-permission fallback');
+  assert.match(scan.slice(failureBranch, permissionBranch), /label="Scan Again"/);
 });
