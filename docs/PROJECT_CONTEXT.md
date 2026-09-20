@@ -54,7 +54,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
   - **Weekly check-in context (I1-B4B)**: optional tags + one note are history for comparison, not proven causes. No food diary or period tracker.
   - **Commercial Independence**: Monetization must not silently change recommendations.
 * **Historical (do not delete)**: ADR-21 $100/month all-in/products-included experiment; ADR-10 $129; ADR-15 Arthur $96/mo routine-derived prototype. All superseded as commercial direction.
-* **Commerce State**: S5 membership Checkout and Portal are implemented, with hosted activation pending. C1 member Shop and C1.5A acquisition foundation are landed, with zero production merchant listings. C1.5B feeds/attribution and C1.5C physical checkout are parked while the first-10 concierge flow is proven. No sixth tab.
+* **Commerce State**: S5 membership Checkout and Portal are implemented, with hosted Stripe activation owned by Sami and still pending. H1A's disposable admin entitlement is only a post-auth test fixture. C1 member Shop and C1.5A acquisition foundation are landed, with zero production merchant listings. C1.5B feeds/attribution and C1.5C physical checkout are parked while the first-10 concierge flow is proven. No sixth tab.
 
 ---
 

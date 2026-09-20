@@ -14,7 +14,9 @@ Owns `supabase/**`, `supabase/functions/**`, `admin/**`, `src/services/remote/**
 
 `src/contracts/**`, `src/domain/**`, `src/types/schema.ts`, package manifests, CI, and durable architecture docs are integration boundaries. The milestone that needs a change owns it, keeps it minimal, preserves the other lane's expectations, documents the interface, and hands it off before dependent work starts. Avoid parallel conflicting edits. A deliberate milestone reassignment must be recorded in the roadmap.
 
-The L0/H1A founder authorization makes H1A a single temporary exception: Kanuj owns the hosted post-auth core implementation on a fresh H1A branch after L0 lands. This does not transfer H1E email, H1B Stripe, F1 founder operations, or ongoing platform ownership; those remain Sami work. H1A must hand tested interfaces and evidence back to Sami before the next platform milestone.
+The L0/H1A founder authorization made H1A a single temporary exception: Kanuj owned its hosted post-auth verification and disposable fixture harness after L0 landed. It did not transfer H1E email, H1B Stripe, F1 founder operations, model/provider selection, or ongoing platform ownership. H1A's tested boundaries and remaining provider blocker are handed back through [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md) and [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
+
+**Next parallel wave:** Kanuj owns L1A physical-device Remote staging preflight and customer/mobile defects; Sami owns F1 founder manual routine fallback and platform/provider blockers. L1A's routine/member pass waits for a publishable routine path. H1E and H1B are later Sami provider-activation milestones, while L1B and L2A/L2B remain Kanuj acceptance milestones. Exact prerequisites and handoffs are in [ROADMAP.md](ROADMAP.md).
 
 ## Cross-lane defects
 
