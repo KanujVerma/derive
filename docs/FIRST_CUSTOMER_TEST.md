@@ -1,205 +1,95 @@
-# Derive — First Founding Beta Customer Acceptance Script
+# Derive: First Customer Acceptance Script
 
-**Purpose**: Structured 10–15 min guided session with a first beta member to validate usability, trust, and perceived effort before full enrollment.
+**Purpose:** Verify that customer #1 can activate a $25/month Founding Beta membership, provide truthful intake data, and receive a reviewed skincare routine. Products are purchased separately. The first 10 members may receive manual founder care, but no step may invent product, formula, payment, or routine truth.
 
-**Format**: Founder observes silently. Let the member drive. Speak only to prompt when stuck more than ~30 seconds.
+**Owner:** Kanuj, for the customer device journey and acceptance record. Sami owns hosted Auth, billing, intelligence, and founder operations. Record a backend blocker for Sami instead of changing that lane during this test.
 
-**Key Objectives**:
-- Can they complete onboarding without assistance?
-- Do the 3-angle baseline photos feel natural?
-- Does barcode Scan feel instant and accurate?
-- Do they trust the plan enough to follow it?
-- Where do they hesitate, re-read, or express doubt?
+**Current status:** This is a test script, not evidence that hosted Remote or live payment is ready. H1 hosted activation and the F1 founder fallback must be proven before L1 physical-device acceptance. L2 is the separate real-money launch gate. See [ROADMAP.md](ROADMAP.md) and [OWNERSHIP.md](OWNERSHIP.md).
 
----
+## Choose the run before opening the app
 
-## Setup (Before Member Arrives)
+| Run | Identity and money | What its result proves |
+| --- | --- | --- |
+| Mock development | Local Mock data. No real email OTP, Stripe charge, signed webhook, or hosted persistence. | Screen behavior and copy only. A Mock pass cannot clear a Remote or launch gate. |
+| Remote staging, Stripe test mode | Dedicated test identity and inbox, hosted six-digit email OTP, Stripe test Checkout and Portal, hosted records, test photos. | End-to-end hosted lifecycle only for steps actually observed and recorded. Complete H1 smoke first; keep real customer data and live charges out of this run. |
+| Real-money customer launch | Production customer build, real member identity, live $25/month Stripe membership, real intake, and an operational founder response. | Customer #1 acceptance only after L2 prerequisites and the full customer path pass. Do not charge or enroll customer #1 based on Mock or test-mode evidence. |
 
-- [ ] iPhone charged, TestFlight or development-client build installed
-- [ ] App in clean state (fresh install; production builds have no reset control)
-- [ ] No demo or Arthur data visible
-- [ ] WiFi connected
-- [ ] Note-taking ready (paper preferred to avoid device distraction)
-- [ ] Bring 2–3 real skincare product bottles with barcodes
+For a guided usability session, let the person drive and prompt only after they are stuck for about 30 seconds. Observe hesitation and trust, but do not replace the checks below with an interview. Use a fresh account and clean app state; verify that no Arthur, demo, or other member data appears. Do not put names, OTPs, payment details, photos, or sensitive skin disclosures in the acceptance record.
 
----
+## Preflight gates
 
-## Session Script
+- [ ] Record run type, build and revision, environment, device, date, tester role, and whether a real customer is involved. Confirm the build points to the intended environment. A TestFlight label alone does not prove Remote mode.
+- [ ] For Remote staging, use H1 hosted smoke evidence for OTP, signed test Checkout webhook, active membership, private photos, real provider call, founder review and publication, member reads, cross-user boundaries, and Portal downgrade. Recheck any changed boundary on the device. H1's existing negative tests alone do not prove the active lifecycle.
+- [ ] For L1, verify that F1 can recover when automatic routine preparation yields no usable proposal: an authorized founder can construct, validate, and publish a complete routine through the approved workflow. If that path is unavailable, mark the test blocked; a promise to handle it manually outside Derive is not a passing app flow.
+- [ ] For L2, independently confirm production OTP/email, live Stripe price and webhook, founder operations, security checks, and a working customer contact path. Do not display or hand out an unverified support email, phone number, or URL.
+- [ ] Have one known catalog barcode and one genuinely unknown product or barcode for Scan. Their identities must be independently known to the tester. Have products for manual Shelf entry and a safe, private space for baseline photos.
 
-### 1. Warm-Up (2 min)
+## Customer path
 
-"We're going to walk through the app together. I want you to use it like it's yours — don't worry about doing it wrong, because there's no wrong. I'll mostly be watching."
+Mark each item **Pass**, **Fail**, **Blocked**, or **Not applicable** with a short observation. Do not mark an unrun Remote or launch step as passed because its Mock equivalent worked.
 
-Ask before they open:
-- "What do you currently use on your skin daily, if anything?"
-- "What's your biggest frustration with skincare right now?"
+### 1. Sign in and activate membership, Remote runs
 
-**Observe**: baseline trust level, vocabulary they use for their skin.
+- [ ] Enter an email and receive a six-digit code in the intended inbox. Enter it on the phone and confirm the resulting account belongs to that identity. Record delivery and retry failures without copying the code.
+- [ ] Before payment, confirm the membership screen explains **$25/month for Derive skincare management** and that routine products cost extra. A signed-in account without an active membership must not reach sensitive onboarding or the five member tabs.
+- [ ] Open Stripe-hosted Checkout in the run's test or live mode. Confirm the trusted Checkout amount, recurring cadence, and account match the $25 membership. A cancelled or failed Checkout must leave access inactive.
+- [ ] After successful Checkout, distinguish the return navigation from entitlement. The app may proceed only after the signed Stripe webhook projects canonical **active** membership and a fresh backend read confirms it. If confirmation is pending, show a recoverable pending state; do not unlock from the success URL or a local flag.
 
----
+Mock development: inspect the membership explanation if exposed, but record Auth, charge, webhook, and entitlement checks as **Not applicable**. Never simulate a payment success and call it billing acceptance.
 
-### 2. Welcome & Onboarding (4–6 min)
+### 2. Welcome, intake, and real Shelf
 
-**Action**: Hand them the phone on the Welcome screen. Say nothing else.
+- [ ] Let the member complete goals, preference, skin behavior, reaction history, and safety questions. Check that skipped or withheld safety answers remain unknown rather than turning into "no." Note any confusing, coercive, or clinical-sounding language.
+- [ ] At Shelf, photograph products if desired. Explain only that Derive will try to identify what it can and the member can review or add products. Do not promise automatic recognition of arbitrary bottles.
+- [ ] Add a real product manually using the member's **brand, exact product name, and category**. Review it, edit each field, remove it, add it again, leave Shelf, and return. Confirm the entered identity remains correct. No canned Vanicream or other fixture may appear.
+- [ ] Retake the Shelf photo and exercise an empty or failed recognition result. Confirm the manual product survives and recognized products, when present, can coexist without an obvious duplicate. Unknown ingredients, actives, formula, barcode, catalog verification, retailer, and price must remain unknown; a typed name alone does not establish them.
+- [ ] Continue without automatic recognition. An unknown product is acceptable for this concierge beta if the customer can finish intake and the founder can work from truthful information. A dead end or fabricated match fails.
 
-| Step | Expected | Failure Signal |
-|------|----------|---------------|
-| Welcome screen | Headline "Let's get to know your skin." plus a 4-minute, private, final-quality-check framing | Confusion about what Derive does |
-| Goals selection | Selects 1–3 goals without hesitation | Asks "what does this mean?" for >2 options |
-| Complexity preference | Selects 1 option; no confusion | Feels like a quiz they can fail |
-| Skin behavior | Answers honestly; may ask about specific terms | Feels judged or embarrassed |
-| Shelf products | Enters 1–2 products without coaching | Cannot figure out how to add products |
-| Reaction history | Accurate No/Yes flow; no over-disclosure pressure | Feels like a medical intake form |
-| Safety screen | Quick scan, no alarm | Pauses on pregnancy or Rx question with confusion |
+### 3. Baseline photos and submission
 
-**Observe**: hesitation points, language they use, whether they feel judged.
+- [ ] Capture front, left, and right baseline photos. Check guidance, comfort, permission handling, retake, and manual shutter recovery if auto-capture does not work. Confirm the correct three photos are shown at review; do not claim a specific capture speed without observing it.
+- [ ] At the summary, have the member recognize their goals, products, and safety answers and use an Edit link if needed. Confirm the $25 membership and separate product costs remain clear. In Remote, payment should already have been activated before this intake.
+- [ ] Submit once, then verify the app's own completion state and hosted intake/photo records for a Remote run. A submission error must preserve the member's work and allow retry. Submission starts routine preparation; it does not prove that a proposal exists, is under founder review, or is active.
 
----
+### 4. Routine preparation and founder handoff, Remote runs
 
-### 3. Baseline Photos — 3-Angle Capture (2–3 min)
+- [ ] Observe whether an actual routine proposal is created and, if so, that its status is **awaiting review**. Verify the founder task belongs to an authorized founder, uses the submitted member data, and does not invent formula facts for manually entered products.
+- [ ] Have the founder inspect safety context and product evidence, correct or reject unsafe or unsupported steps, then publish through the guarded workflow. Verify the published routine belongs to this member and the member app refreshes to it without reinstalling.
+- [ ] If automatic preparation produces no usable proposal, run the F1 manual founder fallback. Confirm the founder can create, validate, and publish the full routine in Derive. Until F1 is implemented and demonstrated, record **Blocked** here and do not claim customer #1 can receive a routine.
+- [ ] Record who owns any manual follow-up and when the member should expect it. Do not show an "under review" or "ready" state unless the corresponding server state exists.
 
-**Action**: Watch them navigate to the photo capture step.
+### 5. Five member tabs and Scan
 
-| Check | Expected | Failure Signal |
-|-------|----------|---------------|
-| Front capture | Camera opens, auto-capture triggers within ~5 sec of good positioning | Cannot get face in oval; capture never triggers |
-| Guidance messaging | "Center your face" / "Move closer" / "Hold still" appear and are understood | Instructions feel confusing or stressful |
-| Left profile | Turns their left (~quarter turn / 45°); not a full side profile | Turns wrong direction or forces a 90° ear-on pose |
-| Right profile | Same on their right | Gives up before third capture |
-| Use Photo / Retake | Comfortable accepting or retaking | Accepts blurry photo without noticing |
-| Cannot skip | Continue button stays inactive until 3 photos | Feels forced and frustrated |
+The root navigation is **Today · Plan · Shop · Ask · Progress**. **Scan is inside Shop**, with a Today shortcut where shown; it is not a sixth tab. Check both pending and published states when the run can reach them.
 
-**Key UX Question**: Does auto-capture feel magical or unsettling?
+| Surface | Acceptance observation |
+| --- | --- |
+| Today | Before publication, show a truthful preparation or draft state with no active routine, shipment, streak, or insight invented. After publication, show only the member's current steps and actual status. |
+| Plan | The member can distinguish DRAFT · NOT ACTIVE from a published routine. Products match the submitted Shelf; actions and rationale do not assert unknown formula facts. |
+| Shop | While a routine is unpublished, no active ADD purchase prompt. After publication, show only real plan needs or a calm covered state. Production currently has zero verified merchant listings; no fake retailer, live price, stock, physical checkout, order, or tracking claim. |
+| Shop → Scan | Reach the scanner from Shop. A known, verified match may show identity and fit/formula verdicts supported by evidence. An unknown or unresolved product must show a recoverable unknown state, such as Scan Again, without an invented identity or verdict. Arbitrary visual product resolution is not a current acceptance assumption. |
+| Scan → Ask | For a verified Scan result, the Ask handoff retains that product context. For an unknown result, Ask must not turn missing product facts into a confident match. |
+| Ask | Ask a routine question and a safety-sensitive question. Check that ordinary answers use actual member context, uncertainty is stated where needed, and urgent symptoms take the safety path. A failed provider call must not be presented as a generated answer. |
+| Progress | Show only the member's baseline and real check-in history. Try a weekly check-in when enabled; verify a truthful result and no fabricated comparison or learned insight. |
 
-**Observe**: how long auto-capture takes, whether manual shutter fallback is needed, body language (comfort with front camera).
+Open Orders & Refills from Shop or Profile if available. With no real order, the empty state must remain empty. A retailer page visit is not an order, and no managed refill or shipment should be shown without its actual record.
 
----
+### 6. Billing lifecycle, Remote runs
 
-### 4. Onboarding Summary & Plan Draft (1 min)
+- [ ] Open Manage Membership and the member's own Stripe Billing Portal in the run's mode. Verify that returning from the Portal does not itself alter membership state.
+- [ ] In staging, use a safe supported pause or cancellation path and observe the signed webhook update. After refresh, the app must route the inactive member to Membership, clear managed client caches, and block onboarding and paid tabs. Historical ownership and account deletion follow their existing authorized boundaries.
+- [ ] Verify any reactivation only through an actually supported billing path and another canonical active backend read. Do not infer reactivation from a Portal page or local state. For a real customer, exercise live cancellation only with the member's explicit intent; otherwise carry forward the proven staging result and mark the live action **Not applicable**.
 
-**Action**: Let them reach the summary screen.
+## Close and record the result
 
-| Check | Expected | Failure Signal |
-|-------|----------|---------------|
-| Review summary | Can identify their products and goals | "I didn't know I was giving all this" |
-| $100 Founding Beta | Visible on the membership card and makes sense | "$100 for what exactly?" |
-| Final Review copy | Understands the first routine gets a quality check before it goes live | Thinks the plan is already active |
-| Explore-while-reviewing | Can still use Today / Plan preview / Scan / Ask | Feels locked out after submitting |
+Ask the participant: "In your own words, what is Derive?"; "What would make you trust this routine?"; "Where did you hesitate?"; and "At $25 per month, with products purchased separately, what would make this worthwhile?" Note time, unprompted questions, confusion, recovery attempts, and exact screen at failure. Do not record audio or identifying skin details for this script.
 
----
+Record one outcome for each run:
 
-### 5. Today Tab — At-a-Glance (30 sec)
+| Result | Meaning |
+| --- | --- |
+| Pass | Every applicable check in this run was observed, with evidence for external boundaries. |
+| Fail | An observed behavior violated a check; include reproduction and owner. |
+| Blocked | A prerequisite or system path was unavailable, so the customer journey could not be completed. Name the missing gate and owner. |
 
-**Action**: Navigate to Today.
-
-| Check | Expected | Failure Signal |
-|-------|----------|---------------|
-| Status card | Clean "plan in review" state | Sees fake shipment or fake insight |
-| No streak counter | No daily check-in guilt visible | Feels obligated to check in daily |
-
----
-
-### 6. Barcode Scan (2 min)
-
-**Action**: Hand them one of the product bottles. Say: "Try scanning this."
-
-| Check | Expected | Failure Signal |
-|-------|----------|---------------|
-| Camera opens | < 1 second | Visible delay or confusion finding Scan tab |
-| Barcode detected | Single haptic, no shutter press | Has to move bottle many times; never detects |
-| Known product | "FIT FOR YOU RIGHT NOW" verdict appears | Shows wrong product |
-| Unknown product | Retry / Search options appear without fabricated identity | Shows a made-up product |
-| Scan → Ask | One tap sends product to Ask tab with context | Context is lost between tabs |
-
-**Observe**: perceived scanning speed, confidence in verdict, whether they trust the evaluation.
-
----
-
-### 7. Ask Tab (1–2 min)
-
-**Action**: Let them ask a natural skincare question.
-
-| Check | Expected | Failure Signal |
-|-------|----------|---------------|
-| Composer usable | Can type; mic button is present (native currently uses a local dictation fallback, not live speech recognition) | Mic button placement confuses |
-| Response grounded | References their actual skin/routine | Generic response ignores their context |
-| Scanned product context | If coming from Scan, product banner visible | Context not carried over |
-
----
-
-### 8. Plan Tab (30 sec)
-
-**Action**: Navigate to Plan.
-
-| Check | Expected | Failure Signal |
-|-------|----------|---------------|
-| DRAFT · NOT ACTIVE | Clearly a pending state | Thinks this is their live routine |
-| Product shelf audit | Products they entered are visible | Empty or has Arthur's products |
-
----
-
-### 9. Progress Tab (30 sec)
-
-**Action**: Navigate to Progress.
-
-| Check | Expected | Failure Signal |
-|-------|----------|---------------|
-| Baseline only | 3 photos captured in onboarding shown | Fabricated history shown |
-| "Awaiting first check-in" | Makes sense, no pressure | Feels like they failed to complete something |
-
----
-
-### 10. Orders / Refills (30 sec)
-
-**Action**: Check the Orders tab or Refills if visible.
-
-| Check | Expected | Failure Signal |
-|-------|----------|---------------|
-| Empty state | "Managed refills activate after your plan is confirmed" | Fake tracking number shown |
-
----
-
-## Closing Interview (2 min)
-
-Ask after the session:
-
-1. "In your own words, what is Derive?"
-2. "What would make you trust this more?"
-3. "Was there anything that felt off or confusing?"
-4. "If you were going to tell a friend about this, what would you say?"
-5. "At $100/month, what would you need to see to feel like it's worth it?"
-
-**Do not prime them** — let them answer before clarifying.
-
----
-
-## What to Record
-
-For each major step, note:
-- Time spent
-- Verbal reactions
-- Hesitations (> 10 sec on same element)
-- Questions they ask aloud
-- Things they say they like or distrust
-- Moments of visible confusion or delight
-
-**Do NOT record**:
-- Customer name or face
-- Audio
-- Specific skin condition disclosures beyond general context
-
----
-
-## Common Failure Patterns to Watch For
-
-| Pattern | Likely Root Cause |
-|---------|------------------|
-| Cannot position face for auto-capture | Hold threshold too strict; environment too dark |
-| "What is Derive exactly?" at summary | Welcome copy needs stronger managed-service framing |
-| Skips reading reactions page | Too many disclosure steps |
-| "$100 for this?" | Perceived value not yet established by the time price appears |
-| "Can I look things up myself?" | Trust not yet established; they want to verify |
-
----
-
-*Script version: K5 initial — update after first 3 sessions.*
+Keep Mock, Remote staging, and launch results separate. Customer #1 may be charged only after L2 confirms the complete production path, including a real contact route and routine delivery when automation fails. Kanuj fixes customer/mobile defects in his lane; hosted Auth, billing, provider, product resolution, and founder-operation defects are recorded for Sami with evidence.

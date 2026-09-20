@@ -20,6 +20,7 @@ another.
 | `EXPO_PUBLIC_USE_REMOTE_SERVICE` | Expo mobile/web build | Public | `false` until the I1 remote integration is verified |
 | `EXPO_PUBLIC_SUPABASE_URL` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo mobile/web build | Public | Local or hosted Supabase client access |
+| `EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL` | Expo mobile/web build | Public | Optional customer contact; configure only after send-and-receive mailbox verification |
 | `SUPABASE_PROJECT_ID` | CLI / CI | Public identifier | Linking and deploying to a hosted project |
 | `SUPABASE_ACCESS_TOKEN` | CLI / CI | Secret | Headless Supabase management; interactive local login should use the CLI credential store instead |
 | `SUPABASE_DB_PASSWORD` | CLI / CI | Secret | Hosted migration and database operations |
@@ -33,10 +34,12 @@ another.
 | `DERIVE_CHECKOUT_CANCEL_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS cancellation destination (localhost HTTP allowed only for local development) |
 | `DERIVE_PORTAL_RETURN_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS return destination from Stripe Billing Portal |
 
-The root `.env.example` lists only the three `EXPO_PUBLIC_*` mobile variables.
+The root `.env.example` lists only public mobile variables, including an empty optional support address.
 CLI/CI and trusted-server names are documented here instead of being mixed into
 the Expo template, reducing the risk that a developer pastes a server secret
 into the mobile build environment.
+
+When the support address is unset or malformed, onboarding does not offer a human support contact and Profile routes skincare questions to Ask. A real-money customer launch requires a separately verified working contact path; a syntactically valid email address alone does not prove delivery.
 
 S5 trusted-server names are listed with empty values in `supabase/.env.example`.
 They are deliberately absent from the root Expo template. PostHog remains

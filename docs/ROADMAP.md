@@ -1,8 +1,97 @@
-# Derive V1 Roadmap: Independent Founder Workstreams
+# Derive Roadmap: First Customer
 
-Derive divides engineering into two independent, unblocked workstreams anchored on a shared contract layer.
+This opening section is the current execution plan. Earlier delivery records below are historical, not assignments for new work. Each active or future implementation milestone has one founder owner. [OWNERSHIP.md](OWNERSHIP.md) defines lanes and cross-lane defect handoffs. GitHub is the sole durable project context.
+
+**Company gate:** customer #1 can pay $25/month for the Derive management membership, buy products separately, complete the real app journey, and receive a trustworthy routine. The first 10 members are a concierge MVP: manual founder recovery is acceptable; fabricated product/formula truth and unrecoverable automation are not.
+
+## Current milestone sequence
+
+```text
+Kanuj  V1A ────────────────────────┐
+                                   ▼
+Sami   H1 ─────► F1 ─────────────► L1 (Kanuj) ─────► L2 (Kanuj) ─────► customer #1
+                                                                        │
+                                                                        ▼
+Sami                                            S6 after manual customer flow is proven
+```
+
+V1A and H1 occupy separate lanes and may run in parallel. F1 needs H1's backend baseline. L1 needs both H1 and F1 ready. L2 needs L1 plus Sami's declared production readiness. S6 does not block customer #1 when manual recovery works. Waiting never transfers a milestone to the other founder.
+
+### V1A: First-Customer Intake Integrity
+
+- **Owner:** Kanuj. **Status:** COMPLETE. **Prerequisites:** C1.5A landed.
+- **Owned surfaces:** customer mobile onboarding/Shelf, client recovery/support presentation, acceptance documentation, repository roadmap and ownership docs.
+- **Explicit non-scope:** H1, backend, founder operations, F1, S6, hosted configuration, physical commerce.
+- **Outcome / acceptance:** customer-entered brand, exact product name, and category can be added, edited, viewed, removed, and retained through an empty or failed recognition/retake; no canned product or invented actives/formula/catalog provenance; truthful Shelf and support copy; current first-customer acceptance script.
+- **Handoff to:** H1/F1 supply hosted and founder-operation baselines; Kanuj takes L1 when both are ready.
+
+### H1: Hosted Remote Activation
+
+- **Owner:** Sami. **Status:** separate draft PR #21 at the last repository checkpoint; verify its current PR state before continuing. **Prerequisites:** current `main` reconciliation before landing.
+- **Owned surfaces:** `supabase/**`, Remote service, hosted Auth/Stripe/Gemini configuration, founder platform smoke.
+- **Explicit non-scope:** V1A mobile changes, customer UX redesign, L1 device acceptance.
+- **Outcome / acceptance:** hosted six-digit OTP; Stripe test Checkout, signed webhook and Portal/downgrade lifecycle; real Gemini call; founder account; Remote onboarding/photo lifecycle; founder review/publish; member surfaces; cross-user/security smoke.
+- **Handoff to:** F1 with tested backend baseline and L1 with a stable Remote interface. Kanuj does not implement H1.
+
+### F1: Founder Manual Routine Fallback
+
+- **Owner:** Sami. **Status:** PLANNED, blocked on H1 being landed or sufficiently reconciled and green.
+- **Owned surfaces:** `admin/**`, founder operations, backend routine validation and publication.
+- **Explicit non-scope:** customer mobile UX and L1 device acceptance.
+- **Outcome / acceptance:** when automation has no usable proposal, an authorized founder can construct, validate, and publish a complete routine inside Derive through the same safety/publication pipeline. Current founder publication begins from an `awaiting_review` proposal with known product references; F1 must resolve that limitation without bypassing validation.
+- **Handoff to:** L1 after the manual fallback is exercised and the interface is stable.
+
+### L1: First-Customer Remote Acceptance
+
+- **Owner:** Kanuj. **Status:** PLANNED, waiting on H1 and F1 readiness.
+- **Owned surfaces:** Remote-enabled staging/TestFlight customer build, physical-device journey, customer UX/state/recovery fixes, acceptance checklist.
+- **Explicit non-scope:** backend, Stripe, Gemini, RLS/storage, Remote service, and founder-operation implementation.
+- **Outcome / acceptance:** real customer-facing Remote path works on device; each failure has a truthful recovery or an explicit blocker. Record backend defects with evidence as Sami tickets and stop at the ownership boundary.
+- **Handoff to:** L2 after customer acceptance passes and Sami receives any platform blockers.
+
+### L2: Customer #1 Launch Gate
+
+- **Owner:** Kanuj as launch and customer acceptance owner. **Status:** PLANNED, waiting on L1 and Sami's production readiness declaration.
+- **Owned surfaces:** production customer build, contact-path check, real-money checkout presentation, full customer journey acceptance.
+- **Explicit non-scope:** production OTP/email, live Stripe, founder operations, backend security implementation; these are Sami-owned prerequisites.
+- **Outcome / acceptance:** verify working support contact, no fake product/formula claims, complete customer journey, and Sami's production OTP/email, live Stripe, founder operations, and security smoke. Do not charge customer #1 until L2 passes. Backend failures become Sami blockers; mobile failures remain Kanuj work.
+- **Handoff to:** first-customer operation and learning; S6 may follow once manual flow is operational.
+
+### S6: Visual Product Identity and Formula Resolution
+
+- **Owner:** Sami. **Status:** PLANNED after the manual customer flow is operational; not a launch dependency.
+- **Owned surfaces:** backend product identity, formula/provenance resolution, intelligence serving both Shelf and Scan.
+- **Explicit non-scope:** Kanuj mobile UI adaptation, merchant-driven recommendation or Scan truth.
+- **Outcome / acceptance:** one resolver uses barcode, front label, ingredient photo, typed name, and authoritative catalog evidence; model resemblance proposes candidates only. Variant, region, packaging, and reformulation provenance matter. Unknown or ambiguous evidence remains unknown. Current barcode lookup exists, but hosted visual resolution and production Shelf recognition do not yet identify arbitrary products.
+- **Handoff to:** a separately owned Kanuj mobile-consumer milestone only after a stable S6 interface exists.
+
+## Parked commerce execution
+
+C1.5A is **LANDED** (PR #23, merge `6f6a556`): Shop-only Where to Buy foundation. Production merchant listings remain zero and Ulta is test-only. `Product.isCatalogStandard` indicates narrow catalog provenance, not merchant/package/formula equivalence. No fake live price or availability; commerce never changes recommendation or Scan truth.
+
+C1.5B official retailer feeds, live offers, affiliate/network applications and attribution, and C1.5C Derive Shopify merchant/checkout are **PARKED**. Public Shop, price comparison, cart, broad discovery, and automated physical fulfillment are parked too. First-10 operability and learning take priority. Keep the architecture in [COMMERCE.md](COMMERCE.md), but do not begin execution.
+
+When reopened, split each implementation:
+
+| Sequence | Single owner | Scope and handoff |
+| :--- | :--- | :--- |
+| C1.5B platform | Sami | Official feeds/APIs, listing identity, current offers, freshness, approved attribution. Publish a stable evidence-backed interface. |
+| C1.5B mobile | Kanuj | Customer offer/purchase-option presentation and Shop states, after the platform interface. |
+| C1.5C platform | Sami | Shopify product/variant, inventory, checkout, order and fulfillment lifecycle. Publish a stable interface. |
+| C1.5C mobile | Kanuj | Customer checkout and order UX after the platform interface. |
+
+## Next action by founder
+
+- **Kanuj:** prepare the L1 customer-device acceptance plan and wait for H1 and F1 readiness before executing it; stay within customer/mobile ownership.
+- **Sami:** continue H1 on its separate branch, reconcile with current `main`, then own F1. Do not take V1A/L1/L2 mobile implementation.
+
+Future tickets use: **Milestone, Owner, Status, Prerequisites, Owned surfaces, Explicit non-scope, Outcome, Acceptance criteria, Handoff to.**
 
 ---
+
+## Historical delivery record
+
+The following entries preserve earlier scope and checkpoint language. The current plan above overrides old next-step, tab, pricing, and commerce-status wording.
 
 ## Kanuj Workstream (Customer Experience + Mobile)
 
@@ -653,13 +742,13 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Local unit, pgTAP, OTP, E1 lifecycle, and S1-S5 integration tests cover the boundary.
   - [ ] Configure and smoke the hosted six-digit OTP template, Supabase functions/migrations, Gemini secret, and test-mode Stripe Checkout to signed webhook to Portal lifecycle before enabling production Remote mode.
 
-### C1.5A: Multi-Merchant Acquisition Foundation [IMPLEMENTED IN DRAFT PR]
+### C1.5A: Multi-Merchant Acquisition Foundation [LANDED]
 * **Scope**: Shop-owned exact identity resolver, merchant/listing/optional offer presentation and member Where to Buy UI. The production listing registry is empty until merchant destination, product variant and formula equivalence can be supported. The reviewed Ulta listing remains a test-only fixture. Product/recommendation truth remains upstream; provisional products and unpublished ADD fail closed. No backend migration, live price, checkout or public routing.
 
-### C1.5B: Official Retailer Feeds, Live Offers & Attribution [PLANNED]
+### C1.5B: Official Retailer Feeds, Live Offers & Attribution [PARKED]
 * **Scope**: Verify official merchant APIs/feeds or approved networks, establish merchant product identity and listing verification, then ingest live prices, availability, identifiers, freshness and approved affiliate attribution with provenance. S6 may supply stronger product/variant/formula evidence, but price, availability and commission never decide product truth or recommendations. HTML scraping is not the core data source. No C1.5B code in A.
 
-### C1.5C: Derive Shopify Merchant & Integrated Checkout [PLANNED]
+### C1.5C: Derive Shopify Merchant & Integrated Checkout [PARKED]
 * **Scope**: Derive becomes a first-class merchant through Shopify product/variant mapping, real offer, inventory, cart/checkout, physical orders, fulfillment, returns and member benefits. External alternatives stay visible. No C1.5C code in A. Public catalog/Shop and factual non-member Scan each need independent routing, data and authorization gates.
 
 ### C2: Personalized Discovery & Cart [DEFERRED]
@@ -668,10 +757,10 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
 
 ---
 
-## Shared Milestone
+## Historical integration objective (not an active implementation milestone)
 
 ### I1: Mock → Remote DeriveService Integration
-* **Scope**: Joint end-to-end integration test verifying complete customer lifecycle on live backend:
+* **Historical scope**: Earlier end-to-end integration objective. Current ownership and acceptance are H1, F1, L1 and L2 above. The earlier test described:
   Onboarding → Profile → Routine Generation → Founder Review & Approval → Today Display → Shelf Audit → Product Scan → Ask Context → Weekly Check-In → Refill Request → Tracking.
 * **Acceptance Criteria**:
   - Kanuj switches `EXPO_PUBLIC_USE_REMOTE_SERVICE=true` without changing UI code.

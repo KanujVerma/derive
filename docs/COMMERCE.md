@@ -1,8 +1,8 @@
 # Derive Commerce Architecture (C1.5A acquisition foundation)
 
 **Source of Truth**: Canonical architecture for Derive Shop, customer-facing commerce, and product acquisition.
-**Owner**: Kanuj (Customer Experience + Mobile) with Platform/Shared integration points noted.
-**Status**: C1 and C1.1 are implemented. The C1.5A acquisition foundation is implemented in a draft PR; production merchant listings remain empty pending stronger product, variant, and formula verification. C1.5B feeds and C1.5C Derive Shopify checkout remain planned. S5 membership billing is separate.
+**Owner**: Kanuj for customer Shop presentation; Sami for future platform feeds and physical commerce backend. See `docs/ROADMAP.md` for single-owner milestones.
+**Status**: C1/C1.1 and C1.5A are landed. Production merchant listings remain empty pending stronger product, variant, and formula verification. C1.5B feeds and C1.5C Derive Shopify checkout are parked. S5 membership billing is separate.
 
 ---
 
@@ -35,12 +35,14 @@ Long-term product loop mental model:
 | **Action-to-Commerce Semantics** | IMPLEMENTED | Kanuj | `resolveActionCommerceSemantics()`: ADD eligible on publish; PAUSE/STOP never; KEEP non-urgent; REPLACE never sells old product. |
 | **No Universal Product Score Invariant** | IMPLEMENTED | Kanuj | Categorical fit guidance only (`GREAT FIT`, `COULD WORK`, `USE WITH CAUTION`, etc.). |
 | **Shop state separation** | C1.1 | Kanuj | Loading, error, preparation, unpublished review, published needs, covered, and empty are distinct. Covered requires a resolved published plan. |
-| **S5 Membership Billing Separation** | IMPLEMENTED / PRESERVED | Sami / Shared | Stripe membership checkout ($25/mo) remains strictly isolated in S5. |
-| **Merchant listings and purchase options** | C1.5A DRAFT | Kanuj | Shop-owned resolver and 0/1/many presentation; zero production listings. Ulta example is test-only. No live price. |
-| **Physical Product Commerce Backend** | PLANNED (C1.5C) | Cross-founder | Derive as Shopify merchant, inventory, cart, checkout, orders, fulfillment, returns. |
-| **Official retailer feeds** | PLANNED (C1.5B) | Cross-founder | Live offers, availability and approved attribution from official sources. |
-| **Multi-Item Cart** | DEFERRED (V2) | Kanuj / Platform | V1/V1.5 is single-product purchase intent. Cart deferred until behavioral evidence warrants. |
-| **ADR-32** | C1.5A DRAFT | Cross-founder | Acquisition separation and future Derive merchant decision. |
+| **S5 Membership Billing Separation** | IMPLEMENTED / PRESERVED | Sami | Stripe membership checkout ($25/mo) remains strictly isolated in S5. |
+| **Merchant listings and purchase options** | C1.5A LANDED | Kanuj | Shop-owned resolver and 0/1/many presentation; zero production listings. Ulta example is test-only. No live price. |
+| **Official retailer feeds and attribution backend** | C1.5B PARKED | Sami | Official source identity, fresh offers, availability and approved attribution; stable interface before mobile consumption. |
+| **Retailer offer presentation** | C1.5B PARKED | Kanuj | Customer Shop states and purchase-option UX after Sami's interface. |
+| **Physical product commerce backend** | C1.5C PARKED | Sami | Shopify mapping, inventory, checkout, orders, fulfillment, returns; stable interface before mobile consumption. |
+| **Physical checkout and order UX** | C1.5C PARKED | Kanuj | Customer mobile flow after Sami's interface. |
+| **Multi-item cart** | DEFERRED | Kanuj | Separate customer UX milestone only if purchase behavior warrants it. |
+| **ADR-32** | APPROVED / C1.5A LANDED | Kanuj | Acquisition separation and future Derive merchant direction; implementation split above. |
 
 ---
 
@@ -219,16 +221,18 @@ C1.5B should prefer official merchant APIs, affiliate/product feeds, approved ne
 - [x] 245 unit tests, both TypeScript checks, web export, and 390/320-pixel
   Mock phone review passed. Unknown verdicts fail closed with Scan Again.
 
-### C1.5A / Multi-Merchant Acquisition Foundation (Implemented in draft PR)
+### C1.5A / Multi-Merchant Acquisition Foundation (Landed)
 - Shop-owned merchant, listing, optional offer and purchase path presentation.
 - Member ADD Where to Buy, privacy-safe outbound event, and test-only external acquisition fixture. Production listing count is zero until the activation gate above is met.
 - No backend, migration, feed, affiliate attribution, Derive checkout, public routing or Scan purchase CTA.
 
-### C1.5B / Official Retailer Feeds, Live Offers & Attribution (Planned)
+### C1.5B / Official Retailer Feeds, Live Offers & Attribution (Parked)
 - Verify official integration paths when opened. Establish merchant/feed product identity and listing verification, then resolve live merchant IDs, price, sale price, availability, offer freshness and approved affiliate attribution with provenance. Activate production listings only with adequate product, variant, and formula evidence.
+- Sami owns the backend/feed interface; Kanuj owns a later mobile offer-presentation milestone after that interface is stable. Affiliate/network applications and integration are also parked.
 
-### C1.5C / Derive Shopify Merchant & Integrated Checkout (Planned)
+### C1.5C / Derive Shopify Merchant & Integrated Checkout (Parked)
 - Map Derive Shopify products and variants, then build real Derive offer, inventory, cart/checkout, product orders, fulfillment, returns and member benefits. Keep legitimate external alternatives visible.
+- Sami owns backend merchant and order lifecycle; Kanuj owns later customer checkout/order UX after a stable interface. Neither begins before first-10 operability takes priority.
 - Public factual catalog/routing and non-member Scan authorization each require separate deliberate gates; neither is activated here.
 
 ### C2 / Personalized Discovery & Cart (Later Phase)

@@ -15,8 +15,8 @@ This guide establishes the standardized procedure for any coding agent (Kanuj's 
    ```bash
    git log -n 5 --oneline
    ```
-3. **Read Roadmaps & Workstream Assignment**:
-   Read [`docs/ROADMAP.md`](../ROADMAP.md) to locate the current active milestone (e.g. K1–K5 for Kanuj, S1–S5 for Sami).
+3. **Read Roadmap & Ownership**:
+   Read [`docs/ROADMAP.md`](../ROADMAP.md) and [`docs/OWNERSHIP.md`](../OWNERSHIP.md) for the current single-owner milestone, prerequisites, lane, and cross-lane handoff. Historical milestone entries are not current assignments.
 4. **Read Relevant Handoff**:
    Check if a handoff document exists in `docs/agent/` for the current branch or task.
 5. **Inspect Verification State**:

@@ -61,13 +61,13 @@ developer/CI, and trusted-server credential boundaries.
 - **Visual Design**: Direction A Mineral (Warm Ivory `#F6F3EC`, Elevated Surface `#FFFEFB`, Architectural Charcoal `#171A18`, Mineral Green `#345447`).
 - **Platform / Backend**: Supabase PostgreSQL, Row-Level Security, Auth, private Storage, and Edge Functions are implemented through S5. Hosted activation remains pending.
 - **Intelligence**: S3 server intelligence uses a server-side Gemini provider when configured and deterministic safety circuit breakers. The mobile app remains in Mock mode by default.
-- **Commerce**: S5 membership Checkout, Billing Portal, and signed subscription webhooks are implemented; hosted test-mode activation remains pending. C1 member Shop V1 is implemented. Products are separate purchases, with physical checkout deferred to C1.5.
+- **Commerce**: S5 membership Checkout, Billing Portal, and signed subscription webhooks are implemented; hosted test-mode activation remains pending. C1 Shop and C1.5A acquisition foundation are landed. Products are separate purchases; C1.5B feeds and C1.5C physical checkout are parked.
 - **Member Access**: E1 requires canonical active membership before Remote onboarding and the managed app. Unpaid, paused, and cancelled accounts reach Membership for trusted billing actions. Mock remains the default and production Remote activation awaits hosted end-to-end smoke.
 - **Telemetry**: Planned privacy-safe telemetry (PostHog with session replay strictly disabled; typed navigation allowlist only; zero health data/photos/symptoms).
 
 ---
 
-## 3. Parallel Founder Workstreams
+## 3. Founder Workstreams
 
 Derive separates development into two independent lanes connected by a thin, stable service contract (`src/contracts/DeriveService.ts`):
 
@@ -77,6 +77,8 @@ Derive separates development into two independent lanes connected by a thin, sta
 * **Sami (Platform + Intelligence + Operations)**:
   - Supabase database schema, migrations, RLS policies, private storage, Edge Functions (`supabase/**`), intelligence workflows, and founder operations console (`admin/**`).
   - Implements `RemoteDeriveService` fulfilling the exact same contract.
+
+Each implementation milestone has one founder owner. Read [`docs/ROADMAP.md`](docs/ROADMAP.md) for current status and prerequisites and [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md) for file boundaries and cross-lane defect handoffs. GitHub is the sole durable source for project context; Drive is limited to customer-research artifacts.
 
 ### Toggling Between Mock and Remote Backend
 The service factory supports selecting the remote backend adapter:
@@ -92,12 +94,13 @@ EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 
 Before beginning substantial feature work, consult the core documentation:
 * [`AGENTS.md`](AGENTS.md): Essential orienting instructions, bootstrap rules, and architecture challenge protocol for AI agents and founders.
-* [`docs/CONTEXT_SYNC.md`](docs/CONTEXT_SYNC.md): Cross-founder and cross-agent durable synchronization ledger.
+* [`docs/CONTEXT_SYNC.md`](docs/CONTEXT_SYNC.md): Repository-native checkpoint ledger; older entries are historical.
 * [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md): Strategic context, target customers, Founding Beta concierge operating model, and business hypotheses.
 * [`docs/PRODUCT.md`](docs/PRODUCT.md): Full product specification, navigation, autopilot vs. depth philosophy, baseline photo capture, and care loop.
 * [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md): Granular file ownership and contract change rules.
 * [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md): Environment-variable inventory, credential boundaries, and safe Supabase setup workflow.
-* [`docs/ROADMAP.md`](docs/ROADMAP.md): Independent sprint milestones (K1–K5 and S1–S5).
+* [`docs/ROADMAP.md`](docs/ROADMAP.md): Current single-owner milestones, prerequisites, and historical delivery record.
+* [`docs/FIRST_CUSTOMER_TEST.md`](docs/FIRST_CUSTOMER_TEST.md): Current first-customer acceptance script.
 * [`docs/INTERFACES.md`](docs/INTERFACES.md): Runtime contract specifications, error models, and semantic requirements for backend evolution.
 * [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): System topology, security boundaries, and data flow.
 * [`docs/DESIGN.md`](docs/DESIGN.md): Direction A Mineral design tokens, spatial grammar, and Apple HIG guidelines.

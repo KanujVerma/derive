@@ -24,6 +24,8 @@ export interface OnboardingState {
   postCleanseTightness: boolean | null;
   shelfPhotoUri: string | null;
   detectedProducts: Product[];
+  /** IDs the customer added or corrected; recognition cannot replace these. */
+  customerEditedProductIds: string[];
   frontPhotoUri: string | null;
   leftPhotoUri: string | null;
   rightPhotoUri: string | null;
@@ -96,6 +98,7 @@ const INITIAL_EMPTY_STATE = {
   postCleanseTightness: null,
   shelfPhotoUri: null,
   detectedProducts: [],
+  customerEditedProductIds: [],
   frontPhotoUri: null,
   leftPhotoUri: null,
   rightPhotoUri: null,
@@ -224,24 +227,51 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
     set({ middayFeel: midday, postCleanseTightness: tightness }),
 
   setShelfPhoto: (uri, products) =>
-    set({ shelfPhotoUri: uri, detectedProducts: products }),
+    set((state) => {
+      const preserved = state.detectedProducts.filter((product) =>
+        state.customerEditedProductIds.includes(product.id)
+      );
+      const merged = [...preserved];
+      const seenIds = new Set(preserved.map((product) => product.id));
+      const seenNames = new Set(preserved.map(shelfProductIdentity));
+      for (const product of products) {
+        const identity = shelfProductIdentity(product);
+        if (seenIds.has(product.id) || seenNames.has(identity)) continue;
+        merged.push(product);
+        seenIds.add(product.id);
+        seenNames.add(identity);
+      }
+      return { shelfPhotoUri: uri, detectedProducts: merged };
+    }),
 
   confirmProduct: (product) =>
     set((state) => ({
       detectedProducts: state.detectedProducts.map((p) =>
         p.id === product.id ? product : p
       ),
+      customerEditedProductIds: state.customerEditedProductIds.includes(product.id)
+        ? state.customerEditedProductIds
+        : [...state.customerEditedProductIds, product.id],
     })),
 
   removeProduct: (productId) =>
     set((state) => ({
       detectedProducts: state.detectedProducts.filter((p) => p.id !== productId),
+      customerEditedProductIds: state.customerEditedProductIds.filter((id) => id !== productId),
     })),
 
   addProduct: (product) =>
-    set((state) => ({
-      detectedProducts: [...state.detectedProducts, product],
-    })),
+    set((state) => {
+      const duplicate = state.detectedProducts.find((existing) =>
+        existing.id === product.id || shelfProductIdentity(existing) === shelfProductIdentity(product)
+      );
+      return {
+        detectedProducts: duplicate
+          ? state.detectedProducts.map((existing) => existing.id === duplicate.id ? product : existing)
+          : [...state.detectedProducts, product],
+        customerEditedProductIds: [...state.customerEditedProductIds.filter((id) => id !== duplicate?.id && id !== product.id), product.id],
+      };
+    }),
 
   setHasBadReactions: (has) => set({ hasBadReactions: has }),
 
@@ -316,5 +346,10 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
 
   resetOnboarding: () => set({ ...INITIAL_EMPTY_STATE }),
 
-  loadArthurDemoState: () => set({ ...ARTHUR_DEMO_STATE }),
+  loadArthurDemoState: () => set({ ...ARTHUR_DEMO_STATE, customerEditedProductIds: [] }),
 }));
+
+function shelfProductIdentity(product: Pick<Product, 'brand' | 'name'>): string {
+  const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+  return JSON.stringify([normalize(product.brand), normalize(product.name)]);
+}
