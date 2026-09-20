@@ -1,6 +1,6 @@
 # Derive — First Founding Beta Customer Acceptance Script
 
-**Purpose**: Structured 10–15 min guided session with a first beta member to validate usability, trust, and perceived effort before full enrollment.
+**Purpose**: Structured 15–20 min guided session with a first beta member to validate usability, trust, and perceived effort before full enrollment.
 
 **Format**: Founder observes silently. Let the member drive. Speak only to prompt when stuck more than ~30 seconds.
 
@@ -21,6 +21,9 @@
 - [ ] WiFi connected
 - [ ] Note-taking ready (paper preferred to avoid device distraction)
 - [ ] Bring 2–3 real skincare product bottles with barcodes
+- [ ] Complete H1 hosted Remote smoke in `docs/HOSTED_REMOTE_SMOKE.md` before
+  this member session. Use a dedicated staging test identity first; do not
+  treat a Mock run as a hosted acceptance test.
 
 ---
 
@@ -38,7 +41,21 @@ Ask before they open:
 
 ---
 
-### 2. Welcome & Onboarding (4–6 min)
+### 2. Membership and payment (staging rehearsal)
+
+**Action**: Sign in using the six-digit email code, review the Founding Beta
+membership screen, and enter Stripe-hosted test Checkout. Only a signed Stripe
+webhook and canonical backend membership activation may unlock onboarding.
+Products are purchased separately. Do not run a real customer payment from
+this staging script; production enrollment needs a separate launch decision.
+
+**Observe**: whether `$25/month` and the boundary between managed service and
+product purchases are clear. A Checkout success return alone must not open
+onboarding.
+
+---
+
+### 3. Welcome & Onboarding (4–6 min)
 
 **Action**: Hand them the phone on the Welcome screen. Say nothing else.
 
@@ -56,7 +73,7 @@ Ask before they open:
 
 ---
 
-### 3. Baseline Photos — 3-Angle Capture (2–3 min)
+### 4. Baseline Photos, 3-Angle Capture (2–3 min)
 
 **Action**: Watch them navigate to the photo capture step.
 
@@ -75,20 +92,20 @@ Ask before they open:
 
 ---
 
-### 4. Onboarding Summary & Plan Draft (1 min)
+### 5. Onboarding Summary & Plan Draft (1 min)
 
 **Action**: Let them reach the summary screen.
 
 | Check | Expected | Failure Signal |
 |-------|----------|---------------|
 | Review summary | Can identify their products and goals | "I didn't know I was giving all this" |
-| $100 Founding Beta | Visible on the membership card and makes sense | "$100 for what exactly?" |
+| $25 Founding Beta | Already confirmed before onboarding; products separate | "$25 for what exactly?" |
 | Final Review copy | Understands the first routine gets a quality check before it goes live | Thinks the plan is already active |
 | Explore-while-reviewing | Can still use Today / Plan preview / Scan / Ask | Feels locked out after submitting |
 
 ---
 
-### 5. Today Tab — At-a-Glance (30 sec)
+### 6. Today Tab, At-a-Glance (30 sec)
 
 **Action**: Navigate to Today.
 
@@ -99,7 +116,7 @@ Ask before they open:
 
 ---
 
-### 6. Barcode Scan (2 min)
+### 7. Barcode Scan (2 min)
 
 **Action**: Hand them one of the product bottles. Say: "Try scanning this."
 
@@ -115,7 +132,7 @@ Ask before they open:
 
 ---
 
-### 7. Ask Tab (1–2 min)
+### 8. Ask Tab (1–2 min)
 
 **Action**: Let them ask a natural skincare question.
 
@@ -127,7 +144,7 @@ Ask before they open:
 
 ---
 
-### 8. Plan Tab (30 sec)
+### 9. Plan Tab (30 sec)
 
 **Action**: Navigate to Plan.
 
@@ -138,7 +155,7 @@ Ask before they open:
 
 ---
 
-### 9. Progress Tab (30 sec)
+### 10. Progress Tab (30 sec)
 
 **Action**: Navigate to Progress.
 
@@ -149,7 +166,7 @@ Ask before they open:
 
 ---
 
-### 10. Orders / Refills (30 sec)
+### 11. Orders / Refills (30 sec)
 
 **Action**: Check the Orders tab or Refills if visible.
 
@@ -167,7 +184,7 @@ Ask after the session:
 2. "What would make you trust this more?"
 3. "Was there anything that felt off or confusing?"
 4. "If you were going to tell a friend about this, what would you say?"
-5. "At $100/month, what would you need to see to feel like it's worth it?"
+5. "At $25/month, with products purchased separately, what would you need to see to feel like it's worth it?"
 
 **Do not prime them** — let them answer before clarifying.
 
@@ -197,7 +214,7 @@ For each major step, note:
 | Cannot position face for auto-capture | Hold threshold too strict; environment too dark |
 | "What is Derive exactly?" at summary | Welcome copy needs stronger managed-service framing |
 | Skips reading reactions page | Too many disclosure steps |
-| "$100 for this?" | Perceived value not yet established by the time price appears |
+| "$25 for this, plus products?" | Managed service and product costs were not explained clearly before onboarding |
 | "Can I look things up myself?" | Trust not yet established; they want to verify |
 
 ---

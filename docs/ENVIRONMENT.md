@@ -7,7 +7,10 @@ another.
 ## Current deployment state
 
 - The mobile app remains in mock mode by default.
-- No hosted Supabase project is identified by committed configuration.
+- H1 uses the existing Derive organization project `snojlbqovlawewwqbviz`
+  (`us-east-2`) for staging/test work. All 15 committed migrations and 13
+  required Edge Functions are deployed. See `docs/HOSTED_REMOTE_SMOKE.md` for
+  dated readback and unresolved hosted gates.
 - `.env.example` contains only public mobile names and a safe mock-mode default;
   it contains no usable credentials.
 - Setting `EXPO_PUBLIC_USE_REMOTE_SERVICE=true` is intentionally fail-closed
@@ -25,13 +28,14 @@ another.
 | `SUPABASE_DB_PASSWORD` | CLI / CI | Secret | Hosted migration and database operations |
 | `DERIVE_PUBLIC_SUPABASE_URL` | Local Edge Function runtime | Public | Optional override when testing signed photo URLs from a physical device; hosted environments do not need it |
 | `GEMINI_API_KEY` | Supabase Edge Functions / trusted server | Secret | Required for live S3 routine, scan, and Ask generation |
-| `GEMINI_MODEL` | Supabase Edge Functions / trusted server | Non-secret configuration | Optional S3 model override; defaults to `gemini-2.5-flash` |
+| `GEMINI_MODEL` | Supabase Edge Functions / trusted server | Non-secret configuration | Optional model override; shared Ask/Scan runtime defaults to `gemini-2.5-flash`, while the routine proposal adapter defaults to `gemini-3.8-flash` |
 | `STRIPE_SECRET_KEY` | Supabase Edge Functions / trusted server | Secret | Required for Checkout, Portal, and subscription retrieval; use a test-mode key until production readiness review |
 | `STRIPE_WEBHOOK_SECRET` | Supabase Edge Functions / trusted server | Secret | Required to verify the raw Stripe webhook body; unique per webhook endpoint/listener |
 | `STRIPE_FOUNDING_BETA_PRICE_ID` | Supabase Edge Functions / trusted server | Non-secret identifier, server-only policy | Recurring monthly Stripe Price that owns the actual Founding Beta charge |
 | `DERIVE_CHECKOUT_SUCCESS_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS success destination (localhost HTTP allowed only for local development) |
 | `DERIVE_CHECKOUT_CANCEL_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS cancellation destination (localhost HTTP allowed only for local development) |
 | `DERIVE_PORTAL_RETURN_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS return destination from Stripe Billing Portal |
+| `ADMIN_ALLOWED_ORIGINS` | Founder Edge Function runtime | Non-secret configuration | Approved browser origins for a hosted founder console; retain the existing S4 founder allowlist |
 
 The root `.env.example` lists only the three `EXPO_PUBLIC_*` mobile variables.
 CLI/CI and trusted-server names are documented here instead of being mixed into
@@ -71,18 +75,21 @@ from `.env.example`.
 The mobile sign-in screen expects a six-digit email OTP. Local Supabase uses
 `supabase/templates/magic_link.html` with `{{ .Token }}` and an explicit six-digit
 OTP length. The default Supabase Magic Link email does not satisfy this UI.
-For a hosted project, set its Magic Link / OTP email template in the Supabase
-Dashboard to include `{{ .Token }}` and verify the OTP length is six before the
-Remote activation smoke. Local CLI template configuration does not deploy to
-the hosted project.
+The existing hosted Derive project still sends the default Magic Link email.
+It was created on the free tier after Supabase restricted template editing with
+its shared mail provider. A founder must choose custom SMTP or a paid plan,
+and an authorized administrator must install a `{{ .Token }}` template before
+the six-digit Remote OTP smoke. Shared mail is also limited to organization
+team addresses. Local CLI template configuration does not deploy to hosted.
 
 E1 resolves the managed-app entitlement policy: Remote accounts need canonical
 active membership before sensitive onboarding and the member tabs. A signed-in
 inactive account uses `/membership` for trusted Checkout or billing management.
 Profile readiness alone cannot grant access. Public Shop routing remains
 separate, unopened C1.5 work. Keep `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`
-until hosted migrations/functions, six-digit OTP email, Gemini secret, and the
-test-mode Checkout to signed webhook to membership to Portal smoke all pass.
+until six-digit hosted OTP, Gemini, and test-mode Checkout to signed webhook to
+membership to Portal smoke all pass. H1's schema and function deployment alone
+do not authorize production activation.
 
 For a developer workstation, prefer interactive authentication:
 
@@ -122,9 +129,9 @@ S3 intelligence reads `GEMINI_API_KEY` only inside the trusted Edge Function
 runtime. Store it through Supabase Edge Function secrets (and in an ignored
 `supabase/.env.local` file for local development), never in the repository
 root's mobile values. `GEMINI_MODEL` may be set beside it when an explicitly
-reviewed model override is needed; otherwise the functions use
-`gemini-2.5-flash`. Without a Gemini key, live routine, scan, and safe Ask model
-paths return a sanitized `503` rather than fabricating model output. The
+reviewed model override is needed; otherwise the functions use the implemented
+models described above. Without a Gemini key, live routine, scan, and safe Ask
+model paths return a sanitized `503` rather than fabricating model output. The
 deterministic emergency circuit breaker and server-owned signal inference do
 not require the provider key.
 

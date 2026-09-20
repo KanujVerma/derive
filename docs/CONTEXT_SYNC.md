@@ -6,6 +6,16 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19: H1 hosted activation checkpoint, partial
+
+- **Predecessor**: clean shared `main@953c9295573b7fe8c8bd88a0758c4a00819175c4`, final E1 CI `35474929110` success. H1 source branch is `kanuj/h1-hosted-remote-activation`.
+- **Project identity**: Existing `Derive` project `snojlbqovlawewwqbviz` in organization `Derive`, `us-east-2`, healthy Postgres 17.6.1.166. This organization is distinct from `Kanuj's Org`; individual Sami ownership is supplied by the H1 brief rather than independently verified.
+- **Hosted changes**: The first 14 local migration versions matched the hosted S1-S5 ledger. The E1 entitlement migration was the only dry-run pending item, then was applied forward-only. All 15 migrations now appear in hosted history. Seven E1-modified functions were redeployed and three missing S5 billing functions added; all 13 are active with the Stripe webhook as the sole `verify_jwt=false` exception. No customer data was present before deployment.
+- **Readback**: E1 invoker function and active-member write policies verified in hosted SQL. Data API exposes `public` and `graphql_public`; selective customer grants, RLS, and private photo bucket inspected. Gateway denies unauthenticated onboarding (401); webhook rejects an unsigned body (400). These probes do not establish the real lifecycle.
+- **Staging client**: A one-off Remote web export succeeded using the hosted URL and modern publishable key as public build values. No server secret entered the build, and the committed default remains `false`.
+- **External blocker**: Hosted free-tier Auth still uses a link-only template and has no custom SMTP. Supabase's June 2026 restriction prevents editing that template on new free projects using shared mail. A founder must choose custom SMTP or a paid plan, and an authorized administrator must configure a six-digit `{{ .Token }}` email. Supabase secret inventory has only platform defaults. The available Stripe browser login is for an unrelated account, so no Derive Stripe resources were changed.
+- **Status**: H1 is partial; real OTP, Gemini, Stripe, customer, founder, photo, billing, and cross-user smoke remain unverified. `EXPO_PUBLIC_USE_REMOTE_SERVICE=false` and C1.5 remains unopened. See `docs/HOSTED_REMOTE_SMOKE.md` for exact evidence and repeatable checks.
+
 ## 2026-09-19: E1 membership entitlement integration checkpoint
 
 - **Branch / predecessor**: `kanuj/e1-membership-entitlements` from shared `main` at `e661f71c54f67e740c7987f76f2f6dc671603ae2` (CI `35471149916` success). PR and final CI remain separate acceptance gates at this checkpoint.

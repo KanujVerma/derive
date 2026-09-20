@@ -625,6 +625,18 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Local unit, pgTAP, OTP, E1 lifecycle, and S1-S5 integration tests cover the boundary.
   - [ ] Configure and smoke the hosted six-digit OTP template, Supabase functions/migrations, Gemini secret, and test-mode Stripe Checkout to signed webhook to Portal lifecycle before enabling production Remote mode.
 
+### H1: Hosted Remote Activation and End-to-End Smoke [PARTIAL; EXTERNAL DECISIONS PENDING]
+* **Scope**: Use the existing Derive organization Supabase project for a real test-mode OTP, membership, onboarding, model, founder, managed-service, billing downgrade, and security lifecycle. Keep the committed Remote default off.
+* **Verified on 2026-09-19**:
+  - [x] Existing project `snojlbqovlawewwqbviz` identified and linked in an isolated worktree; 14 hosted S1-S5 migrations reconciled with the local ledger.
+  - [x] E1 migration deployed forward-only and read back; all 13 required Edge Functions active with the webhook's JWT exception scoped to that function.
+  - [x] Private photo bucket, Data API exposure, RLS/grants, and advisor baseline inspected. Unauthenticated paid call returned 401; unsigned webhook returned 400.
+  - [x] Explicit staging Remote web export succeeded with the hosted URL and modern publishable key, without changing the committed default.
+  - [ ] Founder decision and authorized setup for hosted six-digit OTP delivery: new free-tier shared mail cannot customize the default Magic Link template.
+  - [ ] Correct Derive Stripe test account access, test Price, signed webhook, Checkout, Portal, and downgrade smoke.
+  - [ ] Real Gemini credential and provider call; full Remote customer, photo, founder, and cross-user smoke.
+* **Evidence and reusable checks**: `docs/HOSTED_REMOTE_SMOKE.md`. No hosted customer lifecycle has yet passed. Production Remote remains `false`; C1.5 remains unopened.
+
 ### C1.5: Physical Product Commerce Integration [NOT STARTED]
 * **Scope**: Future physical product checkout, offers, order persistence, fulfillment, and public Shop activation.
 * **Prerequisites**: Choose a physical-commerce provider and approve a separate contract and data model.
