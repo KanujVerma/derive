@@ -72,7 +72,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 
 ### 6. Profile & Settings (`app/profile`)
 - **Customer Account Identity**: Member name, email, Founding Beta badge, and membership price. **Implemented (I1-B4A):** `${config.betaPriceMonthly}/mo` (`25`) for Derive management. Products purchased separately.
-- **Clean Customer Scope**: Dedicated customer-facing sections for Care & History (Active Routine, Product Reaction History, Orders & Refills) and Support & Privacy (Member Support, Export Personal Data).
+- **Clean Customer Scope**: Dedicated customer-facing Care & History and Help sections. With no verified human contact configured, Help routes skincare questions to Ask. The former data-export alert did not create a request and is hidden until a real authenticated export path exists.
 - **No Developer Bloat**: Internal founder review desk links, dev toggles, and unsubstantiated HIPAA/GDPR regulatory claims are completely removed from customer view.
 
 ---

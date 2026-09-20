@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { shelfProductIdentity } from '../utils/shelfProducts.ts';
 import type {
   Goal,
   RoutineComplexity,
@@ -26,6 +27,9 @@ export interface OnboardingState {
   detectedProducts: Product[];
   /** IDs the customer added or corrected; recognition cannot replace these. */
   customerEditedProductIds: string[];
+  /** Labels and IDs a customer corrected or removed during this intake. */
+  suppressedRecognitionKeys: string[];
+  suppressedRecognitionIds: string[];
   frontPhotoUri: string | null;
   leftPhotoUri: string | null;
   rightPhotoUri: string | null;
@@ -57,7 +61,7 @@ export interface OnboardingState {
   setCostPreference: (pref: ProductCostPreference) => void;
   setSkinBehavior: (midday: MiddayFeel, tightness: boolean) => void;
   setShelfPhoto: (uri: string, products: Product[]) => void;
-  confirmProduct: (product: Product) => void;
+  confirmProduct: (product: Product, prior?: Product) => void;
   removeProduct: (productId: string) => void;
   addProduct: (product: Product) => void;
   setHasBadReactions: (has: boolean) => void;
@@ -99,6 +103,8 @@ const INITIAL_EMPTY_STATE = {
   shelfPhotoUri: null,
   detectedProducts: [],
   customerEditedProductIds: [],
+  suppressedRecognitionKeys: [],
+  suppressedRecognitionIds: [],
   frontPhotoUri: null,
   leftPhotoUri: null,
   rightPhotoUri: null,
@@ -233,10 +239,10 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       );
       const merged = [...preserved];
       const seenIds = new Set(preserved.map((product) => product.id));
-      const seenNames = new Set(preserved.map(shelfProductIdentity));
+      const seenNames = new Set([...preserved.map(shelfProductIdentity), ...state.suppressedRecognitionKeys]);
       for (const product of products) {
         const identity = shelfProductIdentity(product);
-        if (seenIds.has(product.id) || seenNames.has(identity)) continue;
+        if (seenIds.has(product.id) || state.suppressedRecognitionIds.includes(product.id) || seenNames.has(identity)) continue;
         merged.push(product);
         seenIds.add(product.id);
         seenNames.add(identity);
@@ -244,21 +250,42 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       return { shelfPhotoUri: uri, detectedProducts: merged };
     }),
 
-  confirmProduct: (product) =>
-    set((state) => ({
-      detectedProducts: state.detectedProducts.map((p) =>
-        p.id === product.id ? product : p
-      ),
-      customerEditedProductIds: state.customerEditedProductIds.includes(product.id)
-        ? state.customerEditedProductIds
-        : [...state.customerEditedProductIds, product.id],
-    })),
+  confirmProduct: (product, prior) =>
+    set((state) => {
+      const current = state.detectedProducts.find((p) => p.id === product.id);
+      if (!current && (!prior || state.suppressedRecognitionIds.includes(product.id))) return state;
+      const nextKey = shelfProductIdentity(product);
+      if (state.detectedProducts.some((other) => other.id !== product.id && shelfProductIdentity(other) === nextKey)) return state;
+      const previousProduct = current ?? prior;
+      const priorKey = previousProduct && shelfProductIdentity(previousProduct);
+      const suppressed = state.suppressedRecognitionKeys.filter((key) => key !== nextKey);
+      if (priorKey && priorKey !== nextKey && !suppressed.includes(priorKey)) suppressed.push(priorKey);
+      return {
+        detectedProducts: current
+          ? state.detectedProducts.map((p) => p.id === product.id ? product : p)
+          : [...state.detectedProducts, product],
+        customerEditedProductIds: state.customerEditedProductIds.includes(product.id)
+          ? state.customerEditedProductIds
+          : [...state.customerEditedProductIds, product.id],
+        suppressedRecognitionKeys: suppressed,
+      };
+    }),
 
   removeProduct: (productId) =>
-    set((state) => ({
-      detectedProducts: state.detectedProducts.filter((p) => p.id !== productId),
-      customerEditedProductIds: state.customerEditedProductIds.filter((id) => id !== productId),
-    })),
+    set((state) => {
+      const removed = state.detectedProducts.find((product) => product.id === productId);
+      const key = removed && shelfProductIdentity(removed);
+      return {
+        detectedProducts: state.detectedProducts.filter((p) => p.id !== productId),
+        customerEditedProductIds: state.customerEditedProductIds.filter((id) => id !== productId),
+        suppressedRecognitionKeys: key && !state.suppressedRecognitionKeys.includes(key)
+          ? [...state.suppressedRecognitionKeys, key]
+          : state.suppressedRecognitionKeys,
+        suppressedRecognitionIds: state.suppressedRecognitionIds.includes(productId)
+          ? state.suppressedRecognitionIds
+          : [...state.suppressedRecognitionIds, productId],
+      };
+    }),
 
   addProduct: (product) =>
     set((state) => {
@@ -270,6 +297,8 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
           ? state.detectedProducts.map((existing) => existing.id === duplicate.id ? product : existing)
           : [...state.detectedProducts, product],
         customerEditedProductIds: [...state.customerEditedProductIds.filter((id) => id !== duplicate?.id && id !== product.id), product.id],
+        suppressedRecognitionKeys: state.suppressedRecognitionKeys.filter((key) => key !== shelfProductIdentity(product)),
+        suppressedRecognitionIds: state.suppressedRecognitionIds.filter((id) => id !== product.id),
       };
     }),
 
@@ -346,10 +375,10 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
 
   resetOnboarding: () => set({ ...INITIAL_EMPTY_STATE }),
 
-  loadArthurDemoState: () => set({ ...ARTHUR_DEMO_STATE, customerEditedProductIds: [] }),
+  loadArthurDemoState: () => set({
+    ...ARTHUR_DEMO_STATE,
+    customerEditedProductIds: [],
+    suppressedRecognitionKeys: [],
+    suppressedRecognitionIds: [],
+  }),
 }));
-
-function shelfProductIdentity(product: Pick<Product, 'brand' | 'name'>): string {
-  const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
-  return JSON.stringify([normalize(product.brand), normalize(product.name)]);
-}

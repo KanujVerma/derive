@@ -63,15 +63,6 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleExportData = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      'Export Requested',
-      'Export request received. Your care concierge will compile your skin observations and routine history archive.',
-      [{ text: 'OK' }]
-    );
-  };
-
   const handleLoadDemo = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     loadArthurDemoUser();
@@ -238,8 +229,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </GroupedSection>
 
-        {/* Section 2: Support & Privacy */}
-        <GroupedSection header="Support & Privacy">
+        {/* Section 2: Working in-app help; human contact appears only when configured. */}
+        <GroupedSection header="Help">
           <TouchableOpacity
             style={styles.groupedRow}
             onPress={handleContactSupport}
@@ -255,18 +246,6 @@ export default function ProfileScreen() {
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.groupedRow}
-            onPress={handleExportData}
-            activeOpacity={0.7}
-          >
-            <Icon name="info" size={18} color={colors.inkMuted} />
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Export Personal Data</Text>
-              <Text style={styles.rowSubtitle}>Download your skin logs and routine record</Text>
-            </View>
-            <Icon name="forward" size={16} color={colors.inkMuted} />
-          </TouchableOpacity>
         </GroupedSection>
 
         {/* Section 3: Account & Session */}

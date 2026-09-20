@@ -9024,6 +9024,81 @@ test('V1A Shelf: customer corrections survive retake and removal stays removed',
   }
 });
 
+test('V1A Shelf: retake cannot reintroduce the label a customer corrected', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    shelf.setShelfPhoto('file:///first.jpg', [
+      { id: 'recognized-1', brand: 'Misread', name: 'Lotion', category: 'other', keyActives: [] },
+    ]);
+    shelf.confirmProduct({ id: 'recognized-1', brand: 'Correct Brand', name: 'Exact Lotion', category: 'moisturizer', keyActives: [], isCatalogStandard: false });
+    shelf.setShelfPhoto('file:///retake.jpg', [
+      { id: 'recognized-2', brand: 'Misread', name: 'Lotion', category: 'other', keyActives: [] },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts.map((product) => product.id), ['recognized-1']);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: removed customer product stays removed when retake finds its old label', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    shelf.addProduct({ id: 'manual-1', brand: 'Brand', name: 'Cream', category: 'moisturizer', keyActives: [], isCatalogStandard: false });
+    shelf.removeProduct('manual-1');
+    shelf.setShelfPhoto('file:///retake.jpg', [
+      { id: 'recognized-2', brand: 'Brand', name: 'Cream', category: 'moisturizer', keyActives: [] },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, []);
+    const reentered: Product = { id: 'manual-2', brand: 'Brand', name: 'Cream', category: 'moisturizer', keyActives: [], isCatalogStandard: false };
+    shelf.addProduct(reentered);
+    shelf.setShelfPhoto('file:///later.jpg', [
+      { id: 'recognized-3', brand: 'Brand', name: 'Cream', category: 'moisturizer', keyActives: [] },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, [reentered]);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: editing one product to another exact identity cannot create duplicate rows', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    shelf.setShelfPhoto('file:///two.jpg', [
+      { id: 'recognized-a', brand: 'Brand A', name: 'One', category: 'cleanser', keyActives: [] },
+      { id: 'recognized-b', brand: 'Brand B', name: 'Two', category: 'moisturizer', keyActives: [] },
+    ]);
+    shelf.confirmProduct({ id: 'recognized-b', brand: ' brand a ', name: 'One', category: 'moisturizer', keyActives: [], isCatalogStandard: false });
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts.map((product) => [product.brand, product.name]), [
+      ['Brand A', 'One'],
+      ['Brand B', 'Two'],
+    ]);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: correction saved after an empty retake restores customer truth', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    const misread: Product = { id: 'recognized-a', brand: 'Misread', name: 'Lotion', category: 'other', keyActives: [] };
+    const corrected: Product = { id: 'recognized-a', brand: 'Actual Brand', name: 'Exact Lotion', category: 'moisturizer', keyActives: [], isCatalogStandard: false };
+    shelf.setShelfPhoto('file:///first.jpg', [misread]);
+    shelf.setShelfPhoto('file:///empty-retake.jpg', []);
+    shelf.confirmProduct(corrected, misread);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, [corrected]);
+    shelf.setShelfPhoto('file:///third.jpg', [
+      { ...misread, id: 'recognized-b' },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, [corrected]);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
 test('V1A Shelf: manual identity carries no invented formula or catalog trust', () => {
   const product = buildCustomerShelfProduct('manual-1', {
     brand: '  Customer Brand  ',

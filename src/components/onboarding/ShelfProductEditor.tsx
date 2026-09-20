@@ -3,12 +3,14 @@ import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radii, spacing, typography } from '../../constants/theme';
 import { ProductCategorySchema, type Product, type ProductCategory } from '../../types/schema';
+import { shelfProductIdentity } from '../../utils/shelfProducts';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 import { TextField } from '../ui/TextField';
 
 interface Props {
   product?: Product;
+  existingProducts: readonly Product[];
   onSave: (details: { brand: string; name: string; category: ProductCategory }) => void;
   onCancel: () => void;
 }
@@ -18,12 +20,15 @@ const CATEGORY_LABELS: Partial<Record<ProductCategory, string>> = {
   hair_care: 'Hair care',
 };
 
-export function ShelfProductEditor({ product, onSave, onCancel }: Props) {
+export function ShelfProductEditor({ product, existingProducts, onSave, onCancel }: Props) {
   const insets = useSafeAreaInsets();
   const [brand, setBrand] = useState(product?.brand ?? '');
   const [name, setName] = useState(product?.name ?? '');
   const [category, setCategory] = useState<ProductCategory | null>(product?.category ?? null);
-  const canSave = !!brand.trim() && !!name.trim() && category !== null;
+  const duplicate = existingProducts.some((other) =>
+    other.id !== product?.id && shelfProductIdentity(other) === shelfProductIdentity({ brand, name })
+  );
+  const canSave = !!brand.trim() && !!name.trim() && category !== null && !duplicate;
 
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onCancel}>
@@ -46,6 +51,7 @@ export function ShelfProductEditor({ product, onSave, onCancel }: Props) {
           </Text>
           <TextField label="Brand" value={brand} onChangeText={setBrand} placeholder="Brand on the package" autoCapitalize="words" />
           <TextField label="Exact product name" value={name} onChangeText={setName} placeholder="Name on the package" autoCapitalize="words" />
+          {duplicate && <Text style={styles.duplicateNotice} accessibilityRole="alert">This product is already on your shelf. Edit that entry instead.</Text>}
           <Text style={styles.categoryLabel}>Category</Text>
           <View style={styles.categories} accessibilityRole="radiogroup">
             {ProductCategorySchema.options.map((option) => (
@@ -89,6 +95,7 @@ const styles = StyleSheet.create({
   closeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   description: { fontSize: typography.sizes.bodyRegular, color: colors.inkMuted, lineHeight: 22, marginBottom: spacing.lg },
+  duplicateNotice: { color: colors.actionPause.text, fontSize: typography.sizes.caption, lineHeight: 19, marginBottom: spacing.md },
   categoryLabel: { fontSize: typography.sizes.caption, fontWeight: typography.weights.semibold, color: colors.ink, marginBottom: spacing.sm },
   categories: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   categoryChip: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.full, backgroundColor: colors.surface, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },

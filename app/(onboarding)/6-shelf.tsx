@@ -68,7 +68,7 @@ export default function ShelfScreen() {
       ? editor.product.id
       : `manual_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const product = buildCustomerShelfProduct(id, details);
-    if (editor.kind === 'edit') confirmProduct(product);
+    if (editor.kind === 'edit') confirmProduct(product, editor.product);
     else addProduct(product);
     setEditor(null);
   };
@@ -95,6 +95,7 @@ export default function ShelfScreen() {
         <ShelfProductEditor
           key={editor.kind === 'edit' ? editor.product.id : 'new'}
           product={editor.kind === 'edit' ? editor.product : undefined}
+          existingProducts={detectedProducts}
           onSave={handleSaveProduct}
           onCancel={() => setEditor(null)}
         />
@@ -119,10 +120,12 @@ export default function ShelfScreen() {
           <TouchableOpacity
             style={styles.cameraButton}
             onPress={() => setShowCamera(true)}
+            disabled={isScanning}
             activeOpacity={0.8}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel={shelfPhotoUri ? 'Retake shelf photo' : 'Take a photo of your shelf'}
+            accessibilityState={{ disabled: isScanning }}
           >
             <Icon name="camera" size={20} color={colors.inkInverse} />
             <Text style={styles.cameraButtonText}>{shelfPhotoUri ? 'Retake Shelf Photo' : 'Take Shelf Photo'}</Text>

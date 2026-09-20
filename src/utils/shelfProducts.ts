@@ -1,5 +1,11 @@
 import { ProductCategorySchema, type Product, type ProductCategory } from '../types/schema.ts';
 
+/** Exact brand and name identity for local Shelf deduplication. */
+export function shelfProductIdentity(product: Pick<Product, 'brand' | 'name'>): string {
+  const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+  return JSON.stringify([normalize(product.brand), normalize(product.name)]);
+}
+
 /** A customer's product identity is known; chemistry and catalog status are not. */
 export function buildCustomerShelfProduct(
   id: string,

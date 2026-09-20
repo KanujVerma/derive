@@ -217,9 +217,17 @@ export default function SummaryScreen() {
         <GroupedSection header="Counter Products & Reactions">
           {renderAuditRow(
             'Current Shelf',
-            `${onboarding.detectedProducts.length} product${onboarding.detectedProducts.length === 1 ? '' : 's'} reviewed`,
+            `${onboarding.detectedProducts.length} product${onboarding.detectedProducts.length === 1 ? '' : 's'} added`,
             '/(onboarding)/6-shelf'
           )}
+          {onboarding.detectedProducts.map((product) => (
+            <View key={product.id} style={styles.shelfProductRow}>
+              <Text style={styles.shelfProductName}>{product.brand} · {product.name}</Text>
+              <Text style={styles.shelfProductCategory}>
+                {product.category.replace('_', ' ').replace(/^./, (letter) => letter.toUpperCase())}
+              </Text>
+            </View>
+          ))}
           {renderAuditRow(
             'Past Reactions',
             onboarding.productReactions.length > 0
@@ -280,7 +288,7 @@ export default function SummaryScreen() {
       </ScrollView>
 
       <StickyActionFooter
-        ctaLabel={isBuilding ? 'Building Your Plan...' : 'Build My Plan'}
+        ctaLabel={isBuilding ? 'Submitting Intake...' : 'Submit My Intake'}
         onPressCta={handleBuildPlan}
         loading={isBuilding}
       />
@@ -394,6 +402,20 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyRegular,
     fontWeight: typography.weights.semibold,
     color: colors.ink,
+  },
+  shelfProductRow: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  shelfProductName: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+  },
+  shelfProductCategory: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    marginTop: 2,
   },
   editButton: {
     paddingVertical: 6,
