@@ -7,7 +7,8 @@ another.
 ## Current deployment state
 
 - The mobile app remains in mock mode by default.
-- No hosted Supabase project is identified by committed configuration.
+- The existing hosted Derive project is `snojlbqovlawewwqbviz`, independently read back in H1A. This identifier is documented here, not hardcoded in `eas.json`.
+- EAS `preview` contains the matching public client URL and publishable key. No staging binary or production Remote app has been accepted.
 - `.env.example` contains only public mobile names and a safe mock-mode default;
   it contains no usable credentials.
 - Setting `EXPO_PUBLIC_USE_REMOTE_SERVICE=true` is intentionally fail-closed
@@ -27,7 +28,7 @@ another.
 | `SUPABASE_DB_PASSWORD` | CLI / CI | Secret | Hosted migration and database operations |
 | `DERIVE_PUBLIC_SUPABASE_URL` | Local Edge Function runtime | Public | Optional override when testing signed photo URLs from a physical device; hosted environments do not need it |
 | `GEMINI_API_KEY` | Supabase Edge Functions / trusted server | Secret | Required for live S3 routine, scan, and Ask generation |
-| `GEMINI_MODEL` | Supabase Edge Functions / trusted server | Non-secret configuration | Optional S3 model override; defaults to `gemini-2.5-flash` |
+| `GEMINI_MODEL` | Supabase Edge Functions / trusted server | Non-secret configuration | Optional shared S3 model override; Ask/Scan currently default to `gemini-2.5-flash`, while routine proposal currently defaults to `gemini-3.8-flash`. Neither is a founder-approved final model choice. |
 | `STRIPE_SECRET_KEY` | Supabase Edge Functions / trusted server | Secret | Required for Checkout, Portal, and subscription retrieval; use a test-mode key until production readiness review |
 | `STRIPE_WEBHOOK_SECRET` | Supabase Edge Functions / trusted server | Secret | Required to verify the raw Stripe webhook body; unique per webhook endpoint/listener |
 | `STRIPE_FOUNDING_BETA_PRICE_ID` | Supabase Edge Functions / trusted server | Non-secret identifier, server-only policy | Recurring monthly Stripe Price that owns the actual Founding Beta charge |
@@ -74,13 +75,13 @@ from `.env.example`.
 
 `eas.json` has three explicit build profiles. `development` is an internal development client with Remote disabled. `production` is store-signed with Remote disabled. `remote-staging` is store-signed and TestFlight-capable, sets `EXPO_PUBLIC_BUILD_FLAVOR=remote-staging` and `EXPO_PUBLIC_USE_REMOTE_SERVICE=true`, and explicitly selects EAS environment `preview`. The explicit preview selection matters because a store distribution build otherwise selects the production environment by default. The build flavor is independent of service mode; a later approved production Remote activation remains possible without redefining flavor semantics.
 
-EAS preview must provide `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as public client configuration. On 2026-09-20, `eas config --platform ios --profile remote-staging --json` validated the profile but reported no plain-text or sensitive preview variables. A Remote staging binary cannot be treated as ready until H1A verifies the exact hosted project and configures these values in EAS preview. Do not copy a guessed project URL or key into `eas.json`, source, or a PR. Never use a service-role or secret key in Expo.
+EAS preview provides `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as public client configuration. L0 first validated the profile with both absent. H1A then verified the existing Derive Supabase project and matched the stored preview values privately against its exact URL and enabled publishable key. This is configuration proof, not a shipped binary or customer session. Do not copy the key into `eas.json`, source, or a PR. Never use a service-role or secret key in Expo.
 
 The L0 resolver rejects invalid flavor values, Remote staging with Remote disabled, missing or malformed publishable keys, legacy anon-only key, local/non-HTTPS or non-`*.supabase.co` hosts, and URLs containing a path, query, fragment, or embedded credentials. Remote staging checks the documented `sb_publishable_` key shape: a 22-character random part and an 8-character checksum part. A future reviewed custom-domain rollout would need an explicit guard change. The build shows a staging-only identity card on sign-in, Holding, Membership, and Profile with its service mode, safe backend host, **public configuration shape** status, and app version. Shape validation does not establish that the key is active or belongs to the displayed project. It never shows a key or user token. H1A must compare the host on a built device with the verified project and prove an authenticated call; a TestFlight label alone is not evidence of Remote mode.
 
 When switching local build flavors, clear Metro's cache before using an export as evidence. A 2026-09-20 local export initially reused a prior Mock bundle after shell environment values changed; `npx expo export -p web --clear` rebuilt and embedded the synthetic staging host as expected. Always inspect the compiled staging diagnostic on the installed build. This local observation does not assert the state of an EAS cloud binary.
 
-The optional fixed expected-project-ref guard was not added in L0 because the previously recorded Derive ref was not available through the connected Supabase project listing at this checkpoint. The staging diagnostic and H1A project assertion provide a visible/manual boundary until the project can be verified directly. This is not proof that the EAS preview configuration currently points to the correct project.
+The optional fixed expected-project-ref guard was not added in L0 because the general connected project list then omitted Derive. H1A direct project lookup and authenticated CLI later verified the exact ref, and private EAS preview readback matched it. The staging diagnostic still needs an installed-device comparison; it alone cannot prove the backend key is live.
 
 ## Supabase CLI and hosted-project access
 
@@ -136,15 +137,22 @@ photo signer rewrites that local-only origin to `http://127.0.0.1:54321` by
 default. Set `DERIVE_PUBLIC_SUPABASE_URL` only when a physical test device needs
 the Mac's LAN-reachable Supabase URL. The signed path and token are preserved.
 
-S3 intelligence reads `GEMINI_API_KEY` only inside the trusted Edge Function
-runtime. Store it through Supabase Edge Function secrets (and in an ignored
+S3 intelligence reads `GEMINI_API_KEY` only inside trusted Edge Functions.
+Store it through Supabase Edge Function secrets (and in an ignored
 `supabase/.env.local` file for local development), never in the repository
-root's mobile values. `GEMINI_MODEL` may be set beside it when an explicitly
-reviewed model override is needed; otherwise the functions use
-`gemini-2.5-flash`. Without a Gemini key, live routine, scan, and safe Ask model
-paths return a sanitized `503` rather than fabricating model output. The
-deterministic emergency circuit breaker and server-owned signal inference do
-not require the provider key.
+root's mobile values. At the 2026-09-20 H1A gate, an exact free-tier auth key
+was verified through Google's read-only model endpoint, but the authenticated
+Supabase CLI account was denied permission to set `GEMINI_API_KEY` on the
+existing Derive project. No partial hosted secret was stored. The model
+selection remains open. A synthetic direct adapter call to current routine
+default `gemini-3.8-flash` received Google 503 high-demand twice; a direct
+diagnostic with the shared Ask/Scan default ID `gemini-2.5-flash` received
+404 for this new key; a one-off
+`gemini-3.6-flash` diagnostic also received 503. Do not call any of those
+hosted provider paths proven. Without a selected/configured provider,
+`propose-routine` returns sanitized `MODEL_UNAVAILABLE` rather than fabricating
+a routine. The deterministic emergency circuit breaker and server-owned signal
+inference do not require the provider key. See [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md).
 
 S5 commerce reads every Stripe value only inside Supabase Edge Functions.
 `create-membership-checkout` and `create-membership-portal` require a valid

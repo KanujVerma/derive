@@ -86,9 +86,9 @@ The service factory supports selecting the remote backend adapter:
 # In your local .env:
 EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 ```
-*Note: The mobile client remains in Mock mode by default. The Remote adapter and S1-S5 implementation are present, but hosted migrations, functions, provider secrets, and the Stripe test-mode lifecycle smoke must be verified before Remote production activation. Enabling this flag alone is not a production readiness check.*
+*Note: The mobile client remains in Mock mode by default. H1A verified the existing hosted migrations, function inventory, and selected post-auth flows. Hosted provider proposal/publication, real email OTP, Stripe test-mode lifecycle and production readiness remain open. Enabling this flag alone is not a production readiness check.*
 
-L0 defines a separate `remote-staging` EAS profile for a store-signed Remote test build. It selects EAS `preview`; H1A must verify the hosted project and supply the preview public Supabase URL and publishable key before building. The production profile remains Mock. See [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) for preflight and staging-only diagnostics.
+L0 defines a separate `remote-staging` EAS profile for a store-signed Remote test build. It selects EAS `preview`; H1A verified the existing hosted Derive project and configured the matching public preview URL/key. No device build has been accepted. The production profile remains Mock. The H1A hosted post-auth baseline and blocked provider/publication gates are in [`docs/HOSTED_REMOTE_SMOKE.md`](docs/HOSTED_REMOTE_SMOKE.md); build preflight is in [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md).
 
 ---
 
