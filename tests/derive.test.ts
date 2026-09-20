@@ -19,6 +19,15 @@ import {
   normalizeIngredient,
 } from '../src/services/ai-workflows/ingredient-intelligence.ts';
 import { analytics } from '../src/services/analytics.ts';
+import {
+  MERCHANTS,
+  CURATED_LISTINGS,
+  exactProductKey,
+  isTrustedMerchantUrl,
+  resolvePurchaseOptions,
+  openExternalPurchase,
+  presentOfferPrice,
+} from '../src/commerce/merchantListings.ts';
 import { colors } from '../src/constants/theme.ts';
 import {
   validateCanonicalRoutine,
@@ -6217,6 +6226,7 @@ test('I1-B2 RemoteDeriveService: getUserProducts maps joined products table into
   assert.equal(p1.product.category, 'cleanser');
   assert.deepEqual(p1.product.keyActives, ['Ceramides', 'Hyaluronic Acid']);
   assert.equal(p1.product.retailPriceApprox, 15.99);
+  assert.equal(p1.product.isCatalogStandard, true, 'Existing catalog provenance must reach Shop');
 
   const p2 = userProducts[1];
   assert.equal(p2.action, 'PAUSE');
@@ -6898,6 +6908,7 @@ test('I1-B2.3 RemoteDeriveService: getUserProducts maps null/undefined is_confir
   const userProducts = await service.getUserProducts('usr_b2_null_test');
   assert.equal(userProducts.length, 1);
   assert.equal(userProducts[0].isConfirmedByUser, false, 'Null is_confirmed_by_user must fail closed to false');
+  assert.equal(userProducts[0].product.isCatalogStandard, false, 'Provisional identity must fail closed in Shop');
 });
 
 test('I1-B2.3: resolveRoutineProvider has no filesystem fallback and enforces server-only resolution', async () => {
@@ -8479,12 +8490,12 @@ test('C1 Shop: Mock Ask handoff preserves the scanned verdict', async () => {
   assert.deepEqual(response.referencedProducts, [scannedProduct.productName]);
 });
 
-test('C1 Shop: product detail does not fabricate price and uses truthful C1 commerce language', () => {
+test('C1 Shop: product detail keeps catalog price separate from merchant options', () => {
   const detailContent = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
   const commerceContent = fs.readFileSync(path.resolve('src/components/shop/ProductCommerceSection.tsx'), 'utf8');
   assert.ok(detailContent.includes('product.retailPriceApprox != null'), 'Price must only render when retailPriceApprox is non-null');
   assert.ok(detailContent.includes('<ProductCommerceSection'), 'Detail composes the Shop-owned commerce seam');
-  assert.ok(commerceContent.includes('Purchase through Derive coming soon'), 'Must use truthful C1 commerce language');
+  assert.ok(commerceContent.includes('Where to Buy'), 'Published ADD needs truthful multi-merchant options');
   assert.ok(!`${detailContent}${commerceContent}`.includes('Available at checkout'), 'Must never say Available at checkout');
 });
 
@@ -8837,4 +8848,114 @@ test('C1.1 Scan failure remains recoverable when camera permission is denied', (
   assert.ok(failureBranch > 0 && failureBranch < permissionBranch,
     'Evaluation failure must render before the camera-permission fallback');
   assert.match(scan.slice(failureBranch, permissionBranch), /label="Scan Again"/);
+});
+
+const acquisitionProduct = {
+  id: 'runtime-uuid', brand: 'CeraVe', name: 'Hydrating Facial Cleanser',
+  isCatalogStandard: true,
+};
+const currentRoutineProductIds = [acquisitionProduct.id];
+
+test('C1.5A: exact normalized identity and trusted provenance gate listing lookup', () => {
+  const input = { product: acquisitionProduct, action: 'ADD' as const, routineStatus: 'published' as const, currentRoutineProductIds };
+  assert.equal(exactProductKey(' CeraVe ', ' Hydrating   Facial Cleanser '), exactProductKey('cerave', 'hydrating facial cleanser'));
+  assert.equal(resolvePurchaseOptions(input).length, 1);
+  assert.deepEqual(resolvePurchaseOptions({ ...input, product: { ...acquisitionProduct, name: 'Hydrating Facial Cleanser SPF' } }), []);
+  assert.deepEqual(resolvePurchaseOptions({ ...input, product: { ...acquisitionProduct, name: 'Facial Cleanser' } }), []);
+  assert.deepEqual(resolvePurchaseOptions({ ...input, product: { ...acquisitionProduct, isCatalogStandard: false } }), []);
+  assert.deepEqual(resolvePurchaseOptions({ ...input, product: { ...acquisitionProduct, isCatalogStandard: undefined } }), []);
+  assert.deepEqual(resolvePurchaseOptions({ ...input, product: { ...acquisitionProduct, brand: 'Other' } }), []);
+});
+
+test('C1.5A: a retained ADD from an older plan has no acquisition in the published routine', () => {
+  assert.deepEqual(resolvePurchaseOptions({
+    product: acquisitionProduct,
+    action: 'ADD',
+    routineStatus: 'published',
+    currentRoutineProductIds: ['a-different-product'],
+  }), []);
+});
+
+test('C1.5A: zero, one and many options use an extensible merchant registry', () => {
+  const input = { product: acquisitionProduct, action: 'ADD' as const, routineStatus: 'published' as const, currentRoutineProductIds };
+  assert.equal(resolvePurchaseOptions({ ...input, listings: [] }).length, 0);
+  assert.equal(resolvePurchaseOptions({ ...input, listings: CURATED_LISTINGS.slice(0, 1) }).length, 1);
+  assert.equal(resolvePurchaseOptions(input).length, 1);
+  assert.equal(MERCHANTS.some((merchant) => merchant.id === 'derive'), true);
+  const custom = { id: 'brand-direct-example', displayName: 'Example Brand', trustedDomains: ['example.com'], kind: 'external' as const, priority: 10 };
+  const listing = { id: 'example-listing', productKey: exactProductKey('CeraVe', 'Hydrating Facial Cleanser'), merchantId: custom.id, url: 'https://example.com/products/hydrating-facial-cleanser', verifiedAt: '2026-09-19' };
+  assert.equal(resolvePurchaseOptions({ ...input, merchants: [custom], listings: [listing] }).length, 1);
+  assert.equal(resolvePurchaseOptions({ ...input, merchants: [...MERCHANTS, custom], listings: [...CURATED_LISTINGS, listing] }).length, 2);
+});
+
+test('C1.5A: merchant destinations require HTTPS and exact configured host', () => {
+  const target = MERCHANTS.find((merchant) => merchant.id === 'target')!;
+  assert.equal(isTrustedMerchantUrl('https://www.target.com/p/-/A-51148016', target), true);
+  for (const url of ['http://www.target.com/p/-/A-51148016', 'https://target.com.evil.test/p', 'javascript:alert(1)', 'https://target.com@evil.test/p', 'https://www.target.com/search?q=cleanser', 'https://www.target.com/p/#fragment']) {
+    assert.equal(isTrustedMerchantUrl(url, target), false, url);
+  }
+  assert.deepEqual(resolvePurchaseOptions({ product: acquisitionProduct, action: 'ADD', routineStatus: 'published', currentRoutineProductIds, listings: [{ ...CURATED_LISTINGS[0], url: 'https://target.com.evil.test/p' }] }), []);
+});
+
+test('C1.5A: only published ADD exposes acquisition; other actions keep their meaning', () => {
+  const input = { product: acquisitionProduct, action: 'ADD' as const, routineStatus: 'published' as const, currentRoutineProductIds };
+  for (const status of ['draft', 'awaiting_review', 'approved', null] as const) {
+    assert.deepEqual(resolvePurchaseOptions({ ...input, routineStatus: status }), []);
+  }
+  for (const action of ['KEEP', 'PAUSE', 'STOP', 'REPLACE'] as const) {
+    assert.deepEqual(resolvePurchaseOptions({ ...input, action }), []);
+  }
+  assert.equal(resolveActionCommerceSemantics('KEEP', 'published').planStatusLabel, 'In your plan');
+});
+
+test('C1.5A: offer price requires current authoritative provenance and remains separate from catalog price', () => {
+  const now = '2026-09-19T12:00:00.000Z';
+  const offer = { listingId: CURATED_LISTINGS[0].id, amountMinor: 1599, currency: 'USD', observedAt: '2026-09-19T11:00:00.000Z', source: { kind: 'official_feed' as const, name: 'Merchant feed' } };
+  assert.equal(resolvePurchaseOptions({ product: acquisitionProduct, action: 'ADD', routineStatus: 'published', currentRoutineProductIds })[0].offer, undefined);
+  assert.equal(presentOfferPrice(offer, now)?.price, '$15.99');
+  assert.match(presentOfferPrice(offer, now)?.provenance ?? '', /Merchant feed/);
+  assert.equal(presentOfferPrice({ ...offer, observedAt: '2026-09-17T11:00:00.000Z' }, now), null);
+  assert.equal(presentOfferPrice({ ...offer, amountMinor: -1 }, now), null);
+  assert.equal(presentOfferPrice({ ...offer, availability: 'out_of_stock' as const }, now), null);
+  assert.equal(presentOfferPrice({ ...offer, source: { kind: 'manual' as any, name: 'Someone' } }, now), null);
+  assert.equal(resolvePurchaseOptions({ product: acquisitionProduct, action: 'ADD', routineStatus: 'published', currentRoutineProductIds, offers: [offer], now })[0].offer?.price, '$15.99');
+  assert.equal(resolvePurchaseOptions({ product: acquisitionProduct, action: 'ADD', routineStatus: 'published', currentRoutineProductIds, offers: [{ ...offer, listingId: 'wrong' }], now })[0].offer, undefined);
+});
+
+test('C1.5A: future Derive merchant is first only with a real offer; alternatives remain', () => {
+  const derive = MERCHANTS.find((merchant) => merchant.id === 'derive')!;
+  const listing = { id: 'derive-future', productKey: exactProductKey('CeraVe', 'Hydrating Facial Cleanser'), merchantId: derive.id, verifiedAt: '2026-09-19', purchasePath: { kind: 'derive_checkout' as const } };
+  const input = { product: acquisitionProduct, action: 'ADD' as const, routineStatus: 'published' as const, currentRoutineProductIds, listings: [...CURATED_LISTINGS, listing] };
+  assert.equal(resolvePurchaseOptions(input).length, 1);
+  const offer = { listingId: listing.id, amountMinor: 1499, currency: 'USD', observedAt: '2026-09-19T11:00:00.000Z', source: { kind: 'official_feed' as const, name: 'Derive catalog' } };
+  const options = resolvePurchaseOptions({ ...input, offers: [offer], now: '2026-09-19T12:00:00.000Z' });
+  assert.deepEqual(options.map((option) => option.merchant.id), ['derive', 'ulta']);
+  const unavailable = resolvePurchaseOptions({ ...input, offers: [{ ...offer, availability: 'out_of_stock' as const }], now: '2026-09-19T12:00:00.000Z' });
+  assert.deepEqual(unavailable.map((option) => option.merchant.id), ['ulta']);
+});
+
+test('C1.5A: safe handoff tracks only successful open with minimal payload', async () => {
+  const [option] = resolvePurchaseOptions({ product: acquisitionProduct, action: 'ADD', routineStatus: 'published', currentRoutineProductIds });
+  const calls: unknown[] = [];
+  const opened = await openExternalPurchase(option, acquisitionProduct.id, async (url) => { calls.push(url); }, (event, payload) => calls.push({ event, payload }));
+  assert.equal(opened, true);
+  assert.deepEqual(calls[1], { event: 'external_purchase_opened', payload: { productId: 'runtime-uuid', merchantId: option.merchant.id, entryPoint: 'product_detail' } });
+  assert.equal(await openExternalPurchase(option, 'runtime-uuid', async () => {}, () => { throw Error('telemetry unavailable'); }), true);
+  assert.equal(await openExternalPurchase(option, 'runtime-uuid', async () => { throw Error('private platform error'); }, () => { throw Error('should not track'); }), false);
+  const invalid = { ...option, listing: { ...option.listing, url: 'javascript:alert(1)' } };
+  assert.equal(await openExternalPurchase(invalid, 'runtime-uuid', async () => { throw Error('should not open'); }, () => { throw Error('should not track'); }), false);
+});
+
+test('C1.5A: presentation and boundary avoid Scan, Orders, checkout and backend changes', () => {
+  const detail = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
+  const section = fs.readFileSync(path.resolve('src/components/shop/ProductCommerceSection.tsx'), 'utf8');
+  const scan = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  const recommendation = fs.readFileSync(path.resolve('src/services/ai-workflows/routine-generator.ts'), 'utf8');
+  assert.match(detail, /resolvePurchaseOptions/);
+  assert.match(section, /Where to Buy/);
+  assert.match(section, /activeOptions\.map/);
+  assert.match(section, /onDeriveCheckout/, 'Future Derive options require a real checkout handler before presentation');
+  assert.doesNotMatch(scan, /Where to Buy|View at Target|external_purchase_opened/);
+  assert.doesNotMatch(recommendation, /merchantListings|commerce\/merchant/);
+  assert.doesNotMatch(`${detail}${section}`, /createProductCheckout|createShopifySession|purchase_completed/);
 });

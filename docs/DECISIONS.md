@@ -230,6 +230,14 @@ Key technical and product decisions accepted for Derive V1.
 * **Revocation and privacy**: Foreground refresh can revoke access when billing status changes. The client clears managed caches while retaining Auth identity. Service-role Edge functions and owner-scoped RLS enforce active membership for paid operations and new sensitive writes. Owner-readable history and account deletion remain available. Emergency Ask hard-stops remain available before model work.
 * **Public Shop**: A future public or non-member Shop is a separate C1.5 catalog and routing milestone. E1 does not expose C1's limited fallback as a public product experience or implement physical-product commerce.
 
+### ADR-32: Multi-Merchant Acquisition Layer and Future Derive Shopify Merchant (C1.5A)
+* **Status**: APPROVED ARCHITECTURE; C1.5A implementation in draft review.
+* **Decision**: Keep canonical Product and member Recommendation independent of stable MerchantListing, optional volatile OfferSnapshot and PurchasePath. Recommendation and Scan verdicts never consume merchant payout, discounts or stock. C1.5A composes commerce only downstream of a published ADD and trusted catalog identity.
+* **Acquisition**: Start with small manually verified direct retailer product pages, HTTPS and exact trusted hosts. Use exact normalized trusted brand and full name when production product UUIDs are runtime-generated. Existing `is_catalog_standard` provenance must reach the client; false or missing suppresses acquisition. Unverified or marketplace-seller links are omitted. Retailer clicks are outbound intent, not orders.
+* **Future Derive merchant**: C1.5C will map Derive to Shopify products/variants, real offers and integrated checkout. A real active Derive offer may appear first, while legitimate external alternatives remain visible. S5 Stripe membership stays separate from physical commerce.
+* **Data and money**: C1.5B verifies official APIs, feeds or approved networks before ingesting current price/availability and approved attribution. HTML scraping is not foundational. Prices need source and observed time. Membership ARR, product GMV, Derive commerce revenue and gross profit are distinct; retailer commission is Derive revenue only to the extent attributable.
+* **Phasing**: C1.5A is client acquisition/presentation only; C1.5B owns live feeds and attribution; C1.5C owns Shopify integration and physical order lifecycle. No affiliate identifiers, backend schema, public Shop/Scan, S6 resolver or physical checkout is part of A.
+
 ---
 
 ## Open Shared-Contract Challenges (PROPOSED · UNRESOLVED)

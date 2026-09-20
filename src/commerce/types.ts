@@ -7,8 +7,9 @@
  * These types live under src/commerce/ (Kanuj-owned) and are NOT in
  * src/contracts/ or src/domain/. They are presentation helpers only.
  *
- * PHYSICAL COMMERCE BACKEND: Deferred to C1.5.
- * No ProductOffer DB schema, no Stripe physical checkout, no Shopify here.
+ * PHYSICAL COMMERCE BACKEND: Deferred to C1.5C.
+ * C1.5A external acquisition lives in merchantListings.ts. No ProductOffer DB
+ * schema, Stripe physical checkout, or Shopify implementation here.
  *
  * MEMBERSHIP BILLING: Strictly S5 / Sami-owned. DO NOT touch.
  * (IDeriveService.createMembershipCheckout / createMembershipPortal / HostedMembershipSession)
@@ -70,7 +71,7 @@ export function resolveShopProductContext(
 // =============================================
 // PURCHASE AVAILABILITY
 // Presentation-only purchase state.
-// No physical-commerce backend in C1.
+// External links are composed separately; this legacy state refers to Derive checkout.
 // =============================================
 
 /**
@@ -80,7 +81,8 @@ export function resolveShopProductContext(
  * is a C1.5 decision.
  *
  * - not_applicable: PAUSE / STOP — no acquisition CTA ever shown.
- * - deferred_to_c15: Would be purchasable; awaiting commerce backend.
+ * - deferred_to_c15: Derive-managed product checkout remains deferred;
+ *   a published ADD may independently have curated external purchase options.
  * - view_replacement: REPLACE action — show "View recommended replacement" only.
  */
 export type ShopPurchaseAvailability =
@@ -98,7 +100,7 @@ export interface ActionCommercePresentation {
   planStatusLabel: string;
   /** Whether a purchase CTA is conceptually appropriate for this action */
   acquisitionEligible: boolean;
-  /** Physical availability state for C1 */
+  /** Legacy Derive-managed checkout state; not an external listing count */
   purchaseAvailability: ShopPurchaseAvailability;
   /** True if we must never show a "Buy" CTA for the OLD product (REPLACE semantics) */
   neverSellOldProduct: boolean;
@@ -207,7 +209,7 @@ export interface ShopProductViewModel {
   scheduleText?: string;
   fitVerdict?: string; // e.g., "GREAT FIT", "COULD WORK" from Scan
 
-  // --- Commerce state (C1: always deferred_to_c15 or not_applicable) ---
+  // --- Derive-managed checkout state; external listings resolve separately ---
   purchaseAvailability: ShopPurchaseAvailability;
   /** True only when routine is published AND action is ADD */
   acquisitionEligible: boolean;
@@ -238,7 +240,7 @@ export interface ShopMembershipPresentation {
 // =============================================
 
 /**
- * OPEN_COMMERCE_QUESTIONS — C1.5+ decisions required before physical commerce.
+ * OPEN_COMMERCE_QUESTIONS — operational decisions for future Derive Shopify sales.
  *
  * 1. Is Derive the merchant of record?
  * 2. Does Derive hold physical inventory?
@@ -253,8 +255,8 @@ export interface ShopMembershipPresentation {
  * 11. Who sets member-price/coupon eligibility rules?
  * 12. What is the margin/economics model per SKU?
  *
- * Physical-commerce provider decision: OPEN (Stripe direct, Shopify headless, or external).
- * ProductOffer schema: OPEN — to be defined in C1.5 after provider decision.
+ * C1.5C plans Shopify as Derive's merchant platform; fulfillment and tax
+ * decisions remain open. C1.5A has no shared physical-commerce schema.
  */
 export const OPEN_COMMERCE_QUESTIONS = [
   'merchant_of_record',

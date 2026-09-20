@@ -186,6 +186,8 @@ export type RoutineAction = z.infer<typeof RoutineActionSchema>;
 
 export interface Product {
   id: string;
+  /** Existing catalog provenance; absent means unverified for acquisition. */
+  isCatalogStandard?: boolean;
   brand: string;
   name: string;
   category: ProductCategory;

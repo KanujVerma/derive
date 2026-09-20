@@ -6,6 +6,15 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19: C1.5A multi-merchant acquisition foundation (draft branch)
+
+- **Predecessor**: clean `origin/main@63884e91526437493b001919059e04c7d6c2c878` after fetch. H1 PR #21 remained open and draft at `50ff9fa65d45c3871e759094a196f4054c29ce5e`; its branch was not modified.
+- **Decision**: ADR-32 accepts Product/Recommendation/Listing/optional Offer/PurchasePath separation. The member product detail consumes curated Shop-only direct retailer links downstream of a published ADD; no link is attached to provisional or unknown catalog provenance. C1.5B will verify official feed/attribution paths; C1.5C plans a future Derive Shopify merchant. Legitimate alternative retailers remain visible when Derive offers a real product.
+- **Narrow existing-field propagation**: Remote already selects `products.is_catalog_standard` but omitted it from the client Product. C1.5A carries that existing boolean as optional `Product.isCatalogStandard`, with missing/false failing closed; no database or commerce service contract change. Demo CeraVe fixture carries explicit trusted provenance. This is necessary to prevent provisional brand/name collisions from receiving purchase links.
+- **Initial coverage**: One direct CeraVe Hydrating Facial Cleanser Ulta page with size selector was opened and checked 2026-09-19. A Target page was omitted because its published ingredients conflict with Ulta and the brand page. Product-family identity is not formula/variant verification; members are prompted to check ingredients and size at the retailer. No retailer price, inventory, affiliate IDs or actual purchase tracking is stored. Orders & Refills and Scan remain unchanged.
+- **S6 parked**: Sami owns a future shared Product Identity Resolver for Scan and Shelf. Candidate image/label/formula evidence needs provenance and user confirmation; C1.5A adds no S6 implementation.
+- **Scope boundary**: No H1, hosted Supabase, migration, physical Stripe checkout, S5 membership, SMTP, retailer feed, Shopify, public Shop/Scan or broad app UI changes. Verification and PR CI are separate final gates; this entry does not predict their outcome.
+
 ## 2026-09-19: C1.1 Shop and Scan experience checkpoint
 
 - **Predecessor**: clean `origin/main@953c9295573b7fe8c8bd88a0758c4a00819175c4`; separate H1 PR #21 remains draft at `50ff9fa65d45c3871e759094a196f4054c29ce5e`. C1.1 uses `kanuj/c1-1-shop-scan-experience` in its own worktree.

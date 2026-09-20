@@ -53,6 +53,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 - **Nested Scan Capability**: Camera and barcode evaluation lives canonically under `/shop/scan` (`app/shop/scan.tsx`) with split categorical verdicts (`FIT FOR YOU RIGHT NOW` vs `FORMULA QUALITY`) and 1-tap handoff to Ask.
 - **Calm Invariant**: When no products are needed, Shop shows "Your current plan is covered" — never manufacturing shopping urgency.
 - **Non-Member / Guest Fallback**: C1's limited presentation model exists, but E1 does not expose it through Remote paid-app routing. A factual public catalog and guest Shop belong to C1.5.
+- **Member acquisition (C1.5A draft)**: A published ADD with trusted catalog identity may show verified external retailer pages on product detail. A missing listing gets a truthful no-option state. KEEP remains a managed refill; PAUSE, STOP and the old REPLACE product are never sold. Merchant-specific price and stock are omitted without a current authoritative offer. Scan remains evaluation-only, and outbound clicks do not appear in Orders & Refills.
 
 ### 4. Ask ("Contextual skincare conversation")
 - **Grounding Context**: Explicit context indicator: *"Answers based on your routine, skin history, and what we've learned about you."*
@@ -83,6 +84,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 * **Target Cohort**: First 10 paying Founding Beta members.
 * **Pricing Concept**: Flat **$25/month** Founding Beta experiment that pays for Derive **managing** the member's skincare (canonical routine, ongoing adaptation, weekly check-ins, Progress, Scan, Ask, product-fit guidance, beta founder quality review). Do **not** frame as "$25 for AI". $25 is not a lifetime company price.
 * **Products Are Separate**: Routine products are purchased separately. Membership price does not depend on product count, retail cost, lifespan, refill rate, or routine size. No V1 membership tiers.
+* **Money measures**: Membership ARR measures recurring membership revenue. One-time product transactions are commerce GMV; Derive commerce revenue from its own future sales or attributable affiliate commission is separate. Commerce gross profit accounts for direct product and commerce costs. Retailer clicks are not purchases or revenue.
 * **Preserve Working Products**: Existing products that already work are retained (`KEEP`); Derive does not ship duplicate bottles merely because a member pays monthly.
 * **Need-Based Replenishment / Consent**: Same-SKU refills may stay low-friction. New product/substitution charges require explicit member approval.
 * **Commercial Independence**: Margin, affiliate, sponsorship, and coupons must never silently alter KEEP / PAUSE / REPLACE / ADD, Scan, safety, or ranking.
