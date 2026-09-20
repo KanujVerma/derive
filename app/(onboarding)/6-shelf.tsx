@@ -6,15 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
-import { Product } from '@/src/types/schema';
+import type { Product, ProductCategory } from '@/src/types/schema';
 import { recognizeShelfProducts } from '@/src/services/catalog';
+import { buildCustomerShelfProduct } from '@/src/utils/shelfProducts';
 import { CameraCapture } from '@/src/components/ui/CameraCapture';
+import { ShelfProductEditor } from '@/src/components/onboarding/ShelfProductEditor';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
@@ -27,6 +28,7 @@ export default function ShelfScreen() {
     setShelfPhoto,
     removeProduct,
     addProduct,
+    confirmProduct,
     hasBadReactions,
     setHasBadReactions,
     productReactions,
@@ -35,6 +37,7 @@ export default function ShelfScreen() {
 
   const [isScanning, setIsScanning] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [editor, setEditor] = useState<{ kind: 'add' } | { kind: 'edit'; product: Product } | null>(null);
 
   const handleCapture = async (uri: string) => {
     setShowCamera(false);
@@ -48,23 +51,26 @@ export default function ShelfScreen() {
       } catch {}
     } catch (e) {
       console.warn('Recognition failed:', e);
+      setShelfPhoto(uri, []);
     } finally {
       setIsScanning(false);
     }
   };
 
   const handleAddMissing = () => {
-    const sampleProducts: Product[] = [
-      {
-        id: `prod_${Date.now()}`,
-        brand: 'Vanicream',
-        name: 'Daily Facial Moisturizer',
-        category: 'moisturizer',
-        keyActives: ['Ceramides', 'Hyaluronic Acid'],
-      },
-    ];
-    addProduct(sampleProducts[0]);
-    Haptics.selectionAsync();
+    setEditor({ kind: 'add' });
+    void Haptics.selectionAsync().catch(() => {});
+  };
+
+  const handleSaveProduct = (details: { brand: string; name: string; category: ProductCategory }) => {
+    if (!editor) return;
+    const id = editor.kind === 'edit'
+      ? editor.product.id
+      : `manual_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const product = buildCustomerShelfProduct(id, details);
+    if (editor.kind === 'edit') confirmProduct(product, editor.product);
+    else addProduct(product);
+    setEditor(null);
   };
 
   const handleContinue = () => {
@@ -85,6 +91,15 @@ export default function ShelfScreen() {
 
   return (
     <View style={styles.container}>
+      {editor && (
+        <ShelfProductEditor
+          key={editor.kind === 'edit' ? editor.product.id : 'new'}
+          product={editor.kind === 'edit' ? editor.product : undefined}
+          existingProducts={detectedProducts}
+          onSave={handleSaveProduct}
+          onCancel={() => setEditor(null)}
+        />
+      )}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -99,26 +114,32 @@ export default function ShelfScreen() {
         <View style={styles.actionCard}>
           <Text style={styles.actionTitle}>Snap your current products</Text>
           <Text style={styles.actionDesc}>
-            Take a photo of your bathroom shelf or products lined up together. We will identify the bottles automatically.
+            Take a photo of your products. Derive will try to identify what it can. Review the list and add or correct anything missing.
           </Text>
 
           <TouchableOpacity
             style={styles.cameraButton}
             onPress={() => setShowCamera(true)}
+            disabled={isScanning}
             activeOpacity={0.8}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel="Take a photo of your shelf"
+            accessibilityLabel={shelfPhotoUri ? 'Retake shelf photo' : 'Take a photo of your shelf'}
+            accessibilityState={{ disabled: isScanning }}
           >
             <Icon name="camera" size={20} color={colors.inkInverse} />
-            <Text style={styles.cameraButtonText}>Take Shelf Photo</Text>
+            <Text style={styles.cameraButtonText}>{shelfPhotoUri ? 'Retake Shelf Photo' : 'Take Shelf Photo'}</Text>
           </TouchableOpacity>
         </View>
+
+        {shelfPhotoUri && (
+          <Text style={styles.photoNote}>Photo saved. Please review the products below and add anything we could not identify.</Text>
+        )}
 
         {isScanning && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={colors.brand} />
-            <Text style={styles.loadingText}>Analyzing bottles and labels...</Text>
+            <Text style={styles.loadingText}>Checking photo for products...</Text>
           </View>
         )}
 
@@ -127,7 +148,7 @@ export default function ShelfScreen() {
           <Text style={styles.shelfSectionTitle}>
             Current Products ({detectedProducts.length})
           </Text>
-          <TouchableOpacity onPress={handleAddMissing}>
+          <TouchableOpacity onPress={handleAddMissing} accessibilityRole="button" accessibilityLabel="Add a product manually">
             <Text style={styles.addManualText}>+ Add product</Text>
           </TouchableOpacity>
         </View>
@@ -156,9 +177,18 @@ export default function ShelfScreen() {
                   </Text>
                 </View>
                 <TouchableOpacity
+                  onPress={() => setEditor({ kind: 'edit', product: p })}
+                  style={styles.editButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit ${p.name}`}
+                >
+                  <Text style={styles.editText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   onPress={() => removeProduct(p.id)}
                   style={styles.removeButton}
                   accessible={true}
+                  accessibilityRole="button"
                   accessibilityLabel={`Remove ${p.name}`}
                 >
                   <Icon name="close" size={16} color={colors.inkMuted} />
@@ -322,6 +352,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: spacing.md,
   },
+  photoNote: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
+    lineHeight: 19,
+    marginBottom: spacing.lg,
+  },
   cameraButton: {
     backgroundColor: colors.brand,
     flexDirection: 'row',
@@ -423,6 +459,15 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: spacing.xs,
+  },
+  editButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  editText: {
+    fontSize: typography.sizes.caption,
+    color: colors.brand,
+    fontWeight: typography.weights.semibold,
   },
   reactionSection: {
     marginTop: spacing.md,

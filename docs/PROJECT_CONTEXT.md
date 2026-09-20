@@ -9,16 +9,16 @@ Derive is a managed skincare service. Customers provide their observations, bath
 
 ## 1. Founding Beta Operating Model (Concierge MVP) — APPROVED EXPERIMENT
 
-The immediate business objective is to recruit **10 real paying Founding Beta members** quickly while simultaneously conducting 50–100 broader customer-discovery conversations.
+The immediate business objective is for customer #1 to pay $25, complete the real app journey, and receive a trustworthy routine, then learn from **10 real paying Founding Beta members**. Broader customer discovery remains useful, but the first-10 operation is a concierge MVP.
 
 ### Core Operating Principle
 > **Sell the future Derive outcome now; deliver it manually where necessary.**
 
-The long-term scalable product is AI-led and software-managed. For the initial 10 Founding Beta members, Kanuj will manually perform or review operational tasks that future software, platform workflows, and intelligence services will automate:
+The long-term scalable product is AI-led and software-managed. For the initial 10 Founding Beta members, authorized founders may manually perform or review operational tasks that future software, platform workflows, and intelligence services will automate:
 - Manually reviewing intake submissions and baseline skin photos.
 - Manually constructing or deeply reviewing the initial routine proposal.
 - Manually checking early system-generated recommendations and verdicts.
-- Manually sourcing, purchasing, and fulfilling approved routine products.
+- Helping members source and purchase approved routine products separately from membership; any founder fulfillment follows explicit beta terms.
 - Manually reviewing weekly check-in logs when necessary.
 - Manually monitoring product refill timing and operational exceptions.
 - Conducting biweekly-ish customer research and feedback conversations.
@@ -32,7 +32,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
   3. Derive helps the member know what to keep, pause, replace, or add.
   4. Derive learns what happens over time and proposes justified adaptations.
   5. Derive prevents wasteful, incompatible, or redundant product purchases.
-  6. Approved managed OTC products are fulfilled and replenished according to beta terms.
+  6. Product acquisition and refills are handled honestly under beta terms; the $25 membership does not include products.
 
 ---
 
@@ -54,7 +54,7 @@ The long-term scalable product is AI-led and software-managed. For the initial 1
   - **Weekly check-in context (I1-B4B)**: optional tags + one note are history for comparison, not proven causes. No food diary or period tracker.
   - **Commercial Independence**: Monetization must not silently change recommendations.
 * **Historical (do not delete)**: ADR-21 $100/month all-in/products-included experiment; ADR-10 $129; ADR-15 Arthur $96/mo routine-derived prototype. All superseded as commercial direction.
-* **Commerce State**: S5 membership Checkout and Portal are implemented, with hosted activation pending. C1 member Shop V1 is implemented with Scan inside Shop. Physical-product checkout and provider selection remain unopened C1.5 work. No sixth tab.
+* **Commerce State**: S5 membership Checkout and Portal are implemented, with hosted activation pending. C1 member Shop and C1.5A acquisition foundation are landed, with zero production merchant listings. C1.5B feeds/attribution and C1.5C physical checkout are parked while the first-10 concierge flow is proven. No sixth tab.
 
 ---
 
@@ -86,6 +86,6 @@ The Founding Beta delivers:
 - **Third-Party Products Only**: We do not formulate custom white-label bottles. We curate established, reliable dermatological formulas (CeraVe, La Roche-Posay, Differin, EltaMD).
 - **Phenotype-Aware, Never Race-Aware**: Skincare personalization is grounded in observable cutaneous biology (pigmentation depth, undertone, post-inflammatory response, hair curl pattern). We strictly prohibit race/ethnicity classifiers, CV colorimetry, or demographic recommendation rules.
 - **Cosmetic Skincare, Not Medicine**: We advise on over-the-counter routines and cosmetic tolerance. We never diagnose skin diseases or treat clinical pathology.
-- **Scalable AI-Led Care Loop with Concierge Beta Bridge**: The long-term scalable Derive service is AI-led and software-managed, executing routine adaptations, weekly check-in assessments, and learned insights automatically (with founder review reserved as a quality net for initial routine proposals before first activation). For the initial 10-member Founding Beta cohort, Kanuj may manually review early system recommendations, proposed adjustments, and check-in logs where useful to ensure quality and accelerate operational learning. However, recurring private founder consultation is explicitly an operational learning bridge for the beta, not the permanent product promise.
+- **Scalable AI-Led Care Loop with Concierge Beta Bridge**: The long-term scalable Derive service is AI-led and software-managed, executing routine adaptations, weekly check-in assessments, and learned insights automatically when supported. For the initial 10-member Founding Beta cohort, authorized founders may manually review early recommendations, proposed adjustments, and check-ins to ensure quality and accelerate learning. F1, owned by Sami, supplies the in-app manual routine publication fallback. Recurring private founder consultation is not the permanent product promise.
 - **Speed & Learning Over Premature Moats**: Real customer retention and paid conversions teach us what features actually matter.
 - **Long-Term Defensibility**: Lies in proprietary longitudinal context—knowing how specific skin types and barrier histories react to active combinations over 3–12 months.

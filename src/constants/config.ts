@@ -3,6 +3,8 @@
  * Centralized to keep the brand identity configurable and uncoupled from code logic.
  */
 
+import { resolveSupportEmail } from '../utils/supportContact.ts';
+
 export const config = {
   appName: 'Derive',
   brandTagline: 'Your skincare, handled.',
@@ -10,9 +12,9 @@ export const config = {
   /** Customer-facing Founding Beta display price (USD / month). Display/config only — Stripe/S5 owns charged money. */
   betaPriceMonthly: 25,
   currency: 'USD',
-  founderSupportEmail: 'concierge@derive.skin',
+  /** Configure only after the mailbox has been tested for sending and receiving. */
+  founderSupportEmail: resolveSupportEmail(process.env.EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL),
   founderReviewWindowHours: 12,
-  webCheckoutUrl: 'https://checkout.derive.skin/founding-beta',
   
   // Storage buckets
   storageBuckets: {

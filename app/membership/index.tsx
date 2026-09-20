@@ -97,7 +97,7 @@ export default function MembershipScreen() {
       if (mounted.current) {
         setNotice(kind === 'checkout'
           ? 'Checkout could not be opened. Please try again.'
-          : 'Billing settings could not be opened. Please try again or contact member support.');
+          : 'Billing settings could not be opened. Please try again.');
       }
     } finally {
       if (mounted.current) setBusy(false);

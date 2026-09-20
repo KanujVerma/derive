@@ -19,6 +19,8 @@ import {
   normalizeIngredient,
 } from '../src/services/ai-workflows/ingredient-intelligence.ts';
 import { analytics } from '../src/services/analytics.ts';
+import { buildCustomerShelfProduct } from '../src/utils/shelfProducts.ts';
+import { resolveSupportEmail } from '../src/utils/supportContact.ts';
 import {
   MERCHANTS,
   CURATED_LISTINGS,
@@ -1158,12 +1160,14 @@ test('Environment template: Lists only approved names and contains zero credenti
   const names = assignments.map((match) => match[1]).sort();
 
   assert.deepEqual(names, [
+    'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'EXPO_PUBLIC_SUPABASE_URL',
     'EXPO_PUBLIC_USE_REMOTE_SERVICE',
   ]);
 
   const approvedPublicNames = new Set([
+    'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'EXPO_PUBLIC_SUPABASE_URL',
     'EXPO_PUBLIC_USE_REMOTE_SERVICE',
@@ -1183,6 +1187,7 @@ test('Environment template: Lists only approved names and contains zero credenti
 
 test('Environment guard: Mobile source references only approved public variables', () => {
   const approved = new Set([
+    'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_ANON_KEY', // Temporary compatibility fallback only.
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'EXPO_PUBLIC_SUPABASE_URL',
@@ -1747,7 +1752,13 @@ test('Safety & Privacy: Zero race, ethnicity, or ancestry classifiers in phenoty
 test('K4.3 Pricing Truth: Client configuration centralizes beta price at $25/mo', () => {
   assert.equal(config.betaPriceMonthly, 25);
   assert.equal(config.currency, 'USD');
-  assert.equal(config.founderSupportEmail, 'concierge@derive.skin');
+});
+
+test('V1A Support: only an explicitly configured address can appear as contact', () => {
+  assert.equal(resolveSupportEmail(undefined), null);
+  assert.equal(resolveSupportEmail('   '), null);
+  assert.equal(resolveSupportEmail('not-an-address'), null);
+  assert.equal(resolveSupportEmail(' team@example.test '), 'team@example.test');
 });
 
 test('K4.3 Demo Isolation: UserStore initializes with clean default and separates Arthur demo fixture', () => {
@@ -8973,4 +8984,135 @@ test('C1.5A: presentation and boundary avoid Scan, Orders, checkout and backend 
   assert.doesNotMatch(scan, /Where to Buy|View at Target|external_purchase_opened/);
   assert.doesNotMatch(recommendation, /merchantListings|commerce\/merchant/);
   assert.doesNotMatch(`${detail}${section}`, /createProductCheckout|createShopifySession|purchase_completed/);
+});
+
+test('V1A Shelf: empty recognition and retakes preserve customer-entered products', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    const manual: Product = { id: 'manual-1', brand: 'My Brand', name: 'Barrier Cream', category: 'moisturizer', keyActives: [], isCatalogStandard: false };
+    shelf.addProduct(manual);
+    shelf.setShelfPhoto('file:///first-shelf.jpg', []);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, [manual]);
+    shelf.setShelfPhoto('file:///retake.jpg', [
+      { id: 'recognized-1', brand: 'My Brand', name: 'Barrier Cream', category: 'moisturizer', keyActives: ['unknown'] },
+      { id: 'recognized-2', brand: 'Other Brand', name: 'Face Wash', category: 'cleanser', keyActives: [] },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts.map((product) => product.id), ['manual-1', 'recognized-2']);
+    assert.equal(useOnboardingStore.getState().shelfPhotoUri, 'file:///retake.jpg');
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: customer corrections survive retake and removal stays removed', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    shelf.setShelfPhoto('file:///first.jpg', [
+      { id: 'recognized-1', brand: 'Initial', name: 'Unknown Gel', category: 'other', keyActives: ['guessed'] },
+    ]);
+    const corrected: Product = { id: 'recognized-1', brand: 'Actual Brand', name: 'Exact Gel', category: 'treatment', keyActives: [], isCatalogStandard: false };
+    shelf.confirmProduct(corrected);
+    shelf.setShelfPhoto('file:///retake.jpg', []);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, [corrected]);
+    shelf.removeProduct('recognized-1');
+    shelf.setShelfPhoto('file:///later.jpg', []);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, []);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: retake cannot reintroduce the label a customer corrected', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    shelf.setShelfPhoto('file:///first.jpg', [
+      { id: 'recognized-1', brand: 'Misread', name: 'Lotion', category: 'other', keyActives: [] },
+    ]);
+    shelf.confirmProduct({ id: 'recognized-1', brand: 'Correct Brand', name: 'Exact Lotion', category: 'moisturizer', keyActives: [], isCatalogStandard: false });
+    shelf.setShelfPhoto('file:///retake.jpg', [
+      { id: 'recognized-2', brand: 'Misread', name: 'Lotion', category: 'other', keyActives: [] },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts.map((product) => product.id), ['recognized-1']);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: removed customer product stays removed when retake finds its old label', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    shelf.addProduct({ id: 'manual-1', brand: 'Brand', name: 'Cream', category: 'moisturizer', keyActives: [], isCatalogStandard: false });
+    shelf.removeProduct('manual-1');
+    shelf.setShelfPhoto('file:///retake.jpg', [
+      { id: 'recognized-2', brand: 'Brand', name: 'Cream', category: 'moisturizer', keyActives: [] },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, []);
+    const reentered: Product = { id: 'manual-2', brand: 'Brand', name: 'Cream', category: 'moisturizer', keyActives: [], isCatalogStandard: false };
+    shelf.addProduct(reentered);
+    shelf.setShelfPhoto('file:///later.jpg', [
+      { id: 'recognized-3', brand: 'Brand', name: 'Cream', category: 'moisturizer', keyActives: [] },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, [reentered]);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: editing one product to another exact identity cannot create duplicate rows', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    shelf.setShelfPhoto('file:///two.jpg', [
+      { id: 'recognized-a', brand: 'Brand A', name: 'One', category: 'cleanser', keyActives: [] },
+      { id: 'recognized-b', brand: 'Brand B', name: 'Two', category: 'moisturizer', keyActives: [] },
+    ]);
+    shelf.confirmProduct({ id: 'recognized-b', brand: ' brand a ', name: 'One', category: 'moisturizer', keyActives: [], isCatalogStandard: false });
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts.map((product) => [product.brand, product.name]), [
+      ['Brand A', 'One'],
+      ['Brand B', 'Two'],
+    ]);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: correction saved after an empty retake restores customer truth', () => {
+  const shelf = useOnboardingStore.getState();
+  shelf.resetOnboarding();
+  try {
+    const misread: Product = { id: 'recognized-a', brand: 'Misread', name: 'Lotion', category: 'other', keyActives: [] };
+    const corrected: Product = { id: 'recognized-a', brand: 'Actual Brand', name: 'Exact Lotion', category: 'moisturizer', keyActives: [], isCatalogStandard: false };
+    shelf.setShelfPhoto('file:///first.jpg', [misread]);
+    shelf.setShelfPhoto('file:///empty-retake.jpg', []);
+    shelf.confirmProduct(corrected, misread);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, [corrected]);
+    shelf.setShelfPhoto('file:///third.jpg', [
+      { ...misread, id: 'recognized-b' },
+    ]);
+    assert.deepEqual(useOnboardingStore.getState().detectedProducts, [corrected]);
+  } finally {
+    useOnboardingStore.getState().resetOnboarding();
+  }
+});
+
+test('V1A Shelf: manual identity carries no invented formula or catalog trust', () => {
+  const product = buildCustomerShelfProduct('manual-1', {
+    brand: '  Customer Brand  ',
+    name: '  Exact Barrier Lotion  ',
+    category: 'moisturizer',
+  });
+  assert.deepEqual(product, {
+    id: 'manual-1',
+    brand: 'Customer Brand',
+    name: 'Exact Barrier Lotion',
+    category: 'moisturizer',
+    keyActives: [],
+    isCatalogStandard: false,
+  });
+  assert.throws(() => buildCustomerShelfProduct('manual-2', { brand: ' ', name: 'Lotion', category: 'moisturizer' }), /brand/i);
+  assert.throws(() => buildCustomerShelfProduct('manual-3', { brand: 'Brand', name: ' ', category: 'moisturizer' }), /name/i);
 });

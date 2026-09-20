@@ -1,10 +1,20 @@
 # Derive Cross-Agent Context Sync Ledger
 
-This ledger tracks durable architectural, product, and contract decisions across founder workstreams (Kanuj: Mobile/UX, Sami: Platform/Intelligence) and their respective AI agents.
+This repository-native ledger records meaningful cross-agent checkpoints. Current implementation/runtime/tests and the canonical docs outrank historical entries below. GitHub is the sole durable project context; Drive is limited to customer-research artifacts. Past `Drive Status` and `DRIVE_SYNC_PAYLOAD` lines document their historical checkpoints and impose no current sync requirement.
 
 **Core Rules**:
-1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
+1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
+
+## 2026-09-20: V1A first-customer roadmap and context reset
+
+- **Predecessor:** `main@6f6a55615b9622ccdf2536c7e7cfb4dbb74cce0e`, the C1.5A PR #23 merge. This entry records branch documentation, not V1A merge or CI outcome.
+- **Durable source:** working tree for in-progress work, GitHub `main` for shared checkpoints, repository docs for product/architecture/roadmap. Drive retains customer-research artifacts only; no living-brief sync, dual-source freshness, `DRIVE_SYNC_PAYLOAD`, or Drive completion gate applies going forward.
+- **Intake integrity:** Shelf now accepts customer-entered brand, exact name and canonical category with empty actives and `isCatalogStandard: false`. Customer-added or corrected products survive empty recognition and photo retakes; exact duplicate identities merge conservatively. Unconfigured human support is hidden, Profile routes skincare questions to Ask, and a customer contact address is public only after the optional mailbox is configured and operationally verified. No hosted backend or formula contract changed.
+- **Cross-lane follow-up:** Profile's former Export Personal Data row only showed a local success alert; it created no export request. V1A hides that false action. Sami owns any future authenticated export/fulfillment backend; Kanuj can restore customer UX after a working interface is handed off. This is not treated as a completed export capability.
+- **Ownership:** V1A, L1 and L2 belong to Kanuj; H1, F1 and S6 belong to Sami. F1 needs H1's baseline; L1 needs H1 and F1; L2 needs L1 and Sami's production readiness. Cross-lane defects become evidence-backed tickets/blockers rather than silent edits.
+- **Commerce:** $25/month membership with products separate. C1.5A landed with zero production merchant listings and a test-only Ulta example. C1.5B/C, affiliate work, public Shop, cart and broad commerce automation are parked. Future backend and mobile execution are separate single-owner milestones.
+- **H1 boundary:** PR #21 remains a separate Sami workstream at the prior checkpoint. Its live state must be rechecked; V1A does not modify H1.
 
 ## 2026-09-20: C1.5A final trust closure on draft PR #23
 

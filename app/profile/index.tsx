@@ -52,18 +52,13 @@ export default function ProfileScreen() {
 
   const handleContactSupport = () => {
     Haptics.selectionAsync();
+    if (!config.founderSupportEmail) {
+      router.push('/(tabs)/ask');
+      return;
+    }
     Alert.alert(
       'Derive Member Support',
       `For routine questions or adjustments, ask directly in the Ask tab or email ${config.founderSupportEmail}.`,
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleExportData = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      'Export Requested',
-      'Export request received. Your care concierge will compile your skin observations and routine history archive.',
       [{ text: 'OK' }]
     );
   };
@@ -137,7 +132,7 @@ export default function ProfileScreen() {
       const id = useAuthStore.getState().sessionUserId;
       if (id && isRemoteServiceEnabled()) void refreshCustomerBootstrap(id);
     } catch {
-      setBillingError('Billing settings could not be opened. Please try again or contact member support.');
+      setBillingError('Billing settings could not be opened. Please try again.');
     } finally {
       setBillingBusy(false);
     }
@@ -179,7 +174,7 @@ export default function ProfileScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.memberName}>{fullName || 'Derive Member'}</Text>
-            <Text style={styles.memberEmail}>{email || 'member@derive.skin'}</Text>
+            {email ? <Text style={styles.memberEmail}>{email}</Text> : null}
             <View style={styles.badgeRow}>
               <Badge label="FOUNDING BETA" variant="keep" size="small" />
               <Text style={styles.memberPrice}>${config.betaPriceMonthly}/mo</Text>
@@ -234,33 +229,23 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </GroupedSection>
 
-        {/* Section 2: Support & Privacy */}
-        <GroupedSection header="Support & Privacy">
+        {/* Section 2: Working in-app help; human contact appears only when configured. */}
+        <GroupedSection header="Help">
           <TouchableOpacity
             style={styles.groupedRow}
             onPress={handleContactSupport}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={config.founderSupportEmail ? 'Member Support' : 'Ask Derive'}
           >
             <Icon name="person" size={18} color={colors.brand} />
             <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Member Support</Text>
-              <Text style={styles.rowSubtitle}>Assistance with products and routine timing</Text>
+              <Text style={styles.rowTitle}>{config.founderSupportEmail ? 'Member Support' : 'Ask Derive'}</Text>
+              <Text style={styles.rowSubtitle}>{config.founderSupportEmail ? 'Contact the Founding Beta team' : 'Questions about your routine and products'}</Text>
             </View>
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.groupedRow}
-            onPress={handleExportData}
-            activeOpacity={0.7}
-          >
-            <Icon name="info" size={18} color={colors.inkMuted} />
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Export Personal Data</Text>
-              <Text style={styles.rowSubtitle}>Download your skin logs and routine record</Text>
-            </View>
-            <Icon name="forward" size={16} color={colors.inkMuted} />
-          </TouchableOpacity>
         </GroupedSection>
 
         {/* Section 3: Account & Session */}

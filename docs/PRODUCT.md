@@ -52,8 +52,8 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
   - **ORDERS & REFILLS**: Direct path to active shipment tracking and refill requests.
 - **Nested Scan Capability**: Camera and barcode evaluation lives canonically under `/shop/scan` (`app/shop/scan.tsx`) with split categorical verdicts (`FIT FOR YOU RIGHT NOW` vs `FORMULA QUALITY`) and 1-tap handoff to Ask.
 - **Calm Invariant**: When no products are needed, Shop shows "Your current plan is covered" — never manufacturing shopping urgency.
-- **Non-Member / Guest Fallback**: C1's limited presentation model exists, but E1 does not expose it through Remote paid-app routing. A factual public catalog and guest Shop belong to C1.5.
-- **Member acquisition (C1.5A draft)**: The Where to Buy foundation can show external retailer pages for a published ADD only when a production listing has adequate product, variant and formula evidence. There are currently zero production listings, so ADD shows a truthful no-verified-option state. KEEP remains a managed refill; PAUSE, STOP and the old REPLACE product are never sold. Merchant-specific price and stock are omitted without a current authoritative offer. Scan remains evaluation-only, and outbound clicks do not appear in Orders & Refills.
+- **Non-Member / Guest Fallback**: C1's limited presentation model exists, but E1 does not expose it through Remote paid-app routing. A factual public catalog and guest Shop remain parked until separately authorized.
+- **Member acquisition (C1.5A landed)**: The Where to Buy foundation can show external retailer pages for a published ADD only when a production listing has adequate product, variant and formula evidence. There are currently zero production listings, so ADD shows a truthful no-verified-option state. KEEP remains a managed refill; PAUSE, STOP and the old REPLACE product are never sold. Merchant-specific price and stock are omitted without a current authoritative offer. Scan remains evaluation-only, and outbound clicks do not appear in Orders & Refills.
 
 ### 4. Ask ("Contextual skincare conversation")
 - **Grounding Context**: Explicit context indicator: *"Answers based on your routine, skin history, and what we've learned about you."*
@@ -64,7 +64,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 - **Clinical Safety Circuit Breaker**: Severe allergic symptoms immediately halt chat and surface emergency guidance.
 
 ### 5. Progress ("Longitudinal skin record")
-- **100% AI-Led Longitudinal Care Loop**: Weekly check-ins are fully automated through intelligent AI assessment of skin state, barrier comfort, and product tolerance. Derive dynamically updates schedules, generates learned insights, and adapts routines without requiring recurring manual founder calls.
+- **Long-Term AI-Led Longitudinal Care Loop**: The target is automated assessment of check-ins, learned insights, and justified routine proposals. The first-10 concierge beta may use founder review and manual recovery; automation is not claimed where it has not been proven.
 - **Weekly Check-In Card**: ~30-second structured check-in (skin outcome, adherence, irritation, optional multi-select context tags, one optional context note). **Implemented (I1-B4B):** tags are context, not causation; empty selection is valid; one note covers all selected tags. No food diary. `cycle` is not a period tracker.
 - **Photo Comparison**: Side-by-side baseline vs. latest photo comparison across Front, Left, and Right angles using full-width `SegmentedControl` with friendly dates (`Sep 1`, `Sep 8`, `Sep 15`).
 - **Learned Insights**: Plain-English observations with clear provenance labels (`From your check-ins`, `From your routine history`).
@@ -72,7 +72,7 @@ All 5 primary tabs feature a standardized, accessible 44x44 pt Account profile b
 
 ### 6. Profile & Settings (`app/profile`)
 - **Customer Account Identity**: Member name, email, Founding Beta badge, and membership price. **Implemented (I1-B4A):** `${config.betaPriceMonthly}/mo` (`25`) for Derive management. Products purchased separately.
-- **Clean Customer Scope**: Dedicated customer-facing sections for Care & History (Active Routine, Product Reaction History, Orders & Refills) and Support & Privacy (Member Support, Export Personal Data).
+- **Clean Customer Scope**: Dedicated customer-facing Care & History and Help sections. With no verified human contact configured, Help routes skincare questions to Ask. The former data-export alert did not create a request and is hidden until a real authenticated export path exists.
 - **No Developer Bloat**: Internal founder review desk links, dev toggles, and unsubstantiated HIPAA/GDPR regulatory claims are completely removed from customer view.
 
 ---
@@ -133,7 +133,7 @@ Derive is prototyping moving away from arbitrary subscription tiers and flat-rat
 2. **Preferences**: Routine complexity (Simple & Focused, Balanced, More Involved); budget expectations (Value, Balanced, Premium When Worth It). Continue button disabled until explicit selection is made.
 3. **Behavior**: Everyday skin observations (midday oil feel, post-cleansing tightness) utilizing `SelectionCard` and `SelectionRow`.
 4. **Products & Safety**:
-   - Shelf photo recognition of bathroom counter products.
+   - Customer may photograph the shelf; Derive tries to identify what it can. The member reviews/corrects candidates and can always add brand, exact product name, and category manually. Unknown formula/actives stay unknown. Empty or failed recognition must preserve customer-entered products.
    - **Progressive Reaction Disclosure**: Clean Yes/No entry gate. Product name, symptoms chips, and voice note only disclose if the member indicates they experienced a reaction.
    - **Safety Tri-State Audit**: Explicit tri-state tracking for pregnancy/nursing (`'yes' | 'no' | 'prefer_not_to_say'`) and sensitivities (`'none_known' | 'reported' | 'unanswered'`), preventing false negatives.
    - **Focused Retinoid Frequency**: When prescription actives (e.g. Differin) are detected, members select structured frequency choices (`1–2 nights`, `3–4 nights`, `5–6 nights`, `Every night`, `Not sure`) rather than ambiguous free text.
@@ -155,7 +155,7 @@ Derive is prototyping moving away from arbitrary subscription tiers and flat-rat
 
 ### 1. Founding Beta Concierge Operating Model
 - **Core Principle**: *Sell the future Derive outcome now; deliver it manually where necessary.*
-- For the first 10 paying members, Kanuj manually reviews intake, baseline photos, routine construction, product sourcing/fulfillment, check-ins, and conducts biweekly customer research conversations.
+- For the first 10 paying members, authorized founders may review intake, baseline photos, routine construction, product acquisition, and check-ins. Manual publication inside Derive is F1, a Sami-owned platform milestone. Customer research conversations are a learning activity, not permanent member consultation.
 - The scalable long-term product remains AI-led and software-managed. Concierge operations bridge learning without creating a permanent founder consultation promise.
 
 ### 2. Routine Change & Member Approval Policy

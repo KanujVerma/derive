@@ -4,8 +4,8 @@
 Derive is a managed skincare service ("Your skincare, handled"). This guide defines repository-wide rules, boundaries, and source-of-truth pointers for AI agents and human contributors.
 
 ## Sources of Truth
-When information conflicts, actual repository implementation, runtime code, and passing tests outrank documentation. For domain context, consult canonical references relevant to your task:
-- `docs/CONTEXT_SYNC.md`: Active cross-founder decisions, milestone history, and shared ledger.
+GitHub is the sole durable project context. The working tree records in-progress implementation; `main` is the shared implementation and documentation checkpoint. When information conflicts, actual implementation, runtime behavior, and tests outrank accepted repository decisions and docs. Drive holds customer-research artifacts only; it is not an architecture, roadmap, or agent handoff source. Before substantial work, read `docs/ROADMAP.md` and `docs/OWNERSHIP.md`, then the references relevant to the task:
+- `docs/CONTEXT_SYNC.md`: Meaningful repository-native cross-agent checkpoints and historical ledger.
 - `docs/OWNERSHIP.md`: Detailed directory ownership boundaries between founders.
 - `docs/ROADMAP.md`: Project milestones, deliverables, and execution phases.
 - `docs/DECISIONS.md`: Architectural decision records (ADRs).
@@ -16,9 +16,9 @@ When information conflicts, actual repository implementation, runtime code, and 
 Read documents relevant to your specific task rather than loading all documentation indiscriminately.
 
 ## Ownership
-- **Kanuj (Customer Experience + Mobile)**: Mobile app (`app/**`), UI components (`src/components/**`), client stores, themes, haptics, camera/voice UX, client analytics allowlist, and Expo/EAS configuration.
-- **Sami (Platform + Intelligence + Operations)**: Supabase backend (`supabase/**`), database schema/migrations, RLS, private storage, Edge Functions, server intelligence workflows, and founder operations (`admin/**`).
-- **Shared Contracts**: `src/contracts/**`, `src/domain/**`, and `src/types/schema.ts` form the stable integration boundary.
+- **Kanuj (Customer Experience + Mobile)**: `app/**`, `src/components/**`, `src/constants/**`, customer-facing client state/helpers, mobile recovery UX, device/TestFlight acceptance.
+- **Sami (Platform + Intelligence + Operations)**: `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted configuration, server billing, product resolution, founder operations.
+- **Shared Contracts**: `src/contracts/**`, `src/domain/**`, `src/types/schema.ts`, manifests, CI, and architecture docs are interfaces, not co-owned implementation milestones. One milestone owns each required change and records the handoff.
 
 ## Commercial truth
 - **Implemented (I1-B4A)**: Founding Beta membership display is `$25/month` via `config.betaPriceMonthly` (display only; Stripe/S5 owns charged money). Canonical identity is `founding_beta`. Products are purchased separately. Routine-derived all-in pricing (`src/pricing/**`) has been removed.
@@ -27,9 +27,9 @@ Read documents relevant to your specific task rather than loading all documentat
 - **Implemented (S5)**: server-owned Stripe membership Checkout, Billing Portal, and signed webhook projection. Hosted Stripe/Supabase activation smoke remains pending. Production Remote mode remains disabled.
 - **Implemented (C1)**: member Shop V1 uses Today, Plan, Shop, Ask, and Progress as the five root tabs, with one Scan route inside Shop. Public Shop routing remains a future activation step.
 - **E1 entitlement**: Remote managed skincare requires canonical `CustomerBootstrapState.membershipStatus === 'active'`. Auth identity and onboarding readiness are separate. Sign in, activate membership through S5 Checkout and signed webhook, then onboard. Inactive Remote customers use the Membership screen; Mock mode bypasses billing. Premium writes are gated by Edge checks and RLS, while owner-readable history remains available. Production Remote remains disabled pending hosted smoke.
-- **C1.5A draft**: Shop-only merchant/listing/offer presentation and Where to Buy foundation. Production listings are empty until product, variant, and formula equivalence can be supported; `isCatalogStandard` alone is not acquisition authority. C1.5B official feeds and C1.5C Derive Shopify checkout remain planned. See `docs/COMMERCE.md` and ADR-32.
+- **C1.5A landed**: Shop-only merchant/listing/offer presentation and Where to Buy foundation. Production listings are empty until product, variant, and formula equivalence can be supported; `isCatalogStandard` alone is not acquisition authority. C1.5B feeds, C1.5C Shopify checkout, affiliate work, public Shop, and physical commerce automation are parked. See `docs/COMMERCE.md` and ADR-32.
 
-Never silently cross founder ownership boundaries. For shared-contract modifications or cross-boundary integrations, document rationale and changes in `docs/CONTEXT_SYNC.md`.
+Never silently implement the other founder's work. Record a cross-lane defect with exact evidence, affected interface, owner, and blocker status; continue safely or stop at the dependency. Update relevant repository docs when durable state changes, and record material shared-contract or milestone handoffs in `docs/CONTEXT_SYNC.md`.
 
 ## Repository Freshness
 Before substantial work, fetch upstream and establish whether the working branch is in sync, behind, ahead, dirty, or diverged. Treat local repository state as authoritative only after this check.
@@ -42,7 +42,7 @@ Before substantial work, fetch upstream and establish whether the working branch
 - **Evidence-Grounded Refactoring**: Code and passing tests supersede stale documentation. Challenge architectural assumptions with code or test evidence, but never silently alter shared architecture.
 - **Security & Secrets**: Secrets, service-role keys, and LLM credentials belong strictly in server-side environments (`supabase/functions/**`, uncommitted `.env`). Never expose secrets in client bundles or `EXPO_PUBLIC_*` variables.
 - **Safety & Privacy Invariants**: Never weaken Auth, RLS, storage boundaries, or clinical safety guards for implementation convenience. Skincare advice is strictly cosmetic (non-diagnostic); emergency symptoms escalate immediately. Session replay is strictly disabled; sensitive photos/notes remain private.
-- **Ledger Synchronization**: Update `docs/CONTEXT_SYNC.md` whenever modifying shared contracts, system architecture, database schema, safety rules, or milestone states.
+- **Repository checkpoint**: Update the canonical doc and add a concise `docs/CONTEXT_SYNC.md` entry when a material contract, architecture, safety rule, ownership handoff, or milestone state changes. Historical entries are not current instructions.
 
 ## Validation
 Before claiming any substantial implementation complete:

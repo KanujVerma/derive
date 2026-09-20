@@ -5,6 +5,7 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { analytics } from '@/src/services/analytics';
+import { config } from '@/src/constants/config';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -15,10 +16,11 @@ export default function WelcomeScreen() {
   };
 
   const handleAssistedSetup = () => {
+    if (!config.founderSupportEmail) return;
     analytics.track('onboarding_started', { entryPoint: 'founder_assist' });
     Alert.alert(
       'Founding Beta Setup Support',
-      'Need help completing your initial intake? We can walk through your routine setup with you. Send a note to concierge@derive.skin or continue self-serve.',
+      `Need help completing your initial intake? Contact ${config.founderSupportEmail} or continue setup here.`,
       [
         { text: 'Continue Self-Serve', style: 'cancel' },
         { text: 'Start Setup', onPress: () => router.push('/(onboarding)/2-goals') },
@@ -86,13 +88,15 @@ export default function WelcomeScreen() {
           size="large"
           onPress={handleStart}
         />
-        <Button
-          label="Want help setting this up?"
-          variant="ghost"
-          size="medium"
-          onPress={handleAssistedSetup}
-          style={{ marginTop: spacing.xs }}
-        />
+        {config.founderSupportEmail && (
+          <Button
+            label="Want help setting this up?"
+            variant="ghost"
+            size="medium"
+            onPress={handleAssistedSetup}
+            style={{ marginTop: spacing.xs }}
+          />
+        )}
       </View>
     </ScrollView>
   );
