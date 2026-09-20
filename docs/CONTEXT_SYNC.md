@@ -6,6 +6,14 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-20: C1.5A final trust closure on draft PR #23
+
+- **Predecessor**: reviewed draft PR #23 at `4835b78e79c42cf7de2ad5ab3a09b46b79f9ae72`, based on `origin/main@63884e91526437493b001919059e04c7d6c2c878`. H1 PR #21 remains separate and draft at `50ff9fa65d45c3871e759094a196f4054c29ce5e` at re-entry.
+- **Orchestrator decision**: The Product → Recommendation → MerchantListing → optional OfferSnapshot → PurchasePath architecture is approved. Remove the live Ulta listing because the merchant and brand ingredient presentations do not prove package/formula equivalence. This does not establish that Ulta sells the wrong formula. Keep the Ulta example in test-only fixture data. The production `CURATED_LISTINGS` is empty; published ADD therefore shows the truthful no-verified-option state.
+- **Trust boundary**: Existing `Product.isCatalogStandard?: boolean` is an additive shared Product type field carrying existing database catalog provenance into the client. It does not mean formula-current, merchant-verified or acquisition-ready. Production listing activation requires sufficient merchant destination, product variant and formula evidence; C1.5B official merchant/feed identity and future S6 product/formula resolution can contribute. No new formula-link contract is set in C1.5A.
+- **Ownership**: `RemoteDeriveService` keeps its minimal existing `is_catalog_standard` mapping. Database schema, `IDeriveService`, backend migrations, H1, membership Stripe, SMTP, hosted activation, Shopify and S6 implementation remain unchanged. C1.5C Shopify direction remains approved.
+- **Validation**: Tests, both TypeScript checks, Expo export, exact-head PR CI and final branch state are separate closure gates; this entry records the decision without predicting their results.
+
 ## 2026-09-19: C1.5A multi-merchant acquisition foundation (draft branch)
 
 - **Predecessor**: clean `origin/main@63884e91526437493b001919059e04c7d6c2c878` after fetch. H1 PR #21 remained open and draft at `50ff9fa65d45c3871e759094a196f4054c29ce5e`; its branch was not modified.

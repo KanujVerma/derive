@@ -2,7 +2,7 @@
 
 **Source of Truth**: Canonical architecture for Derive Shop, customer-facing commerce, and product acquisition.
 **Owner**: Kanuj (Customer Experience + Mobile) with Platform/Shared integration points noted.
-**Status**: C1 and C1.1 are implemented. C1.5A adds curated external merchant links in a draft branch. C1.5B live feeds and C1.5C Derive Shopify checkout remain planned. S5 membership billing is separate.
+**Status**: C1 and C1.1 are implemented. The C1.5A acquisition foundation is implemented in a draft PR; production merchant listings remain empty pending stronger product, variant, and formula verification. C1.5B feeds and C1.5C Derive Shopify checkout remain planned. S5 membership billing is separate.
 
 ---
 
@@ -36,7 +36,7 @@ Long-term product loop mental model:
 | **No Universal Product Score Invariant** | IMPLEMENTED | Kanuj | Categorical fit guidance only (`GREAT FIT`, `COULD WORK`, `USE WITH CAUTION`, etc.). |
 | **Shop state separation** | C1.1 | Kanuj | Loading, error, preparation, unpublished review, published needs, covered, and empty are distinct. Covered requires a resolved published plan. |
 | **S5 Membership Billing Separation** | IMPLEMENTED / PRESERVED | Sami / Shared | Stripe membership checkout ($25/mo) remains strictly isolated in S5. |
-| **Merchant listings and purchase options** | C1.5A DRAFT | Kanuj | Shop-owned exact identity registry; one verified retailer page for one beta product. Supports 0/1/many. No live price. |
+| **Merchant listings and purchase options** | C1.5A DRAFT | Kanuj | Shop-owned resolver and 0/1/many presentation; zero production listings. Ulta example is test-only. No live price. |
 | **Physical Product Commerce Backend** | PLANNED (C1.5C) | Cross-founder | Derive as Shopify merchant, inventory, cart, checkout, orders, fulfillment, returns. |
 | **Official retailer feeds** | PLANNED (C1.5B) | Cross-founder | Live offers, availability and approved attribution from official sources. |
 | **Multi-Item Cart** | DEFERRED (V2) | Kanuj / Platform | V1/V1.5 is single-product purchase intent. Cart deferred until behavioral evidence warrants. |
@@ -110,8 +110,10 @@ the existing `hydratePlanState()` coordinator. Needed products show their
 reason and a **View product** path; future ordering is explained only on
 detail. The Shop-owned `ProductCommerceSection` composes ADD, KEEP, PAUSE,
 STOP, and REPLACE states from the existing action semantics. Published ADD with
-trusted identity and a curated listing shows external Where to Buy options.
-No listing yields a truthful unavailable state. No live offer is seeded.
+trusted product identity and an acquisition-active listing shows external Where to Buy options.
+The production registry is empty, so published ADD currently yields a truthful
+no-verified-option state. A test-only Ulta fixture exercises the full path.
+No live offer is seeded.
 
 ---
 
@@ -153,7 +155,7 @@ The data flow is one-way. Recommendations are resolved first; commerce cannot se
             ▼
 ┌─────────────────────────┐
 │    MERCHANT LISTING     │  Stable mapping: exact product identity, merchant,
-│    (Shop beta registry) │  listing ID, verified product page and variant.
+│    (Shop registry)      │  listing ID, verified destination and variant.
 └───────────┬─────────────┘
             │
             ▼
@@ -170,9 +172,10 @@ The data flow is one-way. Recommendations are resolved first; commerce cannot se
 ```
 
 - **Derive** owns canonical Product and member Recommendation truth. Existing `retailPriceApprox` is catalog context, never an offer from Target or Ulta.
-- **Shop-owned beta resolver** uses exact case/whitespace-normalized brand and full name because Remote product UUIDs are runtime-generated. It requires the existing `is_catalog_standard === true` provenance mapped to `Product.isCatalogStandard`, plus presence in the current published routine steps. Missing/false provenance or a retained older ADD outside the current routine fails closed; no fuzzy, substring, AI, or Scan fixture lookup.
+- **Shop-owned beta resolver** uses exact case/whitespace-normalized brand and full name because Remote product UUIDs are runtime-generated. It requires the existing `is_catalog_standard === true` provenance mapped to `Product.isCatalogStandard`, plus presence in the current published routine steps. Missing/false provenance or a retained older ADD outside the current routine fails closed; no fuzzy, substring, AI, or Scan fixture lookup. `isCatalogStandard` describes canonical catalog provenance only. It does not establish that a retailer package has the same formula Derive evaluated.
 - **MerchantDefinition** is extensible. The registry includes brand-direct CeraVe, Target, Ulta, Sephora, Walmart, Amazon and future `derive`; inclusion does not mean a listing exists. Marketplace seller legitimacy must be verified before any listing is added.
-- **MerchantListing** holds stable merchant identity, direct page URL, verification date and variant. `CURATED_LISTINGS` currently contains the [Ulta CeraVe Hydrating Facial Cleanser page with size selector](https://www.ulta.com/p/hydrating-facial-cleanser-xlsImpprod4190255), opened and checked on 2026-09-19. It names the intended product and lists ceramides and hyaluronic acid, but ingredient order differs from [CeraVe's current product page](https://www.cerave.com/skincare/cleansers/hydrating-facial-cleanser); formula equivalence is unproven. A Target page was considered and omitted because its published ingredient list conflicts more clearly with those pages. CeraVe's own page says Find in Stores, so it was not treated as a direct purchase destination. Exact brand/name identifies a product family, not a verified package formula; the member is asked to check size and ingredients on the retailer page. S6 will strengthen formula/variant resolution.
+- **MerchantListing** holds stable merchant identity, direct page URL, verification date and variant. `CURATED_LISTINGS` is empty in production. The [Ulta CeraVe Hydrating Facial Cleanser page](https://www.ulta.com/p/hydrating-facial-cleanser-xlsImpprod4190255) is retained only in `tests/fixtures/merchantListings.ts`. The Ulta and [CeraVe ingredient presentations](https://www.cerave.com/skincare/cleansers/hydrating-facial-cleanser) are not sufficient to prove package/formula equivalence; this does not establish that Ulta sells the wrong formula. CeraVe also warns that ingredient lists can change and that the package is the current source. No replacement link is added merely to populate Shop.
+- **Production listing activation** requires sufficient evidence that the merchant destination represents the intended canonical product, size/variant, and formula. Future evidence may combine GTIN/UPC, merchant identifiers, exact size, brand-direct identity, FormulaSnapshot comparison, S6 resolution, and official feed identity. The exact future contract remains open. Exact brand/name is a lookup seam, never acquisition authority by itself.
 - **MerchantOfferSnapshot** is separate, optional and currently empty in production. Its display requires a named official feed/API source, USD minor-unit amount and observed time within 24 hours. Explicit out-of-stock offers do not display a price or activate Derive checkout. No manual current price or availability is seeded. A later feed must revalidate the policy and show source/freshness.
 - **Purchase path** is HTTPS external handoff in A. At composition and tap time, the URL must match an exact configured host. The OS open failure has a sanitized retry message. A successful open records only `productId`, `merchantId` and `entryPoint`; it never creates an order or marks a purchase.
 - **Future `derive` merchant** can be ordered first only with a real active offer; external alternatives remain visible. Shopify catalog mapping, inventory, checkout and fulfillment start in C1.5C. The current client has no Derive offer or checkout.
@@ -216,13 +219,13 @@ C1.5B should prefer official merchant APIs, affiliate/product feeds, approved ne
 - [x] 245 unit tests, both TypeScript checks, web export, and 390/320-pixel
   Mock phone review passed. Unknown verdicts fail closed with Scan Again.
 
-### C1.5A / Multi-Merchant Acquisition Foundation (Draft)
+### C1.5A / Multi-Merchant Acquisition Foundation (Implemented in draft PR)
 - Shop-owned merchant, listing, optional offer and purchase path presentation.
-- Curated exact-match retailer pages for trusted canonical beta products, member ADD Where to Buy and privacy-safe outbound event.
+- Member ADD Where to Buy, privacy-safe outbound event, and test-only external acquisition fixture. Production listing count is zero until the activation gate above is met.
 - No backend, migration, feed, affiliate attribution, Derive checkout, public routing or Scan purchase CTA.
 
 ### C1.5B / Official Retailer Feeds, Live Offers & Attribution (Planned)
-- Verify official integration paths when opened. Resolve live merchant IDs, price, sale price, availability, offer freshness and approved affiliate attribution with provenance.
+- Verify official integration paths when opened. Establish merchant/feed product identity and listing verification, then resolve live merchant IDs, price, sale price, availability, offer freshness and approved affiliate attribution with provenance. Activate production listings only with adequate product, variant, and formula evidence.
 
 ### C1.5C / Derive Shopify Merchant & Integrated Checkout (Planned)
 - Map Derive Shopify products and variants, then build real Derive offer, inventory, cart/checkout, product orders, fulfillment, returns and member benefits. Keep legitimate external alternatives visible.

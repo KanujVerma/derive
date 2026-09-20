@@ -1,4 +1,4 @@
-/** Curated beta acquisition data. This is client presentation, not product or offer authority. */
+/** Shop acquisition presentation. This is not product or formula authority. */
 import { resolveActionCommerceSemantics } from './types.ts';
 import type { RoutineAction } from '../types/schema.ts';
 
@@ -52,17 +52,13 @@ export function exactProductKey(brand: string, name: string): string {
   return JSON.stringify([normalize(brand), normalize(name)]);
 }
 
-export const CURATED_LISTINGS: readonly MerchantListing[] = [
-  {
-    id: 'cerave-hydrating-cleanser-ulta',
-    productKey: exactProductKey('CeraVe', 'Hydrating Facial Cleanser'),
-    merchantId: 'ulta',
-    merchantProductId: '2559841',
-    url: 'https://www.ulta.com/p/hydrating-facial-cleanser-xlsImpprod4190255',
-    verifiedAt: '2026-09-19',
-    variant: 'Choose size at Ulta',
-  },
-];
+/**
+ * Production activation gate: catalog provenance and exact brand/name identify
+ * a product family, not the retailer package/formula Derive evaluated. Add a
+ * listing only after sufficient destination, variant, and formula evidence.
+ * The reviewed Ulta example is isolated in tests/fixtures.
+ */
+export const CURATED_LISTINGS: readonly MerchantListing[] = [];
 
 /** Recheck untrusted data at both option composition and tap time. */
 export function isTrustedMerchantUrl(raw: string | undefined, merchant: MerchantDefinition): boolean {
