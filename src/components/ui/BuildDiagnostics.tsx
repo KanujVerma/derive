@@ -14,7 +14,7 @@ export function BuildDiagnostics() {
   return (
     <View style={styles.card} accessibilityLabel="Remote staging build diagnostics">
       <Text style={styles.heading}>REMOTE STAGING BUILD</Text>
-      <Text style={styles.detail}>Service: {details.serviceMode} · Config: {details.backendConfiguration}</Text>
+      <Text style={styles.detail}>Service: {details.serviceMode} · Public config shape: {details.backendConfigurationShape}</Text>
       <Text style={styles.detail}>Backend: {details.backendHost}</Text>
       <Text style={styles.detail}>App: {version}{nativeBuild ? ` (${nativeBuild})` : ''}</Text>
     </View>

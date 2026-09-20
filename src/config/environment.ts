@@ -20,7 +20,7 @@ export interface StagingBuildDiagnostics {
   buildFlavor: 'Remote Staging';
   serviceMode: 'Remote' | 'Mock';
   backendHost: string;
-  backendConfiguration: 'Valid' | 'Invalid';
+  backendConfigurationShape: 'Valid' | 'Invalid';
 }
 
 /** Safe bundle identity for staging QA; never returns a key or session value. */
@@ -31,7 +31,7 @@ export function getBuildDiagnostics(environment: PublicEnvironment): StagingBuil
     buildFlavor: 'Remote Staging',
     serviceMode: environment.useRemoteService ? 'Remote' : 'Mock',
     backendHost,
-    backendConfiguration: environment.useRemoteService && environment.supabaseKeySource === 'publishable' && backendHost !== 'Not configured'
+    backendConfigurationShape: environment.useRemoteService && environment.supabaseKeySource === 'publishable' && backendHost !== 'Not configured'
       ? 'Valid' : 'Invalid',
   };
 }
@@ -78,7 +78,7 @@ function validateSupabaseKeys(publishableKey: string, legacyAnonKey: string): vo
     throw new Error('Supabase secret keys must never be embedded in the Expo client.');
   }
 
-  if (publishableKey && !publishableKey.startsWith('sb_publishable_')) {
+  if (publishableKey && !/^sb_publishable_[A-Za-z0-9_-]+$/.test(publishableKey)) {
     throw new Error(
       'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY must be a Supabase publishable key.',
     );
@@ -121,11 +121,14 @@ export function resolvePublicEnvironment(
     if (!useRemoteService) throw new Error('remote-staging requires Remote mode.');
     if (!supabaseUrl) throw new Error('remote-staging requires EXPO_PUBLIC_SUPABASE_URL.');
     if (!publishableKey) throw new Error('remote-staging requires an EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY publishable key.');
+    if (!/^sb_publishable_[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{8}$/.test(publishableKey)) {
+      throw new Error('remote-staging requires a correctly shaped Supabase publishable key.');
+    }
     const url = new URL(supabaseUrl);
     if (url.protocol !== 'https:' || !url.hostname.includes('.') || ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
       throw new Error('remote-staging requires a hosted HTTPS Supabase URL.');
     }
-    if (!url.hostname.endsWith('.supabase.co')) {
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.supabase\.co$/.test(url.hostname) || url.port !== '') {
       throw new Error('remote-staging requires a hosted Supabase host.');
     }
     if (url.pathname !== '/' || url.search || url.hash || url.username || url.password) {

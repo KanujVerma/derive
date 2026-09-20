@@ -4,14 +4,15 @@
 
 **Owner:** Kanuj, for the customer device journey and acceptance record. Sami owns hosted Auth, billing, intelligence, and founder operations. Record a backend blocker for Sami instead of changing that lane during this test.
 
-**Current status:** This is a test script, not evidence that hosted Remote or live payment is ready. H1 hosted activation and the F1 founder fallback must be proven before L1 physical-device acceptance. L2 is the separate real-money launch gate. See [ROADMAP.md](ROADMAP.md) and [OWNERSHIP.md](OWNERSHIP.md).
+**Current status:** This is a test script, not evidence that hosted Remote or live payment is ready. H1A hosted core can support a controlled L1 happy-path device run after L0. H1E real email, H1B Stripe and F1 manual founder recovery have separate acceptance gates before complete first-customer launch. See [ROADMAP.md](ROADMAP.md) and [OWNERSHIP.md](OWNERSHIP.md).
 
 ## Choose the run before opening the app
 
 | Run | Identity and money | What its result proves |
 | --- | --- | --- |
 | Mock development | Local Mock data. No real email OTP, Stripe charge, signed webhook, or hosted persistence. | Screen behavior and copy only. A Mock pass cannot clear a Remote or launch gate. |
-| Remote staging, Stripe test mode | Dedicated test identity and inbox, hosted six-digit email OTP, Stripe test Checkout and Portal, hosted records, test photos. | End-to-end hosted lifecycle only for steps actually observed and recorded. Complete H1 smoke first; keep real customer data and live charges out of this run. |
+| Remote core staging | Disposable authenticated identity and trusted service/admin staging entitlement after H1A project verification. No real email delivery or Stripe payment. | Post-auth hosted intake, routine, founder and member core only. Synthetic entitlement is never billing proof. |
+| Remote provider staging | Dedicated test inbox and identity, real hosted six-digit OTP, Stripe test Checkout/webhook/Portal, hosted records and test photos after H1E/H1B readiness. | Email and billing lifecycles only for steps actually observed and recorded; F1 is additionally required to clear manual routine fallback. |
 | Real-money customer launch | Production customer build, real member identity, live $25/month Stripe membership, real intake, and an operational founder response. | Customer #1 acceptance only after L2 prerequisites and the full customer path pass. Do not charge or enroll customer #1 based on Mock or test-mode evidence. |
 
 For a guided usability session, let the person drive and prompt only after they are stuck for about 30 seconds. Observe hesitation and trust, but do not replace the checks below with an interview. Use a fresh account and clean app state; verify that no Arthur, demo, or other member data appears. Do not put names, OTPs, payment details, photos, or sensitive skin disclosures in the acceptance record.
@@ -20,8 +21,9 @@ For a guided usability session, let the person drive and prompt only after they 
 
 - [ ] Record run type, build and revision, environment, device, date, tester role, and whether a real customer is involved. Confirm the build points to the intended environment. A TestFlight label alone does not prove Remote mode.
 - [ ] For a Remote staging run, use the L0 `remote-staging` profile and read its staging-only diagnostics before sign-in: build flavor, Remote service mode, valid public configuration, expected hosted backend host and app version. Match the host against H1A's independently verified project. Never record or display the publishable key. An absent or wrong host blocks the run.
-- [ ] For Remote staging, use H1 hosted smoke evidence for OTP, signed test Checkout webhook, active membership, private photos, real provider call, founder review and publication, member reads, cross-user boundaries, and Portal downgrade. Recheck any changed boundary on the device. H1's existing negative tests alone do not prove the active lifecycle.
-- [ ] For L1, verify that F1 can recover when automatic routine preparation yields no usable proposal: an authorized founder can construct, validate, and publish a complete routine through the approved workflow. If that path is unavailable, mark the test blocked; a promise to handle it manually outside Derive is not a passing app flow.
+- [ ] For a Remote core staging run, use H1A evidence for the exact hosted project, controlled Auth/session, disposable entitlement, private photos, real provider attempt, current founder review/publication, member reads and cross-user boundaries. Mark real email OTP and Stripe rows Not applicable, never passed. H1's old negative tests alone do not prove the active lifecycle.
+- [ ] For Remote provider staging, require separate H1E real inbox OTP and H1B signed test Checkout/webhook/Portal evidence. Do not carry synthetic H1A entitlement forward as payment proof.
+- [ ] For full manual-fallback acceptance, verify F1 can recover when automation produces no usable proposal: an authorized founder can construct, validate and publish a complete routine through the approved workflow. A controlled L1 core happy-path run may occur before F1, but it cannot clear the fallback or customer-launch gate.
 - [ ] For L2, independently confirm production OTP/email, live Stripe price and webhook, founder operations, security checks, and a working customer contact path. Do not display or hand out an unverified support email, phone number, or URL.
 - [ ] Have one known catalog barcode and one genuinely unknown product or barcode for Scan. Their identities must be independently known to the tester. Have products for manual Shelf entry and a safe, private space for baseline photos.
 
@@ -29,7 +31,7 @@ For a guided usability session, let the person drive and prompt only after they 
 
 Mark each item **Pass**, **Fail**, **Blocked**, or **Not applicable** with a short observation. Do not mark an unrun Remote or launch step as passed because its Mock equivalent worked.
 
-### 1. Sign in and activate membership, Remote runs
+### 1. Sign in and activate membership, provider staging and launch runs
 
 - [ ] Enter an email and receive a six-digit code in the intended inbox. Enter it on the phone and confirm the resulting account belongs to that identity. Record delivery and retry failures without copying the code.
 - [ ] Before payment, confirm the membership screen explains **$25/month for Derive skincare management** and that routine products cost extra. A signed-in account without an active membership must not reach sensitive onboarding or the five member tabs.
@@ -37,6 +39,8 @@ Mark each item **Pass**, **Fail**, **Blocked**, or **Not applicable** with a sho
 - [ ] After successful Checkout, distinguish the return navigation from entitlement. The app may proceed only after the signed Stripe webhook projects canonical **active** membership and a fresh backend read confirms it. If confirmation is pending, show a recoverable pending state; do not unlock from the success URL or a local flag.
 
 Mock development: inspect the membership explanation if exposed, but record Auth, charge, webhook, and entitlement checks as **Not applicable**. Never simulate a payment success and call it billing acceptance.
+
+Remote core staging: begin from H1A's disposable authenticated session and trusted server/admin entitlement. Verify the app reads the canonical active state, but mark email delivery, Checkout, webhook and Portal proof **Not applicable**. Do not describe the fixture as a paid member.
 
 ### 2. Welcome, intake, and real Shelf
 
@@ -49,14 +53,14 @@ Mock development: inspect the membership explanation if exposed, but record Auth
 ### 3. Baseline photos and submission
 
 - [ ] Capture front, left, and right baseline photos. Check guidance, comfort, permission handling, retake, and manual shutter recovery if auto-capture does not work. Confirm the correct three photos are shown at review; do not claim a specific capture speed without observing it.
-- [ ] At the summary, have the member recognize their goals, products, and safety answers and use an Edit link if needed. Confirm the $25 membership and separate product costs remain clear. In Remote, payment should already have been activated before this intake.
+- [ ] At the summary, have the member recognize their goals, products, and safety answers and use an Edit link if needed. Confirm the $25 membership and separate product costs remain clear. Provider staging and launch require actual payment activation before intake; Remote core staging uses only its controlled test entitlement.
 - [ ] Submit once, then verify the app's own completion state and hosted intake/photo records for a Remote run. A submission error must preserve the member's work and allow retry. Submission starts routine preparation; it does not prove that a proposal exists, is under founder review, or is active.
 
 ### 4. Routine preparation and founder handoff, Remote runs
 
 - [ ] Observe whether an actual routine proposal is created and, if so, that its status is **awaiting review**. Verify the founder task belongs to an authorized founder, uses the submitted member data, and does not invent formula facts for manually entered products.
 - [ ] Have the founder inspect safety context and product evidence, correct or reject unsafe or unsupported steps, then publish through the guarded workflow. Verify the published routine belongs to this member and the member app refreshes to it without reinstalling.
-- [ ] If automatic preparation produces no usable proposal, run the F1 manual founder fallback. Confirm the founder can create, validate, and publish the full routine in Derive. Until F1 is implemented and demonstrated, record **Blocked** here and do not claim customer #1 can receive a routine.
+- [ ] If automatic preparation produces no usable proposal, record the core happy-path run as blocked and route the evidence to F1. For full manual-fallback acceptance, run F1 and confirm the founder can create, validate and publish the full routine in Derive. Until F1 is implemented and demonstrated, do not claim customer #1 can receive a routine after automation fails.
 - [ ] Record who owns any manual follow-up and when the member should expect it. Do not show an "under review" or "ready" state unless the corresponding server state exists.
 
 ### 5. Five member tabs and Scan
@@ -75,7 +79,7 @@ The root navigation is **Today · Plan · Shop · Ask · Progress**. **Scan is i
 
 Open Orders & Refills from Shop or Profile if available. With no real order, the empty state must remain empty. A retailer page visit is not an order, and no managed refill or shipment should be shown without its actual record.
 
-### 6. Billing lifecycle, Remote runs
+### 6. Billing lifecycle, provider staging and launch runs
 
 - [ ] Open Manage Membership and the member's own Stripe Billing Portal in the run's mode. Verify that returning from the Portal does not itself alter membership state.
 - [ ] In staging, use a safe supported pause or cancellation path and observe the signed webhook update. After refresh, the app must route the inactive member to Membership, clear managed client caches, and block onboarding and paid tabs. Historical ownership and account deletion follow their existing authorized boundaries.
@@ -93,4 +97,4 @@ Record one outcome for each run:
 | Fail | An observed behavior violated a check; include reproduction and owner. |
 | Blocked | A prerequisite or system path was unavailable, so the customer journey could not be completed. Name the missing gate and owner. |
 
-Keep Mock, Remote staging, and launch results separate. Customer #1 may be charged only after L2 confirms the complete production path, including a real contact route and routine delivery when automation fails. Kanuj fixes customer/mobile defects in his lane; hosted Auth, billing, provider, product resolution, and founder-operation defects are recorded for Sami with evidence.
+Keep Mock, Remote core staging, Remote provider staging, and launch results separate. Customer #1 may be charged only after the final launch gate confirms the complete production path, including a real contact route and routine delivery when automation fails. Kanuj fixes customer/mobile defects in his lane; hosted Auth, billing, provider, product resolution, and founder-operation defects are recorded for Sami with evidence.

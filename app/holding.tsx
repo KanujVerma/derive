@@ -8,6 +8,7 @@ import { useAuthStore } from '@/src/stores/authStore';
 import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { resolveCustomerBootstrap } from '@/src/services/deriveClient';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
+import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
 
 export default function HoldingScreen() {
   const router = useRouter();
@@ -79,6 +80,7 @@ export default function HoldingScreen() {
       </View>
 
       <View style={styles.footer}>
+        <BuildDiagnostics />
         {isError && (
           <TouchableOpacity
             onPress={handleRetry}

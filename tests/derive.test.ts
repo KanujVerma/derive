@@ -1160,7 +1160,7 @@ test('L0 build flavor: remote staging requires a hosted Remote client with a pub
     buildFlavor: 'remote-staging',
     useRemoteService: 'true',
     supabaseUrl: 'https://staging-project.supabase.co',
-    supabasePublishableKey: 'sb_publishable_staging',
+    supabasePublishableKey: 'sb_publishable_ABCDEFGHIJKLMNOPQRSTUV_12345678',
   };
   const resolved = resolvePublicEnvironment(hosted);
   assert.equal(resolved.buildFlavor, 'remote-staging');
@@ -1168,9 +1168,15 @@ test('L0 build flavor: remote staging requires a hosted Remote client with a pub
   assert.throws(() => resolvePublicEnvironment({ ...hosted, useRemoteService: 'false' }), /remote-staging.*Remote/i);
   assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: '' }), /EXPO_PUBLIC_SUPABASE_URL/);
   assert.throws(() => resolvePublicEnvironment({ ...hosted, supabasePublishableKey: '' }), /EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabasePublishableKey: 'sb_publishable_' }), /publishable key/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabasePublishableKey: 'sb_publishable_a' }), /publishable key/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabasePublishableKey: 'sb_publishable_ABCDEFGHIJKLMNOPQRSTUV_short' }), /publishable key/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabasePublishableKey: 'sb_publishable_bad key' }), /publishable key/i);
   assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'http://127.0.0.1:54321' }), /hosted HTTPS/i);
   assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://unrelated.example.com' }), /Supabase host/i);
   assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://project.supabase.co.evil.test' }), /Supabase host/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://.supabase.co' }), /Supabase host/i);
+  assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://x.supabase.co:1234' }), /Supabase host/i);
   assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://staging-project.supabase.co/auth/v1' }), /base URL/i);
   assert.throws(() => resolvePublicEnvironment({ ...hosted, supabaseUrl: 'https://staging-project.supabase.co/?redirect=other' }), /base URL/i);
   assert.throws(() => resolvePublicEnvironment({ ...hosted, supabasePublishableKey: '', legacySupabaseAnonKey: 'legacy-anon-key' }), /publishable key/i);
@@ -1200,14 +1206,14 @@ test('L0 diagnostics: only Remote staging reveals safe build identity, never a k
     buildFlavor: 'remote-staging',
     useRemoteService: 'true',
     supabaseUrl: 'https://staging-project.supabase.co',
-    supabasePublishableKey: 'sb_publishable_do_not_render',
+    supabasePublishableKey: 'sb_publishable_ABCDEFGHIJKLMNOPQRSTUV_12345678',
   });
   const details = getBuildDiagnostics(staging);
   assert.deepEqual(details, {
     buildFlavor: 'Remote Staging',
     serviceMode: 'Remote',
     backendHost: 'staging-project.supabase.co',
-    backendConfiguration: 'Valid',
+    backendConfigurationShape: 'Valid',
   });
   assert.equal(JSON.stringify(details).includes('sb_publishable'), false);
   assert.equal(getBuildDiagnostics(resolvePublicEnvironment({})), null);
