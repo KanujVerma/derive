@@ -3,6 +3,7 @@ import { AppState, Linking, Platform, ScrollView, StyleSheet, Text, View } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Button } from '@/src/components/ui/Button';
+import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
 import { colors, radii, spacing, typography } from '@/src/constants/theme';
 import { config } from '@/src/constants/config';
 import { useAuthStore } from '@/src/stores/authStore';
@@ -167,6 +168,7 @@ export default function MembershipScreen() {
         {notice || refreshError ? <Text style={styles.notice}>{notice || refreshError}</Text> : null}
         {!activationPending ? <Button label="Refresh Membership" variant="ghost" onPress={handleRetry} disabled={busy} style={styles.action} /> : null}
         <Button label="Sign Out" variant="ghost" onPress={() => void handleSignOut()} disabled={busy} style={styles.signOut} />
+        <BuildDiagnostics />
       </ScrollView>
     </View>
   );

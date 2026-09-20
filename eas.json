@@ -7,21 +7,37 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "ios": {
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_USE_REMOTE_SERVICE": "false"
+        "EXPO_PUBLIC_USE_REMOTE_SERVICE": "false",
+        "EXPO_PUBLIC_BUILD_FLAVOR": "development"
+      }
+    },
+    "remote-staging": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "environment": "preview",
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_USE_REMOTE_SERVICE": "true",
+        "EXPO_PUBLIC_BUILD_FLAVOR": "remote-staging"
       }
     },
     "production": {
       "autoIncrement": true,
       "distribution": "store",
+      "environment": "production",
       "ios": {
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_USE_REMOTE_SERVICE": "false"
+        "EXPO_PUBLIC_USE_REMOTE_SERVICE": "false",
+        "EXPO_PUBLIC_BUILD_FLAVOR": "production"
       }
     }
   },

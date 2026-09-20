@@ -6,6 +6,15 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-20: L0 Remote customer build readiness checkpoint
+
+- **Predecessor:** clean `origin/main@672db7640c3c0a3c712643ab6d286901105c21dc`, the V1A PR #24 merge. This records the L0 branch decision without predicting merge or CI outcome.
+- **Build architecture:** `remote-staging` is store-signed, TestFlight-capable and explicitly selects EAS preview with Remote mode and a separate build-flavor marker. Development and production profiles keep Remote disabled. The client rejects inconsistent or incomplete Remote staging configuration; staging-only diagnostics expose flavor, service mode, safe backend host and version without a key.
+- **Environment handoff:** read-only `eas config` validated the remote-staging profile and reported that EAS preview has no plain-text/sensitive public variables at this checkpoint. H1A must independently verify the hosted Derive project before configuring the public URL/key in preview and making a real staging build. A fixed expected-project-ref guard was deferred because the connected Supabase project listing did not expose the previously recorded Derive project; no ref is guessed into the client.
+- **Remote client audit:** existing route and session tests cover signed out, session initialization, unresolved/error bootstrap, inactive membership, pending refresh, active onboarding incomplete/complete, published/draft routine presentation, downgrade, account switch and sign out. L0 adds build-flavor and configuration tests; no additional mobile routing defect was found in this pass. These local tests do not prove the hosted lifecycle.
+- **Build verification nuance:** a local web export reused a prior Mock bundle after switching shell public variables; a cache-cleared export rebuilt with the synthetic staging host. L1/H1A should clear local Metro cache when switching flavors and read the compiled staging diagnostic on-device. This is local tooling evidence, not a claim about an EAS cloud build.
+- **Ownership and evidence:** founder authorization assigns H1A hosted post-auth core temporarily to Kanuj after L0 lands. H1E email delivery, H1B Stripe activation, F1 founder fallback and normal platform implementation stay with Sami. Old draft H1 PR #21 is read-only evidence, not a branch to continue. No hosted activation, real OTP, Stripe, Gemini or production Remote proof is claimed by L0.
+
 ## 2026-09-20: V1A first-customer roadmap and context reset
 
 - **Predecessor:** `main@6f6a55615b9622ccdf2536c7e7cfb4dbb74cce0e`, the C1.5A PR #23 merge. This entry records branch documentation, not V1A merge or CI outcome.

@@ -88,6 +88,8 @@ EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 ```
 *Note: The mobile client remains in Mock mode by default. The Remote adapter and S1-S5 implementation are present, but hosted migrations, functions, provider secrets, and the Stripe test-mode lifecycle smoke must be verified before Remote production activation. Enabling this flag alone is not a production readiness check.*
 
+L0 defines a separate `remote-staging` EAS profile for a store-signed Remote test build. It selects EAS `preview`; H1A must verify the hosted project and supply the preview public Supabase URL and publishable key before building. The production profile remains Mock. See [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) for preflight and staging-only diagnostics.
+
 ---
 
 ## 4. Repository Documentation Sitemap

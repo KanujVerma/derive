@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
+import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
 import { sendEmailOtp, isValidEmail } from '@/src/services/authClient';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
@@ -115,6 +116,7 @@ export default function LoginScreen() {
               disabled={!email.trim() || loading}
               size="large"
             />
+            <BuildDiagnostics />
           </View>
         </KeyboardAvoidingView>
       </View>

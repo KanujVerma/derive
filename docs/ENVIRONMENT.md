@@ -17,7 +17,8 @@ another.
 
 | Variable | Runtime | Sensitivity | When required |
 | --- | --- | --- | --- |
-| `EXPO_PUBLIC_USE_REMOTE_SERVICE` | Expo mobile/web build | Public | `false` until the I1 remote integration is verified |
+| `EXPO_PUBLIC_USE_REMOTE_SERVICE` | Expo mobile/web build | Public | `false` in development and production profiles; `true` only in the explicit Remote staging profile before launch approval |
+| `EXPO_PUBLIC_BUILD_FLAVOR` | Expo mobile/web build | Public | `development`, `remote-staging`, or `production`; empty local value defaults to development |
 | `EXPO_PUBLIC_SUPABASE_URL` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL` | Expo mobile/web build | Public | Optional customer contact; configure only after send-and-receive mailbox verification |
@@ -34,7 +35,7 @@ another.
 | `DERIVE_CHECKOUT_CANCEL_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS cancellation destination (localhost HTTP allowed only for local development) |
 | `DERIVE_PORTAL_RETURN_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS return destination from Stripe Billing Portal |
 
-The root `.env.example` lists only public mobile variables, including an empty optional support address.
+The root `.env.example` lists only public mobile variables, including an empty optional build flavor and support address.
 CLI/CI and trusted-server names are documented here instead of being mixed into
 the Expo template, reducing the risk that a developer pastes a server secret
 into the mobile build environment.
@@ -69,6 +70,18 @@ does not break. New environments must use
 `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. The legacy name is deliberately absent
 from `.env.example`.
 
+## L0 Remote staging build boundary
+
+`eas.json` has three explicit build profiles. `development` is an internal development client with Remote disabled. `production` is store-signed with Remote disabled. `remote-staging` is store-signed and TestFlight-capable, sets `EXPO_PUBLIC_BUILD_FLAVOR=remote-staging` and `EXPO_PUBLIC_USE_REMOTE_SERVICE=true`, and explicitly selects EAS environment `preview`. The explicit preview selection matters because a store distribution build otherwise selects the production environment by default. The build flavor is independent of service mode; a later approved production Remote activation remains possible without redefining flavor semantics.
+
+EAS preview must provide `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as public client configuration. On 2026-09-20, `eas config --platform ios --profile remote-staging --json` validated the profile but reported no plain-text or sensitive preview variables. A Remote staging binary cannot be treated as ready until H1A verifies the exact hosted project and configures these values in EAS preview. Do not copy a guessed project URL or key into `eas.json`, source, or a PR. Never use a service-role or secret key in Expo.
+
+The L0 resolver rejects invalid flavor values, Remote staging with Remote disabled, missing or malformed publishable keys, legacy anon-only key, local/non-HTTPS or non-`*.supabase.co` hosts, and URLs containing a path, query, fragment, or embedded credentials. Remote staging checks the documented `sb_publishable_` key shape: a 22-character random part and an 8-character checksum part. A future reviewed custom-domain rollout would need an explicit guard change. The build shows a staging-only identity card on sign-in, Holding, Membership, and Profile with its service mode, safe backend host, **public configuration shape** status, and app version. Shape validation does not establish that the key is active or belongs to the displayed project. It never shows a key or user token. H1A must compare the host on a built device with the verified project and prove an authenticated call; a TestFlight label alone is not evidence of Remote mode.
+
+When switching local build flavors, clear Metro's cache before using an export as evidence. A 2026-09-20 local export initially reused a prior Mock bundle after shell environment values changed; `npx expo export -p web --clear` rebuilt and embedded the synthetic staging host as expected. Always inspect the compiled staging diagnostic on the installed build. This local observation does not assert the state of an EAS cloud binary.
+
+The optional fixed expected-project-ref guard was not added in L0 because the previously recorded Derive ref was not available through the connected Supabase project listing at this checkpoint. The staging diagnostic and H1A project assertion provide a visible/manual boundary until the project can be verified directly. This is not proof that the EAS preview configuration currently points to the correct project.
+
 ## Supabase CLI and hosted-project access
 
 The mobile sign-in screen expects a six-digit email OTP. Local Supabase uses
@@ -83,9 +96,11 @@ E1 resolves the managed-app entitlement policy: Remote accounts need canonical
 active membership before sensitive onboarding and the member tabs. A signed-in
 inactive account uses `/membership` for trusted Checkout or billing management.
 Profile readiness alone cannot grant access. Public Shop routing remains
-separate, unopened C1.5 work. Keep `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`
-until hosted migrations/functions, six-digit OTP email, Gemini secret, and the
-test-mode Checkout to signed webhook to membership to Portal smoke all pass.
+parked. Keep the committed production and local default profiles on
+`EXPO_PUBLIC_USE_REMOTE_SERVICE=false` until hosted core, real six-digit OTP
+email, Gemini, and Stripe Checkout/webhook/Portal gates pass. The separate
+Remote staging profile is for controlled hosted-core verification with a
+disposable authenticated entitlement fixture; it is not email or billing proof.
 
 For a developer workstation, prefer interactive authentication:
 
@@ -184,8 +199,9 @@ ignored `supabase/.env.local` file or the hosted Supabase secret store.
   keys, or payment credentials in mobile code.
 - Real credentials in `.env.example`, documentation, tests, screenshots,
   issues, commits, or pull-request descriptions.
-- Enabling remote mode in EAS until authentication, row mapping, Edge
-  Functions, and I1 end-to-end verification are complete.
+- Enabling Remote mode in the committed production EAS profile before the
+  later production launch gate. The separate L0 Remote staging profile is
+  allowed only with its validated preview configuration and hosted-core smoke.
 
 ## Failure behavior
 
