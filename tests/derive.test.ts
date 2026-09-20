@@ -8170,8 +8170,8 @@ test('C1 Shop: draft and approved KEEP products cannot offer a refill', () => {
     const semantics = resolveActionCommerceSemantics('KEEP', status);
     assert.equal(semantics.purchaseAvailability, 'not_applicable');
   }
-  const detailContent = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
-  assert.ok(detailContent.includes("action === 'KEEP' && isPublished"));
+  const commerceContent = fs.readFileSync(path.resolve('src/components/shop/ProductCommerceSection.tsx'), 'utf8');
+  assert.ok(commerceContent.includes("action === 'KEEP' && published"));
 });
 
 test('C1 Shop: REPLACE never sells old product — neverSellOldProduct=true', () => {
@@ -8481,15 +8481,17 @@ test('C1 Shop: Mock Ask handoff preserves the scanned verdict', async () => {
 
 test('C1 Shop: product detail does not fabricate price and uses truthful C1 commerce language', () => {
   const detailContent = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
+  const commerceContent = fs.readFileSync(path.resolve('src/components/shop/ProductCommerceSection.tsx'), 'utf8');
   assert.ok(detailContent.includes('product.retailPriceApprox != null'), 'Price must only render when retailPriceApprox is non-null');
-  assert.ok(detailContent.includes('Purchase through Derive coming soon'), 'Must use truthful C1 commerce language');
-  assert.ok(!detailContent.includes('Available at checkout'), 'Must never say Available at checkout');
+  assert.ok(detailContent.includes('<ProductCommerceSection'), 'Detail composes the Shop-owned commerce seam');
+  assert.ok(commerceContent.includes('Purchase through Derive coming soon'), 'Must use truthful C1 commerce language');
+  assert.ok(!`${detailContent}${commerceContent}`.includes('Available at checkout'), 'Must never say Available at checkout');
 });
 
 test('C1 Shop: no Available at checkout copy remains in C1 customer UI', () => {
   const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
   assert.ok(!shopContent.includes('Available at checkout'), 'shop.tsx must not contain Available at checkout');
-  assert.ok(shopContent.includes('Purchase through Derive coming soon'), 'shop.tsx must use truthful coming soon copy');
+  assert.ok(shopContent.includes('View product'), 'Shop acquisition cards should open detail before future ordering copy');
 });
 
 test('C1 Shop: member no-products-needed state is calm (no manufactured urgency)', () => {
@@ -8702,4 +8704,137 @@ test('E1 activation: bounded backend reads, never a client-side entitlement asse
     attempts: 2, delaysMs: [1], read: async () => pending,
     wait: async () => {}, isCurrent: () => false,
   }), 'aborted');
+});
+
+test('C1.1 Shop: loading and error never claim the plan is covered', async () => {
+  const presentation: any = await import('../src/commerce/shopState.ts').catch(() => ({}));
+  assert.equal(typeof presentation.resolveShopHomeState, 'function', 'Shop needs one state selector');
+  const input = {
+    routineStatus: 'published',
+    neededCount: 0,
+    isRoutineBeingPrepared: false,
+    isPlanUnderReview: false,
+  } as const;
+  assert.equal(presentation.resolveShopHomeState({ ...input, hydrationStatus: 'idle' }), 'loading');
+  assert.equal(presentation.resolveShopHomeState({ ...input, hydrationStatus: 'loading' }), 'loading');
+  assert.equal(presentation.resolveShopHomeState({ ...input, hydrationStatus: 'error' }), 'error');
+});
+
+test('C1.1 Shop: only a ready published plan can be covered or need products', async () => {
+  const presentation: any = await import('../src/commerce/shopState.ts').catch(() => ({}));
+  assert.equal(typeof presentation.resolveShopHomeState, 'function');
+  const input = {
+    hydrationStatus: 'ready',
+    routineStatus: 'published',
+    isRoutineBeingPrepared: false,
+    isPlanUnderReview: false,
+  } as const;
+  assert.equal(presentation.resolveShopHomeState({ ...input, neededCount: 0 }), 'covered');
+  assert.equal(presentation.resolveShopHomeState({ ...input, neededCount: 2 }), 'needs_products');
+  assert.equal(presentation.resolveShopHomeState({ ...input, routineStatus: null, neededCount: 0 }), 'empty');
+});
+
+test('C1.1 Shop: preparation and unpublished review suppress acquisition', async () => {
+  const presentation: any = await import('../src/commerce/shopState.ts').catch(() => ({}));
+  assert.equal(typeof presentation.resolveShopHomeState, 'function');
+  const input = {
+    hydrationStatus: 'ready',
+    routineStatus: 'approved',
+    neededCount: 3,
+    isRoutineBeingPrepared: false,
+    isPlanUnderReview: false,
+  } as const;
+  assert.equal(presentation.resolveShopHomeState(input), 'review');
+  assert.equal(presentation.resolveShopHomeState({ ...input, routineStatus: 'awaiting_review' }), 'review');
+  assert.equal(presentation.resolveShopHomeState({ ...input, routineStatus: 'published', isPlanUnderReview: true }), 'review');
+  assert.equal(presentation.resolveShopHomeState({ ...input, routineStatus: null, isRoutineBeingPrepared: true }), 'preparing');
+});
+
+test('C1.1 Scan access: Today and Shop headers expose the canonical scanner', () => {
+  const today = fs.readFileSync(path.resolve('app/(tabs)/index.tsx'), 'utf8');
+  const shop = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
+  const ask = fs.readFileSync(path.resolve('app/(tabs)/ask.tsx'), 'utf8');
+  const legacy = fs.readFileSync(path.resolve('app/(tabs)/scan.tsx'), 'utf8');
+  const todayHeader = today.slice(today.indexOf('{/* Clean Consumer Header'), today.indexOf('<ScrollView'));
+  const shopHeader = shop.slice(shop.indexOf('if (isMember) {'), shop.indexOf('<ScrollView'));
+
+  assert.match(todayHeader, /onPress=\{handleScanPress\}/);
+  assert.match(shopHeader, /onPress=\{handleScanPress\}/);
+  assert.match(today, /router\.push\('\/shop\/scan'\)/);
+  assert.match(shop, /router\.push\('\/shop\/scan'\)/);
+  assert.match(ask, /router\.push\('\/shop\/scan'\)/);
+  assert.equal(fs.existsSync(path.resolve('app/shop/scan.tsx')), true);
+  assert.match(legacy, /Redirect/);
+  assert.ok(!legacy.includes('CameraView'), 'Legacy tab must not contain a second scanner');
+  for (const unrelated of ['app/(tabs)/plan.tsx', 'app/(tabs)/progress.tsx', 'app/profile/index.tsx']) {
+    assert.ok(!fs.readFileSync(path.resolve(unrelated), 'utf8').includes("router.push('/shop/scan')"),
+      `${unrelated} must not gain a global Scan accelerator`);
+  }
+});
+
+test('C1.1 Scan result: product identity and verdict precede formula detail', () => {
+  const scan = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  const invalidBranch = scan.indexOf("resultPresentation.kind === 'invalid'");
+  const readyBranch = scan.indexOf("resultPresentation.kind === 'ready'");
+  const result = scan.slice(readyBranch, scan.indexOf('if (isSearching)'));
+  const identity = result.indexOf('styles.productNameText');
+  const verdict = result.indexOf('styles.verdictHeadline');
+  const formula = result.indexOf('styles.formulaCard');
+  assert.ok(invalidBranch > 0 && invalidBranch < readyBranch, 'Invalid result must be handled before the verdict view');
+  assert.ok(identity >= 0 && verdict > identity && formula > verdict);
+  assert.match(scan, /resolveScanResultPresentation\(scanResult\)/);
+  assert.match(result, /onPress=\{handleResetScan\}/);
+  assert.match(result, /onPress=\{handleHandoffToAsk\}/);
+});
+
+test('C1.1 Scan verdict: only canonical categorical labels reach the UI', async () => {
+  const presentation: any = await import('../src/commerce/scanPresentation.ts').catch(() => ({}));
+  assert.equal(typeof presentation.resolveScanVerdictLabel, 'function');
+  assert.equal(presentation.resolveScanVerdictLabel('could_work'), 'COULD WORK');
+  assert.equal(presentation.resolveScanVerdictLabel('not_good_fit'), 'NOT A GOOD FIT RIGHT NOW');
+  assert.equal(presentation.resolveScanVerdictLabel('92% match'), null);
+  assert.equal(presentation.resolveScanVerdictLabel(''), null);
+});
+
+test('C1.1 Scan result boundary: unknown runtime verdict has no trusted label', async () => {
+  const presentation: any = await import('../src/commerce/scanPresentation.ts');
+  assert.equal(typeof presentation.resolveScanResultPresentation, 'function');
+  assert.deepEqual(presentation.resolveScanResultPresentation(null), { kind: 'waiting' });
+  assert.deepEqual(
+    presentation.resolveScanResultPresentation({
+      verdict: 'totally_unknown_verdict',
+      verdictLabel: 'GREAT FIT',
+      score: 50,
+    }),
+    { kind: 'invalid' },
+  );
+  assert.deepEqual(
+    presentation.resolveScanResultPresentation({ verdict: '50/100' }),
+    { kind: 'invalid' },
+  );
+});
+
+test('C1.1 Scan result boundary: every canonical verdict keeps its category label', async () => {
+  const { resolveScanResultPresentation } = await import('../src/commerce/scanPresentation.ts') as any;
+  const labels = [
+    ['great_fit', 'GREAT FIT'],
+    ['fits_plan', 'GREAT FIT'],
+    ['could_work', 'COULD WORK'],
+    ['not_needed', 'NOT NEEDED'],
+    ['better_replacement', 'BETTER AS A REPLACEMENT'],
+    ['use_with_caution', 'USE WITH CAUTION'],
+    ['not_good_fit', 'NOT A GOOD FIT RIGHT NOW'],
+  ];
+  for (const [verdict, label] of labels) {
+    assert.deepEqual(resolveScanResultPresentation({ verdict }), { kind: 'ready', label });
+  }
+});
+
+test('C1.1 Scan failure remains recoverable when camera permission is denied', () => {
+  const scan = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  const failureBranch = scan.indexOf('if (invalidResult || (evaluationError && !scanResult))');
+  const permissionBranch = scan.indexOf('if (permission && !permission.granted)');
+  assert.ok(failureBranch > 0 && failureBranch < permissionBranch,
+    'Evaluation failure must render before the camera-permission fallback');
+  assert.match(scan.slice(failureBranch, permissionBranch), /label="Scan Again"/);
 });

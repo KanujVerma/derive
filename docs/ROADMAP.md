@@ -615,6 +615,27 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Recommendation and safety decisions remain independent of commercial inputs.
   - [x] C1 adds no backend migration or physical-commerce shared contract.
 
+### C1.1: Shop and Scan Experience Hardening [IMPLEMENTED]
+* **Scope**: Make Scan a visible one-tap utility from the active-member Today
+  and Shop headers while keeping one `/shop/scan` implementation and five root
+  tabs. Clarify Shop state and product-detail presentation without physical
+  commerce or public Scan.
+* **Acceptance**:
+  - [x] Today and Shop header actions reach the canonical scanner; Ask shortcut
+    remains direct.
+  - [x] Scan result prioritizes identity and categorical verdict, then reason,
+    member facts, formula facts, and next actions. Unknown search and repeated
+    Scan remain direct.
+  - [x] Shop distinguishes loading, error, preparation, review, needs,
+    covered, and empty from canonical plan hydration. Product detail has a
+    presentation-only future-offer seam and preserves action semantics.
+  - [x] Invalid runtime verdicts show a truthful retry state without a crash
+    or invented fit label. Stale pre-E1 inactive Shop comment corrected.
+  - [x] 245 unit tests, both TypeScript checks, web export, and phone review
+    passed.
+* **Non-overlap**: No H1, Sami backend, Stripe, SMTP, membership, shared contract,
+  ProductOffer, physical checkout, or app-wide UI cleanup.
+
 ### E1: Membership Entitlements and Checkout UX [IMPLEMENTED LOCALLY; HOSTED ACTIVATION PENDING]
 * **Scope**: Sign in, activate the Founding Beta membership through S5 Checkout, then onboard. Canonical active membership gates the managed app; profile readiness is a separate dimension. Paused, cancelled, and not-yet-active accounts receive one Membership screen with trusted Checkout or Portal links where S5 supports them.
 * **Acceptance**:
