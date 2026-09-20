@@ -105,6 +105,13 @@ export default function TodayScreen() {
     router.push('/profile');
   };
 
+  const handleScanPress = () => {
+    if (!isShopMember) return;
+    Haptics.selectionAsync().catch(() => {});
+    analytics.track('shop_scan_opened', { source: 'today_shortcut' });
+    router.push('/shop/scan');
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Clean Consumer Header with Profile Access */}
@@ -118,14 +125,28 @@ export default function TodayScreen() {
             />
             <Text style={styles.brandWordmark}>DERIVE</Text>
           </View>
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={handleProfile}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Account and Settings"
-          >
-            <Icon name="person" size={18} color={colors.inkMuted} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {isShopMember && (
+              <TouchableOpacity
+                style={styles.headerScanAction}
+                onPress={handleScanPress}
+                accessibilityRole="button"
+                accessibilityLabel="Scan a product"
+                activeOpacity={0.8}
+              >
+                <Icon name="scan" size={17} color={colors.brand} />
+                <Text style={styles.headerScanText}>Scan</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={handleProfile}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityLabel="Account and Settings"
+            >
+              <Icon name="person" size={18} color={colors.inkMuted} />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.greeting}>Good evening, {firstName}.</Text>
       </View>
@@ -457,6 +478,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  headerScanAction: {
+    minHeight: 44,
+    minWidth: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+  },
+  headerScanText: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.semibold,
+    color: colors.brand,
   },
   profileButton: {
     width: 44,

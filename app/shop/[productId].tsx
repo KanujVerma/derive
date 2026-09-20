@@ -42,6 +42,8 @@ import { Badge } from '@/src/components/ui/Badge';
 import { analytics } from '@/src/services/analytics';
 import { resolveShopProductContext } from '@/src/commerce/types';
 import { useShopAudience } from '@/src/commerce/useShopAudience';
+import { hydratePlanState } from '@/src/services/deriveClient';
+import { ProductCommerceSection } from '@/src/components/shop/ProductCommerceSection';
 
 export default function ProductDetailScreen() {
   const router = useRouter();
@@ -49,7 +51,7 @@ export default function ProductDetailScreen() {
   const params = useLocalSearchParams<{ productId: string }>();
   const productId = params.productId;
 
-  const { routine, userProducts } = useRoutineStore();
+  const { routine, userProducts, planHydrationStatus, planHydrationError } = useRoutineStore();
   const audience = useShopAudience();
   const isMember = audience === 'member';
   const memberRoutine = isMember ? routine : null;
@@ -69,7 +71,12 @@ export default function ProductDetailScreen() {
 
   const action = userProduct?.action;
   const actionReason = userProduct?.actionReason || matchingStep?.whyChosen;
-  const isPublished = memberRoutine?.status === 'published';
+
+  React.useEffect(() => {
+    if (isMember && (planHydrationStatus === 'idle' || planHydrationStatus === 'loading')) {
+      void hydratePlanState().catch(() => {});
+    }
+  }, [isMember, planHydrationStatus]);
 
   React.useEffect(() => {
     if (product) {
@@ -95,23 +102,48 @@ export default function ProductDetailScreen() {
     router.push('/refill');
   };
 
+  const header = (
+    <View style={styles.header}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={handleBack}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        accessibilityLabel="Go back"
+        accessibilityRole="button"
+      >
+        <Icon name="back" size={20} color={colors.ink} />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Product Details</Text>
+      <View style={{ width: 40 }} />
+    </View>
+  );
+
+  if (isMember && planHydrationStatus !== 'ready') {
+    const failed = planHydrationStatus === 'error';
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        {header}
+        <View style={styles.unavailableContainer}>
+          <Icon name={failed ? 'info' : 'sparkle'} size={32} color={colors.brand} />
+          <Text style={styles.unavailableTitle}>
+            {failed ? 'Product details could not be loaded' : 'Loading product details'}
+          </Text>
+          <Text style={styles.unavailableText}>
+            {failed ? planHydrationError || 'Please try again in a moment.' : 'Checking your current routine.'}
+          </Text>
+          {failed && <Button label="Try Again" variant="secondary" size="medium" onPress={() => {
+            void hydratePlanState().catch(() => {});
+          }} />}
+        </View>
+      </View>
+    );
+  }
+
   // Truthful unavailable state when productId cannot be resolved from canonical state
   if (!product) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBack}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Icon name="back" size={20} color={colors.ink} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Product Details</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        {header}
 
         <View style={styles.unavailableContainer}>
           <Icon name="info" size={32} color={colors.inkMuted} />
@@ -135,20 +167,7 @@ export default function ProductDetailScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Top Navigation Bar */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleBack}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Icon name="back" size={20} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Product Details</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      {header}
 
       <ScrollView
         contentContainerStyle={[
@@ -169,7 +188,7 @@ export default function ProductDetailScreen() {
             </View>
             {product.retailPriceApprox != null && (
               <Text style={styles.priceText}>
-                ${product.retailPriceApprox} approx.
+                Approx. retail ${product.retailPriceApprox}
               </Text>
             )}
           </View>
@@ -182,23 +201,19 @@ export default function ProductDetailScreen() {
               <Text style={styles.takeOverline}>DERIVE'S TAKE</Text>
               <Badge action={action} />
             </View>
-            {actionReason ? (
-              <Text style={styles.takeReason}>{actionReason}</Text>
-            ) : null}
+            <Text style={styles.takeReason}>
+              {action === 'ADD' ? 'Needed for your plan' : action === 'KEEP' ? 'In your plan' : action === 'PAUSE' ? 'Paused for now' : action === 'STOP' ? 'Discontinued' : 'A change is recommended'}
+            </Text>
           </View>
         )}
 
-        {/* 3. MEMBER PRODUCT CONTEXT */}
-        <View style={styles.detailSection}>
-          <Text style={styles.sectionLabel}>
-            WHY THIS FITS YOUR PLAN
-          </Text>
-          <Text style={styles.sectionBody}>
-            {actionReason
-              ? actionReason
-              : 'No personalized explanation is available for this product yet.'}
-          </Text>
-        </View>
+        {/* 3. One reason, without repeating it in the action badge. */}
+        {isMember && actionReason && (
+          <View style={styles.detailSection}>
+            <Text style={styles.sectionLabel}>WHY DERIVE SAYS THIS</Text>
+            <Text style={styles.sectionBody}>{actionReason}</Text>
+          </View>
+        )}
 
         {/* 4. HOW IT FITS YOUR ROUTINE (When matching routine step exists) */}
         {isMember && matchingStep && (
@@ -261,87 +276,12 @@ export default function ProductDetailScreen() {
           </View>
         )}
 
-        {/* 6. COMMERCE ACTION CARD (Truthful C1 Presentation) */}
-        <View style={styles.commerceActionCard}>
-          {action === 'ADD' ? (
-            isPublished ? (
-              <>
-                <View style={styles.commerceHeader}>
-                  <Icon name="bottle" size={18} color={colors.brand} />
-                  <Text style={styles.commerceTitle}>Purchase through Derive coming soon</Text>
-                </View>
-                <Text style={styles.commerceBody}>
-                  Derive is finalizing physical product ordering. This product is recommended for your active routine.
-                </Text>
-              </>
-            ) : (
-              <>
-                <View style={styles.commerceHeader}>
-                  <Icon name="sparkle" size={18} color={colors.brand} />
-                  <Text style={styles.commerceTitle}>Recommendation under review</Text>
-                </View>
-                <Text style={styles.commerceBody}>
-                  Your first plan is undergoing final verification. Product acquisition will open once your routine is published.
-                </Text>
-              </>
-            )
-          ) : action === 'KEEP' && isPublished ? (
-            <>
-              <View style={styles.commerceHeader}>
-                <Icon name="checkCircle" size={18} color={colors.brand} />
-                <Text style={styles.commerceTitle}>In your plan</Text>
-              </View>
-              <Text style={styles.commerceBody}>
-                You already have this product on your shelf. Need a refill?
-              </Text>
-              <Button
-                label="Request Refill"
-                variant="secondary"
-                size="small"
-                onPress={handleRefill}
-                style={{ marginTop: spacing.xs, alignSelf: 'flex-start' }}
-              />
-            </>
-          ) : action === 'KEEP' ? (
-            <Text style={styles.commerceBody}>
-              This product is still under routine review. Managed refills are available after publication.
-            </Text>
-          ) : action === 'PAUSE' ? (
-            <>
-              <View style={styles.commerceHeader}>
-                <Icon name="info" size={18} color={colors.actionPause.text} />
-                <Text style={styles.commerceTitle}>Product paused</Text>
-              </View>
-              <Text style={styles.commerceBody}>
-                This product is temporarily held while your skin barrier stabilizes. No purchase needed.
-              </Text>
-            </>
-          ) : action === 'STOP' ? (
-            <>
-              <View style={styles.commerceHeader}>
-                <Icon name="close" size={18} color={colors.actionStop.text} />
-                <Text style={styles.commerceTitle}>Discontinued product</Text>
-              </View>
-              <Text style={styles.commerceBody}>
-                Derive recommends discontinuing this product. It is no longer in your active routine.
-              </Text>
-            </>
-          ) : action === 'REPLACE' ? (
-            <>
-              <View style={styles.commerceHeader}>
-                <Icon name="info" size={18} color={colors.brand} />
-                <Text style={styles.commerceTitle}>Replacement recommended</Text>
-              </View>
-              <Text style={styles.commerceBody}>
-                Derive recommends replacing this formula with an optimal alternative. We never sell replaced or discontinued bottles.
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.commerceBody}>
-              Explore product details and ingredients.
-            </Text>
-          )}
-        </View>
+        {/* C1 presentation seam for future offer data, with no physical checkout. */}
+        <ProductCommerceSection
+          action={action}
+          routineStatus={memberRoutine?.status ?? null}
+          onRefill={handleRefill}
+        />
       </ScrollView>
     </View>
   );
@@ -547,29 +487,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: colors.actionPause.text,
     lineHeight: 18,
-  },
-  commerceActionCard: {
-    backgroundColor: colors.brandLight,
-    borderColor: colors.borderSubtle,
-    borderWidth: 1,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    gap: spacing.xs,
-  },
-  commerceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  commerceTitle: {
-    fontSize: typography.sizes.bodyRegular,
-    fontWeight: typography.weights.bold,
-    color: colors.ink,
-  },
-  commerceBody: {
-    fontSize: typography.sizes.caption,
-    color: colors.inkMuted,
-    lineHeight: 20,
   },
   unavailableContainer: {
     flex: 1,

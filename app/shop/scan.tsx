@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +16,6 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { Icon } from '@/src/components/ui/Icon';
-import { StatusBadge, StatusBadgeVariant } from '@/src/components/ui/StatusBadge';
 import { Button } from '@/src/components/ui/Button';
 import { analytics } from '@/src/services/analytics';
 import {
@@ -25,6 +25,7 @@ import {
 } from '@/src/services/catalog';
 import { evaluateProduct } from '@/src/services/deriveClient';
 import { ProductScanResult, ProductScanVerdict } from '@/src/types/schema';
+import { resolveScanVerdictLabel } from '@/src/commerce/scanPresentation';
 import { normalizeBarcode } from '@/src/utils/barcode';
 import { useScanContextStore } from '@/src/stores/scanContextStore';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
@@ -66,6 +67,9 @@ export default function ScanScreen() {
           recentReactions: productReactions,
         },
       });
+      if (!resolveScanVerdictLabel(result.verdict)) {
+        throw new Error('Unrecognized Scan verdict');
+      }
       setScanResult(result);
       return result;
     } catch (err: any) {
@@ -219,23 +223,23 @@ export default function ScanScreen() {
     });
   };
 
-  const getVerdictBadgeVariant = (verdict: ProductScanVerdict): StatusBadgeVariant => {
+  const getVerdictTone = (verdict: ProductScanVerdict) => {
     switch (verdict) {
       case 'great_fit':
       case 'fits_plan':
-        return 'keep';
+        return colors.actionKeep;
       case 'could_work':
-        return 'add';
+        return colors.actionAdd;
       case 'not_needed':
-        return 'pause';
+        return colors.actionPause;
       case 'better_replacement':
-        return 'replace';
+        return colors.actionReplace;
       case 'use_with_caution':
-        return 'pause';
+        return colors.actionPause;
       case 'not_good_fit':
-        return 'stop';
+        return colors.actionStop;
       default:
-        return 'info';
+        return { text: colors.inkMuted, bg: colors.surfaceMuted, border: colors.border };
     }
   };
 
@@ -253,11 +257,18 @@ export default function ScanScreen() {
 
   // 1. RESULT VIEW: Split FORMULA QUALITY vs FIT FOR YOU RIGHT NOW
   if (scanResult && confirmedProduct) {
+    const verdictTone = getVerdictTone(scanResult.verdict);
+    const verdictLabel = resolveScanVerdictLabel(scanResult.verdict)!;
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={styles.screenTitle}>Product Evaluation</Text>
-          <TouchableOpacity onPress={handleResetScan} style={styles.resetButton}>
+          <Text style={styles.screenTitle}>Scan Result</Text>
+          <TouchableOpacity
+            onPress={handleResetScan}
+            style={styles.resetButton}
+            accessibilityRole="button"
+            accessibilityLabel="Scan another product"
+          >
             <Text style={styles.resetButtonText}>Scan Another</Text>
           </TouchableOpacity>
         </View>
@@ -269,19 +280,20 @@ export default function ScanScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* SECTION 1: FIT FOR YOU RIGHT NOW */}
+          {/* Identity, immediate fit, then explanation. */}
           <View style={styles.verdictCard}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionCategoryTag}>FIT FOR YOU RIGHT NOW</Text>
-              <StatusBadge
-                label={scanResult.verdictLabel || scanResult.verdict.toUpperCase()}
-                variant={getVerdictBadgeVariant(scanResult.verdict)}
-                size="small"
-              />
-            </View>
-
             <Text style={styles.productBrandText}>{confirmedProduct.brand.toUpperCase()}</Text>
             <Text style={styles.productNameText}>{confirmedProduct.name}</Text>
+
+            <Text style={styles.sectionCategoryTag}>FIT FOR YOU RIGHT NOW</Text>
+            <View style={[styles.verdictHighlight, { backgroundColor: verdictTone.bg, borderColor: verdictTone.border }]}>
+              <Text
+                style={[styles.verdictHeadline, { color: verdictTone.text }]}
+                accessibilityLabel={`Derive fit: ${verdictLabel}`}
+              >
+                {verdictLabel.toUpperCase()}
+              </Text>
+            </View>
 
             <View style={styles.summaryBox}>
               <Text style={styles.summaryText}>{scanResult.verdictSummary}</Text>
@@ -307,10 +319,10 @@ export default function ScanScreen() {
             )}
           </View>
 
-          {/* SECTION 2: FORMULA / GENERAL QUALITY */}
+          {/* Formula facts stay separate from this member-specific fit. */}
           <View style={styles.formulaCard}>
-            <Text style={styles.sectionCategoryTag}>FORMULA QUALITY</Text>
-            <Text style={styles.formulaTitle}>Category & Ingredient Profile</Text>
+            <Text style={styles.sectionCategoryTag}>FORMULA / PRODUCT FACTS</Text>
+            <Text style={styles.formulaTitle}>Catalog details</Text>
 
             <View style={styles.formulaRow}>
               <Text style={styles.formulaLabel}>Product Type</Text>
@@ -328,10 +340,6 @@ export default function ScanScreen() {
               </View>
             )}
 
-            <View style={styles.formulaRow}>
-              <Text style={styles.formulaLabel}>Formulation Standard</Text>
-              <Text style={styles.formulaValue}>Verified manufacturer formulation snapshot</Text>
-            </View>
           </View>
 
           {/* ACTIONS */}
@@ -355,6 +363,22 @@ export default function ScanScreen() {
     );
   }
 
+  if (confirmedProduct && !evaluationError) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.screenTitle}>Evaluating Product</Text>
+        </View>
+        <View style={styles.evaluatingContent}>
+          <ActivityIndicator color={colors.brand} size="large" />
+          <Text style={styles.productBrandText}>{confirmedProduct.brand.toUpperCase()}</Text>
+          <Text style={styles.productNameText}>{confirmedProduct.name}</Text>
+          <Text style={styles.evaluatingText}>Checking how this fits your routine.</Text>
+        </View>
+      </View>
+    );
+  }
+
 
   // 3. MANUAL SEARCH FALLBACK VIEW
   if (isSearching) {
@@ -369,9 +393,14 @@ export default function ScanScreen() {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => setIsSearching(false)}
+            onPress={() => {
+              setIsSearching(false);
+              handleRetryScan();
+            }}
             style={styles.backButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Back to scanner"
           >
             <Icon name="back" size={20} color={colors.ink} />
           </TouchableOpacity>
@@ -396,7 +425,7 @@ export default function ScanScreen() {
             contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.catalogHeading}>Common Products</Text>
+            <Text style={styles.catalogHeading}>COMMON BETA PRODUCTS</Text>
             <View style={styles.catalogList}>
               {filtered.map((item, idx) => (
                 <TouchableOpacity
@@ -404,6 +433,8 @@ export default function ScanScreen() {
                   style={styles.catalogItemRow}
                   onPress={() => handleSelectCatalogItem(item)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Evaluate ${item.brand} ${item.name}`}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.catalogItemBrand}>{item.brand}</Text>
@@ -412,6 +443,16 @@ export default function ScanScreen() {
                   <Icon name="forward" size={14} color={colors.brand} />
                 </TouchableOpacity>
               ))}
+              {filtered.length === 0 && (
+                <View style={styles.searchEmpty}>
+                  <Text style={styles.searchEmptyTitle}>No match in the beta catalog</Text>
+                  <Text style={styles.searchEmptyText}>Try another name or return to the scanner.</Text>
+                  <Button label="Back to Scanner" variant="secondary" size="small" onPress={() => {
+                    setIsSearching(false);
+                    handleRetryScan();
+                  }} />
+                </View>
+              )}
             </View>
           </ScrollView>
         </View>
@@ -539,6 +580,8 @@ export default function ScanScreen() {
             style={styles.manualSearchLink}
             onPress={() => setIsSearching(true)}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Search beta products by name"
           >
             <Icon name="search" size={16} color={colors.brand} />
             <Text style={styles.manualSearchText}>Can't scan barcode? Search by name</Text>
@@ -685,7 +728,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   resetButton: {
-    paddingVertical: 6,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: spacing.sm,
   },
   resetButtonText: {
@@ -712,6 +756,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.sm,
+    minHeight: 44,
   },
   manualSearchText: {
     fontSize: typography.sizes.bodyRegular,
@@ -760,10 +805,6 @@ const styles = StyleSheet.create({
     ...shadows.card,
     marginBottom: spacing.md,
   },
-  sectionHeaderRow: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
   sectionCategoryTag: {
     fontSize: typography.sizes.micro,
     fontWeight: typography.weights.bold,
@@ -782,6 +823,18 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.ink,
     marginBottom: spacing.md,
+  },
+  verdictHighlight: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  verdictHeadline: {
+    fontSize: typography.sizes.sectionTitle,
+    fontWeight: typography.weights.bold,
+    lineHeight: typography.lineHeights.sectionTitle,
   },
   summaryBox: {
     backgroundColor: colors.canvas,
@@ -875,6 +928,17 @@ const styles = StyleSheet.create({
   actionContainer: {
     gap: spacing.sm,
     marginTop: spacing.sm,
+  },
+  evaluatingContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  evaluatingText: {
+    fontSize: typography.sizes.bodyRegular,
+    color: colors.inkMuted,
+    textAlign: 'center',
   },
   confirmationContent: {
     flex: 1,
@@ -970,6 +1034,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
+  },
+  searchEmpty: {
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  searchEmptyTitle: {
+    fontSize: typography.sizes.bodyRegular,
+    fontWeight: typography.weights.semibold,
+    color: colors.ink,
+  },
+  searchEmptyText: {
+    fontSize: typography.sizes.caption,
+    color: colors.inkMuted,
   },
   catalogItemRow: {
     flexDirection: 'row',

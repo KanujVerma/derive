@@ -1,8 +1,8 @@
-# Derive Commerce Architecture (C1 / Shop V1)
+# Derive Commerce Architecture (C1 / C1.1 Shop and Scan)
 
 **Source of Truth**: Canonical architecture for Derive Shop, customer-facing commerce, and product acquisition.
 **Owner**: Kanuj (Customer Experience + Mobile) with Platform/Shared integration points noted.
-**Status**: C1 Shop V1 IMPLEMENTED; S5 membership billing implementation MERGED, with hosted Stripe/Supabase activation smoke pending; physical-product commerce C1.5 NOT STARTED.
+**Status**: C1 Shop V1 implemented; C1.1 Shop and Scan experience hardening on an isolated draft branch. S5 membership billing is separate; physical-product commerce C1.5 is not started.
 
 ---
 
@@ -34,7 +34,7 @@ Long-term product loop mental model:
 | **Shop Audience Model (Guest / Non-Member / Member)** | APPROVED TARGET | Kanuj | Pure client view models in `src/commerce/types.ts`. Non-member fallback architected. |
 | **Action-to-Commerce Semantics** | IMPLEMENTED | Kanuj | `resolveActionCommerceSemantics()`: ADD eligible on publish; PAUSE/STOP never; KEEP non-urgent; REPLACE never sells old product. |
 | **No Universal Product Score Invariant** | IMPLEMENTED | Kanuj | Categorical fit guidance only (`GREAT FIT`, `COULD WORK`, `USE WITH CAUTION`, etc.). |
-| **Calm Empty States (Plan Covered / Review Pending)** | IMPLEMENTED | Kanuj | "Your current plan is covered" — Derive encourages buying nothing when appropriate. |
+| **Shop state separation** | C1.1 | Kanuj | Loading, error, preparation, unpublished review, published needs, covered, and empty are distinct. Covered requires a resolved published plan. |
 | **S5 Membership Billing Separation** | IMPLEMENTED / PRESERVED | Sami / Shared | Stripe membership checkout ($25/mo) remains strictly isolated in S5. |
 | **Product / Recommendation / Offer Separation** | APPROVED TARGET | Shared | Conceptual 3-way split: catalog product vs member routine action vs commercial offer. |
 | **Physical Product Commerce Backend** | DEFERRED (C1.5) | Cross-founder | Order schema, SKU commerce, fulfillment provider, single-item checkout. |
@@ -81,13 +81,41 @@ Today · Plan · Shop · Ask · Progress
 - **Legacy Route Compatibility**: `app/(tabs)/scan.tsx` is preserved as a lightweight redirect shim directly to `/shop/scan`. Deep links, Ask handoffs, and starter pills route to canonical Shop Scan directly.
 - **Single Scanner Invariant**: There is strictly **one** camera scanner implementation (`app/shop/scan.tsx`). Zero code duplication.
 
+### C1.1 frequent Scan access
+
+- Active members have a compact Scan control in the Today header and a
+  permanent Scan control in the Shop header. Ask retains its contextual starter
+  pill. All three go directly to `/shop/scan`; there is no sixth tab or global
+  Scan button on unrelated screens.
+- Shop's body Scan card explains the feature. The header is the primary
+  shortcut and stays visible without scrolling. Inactive Remote accounts
+  remain behind E1 membership routing; no public Scan is activated.
+- A recognized Scan shows product identity, categorical fit verdict, one
+  reason, member-specific facts, then separate formula facts and actions.
+  `Scan Another` returns to the same scanner. `Ask Derive About This` passes
+  the full typed result through the transient store. Unknown products get a
+  no-match path, not invented identity or evaluation.
+- Scan history and iOS app-icon Quick Actions remain future opportunities.
+  Neither has persistence or native implementation in C1.1.
+
+### Shop and detail presentation
+
+`src/commerce/shopState.ts` reads the existing plan hydration status. A
+loading or failed read cannot masquerade as a covered plan, and unpublished
+review cannot show an acquisition section. Shop and product detail retry with
+the existing `hydratePlanState()` coordinator. Needed products show their
+reason and a **View product** path; future ordering is explained only on
+detail. The Shop-owned `ProductCommerceSection` composes ADD, KEEP, PAUSE,
+STOP, and REPLACE states from the existing action semantics. It has no offer,
+price authority, payment path, or shared contract.
+
 ---
 
 ## 5. Action-to-Commerce Semantics
 
 The single source of truth is `resolveActionCommerceSemantics(action, routineStatus)` in `src/commerce/types.ts`:
 
-| Action | Plan Status Label | Routine Draft/Review | Routine Published/Approved | Never Sell Old Product? |
+| Action | Plan Status Label | Routine Draft/Review/Approved | Routine Published | Never Sell Old Product? |
 | :--- | :--- | :--- | :--- | :--- |
 | **ADD** | Needed for your plan | Not acquisition-eligible (`not_applicable`) | **Acquisition-eligible** (`deferred_to_c15`) | False |
 | **KEEP** | In your plan | Not acquisition-eligible | In your plan (`deferred_to_c15` optional refill) | False |
@@ -161,6 +189,16 @@ Decision status: **OPEN / DEFERRED TO C1.5**.
 - [x] Non-member and guest fallback view models
 - [x] Automated unit and boundary tests for audience, publication, Scan, and member-only presentation
 - [x] Full architecture documentation (`docs/COMMERCE.md`)
+
+### C1.1 / Shop and Scan experience hardening (Shop-only draft)
+- [x] Today and Shop header Scan accelerators route to the one scanner; Ask
+  shortcut remains direct.
+- [x] Result shows an immediate categorical verdict before formula facts;
+  repeated Scan and unknown-product return paths remain direct and truthful.
+- [x] Shop loading/error/review/covered states and product-detail action
+  presentation are separated without backend or shared-contract changes.
+- [x] 242 unit tests, both TypeScript checks, web export, and 390/320-pixel
+  Mock phone review passed. Draft PR CI is a separate gate.
 
 ### C1.5 / Physical Product Commerce Integration (Next Phase)
 - Preserve the membership and physical-product commerce separation established by S5 and C1.

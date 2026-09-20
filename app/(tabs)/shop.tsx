@@ -45,8 +45,9 @@ import { Badge } from '@/src/components/ui/Badge';
 import { analytics } from '@/src/services/analytics';
 import { config } from '@/src/constants/config';
 import { membershipDisplayLabel } from '@/src/domain/types';
-import { resolveActionCommerceSemantics } from '@/src/commerce/types';
 import { useShopAudience } from '@/src/commerce/useShopAudience';
+import { resolveShopHomeState } from '@/src/commerce/shopState';
+import { hydratePlanState } from '@/src/services/deriveClient';
 
 export default function ShopScreen() {
   const router = useRouter();
@@ -58,6 +59,8 @@ export default function ShopScreen() {
     isPlanUnderReview,
     isRoutineBeingPrepared,
     refillRequests,
+    planHydrationStatus,
+    planHydrationError,
   } = useRoutineStore();
 
   const audience = useShopAudience();
@@ -79,6 +82,35 @@ export default function ShopScreen() {
   const activeOrShippedRefills = refillRequests.filter(
     (r) => r.status === 'shipped' || r.status === 'ordered' || r.status === 'requested'
   );
+  const shopState = resolveShopHomeState({
+    hydrationStatus: planHydrationStatus,
+    routineStatus: routine?.status ?? null,
+    isRoutineBeingPrepared,
+    isPlanUnderReview,
+    neededCount: neededProducts.length,
+  });
+
+  React.useEffect(() => {
+    // Deduplicates an in-flight read and recovers a stale loading projection
+    // after entitlement refresh remounts Shop.
+    if (isMember && (planHydrationStatus === 'idle' || planHydrationStatus === 'loading')) {
+      void hydratePlanState().catch(() => {});
+    }
+  }, [isMember, planHydrationStatus]);
+
+  const stateNotice = shopState === 'loading'
+    ? { title: 'Loading your plan', body: 'Your product guidance is on its way.', icon: 'sparkle' as const }
+    : shopState === 'error'
+    ? { title: 'Your plan could not be loaded', body: planHydrationError || 'Please try again in a moment.', icon: 'info' as const }
+    : shopState === 'preparing'
+    ? { title: 'Your routine is being prepared', body: 'Product guidance will appear as soon as your plan is ready.', icon: 'sparkle' as const }
+    : shopState === 'review'
+    ? { title: 'Your plan is in review', body: 'We will show what you need once the routine is published.', icon: 'sparkle' as const }
+    : shopState === 'covered'
+    ? { title: 'Your current plan is covered', body: 'All recommended products are accounted for.', icon: 'checkCircle' as const }
+    : shopState === 'empty'
+    ? { title: 'Your Shop is taking shape', body: 'Products will appear here after your routine is ready.', icon: 'sparkle' as const }
+    : null;
 
   // =============================================
   // HANDLERS
@@ -88,6 +120,10 @@ export default function ShopScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     analytics.track('shop_scan_opened', { source: 'shop_home' });
     router.push('/shop/scan');
+  };
+
+  const handleRetryPlan = () => {
+    void hydratePlanState().catch(() => {});
   };
 
   const handleOrdersPress = () => {
@@ -130,18 +166,22 @@ export default function ShopScreen() {
   if (isMember) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        {/* Header */}
+        {/* Header: the primary Scan accelerator stays above the scroll area. */}
         <View style={styles.header}>
-          <Text style={styles.screenTitle}>Shop</Text>
-          <Text style={styles.screenSubtitle}>
-            {isRoutineBeingPrepared
-              ? 'Your routine is being prepared.'
-              : isPlanUnderReview
-              ? 'Your product recommendations are being finalized.'
-              : isPublished
-              ? 'What does Derive think you actually need?'
-              : 'Your personalized shop.'}
-          </Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.screenTitle}>Shop</Text>
+            <TouchableOpacity
+              style={styles.headerScanAction}
+              onPress={handleScanPress}
+              accessibilityRole="button"
+              accessibilityLabel="Scan a product"
+              activeOpacity={0.8}
+            >
+              <Icon name="scan" size={18} color={colors.brand} />
+              <Text style={styles.headerScanText}>Scan</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.screenSubtitle}>Product guidance for your routine.</Text>
         </View>
 
         <ScrollView
@@ -152,7 +192,7 @@ export default function ShopScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* ── NEEDED FOR YOUR PLAN ── */}
-          {isPublished && neededProducts.length > 0 && (
+          {shopState === 'needs_products' && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionLabel}>NEEDED FOR YOUR PLAN</Text>
@@ -161,7 +201,6 @@ export default function ShopScreen() {
                 Derive recommends adding these to complete your routine.
               </Text>
               {neededProducts.map((up) => {
-                const semantics = resolveActionCommerceSemantics('ADD', routine?.status ?? null);
                 return (
                   <TouchableOpacity
                     key={up.id}
@@ -182,14 +221,10 @@ export default function ShopScreen() {
                       </View>
                       <Icon name="forward" size={16} color={colors.inkMuted} />
                     </View>
-                    {/* C1 truthful commerce presentation */}
+                    {/* Product detail owns the truthful future-ordering explanation. */}
                     <View style={styles.deferredCTA}>
-                      <Icon name="bottle" size={14} color={colors.brand} />
-                      <Text style={styles.deferredCTAText}>
-                        {semantics.acquisitionEligible
-                          ? 'Purchase through Derive coming soon'
-                          : 'Finalizing your plan first'}
-                      </Text>
+                      <Text style={styles.deferredCTAText}>View product</Text>
+                      <Icon name="forward" size={14} color={colors.brand} />
                     </View>
                   </TouchableOpacity>
                 );
@@ -197,44 +232,26 @@ export default function ShopScreen() {
             </View>
           )}
 
-          {/* ── ROUTINE UNDER REVIEW STATE ── */}
-          {(isRoutineBeingPrepared || isPlanUnderReview) && (
+          {/* One truthful state at a time. A loading plan is never covered. */}
+          {stateNotice && (
             <View style={styles.calmCard}>
-              <Icon name="sparkle" size={18} color={colors.brand} />
+              <Icon name={stateNotice.icon} size={18} color={colors.brand} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.calmTitle}>
-                  {isRoutineBeingPrepared
-                    ? 'Your routine is being prepared'
-                    : 'Your product recommendations are being finalized'}
-                </Text>
-                <Text style={styles.calmText}>
-                  {isRoutineBeingPrepared
-                    ? 'Product recommendations will appear once your routine is ready. You can scan and ask in the meantime.'
-                    : 'We\'ll show you exactly what to get once your plan is confirmed. You can scan and ask in the meantime.'}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* ── NO PRODUCTS NEEDED — PLAN IS COVERED ── */}
-          {isMember && isPublished && neededProducts.length === 0 && !isRoutineBeingPrepared && !isPlanUnderReview && (
-            <View style={styles.calmCard}>
-              <Icon name="checkCircle" size={18} color={colors.brand} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.calmTitle}>Your current plan is covered</Text>
-                <Text style={styles.calmText}>
-                  All recommended products are accounted for. Derive will let you know if anything needs to change.
-                </Text>
+                <Text style={styles.calmTitle}>{stateNotice.title}</Text>
+                <Text style={styles.calmText}>{stateNotice.body}</Text>
+                {shopState === 'error' && (
+                  <Button label="Try Again" variant="ghost" size="small" onPress={handleRetryPlan} />
+                )}
               </View>
             </View>
           )}
 
           {/* ── YOUR ROUTINE (KEEP products) ── */}
-          {routineProducts.length > 0 && (
+          {(shopState === 'needs_products' || shopState === 'covered') && routineProducts.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionLabel}>YOUR ROUTINE</Text>
-                <TouchableOpacity onPress={handlePlanPress}>
+                <TouchableOpacity onPress={handlePlanPress} accessibilityRole="button" accessibilityLabel="See your full plan">
                   <Text style={styles.sectionAction}>See plan</Text>
                 </TouchableOpacity>
               </View>
@@ -258,7 +275,12 @@ export default function ShopScreen() {
                 </TouchableOpacity>
               ))}
               {routineProducts.length > 3 && (
-                <TouchableOpacity style={styles.seeAllRow} onPress={handlePlanPress}>
+                <TouchableOpacity
+                  style={styles.seeAllRow}
+                  onPress={handlePlanPress}
+                  accessibilityRole="button"
+                  accessibilityLabel={`See ${routineProducts.length - 3} more products in your plan`}
+                >
                   <Text style={styles.seeAllText}>
                     +{routineProducts.length - 3} more in your plan
                   </Text>
@@ -268,7 +290,7 @@ export default function ShopScreen() {
             </View>
           )}
 
-          {/* ── SCAN A PRODUCT ── */}
+          {/* Optional explanation; the persistent header action is the shortcut. */}
           <TouchableOpacity
             style={styles.scanCard}
             activeOpacity={0.85}
@@ -280,10 +302,12 @@ export default function ShopScreen() {
               <View style={styles.scanIconCircle}>
                 <Icon name="scan" size={22} color={colors.brand} />
               </View>
-              <View>
-                <Text style={styles.scanCardTitle}>Scan a Product</Text>
+              <View style={styles.scanCardCopy}>
+                <Text style={styles.scanCardTitle}>Considering something else?</Text>
                 <Text style={styles.scanCardSub}>
-                  Camera · Search by name · Personalized fit
+                  {shopState === 'needs_products' || shopState === 'covered'
+                    ? 'Scan it to see how it fits your plan.'
+                    : 'Get a personalized product fit check.'}
                 </Text>
               </View>
             </View>
@@ -300,7 +324,7 @@ export default function ShopScreen() {
           >
             <View style={styles.ordersCardLeft}>
               <Icon name="shipping" size={18} color={colors.inkMuted} />
-              <View>
+              <View style={styles.ordersCardCopy}>
                 <Text style={styles.ordersCardTitle}>Orders & Refills</Text>
                 {activeOrShippedRefills.length > 0 ? (
                   <Text style={styles.ordersCardSub}>
@@ -308,7 +332,11 @@ export default function ShopScreen() {
                     {activeOrShippedRefills.length === 1 ? 'order' : 'orders'}
                   </Text>
                 ) : (
-                  <Text style={styles.ordersCardSub}>Request a refill or track orders</Text>
+                  <Text style={styles.ordersCardSub}>
+                    {shopState === 'needs_products' || shopState === 'covered'
+                      ? 'Manage refills and tracking'
+                      : 'Refills open after your plan is published'}
+                  </Text>
                 )}
               </View>
             </View>
@@ -416,6 +444,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerScanAction: {
+    minHeight: 44,
+    minWidth: 82,
+    paddingHorizontal: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+    borderWidth: 1,
+    borderRadius: radii.full,
+  },
+  headerScanText: {
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.weights.semibold,
+    color: colors.brand,
   },
   screenTitle: {
     fontFamily: typography.fontFamilies.serif,
@@ -584,6 +635,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     flex: 1,
+    minWidth: 0,
+  },
+  scanCardCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   scanIconCircle: {
     width: 44,
@@ -597,11 +653,13 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyRegular,
     fontWeight: typography.weights.semibold,
     color: colors.ink,
+    lineHeight: 21,
   },
   scanCardSub: {
     fontSize: typography.sizes.caption,
     color: colors.inkMuted,
     marginTop: 1,
+    lineHeight: 18,
   },
   // Orders card
   ordersCard: {
@@ -619,6 +677,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     flex: 1,
+    minWidth: 0,
+  },
+  ordersCardCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   ordersCardTitle: {
     fontSize: typography.sizes.bodyRegular,

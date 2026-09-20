@@ -6,6 +6,13 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19: C1.1 Shop and Scan experience checkpoint
+
+- **Predecessor**: clean `origin/main@953c9295573b7fe8c8bd88a0758c4a00819175c4`; separate H1 PR #21 remains draft at `50ff9fa65d45c3871e759094a196f4054c29ce5e`. C1.1 uses `kanuj/c1-1-shop-scan-experience` in its own worktree.
+- **Scope**: Active-member Today and Shop headers expose direct `/shop/scan` actions; Ask's contextual route remains. One canonical scanner, five root tabs, and E1 entitlement remain unchanged. Shop's existing plan hydration distinguishes loading/error/review/covered/needs; product detail composes a presentation-only commerce section. Scan foregrounds the categorical verdict and preserves the full typed Ask handoff.
+- **Verification at checkpoint**: Shop state and categorical verdict red/green unit tests passed. A phone-sized Mock preview at 390 and 320 pixels exercised direct Today/Shop/Ask Scan routes, known and unknown product paths, Scan Another, typed Scan to Ask context, covered/ADD/review/loading/error Shop states, and ADD/KEEP/PAUSE/STOP/REPLACE detail semantics. 242 unit tests, both TypeScript checks, web export, and diff check passed. Draft PR CI remains a separate gate.
+- **Non-overlap**: No H1 branch changes, hosted Supabase actions, Stripe, SMTP, backend migration, shared contract, membership, public Shop/Scan, ProductOffer, or physical checkout. Sami's parallel app-wide polish remains separate. C1.5 stays unopened.
+
 ## 2026-09-19: E1 membership entitlement integration checkpoint
 
 - **Branch / predecessor**: `kanuj/e1-membership-entitlements` from shared `main` at `e661f71c54f67e740c7987f76f2f6dc671603ae2` (CI `35471149916` success). PR and final CI remain separate acceptance gates at this checkpoint.
