@@ -6,6 +6,13 @@ This ledger tracks durable architectural, product, and contract decisions across
 1. A fresh agent on either founder's machine must be able to recover full shared project truth by reading `AGENTS.md`, this ledger, and the repository documentation without manual chat debriefing.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-19: H1 continuation, independent negative smoke
+
+- **Predecessor**: draft PR #21 at `95ae1531be407e1fe5e714c1067d486e6add4ece`, CI `35479491153` success; shared main remains `953c9295573b7fe8c8bd88a0758c4a00819175c4`.
+- **Hosted freshness**: Existing Derive project remains healthy with 15 migrations, the same 13 active functions, private photo bucket, and no test identities or memberships before this pass. Supabase secret names still contain only platform defaults; the hosted Auth subject still indicates default link-only email.
+- **Independent verification**: New guarded H1 hosted negative harness created two disposable password-auth users, verified profile owner isolation, seven active-member Edge denials, founder denial, self-activation denial, and a 403 for a valid synthetic inactive photo upload. It self-deleted both accounts; hosted SQL readback returned zero Auth users, profiles, memberships, photo rows, and Storage objects. This is not OTP or the primary customer lifecycle.
+- **Ownership update from Kanuj**: Sami is building Resend/SMTP/Auth template delivery and Stripe infrastructure. Do not duplicate or overwrite his work; wait for actual hosted readiness, then inspect/reuse and verify. Gemini credential and dedicated staging inbox remain external gates. PR #21 stays draft, production Remote stays `false`, C1.5 stays unopened.
+
 ## 2026-09-19: H1 hosted activation checkpoint, partial
 
 - **Predecessor**: clean shared `main@953c9295573b7fe8c8bd88a0758c4a00819175c4`, final E1 CI `35474929110` success. H1 source branch is `kanuj/h1-hosted-remote-activation`.

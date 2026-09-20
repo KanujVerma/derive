@@ -632,8 +632,9 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] E1 migration deployed forward-only and read back; all 13 required Edge Functions active with the webhook's JWT exception scoped to that function.
   - [x] Private photo bucket, Data API exposure, RLS/grants, and advisor baseline inspected. Unauthenticated paid call returned 401; unsigned webhook returned 400.
   - [x] Explicit staging Remote web export succeeded with the hosted URL and modern publishable key, without changing the committed default.
-  - [ ] Founder decision and authorized setup for hosted six-digit OTP delivery: new free-tier shared mail cannot customize the default Magic Link template.
-  - [ ] Correct Derive Stripe test account access, test Price, signed webhook, Checkout, Portal, and downgrade smoke.
+  - [x] Hosted disposable password-auth negative smoke: profile owner isolation, seven paid API denials, founder denial, self-activation denial, inactive photo upload denial, and self-deletion. This does not count as OTP or a populated cross-user data test.
+  - [ ] Sami-owned Resend/SMTP and hosted six-digit OTP delivery, then real email verification.
+  - [ ] Sami-owned Stripe infrastructure and account wiring, then test Price, signed webhook, Checkout, Portal, and downgrade smoke.
   - [ ] Real Gemini credential and provider call; full Remote customer, photo, founder, and cross-user smoke.
 * **Evidence and reusable checks**: `docs/HOSTED_REMOTE_SMOKE.md`. No hosted customer lifecycle has yet passed. Production Remote remains `false`; C1.5 remains unopened.
 

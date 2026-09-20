@@ -22,6 +22,33 @@ the committed Remote default. Record observations, not secret values or OTPs.
 | Advisors | Security: eight informational `rls_enabled_no_policy` notices on deliberately server-only tables. Performance: five unindexed foreign keys, 24 unused indexes on empty tables, one duplicate routine index warning. No change was made on advisory output alone. |
 | Remote state | Committed `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`. An explicit staging web export with the hosted URL and modern publishable key succeeded; no hosted customer lifecycle or provider smoke has passed. |
 
+## H1 continuation: independent hosted negative smoke
+
+`scripts/test-h1-hosted-negative.mjs` ran against the exact project above with
+two generated, disposable password-auth users. This is separate from the
+primary six-digit OTP customer flow. Both users received their own profile and
+no membership. Each could read its own profile but not the other's. The seven
+paid Edge operations returned 403 for an inactive user, as did founder
+operations. A customer could not insert an active membership, and a valid
+synthetic PNG upload returned 403 at the private Storage authorization
+boundary. Both accounts used the deployed self-deletion function; hosted SQL
+readback then showed zero Auth users, profiles, memberships, photo metadata,
+and Storage objects.
+
+This proves only the exercised inactive and profile-owner boundaries. It does
+not prove cross-user routine/check-in/photo reads with populated rows, signed
+photo URLs, deletion of an existing photo, real email OTP, or active-member
+flows. Those remain in the full smoke checklist.
+
+To repeat this narrowly scoped test, supply only the hosted public URL and
+modern publishable key as `H1_HOSTED_SUPABASE_URL` and
+`H1_HOSTED_SUPABASE_PUBLISHABLE_KEY`, then set
+`H1_HOSTED_ALLOW_DISPOSABLE_TESTS=YES` and run the script. It rejects any
+project other than `snojlbqovlawewwqbviz`, generates credentials in memory,
+and attempts self-deletion in `finally`. If deletion fails, it reports only the
+disposable Auth user IDs for authorized cleanup. Never run it in CI or use a
+real customer identity.
+
 The read-only shadow schema diff could not connect to the direct database host
 from this environment. The migration ledger, actual table/policy inspection,
 dry run, E1 migration preflight, and post-push readback support the narrow E1
@@ -29,22 +56,17 @@ deployment claim. A full independent hosted schema diff remains unverified.
 
 ## External decisions and secure setup
 
-1. The founders choose a custom SMTP provider or a paid Supabase plan for this
-   existing project. A new free-tier project using the shared provider cannot
-   customize the OTP template, and shared mail only delivers to team addresses.
-   An authorized project administrator configures the selected mail service,
-   then installs the repository's six-digit `{{ .Token }}` template. Do not use
-   an alternate project or a magic-link workaround for the app's OTP UI.
-2. An authorized founder identifies the correct Derive Stripe account in
-   **test mode** and grants the H1 operator access through Stripe's own invite
-   flow, or performs the setup there. Do not use another account's saved login.
-   Inspect existing test products, prices, webhook endpoints, and Portal
-   configuration before creating anything.
-3. The founders provide a dedicated staging inbox they can receive and the
-   real Gemini API credential through trusted provider and Supabase settings.
-   Never paste credentials, OTPs, or test payment details into chat or Git.
-4. Set only trusted hosted secrets for the implemented provider and billing
-   paths. The webhook endpoint is
+1. Sami owns Resend, sender/domain and DNS, Supabase custom SMTP, and the hosted
+   six-digit `{{ .Token }}` template. Do not duplicate or overwrite that work.
+   Inspect and behaviorally verify it when Sami marks it ready.
+2. Sami is also building the Stripe infrastructure. Do not create or change
+   products, prices, webhooks, Portal configuration, or billing secrets in
+   parallel. After he completes account wiring, inspect the correct Derive
+   test account and reuse what is already configured.
+3. A dedicated staging inbox and a real Gemini API credential are still needed
+   through trusted provider and Supabase settings. Never paste credentials,
+   OTPs, or test payment details into chat or Git.
+4. The implemented billing webhook endpoint is
    `https://snojlbqovlawewwqbviz.supabase.co/functions/v1/stripe-membership-webhook`.
    Subscribe only to the seven event types handled in that function. The
    recurring test Price must be $25/month for `Derive Founding Beta`, with

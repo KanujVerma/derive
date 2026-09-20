@@ -77,10 +77,11 @@ The mobile sign-in screen expects a six-digit email OTP. Local Supabase uses
 OTP length. The default Supabase Magic Link email does not satisfy this UI.
 The existing hosted Derive project still sends the default Magic Link email.
 It was created on the free tier after Supabase restricted template editing with
-its shared mail provider. A founder must choose custom SMTP or a paid plan,
-and an authorized administrator must install a `{{ .Token }}` template before
-the six-digit Remote OTP smoke. Shared mail is also limited to organization
-team addresses. Local CLI template configuration does not deploy to hosted.
+its shared mail provider. Sami owns the Resend, sender/domain, DNS, custom SMTP,
+and hosted `{{ .Token }}` template setup. Verify actual delivery and code
+exchange when he marks it ready; do not configure a competing provider or
+overwrite his settings. Shared mail is limited to organization team addresses.
+Local CLI template configuration does not deploy to hosted.
 
 E1 resolves the managed-app entitlement policy: Remote accounts need canonical
 active membership before sensitive onboarding and the member tabs. A signed-in
@@ -143,6 +144,10 @@ against the unparsed body and `STRIPE_WEBHOOK_SECRET` before any database call.
 Missing Stripe configuration fails closed with sanitized errors.
 
 ## Stripe test-mode setup (required before hosted S5 smoke test)
+
+Sami is building this infrastructure and will handle the actual account
+wiring last. Treat the steps below as the existing S5 contract to verify and
+reuse after his setup, not instructions to create duplicate resources now.
 
 1. In Stripe test mode, create one product named `Derive Founding Beta` and one
    recurring monthly Price at the founder-approved amount. Copy its `price_...`

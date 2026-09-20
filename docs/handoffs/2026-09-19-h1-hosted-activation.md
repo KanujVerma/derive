@@ -11,6 +11,8 @@
 **Latest verified documentation commit before this handoff:** `a25232c7a144af7b8e8b05c3f262928c76b04b73`
 **Draft PR:** [#21](https://github.com/KanujVerma/derive/pull/21), with exact-head CI run `35479188485` successful before this handoff file was added. Check its new head and CI on resume.
 
+**Continuation baseline:** PR #21 reached `95ae1531be407e1fe5e714c1067d486e6add4ece`; both jobs of CI `35479491153` passed. Verify any newer commit and CI on resume.
+
 ## GOAL
 
 Complete the real test-mode Remote customer and founder lifecycle in the
@@ -40,6 +42,13 @@ committed production Remote default.
 - `npm test` under Node 22: 236/236; app and test TypeScript checks pass;
   explicit staging Remote web export with hosted public URL/key succeeds.
   PR #21 CI passed both build and local integration jobs at `a25232c`.
+- The guarded hosted negative harness `scripts/test-h1-hosted-negative.mjs`
+  generated two disposable password-auth users in the exact Derive project.
+  It checked each own profile, cross-user profile denial, seven premium 403s,
+  founder 403, membership self-activation denial, and private Storage upload
+  403 using a valid synthetic PNG. Both users self-deleted through the deployed
+  function; SQL readback confirmed zero users, profiles, memberships, photos,
+  and Storage objects. This did not test OTP or a populated cross-user record.
 
 ## IN PROGRESS
 
@@ -62,16 +71,18 @@ committed production Remote default.
   deploy migrations/functions, but current browser Auth/SMTP setting controls
   are disabled. Treat administrator rights as unverified, not assumed.
 - Only Supabase-provided default secrets exist. The available Stripe browser
-  login was unrelated to Derive. No real OTP, provider, Stripe, customer, or
-  founder lifecycle has passed. No test user was created.
+  login was unrelated to Derive. No real OTP, provider, Stripe, primary
+  customer, or founder lifecycle has passed. Disposable negative test users
+  were created and removed with zero hosted rows remaining.
 
 ## DECISIONS
 
 - The H1 brief requires the existing project, Stripe test mode, webhook-owned
   entitlement, real provider calls, production Remote off, and C1.5 unopened.
-- A founder decision is required for email delivery: configure an approved
-  custom SMTP provider on the existing free project or upgrade its plan. Do
-  not bypass the vendor restriction or replace OTP with a magic link.
+- Kanuj assigned Resend, SMTP, sender/domain/DNS, Supabase SMTP, and the hosted
+  OTP template to Sami. Sami is also building the Stripe infrastructure and
+  will handle account wiring last. Do not duplicate either stream or use an
+  unrelated Stripe account.
 
 ## STANDING INSTRUCTIONS
 
@@ -83,13 +94,14 @@ committed production Remote default.
 
 ## NEXT STEP
 
-After the founders choose the email delivery path and provide authorized
-access to the correct Derive Stripe test account, verify the hosted six-digit
-OTP with a dedicated inbox, then continue the checklist from real Checkout.
+Check for a securely entered Gemini credential and a dedicated staging inbox.
+When Sami marks hosted OTP ready, verify actual six-digit delivery and a real
+session. When Sami completes Stripe account wiring, inspect/reuse his test
+resources and continue Checkout and the full lifecycle. Keep PR #21 draft.
 
 ## OPEN QUESTIONS
 
-1. Which approved SMTP provider or Supabase paid plan will support the hosted
-   six-digit OTP, and who will configure it with administrator access?
-2. Who can invite the H1 operator to the correct Derive Stripe test account?
+1. When will Sami's Resend/SMTP and hosted OTP template be ready for behavior
+   verification?
+2. When will Sami's Derive Stripe test account and resource wiring be ready?
 3. Which dedicated staging inbox and trusted Gemini credential will be used?
