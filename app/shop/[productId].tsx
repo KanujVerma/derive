@@ -13,9 +13,8 @@
  *   truthful unavailable state. Does NOT fabricate products.
  *
  * COMMERCE RULES (Strict Invariant):
- * - C1 has no physical-product checkout.
- * - Eligible ADD products display "Purchase through Derive coming soon".
- * - Never claims checkout is available (no offer/availability API exists in C1).
+ * - Published ADD may offer verified external merchant pages for trusted products.
+ * - No Derive product checkout or live offer/availability feed exists here.
  * - KEEP displays in-plan status with optional refill link; no repurchase pressure.
  * - PAUSE and STOP have no purchase CTA.
  * - REPLACE never sells the old product.
@@ -41,6 +40,7 @@ import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
 import { analytics } from '@/src/services/analytics';
 import { resolveShopProductContext } from '@/src/commerce/types';
+import { resolvePurchaseOptions } from '@/src/commerce/merchantListings';
 import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { hydratePlanState } from '@/src/services/deriveClient';
 import { ProductCommerceSection } from '@/src/components/shop/ProductCommerceSection';
@@ -71,6 +71,15 @@ export default function ProductDetailScreen() {
 
   const action = userProduct?.action;
   const actionReason = userProduct?.actionReason || matchingStep?.whyChosen;
+  const purchaseOptions = product ? resolvePurchaseOptions({
+    product,
+    action,
+    routineStatus: memberRoutine?.status ?? null,
+    currentRoutineProductIds: [
+      ...(memberRoutine?.amSteps ?? []),
+      ...(memberRoutine?.pmSteps ?? []),
+    ].map((step) => step.productId),
+  }) : [];
 
   React.useEffect(() => {
     if (isMember && (planHydrationStatus === 'idle' || planHydrationStatus === 'loading')) {
@@ -276,11 +285,13 @@ export default function ProductDetailScreen() {
           </View>
         )}
 
-        {/* C1 presentation seam for future offer data, with no physical checkout. */}
+        {/* External acquisition is downstream of canonical product and published action. */}
         <ProductCommerceSection
           action={action}
           routineStatus={memberRoutine?.status ?? null}
           onRefill={handleRefill}
+          productId={product.id}
+          options={purchaseOptions}
         />
       </ScrollView>
     </View>

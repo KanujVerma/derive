@@ -1,8 +1,8 @@
-# Derive Commerce Architecture (C1 / C1.1 Shop and Scan)
+# Derive Commerce Architecture (C1.5A acquisition foundation)
 
 **Source of Truth**: Canonical architecture for Derive Shop, customer-facing commerce, and product acquisition.
 **Owner**: Kanuj (Customer Experience + Mobile) with Platform/Shared integration points noted.
-**Status**: C1 Shop V1 and C1.1 Shop and Scan experience hardening implemented. S5 membership billing is separate; physical-product commerce C1.5 is not started.
+**Status**: C1 and C1.1 are implemented. The C1.5A acquisition foundation is implemented in a draft PR; production merchant listings remain empty pending stronger product, variant, and formula verification. C1.5B feeds and C1.5C Derive Shopify checkout remain planned. S5 membership billing is separate.
 
 ---
 
@@ -36,11 +36,11 @@ Long-term product loop mental model:
 | **No Universal Product Score Invariant** | IMPLEMENTED | Kanuj | Categorical fit guidance only (`GREAT FIT`, `COULD WORK`, `USE WITH CAUTION`, etc.). |
 | **Shop state separation** | C1.1 | Kanuj | Loading, error, preparation, unpublished review, published needs, covered, and empty are distinct. Covered requires a resolved published plan. |
 | **S5 Membership Billing Separation** | IMPLEMENTED / PRESERVED | Sami / Shared | Stripe membership checkout ($25/mo) remains strictly isolated in S5. |
-| **Product / Recommendation / Offer Separation** | APPROVED TARGET | Shared | Conceptual 3-way split: catalog product vs member routine action vs commercial offer. |
-| **Physical Product Commerce Backend** | DEFERRED (C1.5) | Cross-founder | Order schema, SKU commerce, fulfillment provider, single-item checkout. |
-| **Commerce Provider Selection (Stripe vs Shopify)** | OPEN | Cross-founder | Evaluation documented below; no premature vendor lock-in. |
+| **Merchant listings and purchase options** | C1.5A DRAFT | Kanuj | Shop-owned resolver and 0/1/many presentation; zero production listings. Ulta example is test-only. No live price. |
+| **Physical Product Commerce Backend** | PLANNED (C1.5C) | Cross-founder | Derive as Shopify merchant, inventory, cart, checkout, orders, fulfillment, returns. |
+| **Official retailer feeds** | PLANNED (C1.5B) | Cross-founder | Live offers, availability and approved attribution from official sources. |
 | **Multi-Item Cart** | DEFERRED (V2) | Kanuj / Platform | V1/V1.5 is single-product purchase intent. Cart deferred until behavioral evidence warrants. |
-| **ADR Numbering** | DEFERRED | Cross-founder | Deferred to avoid conflict with S5's `ADR-30`. Recorded here authoritatively. |
+| **ADR-32** | C1.5A DRAFT | Cross-founder | Acquisition separation and future Derive merchant decision. |
 
 ---
 
@@ -64,7 +64,7 @@ Long-term product loop mental model:
   - `NEEDED FOR YOUR PLAN`: Derived from `UserProduct.action === 'ADD'` and `!isConfirmedByUser` on a published routine.
   - `YOUR ROUTINE`: Current `KEEP` products in the member's routine.
   - `SCAN A PRODUCT`: Camera/barcode scanner evaluating personal fit (`GREAT FIT`, `COULD WORK`, `NOT NEEDED`, etc.).
-  - `ORDERS & REFILLS`: S2/S4 beta operational refill tracking.
+  - `ORDERS & REFILLS`: S2/S4 beta managed refill tracking. Outbound merchant clicks are not Derive orders.
   - `WHY THIS FITS YOU`: Personalized rationale linked to member skin goals and routine timing.
 
 ---
@@ -109,8 +109,11 @@ review cannot show an acquisition section. Shop and product detail retry with
 the existing `hydratePlanState()` coordinator. Needed products show their
 reason and a **View product** path; future ordering is explained only on
 detail. The Shop-owned `ProductCommerceSection` composes ADD, KEEP, PAUSE,
-STOP, and REPLACE states from the existing action semantics. It has no offer,
-price authority, payment path, or shared contract.
+STOP, and REPLACE states from the existing action semantics. Published ADD with
+trusted product identity and an acquisition-active listing shows external Where to Buy options.
+The production registry is empty, so published ADD currently yields a truthful
+no-verified-option state. A test-only Ulta fixture exercises the full path.
+No live offer is seeded.
 
 ---
 
@@ -120,7 +123,7 @@ The single source of truth is `resolveActionCommerceSemantics(action, routineSta
 
 | Action | Plan Status Label | Routine Draft/Review/Approved | Routine Published | Never Sell Old Product? |
 | :--- | :--- | :--- | :--- | :--- |
-| **ADD** | Needed for your plan | Not acquisition-eligible (`not_applicable`) | **Acquisition-eligible** (`deferred_to_c15`) | False |
+| **ADD** | Needed for your plan | Not acquisition-eligible (`not_applicable`) | **Eligible for verified external listings**; Derive checkout remains deferred | False |
 | **KEEP** | In your plan | Not acquisition-eligible | In your plan (`deferred_to_c15` optional refill) | False |
 | **PAUSE** | Paused | Not acquisition-eligible (`not_applicable`) | Not acquisition-eligible (`not_applicable`) | False |
 | **STOP** | Discontinued | Not acquisition-eligible (`not_applicable`) | Not acquisition-eligible (`not_applicable`) | False |
@@ -133,9 +136,9 @@ The single source of truth is `resolveActionCommerceSemantics(action, routineSta
 
 ---
 
-## 6. Product / Recommendation / Offer Conceptual Separation
+## 6. Product / Recommendation / Listing / Offer / Purchase Path
 
-To survive V1 → V1.5 → V2 without architectural churn, three concepts remain decoupled:
+The data flow is one-way. Recommendations are resolved first; commerce cannot select or change a recommendation or Scan verdict.
 
 ```text
 ┌─────────────────────────┐
@@ -151,26 +154,39 @@ To survive V1 → V1.5 → V2 without architectural churn, three concepts remain
             │
             ▼
 ┌─────────────────────────┐
-│      PRODUCT OFFER      │  Commerce truth: merchant, SKU, price, currency,
-│    (C1.5 / Proposed)    │  availability, purchaseMode, fulfillmentMode.
+│    MERCHANT LISTING     │  Stable mapping: exact product identity, merchant,
+│    (Shop registry)      │  listing ID, verified destination and variant.
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│ OPTIONAL OFFER SNAPSHOT │  Volatile price/currency/availability with source
+│  (no live feed in A)    │  and observed time; absent by default.
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│      PURCHASE PATH      │  A: external verified retailer page.
+│                         │  C: future Derive Shopify cart/checkout.
 └─────────────────────────┘
 ```
 
-- **Derive** owns Product and Recommendation truth.
-- **Commerce Provider** (Stripe, Shopify, or External Merchant) owns Offer, Inventory, Checkout, and Fulfillment truth.
+- **Derive** owns canonical Product and member Recommendation truth. Existing `retailPriceApprox` is catalog context, never an offer from Target or Ulta.
+- **Shop-owned beta resolver** uses exact case/whitespace-normalized brand and full name because Remote product UUIDs are runtime-generated. It requires the existing `is_catalog_standard === true` provenance mapped to `Product.isCatalogStandard`, plus presence in the current published routine steps. Missing/false provenance or a retained older ADD outside the current routine fails closed; no fuzzy, substring, AI, or Scan fixture lookup. `isCatalogStandard` describes canonical catalog provenance only. It does not establish that a retailer package has the same formula Derive evaluated.
+- **MerchantDefinition** is extensible. The registry includes brand-direct CeraVe, Target, Ulta, Sephora, Walmart, Amazon and future `derive`; inclusion does not mean a listing exists. Marketplace seller legitimacy must be verified before any listing is added.
+- **MerchantListing** holds stable merchant identity, direct page URL, verification date and variant. `CURATED_LISTINGS` is empty in production. The [Ulta CeraVe Hydrating Facial Cleanser page](https://www.ulta.com/p/hydrating-facial-cleanser-xlsImpprod4190255) is retained only in `tests/fixtures/merchantListings.ts`. The Ulta and [CeraVe ingredient presentations](https://www.cerave.com/skincare/cleansers/hydrating-facial-cleanser) are not sufficient to prove package/formula equivalence; this does not establish that Ulta sells the wrong formula. CeraVe also warns that ingredient lists can change and that the package is the current source. No replacement link is added merely to populate Shop.
+- **Production listing activation** requires sufficient evidence that the merchant destination represents the intended canonical product, size/variant, and formula. Future evidence may combine GTIN/UPC, merchant identifiers, exact size, brand-direct identity, FormulaSnapshot comparison, S6 resolution, and official feed identity. The exact future contract remains open. Exact brand/name is a lookup seam, never acquisition authority by itself.
+- **MerchantOfferSnapshot** is separate, optional and currently empty in production. Its display requires a named official feed/API source, USD minor-unit amount and observed time within 24 hours. Explicit out-of-stock offers do not display a price or activate Derive checkout. No manual current price or availability is seeded. A later feed must revalidate the policy and show source/freshness.
+- **Purchase path** is HTTPS external handoff in A. At composition and tap time, the URL must match an exact configured host. The OS open failure has a sanitized retry message. A successful open records only `productId`, `merchantId` and `entryPoint`; it never creates an order or marks a purchase.
+- **Future `derive` merchant** can be ordered first only with a real active offer; external alternatives remain visible. Shopify catalog mapping, inventory, checkout and fulfillment start in C1.5C. The current client has no Derive offer or checkout.
 
 ---
 
-## 7. Physical Commerce Provider Evaluation (Stripe vs Shopify)
+## 7. Commerce measures and source policy
 
-Decision status: **OPEN / DEFERRED TO C1.5**.
+Membership ARR is annualized recurring membership revenue. Commerce GMV is the total value of product transactions facilitated, when actually measurable. Commerce revenue is Derive's recognized product sales or attributable affiliate commission, not the full third-party retailer basket. Commerce gross profit subtracts the associated product cost and direct commerce costs from commerce revenue. A retailer click proves none of these transaction measures; one-time product GMV is not membership ARR.
 
-| Criteria | Stripe (Direct) | Shopify (Headless / Storefront API) |
-| :--- | :--- | :--- |
-| **Primary Strength** | Custom direct payments, native Apple Pay, seamless extension of S5 Stripe billing. | Complete inventory, variants, multi-warehouse shipping, tax, returns, Shop Pay. |
-| **Complexity** | High backend effort: must build order DB, tax calculation, shipment tracking, refund ops. | Lower commerce ops effort: Shopify manages inventory, tax, fulfillment integrations. |
-| **Best Fit Scenario** | Derive holds small curated inventory (5-10 SKUs) fulfilled by founders or single 3PL. | Derive scales catalog, dropships, or supports complex catalog variants and merchant fulfillment. |
-| **Recommendation** | Keep physical commerce provider-neutral until C1.5 is opened and its provider decision is made. S5 Stripe use is membership-specific. |
+C1.5B should prefer official merchant APIs, affiliate/product feeds, approved networks and trusted providers for identifiers, freshness, availability and allowed attribution. HTML scraping is not core infrastructure. No affiliate IDs, referral parameters, commission ranking or scraping are present in C1.5A.
 
 ---
 
@@ -178,7 +194,7 @@ Decision status: **OPEN / DEFERRED TO C1.5**.
 
 - **S5 Scope**: Stripe-hosted $25/month membership billing only (`HostedMembershipSession`, `createMembershipCheckout`, `createMembershipPortal`, webhook entitlement).
 - **C1 Invariant**: C1 introduces **zero** shared contract modifications in `src/contracts/**` or `src/domain/**`. S5 types are not repurposed or overloaded for physical commerce.
-- **Physical Commerce**: C1 has presentation models only (`src/commerce/types.ts`). C1.5 remains unopened; S5's Stripe integration is membership-specific.
+- **Physical Commerce**: C1.5A adds Shop-only acquisition models (`src/commerce/merchantListings.ts`), not a physical checkout contract. S5's Stripe integration is membership-specific.
 
 ---
 
@@ -203,15 +219,17 @@ Decision status: **OPEN / DEFERRED TO C1.5**.
 - [x] 245 unit tests, both TypeScript checks, web export, and 390/320-pixel
   Mock phone review passed. Unknown verdicts fail closed with Scan Again.
 
-### C1.5 / Physical Product Commerce Integration (Next Phase)
-- Preserve the membership and physical-product commerce separation established by S5 and C1.
-- Select physical-commerce provider (Stripe vs Shopify vs External).
-- Define shared `ProductOffer` contract and database schema.
-- Implement single-item physical checkout (Apple Pay / Payment Sheet).
-- Order persistence: `Order` and `OrderItem[]`.
-- Unify operational refills with physical orders.
-- Activate public/guest routing shell without compromising security.
-- Build and test a general factual Scan backend path before enabling guest or non-member Scan; never reuse member routine context for that path.
+### C1.5A / Multi-Merchant Acquisition Foundation (Implemented in draft PR)
+- Shop-owned merchant, listing, optional offer and purchase path presentation.
+- Member ADD Where to Buy, privacy-safe outbound event, and test-only external acquisition fixture. Production listing count is zero until the activation gate above is met.
+- No backend, migration, feed, affiliate attribution, Derive checkout, public routing or Scan purchase CTA.
+
+### C1.5B / Official Retailer Feeds, Live Offers & Attribution (Planned)
+- Verify official integration paths when opened. Establish merchant/feed product identity and listing verification, then resolve live merchant IDs, price, sale price, availability, offer freshness and approved affiliate attribution with provenance. Activate production listings only with adequate product, variant, and formula evidence.
+
+### C1.5C / Derive Shopify Merchant & Integrated Checkout (Planned)
+- Map Derive Shopify products and variants, then build real Derive offer, inventory, cart/checkout, product orders, fulfillment, returns and member benefits. Keep legitimate external alternatives visible.
+- Public factual catalog/routing and non-member Scan authorization each require separate deliberate gates; neither is activated here.
 
 ### C2 / Personalized Discovery & Cart (Later Phase)
 - Search, filter by category/concern.
@@ -223,7 +241,7 @@ Decision status: **OPEN / DEFERRED TO C1.5**.
 
 ## 10. Open Business & Operational Questions
 
-1. **Merchant of Record**: Will Derive act as merchant of record, or refer to external retailers/brands?
+1. **Merchant of Record**: C1.5A sends customers to external merchants; C1.5C plans Derive as a Shopify merchant. Legal and operational setup remains future work.
 2. **Inventory Ownership**: Will Derive buy wholesale and hold inventory, or rely on dropshipping?
 3. **Fulfillment**: Founder fulfillment (beta) vs 3PL vs dropship vs brand-direct.
 4. **Sales Tax & Shipping**: Destination-based tax calculation, nexus, shipping rate pass-through or flat-rate.

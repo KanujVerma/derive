@@ -430,6 +430,7 @@ export class RemoteDeriveService implements IDeriveService {
         isConfirmedByUser: row.is_confirmed_by_user === true,
         product: {
           id: row.products.id,
+          isCatalogStandard: row.products.is_catalog_standard === true,
           brand: row.products.brand,
           name: row.products.name,
           category: row.products.category as ProductCategory,

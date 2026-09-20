@@ -2,6 +2,10 @@
 
 High-signal findings synthesized from founder research, customer discovery conversations, dermatological literature, and competitive teardowns.
 
+## Commerce source policy (C1.5A direction)
+
+Brand-direct and major trusted retailer product pages are first-class acquisition options when destination, product variant and formula equivalence can be supported. C1.5A has an empty production listing registry and a test-only Ulta example; exact brand/name and `isCatalogStandard` are insufficient activation evidence. C1.5B should prefer official merchant APIs, affiliate/product feeds, approved commerce networks and trusted providers for listing identity and verification, then current prices, availability and approved attribution. Verify each integration's current terms when that milestone opens. HTML scraping is a last-resort research fallback, not production commerce infrastructure. C1.5C plans a future Derive Shopify merchant. Merchant payout never changes product identity, formula verification or Scan/recommendation decisions.
+
 ---
 
 ## 1. Competitive Teardowns & Critical Lessons

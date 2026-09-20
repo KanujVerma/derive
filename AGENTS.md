@@ -27,7 +27,7 @@ Read documents relevant to your specific task rather than loading all documentat
 - **Implemented (S5)**: server-owned Stripe membership Checkout, Billing Portal, and signed webhook projection. Hosted Stripe/Supabase activation smoke remains pending. Production Remote mode remains disabled.
 - **Implemented (C1)**: member Shop V1 uses Today, Plan, Shop, Ask, and Progress as the five root tabs, with one Scan route inside Shop. Public Shop routing remains a future activation step.
 - **E1 entitlement**: Remote managed skincare requires canonical `CustomerBootstrapState.membershipStatus === 'active'`. Auth identity and onboarding readiness are separate. Sign in, activate membership through S5 Checkout and signed webhook, then onboard. Inactive Remote customers use the Membership screen; Mock mode bypasses billing. Premium writes are gated by Edge checks and RLS, while owner-readable history remains available. Production Remote remains disabled pending hosted smoke.
-- **Not started (C1.5)**: physical-product checkout, ProductOffer, product Order schema, and provider selection.
+- **C1.5A draft**: Shop-only merchant/listing/offer presentation and Where to Buy foundation. Production listings are empty until product, variant, and formula equivalence can be supported; `isCatalogStandard` alone is not acquisition authority. C1.5B official feeds and C1.5C Derive Shopify checkout remain planned. See `docs/COMMERCE.md` and ADR-32.
 
 Never silently cross founder ownership boundaries. For shared-contract modifications or cross-boundary integrations, document rationale and changes in `docs/CONTEXT_SYNC.md`.
 

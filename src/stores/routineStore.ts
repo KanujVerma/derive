@@ -32,6 +32,7 @@ export const INITIAL_ROUTINE_STATE = {
 export const ARTHUR_DEMO_PRODUCTS = [
   {
     id: 'p1',
+    isCatalogStandard: true,
     brand: 'CeraVe',
     name: 'Hydrating Facial Cleanser',
     category: 'cleanser' as const,

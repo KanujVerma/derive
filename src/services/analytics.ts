@@ -115,6 +115,11 @@ export interface AllowedAnalyticsEvents {
     productId: string;
     action: 'ADD' | 'KEEP';
   };
+  external_purchase_opened: {
+    productId: string;
+    merchantId: string;
+    entryPoint: 'product_detail';
+  };
 }
 
 class PrivacySafeAnalytics {

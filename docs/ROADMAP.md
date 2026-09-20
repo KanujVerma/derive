@@ -600,6 +600,13 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Product SKU checkout, ProductOffer, cart, and physical orders are outside S5.
   - [ ] Run hosted test-mode Checkout to signed webhook to membership state to Billing Portal smoke before claiming billing is live.
 
+### S6: Visual Product Identity & Formula Resolution [PLANNED]
+* **Owner**: Sami / backend-platform. No S6 implementation is included in C1.5A.
+* **Goal**: Interactive product resolution in seconds when evidence suffices, including products without visible barcode, unknown catalog items, unfamiliar packaging, changed packaging and ingredient-list photos. Manual review is an edge-case fallback; no fixed SLA is promised before measurement.
+* **Shared resolver**: One future Product Identity Resolver serves both Scan and onboarding Shelf. Camera/user evidence flows through extraction, candidate retrieval, identity resolution, formula verification, user confirmation when needed, then personalized Scan evaluation. Barcode/GTIN, front-label OCR, brand/name/variant, packaging image, ingredient OCR, user text, catalog, merchant listing identity and authoritative external product sources are candidate evidence. Verified product/variant identity and FormulaSnapshot linkage may later support Shop listing activation. Merchant economics never affect identity or skincare verdicts.
+* **Trust states**: Conceptually verified product, identified but formula unverified, ambiguous candidates, formula only, or insufficient evidence. Model resemblance generates candidates, not verified product truth. Ask for the ingredient photo or variant confirmation when needed. FormulaSnapshot and provenance must account for reformulations, region and old packaging. Exact contract names remain open.
+* **Current gap**: Client barcode lookup exists; `ScanProductInput.imageUri` exists, but hosted `scan-product` requires `productName` and does not resolve visual identity. Onboarding Shelf UI exists, while production `recognizeShelfProducts()` returns no recognized products. Demo fixtures are not production recognition.
+
 ---
 
 ## Kanuj Commerce Stream (Shop & Customer Acquisition)
@@ -646,15 +653,14 @@ Derive divides engineering into two independent, unblocked workstreams anchored 
   - [x] Local unit, pgTAP, OTP, E1 lifecycle, and S1-S5 integration tests cover the boundary.
   - [ ] Configure and smoke the hosted six-digit OTP template, Supabase functions/migrations, Gemini secret, and test-mode Stripe Checkout to signed webhook to Portal lifecycle before enabling production Remote mode.
 
-### C1.5: Physical Product Commerce Integration [NOT STARTED]
-* **Scope**: Future physical product checkout, offers, order persistence, fulfillment, and public Shop activation.
-* **Prerequisites**: Choose a physical-commerce provider and approve a separate contract and data model.
-* **Candidate deliverables**:
-  - `ProductOffer` contract and database schema, separate from Product and Recommendation.
-  - Single-item checkout and physical `Order` / `OrderItem` persistence.
-  - Public catalog reads and guest/non-member Shop routing without member data leakage.
-  - A separate factual non-member Scan backend path and authorization policy before enabling public Scan.
-  - Verified offer-backed benefits, if any, without influencing recommendations.
+### C1.5A: Multi-Merchant Acquisition Foundation [IMPLEMENTED IN DRAFT PR]
+* **Scope**: Shop-owned exact identity resolver, merchant/listing/optional offer presentation and member Where to Buy UI. The production listing registry is empty until merchant destination, product variant and formula equivalence can be supported. The reviewed Ulta listing remains a test-only fixture. Product/recommendation truth remains upstream; provisional products and unpublished ADD fail closed. No backend migration, live price, checkout or public routing.
+
+### C1.5B: Official Retailer Feeds, Live Offers & Attribution [PLANNED]
+* **Scope**: Verify official merchant APIs/feeds or approved networks, establish merchant product identity and listing verification, then ingest live prices, availability, identifiers, freshness and approved affiliate attribution with provenance. S6 may supply stronger product/variant/formula evidence, but price, availability and commission never decide product truth or recommendations. HTML scraping is not the core data source. No C1.5B code in A.
+
+### C1.5C: Derive Shopify Merchant & Integrated Checkout [PLANNED]
+* **Scope**: Derive becomes a first-class merchant through Shopify product/variant mapping, real offer, inventory, cart/checkout, physical orders, fulfillment, returns and member benefits. External alternatives stay visible. No C1.5C code in A. Public catalog/Shop and factual non-member Scan each need independent routing, data and authorization gates.
 
 ### C2: Personalized Discovery & Cart [DEFERRED]
 * **Scope**: Search, categories, alternatives, and multi-item cart only after customer evidence supports them.
