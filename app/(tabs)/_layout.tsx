@@ -6,6 +6,8 @@ import { colors, typography, radii, spacing } from '@/src/constants/theme';
 import { GlassContainer } from '@/src/components/ui/GlassContainer';
 
 import { Icon, IconName } from '@/src/components/ui/Icon';
+import { publicEnvironment } from '@/src/config/environment';
+import { usesFreeExternalBetaPresentation } from '@/src/utils/membershipPresentation';
 
 const TAB_BAR_HEIGHT = 56;
 
@@ -22,6 +24,7 @@ function TabIcon({ label, icon, focused }: { label: string; icon: IconName; focu
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomOffset = Math.max(insets.bottom, 12);
+  const hideAsk = usesFreeExternalBetaPresentation(publicEnvironment.buildFlavor);
 
   return (
     <Tabs
@@ -99,6 +102,7 @@ export default function TabLayout() {
         name="ask"
         options={{
           title: 'Ask',
+          href: hideAsk ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <TabIcon label="Ask" icon="ask" focused={focused} />
           ),

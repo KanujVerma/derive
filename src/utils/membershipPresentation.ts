@@ -16,3 +16,12 @@ export function shouldOfferStripeMembershipManagement(
 ): boolean {
   return remoteEnabled && shouldOfferStripeMembershipCheckout(buildFlavor);
 }
+
+/** External TestFlight staging is a free beta. Price and provider features stay out of that build. */
+export function usesFreeExternalBetaPresentation(buildFlavor: BuildFlavor): boolean {
+  return usesConciergeMembershipAccess(buildFlavor);
+}
+
+export function showsProviderBetaFeatures(buildFlavor: BuildFlavor): boolean {
+  return !usesFreeExternalBetaPresentation(buildFlavor);
+}

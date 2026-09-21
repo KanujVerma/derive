@@ -29,6 +29,8 @@ import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { StickyActionFooter } from '@/src/components/ui/StickyActionFooter';
 import { analytics } from '@/src/services/analytics';
 import { config } from '@/src/constants/config';
+import { publicEnvironment } from '@/src/config/environment';
+import { usesFreeExternalBetaPresentation } from '@/src/utils/membershipPresentation';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import type { OnboardingPayload } from '@/src/domain/types';
 
@@ -134,7 +136,14 @@ export default function SummaryScreen() {
           Review your inputs. You can tap Edit to adjust any section before we assemble your plan.
         </Text>
 
-        {/* FOUNDING BETA MEMBERSHIP CARD */}
+        {usesFreeExternalBetaPresentation(publicEnvironment.buildFlavor) ? (
+          <View style={styles.pricingCard}>
+            <Text style={styles.pricingBadge}>FOUNDING BETA ACCESS</Text>
+            <Text style={styles.pricingSubtext}>
+              Your Derive beta access is active. Products recommended for your routine are separate from the beta app.
+            </Text>
+          </View>
+        ) : (
         <View style={styles.pricingCard}>
           <View style={styles.pricingHeaderRow}>
             <View>
@@ -162,6 +171,7 @@ export default function SummaryScreen() {
             <Text style={styles.includesItem}>Routine products are purchased separately.</Text>
           </View>
         </View>
+        )}
 
         {/* AUDIT GROUPED SECTIONS WITH DIRECT EDIT LINKS */}
         <GroupedSection header="Preferences & Goals">

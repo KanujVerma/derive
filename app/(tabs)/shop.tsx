@@ -44,6 +44,8 @@ import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
 import { analytics } from '@/src/services/analytics';
 import { config } from '@/src/constants/config';
+import { publicEnvironment } from '@/src/config/environment';
+import { showsProviderBetaFeatures, usesFreeExternalBetaPresentation } from '@/src/utils/membershipPresentation';
 import { membershipDisplayLabel } from '@/src/domain/types';
 import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { resolveShopHomeState } from '@/src/commerce/shopState';
@@ -147,6 +149,8 @@ export default function ShopScreen() {
   // MEMBERSHIP UPSELL (non-member / guest fallback)
   // =============================================
 
+  const showProviderFeatures = showsProviderBetaFeatures(publicEnvironment.buildFlavor);
+  const freeBeta = usesFreeExternalBetaPresentation(publicEnvironment.buildFlavor);
   const membershipPresentation = {
     priceDisplay: `$${config.betaPriceMonthly}/month`,
     tierLabel: membershipDisplayLabel('founding_beta'),
@@ -154,7 +158,7 @@ export default function ShopScreen() {
       'Personalized canonical routine',
       'Weekly check-ins and ongoing adjustments',
       'Personalized product-fit guidance',
-      'Personalized Scan',
+      ...(showProviderFeatures ? ['Personalized Scan'] : []),
       'Founder quality review during beta',
     ],
   };
@@ -170,6 +174,7 @@ export default function ShopScreen() {
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <Text style={styles.screenTitle}>Shop</Text>
+            {showProviderFeatures ? (
             <TouchableOpacity
               style={styles.headerScanAction}
               onPress={handleScanPress}
@@ -180,6 +185,7 @@ export default function ShopScreen() {
               <Icon name="scan" size={18} color={colors.brand} />
               <Text style={styles.headerScanText}>Scan</Text>
             </TouchableOpacity>
+            ) : null}
           </View>
           <Text style={styles.screenSubtitle}>Product guidance for your routine.</Text>
         </View>
@@ -291,6 +297,7 @@ export default function ShopScreen() {
           )}
 
           {/* Optional explanation; the persistent header action is the shortcut. */}
+          {showProviderFeatures ? (
           <TouchableOpacity
             style={styles.scanCard}
             activeOpacity={0.85}
@@ -313,6 +320,7 @@ export default function ShopScreen() {
             </View>
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </TouchableOpacity>
+          ) : null}
 
           {/* ── ORDERS & REFILLS ── */}
           <TouchableOpacity
@@ -420,15 +428,18 @@ export default function ShopScreen() {
               </View>
             ))}
           </View>
+          {!freeBeta ? (
           <Text style={styles.membershipPrice}>
             {membershipPresentation.priceDisplay} · {membershipPresentation.tierLabel}
           </Text>
-          {/* Hosted S5 activation is pending before membership enrollment is linked here. */}
+          ) : null}
+          {!freeBeta ? (
           <View style={styles.membershipCTAPlaceholder}>
             <Text style={styles.membershipCTAText}>
               Membership enrollment available soon.
             </Text>
           </View>
+          ) : null}
         </View>
       </ScrollView>
     </View>

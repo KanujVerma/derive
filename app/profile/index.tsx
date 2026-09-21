@@ -21,8 +21,9 @@ import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
 import { Badge } from '@/src/components/ui/Badge';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { config } from '@/src/constants/config';
-import { publicEnvironment } from '@/src/config/environment';
-import { shouldOfferStripeMembershipManagement } from '@/src/utils/membershipPresentation';
+import { publicEnvironment, publicLegalLinks } from '@/src/config/environment';
+import { PublicLegalLinks } from '@/src/components/account/PublicLegalLinks';
+import { shouldOfferStripeMembershipManagement, usesFreeExternalBetaPresentation } from '@/src/utils/membershipPresentation';
 import { deleteCurrentAccount } from '@/src/services/accountDeletion';
 import { createMembershipPortalSession, hydrateCustomerProfile, refreshCustomerBootstrap } from '@/src/services/deriveClient';
 import { signOutSession } from '@/src/services/authClient';
@@ -43,6 +44,7 @@ export default function ProfileScreen() {
     publicEnvironment.buildFlavor,
     isRemoteServiceEnabled(),
   );
+  const freeBeta = usesFreeExternalBetaPresentation(publicEnvironment.buildFlavor);
 
   React.useEffect(() => {
     hydrateCustomerProfile().catch((err) => {
@@ -61,6 +63,11 @@ export default function ProfileScreen() {
 
   const handleContactSupport = () => {
     Haptics.selectionAsync();
+    if (freeBeta) {
+      if (publicLegalLinks.supportUrl) void Linking.openURL(publicLegalLinks.supportUrl);
+      else Alert.alert('Support', 'Support is not available right now. Please try again.');
+      return;
+    }
     if (!config.founderSupportEmail) {
       router.push('/(tabs)/ask');
       return;
@@ -202,7 +209,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitles}>
           <Text style={styles.title}>Account</Text>
-          <Text style={styles.subtitle}>Founding Beta Membership</Text>
+          <Text style={styles.subtitle}>{freeBeta ? 'Founding Beta Access' : 'Founding Beta Membership'}</Text>
         </View>
       </View>
 
@@ -225,7 +232,7 @@ export default function ProfileScreen() {
             {email ? <Text style={styles.memberEmail}>{email}</Text> : null}
             <View style={styles.badgeRow}>
               <Badge label="FOUNDING BETA" variant="keep" size="small" />
-              <Text style={styles.memberPrice}>${config.betaPriceMonthly}/mo</Text>
+              {!freeBeta ? <Text style={styles.memberPrice}>${config.betaPriceMonthly}/mo</Text> : null}
             </View>
             <Text style={styles.memberClarification}>
               Membership covers Derive's ongoing skincare management. Products are purchased separately.
@@ -284,12 +291,12 @@ export default function ProfileScreen() {
             onPress={handleContactSupport}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={config.founderSupportEmail ? 'Member Support' : 'Ask Derive'}
+            accessibilityLabel={freeBeta ? 'Support' : config.founderSupportEmail ? 'Member Support' : 'Ask Derive'}
           >
             <Icon name="person" size={18} color={colors.brand} />
             <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>{config.founderSupportEmail ? 'Member Support' : 'Ask Derive'}</Text>
-              <Text style={styles.rowSubtitle}>{config.founderSupportEmail ? 'Contact the Founding Beta team' : 'Questions about your routine and products'}</Text>
+              <Text style={styles.rowTitle}>{freeBeta ? 'Support' : config.founderSupportEmail ? 'Member Support' : 'Ask Derive'}</Text>
+              <Text style={styles.rowSubtitle}>{freeBeta ? 'Contact Derive support' : config.founderSupportEmail ? 'Contact the Founding Beta team' : 'Questions about your routine and products'}</Text>
             </View>
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </TouchableOpacity>
@@ -392,6 +399,7 @@ export default function ProfileScreen() {
         )}
 
         {/* Footer Note */}
+        <PublicLegalLinks />
         <BuildDiagnostics />
         <Text style={styles.footerText}>
           Derive Version 1.0 · "Your skincare, handled."

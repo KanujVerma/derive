@@ -19,6 +19,8 @@ import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
+import { publicEnvironment } from '@/src/config/environment';
+import { showsProviderBetaFeatures } from '@/src/utils/membershipPresentation';
 import {
   ensureInitialRoutineProposal,
   hydrateResearchInsights,
@@ -126,7 +128,7 @@ export default function TodayScreen() {
             <Text style={styles.brandWordmark}>DERIVE</Text>
           </View>
           <View style={styles.headerActions}>
-            {isShopMember && (
+            {isShopMember && showsProviderBetaFeatures(publicEnvironment.buildFlavor) && (
               <TouchableOpacity
                 style={styles.headerScanAction}
                 onPress={handleScanPress}

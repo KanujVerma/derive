@@ -18,6 +18,7 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
+import { PublicLegalLinks } from '@/src/components/account/PublicLegalLinks';
 import { signInWithPassword } from '@/src/services/authClient';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { useBootstrapStore } from '@/src/stores/bootstrapStore';
@@ -156,6 +157,7 @@ export default function LoginScreen() {
             >
               <Text style={styles.signupLinkText}>New to Derive? Create account</Text>
             </Pressable>
+            <PublicLegalLinks />
             <BuildDiagnostics />
           </View>
         </KeyboardAvoidingView>
