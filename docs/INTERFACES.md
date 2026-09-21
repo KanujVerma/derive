@@ -7,6 +7,7 @@ Code definitions:
 - Shared domain types: [`src/domain/types.ts`](../src/domain/types.ts)
 - Implementation mock: [`src/services/mock/MockDeriveService.ts`](../src/services/mock/MockDeriveService.ts)
 - Implementation remote: [`src/services/remote/RemoteDeriveService.ts`](../src/services/remote/RemoteDeriveService.ts)
+- S6 product identity: [`src/contracts/ProductIdentityResolver.ts`](../src/contracts/ProductIdentityResolver.ts)
 
 ---
 
@@ -188,7 +189,7 @@ identity cannot select another member's context.
 | Edge Function | Contract role | Current behavior |
 | --- | --- | --- |
 | `propose-routine` | `proposeRoutine` | Loads canonical server context, runs/persists a validated `awaiting_review` proposal, and returns `RoutineProposalResult`. Caller-supplied profile/shelf truth is not trusted. |
-| `scan-product` | `scanProduct` | Requires product name/brand context, returns a categorical `ProductScanResult`, and deterministically downgrades conflicts. `imageUri` is not fetched or sent to Gemini in S3. |
+| `scan-product` | `scanProduct` | Returns a categorical `ProductScanResult` and deterministically downgrades conflicts. Existing name/brand input remains compatible; optional `resolutionCaseId` must belong to the caller and be `verified_product_formula`, then canonical catalog labels override request labels. `imageUri` is not fetched or sent to Gemini. |
 | `ask-derive` | `askDerive` | Enforces request `userId` equality, hard-stops mandatory red flags before model use, and returns `AskResponse`. `photoAttachmentUri` is deliberately excluded from model context. |
 | `infer-ingredient-signals` | Internal S3 operation | Infers and appends owner-readable signal versions from canonical formula/reaction history; it is not an `IDeriveService` client method. |
 
@@ -196,6 +197,25 @@ These endpoints establish the server implementation boundary but do not, by
 themselves, enable the production mobile Remote path. Wiring the existing
 `RemoteDeriveService` methods to them and enabling Remote mode remains a
 coordinated S5/I1 integration change.
+
+### S6 `resolve-product-identity`
+
+This JWT-gated, active-member endpoint is a stable backend boundary outside
+`IDeriveService` until the separately owned mobile adaptation is agreed. Its
+canonical request/result types are in `ProductIdentityResolver.ts`.
+
+- Input: idempotency UUID, `scan | shelf` consumer, optional validated GTIN,
+  typed identity, label/packaging text, ingredient list, and up to three
+  caller-owned private evidence paths.
+- Output: persisted case ID, one of five categorical trust states, supported
+  product/formula identity only when available, candidate evidence, next action,
+  and founder-review status.
+- Raw local URIs and HTTP image URLs are rejected. OCR/model resemblance is
+  candidate evidence only and cannot create verified identity.
+- `scan-product` accepts optional `ScanProductInput.resolutionCaseId` as the
+  first backend consumer. Only an owner-bound verified product+formula case may
+  enter personalized evaluation through that path.
+- Full semantics and persistence are in [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md).
 
 ---
 

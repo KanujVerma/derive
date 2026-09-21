@@ -137,12 +137,13 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 
 ### S6: Visual Product Identity and Formula Resolution
 
-- **Owner:** Sami. **Status:** PLANNED after the manual customer flow is operational; not a launch dependency.
+- **Owner:** Sami. **Status:** BACKEND RESOLVER IMPLEMENTED; mobile consumption and live visual/OCR extraction remain separate handoffs. Not a customer-#1 launch dependency.
 - **Owned surfaces:** backend product identity, formula/provenance resolution, intelligence serving both Shelf and Scan.
 - **Explicit non-scope:** Kanuj mobile UI adaptation, merchant-driven recommendation or Scan truth.
 - **Outcome:** one backend resolver uses barcode, front label, ingredient photo, typed name and authoritative catalog evidence while unknown/ambiguous evidence remains unknown.
 - **Acceptance criteria:** variant, region, packaging and reformulation provenance are retained; model resemblance proposes candidates only; production Shelf and Scan never claim identity from unsupported evidence. Current barcode lookup is a narrower existing path.
-- **Handoff to:** a separately owned Kanuj mobile-consumer milestone only after a stable S6 interface exists.
+- **Implemented:** stable typed contract, deterministic trust resolver, provenance-preserving schema, private product-evidence storage, idempotent Edge Function, founder review/audit flow, owner-bound Scan case integration, deletion lifecycle, and regression coverage.
+- **Handoff to:** Kanuj may now plan a separately owned mobile consumer against [`ProductIdentityResolver.ts`](../src/contracts/ProductIdentityResolver.ts). H1P still owns any live visual/OCR provider decision; model resemblance remains candidate-only.
 
 ## Parked commerce execution
 
@@ -768,12 +769,14 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - [x] Product SKU checkout, ProductOffer, cart, and physical orders are outside S5.
   - [ ] Run hosted test-mode Checkout to signed webhook to membership state to Billing Portal smoke before claiming billing is live.
 
-### S6: Visual Product Identity & Formula Resolution [PLANNED]
-* **Owner**: Sami / backend-platform. No S6 implementation is included in C1.5A.
+### S6: Visual Product Identity & Formula Resolution [BACKEND RESOLVER IMPLEMENTED]
+* **Owner**: Sami / backend-platform. The S6 backend is additive and does not modify C1.5A commerce or Kanuj mobile UI.
 * **Goal**: Interactive product resolution in seconds when evidence suffices, including products without visible barcode, unknown catalog items, unfamiliar packaging, changed packaging and ingredient-list photos. Manual review is an edge-case fallback; no fixed SLA is promised before measurement.
 * **Shared resolver**: One future Product Identity Resolver serves both Scan and onboarding Shelf. Camera/user evidence flows through extraction, candidate retrieval, identity resolution, formula verification, user confirmation when needed, then personalized Scan evaluation. Barcode/GTIN, front-label OCR, brand/name/variant, packaging image, ingredient OCR, user text, catalog, merchant listing identity and authoritative external product sources are candidate evidence. Verified product/variant identity and FormulaSnapshot linkage may later support Shop listing activation. Merchant economics never affect identity or skincare verdicts.
 * **Trust states**: Conceptually verified product, identified but formula unverified, ambiguous candidates, formula only, or insufficient evidence. Model resemblance generates candidates, not verified product truth. Ask for the ingredient photo or variant confirmation when needed. FormulaSnapshot and provenance must account for reformulations, region and old packaging. Exact contract names remain open.
-* **Current gap**: Client barcode lookup exists; `ScanProductInput.imageUri` exists, but hosted `scan-product` requires `productName` and does not resolve visual identity. Onboarding Shelf UI exists, while production `recognizeShelfProducts()` returns no recognized products. Demo fixtures are not production recognition.
+* **Pre-S6 gap retained for context**: Client barcode lookup existed; `ScanProductInput.imageUri` did not resolve visual identity; production Shelf recognition returned no products. Demo fixtures remain non-authoritative.
+* **Delivered backend**: `resolve-product-identity` accepts validated barcode, typed, label, packaging, ingredient and private-photo evidence for either consumer. It returns the five explicit trust states, preserves candidates and provenance, creates audited founder review work when unresolved, and lets `scan-product` consume only an owner-bound verified case through optional `resolutionCaseId`.
+* **Remaining handoffs**: Kanuj-owned capture/confirmation UI has not been changed. Live photo/OCR extraction is provider-dependent H1P work; stored photos without trusted extracted evidence correctly remain unresolved rather than producing invented identity.
 
 ---
 
