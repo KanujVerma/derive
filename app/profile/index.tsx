@@ -21,6 +21,9 @@ import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
 import { Badge } from '@/src/components/ui/Badge';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { config } from '@/src/constants/config';
+import { publicEnvironment } from '@/src/config/environment';
+import { shouldOfferStripeMembershipManagement } from '@/src/utils/membershipPresentation';
+import { deleteCurrentAccount } from '@/src/services/accountDeletion';
 import { createMembershipPortalSession, hydrateCustomerProfile, refreshCustomerBootstrap } from '@/src/services/deriveClient';
 import { signOutSession } from '@/src/services/authClient';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
@@ -35,6 +38,11 @@ export default function ProfileScreen() {
   const { loadArthurDemoRoutine, resetRoutine } = useRoutineStore();
   const [billingBusy, setBillingBusy] = React.useState(false);
   const [billingError, setBillingError] = React.useState<string | null>(null);
+  const [deletingAccount, setDeletingAccount] = React.useState(false);
+  const offerStripeMembership = shouldOfferStripeMembershipManagement(
+    publicEnvironment.buildFlavor,
+    isRemoteServiceEnabled(),
+  );
 
   React.useEffect(() => {
     hydrateCustomerProfile().catch((err) => {
@@ -120,6 +128,45 @@ export default function ProfileScreen() {
           onPress: () => void completeSignOut(),
         },
       ]
+    );
+  };
+
+  const completeAccountDeletion = async () => {
+    if (deletingAccount) return;
+    setDeletingAccount(true);
+    setBillingError(null);
+    const result = await deleteCurrentAccount();
+    if (result.success) {
+      router.replace('/(auth)/login');
+      return;
+    }
+    setDeletingAccount(false);
+    const message = result.error || getCustomerErrorMessage('auth_delete_account');
+    if (Platform.OS === 'web') {
+      window.alert(message);
+    } else {
+      Alert.alert('Delete Account', message, [{ text: 'OK' }]);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    if (deletingAccount) return;
+    const message = "This permanently deletes your Derive account, onboarding information, stored photos, routine history, and other account data. This can't be undone.";
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Delete your account?\n\n${message}`)) void completeAccountDeletion();
+      return;
+    }
+    Alert.alert(
+      'Delete your account?',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: () => void completeAccountDeletion(),
+        },
+      ],
     );
   };
 
@@ -251,11 +298,11 @@ export default function ProfileScreen() {
 
         {/* Section 3: Account & Session */}
         <GroupedSection header="Account">
-          {isRemoteServiceEnabled() && (
+          {offerStripeMembership && (
             <TouchableOpacity
               style={styles.groupedRow}
               onPress={() => void handleManageMembership()}
-              disabled={billingBusy}
+              disabled={billingBusy || deletingAccount}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Manage Membership"
@@ -268,6 +315,23 @@ export default function ProfileScreen() {
               <Icon name="forward" size={16} color={colors.inkMuted} />
             </TouchableOpacity>
           )}
+          <TouchableOpacity
+            style={styles.groupedRow}
+            onPress={handleDeleteAccount}
+            disabled={deletingAccount}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Delete Account"
+          >
+            <Icon name="warning" size={18} color={colors.actionPause.text} />
+            <View style={styles.rowContent}>
+              <Text style={[styles.rowTitle, { color: colors.actionPause.text }]}>
+                {deletingAccount ? 'Deleting account…' : 'Delete Account'}
+              </Text>
+              <Text style={styles.rowSubtitle}>Permanently delete your Derive account and stored data</Text>
+            </View>
+            <Icon name="forward" size={16} color={colors.inkMuted} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.groupedRow}
             onPress={handleSignOut}

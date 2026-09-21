@@ -8,3 +8,11 @@ export function usesConciergeMembershipAccess(buildFlavor: BuildFlavor): boolean
 export function shouldOfferStripeMembershipCheckout(buildFlavor: BuildFlavor): boolean {
   return !usesConciergeMembershipAccess(buildFlavor);
 }
+
+/** Stripe Billing Portal is the same concierge boundary as Checkout. */
+export function shouldOfferStripeMembershipManagement(
+  buildFlavor: BuildFlavor,
+  remoteEnabled: boolean,
+): boolean {
+  return remoteEnabled && shouldOfferStripeMembershipCheckout(buildFlavor);
+}
