@@ -13,11 +13,18 @@ import { createMembershipCheckoutSession, createMembershipPortalSession, refresh
 import { pollForActiveMembership } from '@/src/services/membershipActivation';
 import { signOutSession } from '@/src/services/authClient';
 import { usesConciergeMembershipAccess } from '@/src/utils/membershipPresentation';
+import { confirmAndDeleteAccount } from '@/src/components/account/confirmAccountDeletion';
+import { PublicLegalLinks } from '@/src/components/account/PublicLegalLinks';
 
-const valuePoints = [
+const paidValuePoints = [
   'A personalized routine with ongoing adjustments',
   'Weekly check-ins and Progress history',
   'Personalized product Scan and Ask',
+  'Product-fit guidance and founder quality review during beta',
+];
+const freeBetaValuePoints = [
+  'A personalized routine with ongoing adjustments',
+  'Weekly check-ins and Progress history',
   'Product-fit guidance and founder quality review during beta',
 ];
 
@@ -131,6 +138,17 @@ export default function MembershipScreen() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (busy || checking) return;
+    setBusy(true);
+    const deleted = await confirmAndDeleteAccount();
+    if (deleted) {
+      router.replace('/(auth)/login');
+      return;
+    }
+    if (mounted.current) setBusy(false);
+  };
+
   const handleSignOut = async () => {
     if (busy) return;
     setBusy(true);
@@ -144,7 +162,7 @@ export default function MembershipScreen() {
   };
 
   const statusMessage = conciergeAccess
-    ? 'Your Founding Beta access is activated by the Derive team during this beta.'
+    ? 'Your beta access is activated by the Derive team.'
     : membershipStatus === 'paused'
       ? 'Managed skincare access is paused. Open billing settings to review your subscription.'
       : membershipStatus === 'cancelled'
@@ -154,16 +172,16 @@ export default function MembershipScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.overline}>DERIVE MEMBERSHIP</Text>
+        <Text style={styles.overline}>{conciergeAccess ? 'DERIVE BETA ACCESS' : 'DERIVE MEMBERSHIP'}</Text>
         <Text style={styles.title}>Founding Beta</Text>
-        <Text style={styles.price}>${config.betaPriceMonthly}/month</Text>
+        {conciergeAccess ? null : <Text style={styles.price}>${config.betaPriceMonthly}/month</Text>}
         <Text style={styles.body}>{statusMessage}</Text>
         {conciergeAccess ? (
           <Text style={styles.body}>Once your access has been confirmed, refresh below to continue.</Text>
         ) : null}
 
         <View style={styles.card}>
-          {valuePoints.map((point) => <Text key={point} style={styles.point}>• {point}</Text>)}
+          {(conciergeAccess ? freeBetaValuePoints : paidValuePoints).map((point) => <Text key={point} style={styles.point}>• {point}</Text>)}
           <Text style={styles.separation}>Products are purchased separately.</Text>
         </View>
 
@@ -200,6 +218,8 @@ export default function MembershipScreen() {
         {notice || refreshError ? <Text style={styles.notice}>{notice || refreshError}</Text> : null}
         {!conciergeAccess && !activationPending ? <Button label="Refresh Membership" variant="ghost" onPress={handleRetry} disabled={busy} style={styles.action} /> : null}
         <Button label="Sign Out" variant="ghost" onPress={() => void handleSignOut()} disabled={busy} style={styles.signOut} />
+        <Button label="Delete Account" variant="ghost" onPress={() => void handleDeleteAccount()} disabled={busy || checking} style={styles.signOut} />
+        <PublicLegalLinks />
         <BuildDiagnostics />
       </ScrollView>
     </View>

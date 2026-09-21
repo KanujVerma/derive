@@ -16,6 +16,8 @@ import { Icon } from '@/src/components/ui/Icon';
 import { Badge } from '@/src/components/ui/Badge';
 import { Button } from '@/src/components/ui/Button';
 import { analytics } from '@/src/services/analytics';
+import { publicEnvironment } from '@/src/config/environment';
+import { showsProviderBetaFeatures } from '@/src/utils/membershipPresentation';
 import { ResearchActionRecommendation } from '@/src/types/schema';
 import { hydrateResearchInsights } from '@/src/services/deriveClient';
 
@@ -195,12 +197,14 @@ export default function ResearchInsightDetailScreen() {
 
         {/* Actions */}
         <View style={styles.actionContainer}>
+          {showsProviderBetaFeatures(publicEnvironment.buildFlavor) ? (
           <Button
             label="Ask Derive About This"
             variant="primary"
             size="large"
             onPress={handleAskDerive}
           />
+          ) : null}
           <Button
             label="Done"
             variant="ghost"

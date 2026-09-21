@@ -166,3 +166,49 @@ export const publicEnvironment = resolvePublicEnvironment({
   legacySupabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   useRemoteService: process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE,
 });
+
+export interface PublicLegalLinks {
+  privacyUrl: string;
+  supportUrl: string;
+  privacyChoicesUrl: string;
+}
+
+/** Public pages for the external beta. Not secrets, so they are not new EXPO_PUBLIC variables. */
+export const PUBLIC_BETA_LINKS: PublicLegalLinks = Object.freeze({
+  privacyUrl: 'https://derive-beta-site.vercel.app/privacy',
+  supportUrl: 'https://derive-beta-site.vercel.app/support',
+  privacyChoicesUrl: 'https://derive-beta-site.vercel.app/privacy-choices',
+});
+
+function validatePublicHttpsUrl(name: string, value: string, required: boolean): string {
+  const cleaned = value.trim();
+  if (!cleaned) {
+    if (required) throw new Error(`${name} is required for remote-staging.`);
+    return '';
+  }
+  let url: URL;
+  try {
+    url = new URL(cleaned);
+  } catch {
+    throw new Error(`${name} must be an absolute HTTPS URL.`);
+  }
+  if (url.protocol !== 'https:' || !url.hostname.includes('.') || url.username || url.password) {
+    throw new Error(`${name} must be an absolute HTTPS URL.`);
+  }
+  return url.toString();
+}
+
+/** Remote staging fails closed without public Privacy and Support pages. */
+export function resolvePublicLegalLinks(
+  buildFlavor: BuildFlavor,
+  links: PublicLegalLinks = PUBLIC_BETA_LINKS,
+): PublicLegalLinks {
+  const required = buildFlavor === 'remote-staging';
+  return Object.freeze({
+    privacyUrl: validatePublicHttpsUrl('privacy URL', links.privacyUrl, required),
+    supportUrl: validatePublicHttpsUrl('support URL', links.supportUrl, required),
+    privacyChoicesUrl: validatePublicHttpsUrl('privacy choices URL', links.privacyChoicesUrl, false),
+  });
+}
+
+export const publicLegalLinks = resolvePublicLegalLinks(publicEnvironment.buildFlavor);
