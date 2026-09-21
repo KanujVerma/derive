@@ -16,7 +16,7 @@ Owns `supabase/**`, `supabase/functions/**`, `admin/**`, `src/services/remote/**
 
 The L0/H1A founder authorization made H1A a single temporary exception: Kanuj owned its hosted post-auth verification and disposable fixture harness after L0 landed. It did not transfer H1E email, H1B Stripe, F1 founder operations, model/provider selection, or ongoing platform ownership. H1A's tested boundaries and remaining provider blocker are handed back through [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md) and [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
 
-**Next parallel wave:** Kanuj owns L1A physical-device Remote staging preflight and customer/mobile defects; Sami owns F1 founder manual routine fallback and platform/provider blockers. L1A's routine/member pass waits for a publishable routine path. H1E and H1B are later Sami provider-activation milestones, while L1B and L2A/L2B remain Kanuj acceptance milestones. Exact prerequisites and handoffs are in [ROADMAP.md](ROADMAP.md).
+**Next parallel wave:** Kanuj owns L1A signed-out physical-device Remote staging preflight and customer/mobile defects; Sami owns F1 founder manual routine fallback and platform/provider blockers. H1A's password-auth scripts are not a supported mobile sign-in route. H1P model-provider activation, H1E email OTP and H1B Stripe are distinct Sami milestones. Kanuj L1B separately accepts F1 manual fallback; Kanuj L1C accepts the provider-backed authenticated device path after H1E/H1P. L2A/L2B remain Kanuj launch acceptance. Exact prerequisites and handoffs are in [ROADMAP.md](ROADMAP.md).
 
 ## Cross-lane defects
 

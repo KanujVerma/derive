@@ -101,7 +101,13 @@ parked. Keep the committed production and local default profiles on
 `EXPO_PUBLIC_USE_REMOTE_SERVICE=false` until hosted core, real six-digit OTP
 email, Gemini, and Stripe Checkout/webhook/Portal gates pass. The separate
 Remote staging profile is for controlled hosted-core verification with a
-disposable authenticated entitlement fixture; it is not email or billing proof.
+disposable authenticated entitlement fixture in the separate H1A scripts; it is
+not a mobile Auth path, email proof or billing proof. L1A may build and inspect
+the Remote staging app while signed out, but must stop at customer login until
+H1E proves six-digit hosted OTP or another founder-approved customer Auth path.
+Do not add password login, token paste, session injection or a client
+entitlement override to cross this boundary. H1P separately owns hosted model
+provider activation for routine, Ask and Scan; F1 owns manual routine recovery.
 
 For a developer workstation, prefer interactive authentication:
 

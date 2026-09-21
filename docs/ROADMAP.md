@@ -8,13 +8,14 @@ This opening section is the current execution plan. Earlier delivery records bel
 
 ```text
 Landed foundation: V1A -> L0 -> H1A hosted baseline
-Wave 1 in parallel: Kanuj L1A device core  |  Sami F1 manual routine fallback
-Wave 2 in parallel: Kanuj L1B fallback acceptance  |  Sami H1E email and H1B billing
+Wave 1 in parallel: Kanuj L1A device preflight  |  Sami F1 manual routine fallback
+Next platform: Sami H1P provider activation, H1E email OTP, H1B billing (separate gates)
+After H1E and each routine origin: Kanuj L1B manual fallback and L1C provider-path device acceptance
 Wave 3 in parallel: Kanuj L2A customer launch readiness  |  Sami P1 production backend
 Final: Kanuj L2B customer #1 acceptance
 ```
 
-H1A's verified hosted intake, photos, entitlement fixture, founder authorization and selected security boundaries are in [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md). The final model/provider remains undecided; this account could not store the user's verified free-tier key in hosted Supabase secrets, and bounded direct adapter calls received upstream 503 high-demand. No proposal, publication or published-member path is proven. L1A can begin build and intake preflight but cannot pass routine/member acceptance until a real proposal path or F1 publication exists. This is a dependency, not an excuse to call Mock output a hosted pass. Normal platform ownership returns to Sami after H1A. Email and Stripe are separate Sami gates. S6 does not block customer #1 when manual recovery works.
+H1A's verified hosted intake, photos, entitlement fixture, founder authorization and selected security boundaries are in [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md). H1A password-auth scripts do not give the customer mobile app a supported sign-in path. Until H1E proves hosted six-digit email OTP or a founder-approved customer Auth alternative exists, L1A can verify only the signed-out physical-device path. It must not add a password UI, token injection or entitlement bypass. The final model/provider remains undecided; this account could not store the user's verified free-tier key in hosted Supabase secrets, and bounded direct adapter calls received upstream 503 high-demand. H1P is Sami's separate provider-activation milestone, independent of F1 manual routine recovery. No proposal, publication or published-member path is proven; customer #1 launch cannot claim working Ask/Scan intelligence while H1P remains blocked. Email and Stripe remain separate Sami gates. S6 does not block customer #1 when manual recovery works.
 
 ### V1A: First-Customer Intake Integrity
 
@@ -41,34 +42,52 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Explicit non-scope:** real email delivery and six-digit OTP proof (H1E), Stripe Checkout/webhook proof (H1B), F1 founder-from-scratch routine creation, production Remote enablement, customer mobile redesign.
 - **Outcome:** disposable hosted identities proved post-auth entitlement, intake, manual Shelf and reaction snapshot, private photos, founder authorization, selected cross-user denial and account deletion. The synthetic membership is not billing proof.
 - **Acceptance criteria:** current hosted matrix in [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md) states each PASS, WARN and BLOCKED gate. Real model/proposal, founder routine edit/publish, published customer read and dependent member surfaces remain blocked until a model decision or separate F1 path. Production Remote remains off.
-- **Handoff to:** Sami resumes platform ownership for F1, provider decision, H1E and H1B; Kanuj may start L1A preflight with the explicit routine blocker.
+- **Handoff to:** Sami resumes platform ownership for F1, H1P provider activation, H1E and H1B; Kanuj starts L1A signed-out physical preflight with explicit Auth and routine blockers.
 
 ### F1: Founder Manual Routine Fallback
 
 - **Owner:** Sami. **Status:** NEXT in parallel with Kanuj L1A. **Prerequisites:** H1A hosted baseline.
 - **Owned surfaces:** `admin/**`, founder operations, backend routine validation and publication.
-- **Explicit non-scope:** customer mobile UX, L1A/L1B device acceptance, email and Stripe setup.
+- **Explicit non-scope:** customer mobile UX, L1A/L1B/L1C device acceptance, email and Stripe setup.
 - **Outcome:** when automation has no usable proposal, an authorized founder can construct a complete routine inside Derive through the same safety, validation and publication pipeline. Multiple authorized origins use one publication authority.
 - **Acceptance criteria:** founder creation, edit, validation, publication, member readback and refusal of incomplete or unsupported product truth pass on hosted disposable accounts. No client or RLS bypass.
 - **Handoff to:** Kanuj L1B manual-fallback acceptance after the stable interface is documented.
 
-### L1A: Remote Core Happy-Path Acceptance
+### L1A: Remote Staging Device Preflight
 
-- **Owner:** Kanuj. **Status:** NEXT, build/intake preflight executable; routine/member completion BLOCKED by absent published routine. **Prerequisites:** L0 and H1A hosted baseline; completion also needs a publishable routine origin.
-- **Owned surfaces:** Remote staging/TestFlight build, physical-device customer journey, mobile routing/state/recovery, customer-visible Remote defects and device evidence.
-- **Explicit non-scope:** backend, provider choice, Stripe, RLS/Storage changes, founder operations and F1 implementation.
-- **Outcome:** the customer-facing hosted Remote core works on device with a controlled staging identity and entitlement, without claiming real OTP or billing.
-- **Acceptance criteria:** compiled staging diagnostic matches the verified project, Auth/intake/photo journey and routine-to-member surfaces pass on device, with each backend failure assigned to Sami. Until a routine can be published, only the preflight subset may pass.
-- **Handoff to:** L1B after F1, and Sami for any evidenced platform blocker.
+- **Owner:** Kanuj. **Status:** IN PROGRESS; post-auth device journey BLOCKED by H1E. **Prerequisites:** L0 and H1A hosted baseline.
+- **Owned surfaces:** store-signed Remote staging/TestFlight build, physical-device installation, signed-out login/recovery, staging diagnostics, reachable native camera/haptics/layout checks, and customer mobile defects.
+- **Explicit non-scope:** password login UI, token/session injection, entitlement bypass, backend, F1, H1P, H1E, H1B and production Remote.
+- **Outcome:** a real Remote staging binary is built, installed, identified and safely exercised on a physical device without treating a staging label as backend proof.
+- **Acceptance criteria:** installed build reports Remote Staging, Remote service, the verified Derive host and valid public configuration shape with no key/token; signed-out cold launch, restart, network and OTP-request recovery are observed; reachable native modules do not crash. Authenticated intake/routine/member screens are BLOCKED until H1E supplies the supported customer Auth path. Record each untestable hardware surface as BLOCKED rather than bypassing routing.
+- **Handoff to:** Kanuj L1B for F1 fallback and L1C for H1P provider-path acceptance after H1E; Sami receives exact Auth/provider/backend blockers.
 
 ### L1B: Manual-Fallback Acceptance
 
-- **Owner:** Kanuj. **Status:** PLANNED for Wave 2. **Prerequisites:** F1 hosted publication interface and L1A device baseline.
+- **Owner:** Kanuj. **Status:** PLANNED for Wave 2. **Prerequisites:** F1 hosted publication interface, H1E customer OTP and L1A device baseline.
 - **Owned surfaces:** device journey and mobile recovery when automated routine preparation is unavailable.
 - **Explicit non-scope:** founder routine construction code, model/provider setup, Stripe and email backend.
 - **Outcome:** the customer completes intake, founder uses F1 to construct and publish, and the customer sees the validated routine.
 - **Acceptance criteria:** one controlled device run observes unavailable automation, F1 construction, guarded publication and member readback; no manual off-app promise is counted as success.
-- **Handoff to:** L2A customer launch readiness.
+- **Handoff to:** L2A customer launch readiness for the manual recovery path.
+
+### L1C: Authenticated Remote Provider-Path Acceptance
+
+- **Owner:** Kanuj. **Status:** PLANNED; independent of L1B after its own prerequisites. **Prerequisites:** L1A physical staging baseline, H1E real customer OTP, H1P hosted routine/Ask/Scan provider proof, and a controlled staging entitlement.
+- **Owned surfaces:** physical-device customer Auth, intake/photos, automated proposal-to-founder publication handoff, published member readback and customer-visible Today, Plan, Shop/Scan, Ask, Check-In and Progress states.
+- **Explicit non-scope:** H1P provider implementation, F1 manual routine construction, H1B Stripe backend and production Remote activation.
+- **Outcome:** the authenticated customer app consumes a real hosted provider-backed routine and member services on a physical device without using H1A's script password session or client entitlement bypass.
+- **Acceptance criteria:** hosted six-digit OTP creates the intended mobile session; a trusted staging-only entitlement is read canonically; intake/photos persist; H1P proposal is validated and published through current founder authority; member tabs and known/unknown Scan and Ask states reflect hosted truth. Customer errors recover safely and no Mock fixtures or fabricated product/formula claims appear. Billing remains separately unverified until H1B.
+- **Handoff to:** L2A launch readiness after both L1B manual recovery and L1C provider-path evidence, or a founder-approved narrower launch scope that explicitly withholds unavailable intelligence.
+
+### H1P: Hosted Model Provider Activation
+
+- **Owner:** Sami. **Status:** PLANNED, blocked on approved model choice, hosted Edge secret permission and provider availability. **Prerequisites:** H1A hosted baseline; independent of F1.
+- **Owned surfaces:** approved server-side model credential and runtime configuration, real hosted routine proposal, Ask and Scan provider calls, output validation and provider error behavior.
+- **Explicit non-scope:** F1 manual founder construction, H1E email, H1B Stripe, customer mobile UI and client-visible model keys.
+- **Outcome:** supported hosted intelligence uses a real selected provider while unknown product/formula evidence stays unknown.
+- **Acceptance criteria:** credential remains in trusted server storage; actual provider calls for routine, Ask and Scan are observed; structured outputs pass existing validators; failure stays recoverable and does not fabricate routine, ingredient, product or diagnosis truth. A direct key lookup or local adapter call alone cannot pass H1P.
+- **Handoff to:** Kanuj L1C authenticated provider-path device acceptance and Sami P1 production backend readiness. F1 remains the independent manual routine recovery path.
 
 ### H1E: Hosted Email and OTP Activation
 
@@ -77,7 +96,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Explicit non-scope:** Kanuj mobile UX, synthetic H1A password sessions, Stripe and routine provider choice.
 - **Outcome:** real hosted six-digit email OTP establishes the intended customer session.
 - **Acceptance criteria:** dedicated inbox delivery, code verification, retry/recovery and identity readback pass; link-only or local OTP tests do not count.
-- **Handoff to:** P1 production backend and Kanuj's later provider/device acceptance.
+- **Handoff to:** P1 production backend and Kanuj L1B/L1C authenticated-device acceptance.
 
 ### H1B: Hosted Billing Activation
 
@@ -90,7 +109,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 
 ### L2A: Customer Launch Readiness
 
-- **Owner:** Kanuj. **Status:** PLANNED for Wave 3. **Prerequisites:** L1B and near-complete H1E/H1B provider activation.
+- **Owner:** Kanuj. **Status:** PLANNED for Wave 3. **Prerequisites:** L1B, L1C or a founder-approved narrower intelligence scope, H1E/H1B provider activation, and H1P proof or an explicit founder-approved limit on Ask/Scan claims.
 - **Owned surfaces:** production customer build preparation, customer contact path, launch copy, founder-approved policy surfaces, operating checklist and physical-device launch QA.
 - **Explicit non-scope:** live Stripe backend, SMTP, server security and founder backend.
 - **Outcome:** a truthful, supportable customer launch package is ready for final cross-lane acceptance.
@@ -99,11 +118,11 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 
 ### P1: Production Backend Readiness
 
-- **Owner:** Sami. **Status:** PLANNED for Wave 3. **Prerequisites:** H1E, H1B, F1 and model/fallback operating decision.
+- **Owner:** Sami. **Status:** PLANNED for Wave 3. **Prerequisites:** H1E, H1B, F1 and H1P proof or an explicit founder-approved limit on provider-backed features.
 - **Owned surfaces:** production email/OTP, live Stripe, production founder access, backend/security smoke and production environment.
 - **Explicit non-scope:** Kanuj's customer copy, mobile presentation and device QA.
 - **Outcome:** real backend services and founder operation are ready for customer #1.
-- **Acceptance criteria:** production Auth, signed live billing, routine origin/recovery, RLS/Storage/privacy, advisor review and deletion/operations checks are evidenced.
+- **Acceptance criteria:** production Auth, signed live billing, routine origin/recovery, RLS/Storage/privacy, advisor review and deletion/operations checks are evidenced. Ask/Scan intelligence is proven through H1P or plainly unavailable in the approved launch scope.
 - **Handoff to:** Kanuj L2B final acceptance.
 
 ### L2B: Final Customer #1 Acceptance
@@ -141,8 +160,8 @@ When reopened, split each implementation:
 
 ## Next action by founder
 
-- **Kanuj:** start L1A staging build and physical-device preflight. The routine/member acceptance portion is blocked until a real proposal or F1 publication exists. Own customer/mobile defects; give Sami exact backend reproductions.
-- **Sami:** start F1 from the H1A hosted baseline. H1E and H1B remain separate provider activation work in Wave 2; the model/provider decision is open. Own platform defects and hand tested interfaces to Kanuj. Do not take L1A/L1B/L2 mobile implementation.
+- **Kanuj:** finish L1A signed-out staging build/device preflight without adding Auth shortcuts. Later L1B accepts F1 manual recovery after H1E; L1C accepts the H1P provider path after H1E. Own customer/mobile defects; give Sami exact backend reproductions.
+- **Sami:** start F1 from the H1A hosted baseline. H1P is a separate model-provider activation gate; H1E and H1B are separate email and billing work, with Stripe intentionally later. Own platform defects and hand tested interfaces to Kanuj. Do not take L1A/L1B/L1C/L2 mobile implementation.
 
 Future tickets use: **Milestone, Owner, Status, Prerequisites, Owned surfaces, Explicit non-scope, Outcome, Acceptance criteria, Handoff to.**
 

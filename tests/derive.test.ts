@@ -1220,6 +1220,16 @@ test('L0 diagnostics: only Remote staging reveals safe build identity, never a k
   assert.equal(getBuildDiagnostics(resolvePublicEnvironment({ buildFlavor: 'production' })), null);
 });
 
+test('L1A diagnostics: read the immutable native build number from expo-application', () => {
+  const diagnosticSource = readFileSync(
+    join(REPO_ROOT, 'src/components/ui/BuildDiagnostics.tsx'),
+    'utf8',
+  );
+  assert.match(diagnosticSource, /from ['"]expo-application['"]/);
+  assert.match(diagnosticSource, /Application\.nativeBuildVersion/);
+  assert.doesNotMatch(diagnosticSource, /Constants\.nativeBuildVersion/);
+});
+
 test('Environment template: Lists only approved names and contains zero credential values', () => {
   const template = readFileSync(join(REPO_ROOT, '.env.example'), 'utf8');
   const assignments = [...template.matchAll(/^([A-Z][A-Z0-9_]*)=(.*)$/gm)];
