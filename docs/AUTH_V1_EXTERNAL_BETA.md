@@ -36,3 +36,11 @@ Build 6 supports a later founder-provisioned reviewer account (email, password, 
 ## Build 6
 
 Remote staging profile, marketing version `1.0.0`, EAS auto-incremented native build. Upload to App Store Connect/TestFlight is allowed. External Beta App Review and public links are not part of AUTH-V1.
+
+## Build 7 reviewer cleanup
+
+Remote staging no longer exposes Stripe membership management. The Billing Portal action stays available only for a future non-concierge Remote build.
+
+Profile includes **Delete Account**. After an explicit confirmation, the client calls the existing authenticated `delete-customer-account` function with `{ confirmation: "DELETE_MY_DERIVE_ACCOUNT" }` and clears the local session only after `{ deleted: true }`. The server function is unchanged in this hotfix.
+
+External Beta Review is still not submitted. Kanuj must physically verify Build 7 before any Apple submission.
