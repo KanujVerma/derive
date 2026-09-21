@@ -12,6 +12,8 @@ import type {
 
 const MAX_BODY_BYTES = 250_000;
 const MAX_QUEUE_ROWS = 100;
+const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
+const EVIDENCE_URL_TTL_SECONDS = 900;
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:4173",
   "http://127.0.0.1:4173",
@@ -77,6 +79,11 @@ function requireUuid(value: unknown, field: string): string {
     throw new FounderError("INVALID_PAYLOAD", `${field} must be a UUID`, 400);
   }
   return text;
+}
+
+function optionalUuid(value: unknown, field: string): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  return requireUuid(value, field);
 }
 
 function stringArray(value: unknown, field: string, maxItems = 150): string[] {
@@ -149,6 +156,21 @@ function queryFailure(label: string, error: { code?: string } | null): never {
   throw new FounderError("OPERATIONS_UNAVAILABLE", "Founder data could not be loaded", 500);
 }
 
+function externallyReachableSignedUrl(rawSignedUrl: string): string {
+  const signedUrl = new URL(rawSignedUrl);
+  if (signedUrl.hostname !== "kong") return signedUrl.toString();
+  const publicSupabaseUrl = Deno.env.get("DERIVE_PUBLIC_SUPABASE_URL") ?? "http://127.0.0.1:54321";
+  return new URL(`${signedUrl.pathname}${signedUrl.search}`, publicSupabaseUrl).toString();
+}
+
+function isOwnedProductEvidencePath(userId: string, storagePath: string): boolean {
+  const parts = storagePath.split("/");
+  return parts.length === 3
+    && parts[0] === userId
+    && ["front_label", "ingredients", "packaging"].includes(parts[1])
+    && parts.every((part) => part.length > 0 && part !== "." && part !== "..");
+}
+
 async function profileMap(admin: SupabaseClient, ids: string[]): Promise<Map<string, Record<string, unknown>>> {
   const uniqueIds = [...new Set(ids.filter(Boolean))];
   if (uniqueIds.length === 0) return new Map();
@@ -160,9 +182,9 @@ async function profileMap(admin: SupabaseClient, ids: string[]): Promise<Map<str
 }
 
 async function dashboard(admin: SupabaseClient): Promise<Record<string, unknown>> {
-  const [tasks, routines, refills, formulas] = await Promise.all([
+  const [tasks, routines, refills, formulas, productIdentities] = await Promise.all([
     admin.from("founder_review_tasks")
-      .select("id, user_id, task_type, status, priority, notes, created_at")
+      .select("id, user_id, task_type, status, priority, notes, product_resolution_case_id, created_at")
       .eq("status", "pending")
       .order("priority", { ascending: false })
       .order("created_at", { ascending: true })
@@ -182,14 +204,20 @@ async function dashboard(admin: SupabaseClient): Promise<Record<string, unknown>
       .eq("is_catalog_standard", false)
       .order("created_at", { ascending: true })
       .limit(MAX_QUEUE_ROWS),
+    admin.from("product_resolution_cases")
+      .select("id, user_id, consumer, resolution_state, review_status, evidence_snapshot, created_at")
+      .eq("review_status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(MAX_QUEUE_ROWS),
   ]);
-  for (const [label, result] of [["task queue", tasks], ["routine queue", routines], ["refill queue", refills], ["formula queue", formulas]] as const) {
+  for (const [label, result] of [["task queue", tasks], ["routine queue", routines], ["refill queue", refills], ["formula queue", formulas], ["product identity queue", productIdentities]] as const) {
     if (result.error) queryFailure(label, result.error);
   }
   const ids = [
     ...(tasks.data ?? []).map((row) => row.user_id),
     ...(routines.data ?? []).map((row) => row.user_id),
     ...(refills.data ?? []).map((row) => row.user_id),
+    ...(productIdentities.data ?? []).map((row) => row.user_id),
   ];
   const profiles = await profileMap(admin, ids);
   const member = (userId: string) => profiles.get(userId) ?? { id: userId, full_name: null, email: "" };
@@ -201,6 +229,7 @@ async function dashboard(admin: SupabaseClient): Promise<Record<string, unknown>
       routineReview: (routines.data ?? []).length,
       activeRefills: (refills.data ?? []).length,
       formulaAudit: (formulas.data ?? []).length,
+      productIdentityReview: (productIdentities.data ?? []).length,
     },
     safetyQueue: pendingTasks
       .filter((row) => row.task_type === "safety_flag")
@@ -208,6 +237,7 @@ async function dashboard(admin: SupabaseClient): Promise<Record<string, unknown>
     routineQueue: (routines.data ?? []).map((row) => ({ ...row, member: member(row.user_id) })),
     refillQueue: (refills.data ?? []).map((row) => ({ ...row, member: member(row.user_id) })),
     formulaQueue: formulas.data ?? [],
+    productIdentityQueue: (productIdentities.data ?? []).map((row) => ({ ...row, member: member(row.user_id) })),
   };
 }
 
@@ -254,6 +284,71 @@ async function routineDetail(admin: SupabaseClient, routineId: string): Promise<
     reactions: reactions.data ?? [],
     ingredientSignals: signals.data ?? [],
     recentCheckIns: checkIns.data ?? [],
+  };
+}
+
+async function productIdentityDetail(admin: SupabaseClient, caseId: string): Promise<Record<string, unknown>> {
+  const { data: resolution, error: resolutionError } = await admin.from("product_resolution_cases")
+    .select("id, user_id, consumer, resolution_state, product_id, variant_id, formula_version_id, next_action, requires_founder_review, review_status, evidence_snapshot, created_at, resolved_at")
+    .eq("id", caseId).maybeSingle();
+  if (resolutionError) queryFailure("product identity detail", resolutionError);
+  if (!resolution) throw new FounderError("NOT_FOUND", "Product identity case was not found", 404);
+
+  const [profile, evidence, candidates] = await Promise.all([
+    admin.from("profiles").select("id, email, full_name, phone").eq("id", resolution.user_id).maybeSingle(),
+    admin.from("product_resolution_evidence")
+      .select("id, evidence_type, source_type, storage_path, extracted_text, created_at")
+      .eq("case_id", caseId).order("created_at", { ascending: true }),
+    admin.from("product_resolution_candidates")
+      .select("id, product_id, variant_id, formula_version_id, rank_order, candidate_basis, match_reasons")
+      .eq("case_id", caseId).order("rank_order", { ascending: true }),
+  ]);
+  for (const [label, result] of [["product identity member", profile], ["product identity evidence", evidence], ["product identity candidates", candidates]] as const) {
+    if (result.error) queryFailure(label, result.error);
+  }
+
+  const evidenceWithAccess = await Promise.all((evidence.data ?? []).map(async (item) => {
+    if (!item.storage_path) return { ...item, signedUrl: null, expiresIn: null };
+    if (!isOwnedProductEvidencePath(resolution.user_id, item.storage_path)) {
+      console.error("founder product evidence rejected invalid owner path");
+      throw new FounderError("OPERATIONS_UNAVAILABLE", "Product evidence could not be loaded", 500);
+    }
+    const { data: signed, error } = await admin.storage.from(PRODUCT_EVIDENCE_BUCKET)
+      .createSignedUrl(item.storage_path, EVIDENCE_URL_TTL_SECONDS);
+    if (error || !signed?.signedUrl) {
+      console.error("founder product evidence signing failed");
+      throw new FounderError("OPERATIONS_UNAVAILABLE", "Product evidence could not be loaded", 500);
+    }
+    return {
+      ...item,
+      signedUrl: externallyReachableSignedUrl(signed.signedUrl),
+      expiresIn: EVIDENCE_URL_TTL_SECONDS,
+    };
+  }));
+
+  const productIds = [...new Set((candidates.data ?? []).map((row) => row.product_id).filter(Boolean))];
+  const variantIds = [...new Set((candidates.data ?? []).map((row) => row.variant_id).filter(Boolean))];
+  const formulaIds = [...new Set((candidates.data ?? []).map((row) => row.formula_version_id).filter(Boolean))];
+  const [products, variants, formulas] = await Promise.all([
+    productIds.length > 0
+      ? admin.from("products").select("id, brand, name, category, is_catalog_standard").in("id", productIds)
+      : Promise.resolve({ data: [], error: null }),
+    variantIds.length > 0
+      ? admin.from("product_variants").select("id, product_id, variant_name, region_code, package_size, packaging_markers, lifecycle_status").in("id", variantIds)
+      : Promise.resolve({ data: [], error: null }),
+    formulaIds.length > 0
+      ? admin.from("product_formula_versions").select("id, variant_id, ingredients, region_code, packaging_markers, provenance_type, source_reference, observed_at, verification_status, supersedes_id").in("id", formulaIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  for (const [label, result] of [["candidate products", products], ["candidate variants", variants], ["candidate formulas", formulas]] as const) {
+    if (result.error) queryFailure(label, result.error);
+  }
+  return {
+    resolution,
+    member: profile.data,
+    evidence: evidenceWithAccess,
+    candidates: candidates.data ?? [],
+    catalog: { products: products.data ?? [], variants: variants.data ?? [], formulas: formulas.data ?? [] },
   };
 }
 
@@ -419,6 +514,9 @@ Deno.serve(async (req) => {
     if (action === "routine_detail") {
       return json(req, await routineDetail(admin, requireUuid(body.routineId, "routineId")));
     }
+    if (action === "product_identity_detail") {
+      return json(req, await productIdentityDetail(admin, requireUuid(body.caseId, "caseId")));
+    }
     if (action === "publish_routine") {
       const routineId = requireUuid(body.routineId, "routineId");
       const requestId = requireUuid(body.requestId, "requestId");
@@ -481,6 +579,19 @@ Deno.serve(async (req) => {
         p_actor_user_id: founderId,
         p_task_id: requireUuid(body.taskId, "taskId"),
         p_resolution: requireString(body.resolution, "resolution", 20),
+        p_request_id: requireUuid(body.requestId, "requestId"),
+      });
+      return json(req, { result: data });
+    }
+    if (action === "resolve_product_identity") {
+      const resolutionState = requireString(body.resolutionState, "resolutionState", 60);
+      const data = await rpcOrThrow(admin, "founder_resolve_product_identity", {
+        p_actor_user_id: founderId,
+        p_case_id: requireUuid(body.caseId, "caseId"),
+        p_resolution_state: resolutionState,
+        p_product_id: optionalUuid(body.productId, "productId"),
+        p_variant_id: optionalUuid(body.variantId, "variantId"),
+        p_formula_version_id: optionalUuid(body.formulaVersionId, "formulaVersionId"),
         p_request_id: requireUuid(body.requestId, "requestId"),
       });
       return json(req, { result: data });

@@ -82,6 +82,12 @@ verify_jwt = true
 import_map = "./functions/scan-product/deno.json"
 entrypoint = "./functions/scan-product/index.ts"
 
+[functions.resolve-product-identity]
+enabled = true
+verify_jwt = true
+import_map = "./functions/resolve-product-identity/deno.json"
+entrypoint = "./functions/resolve-product-identity/index.ts"
+
 [functions.ask-derive]
 enabled = true
 verify_jwt = true

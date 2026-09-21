@@ -4,7 +4,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
 
-const PHOTO_BUCKET = "customer-skin-photos";
+const SKIN_PHOTO_BUCKET = "customer-skin-photos";
+const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
 const DELETE_CONFIRMATION = "DELETE_MY_DERIVE_ACCOUNT";
 const PAGE_SIZE = 100;
 const MAX_NAMESPACE_ENTRIES = 10_000;
@@ -33,8 +34,9 @@ function isOwnedStoragePath(userId: string, storagePath: string): boolean {
     && parts.every((part) => part.length > 0 && part !== "." && part !== "..");
 }
 
-async function listNamespaceObjects(
+async function listBucketNamespaceObjects(
   adminClient: ReturnType<typeof createClient>,
+  bucket: string,
   userId: string,
 ): Promise<{ paths: string[]; error: string | null }> {
   const pendingPrefixes = [userId];
@@ -49,7 +51,7 @@ async function listNamespaceObjects(
 
     let offset = 0;
     while (true) {
-      const { data, error } = await adminClient.storage.from(PHOTO_BUCKET).list(prefix, {
+      const { data, error } = await adminClient.storage.from(bucket).list(prefix, {
         limit: PAGE_SIZE,
         offset,
         sortBy: { column: "name", order: "asc" },
@@ -76,6 +78,13 @@ async function listNamespaceObjects(
   }
 
   return { paths, error: null };
+}
+
+async function listNamespaceObjects(
+  adminClient: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<{ paths: string[]; error: string | null }> {
+  return listBucketNamespaceObjects(adminClient, SKIN_PHOTO_BUCKET, userId);
 }
 
 Deno.serve(async (req: Request) => {
@@ -130,24 +139,27 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const [photoRows, submissionRows, namespaceListing] = await Promise.all([
+    const [photoRows, submissionRows, productEvidenceRows, skinNamespace, productNamespace] = await Promise.all([
       adminClient.from("user_photos").select("storage_path").eq("user_id", user.id),
       adminClient
         .from("onboarding_submissions")
         .select("front_storage_path, left_storage_path, right_storage_path, shelf_storage_path")
         .eq("user_id", user.id),
+      adminClient.from("product_resolution_evidence").select("storage_path").eq("user_id", user.id),
       listNamespaceObjects(adminClient, user.id),
+      listBucketNamespaceObjects(adminClient, PRODUCT_EVIDENCE_BUCKET, user.id),
     ]);
 
-    if (photoRows.error || submissionRows.error || namespaceListing.error) {
+    if (photoRows.error || submissionRows.error || productEvidenceRows.error || skinNamespace.error || productNamespace.error) {
       console.error("delete-customer-account inventory failed:",
-        photoRows.error?.code ?? submissionRows.error?.code ?? namespaceListing.error);
+        photoRows.error?.code ?? submissionRows.error?.code ?? productEvidenceRows.error?.code
+          ?? skinNamespace.error ?? productNamespace.error);
       return jsonResponse({ code: "DELETION_FAILED", error: "Account deletion could not be completed" }, 500);
     }
 
-    const allPaths = new Set<string>(namespaceListing.paths);
+    const skinPaths = new Set<string>(skinNamespace.paths);
     for (const row of photoRows.data ?? []) {
-      if (row.storage_path) allPaths.add(String(row.storage_path));
+      if (row.storage_path) skinPaths.add(String(row.storage_path));
     }
     for (const row of submissionRows.data ?? []) {
       for (const value of [
@@ -156,28 +168,42 @@ Deno.serve(async (req: Request) => {
         row.right_storage_path,
         row.shelf_storage_path,
       ]) {
-        if (value) allPaths.add(String(value));
+        if (value) skinPaths.add(String(value));
       }
     }
+    const productPaths = new Set<string>(productNamespace.paths);
+    for (const row of productEvidenceRows.data ?? []) {
+      if (row.storage_path) productPaths.add(String(row.storage_path));
+    }
 
-    if ([...allPaths].some((path) => !isOwnedStoragePath(user.id, path))) {
+    if ([...skinPaths, ...productPaths].some((path) => !isOwnedStoragePath(user.id, path))) {
       console.error("delete-customer-account rejected cross-owner metadata path");
       return jsonResponse({ code: "DELETION_FAILED", error: "Account deletion could not be completed" }, 500);
     }
 
-    const paths = [...allPaths];
-    for (let index = 0; index < paths.length; index += PAGE_SIZE) {
-      const { error } = await adminClient.storage
-        .from(PHOTO_BUCKET)
-        .remove(paths.slice(index, index + PAGE_SIZE));
-      if (error) {
-        console.error("delete-customer-account storage removal failed");
-        return jsonResponse({ code: "DELETION_FAILED", error: "Account deletion could not be completed" }, 500);
+    for (const [bucket, paths] of [
+      [SKIN_PHOTO_BUCKET, [...skinPaths]],
+      [PRODUCT_EVIDENCE_BUCKET, [...productPaths]],
+    ] as const) {
+      for (let index = 0; index < paths.length; index += PAGE_SIZE) {
+        const { error } = await adminClient.storage
+          .from(bucket)
+          .remove(paths.slice(index, index + PAGE_SIZE));
+        if (error) {
+          console.error("delete-customer-account storage removal failed");
+          return jsonResponse({ code: "DELETION_FAILED", error: "Account deletion could not be completed" }, 500);
+        }
       }
     }
 
-    const verification = await listNamespaceObjects(adminClient, user.id);
-    if (verification.error || verification.paths.length > 0) {
+    const [skinVerification, productVerification] = await Promise.all([
+      listNamespaceObjects(adminClient, user.id),
+      listBucketNamespaceObjects(adminClient, PRODUCT_EVIDENCE_BUCKET, user.id),
+    ]);
+    if (
+      skinVerification.error || productVerification.error
+      || skinVerification.paths.length > 0 || productVerification.paths.length > 0
+    ) {
       console.error("delete-customer-account storage verification failed");
       return jsonResponse({ code: "DELETION_FAILED", error: "Account deletion could not be completed" }, 500);
     }
