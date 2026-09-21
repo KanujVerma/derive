@@ -82,3 +82,26 @@ not silently changed by S6.
   Storage-first before account deletion completes.
 - There is no numerical confidence or quality score in the customer contract.
 - Unknown and ambiguous evidence remains unknown or ambiguous.
+
+## Review and rollout checklist
+
+S6 requires no new API key or model credential. Its deterministic resolver uses
+the existing Supabase project configuration. A future OCR or visual provider is
+separate work and must not be enabled through this rollout.
+
+1. Review the shared contract, additive migration, trust-state resolver, and
+   owner/founder access boundaries together.
+2. Merge only after both CI jobs pass against the exact PR head.
+3. Apply the additive migration to the intended hosted Supabase project before
+   deploying code that queries the new tables.
+4. Deploy `resolve-product-identity`, `scan-product`, `founder-operations`, and
+   `delete-customer-account` from the same merged revision.
+5. Smoke-test an active member's verified and unresolved cases, founder detail
+   access, a 15-minute evidence URL, cross-member denial, and Storage-first
+   account deletion.
+6. Keep existing mobile behavior backward compatible until Kanuj separately
+   adopts evidence upload, candidate confirmation, and `resolutionCaseId`.
+
+Do not populate catalog truth from guessed fixture data during rollout. Until
+authoritative identifier/formula records exist, the expected production result
+is an unresolved case—not an invented match.
