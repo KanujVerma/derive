@@ -18,9 +18,14 @@ export type CustomerFacingOperation =
   | 'auth'
   | 'auth_invalid_email'
   | 'auth_invalid_otp'
+  | 'auth_invalid_name'
+  | 'auth_invalid_password'
   | 'auth_send_code'
   | 'auth_signin'
   | 'auth_signout'
+  | 'auth_signup'
+  | 'auth_signup_unconfirmed'
+  | 'auth_password_signin'
   | 'bootstrap'
   | 'routine';
 
@@ -34,9 +39,14 @@ export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = 
   auth: "We couldn't sign you in right now. Please try again.",
   auth_invalid_email: 'Enter a valid email address.',
   auth_invalid_otp: "That code didn't work. Check it and try again.",
+  auth_invalid_name: 'Enter your first and last name.',
+  auth_invalid_password: 'Password must be at least 8 characters.',
   auth_send_code: "We couldn't send a code right now. Please try again.",
   auth_signin: "We couldn't sign you in right now. Please try again.",
   auth_signout: "We couldn't sign you out right now. Please try again.",
+  auth_signup: "We couldn't create your account right now. Please try again.",
+  auth_signup_unconfirmed: "We couldn't finish creating your account. Please try again.",
+  auth_password_signin: "Email or password didn't work. Check your details and try again.",
   bootstrap: "We couldn't finish loading your account. Please try again.",
   routine: "We couldn't refresh your routine right now. Please try again.",
 };

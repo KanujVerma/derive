@@ -6,11 +6,13 @@ import { Button } from '@/src/components/ui/Button';
 import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
 import { colors, radii, spacing, typography } from '@/src/constants/theme';
 import { config } from '@/src/constants/config';
+import { publicEnvironment } from '@/src/config/environment';
 import { useAuthStore } from '@/src/stores/authStore';
 import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { createMembershipCheckoutSession, createMembershipPortalSession, refreshCustomerBootstrap } from '@/src/services/deriveClient';
 import { pollForActiveMembership } from '@/src/services/membershipActivation';
 import { signOutSession } from '@/src/services/authClient';
+import { usesConciergeMembershipAccess } from '@/src/utils/membershipPresentation';
 
 const valuePoints = [
   'A personalized routine with ongoing adjustments',
@@ -25,6 +27,7 @@ export default function MembershipScreen() {
   const userId = useAuthStore((state) => state.sessionUserId);
   const membershipStatus = useBootstrapStore((state) => state.bootstrapState?.membershipStatus ?? 'none');
   const refreshError = useBootstrapStore((state) => state.errorMessage);
+  const conciergeAccess = usesConciergeMembershipAccess(publicEnvironment.buildFlavor);
   const [busy, setBusy] = React.useState(false);
   const [checking, setChecking] = React.useState(false);
   const [activationPending, setActivationPending] = React.useState(false);
@@ -38,8 +41,22 @@ export default function MembershipScreen() {
     return () => { mounted.current = false; };
   }, []);
 
+  const refreshAccess = React.useCallback(async () => {
+    if (!userId) return;
+    if (mounted.current) { setChecking(true); setNotice(null); }
+    try {
+      await refreshCustomerBootstrap(userId);
+    } catch {
+      if (mounted.current) {
+        setNotice("We couldn't refresh your access right now. Please try again.");
+      }
+    } finally {
+      if (mounted.current) setChecking(false);
+    }
+  }, [userId]);
+
   const checkActivation = React.useCallback(async () => {
-    if (!userId || polling.current) return;
+    if (!userId || polling.current || conciergeAccess) return;
     polling.current = true;
     if (mounted.current) { setChecking(true); setNotice(null); }
     try {
@@ -57,9 +74,10 @@ export default function MembershipScreen() {
       polling.current = false;
       if (mounted.current) setChecking(false);
     }
-  }, [userId]);
+  }, [userId, conciergeAccess]);
 
   React.useEffect(() => {
+    if (conciergeAccess) return;
     let previousState = AppState.currentState;
     const onReturn = () => { if (pending.current) void checkActivation(); };
     const sub = AppState.addEventListener('change', (state) => {
@@ -80,10 +98,10 @@ export default function MembershipScreen() {
         document.removeEventListener('visibilitychange', onVisible);
       }
     };
-  }, [checkActivation]);
+  }, [checkActivation, conciergeAccess]);
 
   const openHostedSession = async (kind: 'checkout' | 'portal') => {
-    if (busy) return;
+    if (busy || conciergeAccess) return;
     setBusy(true);
     setNotice(null);
     try {
@@ -125,11 +143,13 @@ export default function MembershipScreen() {
     }
   };
 
-  const statusMessage = membershipStatus === 'paused'
-    ? 'Managed skincare access is paused. Open billing settings to review your subscription.'
-    : membershipStatus === 'cancelled'
-    ? 'Your membership has ended. You can start a new Checkout when you are ready.'
-    : 'Your skincare, handled.';
+  const statusMessage = conciergeAccess
+    ? 'Your Founding Beta access is activated by the Derive team during this beta.'
+    : membershipStatus === 'paused'
+      ? 'Managed skincare access is paused. Open billing settings to review your subscription.'
+      : membershipStatus === 'cancelled'
+        ? 'Your membership has ended. You can start a new Checkout when you are ready.'
+        : 'Your skincare, handled.';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -138,13 +158,25 @@ export default function MembershipScreen() {
         <Text style={styles.title}>Founding Beta</Text>
         <Text style={styles.price}>${config.betaPriceMonthly}/month</Text>
         <Text style={styles.body}>{statusMessage}</Text>
+        {conciergeAccess ? (
+          <Text style={styles.body}>Once your access has been confirmed, refresh below to continue.</Text>
+        ) : null}
 
         <View style={styles.card}>
           {valuePoints.map((point) => <Text key={point} style={styles.point}>• {point}</Text>)}
           <Text style={styles.separation}>Products are purchased separately.</Text>
         </View>
 
-        {activationPending ? (
+        {conciergeAccess ? (
+          <Button
+            label={checking ? 'Checking access…' : 'Refresh Access'}
+            variant="brand"
+            onPress={() => void refreshAccess()}
+            loading={checking}
+            disabled={checking || busy || !userId}
+            style={styles.action}
+          />
+        ) : activationPending ? (
           <View style={styles.statusCard}>
             <Text style={styles.statusTitle}>{checking ? 'Activating your membership…' : 'Membership confirmation pending'}</Text>
             <Text style={styles.body}>Access opens only after Derive confirms your membership from the billing service.</Text>
@@ -166,7 +198,7 @@ export default function MembershipScreen() {
         ) : null}
 
         {notice || refreshError ? <Text style={styles.notice}>{notice || refreshError}</Text> : null}
-        {!activationPending ? <Button label="Refresh Membership" variant="ghost" onPress={handleRetry} disabled={busy} style={styles.action} /> : null}
+        {!conciergeAccess && !activationPending ? <Button label="Refresh Membership" variant="ghost" onPress={handleRetry} disabled={busy} style={styles.action} /> : null}
         <Button label="Sign Out" variant="ghost" onPress={() => void handleSignOut()} disabled={busy} style={styles.signOut} />
         <BuildDiagnostics />
       </ScrollView>

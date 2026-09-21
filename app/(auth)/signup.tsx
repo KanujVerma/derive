@@ -10,6 +10,7 @@ import {
   Keyboard,
   Image,
   Pressable,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,29 +19,38 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { Button } from '@/src/components/ui/Button';
 import { Icon } from '@/src/components/ui/Icon';
 import { BuildDiagnostics } from '@/src/components/ui/BuildDiagnostics';
-import { signInWithPassword } from '@/src/services/authClient';
+import { createPasswordAccount } from '@/src/services/authClient';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { useAuthStore } from '@/src/stores/authStore';
 import { resolveAuthRoute } from '@/src/utils/authRouting';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 
-export default function LoginScreen() {
+export default function SignupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const clearError = () => {
+    if (errorMessage) setErrorMessage(null);
+  };
+
   const handleSubmit = async () => {
     Keyboard.dismiss();
-    const trimmedEmail = email.trim().toLowerCase();
-
     setErrorMessage(null);
     setLoading(true);
 
-    const result = await signInWithPassword(trimmedEmail, password);
+    const result = await createPasswordAccount({
+      firstName,
+      lastName,
+      email,
+      password,
+    });
     setLoading(false);
 
     if (result.success) {
@@ -60,12 +70,16 @@ export default function LoginScreen() {
         router.replace(destination.route);
       }
     } else {
-      setErrorMessage(result.error || getCustomerErrorMessage('auth_password_signin'));
+      setErrorMessage(result.error || getCustomerErrorMessage('auth_signup'));
       try {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } catch {}
     }
   };
+
+  const canSubmit = Boolean(
+    firstName.trim() && lastName.trim() && email.trim() && password && !loading
+  );
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -74,7 +88,10 @@ export default function LoginScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardView}
         >
-          <View style={styles.content}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.brandRow}>
               <Image
                 source={require('@/assets/logo.png')}
@@ -83,9 +100,9 @@ export default function LoginScreen() {
               />
             </View>
 
-            <Text style={styles.title}>Sign in to Derive</Text>
+            <Text style={styles.title}>Create your account</Text>
             <Text style={styles.subtitle}>
-              Enter your email and password to continue.
+              Use your name, email, and a password. Derive will keep you signed in on this device.
             </Text>
 
             {errorMessage && (
@@ -96,6 +113,46 @@ export default function LoginScreen() {
             )}
 
             <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>FIRST NAME</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="First name"
+                placeholderTextColor={colors.inkSubtle}
+                autoCapitalize="words"
+                autoCorrect={false}
+                autoComplete="given-name"
+                textContentType="givenName"
+                value={firstName}
+                onChangeText={(text) => {
+                  setFirstName(text);
+                  clearError();
+                }}
+                returnKeyType="next"
+                editable={!loading}
+              />
+            </View>
+
+            <View style={[styles.inputContainer, styles.followingField]}>
+              <Text style={styles.inputLabel}>LAST NAME</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Last name"
+                placeholderTextColor={colors.inkSubtle}
+                autoCapitalize="words"
+                autoCorrect={false}
+                autoComplete="family-name"
+                textContentType="familyName"
+                value={lastName}
+                onChangeText={(text) => {
+                  setLastName(text);
+                  clearError();
+                }}
+                returnKeyType="next"
+                editable={!loading}
+              />
+            </View>
+
+            <View style={[styles.inputContainer, styles.followingField]}>
               <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
               <TextInput
                 style={styles.input}
@@ -109,52 +166,52 @@ export default function LoginScreen() {
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
-                  if (errorMessage) setErrorMessage(null);
+                  clearError();
                 }}
                 returnKeyType="next"
                 editable={!loading}
               />
             </View>
 
-            <View style={[styles.inputContainer, styles.passwordField]}>
+            <View style={[styles.inputContainer, styles.followingField]}>
               <Text style={styles.inputLabel}>PASSWORD</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter your password"
+                placeholder="At least 8 characters"
                 placeholderTextColor={colors.inkSubtle}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
-                autoComplete="password"
-                textContentType="password"
+                autoComplete="new-password"
+                textContentType="newPassword"
                 passwordRules="minlength: 8;"
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  if (errorMessage) setErrorMessage(null);
+                  clearError();
                 }}
                 onSubmitEditing={handleSubmit}
                 returnKeyType="go"
                 editable={!loading}
               />
             </View>
-          </View>
+          </ScrollView>
 
           <View style={styles.footer}>
             <Button
-              label={loading ? 'Signing in...' : 'Sign In'}
+              label={loading ? 'Creating account...' : 'Create Account'}
               onPress={handleSubmit}
               loading={loading}
-              disabled={!email.trim() || !password || loading}
+              disabled={!canSubmit}
               size="large"
             />
             <Pressable
-              onPress={() => router.push('/(auth)/signup')}
+              onPress={() => router.replace('/(auth)/login')}
               disabled={loading}
               accessibilityRole="link"
-              style={styles.signupLink}
+              style={styles.signinLink}
             >
-              <Text style={styles.signupLinkText}>New to Derive? Create account</Text>
+              <Text style={styles.signinLinkText}>Already have an account? Sign in</Text>
             </Pressable>
             <BuildDiagnostics />
           </View>
@@ -174,9 +231,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   content: {
-    flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
   },
   brandRow: {
     marginBottom: spacing.xl,
@@ -218,7 +275,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     gap: spacing.xs,
   },
-  passwordField: {
+  followingField: {
     marginTop: spacing.md,
   },
   inputLabel: {
@@ -242,12 +299,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
   },
-  signupLink: {
+  signinLink: {
     alignItems: 'center',
     marginTop: spacing.md,
     paddingVertical: spacing.sm,
   },
-  signupLinkText: {
+  signinLinkText: {
     fontSize: typography.sizes.bodyRegular,
     color: colors.brand,
     fontWeight: typography.weights.medium,

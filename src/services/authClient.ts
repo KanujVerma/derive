@@ -25,15 +25,45 @@ export interface VerifyOtpResult {
   error?: string;
 }
 
+export interface PasswordAuthResult {
+  success: boolean;
+  userId?: string;
+  error?: string;
+}
+
+export interface PasswordSignUpInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+}
+
+export interface AuthSignUpRequest {
+  email: string;
+  password: string;
+  options?: { data?: Record<string, string> };
+}
+
+export interface AuthPasswordRequest {
+  email: string;
+  password: string;
+}
+
 export interface AuthAdapter {
   signInWithOtp(email: string): Promise<{ data: any; error: any }>;
   verifyOtp(email: string, token: string): Promise<{ data: { session: any; user: any }; error: any }>;
+  signUp?(input: AuthSignUpRequest): Promise<{ data: { session: any; user: any }; error: any }>;
+  signInWithPassword?(input: AuthPasswordRequest): Promise<{ data: { session: any; user: any }; error: any }>;
   getSession(): Promise<{ data: { session: any }; error: any }>;
   signOut(options?: SignOutOptions): Promise<{ error: any }>;
   onAuthStateChange(callback: (event: string, session: any) => void): {
     data: { subscription: { unsubscribe: () => void } };
   };
 }
+
+export const MAX_PERSON_NAME_LENGTH = 80;
+export const MIN_PASSWORD_LENGTH = 8;
+export const MAX_PASSWORD_LENGTH = 72;
 
 export function isValidEmail(email: string): boolean {
   if (!email || typeof email !== 'string') return false;
@@ -47,6 +77,21 @@ export function isValidOtpToken(token: string): boolean {
   if (!token || typeof token !== 'string') return false;
   const trimmed = token.trim();
   return /^\d{6}$/.test(trimmed);
+}
+
+export function isValidPersonName(value: string): boolean {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  return trimmed.length >= 1 && trimmed.length <= MAX_PERSON_NAME_LENGTH;
+}
+
+export function isValidPassword(password: string): boolean {
+  if (typeof password !== 'string') return false;
+  return password.length >= MIN_PASSWORD_LENGTH && password.length <= MAX_PASSWORD_LENGTH;
+}
+
+export function composeFullName(firstName: string, lastName: string): string {
+  return `${firstName.trim()} ${lastName.trim()}`;
 }
 
 const defaultSupabaseAdapter: AuthAdapter = {
@@ -70,6 +115,27 @@ const defaultSupabaseAdapter: AuthAdapter = {
       email,
       token,
       type: 'email',
+    });
+  },
+
+  async signUp(input) {
+    if (!supabase) {
+      return { data: { session: null, user: null }, error: new Error('Supabase client not configured') };
+    }
+    return supabase.auth.signUp({
+      email: input.email,
+      password: input.password,
+      options: input.options,
+    });
+  },
+
+  async signInWithPassword(input) {
+    if (!supabase) {
+      return { data: { session: null, user: null }, error: new Error('Supabase client not configured') };
+    }
+    return supabase.auth.signInWithPassword({
+      email: input.email,
+      password: input.password,
     });
   },
 
@@ -109,6 +175,18 @@ export function setAuthAdapter(adapter: AuthAdapter): void {
 
 export function resetAuthAdapter(): void {
   activeAdapter = defaultSupabaseAdapter;
+}
+
+function projectAuthenticatedSession(user: { id: string; email?: string | null }): string {
+  const userId = user.id;
+  const sessionEmail = user.email || null;
+  const currentUserId = useAuthStore.getState().sessionUserId;
+  if (currentUserId && currentUserId !== userId) {
+    resetCustomerSessionData();
+  }
+  useAuthStore.getState().setSession(userId, sessionEmail);
+  useUserStore.getState().setRemoteSessionUser(userId, sessionEmail || '');
+  return userId;
 }
 
 /**
@@ -174,18 +252,10 @@ export async function verifyEmailOtp(
       };
     }
 
-    const userId = data.user.id;
-    const sessionEmail = data.user.email || normalizedEmail;
-
-    // If changing authenticated customer, purge previous customer caches first
-    const currentUserId = useAuthStore.getState().sessionUserId;
-    if (currentUserId && currentUserId !== userId) {
-      resetCustomerSessionData();
-    }
-
-    // Project established identity into client stores
-    useAuthStore.getState().setSession(userId, sessionEmail);
-    useUserStore.getState().setRemoteSessionUser(userId, sessionEmail);
+    const userId = projectAuthenticatedSession({
+      id: data.user.id,
+      email: data.user.email || normalizedEmail,
+    });
 
     return {
       success: true,
@@ -196,6 +266,145 @@ export async function verifyEmailOtp(
     return {
       success: false,
       error: getCustomerErrorMessage('auth_invalid_otp'),
+    };
+  }
+}
+
+export async function createPasswordAccount(
+  input: PasswordSignUpInput
+): Promise<PasswordAuthResult> {
+  const firstName = (input.firstName || '').trim();
+  const lastName = (input.lastName || '').trim();
+  const normalizedEmail = (input.email || '').trim().toLowerCase();
+  const password = input.password;
+
+  if (!isValidPersonName(firstName) || !isValidPersonName(lastName)) {
+    return {
+      success: false,
+      error: getCustomerErrorMessage('auth_invalid_name'),
+    };
+  }
+
+  if (!isValidEmail(normalizedEmail)) {
+    return {
+      success: false,
+      error: getCustomerErrorMessage('auth_invalid_email'),
+    };
+  }
+
+  if (!isValidPassword(password)) {
+    return {
+      success: false,
+      error: getCustomerErrorMessage('auth_invalid_password'),
+    };
+  }
+
+  const fullName = composeFullName(firstName, lastName);
+
+  try {
+    if (!activeAdapter.signUp) {
+      console.warn('createPasswordAccount backend error: signup_unavailable');
+      return {
+        success: false,
+        error: getCustomerErrorMessage('auth_signup'),
+      };
+    }
+
+    const { data, error } = await activeAdapter.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          first_name: firstName,
+          last_name: lastName,
+        },
+      },
+    });
+
+    if (error || !data?.user) {
+      console.warn('createPasswordAccount backend error:', error?.name || 'signup_failed');
+      return {
+        success: false,
+        error: getCustomerErrorMessage('auth_signup'),
+      };
+    }
+
+    if (!data.session) {
+      console.warn('createPasswordAccount backend error: missing_session');
+      return {
+        success: false,
+        error: getCustomerErrorMessage('auth_signup_unconfirmed'),
+      };
+    }
+
+    const userId = projectAuthenticatedSession({
+      id: data.user.id,
+      email: data.user.email || normalizedEmail,
+    });
+
+    return {
+      success: true,
+      userId,
+    };
+  } catch (err: any) {
+    console.warn('createPasswordAccount exception:', err?.name || 'unknown_error');
+    return {
+      success: false,
+      error: getCustomerErrorMessage('auth_signup'),
+    };
+  }
+}
+
+export async function signInWithPassword(
+  email: string,
+  password: string
+): Promise<PasswordAuthResult> {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+
+  if (!isValidEmail(normalizedEmail) || typeof password !== 'string' || password.length === 0) {
+    return {
+      success: false,
+      error: getCustomerErrorMessage('auth_password_signin'),
+    };
+  }
+
+  try {
+    if (!activeAdapter.signInWithPassword) {
+      console.warn('signInWithPassword backend error: password_signin_unavailable');
+      return {
+        success: false,
+        error: getCustomerErrorMessage('auth_password_signin'),
+      };
+    }
+
+    const { data, error } = await activeAdapter.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error || !data?.user || !data.session) {
+      console.warn('signInWithPassword backend error:', error?.name || 'signin_failed');
+      return {
+        success: false,
+        error: getCustomerErrorMessage('auth_password_signin'),
+      };
+    }
+
+    const userId = projectAuthenticatedSession({
+      id: data.user.id,
+      email: data.user.email || normalizedEmail,
+    });
+
+    return {
+      success: true,
+      userId,
+    };
+  } catch (err: any) {
+    console.warn('signInWithPassword exception:', err?.name || 'unknown_error');
+    return {
+      success: false,
+      error: getCustomerErrorMessage('auth_password_signin'),
     };
   }
 }
@@ -213,17 +422,8 @@ export async function getCurrentSession(): Promise<{ userId: string | null; emai
     }
 
     const user = data.session.user;
-    const userId = user.id;
+    const userId = projectAuthenticatedSession(user);
     const email = user.email || null;
-
-    const currentUserId = useAuthStore.getState().sessionUserId;
-    if (currentUserId && currentUserId !== userId) {
-      resetCustomerSessionData();
-    }
-
-    useAuthStore.getState().setSession(userId, email);
-    useUserStore.getState().setRemoteSessionUser(userId, email || '');
-
     return { userId, email };
   } catch (err: any) {
     console.warn('getCurrentSession exception:', err?.name || 'unknown_error');
@@ -305,15 +505,7 @@ export function subscribeToAuth(
 ): { unsubscribe: () => void } {
   const { data } = activeAdapter.onAuthStateChange((event, session) => {
     if (session?.user) {
-      const user = session.user;
-      const currentUserId = useAuthStore.getState().sessionUserId;
-
-      if (currentUserId && currentUserId !== user.id) {
-        resetCustomerSessionData();
-      }
-
-      useAuthStore.getState().setSession(user.id, user.email || null);
-      useUserStore.getState().setRemoteSessionUser(user.id, user.email || '');
+      projectAuthenticatedSession(session.user);
     } else if (event === 'SIGNED_OUT' || !session) {
       resetCustomerSessionData();
     }
@@ -329,4 +521,3 @@ export function subscribeToAuth(
     },
   };
 }
-
