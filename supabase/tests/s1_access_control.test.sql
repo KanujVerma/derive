@@ -91,8 +91,11 @@ select results_eq(
       and tablename = 'objects'
     order by policyname
   $$,
-  array['customer_skin_photos_insert_own:INSERT:authenticated'],
-  'Storage has only the immutable member-path upload policy'
+  array[
+    'customer_product_evidence_insert_own:INSERT:authenticated',
+    'customer_skin_photos_insert_own:INSERT:authenticated'
+  ],
+  'Storage has only the two audited immutable member-path upload policies'
 );
 
 select results_eq(

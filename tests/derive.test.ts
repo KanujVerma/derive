@@ -112,6 +112,12 @@ import {
   type RoutineIntelligenceProvider,
   type TrustedProductInfo,
 } from '../src/services/ai-workflows/routine-intelligence.ts';
+import {
+  isValidGtin,
+  normalizeIngredientFingerprint,
+  resolveProductIdentity,
+  type CatalogResolutionRecord,
+} from '../supabase/functions/_shared/product-identity.ts';
 
 // ========================================================
 // 1. SAFETY CLASSIFIER TESTS
@@ -9194,4 +9200,150 @@ test('V1A Shelf: manual identity carries no invented formula or catalog trust', 
   });
   assert.throws(() => buildCustomerShelfProduct('manual-2', { brand: ' ', name: 'Lotion', category: 'moisturizer' }), /brand/i);
   assert.throws(() => buildCustomerShelfProduct('manual-3', { brand: 'Brand', name: ' ', category: 'moisturizer' }), /name/i);
+});
+
+// ========================================================
+// 31. S6 PRODUCT IDENTITY TRUST RESOLVER
+// ========================================================
+
+const s6VerifiedCatalog: CatalogResolutionRecord[] = [{
+  productId: '60000000-0000-4000-8000-000000000001',
+  variantId: '60000000-0000-4000-8000-000000000002',
+  formulaVersionId: '60000000-0000-4000-8000-000000000003',
+  brand: 'Evidence Lab',
+  name: 'Barrier Wash',
+  variantName: 'Fragrance Free',
+  regionCode: 'US',
+  identifierType: 'gtin_12',
+  identifierValue: '036000291452',
+  identifierAuthority: 'gs1',
+  identifierFormulaVersionId: '60000000-0000-4000-8000-000000000003',
+  formulaVerificationStatus: 'verified',
+  formulaSourceReference: 'https://manufacturer.example/barrier-wash-us',
+  formulaObservedAt: '2026-09-20T00:00:00.000Z',
+  ingredientFingerprint: normalizeIngredientFingerprint(['Water', 'Glycerin', 'Ceramide NP']),
+}];
+
+test('S6 resolver: authoritative identifier verifies a formula only when provenance explicitly links it', () => {
+  assert.equal(isValidGtin('036000291452'), true);
+  const linked = resolveProductIdentity({ barcode: '0 36000 29145 2' }, s6VerifiedCatalog);
+  assert.equal(linked.state, 'verified_product_formula');
+  assert.equal(linked.nextAction, 'evaluate_product_fit');
+
+  const unlinked = resolveProductIdentity({ barcode: '036000291452' }, [{
+    ...s6VerifiedCatalog[0],
+    identifierFormulaVersionId: undefined,
+  }]);
+  assert.equal(unlinked.state, 'identified_formula_unverified');
+  assert.equal(unlinked.nextAction, 'photograph_ingredients');
+});
+
+test('S6 resolver: typed identity never promotes a verified catalog formula by itself', () => {
+  const result = resolveProductIdentity({
+    brand: ' evidence lab ',
+    productName: 'BARRIER WASH',
+    variantName: 'Fragrance-Free',
+    regionCode: 'us',
+  }, s6VerifiedCatalog);
+  assert.equal(result.state, 'identified_formula_unverified');
+  assert.equal(result.candidates[0]?.basis, 'exact_typed_identity');
+});
+
+test('S6 resolver: a reused barcode preserves variant identity but does not guess between reformulations', () => {
+  const reformulated: CatalogResolutionRecord = {
+    ...s6VerifiedCatalog[0],
+    formulaVersionId: '60000000-0000-4000-8000-000000000005',
+    identifierFormulaVersionId: '60000000-0000-4000-8000-000000000005',
+    formulaObservedAt: '2026-09-21T00:00:00.000Z',
+    ingredientFingerprint: normalizeIngredientFingerprint(['Water', 'Glycerin', 'Ceramide AP']),
+  };
+  const result = resolveProductIdentity({ barcode: '036000291452' }, [s6VerifiedCatalog[0], reformulated]);
+  assert.equal(result.state, 'identified_formula_unverified');
+  assert.equal(result.selected?.productId, s6VerifiedCatalog[0].productId);
+  assert.equal(result.selected?.formulaVersionId, undefined);
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.nextAction, 'photograph_ingredients');
+});
+
+test('S6 resolver: exact ingredients identify formula evidence without claiming product identity', () => {
+  const result = resolveProductIdentity({
+    ingredientList: ['Water', 'Glycerin', 'Ceramide NP'],
+  }, s6VerifiedCatalog);
+  assert.equal(result.state, 'formula_only');
+  assert.equal(result.requiresFounderReview, true);
+  assert.equal(result.nextAction, 'confirm_variant');
+});
+
+test('S6 resolver: label resemblance remains an ambiguous candidate even with one match', () => {
+  const result = resolveProductIdentity({
+    labelText: 'Evidence Lab Barrier Wash gentle daily cleanser',
+  }, s6VerifiedCatalog);
+  assert.equal(result.state, 'ambiguous_candidates');
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0]?.basis, 'label_text');
+
+  const packaging = resolveProductIdentity({
+    packagingText: 'Evidence Lab Barrier Wash white pump blue label',
+  }, s6VerifiedCatalog);
+  assert.equal(packaging.state, 'ambiguous_candidates');
+  assert.equal(packaging.candidates[0]?.basis, 'packaging');
+});
+
+test('S6 resolver: duplicate typed identities remain ambiguous and unknown evidence stays unknown', () => {
+  const secondVariant: CatalogResolutionRecord = {
+    ...s6VerifiedCatalog[0],
+    variantId: '60000000-0000-4000-8000-000000000004',
+    formulaVersionId: undefined,
+    variantName: 'Original',
+  };
+  const ambiguous = resolveProductIdentity({ brand: 'Evidence Lab', productName: 'Barrier Wash' }, [
+    s6VerifiedCatalog[0],
+    secondVariant,
+  ]);
+  assert.equal(ambiguous.state, 'ambiguous_candidates');
+  assert.equal(ambiguous.candidates.length, 2);
+
+  const unknown = resolveProductIdentity({ labelText: 'unreadable partial bottle' }, s6VerifiedCatalog);
+  assert.equal(unknown.state, 'insufficient_evidence');
+  assert.equal(unknown.candidates.length, 0);
+  assert.equal(unknown.nextAction, 'manual_review');
+});
+
+test('S6 resolver: GTIN validation fails closed', () => {
+  assert.equal(isValidGtin('036000291453'), false);
+  assert.equal(isValidGtin('abc'), false);
+});
+
+test('S6 integration: personalized Scan accepts only an owner-bound verified resolver case', () => {
+  const scanFunction = fs.readFileSync(
+    path.join(process.cwd(), 'supabase/functions/scan-product/index.ts'),
+    'utf8',
+  );
+  assert.match(scanFunction, /\.eq\("id", resolutionCaseId\)/);
+  assert.match(scanFunction, /\.eq\("user_id", userId\)/);
+  assert.match(scanFunction, /resolution\.resolution_state !== "verified_product_formula"/);
+  assert.match(scanFunction, /PRODUCT_IDENTITY_MISMATCH/);
+
+  const founderFunction = fs.readFileSync(
+    path.join(process.cwd(), 'supabase/functions/founder-operations/index.ts'),
+    'utf8',
+  );
+  assert.match(founderFunction, /action === "product_identity_detail"/);
+  assert.match(founderFunction, /isOwnedProductEvidencePath\(resolution\.user_id, item\.storage_path\)/);
+  assert.match(founderFunction, /EVIDENCE_URL_TTL_SECONDS = 900/);
+  assert.match(founderFunction, /founder_resolve_product_identity/);
+});
+
+test('S6 endpoint: authenticates and checks entitlement before parsing evidence, with no model authority', () => {
+  const resolverFunction = fs.readFileSync(
+    path.join(process.cwd(), 'supabase/functions/resolve-product-identity/index.ts'),
+    'utf8',
+  );
+  const authenticateIndex = resolverFunction.indexOf('await authenticate(req)');
+  const entitlementIndex = resolverFunction.indexOf('await requireMemberEntitlement(admin, userId)');
+  const bodyIndex = resolverFunction.indexOf('parseRequest(await readJsonObject(req), userId)');
+  assert.ok(authenticateIndex >= 0 && authenticateIndex < entitlementIndex);
+  assert.ok(entitlementIndex < bodyIndex);
+  assert.match(resolverFunction, /\^\(file\|ph\|content\|https\?\):\\\/\\\//i);
+  assert.doesNotMatch(resolverFunction, /generateStructuredJson|GEMINI_API_KEY|:generateContent/);
 });
