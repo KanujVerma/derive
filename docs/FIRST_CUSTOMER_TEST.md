@@ -4,14 +4,14 @@
 
 **Owner:** Kanuj, for the customer device journey and acceptance record. Sami owns hosted Auth, billing, intelligence, and founder operations. Record a backend blocker for Sami instead of changing that lane during this test.
 
-**Current status:** This is a test script, not evidence that hosted Remote or live payment is ready. H1A proved the disposable hosted post-auth intake/photo baseline, but its provider/proposal/published-routine gates are blocked. L1A may begin device build and intake preflight; it cannot pass a routine/member happy path until a real proposal or F1 publication exists. H1E real email and H1B Stripe remain separate Sami gates. See [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md), [ROADMAP.md](ROADMAP.md) and [OWNERSHIP.md](OWNERSHIP.md).
+**Current status:** This is a test script, not evidence that hosted Remote or live payment is ready. L1A signed-out physical-device preflight passed on Remote staging build `1.0.0 (5)`. H1A's password-auth script sessions are still unavailable through the customer UI. Provider/proposal/published-routine gates remain blocked under Sami's H1P and F1 work; real mobile OTP remains H1E and Stripe remains later H1B. Kanuj L1B/L1C consume those separate handoffs. See [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md), [ROADMAP.md](ROADMAP.md) and [OWNERSHIP.md](OWNERSHIP.md).
 
 ## Choose the run before opening the app
 
 | Run | Identity and money | What its result proves |
 | --- | --- | --- |
 | Mock development | Local Mock data. No real email OTP, Stripe charge, signed webhook, or hosted persistence. | Screen behavior and copy only. A Mock pass cannot clear a Remote or launch gate. |
-| Remote core staging | Disposable authenticated identity and trusted service/admin staging entitlement after H1A project verification. No real email delivery or Stripe payment. | Post-auth hosted intake, routine, founder and member core only. Synthetic entitlement is never billing proof. |
+| Remote core staging | Disposable authenticated identity and trusted service/admin staging entitlement after H1A project verification. No real email delivery or Stripe payment. | Backend post-auth smoke only until a supported mobile Auth path exists. Synthetic entitlement is never billing proof. |
 | Remote provider staging | Dedicated test inbox and identity, real hosted six-digit OTP, Stripe test Checkout/webhook/Portal, hosted records and test photos after H1E/H1B readiness. | Email and billing lifecycles only for steps actually observed and recorded; F1 is additionally required to clear manual routine fallback. |
 | Real-money customer launch | Production customer build, real member identity, live $25/month Stripe membership, real intake, and an operational founder response. | Customer #1 acceptance only after L2 prerequisites and the full customer path pass. Do not charge or enroll customer #1 based on Mock or test-mode evidence. |
 
@@ -21,7 +21,7 @@ For a guided usability session, let the person drive and prompt only after they 
 
 - [ ] Record run type, build and revision, environment, device, date, tester role, and whether a real customer is involved. Confirm the build points to the intended environment. A TestFlight label alone does not prove Remote mode.
 - [ ] For a Remote staging run, use the L0 `remote-staging` profile and read its staging-only diagnostics before sign-in: build flavor, Remote service mode, valid public configuration **shape**, expected hosted backend host and app version. Match the host against H1A's independently verified project. Never record or display the publishable key. An absent or wrong host blocks the run; a shape check alone is not proof of a live key.
-- [ ] For a Remote core staging run, use H1A evidence for the exact hosted project, controlled Auth/session, disposable entitlement, intake/Shelf/reaction snapshot, private photos, founder authorization and selected cross-user boundaries. Record provider proposal, founder routine review/publication and published member reads as **Blocked** until exercised; direct free-tier adapter diagnostics returned upstream errors and the key could not be stored by this Supabase account. Mark real email OTP and Stripe rows Not applicable, never passed. H1's old negative tests alone do not prove the active lifecycle.
+- [ ] For a Remote core staging run, use H1A evidence for the exact hosted project, controlled script Auth/session, disposable entitlement, intake/Shelf/reaction snapshot, private photos, founder authorization and selected cross-user boundaries. Those script sessions do not authorize a password UI, token paste or other L1A mobile bypass. Record mobile post-auth, provider proposal, founder routine review/publication and published member reads as **Blocked** until exercised; H1P owns provider activation. Mark real email OTP and Stripe rows Not applicable, never passed. H1's old negative tests alone do not prove the active lifecycle.
 - [ ] For Remote provider staging, require separate H1E real inbox OTP and H1B signed test Checkout/webhook/Portal evidence. Do not carry synthetic H1A entitlement forward as payment proof.
 - [ ] For full manual-fallback acceptance, verify F1 can recover when automation produces no usable proposal: an authorized founder can construct, validate and publish a complete routine through the approved workflow. A controlled L1 core happy-path run may occur before F1, but it cannot clear the fallback or customer-launch gate.
 - [ ] For L2, independently confirm production OTP/email, live Stripe price and webhook, founder operations, security checks, and a working customer contact path. Do not display or hand out an unverified support email, phone number, or URL.
@@ -40,7 +40,7 @@ Mark each item **Pass**, **Fail**, **Blocked**, or **Not applicable** with a sho
 
 Mock development: inspect the membership explanation if exposed, but record Auth, charge, webhook, and entitlement checks as **Not applicable**. Never simulate a payment success and call it billing acceptance.
 
-Remote core staging: begin from H1A's disposable authenticated session and trusted server/admin entitlement. Verify the app reads the canonical active state, but mark email delivery, Checkout, webhook and Portal proof **Not applicable**. Do not describe the fixture as a paid member.
+Remote core staging: H1A's disposable password-auth sessions and trusted server/admin entitlement are **script-only evidence**. The customer app cannot begin from those sessions; mobile post-auth checks are **Blocked** until H1E proves hosted six-digit OTP or another founder-approved customer Auth path. Once that path exists, a new disposable mobile session may use the trusted staging entitlement to test the core, while Checkout, webhook and Portal remain **Not applicable** until H1B. Never describe the fixture as a paid member or add a client Auth bypass.
 
 ### 2. Welcome, intake, and real Shelf
 

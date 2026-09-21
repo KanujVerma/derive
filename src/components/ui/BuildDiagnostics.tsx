@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { getBuildDiagnostics, publicEnvironment } from '../../config/environment';
 import { colors, radii, spacing, typography } from '../../constants/theme';
 
@@ -9,8 +9,8 @@ export function BuildDiagnostics() {
   const details = getBuildDiagnostics(publicEnvironment);
   if (!details) return null;
 
-  const version = Constants.expoConfig?.version ?? 'unknown';
-  const nativeBuild = Constants.nativeBuildVersion;
+  const version = Application.nativeApplicationVersion ?? 'unknown';
+  const nativeBuild = Application.nativeBuildVersion;
   return (
     <View style={styles.card} accessibilityLabel="Remote staging build diagnostics">
       <Text style={styles.heading}>REMOTE STAGING BUILD</Text>
