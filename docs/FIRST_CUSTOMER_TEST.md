@@ -4,7 +4,7 @@
 
 **Owner:** Kanuj, for the customer device journey and acceptance record. Sami owns hosted Auth, billing, intelligence, and founder operations. Record a backend blocker for Sami instead of changing that lane during this test.
 
-**Current status:** This is a test script, not evidence that hosted Remote or live payment is ready. H1A proved disposable hosted post-auth intake/photo behavior in scripts; those password-auth sessions are not available through the customer mobile UI. L1A is a signed-out physical-device preflight until H1E proves six-digit email OTP or another founder-approved customer Auth path. Provider/proposal/published-routine gates remain blocked under Sami's H1P and F1 work; H1B Stripe is later. See [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md), [ROADMAP.md](ROADMAP.md) and [OWNERSHIP.md](OWNERSHIP.md).
+**Current status:** This is a test script, not evidence that hosted Remote or live payment is ready. L1A signed-out physical-device preflight passed on Remote staging build `1.0.0 (5)`. H1A's password-auth script sessions are still unavailable through the customer UI. Provider/proposal/published-routine gates remain blocked under Sami's H1P and F1 work; real mobile OTP remains H1E and Stripe remains later H1B. Kanuj L1B/L1C consume those separate handoffs. See [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md), [ROADMAP.md](ROADMAP.md) and [OWNERSHIP.md](OWNERSHIP.md).
 
 ## Choose the run before opening the app
 

@@ -37,8 +37,8 @@ Record a dated observation, device model/iOS version and installed build number 
 | Cold launch and restart | PASS | Initial TestFlight launch and USB terminate/relaunch reached signed-out login without native crash; restart cleared the invalid-email draft/error |
 | Staging diagnostics | PASS on fix build `5` | Physical screen shows Remote Staging, Remote service, valid public configuration shape, exact `snojlbqovlawewwqbviz.supabase.co` host and `App: 1.0.0 (5)`; no key, token, user ID or server secret visible |
 | Signed-out routing and form validation | PASS for observed checks | Login remained canonical; invalid email showed a customer-safe validation error; background/foreground preserved it; process restart safely cleared it |
-| Background/foreground and network recovery | Background/foreground PASS; network transition pending approval | App returned to the same safe signed-out state without Mock fallback |
-| Hosted OTP request/error | BLOCKED | Request and response observed; a Magic Link is not six-digit OTP proof |
+| Background/foreground and network recovery | PASS | With explicit approval, Wi-Fi and cellular data were disabled. Build 5 cold-launched offline and remained Remote staging. Both settings were restored; the status bar regained Wi-Fi/5G, Safari reached the exact Derive Supabase Auth endpoint, and Derive returned to clean signed-out login without Mock fallback |
+| Hosted OTP request/error | Offline error PASS; real delivery BLOCKED by H1E | Offline request used reserved non-deliverable `l1a-offline@example.invalid` and showed “We couldn't send a code right now. Please try again.” No real inbox, code or Magic Link was claimed |
 | Camera permission/front camera | BLOCKED | Only where reachable without Auth bypass; otherwise H1E blocker |
 | DeriveFaceCapture native module | Runtime BLOCKED by H1E | Auth-gated; binary strings confirm `DeriveFaceCaptureModule`, `DeriveFaceCaptureView` and `AVCaptureSession` are included |
 | Barcode camera, haptics and safe area | Barcode runtime BLOCKED; login safe-area PASS; haptic not independently perceived | Binary contains barcode camera settings; signed-out screen respected iPhone safe areas. Camera/Scan remains Auth-gated |
@@ -46,7 +46,7 @@ Record a dated observation, device model/iOS version and installed build number 
 
 ## Current handoff and limits
 
-- **Kanuj:** finish signed-out network recovery after action-time approval. The Remote staging binary, TestFlight install and safe diagnostic are physically verified. L1B later consumes F1 manual recovery; L1C separately consumes H1E/H1P for the authenticated provider path.
+- **Kanuj:** L1A signed-out device preflight is physically complete. L1B later consumes F1 manual recovery; L1C separately consumes H1E/H1P for the authenticated provider path.
 - **Sami F1:** founder manual routine fallback remains separate.
 - **Sami H1P:** select and configure a real hosted model provider, then prove routine, Ask and Scan calls. The supplied free-tier key could not be placed in hosted Supabase secrets by the current account; H1A documented the permission and upstream 503 blockers.
 - **Sami H1E:** real hosted six-digit email OTP is required before the mobile post-auth journey is reachable. H1A's password-auth test sessions cannot be imported into the app.

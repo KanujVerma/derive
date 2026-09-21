@@ -8,7 +8,8 @@ This opening section is the current execution plan. Earlier delivery records bel
 
 ```text
 Landed foundation: V1A -> L0 -> H1A hosted baseline
-Wave 1 in parallel: Kanuj L1A device preflight  |  Sami F1 manual routine fallback
+Completed mobile preflight: Kanuj L1A
+Current platform: Sami F1 manual routine fallback
 Next platform: Sami H1P provider activation, H1E email OTP, H1B billing (separate gates)
 After H1E and each routine origin: Kanuj L1B manual fallback and L1C provider-path device acceptance
 Wave 3 in parallel: Kanuj L2A customer launch readiness  |  Sami P1 production backend
@@ -55,11 +56,11 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 
 ### L1A: Remote Staging Device Preflight
 
-- **Owner:** Kanuj. **Status:** IN PROGRESS; post-auth device journey BLOCKED by H1E. **Prerequisites:** L0 and H1A hosted baseline.
+- **Owner:** Kanuj. **Status:** COMPLETE for signed-out physical-device scope; post-auth journey remains outside L1A and blocked by H1E. **Prerequisites:** L0 and H1A hosted baseline.
 - **Owned surfaces:** store-signed Remote staging/TestFlight build, physical-device installation, signed-out login/recovery, staging diagnostics, reachable native camera/haptics/layout checks, and customer mobile defects.
 - **Explicit non-scope:** password login UI, token/session injection, entitlement bypass, backend, F1, H1P, H1E, H1B and production Remote.
-- **Outcome:** a real Remote staging binary is built, installed, identified and safely exercised on a physical device without treating a staging label as backend proof.
-- **Acceptance criteria:** installed build reports Remote Staging, Remote service, the verified Derive host and valid public configuration shape with no key/token; signed-out cold launch, restart, network and OTP-request recovery are observed; reachable native modules do not crash. Authenticated intake/routine/member screens are BLOCKED until H1E supplies the supported customer Auth path. Record each untestable hardware surface as BLOCKED rather than bypassing routing.
+- **Outcome:** Remote staging `1.0.0 (5)` was built, processed by internal TestFlight, installed and exercised on an iPhone 17 Pro Max without treating build identity as backend proof. A missing build-number diagnostic was found on build 4, fixed and physically closed on build 5.
+- **Acceptance criteria:** installed build reports Remote Staging, Remote service, verified Derive host, valid public configuration shape and `App: 1.0.0 (5)` with no key/token. Signed-out cold launch, USB restart, invalid email, background/foreground, offline OTP-request failure and restored-network recovery passed. Scan and photo deep links did not grant a supported post-auth session. Authenticated intake/routine/member and camera module runtime remain assigned to later H1E-dependent milestones rather than bypassed.
 - **Handoff to:** Kanuj L1B for F1 fallback and L1C for H1P provider-path acceptance after H1E; Sami receives exact Auth/provider/backend blockers.
 
 ### L1B: Manual-Fallback Acceptance
@@ -160,7 +161,7 @@ When reopened, split each implementation:
 
 ## Next action by founder
 
-- **Kanuj:** finish L1A signed-out staging build/device preflight without adding Auth shortcuts. Later L1B accepts F1 manual recovery after H1E; L1C accepts the H1P provider path after H1E. Own customer/mobile defects; give Sami exact backend reproductions.
+- **Kanuj:** L1A is complete. Start L1B only after F1 and H1E; start L1C only after H1P and H1E. Until those handoffs, do not add Auth shortcuts or take Sami platform work.
 - **Sami:** start F1 from the H1A hosted baseline. H1P is a separate model-provider activation gate; H1E and H1B are separate email and billing work, with Stripe intentionally later. Own platform defects and hand tested interfaces to Kanuj. Do not take L1A/L1B/L1C/L2 mobile implementation.
 
 Future tickets use: **Milestone, Owner, Status, Prerequisites, Owned surfaces, Explicit non-scope, Outcome, Acceptance criteria, Handoff to.**
