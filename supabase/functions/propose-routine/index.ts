@@ -3,6 +3,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
+import { diagnosticErrorHeaders, withDiagnosticResponse } from "../_shared/diagnostics.ts";
 import { MembershipEntitlementError, requireActiveMembership } from "../_shared/entitlement.ts";
 
 import type {
@@ -22,7 +23,7 @@ import { resolveRoutineProvider } from './provider.ts';
 // Section 10: x-routine-fixture completely removed from CORS and request inspection
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-derive-trace-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -30,7 +31,7 @@ function errorResponse(code: RoutineErrorCode, message: string, status = 400): R
   const body: RoutineErrorResponse = { code, error: message };
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, ...diagnosticErrorHeaders(code), "Content-Type": "application/json" },
   });
 }
 
@@ -63,7 +64,7 @@ function hydrateUserProducts(rows: any[], userId: string): { ok: true; value: an
   return { ok: true, value };
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve((req: Request) => withDiagnosticResponse(req, "routine_propose", async () => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -119,7 +120,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (subErr) {
-      console.error(`[propose-routine] Error querying onboarding_submissions: ${subErr.message}`);
+      console.error("[propose-routine] Error querying onboarding_submissions:", subErr.code);
       return errorResponse("INTERNAL_ERROR", "Failed to verify onboarding intake status.", 500);
     }
 
@@ -252,7 +253,7 @@ Deno.serve(async (req: Request) => {
     try {
       proposal = await provider.generateProposal(context);
     } catch (provErr: any) {
-      console.error(`[propose-routine] Provider '${provider.providerId}' execution failed: ${provErr?.message}`);
+      console.error("[propose-routine] Provider execution failed:", provider.providerId);
       if (provErr?.code === "MODEL_OUTPUT_INVALID") {
         return errorResponse(
           "MODEL_OUTPUT_INVALID",
@@ -285,7 +286,7 @@ Deno.serve(async (req: Request) => {
     // 7. Deterministic Safety & Clinical Invariant Validation
     const validation = validateRoutineProposal(proposal, context);
     if (!validation.valid) {
-      console.error(`[propose-routine] Validation failed: ${validation.errors.join("; ")}`);
+      console.error("[propose-routine] Validation failed:", validation.errors.length);
       return errorResponse(
         "VALIDATION_FAILED",
         "Generated routine proposal did not satisfy clinical safety criteria.",
@@ -299,7 +300,7 @@ Deno.serve(async (req: Request) => {
       .select("id, brand, name, category, key_actives, full_ingredients, retail_price_approx, is_catalog_standard");
 
     if (catErr) {
-      console.error(`[propose-routine] Failed reading products catalog: ${catErr.message}`);
+      console.error("[propose-routine] Failed reading products catalog:", catErr.code);
       return errorResponse("INTERNAL_ERROR", "Failed to verify catalog products.", 500);
     }
 
@@ -319,7 +320,7 @@ Deno.serve(async (req: Request) => {
     // Section 21: Reported Sensitivities Verification
     const sensValidation = validateSensitivities(proposal, context, trustedMap);
     if (!sensValidation.valid) {
-      console.error(`[propose-routine] Sensitivity validation failed: ${sensValidation.errors.join("; ")}`);
+      console.error("[propose-routine] Sensitivity validation failed:", sensValidation.errors.length);
       return errorResponse(
         "VALIDATION_FAILED",
         `Routine validation failed: ${sensValidation.errors.join("; ")}`,
@@ -422,7 +423,7 @@ Deno.serve(async (req: Request) => {
     });
 
     if (rpcErr || !rpcResult) {
-      console.error(`[propose-routine] commit_routine_proposal RPC failed: ${rpcErr?.message}`);
+      console.error("[propose-routine] commit_routine_proposal RPC failed:", rpcErr?.code ?? "unknown");
       return errorResponse(
         "PERSISTENCE_FAILED",
         "Failed to persist routine proposal. Please try again.",
@@ -523,7 +524,7 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err: any) {
     // Customer-safe error boundary. Zero internal leakages.
-    console.error(`[propose-routine] Internal error: ${err?.message}`);
+    console.error("[propose-routine] Internal error:", err instanceof Error ? err.name : "unknown");
     return errorResponse("INTERNAL_ERROR", "An unexpected internal error occurred.", 500);
   }
-});
+}));

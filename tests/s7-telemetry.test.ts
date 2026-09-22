@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import { PrivacySafeAnalytics } from '../src/services/analytics.ts';
 import { useAuthStore } from '../src/stores/authStore.ts';
 import { sanitizeTelemetryEvent } from '../src/services/telemetry/contract.ts';
-import { classifyRemoteFailure } from '../src/services/remote/diagnostics.ts';
+import { classifyRemoteFailure, createDiagnosticTraceId, diagnosticRequestHeaders } from '../src/services/remote/diagnostics.ts';
+import { diagnosticErrorHeaders, withDiagnosticResponse } from '../supabase/functions/_shared/diagnostics.ts';
 import type { TelemetrySink } from '../src/services/telemetry/posthogTransport.ts';
 
 test('S7: unknown events and invalid required enums are rejected at runtime', () => {
@@ -115,4 +116,57 @@ test('S7: diagnostic classification ignores raw provider message content', () =>
   assert.deepEqual(wire?.properties, {
     schema_version: 1, operation: 'routine_propose', outcome: 'failure', error_code: 'MODEL_UNAVAILABLE',
   });
+});
+
+test('S7: opaque client trace is valid and never derived from customer content', async () => {
+  const trace = await createDiagnosticTraceId();
+  assert.match(trace ?? '', /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  assert.deepEqual(diagnosticRequestHeaders(trace), { 'x-derive-trace-id': trace });
+  assert.deepEqual(diagnosticRequestHeaders('sam@example.com'), {});
+  const wire = sanitizeTelemetryEvent('diagnostic_operation', {
+    operation: 'ask', outcome: 'failure', errorCode: 'SERVER_UNAVAILABLE',
+    traceId: trace, buildFlavor: 'remote-staging', question: 'private rash description',
+  });
+  assert.deepEqual(wire?.properties, {
+    schema_version: 1, operation: 'ask', outcome: 'failure',
+    build_flavor: 'remote-staging', error_code: 'SERVER_UNAVAILABLE', trace_id: trace,
+  });
+  assert.equal(sanitizeTelemetryEvent('diagnostic_operation', {
+    operation: 'ask', outcome: 'success', traceId: trace,
+  })?.properties.trace_id, undefined);
+});
+
+test('S7: server failure header maps to a bounded code without reading response body', () => {
+  const response = new Response(JSON.stringify({ error: 'private note: sam@example.com' }), {
+    status: 503,
+    headers: { 'x-derive-error-code': 'INTELLIGENCE_UNAVAILABLE' },
+  });
+  assert.equal(classifyRemoteFailure({ context: response, name: 'FunctionsHttpError' }, 'ask'), 'MODEL_UNAVAILABLE');
+  assert.deepEqual(diagnosticErrorHeaders('bad\r\nX-Leak: secret'), { 'x-derive-error-code': 'UNKNOWN' });
+});
+
+test('S7: Edge trace response and log exclude private response content', async () => {
+  const trace = '426397b5-183e-4a7b-9b67-987ce64b8084';
+  const originalError = console.error;
+  const logs: string[] = [];
+  console.error = (...args: unknown[]) => { logs.push(args.map(String).join(' ')); };
+  try {
+    const request = new Request('https://example.test/ask-derive', {
+      method: 'POST', headers: { 'x-derive-trace-id': trace },
+    });
+    const response = await withDiagnosticResponse(request, 'ask', async () => new Response(
+      JSON.stringify({ code: 'INVALID_PAYLOAD', error: 'private rash note' }),
+      { status: 400, headers: diagnosticErrorHeaders('INVALID_PAYLOAD') },
+    ));
+    assert.equal(response.headers.get('x-derive-trace-id'), trace);
+    assert.equal(response.headers.get('x-derive-error-code'), 'INVALID_PAYLOAD');
+    assert.match(response.headers.get('access-control-expose-headers') ?? '', /x-derive-trace-id/);
+    assert.deepEqual(await response.json(), { code: 'INVALID_PAYLOAD', error: 'private rash note' });
+    assert.equal(logs.length, 1);
+    assert.match(logs[0], /INVALID_PAYLOAD/);
+    assert.match(logs[0], /426397b5-183e-4a7b-9b67-987ce64b8084/);
+    assert.equal(logs[0].includes('private rash note'), false);
+  } finally {
+    console.error = originalError;
+  }
 });

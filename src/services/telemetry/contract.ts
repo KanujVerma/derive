@@ -5,6 +5,8 @@ const STAGES = ['goals', 'preferences', 'your_skin', 'products', 'photos', 'revi
 const DURATIONS = ['under_30s', '30_60s', '1_3min', 'over_3min'] as const;
 const VERDICTS = ['great_fit', 'could_work', 'not_needed', 'better_as_replacement', 'use_with_caution', 'not_good_fit'] as const;
 const RESOLUTION_STATES = ['verified_product_formula', 'identified_formula_unverified', 'ambiguous_candidates', 'formula_only', 'insufficient_evidence'] as const;
+const BUILD_FLAVORS = ['remote-staging', 'production'] as const;
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const DIAGNOSTIC_OPERATIONS = [
   'auth', 'onboarding_prepare', 'onboarding_upload', 'onboarding_commit',
@@ -141,7 +143,16 @@ export function sanitizeTelemetryEvent(event: unknown, input: unknown): Telemetr
       const outcome = required(props, 'outcome', ['success', 'failure']);
       const code = choice(props.errorCode ?? props.error_code, DIAGNOSTIC_CODES);
       if (!operation || !outcome || (outcome === 'failure' && !code)) return null;
-      return result(event, outcome === 'failure' ? { operation, outcome, error_code: code! } : { operation, outcome });
+      const flavor = choice(props.buildFlavor ?? props.build_flavor, BUILD_FLAVORS);
+      const trace = props.traceId ?? props.trace_id;
+      const base: Record<string, string | number | boolean> = { operation, outcome };
+      if (flavor) base.build_flavor = flavor;
+      if (outcome === 'success') return result(event, base);
+      return result(event, {
+        ...base,
+        error_code: code!,
+        ...(typeof trace === 'string' && UUID_V4.test(trace) ? { trace_id: trace } : {}),
+      });
     }
     case 'today_viewed':
     case 'checkin_started':

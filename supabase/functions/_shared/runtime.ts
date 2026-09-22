@@ -6,6 +6,7 @@ import type {
 } from "./intelligence.ts";
 import { inferIngredientSignals } from "../../../src/services/ai-workflows/ingredient-intelligence.ts";
 import { MembershipEntitlementError, requireActiveMembership } from "./entitlement.ts";
+import { diagnosticErrorHeaders } from "./diagnostics.ts";
 import type {
   FormulaSnapshot,
   IngredientSignal,
@@ -15,7 +16,7 @@ import type {
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-derive-trace-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -42,10 +43,14 @@ export function jsonResponse(body: unknown, status = 200): Response {
 
 export function errorResponse(error: unknown): Response {
   if (error instanceof ServiceError) {
-    return jsonResponse({ code: error.code, error: error.message }, error.status);
+    const response = jsonResponse({ code: error.code, error: error.message }, error.status);
+    for (const [key, value] of Object.entries(diagnosticErrorHeaders(error.code))) response.headers.set(key, value);
+    return response;
   }
   console.error("intelligence function failed:", error instanceof Error ? error.name : "unknown");
-  return jsonResponse({ code: "INTERNAL_ERROR", error: "Derive intelligence is temporarily unavailable" }, 500);
+  const response = jsonResponse({ code: "INTERNAL_ERROR", error: "Derive intelligence is temporarily unavailable" }, 500);
+  for (const [key, value] of Object.entries(diagnosticErrorHeaders("INTERNAL_ERROR"))) response.headers.set(key, value);
+  return response;
 }
 
 export async function readJsonObject(req: Request): Promise<Record<string, unknown>> {

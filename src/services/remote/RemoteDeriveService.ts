@@ -41,7 +41,7 @@ import { formatRoutineStepSchedule } from '../../types/schema.ts';
 import { isCheckInDueFromLatest, mapCheckInResult, mapDbCheckIn, type DbCheckInRow } from '../../domain/checkIn.ts';
 import { supabase } from '../supabase.ts';
 import { uploadPhotoToStorage } from '../onboardingPhotoUpload.ts';
-import { recordRemoteFailure, recordRemoteSuccess } from './diagnostics.ts';
+import { createDiagnosticTraceId, diagnosticRequestHeaders, recordRemoteFailure, recordRemoteSuccess } from './diagnostics.ts';
 
 const ROUTINE_STATUSES = new Set<RoutineStatus>([
   'draft',
@@ -158,14 +158,15 @@ export class RemoteDeriveService implements IDeriveService {
 
   async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
     const client = this.getClient();
+    const prepareTrace = await createDiagnosticTraceId();
 
     // 1. Prepare onboarding submission and retrieve opaque server-issued upload targets
     const { data: prepareData, error: prepareError } = await client.functions.invoke(
       'prepare-onboarding',
-      { body: {} }
+      { body: {}, headers: diagnosticRequestHeaders(prepareTrace) }
     );
     if (prepareError || !prepareData?.submissionId) {
-      recordRemoteFailure('onboarding_prepare', prepareError ?? { code: 'INVALID_RESPONSE' });
+      recordRemoteFailure('onboarding_prepare', prepareError ?? { code: 'INVALID_RESPONSE' }, prepareTrace);
       throw new Error(
         `RemoteDeriveService.onboard failed in prepare-onboarding: ${prepareError?.message || 'Invalid prepare response'}`
       );
@@ -213,16 +214,18 @@ export class RemoteDeriveService implements IDeriveService {
         contextNote: skinPhotos?.contextNote,
       },
     };
+    const commitTrace = await createDiagnosticTraceId();
 
     const { data, error } = await client.functions.invoke('onboard-customer', {
       body: {
         submissionId,
         payload: sanitizedPayload,
       },
+      headers: diagnosticRequestHeaders(commitTrace),
     });
 
     if (error || !data) {
-      recordRemoteFailure('onboarding_commit', error ?? { code: 'INVALID_RESPONSE' });
+      recordRemoteFailure('onboarding_commit', error ?? { code: 'INVALID_RESPONSE' }, commitTrace);
       throw new Error(
         `RemoteDeriveService.onboard failed in onboard-customer: ${error?.message || 'Empty response'}`
       );
@@ -234,11 +237,13 @@ export class RemoteDeriveService implements IDeriveService {
 
   async proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult> {
     const client = this.getClient();
+    const trace = await createDiagnosticTraceId();
     const { data, error } = await client.functions.invoke('propose-routine', {
       body: input || {},
+      headers: diagnosticRequestHeaders(trace),
     });
     if (error) {
-      recordRemoteFailure('routine_propose', error);
+      recordRemoteFailure('routine_propose', error, trace);
       throw new Error(`RemoteDeriveService.proposeRoutine failed: ${error.message}`);
     }
     recordRemoteSuccess('routine_propose');
@@ -247,11 +252,13 @@ export class RemoteDeriveService implements IDeriveService {
 
   async askDerive(request: AskRequest): Promise<AskResponse> {
     const client = this.getClient();
+    const trace = await createDiagnosticTraceId();
     const { data, error } = await client.functions.invoke('ask-derive', {
       body: request,
+      headers: diagnosticRequestHeaders(trace),
     });
     if (error) {
-      recordRemoteFailure('ask', error);
+      recordRemoteFailure('ask', error, trace);
       throw new Error(`RemoteDeriveService.askDerive failed: ${error.message}`);
     }
     recordRemoteSuccess('ask');
@@ -260,11 +267,13 @@ export class RemoteDeriveService implements IDeriveService {
 
   async scanProduct(input: ScanProductInput): Promise<ProductScanResult> {
     const client = this.getClient();
+    const trace = await createDiagnosticTraceId();
     const { data, error } = await client.functions.invoke('scan-product', {
       body: input,
+      headers: diagnosticRequestHeaders(trace),
     });
     if (error) {
-      recordRemoteFailure('product_scan', error);
+      recordRemoteFailure('product_scan', error, trace);
       throw new Error(`RemoteDeriveService.scanProduct failed: ${error.message}`);
     }
     recordRemoteSuccess('product_scan');
@@ -273,16 +282,18 @@ export class RemoteDeriveService implements IDeriveService {
 
   async submitCheckIn(input: CheckInInput): Promise<CheckInResult> {
     const client = this.getClient();
+    const trace = await createDiagnosticTraceId();
     const { data, error } = await client.functions.invoke('submit-checkin', {
       body: input,
+      headers: diagnosticRequestHeaders(trace),
     });
     if (error) {
-      recordRemoteFailure('checkin_submit', error);
+      recordRemoteFailure('checkin_submit', error, trace);
       throw new Error(`RemoteDeriveService.submitCheckIn failed: ${error.message}`);
     }
     const mapped = mapCheckInResult(data);
     if (!mapped) {
-      recordRemoteFailure('checkin_submit', { code: 'INVALID_RESPONSE' });
+      recordRemoteFailure('checkin_submit', { code: 'INVALID_RESPONSE' }, trace);
       throw new Error('RemoteDeriveService.submitCheckIn failed: invalid check-in response');
     }
     recordRemoteSuccess('checkin_submit');

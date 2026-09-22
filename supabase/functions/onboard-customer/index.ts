@@ -3,18 +3,19 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
+import { diagnosticErrorHeaders, withDiagnosticResponse } from "../_shared/diagnostics.ts";
 import { MembershipEntitlementError, requireActiveMembership } from "../_shared/entitlement.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-derive-trace-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 function errorResponse(code: string, message: string, status = 400) {
   return new Response(JSON.stringify({ code, error: message }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, ...diagnosticErrorHeaders(code), "Content-Type": "application/json" },
   });
 }
 
@@ -40,7 +41,7 @@ function mapSkinProfileRow(row: any, userId: string) {
   };
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve((req: Request) => withDiagnosticResponse(req, "onboarding_commit", async () => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -323,7 +324,7 @@ Deno.serve(async (req: Request) => {
     );
 
     if (rpcErr || !finalizedSkinProfile) {
-      console.error("onboard-customer RPC execution failed:", rpcErr?.code, rpcErr?.message);
+      console.error("onboard-customer RPC execution failed:", rpcErr?.code ?? "unknown");
       return errorResponse("ONBOARDING_COMMIT_FAILED", "Failed to finalize onboarding intake", 500);
     }
 
@@ -341,7 +342,7 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    console.error("onboard-customer unhandled error:", err?.message || "unknown");
+    console.error("onboard-customer unhandled error:", err instanceof Error ? err.name : "unknown");
     return errorResponse("INTERNAL_ERROR", "Internal server error", 500);
   }
-});
+}));

@@ -141,6 +141,8 @@ export interface AllowedAnalyticsEvents {
       | 'INVALID_INPUT' | 'PHOTO_UPLOAD_FAILED' | 'CATALOG_UNAVAILABLE'
       | 'RESOLUTION_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'SERVER_UNAVAILABLE'
       | 'INVALID_RESPONSE' | 'UNKNOWN';
+    traceId?: string;
+    buildFlavor?: string;
   };
 }
 

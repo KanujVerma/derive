@@ -3,22 +3,23 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
+import { diagnosticErrorHeaders, withDiagnosticResponse } from "../_shared/diagnostics.ts";
 import { MembershipEntitlementError, requireActiveMembership } from "../_shared/entitlement.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-derive-trace-id",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 function errorResponse(code: string, message: string, status = 400) {
   return new Response(JSON.stringify({ code, error: message }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, ...diagnosticErrorHeaders(code), "Content-Type": "application/json" },
   });
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve((req: Request) => withDiagnosticResponse(req, "onboarding_prepare", async () => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -261,7 +262,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (err: any) {
-    console.error("prepare-onboarding unhandled error:", err?.message || "unknown");
+    console.error("prepare-onboarding unhandled error:", err instanceof Error ? err.name : "unknown");
     return errorResponse("INTERNAL_ERROR", "Internal server error", 500);
   }
-});
+}));
