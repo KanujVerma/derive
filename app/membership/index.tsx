@@ -162,7 +162,7 @@ export default function MembershipScreen() {
   };
 
   const statusMessage = conciergeAccess
-    ? 'Your beta access is activated by the Derive team.'
+    ? "We couldn't finish opening your beta access automatically."
     : membershipStatus === 'paused'
       ? 'Managed skincare access is paused. Open billing settings to review your subscription.'
       : membershipStatus === 'cancelled'
@@ -177,7 +177,7 @@ export default function MembershipScreen() {
         {conciergeAccess ? null : <Text style={styles.price}>${config.betaPriceMonthly}/month</Text>}
         <Text style={styles.body}>{statusMessage}</Text>
         {conciergeAccess ? (
-          <Text style={styles.body}>Once your access has been confirmed, refresh below to continue.</Text>
+          <Text style={styles.body}>Please try again. Beta access does not require payment or founder approval.</Text>
         ) : null}
 
         <View style={styles.card}>
@@ -187,7 +187,7 @@ export default function MembershipScreen() {
 
         {conciergeAccess ? (
           <Button
-            label={checking ? 'Checking access…' : 'Refresh Access'}
+            label={checking ? 'Checking access…' : 'Try Again'}
             variant="brand"
             onPress={() => void refreshAccess()}
             loading={checking}

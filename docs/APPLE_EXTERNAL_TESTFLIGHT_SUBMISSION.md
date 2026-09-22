@@ -37,6 +37,10 @@ Password: ENTER IN APP STORE CONNECT ONLY
 - Support: https://derive-beta-site.vercel.app/support
 - Privacy choices: https://derive-beta-site.vercel.app/privacy-choices
 
+## Build 9
+
+External TestFlight beta access is granted automatically by the hosted database when a signed-in Remote staging account has no membership yet. Founder approval and payment are not required. Paused and cancelled memberships are not reactivated. The reviewer account `kanuj.verma12+derive-review@gmail.com` is already active and should be left unchanged. Build 9 is the physical QA candidate. External Beta Review is still not submitted.
+
 ## Feedback email
 
 kanuj.verma12@gmail.com

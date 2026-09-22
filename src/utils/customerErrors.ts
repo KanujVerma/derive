@@ -27,6 +27,7 @@ export type CustomerFacingOperation =
   | 'auth_signup_unconfirmed'
   | 'auth_password_signin'
   | 'auth_delete_account'
+  | 'beta_access'
   | 'bootstrap'
   | 'routine';
 
@@ -49,6 +50,7 @@ export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = 
   auth_signup_unconfirmed: "We couldn't finish creating your account. Please try again.",
   auth_password_signin: "Email or password didn't work. Check your details and try again.",
   auth_delete_account: "We couldn't delete your account right now. Please try again.",
+  beta_access: "We couldn't finish opening your beta access automatically. Please try again.",
   bootstrap: "We couldn't finish loading your account. Please try again.",
   routine: "We couldn't refresh your routine right now. Please try again.",
 };

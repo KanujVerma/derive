@@ -44,6 +44,8 @@ import { useOnboardingStore, type OnboardingState } from '../stores/onboardingSt
 import { useBootstrapStore } from '../stores/bootstrapStore.ts';
 import { useAuthStore } from '../stores/authStore.ts';
 import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
+import { publicEnvironment } from '../config/environment.ts';
+import { elevateRemoteStagingBetaAccess } from './freeBetaAccess.ts';
 import { clearManagedClientState } from './memberCache.ts';
 
 /**
@@ -662,22 +664,53 @@ export async function resolveCustomerBootstrap(
       return state;
     }
 
-    if (isRemoteServiceEnabled() && state.membershipStatus !== 'active') {
+    let resolvedState = state;
+    if (isRemoteServiceEnabled()) {
+      const elevated = await elevateRemoteStagingBetaAccess({
+        buildFlavor: publicEnvironment.buildFlavor,
+        remoteEnabled: true,
+        sessionUserId: useAuthStore.getState().sessionUserId,
+        state,
+        reread: () => service.getCustomerBootstrapState(trimmed),
+        isCurrent: () => {
+          const currentAttempt = useBootstrapStore.getState().resolutionAttempt;
+          const sessionUserId = useAuthStore.getState().sessionUserId;
+          return attempt === currentAttempt && sessionUserId === trimmed;
+        },
+      });
+      if (elevated.status === 'stale') return null;
+      if (elevated.status === 'failed') {
+        const committed = bootstrapStore.setResolved(state, attempt);
+        if (committed) {
+          bootstrapStore.setRefreshError(getCustomerErrorMessage('beta_access'), attempt);
+          useUserStore.getState().setRemoteBootstrapMembership('none');
+        }
+        return null;
+      }
+      resolvedState = elevated.state;
+    }
+
+    const currentAfterClaim = useBootstrapStore.getState().resolutionAttempt;
+    if (attempt !== currentAfterClaim) return null;
+    if (isRemoteServiceEnabled()) {
+      const activeSessionUser = useAuthStore.getState().sessionUserId;
+      if (!activeSessionUser || activeSessionUser !== resolvedState.userId) return null;
+    }
+
+    if (isRemoteServiceEnabled() && resolvedState.membershipStatus !== 'active') {
       clearManagedClientState();
       clearInFlightHydrations();
       clearInFlightProposals();
     }
 
-    const committed = bootstrapStore.setResolved(state, attempt);
+    const committed = bootstrapStore.setResolved(resolvedState, attempt);
     if (!committed) {
       return null;
     }
 
-    // Project canonical membership status into user store
-    useUserStore.getState().setRemoteBootstrapMembership(state.membershipStatus);
+    useUserStore.getState().setRemoteBootstrapMembership(resolvedState.membershipStatus);
 
-    // If onboarding is completed, attempt profile hydration (non-blocking)
-    if (state.membershipStatus === 'active' && state.onboardingCompleted) {
+    if (resolvedState.membershipStatus === 'active' && resolvedState.onboardingCompleted) {
       try {
         await hydrateCustomerProfile(trimmed);
       } catch (profileErr) {
@@ -685,7 +718,7 @@ export async function resolveCustomerBootstrap(
       }
     }
 
-    return state;
+    return resolvedState;
   } catch (err: any) {
     console.warn('resolveCustomerBootstrap failed:', err);
 
