@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { withDiagnosticResponse } from "../_shared/diagnostics.ts";
 import {
   ASK_RESPONSE_SCHEMA,
   askPrompt,
@@ -19,7 +20,7 @@ import {
   requireMemberEntitlement,
 } from "../_shared/runtime.ts";
 
-Deno.serve(async (req: Request) => {
+Deno.serve((req: Request) => withDiagnosticResponse(req, "ask", async () => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ code: "METHOD_NOT_ALLOWED", error: "POST required" }, 405);
 
@@ -55,11 +56,11 @@ Deno.serve(async (req: Request) => {
     try {
       answer = parseAskResponse(modelValue);
     } catch (error) {
-      console.error("Ask model output rejected:", error instanceof Error ? error.message : "unknown");
+      console.error("Ask model output rejected:", error instanceof Error ? error.name : "unknown");
       throw new ServiceError("MODEL_INVALID_OUTPUT", "Derive could not produce a safe answer", 422);
     }
     return jsonResponse(answer);
   } catch (error) {
     return errorResponse(error);
   }
-});
+}));

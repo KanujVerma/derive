@@ -41,6 +41,7 @@ import { formatRoutineStepSchedule } from '../../types/schema.ts';
 import { isCheckInDueFromLatest, mapCheckInResult, mapDbCheckIn, type DbCheckInRow } from '../../domain/checkIn.ts';
 import { supabase } from '../supabase.ts';
 import { uploadPhotoToStorage } from '../onboardingPhotoUpload.ts';
+import { createDiagnosticTraceId, diagnosticRequestHeaders, recordRemoteFailure, recordRemoteSuccess } from './diagnostics.ts';
 
 const ROUTINE_STATUSES = new Set<RoutineStatus>([
   'draft',
@@ -157,17 +158,20 @@ export class RemoteDeriveService implements IDeriveService {
 
   async onboard(payload: OnboardingPayload): Promise<OnboardingResult> {
     const client = this.getClient();
+    const prepareTrace = await createDiagnosticTraceId();
 
     // 1. Prepare onboarding submission and retrieve opaque server-issued upload targets
     const { data: prepareData, error: prepareError } = await client.functions.invoke(
       'prepare-onboarding',
-      { body: {} }
+      { body: {}, headers: diagnosticRequestHeaders(prepareTrace) }
     );
     if (prepareError || !prepareData?.submissionId) {
+      recordRemoteFailure('onboarding_prepare', prepareError ?? { code: 'INVALID_RESPONSE' }, prepareTrace);
       throw new Error(
         `RemoteDeriveService.onboard failed in prepare-onboarding: ${prepareError?.message || 'Invalid prepare response'}`
       );
     }
+    recordRemoteSuccess('onboarding_prepare');
 
     const { submissionId, uploadTargets } = prepareData;
 
@@ -177,23 +181,29 @@ export class RemoteDeriveService implements IDeriveService {
     const rightUri = payload.skinPhotos?.rightUri;
     const shelfUri = payload.skinPhotos?.shelfUri;
 
-    if (!uploadTargets?.front?.uploaded) {
-      if (!frontUri) throw new Error('Missing front photo URI for onboarding');
-      await uploadPhotoToStorage(uploadTargets.front.path, frontUri, client);
-    }
+    try {
+      if (!uploadTargets?.front?.uploaded) {
+        if (!frontUri) throw new Error('Missing front photo URI for onboarding');
+        await uploadPhotoToStorage(uploadTargets.front.path, frontUri, client);
+      }
 
-    if (!uploadTargets?.left?.uploaded) {
-      if (!leftUri) throw new Error('Missing left photo URI for onboarding');
-      await uploadPhotoToStorage(uploadTargets.left.path, leftUri, client);
-    }
+      if (!uploadTargets?.left?.uploaded) {
+        if (!leftUri) throw new Error('Missing left photo URI for onboarding');
+        await uploadPhotoToStorage(uploadTargets.left.path, leftUri, client);
+      }
 
-    if (!uploadTargets?.right?.uploaded) {
-      if (!rightUri) throw new Error('Missing right photo URI for onboarding');
-      await uploadPhotoToStorage(uploadTargets.right.path, rightUri, client);
-    }
+      if (!uploadTargets?.right?.uploaded) {
+        if (!rightUri) throw new Error('Missing right photo URI for onboarding');
+        await uploadPhotoToStorage(uploadTargets.right.path, rightUri, client);
+      }
 
-    if (shelfUri && uploadTargets?.shelf && !uploadTargets.shelf.uploaded) {
-      await uploadPhotoToStorage(uploadTargets.shelf.path, shelfUri, client);
+      if (shelfUri && uploadTargets?.shelf && !uploadTargets.shelf.uploaded) {
+        await uploadPhotoToStorage(uploadTargets.shelf.path, shelfUri, client);
+      }
+      recordRemoteSuccess('onboarding_upload');
+    } catch (uploadError) {
+      recordRemoteFailure('onboarding_upload', uploadError);
+      throw uploadError;
     }
 
     // 3. Commit intake with onboard-customer (sanitizing client-local URIs)
@@ -204,60 +214,89 @@ export class RemoteDeriveService implements IDeriveService {
         contextNote: skinPhotos?.contextNote,
       },
     };
+    const commitTrace = await createDiagnosticTraceId();
 
     const { data, error } = await client.functions.invoke('onboard-customer', {
       body: {
         submissionId,
         payload: sanitizedPayload,
       },
+      headers: diagnosticRequestHeaders(commitTrace),
     });
 
     if (error || !data) {
+      recordRemoteFailure('onboarding_commit', error ?? { code: 'INVALID_RESPONSE' }, commitTrace);
       throw new Error(
         `RemoteDeriveService.onboard failed in onboard-customer: ${error?.message || 'Empty response'}`
       );
     }
+    recordRemoteSuccess('onboarding_commit');
 
     return data as OnboardingResult;
   }
 
   async proposeRoutine(input?: RoutineProposalInput): Promise<RoutineProposalResult> {
     const client = this.getClient();
+    const trace = await createDiagnosticTraceId();
     const { data, error } = await client.functions.invoke('propose-routine', {
       body: input || {},
+      headers: diagnosticRequestHeaders(trace),
     });
-    if (error) throw new Error(`RemoteDeriveService.proposeRoutine failed: ${error.message}`);
+    if (error) {
+      recordRemoteFailure('routine_propose', error, trace);
+      throw new Error(`RemoteDeriveService.proposeRoutine failed: ${error.message}`);
+    }
+    recordRemoteSuccess('routine_propose');
     return data as RoutineProposalResult;
   }
 
   async askDerive(request: AskRequest): Promise<AskResponse> {
     const client = this.getClient();
+    const trace = await createDiagnosticTraceId();
     const { data, error } = await client.functions.invoke('ask-derive', {
       body: request,
+      headers: diagnosticRequestHeaders(trace),
     });
-    if (error) throw new Error(`RemoteDeriveService.askDerive failed: ${error.message}`);
+    if (error) {
+      recordRemoteFailure('ask', error, trace);
+      throw new Error(`RemoteDeriveService.askDerive failed: ${error.message}`);
+    }
+    recordRemoteSuccess('ask');
     return data as AskResponse;
   }
 
   async scanProduct(input: ScanProductInput): Promise<ProductScanResult> {
     const client = this.getClient();
+    const trace = await createDiagnosticTraceId();
     const { data, error } = await client.functions.invoke('scan-product', {
       body: input,
+      headers: diagnosticRequestHeaders(trace),
     });
-    if (error) throw new Error(`RemoteDeriveService.scanProduct failed: ${error.message}`);
+    if (error) {
+      recordRemoteFailure('product_scan', error, trace);
+      throw new Error(`RemoteDeriveService.scanProduct failed: ${error.message}`);
+    }
+    recordRemoteSuccess('product_scan');
     return data as ProductScanResult;
   }
 
   async submitCheckIn(input: CheckInInput): Promise<CheckInResult> {
     const client = this.getClient();
+    const trace = await createDiagnosticTraceId();
     const { data, error } = await client.functions.invoke('submit-checkin', {
       body: input,
+      headers: diagnosticRequestHeaders(trace),
     });
-    if (error) throw new Error(`RemoteDeriveService.submitCheckIn failed: ${error.message}`);
+    if (error) {
+      recordRemoteFailure('checkin_submit', error, trace);
+      throw new Error(`RemoteDeriveService.submitCheckIn failed: ${error.message}`);
+    }
     const mapped = mapCheckInResult(data);
     if (!mapped) {
+      recordRemoteFailure('checkin_submit', { code: 'INVALID_RESPONSE' }, trace);
       throw new Error('RemoteDeriveService.submitCheckIn failed: invalid check-in response');
     }
+    recordRemoteSuccess('checkin_submit');
     return mapped;
   }
 
@@ -326,7 +365,11 @@ export class RemoteDeriveService implements IDeriveService {
         'id, user_id, product_id, product_name, brand, status, requested_at, shipped_at, delivered_at, estimated_delivery, carrier, tracking_number, tracking_url',
       )
       .single();
-    if (error) throw new Error(`RemoteDeriveService.requestRefill failed: ${error.message}`);
+    if (error) {
+      recordRemoteFailure('refill_request', error);
+      throw new Error(`RemoteDeriveService.requestRefill failed: ${error.message}`);
+    }
+    recordRemoteSuccess('refill_request');
     return mapDbRefillRequest(data);
   }
 

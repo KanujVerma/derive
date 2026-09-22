@@ -146,6 +146,15 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Implemented:** stable typed contract, deterministic trust resolver, provenance-preserving schema, private product-evidence storage, idempotent Edge Function, founder review/audit flow, owner-bound Scan case integration, deletion lifecycle, and regression coverage.
 - **Handoff to:** Kanuj may now plan a separately owned mobile consumer against [`ProductIdentityResolver.ts`](../src/contracts/ProductIdentityResolver.ts). H1P still owns any live visual/OCR provider decision; model resemblance remains candidate-only.
 
+### S7: Privacy-Safe Analytics and Release Diagnostics
+
+- **Owner:** Sami for telemetry contract, optional transport, and remote diagnostics; Kanuj owns customer mobile event call sites, privacy-choice UI, device acceptance, and TestFlight submission. **Status:** IN PROGRESS on isolated S7 branch; no hosted analytics activation.
+- **Prerequisites:** S6 merged; current Build 10 acceptance remains independent. Catalog/Check a Product events wait for Kanuj's real catalog interface. Founder-approved analytics disclosure, PostHog project/region, and privacy-choice behavior are required before enabling any customer telemetry.
+- **Owned surfaces:** `src/services/telemetry/**`, narrow integration with `src/services/analytics.ts`, `src/services/remote/**`, public environment contract, tests, and observability docs. The mobile analytics facade change is a named cross-lane review handoff, not permission to redesign `app/**`.
+- **Outcome:** safe event counts and bounded remote failure categories without sending member health content or raw errors. PostHog is off in development/Mock and without explicit configuration.
+- **Acceptance criteria:** runtime allowlist and final SDK send gate, account-switch reset, opt-out, nonblocking failure, full suite/TypeScript/export/CI, synthetic PostHog readback, privacy disclosure, and Kanuj device acceptance. See [S7_OBSERVABILITY.md](S7_OBSERVABILITY.md) and [GitHub issue #34](https://github.com/KanujVerma/derive/issues/34).
+- **Handoff to:** Kanuj for the real catalog events, app privacy choice, and a new mobile build only after the live-data gate is approved.
+
 ## Parked commerce execution
 
 C1.5A is **LANDED** (PR #23, merge `6f6a556`): Shop-only Where to Buy foundation. Production merchant listings remain zero and Ulta is test-only. `Product.isCatalogStandard` indicates narrow catalog provenance, not merchant/package/formula equivalence. No fake live price or availability; commerce never changes recommendation or Scan truth.

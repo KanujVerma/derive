@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { withDiagnosticResponse } from "../_shared/diagnostics.ts";
 import {
   SCAN_RESPONSE_SCHEMA,
   enforceScanIdentity,
@@ -29,7 +30,7 @@ const optionalShortString = (value: unknown, field: string, max: number): string
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-Deno.serve(async (req: Request) => {
+Deno.serve((req: Request) => withDiagnosticResponse(req, "product_scan", async () => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ code: "METHOD_NOT_ALLOWED", error: "POST required" }, 405);
 
@@ -90,7 +91,7 @@ Deno.serve(async (req: Request) => {
     try {
       scan = enforceScanIdentity(parseProductScan(modelValue), productInput);
     } catch (error) {
-      console.error("scan model output rejected:", error instanceof Error ? error.message : "unknown");
+      console.error("scan model output rejected:", error instanceof Error ? error.name : "unknown");
       throw new ServiceError("MODEL_INVALID_OUTPUT", "The product could not be evaluated safely", 422);
     }
     const guarded = enforceScanSafety(scan, loaded.context);
@@ -98,4 +99,4 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     return errorResponse(error);
   }
-});
+}));

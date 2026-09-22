@@ -1,0 +1,39 @@
+# S7 observability contract
+
+S7 adds an optional, anonymous PostHog event transport for approved Remote builds. The current Build 10 TestFlight binary predates S7 and sends no events. New builds send nothing unless `EXPO_PUBLIC_ANALYTICS_ENABLED=true`, a public PostHog project token, the exact matching US/EU ingestion host, **and an explicit `analytics.optIn()` after the approved privacy choice** are present. The choice must be repeated after each app launch and Auth identity transition. Development and Mock builds send nothing. A missing or invalid configuration never blocks the app.
+
+## Event boundary
+
+`src/services/telemetry/contract.ts` is the runtime source of truth, schema version 1. `src/services/analytics.ts` is the existing customer caller API. It may accept older caller fields for compatibility, but the runtime contract emits only the fields below. The SDK's `before_send` applies the same contract again after the SDK adds metadata. Unknown events and invalid required enums are dropped. Raw text, IDs, URLs, photos, barcodes, notes, user input, product names, and provider messages are never emitted.
+
+| Event family | Sent properties | Meaning |
+| --- | --- | --- |
+| `onboarding_started`, `onboarding_stage_viewed`, `onboarding_stage_completed`, `onboarding_completed` | fixed entry point/stage; optional duration bucket; product count bucket | Funnel milestones, not user-entered details |
+| `routine_viewed`, `plan_tab_switched`, `shop_opened`, `shop_scan_opened`, `shop_product_viewed`, `orders_opened` | fixed source/tab/entry point | Navigation and discovery; no product identity |
+| `product_scan_started`, `product_scan_completed`, `product_scan_recognized`, `scan_tab_opened`, `scan_verdict_viewed`, `scan_ask_handoff` | fixed entry point/source, success, or a supported categorical verdict | Existing beta behavior; name/ID removed |
+| `checkin_started`, `checkin_completed`, `refill_requested`, `ask_message_sent`, `research_insight_viewed`, `voice_input_started`, `voice_input_completed`, `today_viewed` | schema version only | Counts without health context or text |
+| `membership_shop_upsell_viewed`, `product_purchase_intent`, `external_purchase_opened` | fixed audience/action/entry point | Commerce intent without merchant/product identity |
+| `catalog_search_completed`, `product_check_resolved` | result-count/duration buckets, input mode, S6 identity state | Reserved for Kanuj's Catalog/Check a Product integration after its backend contract lands; current S7 code does not invent these events |
+| `diagnostic_operation` | fixed operation, success/failure, fixed failure code, build flavor, optional opaque failure trace ID | Remote service debugging without error messages |
+
+No customer ID or email is passed to PostHog `identify()`. The SDK uses memory-only persistence, so identity and offline events do not survive app restart. Its anonymous identity is rotated at transport creation and when the confirmed Auth user changes or signs out; its in-memory queue is discarded before reset because the SDK otherwise preserves it. The sink is never allowed to block a customer action. `analytics.optOut()` and `analytics.optIn()` are available for Kanuj's privacy-choice UI handoff. The facade requires a fresh affirmative opt-in each launch and account transition; no prior consent is assumed from SDK storage. S7 does not add that UI or assert that an external privacy-choice page controls the SDK. If enabled for a cohort, founders must approve the disclosure and an actual opt-out path first.
+
+## SDK boundaries
+
+The standalone React Native client has no `PostHogProvider`, so screen and touch capture are absent. App lifecycle capture, session replay, automatic exceptions/crashes, push token/open capture, remote feature flags, default person properties, and GeoIP lookup are disabled explicitly. There is no native PostHog plugin. A final runtime `before_send` drops unexpected events and every extra property. A bounded queue holds at most 20 pre-initialization sanitized events; the SDK in-memory queue holds at most 100 and flushes in batches of at most 20. Offline events may be lost when the app closes; this is intentional rather than persisting old-account events. Failed telemetry is discarded, not retried through app logic.
+
+## Debugging map
+
+The current `RemoteDeriveService` reports bounded success/failure events for onboarding prepare/upload/commit, routine proposal, Ask, Scan, check-in submission, and refill request. The classifier reads structured `code`, `status`, and `name` only, never `message`. Errors remain customer-facing through existing flows; S7 does not change those flows. `catalog_search` and S6 resolution require a later integration after Kanuj's backend catalog PR lands.
+
+Six Edge calls (onboarding prepare/commit, routine proposal, Ask, Scan, and check-in submission) now attach a fresh random UUIDv4 in `x-derive-trace-id`. The Edge response echoes only a validated trace ID and a bounded `x-derive-error-code`, exposes both headers for web clients, and writes only operation, trace, HTTP status, and bounded code on failure. The client records that trace on an opted-in failure event, so an operator can match it to Supabase Function logs without sending request content to PostHog. A missing or malformed trace never blocks the operation. Direct Storage uploads and the refill database write do not have Edge correlation IDs. Trace IDs are diagnostic metadata, not proof of a particular user's identity or an end-to-end distributed trace. Native UUID generation uses `expo-crypto` when Web Crypto is unavailable, so installing this S7 code in a native binary requires a rebuilt app.
+
+## Rollout and dashboards
+
+1. The founder's US Cloud PostHog project ID `623376` was read back in PostHog settings under organization `derive` and project `Derive`, on the free plan. Onboarding's automatic interaction capture, heatmaps, and web vitals were turned off; Session Replay was declined; no database or Stripe source was connected; and the project had no events at setup. These dashboard choices do not replace the SDK-level safeguards above. Keep `EXPO_PUBLIC_ANALYTICS_ENABLED` empty in source and EAS until founders approve disclosure and privacy-choice behavior. Use separate PostHog projects for synthetic staging QA and real customer analytics when actual staging telemetry is authorized.
+2. In the selected EAS environment, configure the **public project token** (`phc_...`), matching host (`https://us.i.posthog.com` for the visible US project), and explicit enabled flag. Find the project token in PostHog project settings; do not generate or paste a personal API key into Expo. These are mobile-public configuration, not Supabase secrets. No custom domain is needed. An ignored local `.env.local` may carry the public token for a controlled build, but `__DEV__` keeps local development capture off.
+3. Make a new staging build; verify one synthetic event in PostHog's live events, inspect all raw properties, then verify sign-out/account switching and opt-out. No existing TestFlight binary changes when EAS variables change.
+4. Start with three views: onboarding stage conversion, supported remote operation failures by code/build, and catalog search-to-selection after Kanuj adds the real catalog events. Define each denominator and exclude synthetic/founder sessions through project separation or an approved coarse actor flag. Low-volume first-ten data needs qualitative follow-up.
+5. Update App Store privacy answers and the published privacy policy for any new binary that transmits usage data. The historical Build 8/10 packet remains accurate for its binaries.
+
+PostHog management of an existing anonymous profile's data after a deletion request needs an operator procedure before live customer activation. Local `reset()` severs future attribution but does not erase previously sent vendor events.

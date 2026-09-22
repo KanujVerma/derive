@@ -3,11 +3,12 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.8";
+import { diagnosticErrorHeaders, withDiagnosticResponse } from "../_shared/diagnostics.ts";
 import { MembershipEntitlementError, requireActiveMembership } from "../_shared/entitlement.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-derive-trace-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -45,7 +46,7 @@ type ContextTag = (typeof CONTEXT_TAGS)[number];
 function errorResponse(code: string, message: string, status = 400) {
   return new Response(JSON.stringify({ code, error: message }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, ...diagnosticErrorHeaders(code), "Content-Type": "application/json" },
   });
 }
 
@@ -91,7 +92,7 @@ function authorAnalysis(input: {
   return { sentence, adjustmentProposed };
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve((req: Request) => withDiagnosticResponse(req, "checkin_submit", async () => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -235,4 +236,4 @@ Deno.serve(async (req: Request) => {
   } catch {
     return errorResponse("INTERNAL_ERROR", "Check-in could not be recorded.", 500);
   }
-});
+}));
