@@ -24,6 +24,8 @@ import {
 } from "../_shared/runtime.ts";
 
 const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
+const CATALOG_PAGE_SIZE = 1_000;
+const MAX_CATALOG_ROWS_PER_TABLE = 10_000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PHOTO_ROLES = new Set<ProductEvidencePhotoRole>(["front_label", "ingredients", "packaging"]);
 const ALLOWED_FIELDS = new Set([
@@ -51,6 +53,70 @@ interface ResolutionCaseRow {
   formula_version_id: string | null;
   next_action: ProductResolutionResult["nextAction"];
   requires_founder_review: boolean;
+}
+
+interface ProductRow {
+  id: string;
+  brand: string;
+  name: string;
+}
+
+interface VariantRow {
+  id: string;
+  product_id: string;
+  variant_name: string;
+  region_code: string | null;
+  packaging_markers: string[] | null;
+}
+
+interface FormulaRow {
+  id: string;
+  variant_id: string | null;
+  normalized_ingredient_fingerprint: string;
+  verification_status: "provisional" | "verified" | "rejected" | "superseded";
+  source_reference: string;
+  observed_at: string;
+  packaging_markers: string[] | null;
+}
+
+interface IdentifierRow {
+  id: string;
+  variant_id: string;
+  formula_version_id: string | null;
+  identifier_type: string;
+  identifier_value: string;
+  source_authority: IdentifierAuthority;
+  observed_at: string;
+  verified_at: string | null;
+}
+
+async function loadPagedCatalogRows<T>(
+  label: string,
+  fetchPage: (from: number, to: number) => PromiseLike<{
+    data: T[] | null;
+    error: { code?: string } | null;
+  }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; from <= MAX_CATALOG_ROWS_PER_TABLE; from += CATALOG_PAGE_SIZE) {
+    const pageSize = Math.min(
+      CATALOG_PAGE_SIZE,
+      MAX_CATALOG_ROWS_PER_TABLE - rows.length + 1,
+    );
+    const result = await fetchPage(from, from + pageSize - 1);
+    if (result.error) {
+      console.error(`product identity ${label} query failed:`, result.error.code);
+      throw new ServiceError("CATALOG_UNAVAILABLE", "Product identity catalog is unavailable", 500);
+    }
+    const page = result.data ?? [];
+    rows.push(...page);
+    if (rows.length > MAX_CATALOG_ROWS_PER_TABLE) {
+      console.error(`product identity ${label} exceeded the resolver safety limit`);
+      throw new ServiceError("CATALOG_TOO_LARGE", "Product identity catalog requires indexed resolution", 503);
+    }
+    if (page.length < pageSize) return rows;
+  }
+  return rows;
 }
 
 function optionalString(value: unknown, field: string, max: number): string | undefined {
@@ -169,26 +235,24 @@ async function verifyEvidencePhotos(admin: SupabaseClient, photos: ParsedEvidenc
 }
 
 async function loadCatalog(admin: SupabaseClient): Promise<CatalogResolutionRecord[]> {
-  const [productsResult, variantsResult, formulasResult, identifiersResult] = await Promise.all([
-    admin.from("products").select("id, brand, name"),
-    admin.from("product_variants").select("id, product_id, variant_name, region_code, packaging_markers").eq("lifecycle_status", "active"),
-    admin.from("product_formula_versions").select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, observed_at, packaging_markers"),
-    admin.from("product_identifiers").select("variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at"),
+  const [productRows, variantRows, formulaRows, identifierRows] = await Promise.all([
+    loadPagedCatalogRows<ProductRow>("products", (from, to) => admin.from("products")
+      .select("id, brand, name").order("id", { ascending: true }).range(from, to)),
+    loadPagedCatalogRows<VariantRow>("variants", (from, to) => admin.from("product_variants")
+      .select("id, product_id, variant_name, region_code, packaging_markers")
+      .eq("lifecycle_status", "active").order("id", { ascending: true }).range(from, to)),
+    loadPagedCatalogRows<FormulaRow>("formulas", (from, to) => admin.from("product_formula_versions")
+      .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, observed_at, packaging_markers")
+      .order("id", { ascending: true }).range(from, to)),
+    loadPagedCatalogRows<IdentifierRow>("identifiers", (from, to) => admin.from("product_identifiers")
+      .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at")
+      .order("id", { ascending: true }).range(from, to)),
   ]);
-  for (const [label, result] of [
-    ["products", productsResult], ["variants", variantsResult],
-    ["formulas", formulasResult], ["identifiers", identifiersResult],
-  ] as const) {
-    if (result.error) {
-      console.error(`product identity ${label} query failed:`, result.error.code);
-      throw new ServiceError("CATALOG_UNAVAILABLE", "Product identity catalog is unavailable", 500);
-    }
-  }
 
-  const products = new Map((productsResult.data ?? []).map((row) => [row.id, row]));
-  const variants = new Map((variantsResult.data ?? []).map((row) => [row.id, row]));
-  const formulasByVariant = new Map<string, typeof formulasResult.data>();
-  for (const formula of formulasResult.data ?? []) {
+  const products = new Map(productRows.map((row) => [row.id, row]));
+  const variants = new Map(variantRows.map((row) => [row.id, row]));
+  const formulasByVariant = new Map<string, FormulaRow[]>();
+  for (const formula of formulaRows) {
     if (!formula.variant_id) continue;
     formulasByVariant.set(formula.variant_id, [...(formulasByVariant.get(formula.variant_id) ?? []), formula]);
   }
@@ -221,7 +285,7 @@ async function loadCatalog(admin: SupabaseClient): Promise<CatalogResolutionReco
       });
     }
   }
-  for (const identifier of identifiersResult.data ?? []) {
+  for (const identifier of identifierRows) {
     const variant = variants.get(identifier.variant_id);
     const product = variant ? products.get(variant.product_id) : undefined;
     if (!variant || !product) continue;
@@ -233,6 +297,7 @@ async function loadCatalog(admin: SupabaseClient): Promise<CatalogResolutionReco
       identifierType: identifier.identifier_type,
       identifierValue: identifier.identifier_value,
       identifierAuthority: identifier.source_authority as IdentifierAuthority,
+      identifierVerifiedAt: identifier.verified_at ?? undefined,
       identifierFormulaVersionId: identifier.formula_version_id ?? undefined,
       formulaVerificationStatus: formula?.verification_status,
       formulaSourceReference: formula?.source_reference,
@@ -241,7 +306,7 @@ async function loadCatalog(admin: SupabaseClient): Promise<CatalogResolutionReco
       packagingMarkers: [...(variant.packaging_markers ?? []), ...(formula?.packaging_markers ?? [])],
     });
   }
-  for (const formula of formulasResult.data ?? []) {
+  for (const formula of formulaRows) {
     if (!formula.variant_id) {
       records.push({
         formulaVersionId: formula.id,

@@ -32,7 +32,7 @@ already exist under the member's immutable
 
 | State | Meaning | Allowed next step |
 | --- | --- | --- |
-| `verified_product_formula` | Authoritative identifier is explicitly linked to a verified formula version. | Personalized Scan may evaluate fit. |
+| `verified_product_formula` | A completed-verification authoritative identifier is explicitly linked to a verified formula version. | Personalized Scan may evaluate fit. |
 | `identified_formula_unverified` | Exact product identity is supported, but the current formula is not. | Ask for ingredient evidence. |
 | `ambiguous_candidates` | Evidence supports one or more candidates but cannot establish identity. | Member chooses/corrects; founder review remains open. |
 | `formula_only` | Ingredient evidence matches a verified formula, but product/variant identity is not established. | Confirm variant or manually review. |
@@ -42,7 +42,11 @@ Typed identity, OCR, packaging resemblance, retailer data, and model output do
 not produce `verified_product_formula`. Retail price, availability, commission,
 or offer ordering are never product-truth evidence.
 
-GTINs can survive reformulation. When one authoritative identifier is observed
+An identifier's authority label is not sufficient by itself: `verified_at` must
+record completion of the catalog verification step before the resolver may use
+it to establish identity. GTIN type and digit length must agree exactly.
+
+GTINs can survive reformulation. When one verified authoritative identifier is observed
 against multiple formula versions, the resolver preserves the exact variant but
 returns `identified_formula_unverified` and requests ingredient evidence rather
 than guessing which formula is in the member's package.
@@ -51,7 +55,8 @@ than guessing which formula is in the member's package.
 
 - `product_variants` retains region, package size, packaging markers, and lifecycle.
 - `product_identifiers` retains exact identifier authority and optional explicit
-  formula linkage.
+  formula linkage, while keeping unverified observations out of authoritative
+  resolution.
 - `product_formula_versions` is append-only and preserves source, observation
   date, region, packaging, and reformulation lineage.
 - `product_resolution_cases`, evidence, and candidates preserve what was known
@@ -61,6 +66,9 @@ than guessing which formula is in the member's package.
   founder task. `founder_resolve_product_identity` is service-only, idempotent,
   provenance-checked, and audit logged. Founder operations exposes a guarded
   detail action with candidate catalog facts and 15-minute signed evidence URLs.
+- Customer and founder request UUIDs are concurrency-safe: simultaneous retries
+  return the winning immutable case/audit result rather than creating duplicates
+  or surfacing a unique-constraint failure.
 
 ## Current integration boundary
 
@@ -82,6 +90,10 @@ not silently changed by S6.
   Storage-first before account deletion completes.
 - There is no numerical confidence or quality score in the customer contract.
 - Unknown and ambiguous evidence remains unknown or ambiguous.
+- Catalog reads page deterministically past the API's 1,000-row response limit.
+  Above 10,000 rows per identity table the resolver fails closed until an indexed
+  retrieval milestone replaces bounded in-memory matching; it never silently
+  searches a truncated catalog.
 
 ## Review and rollout checklist
 

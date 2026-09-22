@@ -212,6 +212,11 @@ canonical request/result types are in `ProductIdentityResolver.ts`.
   and founder-review status.
 - Raw local URIs and HTTP image URLs are rejected. OCR/model resemblance is
   candidate evidence only and cannot create verified identity.
+- A catalog identifier becomes authoritative only after its `verified_at`
+  checkpoint exists; its declared GTIN type must match its exact digit length.
+- Request UUID persistence is safe under concurrent retries. Catalog reads are
+  deterministically paged and fail closed at the documented safety ceiling
+  rather than resolving against a silently truncated dataset.
 - `scan-product` accepts optional `ScanProductInput.resolutionCaseId` as the
   first backend consumer. Only an owner-bound verified product+formula case may
   enter personalized evaluation through that path.

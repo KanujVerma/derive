@@ -76,7 +76,10 @@ create table public.product_identifiers (
   created_at timestamptz not null default now(),
   constraint product_identifiers_type_check check (identifier_type in ('gtin_8', 'gtin_12', 'gtin_13', 'gtin_14', 'manufacturer_sku')),
   constraint product_identifiers_value_check check (
-    (identifier_type like 'gtin_%' and identifier_value ~ '^[0-9]{8,14}$')
+    (identifier_type = 'gtin_8' and identifier_value ~ '^[0-9]{8}$')
+    or (identifier_type = 'gtin_12' and identifier_value ~ '^[0-9]{12}$')
+    or (identifier_type = 'gtin_13' and identifier_value ~ '^[0-9]{13}$')
+    or (identifier_type = 'gtin_14' and identifier_value ~ '^[0-9]{14}$')
     or (identifier_type = 'manufacturer_sku' and length(trim(identifier_value)) between 1 and 120)
   ),
   constraint product_identifiers_authority_check check (source_authority in ('manufacturer', 'gs1', 'founder', 'retailer', 'member')),
@@ -432,10 +435,6 @@ begin
     raise exception 'INVALID_RESOLUTION_CANDIDATES';
   end if;
 
-  select * into v_case from public.product_resolution_cases
-  where user_id = p_user_id and request_id = p_request_id;
-  if found then return v_case; end if;
-
   insert into public.product_resolution_cases (
     user_id, request_id, consumer, resolution_state, product_id, variant_id,
     formula_version_id, next_action, requires_founder_review, review_status,
@@ -446,7 +445,16 @@ begin
     coalesce(p_requires_founder_review, false),
     case when coalesce(p_requires_founder_review, false) then 'pending' else 'not_needed' end,
     p_evidence_snapshot
-  ) returning * into v_case;
+  )
+  on conflict on constraint product_resolution_cases_request_unique do nothing
+  returning * into v_case;
+
+  if not found then
+    select * into v_case from public.product_resolution_cases
+    where user_id = p_user_id and request_id = p_request_id;
+    if not found then raise exception 'RESOLUTION_REPLAY_UNAVAILABLE'; end if;
+    return v_case;
+  end if;
 
   for v_evidence in select value from jsonb_array_elements(p_evidence)
   loop
@@ -516,24 +524,36 @@ set search_path = ''
 as $$
 declare
   v_case public.product_resolution_cases;
+  v_replay public.product_resolution_cases;
   v_formula public.product_formula_versions;
 begin
   perform private.assert_active_founder(p_actor_user_id);
   if p_request_id is null then raise exception 'REQUEST_ID_REQUIRED'; end if;
 
-  if exists (
-    select 1 from public.founder_operation_log
-    where actor_user_id = p_actor_user_id and request_id = p_request_id
-  ) then
-    select resolution.* into v_case
-    from public.founder_operation_log as log
-    join public.product_resolution_cases as resolution on resolution.id = log.target_id
-    where log.actor_user_id = p_actor_user_id and log.request_id = p_request_id;
-    return v_case;
-  end if;
+  select resolution.* into v_replay
+  from public.founder_operation_log as log
+  join public.product_resolution_cases as resolution on resolution.id = log.target_id
+  where log.actor_user_id = p_actor_user_id
+    and log.request_id = p_request_id
+    and log.operation = 'product_identity_resolved'
+    and log.target_type = 'product_resolution_case';
+  if found then return v_replay; end if;
 
   select * into v_case from public.product_resolution_cases where id = p_case_id for update;
   if not found then raise exception 'PRODUCT_RESOLUTION_NOT_FOUND'; end if;
+
+  -- A concurrent retry can pass the first replay read while the original
+  -- transaction is still uncommitted. Recheck after taking the case lock so
+  -- it observes the winner and returns the same result instead of failing.
+  select resolution.* into v_replay
+  from public.founder_operation_log as log
+  join public.product_resolution_cases as resolution on resolution.id = log.target_id
+  where log.actor_user_id = p_actor_user_id
+    and log.request_id = p_request_id
+    and log.operation = 'product_identity_resolved'
+    and log.target_type = 'product_resolution_case';
+  if found then return v_replay; end if;
+
   if v_case.review_status <> 'pending' then raise exception 'PRODUCT_RESOLUTION_ALREADY_REVIEWED'; end if;
   if p_resolution_state not in ('verified_product_formula', 'identified_formula_unverified', 'formula_only', 'insufficient_evidence') then
     raise exception 'INVALID_PRODUCT_RESOLUTION_STATE';

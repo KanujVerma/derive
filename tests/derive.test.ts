@@ -9217,6 +9217,7 @@ const s6VerifiedCatalog: CatalogResolutionRecord[] = [{
   identifierType: 'gtin_12',
   identifierValue: '036000291452',
   identifierAuthority: 'gs1',
+  identifierVerifiedAt: '2026-09-20T00:00:00.000Z',
   identifierFormulaVersionId: '60000000-0000-4000-8000-000000000003',
   formulaVerificationStatus: 'verified',
   formulaSourceReference: 'https://manufacturer.example/barrier-wash-us',
@@ -9236,6 +9237,15 @@ test('S6 resolver: authoritative identifier verifies a formula only when provena
   }]);
   assert.equal(unlinked.state, 'identified_formula_unverified');
   assert.equal(unlinked.nextAction, 'photograph_ingredients');
+});
+
+test('S6 resolver: an authority label without completed verification cannot establish identity', () => {
+  const unverified = resolveProductIdentity({ barcode: '036000291452' }, [{
+    ...s6VerifiedCatalog[0],
+    identifierVerifiedAt: undefined,
+  }]);
+  assert.equal(unverified.state, 'insufficient_evidence');
+  assert.equal(unverified.nextAction, 'manual_review');
 });
 
 test('S6 resolver: typed identity never promotes a verified catalog formula by itself', () => {
@@ -9345,5 +9355,8 @@ test('S6 endpoint: authenticates and checks entitlement before parsing evidence,
   assert.ok(authenticateIndex >= 0 && authenticateIndex < entitlementIndex);
   assert.ok(entitlementIndex < bodyIndex);
   assert.match(resolverFunction, /\^\(file\|ph\|content\|https\?\):\\\/\\\//i);
+  assert.match(resolverFunction, /source_authority, observed_at, verified_at/);
+  assert.match(resolverFunction, /loadPagedCatalogRows/);
+  assert.match(resolverFunction, /CATALOG_TOO_LARGE/);
   assert.doesNotMatch(resolverFunction, /generateStructuredJson|GEMINI_API_KEY|:generateContent/);
 });

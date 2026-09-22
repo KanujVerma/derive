@@ -1,6 +1,6 @@
 begin;
 
-select plan(38);
+select plan(39);
 
 select has_table('public', 'product_variants', 'product variants retain packaging and region identity');
 select has_table('public', 'product_formula_versions', 'formula versions retain reformulation provenance');
@@ -123,6 +123,21 @@ insert into public.product_formula_versions (
   array['Water', 'Glycerin', 'Ceramide NP'],
   'water|glycerin|ceramide np',
   'manufacturer', 'https://manufacturer.example/barrier-wash', now(), 'verified'
+);
+
+select throws_ok(
+  $$
+    insert into public.product_identifiers (
+      variant_id, identifier_type, identifier_value,
+      source_authority, source_reference, verified_at
+    ) values (
+      '61200000-0000-4000-8000-000000000001',
+      'gtin_8', '036000291452', 'gs1', 'https://gs1.example/mismatched-type', now()
+    )
+  $$,
+  '23514',
+  null,
+  'GTIN metadata requires the exact digit length declared by identifier_type'
 );
 
 select lives_ok(

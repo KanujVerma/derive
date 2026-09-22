@@ -18,6 +18,7 @@ export interface CatalogResolutionRecord {
   identifierType?: string;
   identifierValue?: string;
   identifierAuthority?: IdentifierAuthority;
+  identifierVerifiedAt?: string;
   identifierFormulaVersionId?: string;
   formulaVerificationStatus?: "provisional" | "verified" | "rejected" | "superseded";
   formulaSourceReference?: string;
@@ -106,7 +107,8 @@ function uniqueRecords(records: CatalogResolutionRecord[]): CatalogResolutionRec
 
 function verifiedFormulaForIdentifier(record: CatalogResolutionRecord): boolean {
   return Boolean(
-    record.formulaVersionId
+    record.identifierVerifiedAt
+      && record.formulaVersionId
       && record.identifierFormulaVersionId === record.formulaVersionId
       && record.formulaVerificationStatus === "verified"
       && record.formulaSourceReference
@@ -147,6 +149,7 @@ export function resolveProductIdentity(
     const matches = uniqueRecords(catalog.filter((record) =>
       normalizeBarcode(record.identifierValue) === barcode
       && record.identifierAuthority
+      && record.identifierVerifiedAt
       && AUTHORITATIVE_IDENTIFIER_SOURCES.has(record.identifierAuthority)
     ));
     if (matches.length === 1) return identifiedDecision(matches[0], "authoritative_identifier", ["exact authoritative identifier"]);
