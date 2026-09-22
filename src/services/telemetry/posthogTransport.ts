@@ -13,6 +13,8 @@ export interface TelemetrySink {
 export function createPostHogSink(projectKey: string, host: string): TelemetrySink {
   const client = new PostHog(projectKey, {
     host,
+    // Never persist anonymous IDs or pending skincare-app events across launches.
+    persistence: 'memory',
     defaultOptIn: false,
     captureAppLifecycleEvents: false,
     enableSessionReplay: false,
