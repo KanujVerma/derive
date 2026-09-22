@@ -84,17 +84,21 @@ select results_eq(
   array['granted'::text],
   'a member with no membership receives active founding beta access'
 );
+set local role service_role;
 select results_eq(
   $$select tier, status, stripe_customer_id, stripe_subscription_id, stripe_price_id, cancel_at_period_end
     from public.memberships where user_id = 'b9111111-1111-4111-8111-111111111111'$$,
   $$values ('founding_beta'::text, 'active'::text, null::text, null::text, null::text, false)$$,
   'the free beta row carries no Stripe lifecycle'
 );
+set local role authenticated;
+set local request.jwt.claim.sub = 'b9111111-1111-4111-8111-111111111111';
 select results_eq(
   $$select public.claim_external_beta_access() ->> 'result'$$,
   array['already_active'::text],
   'a repeated claim is idempotent'
 );
+set local role service_role;
 select results_eq(
   $$select count(*)::int from public.memberships where user_id = 'b9111111-1111-4111-8111-111111111111'$$,
   array[1],
@@ -107,6 +111,7 @@ select results_eq(
   array['already_active'::text],
   'an already active member is unchanged'
 );
+set local role service_role;
 select results_eq(
   $$select count(*)::int from public.memberships where user_id = 'b9222222-2222-4222-8222-222222222222'$$,
   array[1],
@@ -143,6 +148,7 @@ select results_eq(
   array['unchanged'::text],
   'a Stripe-bound membership is not overwritten'
 );
+set local role service_role;
 select results_eq(
   $$select stripe_customer_id, status, count(*)::int
     from public.memberships
@@ -151,6 +157,8 @@ select results_eq(
   $$values ('cus_build9'::text, 'active'::text, 1)$$,
   'the Stripe row remains the only membership'
 );
+set local role authenticated;
+set local request.jwt.claim.sub = 'b9555555-5555-4555-8555-555555555555';
 
 select throws_ok(
   $$insert into public.memberships (user_id, tier, status) values ('b9111111-1111-4111-8111-111111111111', 'founding_beta', 'active')$$,
@@ -163,7 +171,7 @@ select throws_ok(
   'an authenticated caller cannot change the release flag'
 );
 
-set local request.jwt.claim.sub = 'b9222222-2222-4222-8222-222222222222';
+set local role service_role;
 select results_eq(
   $$select count(*)::int from public.memberships where user_id = 'b9333333-3333-4333-8333-333333333333' and status = 'paused'$$,
   array[1],
