@@ -322,7 +322,7 @@ test('AUTH-V1: new accounts map to membership none and cannot self-activate', ()
   const membershipScreen = fs.readFileSync(path.resolve('app/membership/index.tsx'), 'utf8');
   assert.ok(membershipScreen.includes('refreshCustomerBootstrap'));
   assert.ok(membershipScreen.includes('usesConciergeMembershipAccess'));
-  assert.ok(membershipScreen.includes('Refresh Access'));
+  assert.ok(membershipScreen.includes('Try Again'));
   assert.ok(!membershipScreen.toLowerCase().includes('zelle'));
   assert.ok(!membershipScreen.toLowerCase().includes('venmo'));
   assert.ok(!membershipScreen.toLowerCase().includes('cash app'));
