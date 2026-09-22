@@ -23,6 +23,9 @@ another.
 | `EXPO_PUBLIC_SUPABASE_URL` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL` | Expo mobile/web build | Public | Optional customer contact; configure only after send-and-receive mailbox verification |
+| `EXPO_PUBLIC_ANALYTICS_ENABLED` | Expo mobile/web build | Public | S7 kill switch; empty/false until analytics disclosure, privacy-choice UI, and rollout are approved; flag alone never opts a customer in |
+| `EXPO_PUBLIC_POSTHOG_PROJECT_KEY` | Expo mobile/web build | Public project token | Only for an approved Remote analytics build; never use a personal or server API key |
+| `EXPO_PUBLIC_POSTHOG_HOST` | Expo mobile/web build | Public | Exact project region: `https://us.i.posthog.com` or `https://eu.i.posthog.com` |
 | `SUPABASE_PROJECT_ID` | CLI / CI | Public identifier | Linking and deploying to a hosted project |
 | `SUPABASE_ACCESS_TOKEN` | CLI / CI | Secret | Headless Supabase management; interactive local login should use the CLI credential store instead |
 | `SUPABASE_DB_PASSWORD` | CLI / CI | Secret | Hosted migration and database operations |
@@ -44,8 +47,9 @@ into the mobile build environment.
 When the support address is unset or malformed, onboarding does not offer a human support contact and Profile routes skincare questions to Ask. A real-money customer launch requires a separately verified working contact path; a syntactically valid email address alone does not prove delivery.
 
 S5 trusted-server names are listed with empty values in `supabase/.env.example`.
-They are deliberately absent from the root Expo template. PostHog remains
-excluded until its SDK and privacy-safe event transport are implemented.
+They are deliberately absent from the root Expo template. S7's PostHog client
+configuration is public and optional; it remains disabled in the template and
+current EAS profiles. See [S7_OBSERVABILITY.md](S7_OBSERVABILITY.md).
 
 ## Local mobile development
 

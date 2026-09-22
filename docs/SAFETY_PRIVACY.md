@@ -51,10 +51,9 @@ Derive maintains strict integrity in all customer communications.
 ---
 
 ## 3. Privacy-Safe Analytics Guardrails
-* **Session Replay Disabled**: PostHog session replay is strictly disabled (`disable_session_recording: true`) to prevent capturing user photos or typed text.
-* **Allowlisted Events Only**: The mobile client can only dispatch events in the typed analytics catalog:
-  `onboarding_started`, `onboarding_stage_completed`, `onboarding_completed`, `today_viewed`, `routine_viewed`, `checkin_completed`, `refill_requested`, `scan_tab_opened`, `product_scan_recognized`, `scan_verdict_viewed`, `scan_ask_handoff`, `voice_input_started`, `voice_input_completed`.
-* **Zero Health Data in Telemetry**: Symptoms, diagnoses, photo URLs, full chat transcripts, personal notes, selected check-in context tags, `contextNote`, and medication/cycle details must NEVER be included in analytics properties. Check-in completion telemetry stays high-level (`outcome`, `irritationReported`, `adherenceReported`).
+* **Session Replay Disabled**: The S7 React Native client sets `enableSessionReplay: false`, mounts no capture provider, and omits the native capture plugin. Screen/touch/lifecycle and automatic exception capture are disabled.
+* **Runtime Allowlist**: `src/services/telemetry/contract.ts` owns the exact event and property vocabulary. Both the caller facade and the SDK's final `before_send` apply it. The older event list here was incomplete; [S7_OBSERVABILITY.md](S7_OBSERVABILITY.md) documents the current event families.
+* **Zero Health Data in Telemetry**: Symptoms, diagnoses, photo URLs, full chat transcripts, personal notes, selected check-in context tags, `contextNote`, medication/cycle details, product names, raw error messages, and customer/product identifiers must NEVER be emitted. Even high-level check-in outcome and irritation fields are stripped in S7.
 
 ---
 

@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-22: S7 observability branch, guarded implementation
+
+- **Predecessor:** clean `origin/main@69fcc1ac31849ef2738fe6830c144c3f048f66f0`; branch `sami/s7-observability` lives in an isolated worktree. Sami's older local Auth checkout has unrelated uncommitted work and was not modified.
+- **Implementation:** runtime event/property filter, optional PostHog React Native sink with a final send gate, anonymous identity rotation on Auth transitions, and bounded Remote service outcome/failure events. A named narrow handoff is required for Kanuj-owned `src/services/analytics.ts`; no `app/**` UI changed. Catalog/Check a Product event call sites await Kanuj's actual interface.
+- **Safety:** development/Mock/unconfigured builds send nothing, and configured builds still require an explicit app-level opt-in after the approved privacy choice. Offline queues are cleared on sign-out/account switch/opt-out. Replay, screen/touch/lifecycle autocapture, automatic exceptions, native plugin, feature flag events, and GeoIP lookup are disabled. Product names/IDs, photos, notes, raw errors, and Auth identity are removed before transport. No hosted PostHog project/token or customer analytics activation is claimed.
+- **Remaining gate:** founder-approved privacy disclosure and opt-out path, a PostHog project/region, synthetic staging event readback, Kanuj mobile/device acceptance, and direct server correlation work remain open. [S7_OBSERVABILITY.md](S7_OBSERVABILITY.md) records the exact boundary and supported diagnostic paths. This entry does not predict its own commit SHA.
+
 ## 2026-09-21: S6 product identity and formula provenance backend
 
 - **Predecessor:** clean synchronized `origin/main@556a43e0b70f50264c459ae476e2214061a8876a`. S6 was built in the isolated `sami/s6-product-identity-resolver` worktree; the separate local Auth WIP checkout was not modified. This entry does not predict its resulting commit or merge SHA.

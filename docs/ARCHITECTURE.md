@@ -184,11 +184,12 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ---
 
 ## 6. Telemetry & Analytics
-* **Provider**: Planned privacy-safe telemetry (PostHog; client-side allowlist implemented in `src/services/analytics.ts`; SDK integration planned).
+* **Provider**: S7 adds a guarded PostHog React Native transport. It remains off until a new Remote build is explicitly configured and privacy/release gates pass. `src/services/telemetry/contract.ts` is the runtime event/property allowlist.
 * **Strict Privacy Guardrails**:
-  - `disable_session_recording: true` (Session replay strictly disabled).
+  - `enableSessionReplay: false`, no capture provider or native capture plugin; screen/touch/lifecycle and automatic crash capture remain disabled.
   - Zero health data, skin photos, symptoms, or conversation text transmitted.
   - Event payloads restricted to allowlisted navigation, operational milestones, and interaction metrics.
+  - See [S7_OBSERVABILITY.md](S7_OBSERVABILITY.md) for rollout and the currently instrumented failure paths.
 
 ---
 
