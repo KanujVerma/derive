@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-22: Catalog search foundation branch checkpoint
+
+- **Predecessor:** clean synchronized `main@69fcc1ac31849ef2738fe6830c144c3f048f66f0` with S6 merged and hosted. This entry records the starting boundary and does not predict the catalog PR or merge SHA.
+- **Assignment:** this customer-requested milestone gives Kanuj a bounded PR A platform search/ingestion assignment, then a separate PR B mobile consumer; Sami's S6 trust semantics and F1/H1P/H1B ownership remain intact.
+- **Hosted starting state:** `products = 3` and all are provisional; `product_variants = 0`, `product_identifiers = 0`, `product_formula_versions = 0`. The S6 migration `20260922220000` is present. New customer catalog search therefore starts empty until trusted operator ingestion.
+- **Contract:** authenticated bounded indexed search returns only sourced canonical products. Operator input can add product-only identity, sourced aliases, or evidence-backed S6 variant/GTIN/formula records. Formula facts require a uniquely linked verified variant; personal fit still depends on H1P. The approved first product-only source is CeraVe's official Renewing SA Cleanser page, with no inferred GTIN or formula. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md).
+
 ## 2026-09-21: S6 product identity and formula provenance backend
 
 - **Predecessor:** clean synchronized `origin/main@556a43e0b70f50264c459ae476e2214061a8876a`. S6 was built in the isolated `sami/s6-product-identity-resolver` worktree; the separate local Auth WIP checkout was not modified. This entry does not predict its resulting commit or merge SHA.

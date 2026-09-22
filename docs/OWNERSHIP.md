@@ -18,6 +18,8 @@ The L0/H1A founder authorization made H1A a single temporary exception: Kanuj ow
 
 **Current handoff:** Kanuj completed L1A signed-out Remote staging device preflight, then landed AUTH-V1 email/password and Build 9 server-owned free staging access. Sami owns F1 founder manual routine fallback now and the distinct H1P model and H1B Stripe platform gates. H1E email delivery/recovery is parked and does not block this beta. Kanuj L1B separately accepts F1 manual fallback after F1; Kanuj L1C accepts the provider-backed authenticated device path after H1P using current AUTH-V1 access. L2A/L2B remain Kanuj launch acceptance. Exact prerequisites and handoffs are in [ROADMAP.md](ROADMAP.md).
 
+The product catalog V1 request authorizes Kanuj to deliver the bounded PR A search and trusted ingestion foundation before Kanuj's PR B mobile integration. This does not transfer Sami's S6 trust model, F1, H1P, H1B, or continuing platform ownership. The stable interface and evidence are documented in [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md).
+
 ## Cross-lane defects
 
 When work exposes a defect in the other founder's lane, record the exact reproduction/evidence, affected interface, owning founder, and whether it blocks the current milestone in the PR or `docs/CONTEXT_SYNC.md`. Continue around it if safe; otherwise stop at that boundary. Kanuj routes backend/platform defects to Sami. Sami routes mobile/customer defects to Kanuj. Neither silently fixes or redesigns the other's implementation.

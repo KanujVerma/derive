@@ -1,0 +1,17 @@
+{
+  "product": {
+    "brand": "CeraVe",
+    "name": "Renewing SA Cleanser",
+    "category": "cleanser",
+    "sourceReference": "https://www.cerave.com/skincare/cleansers/renewing-sa-cleanser",
+    "observedAt": "2026-09-22T00:00:00Z",
+    "publicSourceUrl": "https://www.cerave.com/skincare/cleansers/renewing-sa-cleanser"
+  },
+  "aliases": [
+    {
+      "name": "CeraVe SA Cleanser",
+      "sourceReference": "https://www.cerave.com/skincare/cleansers/renewing-sa-cleanser",
+      "observedAt": "2026-09-22T00:00:00Z"
+    }
+  ]
+}

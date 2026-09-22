@@ -98,3 +98,6 @@ jobs:
 
       - name: Run local B4B check-in context E2E harness
         run: node scripts/test-i1-b4b-local.mjs
+
+      - name: Run catalog authenticated search E2E harness
+        run: node scripts/test-catalog-local.mjs
