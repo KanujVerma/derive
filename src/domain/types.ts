@@ -297,6 +297,8 @@ export interface ScanProductInput {
   brand?: string;
   imageUri?: string;
   barcode?: string;
+  /** Optional S6 case whose verified identity overrides caller-supplied labels. */
+  resolutionCaseId?: string;
   userRoutineContext?: {
     activeDifferinSchedule?: boolean;
     currentRoutineProducts?: string[];
