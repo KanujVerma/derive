@@ -1,5 +1,5 @@
 /**
- * Derive Privacy-Safe Telemetry (PostHog Client)
+ * Derive privacy-safe telemetry. Customer callers keep this narrow facade.
  *
  * Strict Privacy Contract:
  * - Allowlisted typed events ONLY.
@@ -7,6 +7,10 @@
  *   reaction notes, raw chat text, or medical data.
  * - Session Replay is OFF by default.
  */
+
+import { useAuthStore } from '../stores/authStore.ts';
+import { sanitizeTelemetryEvent, type TelemetryEvent } from './telemetry/contract.ts';
+import type { TelemetrySink } from './telemetry/posthogTransport.ts';
 
 export type OnboardingStageName =
   | 'goals'
@@ -120,32 +124,128 @@ export interface AllowedAnalyticsEvents {
     merchantId: string;
     entryPoint: 'product_detail';
   };
+  catalog_search_completed: {
+    resultCountBucket: 'zero' | 'one' | 'few' | 'many';
+    durationBucket: 'under_30s' | '30_60s' | '1_3min' | 'over_3min';
+  };
+  product_check_resolved: {
+    inputMode: 'search' | 'barcode' | 'identity_case';
+    identityState: 'verified_product_formula' | 'identified_formula_unverified' | 'ambiguous_candidates' | 'formula_only' | 'insufficient_evidence';
+  };
+  diagnostic_operation: {
+    operation: 'auth' | 'onboarding_prepare' | 'onboarding_upload' | 'onboarding_commit'
+      | 'routine_propose' | 'routine_read' | 'catalog_search' | 'product_resolve'
+      | 'product_scan' | 'ask' | 'checkin_submit' | 'refill_request';
+    outcome: 'success' | 'failure';
+    errorCode?: 'NETWORK_UNAVAILABLE' | 'AUTH_REQUIRED' | 'MEMBERSHIP_REQUIRED'
+      | 'INVALID_INPUT' | 'PHOTO_UPLOAD_FAILED' | 'CATALOG_UNAVAILABLE'
+      | 'RESOLUTION_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'SERVER_UNAVAILABLE'
+      | 'INVALID_RESPONSE' | 'UNKNOWN';
+  };
 }
 
-class PrivacySafeAnalytics {
-  private isSessionReplayEnabled = false; // Off by default
+function approvedConfiguration(): { projectKey: string; host: string } | null {
+  const dev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
+  if (dev || process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE !== 'true') return null;
+  if (process.env.EXPO_PUBLIC_ANALYTICS_ENABLED !== 'true') return null;
+  const flavor = process.env.EXPO_PUBLIC_BUILD_FLAVOR;
+  if (flavor !== 'remote-staging' && flavor !== 'production') return null;
+  const projectKey = process.env.EXPO_PUBLIC_POSTHOG_PROJECT_KEY?.trim() ?? '';
+  const host = process.env.EXPO_PUBLIC_POSTHOG_HOST?.trim() ?? '';
+  if (!/^phc_[A-Za-z0-9]+$/.test(projectKey)) return null;
+  if (host !== 'https://us.i.posthog.com' && host !== 'https://eu.i.posthog.com') return null;
+  return { projectKey, host };
+}
+
+export class PrivacySafeAnalytics {
+  private readonly config: { projectKey: string; host: string } | null;
+  private sink: TelemetrySink | null = null;
+  private pending: TelemetryEvent[] = [];
+  // A build switch does not equal customer consent. The app must call optIn()
+  // after its approved privacy choice, on every launch and account transition.
+  private disabledLocally = true;
+  private requestedOptIn = false;
+  private loading = false;
+
+  constructor(config = approvedConfiguration()) {
+    this.config = config;
+    // Anonymous SDK identity is rotated at every confirmed Auth identity transition.
+    // The Auth UUID, email and name are never sent to PostHog.
+    useAuthStore.subscribe((state, previous) => {
+      if (state.sessionUserId !== previous.sessionUserId) {
+        this.pending = [];
+        this.disabledLocally = true;
+        this.requestedOptIn = false;
+        try { this.sink?.reset(); } catch { /* Telemetry cannot affect Auth. */ }
+      }
+    });
+  }
+
+  private start(): void {
+    if (!this.config || this.loading || this.sink || this.disabledLocally) return;
+    this.loading = true;
+    void import('./telemetry/posthogTransport.ts').then(async ({ createPostHogSink }) => {
+      this.sink = createPostHogSink(this.config!.projectKey, this.config!.host);
+      // Never revive a prior launch/account's persisted anonymous ID or offline queue.
+      this.sink.reset();
+      if (this.disabledLocally) {
+        this.pending = [];
+        await this.sink.optOut();
+      } else {
+        if (this.requestedOptIn) await this.sink.optIn();
+        if (!this.disabledLocally && !this.sink.isOptedOut()) {
+          for (const event of this.pending) this.sink.capture(event);
+        }
+        this.pending = [];
+      }
+    }).catch(() => { this.pending = []; }).finally(() => { this.loading = false; });
+  }
 
   /**
-   * Track an allowlisted behavioral event with sanitized, primitive properties.
+   * Invalid events are dropped. Transport failures never block customer actions.
    */
   track<E extends keyof AllowedAnalyticsEvents>(
     event: E,
     properties: AllowedAnalyticsEvents[E]
   ): void {
-    // In production, this proxies to PostHog SDK
-    // Here we ensure strictly typed payloads and log in dev mode
-    const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
-    if (isDev) {
-      console.log(`[Analytics: ${event}]`, properties);
+    const safe = sanitizeTelemetryEvent(event, properties);
+    if (!safe || this.disabledLocally) return;
+    if (!this.sink) {
+      if (!this.config) return;
+      if (this.pending.length < 20) this.pending.push(safe);
+      this.start();
+      return;
     }
+    try {
+      if (!this.sink.isOptedOut()) this.sink.capture(safe);
+    } catch { /* Analytics is optional. */ }
   }
 
+  /** Customer privacy choice. Persisted opt-out is owned by the SDK. */
+  optOut(): void {
+    this.disabledLocally = true;
+    this.requestedOptIn = false;
+    this.pending = [];
+    try { void Promise.resolve(this.sink?.optOut()).catch(() => {}); }
+    catch { /* Local disable still applies. */ }
+  }
 
-  /**
-   * Session replay is strictly kept OFF during beta
-   */
+  optIn(): void {
+    this.disabledLocally = false;
+    this.requestedOptIn = true;
+    try { void Promise.resolve(this.sink?.optIn()).catch(() => {}); }
+    catch { /* No impact on app functionality. */ }
+    this.start();
+  }
+
+  /** Test injection keeps transport tests independent of the native SDK. */
+  setSinkForTesting(sink: TelemetrySink | null): void {
+    this.sink = sink;
+    this.pending = [];
+  }
+
   isReplayActive(): boolean {
-    return this.isSessionReplayEnabled;
+    return false;
   }
 }
 
