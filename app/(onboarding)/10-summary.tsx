@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -31,13 +31,14 @@ import { analytics } from '@/src/services/analytics';
 import { config } from '@/src/constants/config';
 import { publicEnvironment } from '@/src/config/environment';
 import { usesFreeExternalBetaPresentation } from '@/src/utils/membershipPresentation';
-import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
+import { PhotoUploadError } from '@/src/services/onboardingPhotoUpload';
 import type { OnboardingPayload } from '@/src/domain/types';
 
 export default function SummaryScreen() {
   const router = useRouter();
   const onboarding = useOnboardingStore();
   const [isBuilding, setIsBuilding] = useState(false);
+  const submitInFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const goalName = onboarding.primaryGoal
@@ -45,6 +46,8 @@ export default function SummaryScreen() {
     : 'Breakouts';
 
   const handleBuildPlan = async () => {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
     setIsBuilding(true);
     setError(null);
     try {
@@ -96,9 +99,10 @@ export default function SummaryScreen() {
       // Navigate to main application
       router.replace('/(tabs)');
     } catch (e: any) {
-      console.warn('Plan generation error:', e);
-      setError(getCustomerErrorMessage('onboarding'));
+      console.warn('Onboarding submission failed:', e instanceof PhotoUploadError ? e.code : 'pipeline_error');
+      setError("We couldn't finish this step. Please try again.");
     } finally {
+      submitInFlight.current = false;
       setIsBuilding(false);
     }
   };
@@ -133,7 +137,7 @@ export default function SummaryScreen() {
       >
         <Text style={styles.questionTitle}>Review & Final Details</Text>
         <Text style={styles.questionSubtitle}>
-          Review your inputs. You can tap Edit to adjust any section before we assemble your plan.
+          Review your inputs. You can tap Edit to adjust any section before you submit your intake.
         </Text>
 
         {usesFreeExternalBetaPresentation(publicEnvironment.buildFlavor) ? (
@@ -279,7 +283,7 @@ export default function SummaryScreen() {
           <View style={styles.errorNoticeBox}>
             <Icon name="warning" size={20} color={colors.actionStop.text} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.errorNoticeTitle}>Unable to build routine</Text>
+              <Text style={styles.errorNoticeTitle}>Unable to submit intake</Text>
               <Text style={styles.errorNoticeText}>{error}</Text>
             </View>
           </View>
@@ -291,7 +295,9 @@ export default function SummaryScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.reviewNoticeTitle}>Final Review</Text>
             <Text style={styles.reviewNoticeText}>
-              Your first routine gets one final quality check before it goes live. You can explore your plan, Ask questions, and use Scan while we prepare your routine.
+              {isRemoteMode()
+                ? "Your first routine gets one final quality check before it goes live. We'll show it here as soon as it's ready."
+                : 'Your first routine gets one final quality check before it goes live. You can explore your plan, Ask questions, and use Scan while we prepare your routine.'}
             </Text>
           </View>
         </View>
