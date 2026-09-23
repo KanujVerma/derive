@@ -6,6 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.8";
 import { MembershipEntitlementError, requireActiveMembership } from "../_shared/entitlement.ts";
 
 import type {
+  AssembledRoutineContext,
   RoutineErrorCode,
   RoutineErrorResponse,
   RoutineIntelligenceProposal,
@@ -17,6 +18,7 @@ import {
   type TrustedProductInfo,
 } from './validator.ts';
 import { assembleCanonicalContext } from './context.ts';
+import { bindProposalToCommittedCatalog, isCatalogUuid, verifyCommittedCatalogIdentity, type BoundRoutineProposal } from './catalog-identity.ts';
 import { resolveRoutineProvider } from './provider.ts';
 
 // Section 10: x-routine-fixture completely removed from CORS and request inspection
@@ -234,7 +236,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const context = assemblyResult.context;
+    const submittedCatalogIds = assemblyResult.context.confirmedProducts
+      .filter((product) => product.isCatalogStandard)
+      .map((product) => product.submittedCatalogId);
+    if (submittedCatalogIds.some((id) => !id || !isCatalogUuid(id))) {
+      return errorResponse("INTAKE_CONTEXT_INVALID", "Committed catalog selection is invalid.", 400);
+    }
+    let selectedCatalogRows: any[] = [];
+    if (submittedCatalogIds.length > 0) {
+      const { data, error } = await adminClient.from("products")
+        .select("id, brand, name, category, is_catalog_standard, catalog_verified_at")
+        .in("id", submittedCatalogIds as string[]);
+      if (error) {
+        console.error(`[propose-routine] Catalog selection lookup failed: ${error.message}`);
+        return errorResponse("INTERNAL_ERROR", "Could not verify committed catalog selections.", 500);
+      }
+      selectedCatalogRows = data || [];
+    }
+    let context: AssembledRoutineContext;
+    try {
+      context = verifyCommittedCatalogIdentity(assemblyResult.context, selectedCatalogRows);
+    } catch {
+      return errorResponse("INTAKE_CONTEXT_INVALID", "Committed catalog selection does not match a sourced product.", 400);
+    }
 
     // 5. Resolve Provider-Neutral Routine Intelligence Provider
     // Selection is strictly server-side runtime configuration. Customer requests cannot select a provider.
@@ -296,11 +320,24 @@ Deno.serve(async (req: Request) => {
     // 8. Catalog Provenance & Sensitivity Evaluation against Trusted Database Records
     const { data: dbCatalogRows, error: catErr } = await adminClient
       .from("products")
-      .select("id, brand, name, category, key_actives, full_ingredients, retail_price_approx, is_catalog_standard");
+      .select("id, brand, name, category, key_actives, full_ingredients, retail_price_approx, is_catalog_standard, catalog_verified_at");
 
     if (catErr) {
       console.error(`[propose-routine] Failed reading products catalog: ${catErr.message}`);
       return errorResponse("INTERNAL_ERROR", "Failed to verify catalog products.", 500);
+    }
+
+    let boundProposal: BoundRoutineProposal;
+    try {
+      boundProposal = bindProposalToCommittedCatalog(proposal, context, dbCatalogRows || []);
+    } catch (error) {
+      console.error(`[propose-routine] Catalog identity binding failed: ${error instanceof Error ? error.message : 'invalid reference'}`);
+      return errorResponse("VALIDATION_FAILED", "Routine proposal changed a confirmed product identity.", 422);
+    }
+    const boundValidation = validateRoutineProposal(boundProposal, context);
+    if (!boundValidation.valid) {
+      console.error(`[propose-routine] Bound proposal validation failed: ${boundValidation.errors.join('; ')}`);
+      return errorResponse("VALIDATION_FAILED", "Generated routine proposal did not satisfy clinical safety criteria.", 422);
     }
 
     const trustedMap = new Map<string, TrustedProductInfo>();
@@ -317,7 +354,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Section 21: Reported Sensitivities Verification
-    const sensValidation = validateSensitivities(proposal, context, trustedMap);
+    const sensValidation = validateSensitivities(boundProposal, context, trustedMap);
     if (!sensValidation.valid) {
       console.error(`[propose-routine] Sensitivity validation failed: ${sensValidation.errors.join("; ")}`);
       return errorResponse(
@@ -329,7 +366,7 @@ Deno.serve(async (req: Request) => {
 
     // 9. Prepare Catalog Products Payload with Provenance Protection
     // Section 18 & 19: Trusted catalog rows cannot be overwritten; new proposed products are non-catalog-standard
-    const catalogProductsPayload = proposal.catalogProducts.map((cp: any) => {
+    const catalogProductsPayload = boundProposal.catalogProducts.map((cp) => {
       const key = `${cp.brand.trim().toLowerCase()}::${cp.name.trim().toLowerCase()}`;
       const trusted = trustedMap.get(key);
 
@@ -363,13 +400,14 @@ Deno.serve(async (req: Request) => {
       context.confirmedProducts.map((p) => `${p.brand.trim().toLowerCase()}::${p.name.trim().toLowerCase()}`)
     );
 
-    const userProductsPayload = proposal.productDecisions.map((d: any) => {
+    const userProductsPayload = boundProposal.productDecisions.map((d: any) => {
       const brand = (d.brand || '').trim();
       const name = (d.productName ?? d.product_name ?? '').trim();
       const key = `${brand.toLowerCase()}::${name.toLowerCase()}`;
       const isConfirmed = confirmedShelfKeys.has(key) && d.action !== 'ADD';
 
       return {
+        product_id: d.canonicalProductId,
         detected_brand: brand,
         detected_name: name,
         action: d.action,
@@ -381,7 +419,8 @@ Deno.serve(async (req: Request) => {
 
     // 11. Prepare Routine Items Payload
     const routineItemsPayload = [
-      ...proposal.amSteps.map((s: any) => ({
+      ...boundProposal.amSteps.map((s: any) => ({
+        product_id: s.canonicalProductId,
         order_index: s.order_index ?? s.order,
         timing: "am",
         product_name: s.product_name ?? s.productName,
@@ -394,7 +433,8 @@ Deno.serve(async (req: Request) => {
         why_chosen: s.why_chosen ?? s.whyChosen,
         watch_for: s.watch_for ?? s.watchFor,
       })),
-      ...proposal.pmSteps.map((s: any) => ({
+      ...boundProposal.pmSteps.map((s: any) => ({
+        product_id: s.canonicalProductId,
         order_index: s.order_index ?? s.order,
         timing: "pm",
         product_name: s.product_name ?? s.productName,

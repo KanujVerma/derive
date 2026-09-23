@@ -166,6 +166,8 @@ export function assembleCanonicalContext(
     name: string;
     category?: ProductCategory | string;
     keyActives?: string[];
+    submittedCatalogId?: string;
+    isCatalogStandard?: boolean;
   }> = [];
 
   for (const p of confirmedRaw) {
@@ -188,6 +190,8 @@ export function assembleCanonicalContext(
       name,
       category,
       keyActives: Array.isArray(p.keyActives) ? p.keyActives : [],
+      submittedCatalogId: p.isCatalogStandard === true && typeof p.id === 'string' ? p.id : undefined,
+      isCatalogStandard: p.isCatalogStandard === true,
     });
   }
 

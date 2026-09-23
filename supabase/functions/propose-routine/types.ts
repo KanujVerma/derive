@@ -74,6 +74,10 @@ export interface AssembledRoutineContext {
     name: string;
     category?: ProductCategory | string;
     keyActives?: string[];
+    submittedCatalogId?: string;
+    isCatalogStandard?: boolean;
+    shelfRef?: string;
+    catalogProductId?: string;
   }>;
   productReactions: Array<{
     productName?: string;
@@ -95,6 +99,7 @@ export interface AssembledRoutineContext {
 }
 
 export interface RoutineProposalStep {
+  shelfRef?: string;
   order: number;
   timing: 'am' | 'pm';
   productName: string;
@@ -109,6 +114,7 @@ export interface RoutineProposalStep {
 }
 
 export interface RoutineProposalProductDecision {
+  shelfRef?: string;
   productName: string;
   brand: string;
   category: ProductCategory;
@@ -118,6 +124,7 @@ export interface RoutineProposalProductDecision {
 }
 
 export interface CanonicalCatalogProduct {
+  shelfRef?: string;
   brand: string;
   name: string;
   category: ProductCategory;

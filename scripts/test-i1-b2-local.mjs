@@ -18,6 +18,9 @@ const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 // Tiny synthetic 1x1 JPEG blob
 const TINY_JPEG_BASE64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
 const tinyJpegBytes = Buffer.from(TINY_JPEG_BASE64, 'base64');
+let fixtureUserId = null;
+let fixtureCatalogId = null;
+let fixturePhotoPaths = [];
 
 async function run() {
   console.log('=== DERIVE I1-B2 Local Full-Stack E2E Test Harness ===\n');
@@ -63,6 +66,7 @@ async function run() {
   assert.ok(!uErr && uCreate?.user, `Failed creating test user: ${uErr?.message}`);
   const user = uCreate.user;
   const userId = user.id;
+  fixtureUserId = userId;
 
   assert.ifError((await adminClient.from('memberships').insert({
     user_id: userId, tier: 'founding_beta', status: 'active',
@@ -78,6 +82,18 @@ async function run() {
   assert.ok(!uSignErr && uSign.session, `User sign in failed: ${uSignErr?.message}`);
   const userJwt = uSign.session.access_token;
   console.log(`   ✓ Authenticated test user: ${userId}`);
+
+  const selectedCatalogId = crypto.randomUUID();
+  const selectedCatalogName = `B2 Catalog Cleanser ${runId}`;
+  const selectedCatalogBrand = 'Derive Test';
+  const observedAt = new Date().toISOString();
+  assert.ifError((await adminClient.from('products').insert({
+    id: selectedCatalogId, brand: selectedCatalogBrand, name: selectedCatalogName,
+    category: 'cleanser', is_catalog_standard: true, key_actives: [], full_ingredients: [],
+    catalog_source_reference: 'B2 local identity integration fixture',
+    catalog_observed_at: observedAt, catalog_verified_at: observedAt,
+  })).error);
+  fixtureCatalogId = selectedCatalogId;
 
   // -------------------------------------------------------------
   // Step 3: Trigger propose-routine BEFORE onboarding commit (must fail closed)
@@ -141,6 +157,7 @@ async function run() {
       right: rightPath,
       shelf: shelfPath,
     };
+    fixturePhotoPaths = [frontPath, leftPath, rightPath];
 
     // C. Commit onboarding intake
     const commitPayload = {
@@ -160,10 +177,12 @@ async function run() {
       pihTendencyAnswer: 'Sometimes',
       confirmedProducts: [
         {
-          brand: 'CeraVe',
-          name: 'Foaming Facial Cleanser',
+          id: selectedCatalogId,
+          isCatalogStandard: true,
+          brand: selectedCatalogBrand,
+          name: selectedCatalogName,
           category: 'cleanser',
-          keyActives: ['Ceramides', 'Niacinamide'],
+          keyActives: [],
         },
         {
           brand: 'Differin',
@@ -266,6 +285,12 @@ async function run() {
     // Steps verification
     assert.ok(routine.amSteps.length >= 2, 'amSteps must contain steps');
     assert.ok(routine.pmSteps.length >= 2, 'pmSteps must contain steps');
+    assert.ok(routine.amSteps.some((step) => step.productId === selectedCatalogId));
+    assert.ok(routine.pmSteps.some((step) => step.productId === selectedCatalogId));
+    assert.ok(proposalResult.userProducts.some((product) => product.productId === selectedCatalogId));
+    const manualProduct = proposalResult.userProducts.find((product) => product.product.brand === 'Differin');
+    assert.ok(manualProduct && manualProduct.productId !== selectedCatalogId);
+    assert.equal(manualProduct.isConfirmedByUser, true, 'manual Shelf product keeps its confirmation status');
 
     // Sunscreen AM Invariant
     const amSpf = routine.amSteps.find((s) => s.category === 'sunscreen');
@@ -309,6 +334,7 @@ async function run() {
       .select('*')
       .eq('routine_id', rRow.id);
     assert.ok(!iErr && dbItems.length > 0, 'routine_items must exist');
+    assert.ok(dbItems.some((item) => item.product_id === selectedCatalogId && item.product_name === selectedCatalogName));
     for (const item of dbItems) {
       assert.ok(item.product_id, `Item ${item.product_name} must have a valid product_id`);
       // Verify foreign key integrity
@@ -326,6 +352,7 @@ async function run() {
       .select('*, products(*)')
       .eq('user_id', userId);
     assert.ok(!upErr && dbUserProds.length > 0, 'user_products rows must exist');
+    assert.ok(dbUserProds.some((item) => item.product_id === selectedCatalogId && item.is_confirmed_by_user === true));
     for (const up of dbUserProds) {
       assert.ok(['KEEP', 'PAUSE', 'REPLACE', 'ADD', 'STOP'].includes(up.action));
       if (up.action === 'ADD') {
@@ -398,6 +425,7 @@ async function run() {
       .eq('routine_id', routineRow.id)
       .order('order_index', { ascending: true });
     assert.ok(itemRows.length > 0);
+    assert.ok(itemRows.some((item) => item.product_id === selectedCatalogId));
 
     // B. Query user_products joined with only member-readable product columns.
     // Catalog provenance has a separate server-only grant, so wildcard joins must fail.
@@ -407,6 +435,7 @@ async function run() {
       .eq('user_id', userId);
     assert.ifError(upReadError);
     assert.ok(upRows.length > 0);
+    assert.ok(upRows.some((item) => item.product_id === selectedCatalogId));
     assert.ok(upRows[0].products, 'Joined products row must be populated');
     console.log('   ✓ RLS and joined queries succeed for authenticated user');
   }
@@ -416,6 +445,18 @@ async function run() {
 
 run().finally(async () => {
   await adminClient.from('server_runtime_config').delete().eq('key', 'routine_model_provider');
+  if (fixturePhotoPaths.length > 0) {
+    const { error } = await adminClient.storage.from('customer-skin-photos').remove(fixturePhotoPaths);
+    assert.ifError(error);
+  }
+  if (fixtureUserId) {
+    const { error } = await adminClient.auth.admin.deleteUser(fixtureUserId);
+    assert.ifError(error);
+  }
+  if (fixtureCatalogId) {
+    const { error } = await adminClient.from('products').delete().eq('id', fixtureCatalogId);
+    assert.ifError(error);
+  }
 }).catch((err) => {
   console.error('\n❌ B2 E2E TEST FAILED:', err);
   process.exit(1);

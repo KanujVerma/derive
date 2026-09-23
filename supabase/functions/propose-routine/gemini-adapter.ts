@@ -37,6 +37,7 @@ export const GEMINI_PROPOSAL_RESPONSE_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
+          shelfRef: { type: 'STRING', description: 'For a confirmed Shelf product, echo its supplied shelfRef. Omit for additions.' },
           brand: { type: 'STRING' },
           name: { type: 'STRING' },
           category: {
@@ -60,6 +61,7 @@ export const GEMINI_PROPOSAL_RESPONSE_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
+          shelfRef: { type: 'STRING', description: 'For a confirmed Shelf product, echo its supplied shelfRef. Omit for additions.' },
           brand: { type: 'STRING' },
           productName: { type: 'STRING' },
           category: {
@@ -85,6 +87,7 @@ export const GEMINI_PROPOSAL_RESPONSE_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
+          shelfRef: { type: 'STRING', description: 'For a confirmed Shelf product, echo its supplied shelfRef. Omit for additions.' },
           order: { type: 'INTEGER' },
           timing: { type: 'STRING', enum: ['am'] },
           brand: { type: 'STRING' },
@@ -118,6 +121,7 @@ export const GEMINI_PROPOSAL_RESPONSE_SCHEMA = {
       items: {
         type: 'OBJECT',
         properties: {
+          shelfRef: { type: 'STRING', description: 'For a confirmed Shelf product, echo its supplied shelfRef. Omit for additions.' },
           order: { type: 'INTEGER' },
           timing: { type: 'STRING', enum: ['pm'] },
           brand: { type: 'STRING' },
@@ -161,7 +165,8 @@ DETERMINISTIC CLINICAL INVARIANTS YOU MUST STRICTLY OBEY:
 6. REMOVE HARSH ABRASIVES: Physical scrubs (apricot scrubs, walnut shell) and drying astringents (high alcohol denat) must be marked PAUSE or STOP to preserve barrier lipids.
 7. PHOTOPROTECTION RATIONALE: If the member has dark spots or reports PIH tendency (pihTendency is 'Often' or 'Sometimes'), emphasize diligent daily photoprotection in the sunscreen rationale to prevent UV-mediated reactive hyperpigmentation.
 8. PROPOSALS ARE NOT PRODUCT DATABASES: Only propose brand, productName, category, and keyActives. Do not invent pricing or full ingredient lists.
-9. PRESCRIPTION PRESERVATION: Never start, stop, substitute, or reschedule a prescription. If an active prescription has an explicit schedule, reproduce it exactly in the PM routine. If its identity or schedule is unclear, return a clarification question instead of generating a routine.`;
+9. PRESCRIPTION PRESERVATION: Never start, stop, substitute, or reschedule a prescription. If an active prescription has an explicit schedule, reproduce it exactly in the PM routine. If its identity or schedule is unclear, return a clarification question instead of generating a routine.
+10. SHELF REFERENCES: Each confirmedShelfProducts entry has an opaque shelfRef. Echo that shelfRef on its catalogProducts entry, productDecisions entry, and each routine step using it. Omit shelfRef for new additions. Never output a product UUID; only the server binds one.`;
 
 export function buildGeminiPrompt(context: AssembledRoutineContext): string {
   return JSON.stringify({
@@ -180,7 +185,13 @@ export function buildGeminiPrompt(context: AssembledRoutineContext): string {
       activePrescriptions: context.activePrescriptions,
       pihTendency: context.pihTendencyAnswer,
     },
-    confirmedShelfProducts: context.confirmedProducts,
+    confirmedShelfProducts: context.confirmedProducts.map((product) => ({
+      shelfRef: product.shelfRef,
+      brand: product.brand,
+      name: product.name,
+      category: product.category,
+      keyActives: product.keyActives,
+    })),
     productReactions: context.productReactions,
   });
 }
