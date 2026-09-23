@@ -66,6 +66,7 @@ export function createDeterministicTestProposal(
         actionReason = 'Keep at 3 nights/week. Cellular turnover active scheduled with recovery nights.';
         frequency = 3;
         userRetinoid = {
+          shelfRef: p.shelfRef,
           brand: p.brand,
           name: p.name,
           category: 'treatment',
@@ -86,6 +87,7 @@ export function createDeterministicTestProposal(
       frequency = 7;
       if (!userCleanser) {
         userCleanser = {
+          shelfRef: p.shelfRef,
           brand: p.brand,
           name: p.name,
           category: 'cleanser',
@@ -98,6 +100,7 @@ export function createDeterministicTestProposal(
       frequency = 7;
       if (!userMoisturizer) {
         userMoisturizer = {
+          shelfRef: p.shelfRef,
           brand: p.brand,
           name: p.name,
           category: 'moisturizer',
@@ -110,6 +113,7 @@ export function createDeterministicTestProposal(
       frequency = 7;
       if (!userSunscreen) {
         userSunscreen = {
+          shelfRef: p.shelfRef,
           brand: p.brand,
           name: p.name,
           category: 'sunscreen',
@@ -119,6 +123,7 @@ export function createDeterministicTestProposal(
     }
 
     productDecisions.push({
+      shelfRef: p.shelfRef,
       productName: p.name,
       brand: p.brand,
       category: cat,
@@ -190,6 +195,7 @@ export function createDeterministicTestProposal(
 
   for (const product of context.confirmedProducts) {
     addCatalog({
+      shelfRef: product.shelfRef,
       brand: product.brand,
       name: product.name,
       category: (product.category || 'other') as ProductCategory,
@@ -202,6 +208,7 @@ export function createDeterministicTestProposal(
 
   let amOrder = 1;
   amSteps.push({
+    shelfRef: effectiveCleanser.shelfRef,
     order: amOrder++,
     timing: 'am',
     productName: effectiveCleanser.name,
@@ -217,6 +224,7 @@ export function createDeterministicTestProposal(
   });
 
   amSteps.push({
+    shelfRef: effectiveMoisturizer.shelfRef,
     order: amOrder++,
     timing: 'am',
     productName: effectiveMoisturizer.name,
@@ -230,6 +238,7 @@ export function createDeterministicTestProposal(
   });
 
   amSteps.push({
+    shelfRef: effectiveSunscreen.shelfRef,
     order: amOrder++,
     timing: 'am',
     productName: effectiveSunscreen.name,
@@ -246,6 +255,7 @@ export function createDeterministicTestProposal(
 
   let pmOrder = 1;
   pmSteps.push({
+    shelfRef: effectiveCleanser.shelfRef,
     order: pmOrder++,
     timing: 'pm',
     productName: effectiveCleanser.name,
@@ -263,6 +273,7 @@ export function createDeterministicTestProposal(
     const prescriptionDays = prescription ? parsePrescriptionDays(prescription) : [];
     addCatalog(userRetinoid);
     pmSteps.push({
+      shelfRef: userRetinoid.shelfRef,
       order: pmOrder++,
       timing: 'pm',
       productName: userRetinoid.name,
@@ -278,6 +289,7 @@ export function createDeterministicTestProposal(
   }
 
   pmSteps.push({
+    shelfRef: effectiveMoisturizer.shelfRef,
     order: pmOrder++,
     timing: 'pm',
     productName: effectiveMoisturizer.name,
@@ -302,6 +314,18 @@ export function createDeterministicTestProposal(
       parsePrescriptionDays(item).length === 0
     )
   );
+
+  // Exercise provider wording drift in the B2 local integration fixture.
+  const renamedFixture = context.confirmedProducts.find((product) => product.name.startsWith('B2 Catalog Cleanser '));
+  if (renamedFixture) {
+    const renamed = renamedFixture.name.replace('B2 Catalog Cleanser ', 'B2 Provider Cleanser ');
+    const sameShelf = (brand: string, name: string, ref?: string) =>
+      renamedFixture.shelfRef ? ref === renamedFixture.shelfRef
+        : brand === renamedFixture.brand && name === renamedFixture.name;
+    for (const product of catalogProducts) if (sameShelf(product.brand, product.name, product.shelfRef)) product.name = renamed;
+    for (const decision of productDecisions) if (sameShelf(decision.brand, decision.productName, decision.shelfRef)) decision.productName = renamed;
+    for (const step of [...amSteps, ...pmSteps]) if (sameShelf(step.brand, step.productName, step.shelfRef)) step.productName = renamed;
+  }
 
   return {
     summarySentence,
