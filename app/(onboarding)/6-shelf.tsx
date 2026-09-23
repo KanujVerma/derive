@@ -13,7 +13,9 @@ import { colors, typography, spacing, radii, shadows } from '@/src/constants/the
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import type { Product, ProductCategory } from '@/src/types/schema';
 import { recognizeShelfProducts } from '@/src/services/catalog';
-import { buildCustomerShelfProduct } from '@/src/utils/shelfProducts';
+import { buildCustomerShelfProduct, buildCatalogShelfProduct, buildEditedShelfProduct } from '@/src/utils/shelfProducts';
+import type { CatalogProductSummary } from '@/src/contracts/ProductCatalog';
+import { CatalogProductSearch } from '@/src/components/catalog/CatalogProductSearch';
 import { CameraCapture } from '@/src/components/ui/CameraCapture';
 import { ShelfProductEditor } from '@/src/components/onboarding/ShelfProductEditor';
 import { Button } from '@/src/components/ui/Button';
@@ -57,6 +59,11 @@ export default function ShelfScreen() {
     }
   };
 
+  const handleAddCatalog = (item: CatalogProductSummary) => {
+    addProduct(buildCatalogShelfProduct(item));
+    void Haptics.selectionAsync().catch(() => {});
+  };
+
   const handleAddMissing = () => {
     setEditor({ kind: 'add' });
     void Haptics.selectionAsync().catch(() => {});
@@ -64,12 +71,14 @@ export default function ShelfScreen() {
 
   const handleSaveProduct = (details: { brand: string; name: string; category: ProductCategory }) => {
     if (!editor) return;
-    const id = editor.kind === 'edit'
-      ? editor.product.id
-      : `manual_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const product = buildCustomerShelfProduct(id, details);
-    if (editor.kind === 'edit') confirmProduct(product, editor.product);
-    else addProduct(product);
+    const manualId = `manual_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    if (editor.kind === 'edit') {
+      const product = buildEditedShelfProduct(editor.product, details, manualId);
+      if (product.id !== editor.product.id) {
+        removeProduct(editor.product.id);
+        addProduct(product);
+      } else confirmProduct(product, editor.product);
+    } else addProduct(buildCustomerShelfProduct(manualId, details));
     setEditor(null);
   };
 
@@ -110,11 +119,24 @@ export default function ShelfScreen() {
           We start with what is already on your counter so we can keep what works.
         </Text>
 
+        <CatalogProductSearch
+          onSelect={handleAddCatalog}
+          selectedIds={detectedProducts.map((product) => product.id)}
+        />
+        <TouchableOpacity
+          onPress={handleAddMissing}
+          accessibilityRole="button"
+          accessibilityLabel="Can't find it? Add manually"
+          style={{ alignSelf: 'flex-start', marginTop: spacing.sm, marginBottom: spacing.md }}
+        >
+          <Text style={styles.addManualText}>Can't find it? Add manually</Text>
+        </TouchableOpacity>
+
         {/* SCAN ACTION SECTION */}
         <View style={styles.actionCard}>
-          <Text style={styles.actionTitle}>Snap your current products</Text>
+          <Text style={styles.actionTitle}>Optional shelf photo</Text>
           <Text style={styles.actionDesc}>
-            Take a photo of your products. Derive will try to identify what it can. Review the list and add or correct anything missing.
+            If you want, save a photo of your current products. Add product names above so your Shelf stays accurate.
           </Text>
 
           <TouchableOpacity
@@ -148,9 +170,6 @@ export default function ShelfScreen() {
           <Text style={styles.shelfSectionTitle}>
             Current Products ({detectedProducts.length})
           </Text>
-          <TouchableOpacity onPress={handleAddMissing} accessibilityRole="button" accessibilityLabel="Add a product manually">
-            <Text style={styles.addManualText}>+ Add product</Text>
-          </TouchableOpacity>
         </View>
 
         {detectedProducts.length === 0 ? (
@@ -161,8 +180,8 @@ export default function ShelfScreen() {
             </Text>
             <Text style={styles.emptyShelfDesc}>
               {shelfPhotoUri
-                ? "We couldn't automatically read bottle labels from this photo. You can add your products manually using '+ Add product' above, or continue."
-                : "Snap your counter above or add what you use manually so we don't duplicate active ingredients."}
+                ? "Search above or add a product manually. You can continue even if it is not listed."
+                : "Search above or add what you use manually. You can continue if you are not sure."}
             </Text>
           </View>
         ) : (

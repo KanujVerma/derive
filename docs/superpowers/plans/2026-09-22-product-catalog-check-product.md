@@ -56,9 +56,9 @@
 **Files:** Update `docs/PRODUCT_CATALOG.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, and `docs/CONTEXT_SYNC.md` for the bounded platform handoff.
 
 - [x] Run `npm test`, both TypeScript checks, Expo web export, fresh Supabase reset, `supabase test db`, affected local integration harnesses, and `git diff --check`.
-- [ ] Open `Catalog: searchable product knowledge foundation`; require both exact-head CI jobs green and no S6 regression before merging.
-- [ ] Apply the merged migration to `snojlbqovlawewwqbviz`, deploy only `catalog-products`, and read back schema, permissions, catalog counts, and authenticated search. Ingest a source-backed starter only if the founder confirms it.
-- [ ] Record merge SHA, deployment evidence, remaining data-source boundary, and stable API contract for PR B.
+- [x] Open `Catalog: searchable product knowledge foundation`; require both exact-head CI jobs green and no S6 regression before merging.
+- [x] Apply the merged migration to `snojlbqovlawewwqbviz`, deploy only `catalog-products`, and read back schema, permissions, catalog counts, and authenticated search. Ingest a source-backed starter only if the founder confirms it.
+- [x] Record merge SHA, deployment evidence, remaining data-source boundary, and stable API contract for PR B.
 
 ### Task 5: Onboarding product search (PR B)
 
@@ -66,9 +66,9 @@
 
 **Interfaces:** `searchCatalog(query)` yields canonical summaries with `productId`; `buildCatalogShelfProduct` preserves UUID and catalog status while leaving chemistry empty until supported.
 
-- [ ] Write failing tests for one-tap canonical add, duplicate prevention, repeated search, manual fallback, catalog edit demotion, and no invented chemistry.
-- [ ] Implement debounced server search, result states, Add action, and the `Can't find it? Add manually` path without adding an onboarding screen.
-- [ ] Run focused tests and both TypeScript checks, then commit.
+- [x] Write failing tests for one-tap canonical add, duplicate prevention, repeated search, manual fallback, catalog edit demotion, and no invented chemistry.
+- [x] Implement debounced server search, result states, Add action, and the `Can't find it? Add manually` path without adding an onboarding screen.
+- [x] Run focused tests and both TypeScript checks.
 
 ### Task 6: Check a Product and S6 convergence (PR B)
 
@@ -76,12 +76,13 @@
 
 **Interfaces:** Name search selects a canonical `productId`; barcode calls S6 `resolve-product-identity` and uses that same ID; detail shows supported formula facts; personal fit remains unavailable without a verified S6 case and live evaluator.
 
-- [ ] Write failing tests for name/barcode convergence, five S6 states, unknown/ambiguous candidate handling, formula known versus unknown, no numerical score, and Remote Staging deep-link gating.
-- [ ] Implement a search-first Check a Product experience with barcode as a second input, candidate confirmation or founder-review status, and distinct formula/personal-fit sections. Keep camera/label/ingredient evidence contract-ready without enabling a provider.
-- [ ] Remove prototype fixtures from production lookup, run focused tests and Expo exports, then commit.
+- [x] Write failing tests for name/barcode convergence, five S6 states, unknown/ambiguous candidate handling, formula known versus unknown, no numerical score, and Remote Staging deep-link gating.
+- [x] Implement a search-first Check a Product experience with barcode as a second input, candidate confirmation or founder-review status, and distinct formula/personal-fit sections. Keep camera/label/ingredient evidence contract-ready without enabling a provider.
+- [x] Remove prototype fixtures from production lookup, run focused tests and Expo exports.
 
 ### Task 7: PR B validation and landing
 
-- [ ] Run full unit, TypeScript, test TypeScript, web and iOS exports, S6/pgTAP regression, and `git diff --check`.
+- [x] Run full unit, TypeScript, test TypeScript, web and iOS exports, S6/pgTAP regression, and `git diff --check`.
+- [ ] Commit the reviewed PR B change.
 - [ ] Open `Mobile: low-friction product search and Check a Product`, require exact-head CI green, merge normally, and verify main CI.
 - [ ] Read back hosted catalog counts and confirm no new TestFlight submission, External Beta Review, Ask/Scan staging exposure, or S6 trust regression. Return `PRODUCT_CATALOG_CHECK_PRODUCT_PACKET` with remaining data-source limits.

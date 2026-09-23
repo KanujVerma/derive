@@ -1,10 +1,9 @@
 /**
  * Prototype Catalog & Device Scanner Lookup
  *
- * Client-accessible product catalog fixture for instant test scanning and
- * barcode normalization/lookup. Used by the mobile camera layer before
- * sending the identified product to IDeriveService.scanProduct() for
- * personalized evaluation.
+ * Developer/test fixture for Mock demonstrations and barcode normalization.
+ * Production Check a Product uses authenticated catalog-products search and
+ * S6 resolve-product-identity, never this prototype as catalog authority.
  */
 
 import { getBarcodeLookupKeys } from '../utils/barcode.ts';
