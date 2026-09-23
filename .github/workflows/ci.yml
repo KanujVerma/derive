@@ -104,3 +104,6 @@ jobs:
 
       - name: Run catalog authenticated search E2E harness
         run: node scripts/test-catalog-local.mjs
+
+      - name: Run S-FREE-1 anonymous access E2E harness
+        run: node scripts/test-s-free-1-local.mjs
