@@ -2,7 +2,7 @@
 
 ## Current strategy and implementation status (2026-09-23)
 
-Check a Product is the approved free acquisition surface, but the target free funnel is not implemented: Remote Staging still hides the current route, uses the existing membership boundary, and has no anonymous free access. The hosted catalog handoff currently records 4 products, 1 sourced product, 1 alias, and 0 variants, identifiers, or formula versions. Catalog coverage is therefore a direct first-value risk; use demand-driven authoritative sources and truthful unknown fallback.
+Check a Product is the approved free acquisition surface. S-FREE-1 opens the **local platform** for authenticated guests to search sourced catalog facts and resolve typed/barcode product identity without managed membership; the mobile Remote Staging route remains hidden and hosted anonymous signup remains gated. The hosted catalog handoff currently records 4 products, 1 sourced product, 1 alias, and 0 variants, identifiers, or formula versions. Catalog coverage is therefore a direct first-value risk; use demand-driven authoritative sources and truthful unknown fallback. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the exact access/evidence boundary.
 
 The current PR #36/#37 search and Check paths and S6 evidence model are implemented boundaries, not proof of broad catalog coverage, live OCR/provider access, or free accountless routing. Personal Fit must become a deterministic baseline independent of H1P; that service is a future S-FREE-2 milestone. H1P remains useful for richer explanation, Ask and managed routine automation.
 
