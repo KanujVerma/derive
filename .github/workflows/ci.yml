@@ -63,6 +63,9 @@ jobs:
         with:
           version: 2.117.0
 
+      - name: Select Supabase image registry
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io' >> "$GITHUB_ENV"
+
       - name: Start Supabase local stack
         run: supabase start
 
