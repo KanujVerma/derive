@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.39.8";
+import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.39.8";
 import type {
   ContextProduct,
   ContextRoutineStep,
@@ -64,6 +64,7 @@ export async function readJsonObject(req: Request): Promise<Record<string, unkno
 
 export interface AuthenticatedRuntime {
   userId: string;
+  user: User;
   admin: SupabaseClient;
 }
 
@@ -88,6 +89,7 @@ export async function authenticate(req: Request): Promise<AuthenticatedRuntime> 
 
   return {
     userId: user.id,
+    user,
     admin: createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     }),

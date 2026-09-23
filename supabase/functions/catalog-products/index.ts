@@ -45,7 +45,7 @@ async function detail(admin: SupabaseClient, productId: string, variantId?: stri
 
   const variantsQuery = await admin.from('product_variants')
     .select('id,product_id,variant_name,region_code,package_size,catalog_public_source_url,catalog_observed_at,catalog_verification_status')
-    .eq('product_id', productId).eq('lifecycle_status', 'active')
+    .eq('product_id', productId).eq('lifecycle_status', 'active').eq('catalog_verification_status', 'verified')
     .order('variant_name').order('id').limit(31);
   if (variantsQuery.error || !variantsQuery.data) {
     console.error('catalog detail variants query failed:', variantsQuery.error?.code ?? 'empty');

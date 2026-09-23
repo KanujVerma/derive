@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { identityKindFromVerifiedUser } from "../_shared/access.ts";
 import {
   validateRoutineProposal,
   validateSensitivities,
@@ -132,6 +133,14 @@ async function authenticateFounder(req: Request): Promise<FounderRuntime> {
   });
   const { data: { user }, error } = await userClient.auth.getUser();
   if (error || !user) throw new FounderError("UNAUTHORIZED", "Session is invalid or expired", 401);
+  try {
+    if (identityKindFromVerifiedUser(user) !== "permanent") {
+      throw new FounderError("FORBIDDEN", "Founder access requires a permanent account", 403);
+    }
+  } catch (identityError) {
+    if (identityError instanceof FounderError) throw identityError;
+    throw new FounderError("OPERATIONS_UNAVAILABLE", "Founder identity could not be verified", 503);
+  }
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },

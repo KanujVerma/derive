@@ -22,6 +22,7 @@ import {
   readJsonObject,
   requireMemberEntitlement,
 } from "../_shared/runtime.ts";
+import { identityKindFromVerifiedUser } from "../_shared/access.ts";
 
 const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
 const CATALOG_PAGE_SIZE = 1_000;
@@ -59,6 +60,8 @@ interface ProductRow {
   id: string;
   brand: string;
   name: string;
+  is_catalog_standard: boolean;
+  catalog_verified_at: string | null;
 }
 
 interface VariantRow {
@@ -75,6 +78,7 @@ interface FormulaRow {
   normalized_ingredient_fingerprint: string;
   verification_status: "provisional" | "verified" | "rejected" | "superseded";
   source_reference: string;
+  catalog_public_source_url: string | null;
   observed_at: string;
   packaging_markers: string[] | null;
 }
@@ -234,19 +238,32 @@ async function verifyEvidencePhotos(admin: SupabaseClient, photos: ParsedEvidenc
   }
 }
 
-async function loadCatalog(admin: SupabaseClient): Promise<CatalogResolutionRecord[]> {
+async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<CatalogResolutionRecord[]> {
   const [productRows, variantRows, formulaRows, identifierRows] = await Promise.all([
-    loadPagedCatalogRows<ProductRow>("products", (from, to) => admin.from("products")
-      .select("id, brand, name").order("id", { ascending: true }).range(from, to)),
-    loadPagedCatalogRows<VariantRow>("variants", (from, to) => admin.from("product_variants")
-      .select("id, product_id, variant_name, region_code, packaging_markers")
-      .eq("lifecycle_status", "active").order("id", { ascending: true }).range(from, to)),
-    loadPagedCatalogRows<FormulaRow>("formulas", (from, to) => admin.from("product_formula_versions")
-      .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, observed_at, packaging_markers")
-      .order("id", { ascending: true }).range(from, to)),
-    loadPagedCatalogRows<IdentifierRow>("identifiers", (from, to) => admin.from("product_identifiers")
-      .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at")
-      .order("id", { ascending: true }).range(from, to)),
+    loadPagedCatalogRows<ProductRow>("products", (from, to) => {
+      const query = admin.from("products").select("id, brand, name, is_catalog_standard, catalog_verified_at");
+      if (freeOnly) query.eq("is_catalog_standard", true).not("catalog_verified_at", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+    loadPagedCatalogRows<VariantRow>("variants", (from, to) => {
+      const query = admin.from("product_variants")
+        .select("id, product_id, variant_name, region_code, packaging_markers")
+        .eq("lifecycle_status", "active");
+      if (freeOnly) query.eq("catalog_verification_status", "verified");
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+    loadPagedCatalogRows<FormulaRow>("formulas", (from, to) => {
+      const query = admin.from("product_formula_versions")
+        .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers");
+      if (freeOnly) query.eq("verification_status", "verified").not("catalog_public_source_url", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+    loadPagedCatalogRows<IdentifierRow>("identifiers", (from, to) => {
+      const query = admin.from("product_identifiers")
+        .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at");
+      if (freeOnly) query.not("verified_at", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
   ]);
 
   const products = new Map(productRows.map((row) => [row.id, row]));
@@ -278,7 +295,7 @@ async function loadCatalog(admin: SupabaseClient): Promise<CatalogResolutionReco
         brand: product.brand, name: product.name, variantName: variant.variant_name,
         regionCode: variant.region_code ?? undefined,
         formulaVerificationStatus: formula.verification_status,
-        formulaSourceReference: formula.source_reference,
+        formulaSourceReference: freeOnly ? formula.catalog_public_source_url ?? undefined : formula.source_reference,
         formulaObservedAt: formula.observed_at,
         ingredientFingerprint: formula.normalized_ingredient_fingerprint,
         packagingMarkers: [...(variant.packaging_markers ?? []), ...(formula.packaging_markers ?? [])],
@@ -300,7 +317,7 @@ async function loadCatalog(admin: SupabaseClient): Promise<CatalogResolutionReco
       identifierVerifiedAt: identifier.verified_at ?? undefined,
       identifierFormulaVersionId: identifier.formula_version_id ?? undefined,
       formulaVerificationStatus: formula?.verification_status,
-      formulaSourceReference: formula?.source_reference,
+      formulaSourceReference: freeOnly ? formula?.catalog_public_source_url ?? undefined : formula?.source_reference,
       formulaObservedAt: formula?.observed_at,
       ingredientFingerprint: formula?.normalized_ingredient_fingerprint,
       packagingMarkers: [...(variant.packaging_markers ?? []), ...(formula?.packaging_markers ?? [])],
@@ -311,7 +328,7 @@ async function loadCatalog(admin: SupabaseClient): Promise<CatalogResolutionReco
       records.push({
         formulaVersionId: formula.id,
         formulaVerificationStatus: formula.verification_status,
-        formulaSourceReference: formula.source_reference,
+        formulaSourceReference: freeOnly ? formula.catalog_public_source_url ?? undefined : formula.source_reference,
         formulaObservedAt: formula.observed_at,
         ingredientFingerprint: formula.normalized_ingredient_fingerprint,
         packagingMarkers: formula.packaging_markers ?? [],
@@ -406,11 +423,27 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return jsonResponse({ code: "METHOD_NOT_ALLOWED", error: "POST required" }, 405);
 
   try {
-    const { userId, admin } = await authenticate(req);
-    await requireMemberEntitlement(admin, userId);
+    const { userId, user, admin } = await authenticate(req);
+    let identityKind;
+    try { identityKind = identityKindFromVerifiedUser(user); }
+    catch { throw new ServiceError("IDENTITY_UNAVAILABLE", "Account identity could not be verified", 503); }
     const request = parseRequest(await readJsonObject(req), userId);
+    // Wave 1 accepts typed, barcode, and catalog evidence. Product photos
+    // remain managed-only until S-FREE-4 reviews guest Storage/lifecycle.
+    let managedAccess = false;
+    if (identityKind === "permanent") {
+      try {
+        await requireMemberEntitlement(admin, userId);
+        managedAccess = true;
+      } catch (error) {
+        if (!(error instanceof ServiceError) || error.code !== "MEMBERSHIP_REQUIRED") throw error;
+      }
+    }
+    if (request.evidencePhotos.length > 0 && !managedAccess) {
+      throw new ServiceError("PHOTO_EVIDENCE_MANAGED_ONLY", "Photo evidence is not available for free Check yet", 403);
+    }
     await verifyEvidencePhotos(admin, request.evidencePhotos);
-    const catalog = await loadCatalog(admin);
+    const catalog = await loadCatalog(admin, !managedAccess);
 
     const { data: replay, error: replayError } = await admin.from("product_resolution_cases")
       .select("id, resolution_state, product_id, variant_id, formula_version_id, next_action, requires_founder_review")
@@ -445,7 +478,8 @@ Deno.serve(async (req: Request) => {
       p_consumer: request.consumer,
       p_resolution_state: decision.state,
       p_next_action: decision.nextAction,
-      p_requires_founder_review: decision.requiresFounderReview,
+      // Free acquisition must never create an unbounded founder queue.
+      p_requires_founder_review: managedAccess && decision.requiresFounderReview,
       p_product_id: selectedProductId,
       p_variant_id: selectedVariantId,
       p_formula_version_id: selectedFormulaId,

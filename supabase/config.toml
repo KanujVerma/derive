@@ -25,6 +25,9 @@ enabled = true
 site_url = "http://127.0.0.1:8081"
 additional_redirect_urls = ["derive://**"]
 enable_signup = true
+# Local-only S-FREE-1 proof. Hosted anonymous Auth remains deliberately gated
+# until the S-OPS-1 abuse/lifecycle release review.
+enable_anonymous_sign_ins = true
 
 [auth.email]
 enable_signup = true
@@ -87,6 +90,12 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/resolve-product-identity/deno.json"
 entrypoint = "./functions/resolve-product-identity/index.ts"
+
+[functions.access-state]
+enabled = true
+verify_jwt = true
+import_map = "./functions/access-state/deno.json"
+entrypoint = "./functions/access-state/index.ts"
 
 [functions.ask-derive]
 enabled = true

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.116.0";
+import { identityKindFromVerifiedUser } from "./access.ts";
 
 export const commerceCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -116,6 +117,14 @@ export async function authenticateCommerceMember(req: Request): Promise<Authenti
   });
   const { data: { user }, error } = await userClient.auth.getUser();
   if (error || !user) throw new CommerceError("UNAUTHORIZED", "Session is invalid or expired", 401);
+  try {
+    if (identityKindFromVerifiedUser(user) !== "permanent") {
+      throw new CommerceError("PERMANENT_ACCOUNT_REQUIRED", "A permanent account is required for Managed Skincare", 403);
+    }
+  } catch (identityError) {
+    if (identityError instanceof CommerceError) throw identityError;
+    throw new CommerceError("IDENTITY_UNAVAILABLE", "Account identity could not be verified", 503);
+  }
 
   return {
     user,
