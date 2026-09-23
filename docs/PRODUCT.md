@@ -1,6 +1,33 @@
-# Derive Product Specification (V1)
+# Derive Product Specification: Current Strategy and Historical V1
 
-## Product Ethos: Set-It-and-Forget-It & Autopilot vs. Depth
+## Current strategy (approved target; not implemented)
+
+Derive is personalized skincare product intelligence first. **Free Check** answers “Should I use this?” through product-name search, barcode, front-label/package capture, and ingredient capture; later share/paste flows may follow. It presents only supported product identity, formula facts, uncertainty and provenance. If enough context exists, it adds categorical personal fit with no universal numerical score.
+
+The first launch should silently establish a Supabase anonymous authenticated identity and open CHECK. The user sees factual first-check value before an optional, roughly 45-second profile. Current shelf/history is optional progressive context. The target roots are CHECK / MY STUFF / PLAN / SHOP; account/settings stays in the header. Free use requires no managed entitlement. **$25 Managed Skincare** requires a permanent identity plus managed entitlement and adds routine construction and longitudinal care. Existing C1 navigation, E1 membership gates, and managed-first intake still describe runtime behavior; this documentation does not change them.
+
+| Capability | Free Check target | Managed Skincare target |
+| --- | --- | --- |
+| Access | Anonymous or permanent identity; no managed membership | Permanent identity plus managed entitlement |
+| Product facts | Supported catalog/formula facts and exact unknown states | Same Check |
+| Personal fit | Deterministic, categorical, explainable when evidence supports it | Same Check plus ongoing routine management |
+| Context | Optional goals, skin behavior/reactivity, material treatment/sensitivity/pregnancy context, shelf/history | Reuse free context; ask only missing detailed managed-care questions |
+| Photos | Private product evidence only when needed | Required baseline Front / Left / Right photos for managed intake |
+| Navigation | CHECK, MY STUFF, PLAN, SHOP | CHECK, MY STUFF, PLAN, SHOP; open PLAN |
+
+Free personalization covers up to about three goals (breakouts, dark/post-breakout marks, dryness/barrier, redness/sensitivity, texture, oiliness, aging/fine lines); dry/tight, balanced, combination, oily, or unsure behavior; reacts easily, generally tolerates, or unsure; and only material treatment/prescription (including retinoids, benzoyl peroxide and exfoliating acids), known sensitivity/allergy, and pregnancy/nursing context (Yes / No / Prefer not to say). Reuse existing canonical goal enums where sensible. Do not collect baseline photos, budget or routine complexity in this free flow. Do not infer race, ethnicity, ancestry, or Fitzpatrick.
+
+“Formula Details” is factual product/formula evidence. “Personal Fit” is user-contextual. The shipped C1 scanner still displays “FORMULA QUALITY”; replacing that UI text belongs to K-FREE-1 and is not implemented by this docs pass. Fit may consider supported roles, duplicate active classes, retinoid/exfoliant stacking, known sensitivities, current treatments, redundancy/gaps, and sufficiently supported user-reported tolerance. It must explain evidence used, state uncertainty, and fail closed without reliable identity/formula evidence. Model-provider output may improve explanation but must not be required for free Check.
+
+Catalog coverage is an acquisition risk: current hosted count is 4 products, 1 sourced product, 1 alias, and 0 variants, identifiers, or formula versions. Do not claim broad coverage or guess unknown products. The next scanner-first external beta needs the new flow, safe unknown fallback, anonymous RLS review, deterministic fit, and physical acceptance; H1P is not the factual Check gate.
+
+Dermatologist review is future trust/operations work. Say an individual plan was reviewed by a named dermatologist only when that person reviewed that plan. Protocol/advisory review needs different wording and separate legal/operational review. No dermatologist-certified feature exists today.
+
+## Historical managed-first specification (superseded 2026-09-23)
+
+The sections below preserve the earlier C1/Founding Beta product model and shipped UI details. They are implementation/history references, not the current target product model. Current code and hosted evidence still determine what is implemented.
+
+### Historical product ethos: Set-It-and-Forget-It & Autopilot vs. Depth
 
 Derive eliminates the cognitive overhead of skincare ("Your skincare, handled"). The member provides observations, baseline context, and counter products; Derive handles the interpretation, maintenance, and replenishment.
 

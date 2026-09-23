@@ -6,6 +6,16 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-23: Scanner-first product strategy and roadmap
+
+- **Predecessor:** clean `main@2b9ed059b6572949aae1d3d2a4673e83dd6e21df`; fetched `origin/main` matched this SHA before documentation work. PRs #28, #36, #37, #38, and #39 are present in first-parent merge history.
+- **Approved target:** Derive is free personalized skincare product intelligence first, with optional $25 Managed Skincare for ongoing routine management. First launch silently establishes a Supabase anonymous authenticated identity and opens Check. Show factual product/formula evidence before optional compact personalization. Target roots are CHECK / MY STUFF / PLAN / SHOP; no universal numerical product score.
+- **Implementation boundary:** current C1 navigation, Remote membership gate and hidden Remote Check route remain runtime truth. Anonymous free access, target navigation, profile persistence, deterministic baseline fit, free-context persistence, and scanner-first release are not implemented by this docs-only pass.
+- **PR #39 closure:** merge `2b9ed059b6572949aae1d3d2a4673e83dd6e21df` closes committed Shelf UUID preservation through server validation, opaque provider references, server rebinding, routine/user-product persistence, and member readback. Cross-product substitution fails closed; manual fallback and S6 variant/formula identity are unchanged. Recorded verification: 334 unit tests, 403 pgTAP assertions, both TS checks, web/iOS exports, green PR/main CI, and controlled hosted provider-free proof. `propose-routine` v3 is ACTIVE with JWT verification; live provider path remains H1P-unproven. The older pre-merge “remaining boundary” entry below is a historical checkpoint, not current ownership.
+- **Next parallel wave:** Kanuj owns K-FREE-1 customer/mobile shell; Sami owns S-FREE-1 anonymous/free access and RLS/security review. Sami owns each first-required shared contract, merges it, then hands it to Kanuj. See [ROADMAP.md](ROADMAP.md) and [OWNERSHIP.md](OWNERSHIP.md).
+- **Catalog/release risk:** current hosted catalog count is 4 products, 1 sourced product, 1 alias, and no variants, identifiers, or formula versions. H1P is no longer a free Check dependency; sourced coverage, unknown fallback, anonymous lifecycle/security, deterministic fit, and physical scanner-first acceptance remain gates.
+
+
 ## 2026-09-23: Catalog identity cleanup branch
 
 - **Predecessor:** clean `main@fd147ce45679d2f938bb57c683a26475668c26aa`, after the PR #38 CI repair. This branch closes only the committed-Shelf catalog UUID handoff in `propose-routine` and the stale CI ledger.
@@ -16,7 +26,7 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 
 - **Predecessor:** PR #37 merged at `main@50b58b941d47cf32a7c876916a174be12a11f580`. Its exact-head Verify & Build and Database & Integration checks both passed. Local validation passed 329 unit tests, 403 pgTAP assertions, both TypeScript checks, and web/iOS exports. Hosted catalog readback remained 4 products (1 sourced), 1 alias, 0 variants/identifiers/formulas. No EAS build or TestFlight submission was created.
 - **Main CI incident and closure:** Verify & Build passed, but three main Database & Integration attempts stopped before application assertions because GHCR pulls returned `toomanyrequests`, first for `pg_prove` and then for Supabase stack images. An authenticated GHCR pull also hit the same limit. PR #38 selected the CLI-supported Docker Hub registry and merged at `fd147ce45679d2f938bb57c683a26475668c26aa`. Final main CI run [35902132423](https://github.com/KanujVerma/derive/actions/runs/35902132423) passed both Verify & Build and Database & Integration. The repair changed no application, database, or hosted state.
-- **Remaining boundary:** Sami owns routine-service preservation of a customer-selected catalog UUID; the mobile payload carries it, but `propose-routine` currently drops it before persistence. H1P provider activation and physical Remote acceptance remain separate.
+- **Pre-merge remaining boundary (historical):** At this branch checkpoint Sami still owned routine-service preservation of the selected catalog UUID. PR #39 subsequently closed it; see the current strategy/closure checkpoint above. H1P and physical Remote acceptance remain separate.
 
 ## 2026-09-23: Catalog PR A hosted handoff and mobile consumer branch
 

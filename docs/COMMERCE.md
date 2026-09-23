@@ -2,7 +2,11 @@
 
 **Source of Truth**: Canonical architecture for Derive Shop, customer-facing commerce, and product acquisition.
 **Owner**: Kanuj for customer Shop presentation; Sami for future platform feeds and physical commerce backend. See `docs/ROADMAP.md` for single-owner milestones.
-**Status**: C1/C1.1 and C1.5A are landed. Production merchant listings remain empty pending stronger product, variant, and formula verification. C1.5B feeds and C1.5C Derive Shopify checkout are parked. S5 membership billing is separate.
+**Status:** C1/C1.1 and C1.5A describe the implemented legacy managed-member Shop; production merchant listings remain empty pending stronger product, variant, and formula verification. C1.5B feeds and C1.5C Derive Shopify checkout are parked. S5 billing remains a separate current implementation boundary.
+
+**Approved target (2026-09-23):** the root navigation is CHECK / MY STUFF / PLAN / SHOP. Free product checking does not require membership and remains separate from commerce. SHOP handles product acquisition/Where to Buy and future member benefits; sales, offers, margin, and affiliate data never affect product facts, Personal Fit, or ranking. “$25 Managed Skincare” is the paid target. Existing $25 Founding Beta display/checkout implementation is not proof that this new entitlement exists or that hosted billing activation passed.
+
+The sections below record the C1 Shop implementation and its commerce contracts. Their Today / Plan / Shop / Ask / Progress navigation and paid-only access describe current legacy runtime, not the target free product architecture.
 
 ---
 
@@ -71,7 +75,7 @@ Long-term product loop mental model:
 
 ---
 
-## 4. Navigation Architecture & Scan Migration
+## 4. Implemented C1 Navigation & Scan Migration (historical target)
 
 ### The Five Member Root Tabs
 Approved target and C1 implementation:
