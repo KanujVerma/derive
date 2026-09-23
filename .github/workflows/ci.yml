@@ -44,9 +44,6 @@ jobs:
   database:
     name: Database & Integration
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
 
     steps:
       - name: Checkout repository
@@ -66,10 +63,8 @@ jobs:
         with:
           version: 2.117.0
 
-      - name: Authenticate Supabase image pulls
-        env:
-          GHCR_TOKEN: ${{ github.token }}
-        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Select Supabase image registry
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io' >> "$GITHUB_ENV"
 
       - name: Start Supabase local stack
         run: supabase start
