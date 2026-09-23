@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-23: Catalog mobile landing and CI image registry repair
+
+- **Predecessor:** PR #37 merged at `main@50b58b941d47cf32a7c876916a174be12a11f580`. Its exact-head Verify & Build and Database & Integration checks both passed. Local validation passed 329 unit tests, 403 pgTAP assertions, both TypeScript checks, and web/iOS exports. Hosted catalog readback remained 4 products (1 sourced), 1 alias, 0 variants/identifiers/formulas. No EAS build or TestFlight submission was created.
+- **Main CI incident:** Verify & Build passed, but three main Database & Integration attempts stopped before application assertions because unauthenticated GHCR pulls returned `toomanyrequests`, first for `pg_prove` and then for Supabase stack images. A narrow follow-up workflow change gives this CI job read-only package permission and authenticates image pulls with its existing GitHub token. This does not change application, database, or hosted state. Main CI still needs fresh verification after that change lands.
+- **Remaining boundary:** Sami owns routine-service preservation of a customer-selected catalog UUID; the mobile payload carries it, but `propose-routine` currently drops it before persistence. H1P provider activation and physical Remote acceptance remain separate.
+
 ## 2026-09-23: Catalog PR A hosted handoff and mobile consumer branch
 
 - **Predecessor:** catalog PR #36 merged into `main@7b910486192af79a06d0801a81fd117bc965b5f1`, with both main CI jobs green. PR B starts from that contract, preserving separate review and deployment boundaries.

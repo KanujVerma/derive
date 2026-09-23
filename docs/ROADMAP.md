@@ -7,7 +7,7 @@ This opening section is the current execution plan. Earlier delivery records bel
 ## Product catalog and Check a Product V1 assignment
 
 - **Catalog foundation (PR A):** Kanuj completed the bounded platform catalog search/ingestion interface on top of S6 in PR #36, merged at `7b910486192af79a06d0801a81fd117bc965b5f1` and deployed to the verified hosted project. This one-time assignment does not transfer Sami's F1, H1P, H1B, or ongoing product-resolution ownership.
-- **Mobile consumer (PR B):** Kanuj is implementing onboarding search and Check a Product UX against the deployed catalog interface in a separate mobile branch. Current Remote Staging Ask/Scan gating stays in place; this milestone creates no TestFlight submission.
+- **Mobile consumer (PR B):** Kanuj landed onboarding search and Check a Product UX in PR #37 at `50b58b941d47cf32a7c876916a174be12a11f580`. Current Remote Staging Ask/Scan gating stays in place; this milestone created no TestFlight submission. Sami owns the routine-service UUID propagation follow-up documented in [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md).
 - **Source boundary:** demand-driven, operator-verified catalog entries only. Product-only records are valid; formula and package identity require separate S6 evidence. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md).
 
 ## Current milestone sequence

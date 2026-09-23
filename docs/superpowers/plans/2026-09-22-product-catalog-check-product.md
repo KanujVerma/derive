@@ -83,6 +83,8 @@
 ### Task 7: PR B validation and landing
 
 - [x] Run full unit, TypeScript, test TypeScript, web and iOS exports, S6/pgTAP regression, and `git diff --check`.
-- [ ] Commit the reviewed PR B change.
-- [ ] Open `Mobile: low-friction product search and Check a Product`, require exact-head CI green, merge normally, and verify main CI.
-- [ ] Read back hosted catalog counts and confirm no new TestFlight submission, External Beta Review, Ask/Scan staging exposure, or S6 trust regression. Return `PRODUCT_CATALOG_CHECK_PRODUCT_PACKET` with remaining data-source limits.
+- [x] Commit the reviewed PR B change.
+- [x] Open `Mobile: low-friction product search and Check a Product`, require exact-head CI green, and merge normally.
+- [ ] Verify main CI. A GHCR image-pull rate limit blocked its database job after merge; the separate CI repair branch addresses this environment gate.
+- [x] Read back hosted catalog counts and confirm no new TestFlight submission, External Beta Review, Ask/Scan staging exposure, or S6 trust regression.
+- [ ] Return `PRODUCT_CATALOG_CHECK_PRODUCT_PACKET` with remaining data-source limits.
