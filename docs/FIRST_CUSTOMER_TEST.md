@@ -1,4 +1,28 @@
-# Derive: First Customer Acceptance Script
+# Scanner-First External Beta Acceptance Plan
+
+**Purpose:** Future scanner-first beta acceptance. This is a target checklist, not evidence that the new flow or hosted anonymous access exists.
+
+**Owner:** Kanuj owns physical customer/mobile acceptance (K-ACCEPT-1). Sami owns anonymous Auth, RLS/security review, access contracts, deterministic fit, data lifecycle, and hosted evidence. Route cross-lane defects with exact evidence and owner.
+
+## Target first-launch and first-check flow
+
+- [ ] Fresh install silently establishes a Supabase anonymous authenticated identity; the UI does not show create account, sign-in, email, password, membership activation, long onboarding, baseline photos, or managed-routine setup.
+- [ ] The free user lands on CHECK and can start a check with product-name search, barcode, front-label/package capture, or ingredient capture. Verify permission and retry behavior for available capture paths.
+- [ ] Factual result appears before profile prompts. Record supported canonical identity, variant/package state, formula details only when exact evidence supports it, provenance that is customer-safe, and explicit uncertainty. Unknown stays unknown; no universal score.
+- [ ] Offer optional “Want to know if this fits you?” / “Personalize Derive in about 45 seconds.” Skip leaves factual checking useful. Completion refreshes the same product result.
+- [ ] Optional profile checks: up to about three goals (breakouts, dark/post-breakout marks, dryness/barrier, redness/sensitivity, texture, oiliness, aging/fine lines); skin behavior (dry/tight, balanced, combination, oily, unsure); reactivity (reacts easily, generally tolerates, unsure); material current treatments/prescriptions, retinoid/adapalene/tretinoin, benzoyl peroxide, exfoliating acids, known sensitivities/allergies, and pregnancy/nursing Yes / No / Prefer not to say. No race, ethnicity, ancestry or Fitzpatrick inference.
+- [ ] Add current products only as an optional later step. Verify explicit “add what you're using for overlap and stacking checks” messaging and using/considering/stopped states. Verify profile edit in MY STUFF and repeat check history when implemented.
+- [ ] Personal Fit is categorical, deterministic, explainable and based only on supported formula and user evidence; it is independent of H1P. It distinguishes formula facts from personal fit, exposes uncertainty, and gives no diagnosis or invented concentration.
+- [ ] Verify identity linking and loss/deletion/privacy behavior only after Sami's approved S-FREE-1/S-OPS-1 paths exist. Permanent identity is required before managed enrollment; test account linking without recording credentials or sensitive disclosures.
+- [ ] Verify target CHECK / MY STUFF / PLAN / SHOP navigation, free CHECK launch, and managed PLAN launch only after implementation. No Mock fixture leakage.
+
+## Beta release evidence required
+
+A scanner-first external beta requires real hosted anonymous/free access with explicit RLS/security review; supported factual result and safe unknown fallback; useful catalog coverage; deterministic fit and its evidence contract; private product evidence paths; anonymous cleanup, rate/abuse, linking and deletion behavior; physical first-launch/repeat-launch acceptance; and current privacy, support, and App Store Connect information generated from the actual future binary. H1P is not required for factual Check or baseline deterministic fit. No build, submission, or public link is created by this documentation plan.
+
+## Historical managed-first acceptance script
+
+The following script records an earlier paid-first customer flow. It is preserved as historical evidence and must not be used as the acceptance spec for the future scanner-first binary.
 
 **Purpose:** Verify that customer #1 can activate a $25/month Founding Beta membership, provide truthful intake data, and receive a reviewed skincare routine. Products are purchased separately. The first 10 members may receive manual founder care, but no step may invent product, formula, payment, or routine truth.
 

@@ -1,6 +1,8 @@
-# External TestFlight submission packet
+# Historical External TestFlight submission packet
 
-Operational notes for Build 8. This is not the roadmap. Credentials do not belong in this file.
+**Build-specific record:** this packet describes the old Build 8 managed-first beta and includes historical Build 9 notes. It is not the roadmap and does not describe the scanner-first product. Build 10 and earlier binaries remain historical/device evidence; the recorded Build 10 physical photo acceptance remains pending where noted in its evidence doc. Do not submit or edit this packet into future product truth.
+
+For the next intended public external beta, regenerate description, test instructions, reviewer-account requirements, privacy answers, screenshots, and support/privacy links from the actual scanner-first binary. Require a permanent reviewer account only if that binary's real functionality requires one. Do not change App Store Connect in the documentation pass. Credentials do not belong in this file.
 
 ## Beta App Description
 

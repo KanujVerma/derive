@@ -2,6 +2,16 @@
 
 Derive operates under uncompromising safety and privacy standards appropriate for handling sensitive consumer health information.
 
+
+## Approved scanner-first privacy requirements (future; not implemented)
+
+- Free skincare context remains sensitive whether the owner is anonymous or permanent. Private context, check history, products, reactions/tolerance, and product-evidence photos remain owner-bound. Anonymous Auth is an authenticated-role account with an anonymous identity claim, not the public `anon` API key/role. S-FREE-1 must review RLS, grants, Storage, RPCs, and Edge Function authorization for this exact identity before enabling free persistence. A guest identity is device/session-bound until linked to a permanent identity; losing the local session first can make that guest account and its context inaccessible to the customer.
+- The free profile is optional and limited to selected goals, skin behavior/reactivity, materially relevant treatments/prescriptions, explicit sensitivities/allergies, and pregnancy/nursing answer with Yes / No / Prefer not to say. Never infer race, ethnicity, ancestry, or Fitzpatrick. Do not add photos, budget or routine-complexity intake to the free flow.
+- Personal Fit is cosmetic and non-diagnostic. Deterministic rules must name supported evidence and uncertainty, fail closed when formula identity/context is insufficient, and make no unsupported safety or concentration claims. Formula Details and Personal Fit remain distinct.
+- Product evidence photos remain private and owner-bound, with current deletion guarantees preserved. Identity linking, anonymous cleanup, account deletion, lost-device/session expectations, and conflicts when linking to an existing account must be designed to preserve privacy and ownership. Abuse/rate controls are required. Permanent identity is required before Managed Skincare enrollment.
+- No ad tracking or session replay. Future funnel measurement is limited to coarse milestones; never transmit skin/ingredient text, product identity text, profile answers, prescription/sensitivity/pregnancy context, photos, or free text. Current analytics behavior must be described accurately; planned events are not active transmission.
+- Dermatologist involvement is future work. Individualized clinician review can change legal and operating obligations and must be reviewed before launch. Do not claim dermatologist certification or review that has not happened.
+
 ---
 
 ## 1. Clinical Scope, Medical Boundaries & Trust Language

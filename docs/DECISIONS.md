@@ -1,8 +1,8 @@
 # Derive Architecture Decision Records (ADRs)
 
-Key technical and product decisions accepted for Derive V1.
+Key technical and product decisions for Derive. Approved target decisions do not claim runtime implementation.
 
-**Current navigation decision (C1)**: The five root tabs are Today, Plan, Shop, Ask, and Progress. Scan is a capability inside Shop. This supersedes the tab placement in ADR-02, ADR-03, and the IA clause of ADR-26; those records remain below as historical decisions. ADR-30 still governs membership billing only. Physical-product commerce and its provider remain undecided.
+**Current approved product strategy (ADR-33)**: Derive is free personalized product intelligence first, with Check as the acquisition home and optional paid Managed Skincare for longitudinal care. Target navigation is CHECK / MY STUFF / PLAN / SHOP. The C1 Today / Plan / Shop / Ask / Progress navigation remains implemented runtime history, not the target IA. Anonymous Auth, free access, deterministic fit, and the target navigation are approved but not yet implemented. ADR-33 below records the accepted decisions; older rationale remains preserved with affected clauses superseded.
 
 ---
 
@@ -295,3 +295,21 @@ These findings are review evidence, not accepted contract changes. S1A does not 
 2. **Prior risk**: `useVoiceDictation` emitted canned `CONTEXT_SAMPLES` when native recognition was unavailable, which would have inserted fake text into production check-ins.
 3. **Mitigation implemented**: demo transcripts emit only when `__DEV__` is true. Production unsupported platforms keep typed input and do not start a fake listening session.
 4. **Remaining**: a future native transcription path requires an explicit architecture decision and accepted dependency. B4B persistence is not blocked on it.
+
+
+### ADR-33: Scanner-First Free Product Intelligence and Managed Skincare Layer
+
+- **Status:** ACCEPTED by founders; target architecture, not implementation evidence (2026-09-23).
+- **Context:** Derive's former managed-first funnel placed sign-in, paid membership, and long onboarding before product value. The new acquisition wedge answers “Should I use this?” for a specific product and, when evidence and context support it, for this user. Product truth and personal fit must remain understandable without universal scoring or forced paid conversion.
+- **Decision A — Free Check first:** Free Derive provides factual product intelligence and supported categorical personal fit. It is not intentionally crippled to force an upgrade. No arbitrary universal numerical product score or compatibility number is allowed.
+- **Decision B — Value before personalization:** First Check returns supported factual value before asking profile questions. A compact personalization offer is optional; skipping it preserves factual checking. Completing it refreshes the same product result.
+- **Decision C — Accountless experience, authenticated target:** The first-launch UX should silently establish a Supabase anonymous authenticated identity and open Check. Such users are authenticated-role users with an anonymous identity claim, not the public `anon` API role. Anonymous Auth requires explicit RLS/security review before use.
+- **Decision D — Free access and managed entitlement are separate:** Free Check is available to anonymous or permanent identities without managed entitlement. Do not create a `founding_beta` membership row for each free guest. Current E1 behavior remains runtime truth until a future implementation changes it.
+- **Decision E — Target root navigation:** CHECK / MY STUFF / PLAN / SHOP, with account/settings in the header. Free launch opens CHECK; managed launch opens PLAN / Today-like care. ASK can remain contextual; PROGRESS belongs within managed care unless evidence warrants a separate destination. Existing C1 code and evidence remain preserved.
+- **Decision F — Deterministic baseline fit:** Free fit must work without a model provider. It is categorical, explainable, evidence-backed, cosmetic/non-diagnostic, and fails closed when product/formula identity or relevant context is insufficient. A model may enrich explanation but cannot be the sole working path.
+- **Decision G — Separate facts from fit:** Use factual “Formula Details” separately from “Personal Fit.” A supported formula can still be a poor match for one person's context; unknown formula evidence stays unknown. No numeric compatibility score.
+- **Decision H — Permanent identity before Managed Skincare:** Managed enrollment requires a permanent identity plus managed entitlement.
+- **Decision I — No universal numerical product score:** Fit labels such as GREAT FIT, COULD WORK, NOT NEEDED, BETTER AS A REPLACEMENT, USE WITH CAUTION, and NOT A GOOD FIT RIGHT NOW communicate contextual categorical guidance, not a global product grade.
+- **Managed layer:** Target positioning is “$25 Managed Skincare”: routine construction and keep/add/remove/change decisions, longitudinal management, check-ins/progress, proactive adaptation, founder/expert review in beta, and separately reviewed future clinician and commerce benefits. Current Founding Beta display/billing code does not prove the target entitlement or hosted payment flow.
+- **Supersession:** The affected root-navigation and mandatory managed-first clauses in ADR-02, ADR-03, ADR-26, ADR-31 and C1 product docs are superseded as target behavior. ADR-14’s “FORMULA QUALITY” presentation label is superseded by factual “FORMULA DETAILS,” separate from Personal Fit. Their historical implementation and rationale remain intact. Older $100 all-in, $129 tier, and routine-derived price decisions stay superseded as already recorded.
+- **Consequences and gates:** S-FREE-1 owns anonymous identity, free access and RLS/security review; S-FREE-2 owns minimal profile persistence and deterministic fit; Kanuj consumes stable interfaces for mobile work. Anonymous lifecycle and abuse controls, catalog coverage and physical beta acceptance remain explicit roadmap gates.

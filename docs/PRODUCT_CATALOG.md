@@ -1,8 +1,16 @@
-# Shared product catalog and Check a Product V1
+# Shared product catalog and Check a Product
+
+## Current strategy and implementation status (2026-09-23)
+
+Check a Product is the approved free acquisition surface, but the target free funnel is not implemented: Remote Staging still hides the current route, uses the existing membership boundary, and has no anonymous free access. The hosted catalog handoff currently records 4 products, 1 sourced product, 1 alias, and 0 variants, identifiers, or formula versions. Catalog coverage is therefore a direct first-value risk; use demand-driven authoritative sources and truthful unknown fallback.
+
+The current PR #36/#37 search and Check paths and S6 evidence model are implemented boundaries, not proof of broad catalog coverage, live OCR/provider access, or free accountless routing. Personal Fit must become a deterministic baseline independent of H1P; that service is a future S-FREE-2 milestone. H1P remains useful for richer explanation, Ask and managed routine automation.
+
+**PR #39 is closed:** merge `2b9ed059b6572949aae1d3d2a4673e83dd6e21df` validates a committed sourced catalog UUID, sends only an opaque Shelf reference to the provider, binds the output back to the verified canonical UUID before routine persistence, and preserves the UUID through routine/user-product/member readback. Cross-product substitution fails closed; manual/provisional fallback and S6 variant/formula identity are unchanged. The recorded validation was 334 unit tests, 403 pgTAP assertions, both TypeScript checks, web/iOS exports, green PR and main CI, and a controlled hosted provider-free intake → routine → member readback proof. Hosted `propose-routine` v3 is ACTIVE with JWT verification enabled; the live provider path remains H1P-unproven. Do not reopen this completed UUID fix absent contradictory code evidence.
 
 ## Boundary
 
-One trusted catalog begins with `public.products` and extends through S6's `product_variants`, `product_identifiers`, and append-only `product_formula_versions`. A product name, variant, GTIN, formula version, and package provenance remain separate facts. The three hosted products observed at the start of this milestone are provisional (`is_catalog_standard = false`), so they cannot appear in customer catalog search. There is no blanket ingredient or formula truth for an identified product.
+One trusted catalog begins with `public.products` and extends through S6's `product_variants`, `product_identifiers`, and append-only `product_formula_versions`. A product name, variant, GTIN, formula version, and package provenance remain separate facts. At the start of the original catalog milestone, the three observed products were provisional (`is_catalog_standard = false`) and could not appear in customer catalog search. The current hosted handoff has 4 total products, 1 sourced product, 1 alias, and 0 variants, identifiers, or formulas. There is no blanket ingredient or formula truth for an identified product.
 
 ## PR A: searchable knowledge foundation
 
@@ -16,7 +24,7 @@ A source-backed initial product may be added after deployment only if the founde
 
 The Shelf screen leads with debounced catalog search and one-tap Add. Selection stores the canonical product UUID and `isCatalogStandard = true` with no invented ingredients. `Can't find it? Add manually` retains the existing provisional builder, duplicate checks, and ability to continue. Editing catalog identity into a different name converts it to a provisional customer entry, rather than retaining an unrelated catalog UUID.
 
-Check a Product uses the same catalog search and S6 resolver for typed/barcode identity. Search and barcode converge on the canonical product UUID. Barcode, typed identity, and future private label/ingredient photo evidence preserve S6's five trust states and candidate/founder review boundary. Product detail splits known formula facts from personal fit. Without a verified S6 case and live H1P evaluator, personal fit says it is unavailable, with no invented verdict or numeric score. Prototype products remain developer/test fixtures only. Current Remote Staging hides the Check a Product entry and guards direct routes until a separate release decision; no TestFlight submission is part of these PRs.
+Check a Product uses the same catalog search and S6 resolver for typed/barcode identity. Search and barcode converge on the canonical product UUID. Barcode, typed identity, and future private label/ingredient photo evidence preserve S6's five trust states and candidate/founder review boundary. Product detail splits known formula facts from personal fit. Current member Scan behavior remains bounded by its existing provider/evidence gates. The approved target adds a deterministic baseline Personal Fit independent of H1P; until S-FREE-2 lands, do not present that target as implemented. No invented verdict or numeric score. Prototype products remain developer/test fixtures only. Current Remote Staging hides the Check a Product entry and guards direct routes until a separate release decision; no TestFlight submission is part of these PRs.
 
 ## Acceptance and ownership
 

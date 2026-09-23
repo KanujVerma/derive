@@ -1,5 +1,17 @@
 # Project Context: Derive
 
+## Current approved strategy (2026-09-23)
+
+Derive is personalized skincare product intelligence first: a free Check acquisition wedge for factual, evidence-bounded product information and optional personal fit. The paid target is **$25 Managed Skincare**, ongoing routine construction and management. No universal score. See [ROADMAP.md](ROADMAP.md) for the current product flow, access matrix, milestones, gates and open implementation questions.
+
+**Not implemented yet:** silent Supabase anonymous Auth, free access without managed entitlement, optional minimal profile persistence, deterministic baseline fit, target CHECK / MY STUFF / PLAN / SHOP navigation, and scanner-first external beta. Current C1/E1 runtime remains managed-first. The anonymous target is authenticated-role Auth with an anonymous identity claim and requires a dedicated RLS/security review.
+
+**Current evidence:** PR #36/#37 catalog search and Check routes exist, but Remote Staging hides Check. The hosted catalog handoff has 4 products, 1 sourced product, 1 alias and no variants, identifiers or formula versions. PR #39 closes the catalog UUID handoff to routine persistence; hosted live-provider behavior remains H1P-unproven.
+
+## Historical managed-first project context (superseded as product strategy)
+
+The material below preserves prior Founding Beta and C1 product framing and release context. It may describe shipped runtime behavior, but it is not the approved target positioning, access model, navigation, or next-work plan. Read the current Roadmap and Ownership first.
+
 ## The Customer Promise
 **"Your skincare, handled."**
 

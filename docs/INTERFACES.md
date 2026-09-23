@@ -386,3 +386,16 @@ To truthfully determine whether an authenticated user requires onboarding or is 
 ### I. I1-B4 Contract Status
 - **B4A membership (IMPLEMENTED)**: `CustomerProfile.tier` is `'founding_beta'`. Display price is $25/month membership, products separate. `src/pricing/**` all-in engine removed. Mock/Remote map canonical `founding_beta` and fail closed otherwise.
 - **B4B check-in (IMPLEMENTED)**: Canonical `CheckInContextTag` plus `contextTags` / `contextNote` on `CheckIn` / `CheckInInput`. Persisted `CheckIn.contextTags` is a required array (legacy rows map to `[]`). Input remains optional. Legacy `notes` preserved. Tags are context, not causation. Real `submit-checkin` Edge Function exists. Remote `getProgress()` reads `public.check_ins` via RLS and does not call `get-progress`. Remote `learnedInsights` and `recentPhotos` are empty until later durable insight/photo-signer milestones.
+
+
+## 10. Approved free-access and fit interfaces (future; no signatures frozen)
+
+The contracts below are requirements for future milestones, not implemented methods or permission to bypass current E1 gates. Sami owns each platform contract when its milestone first needs it; Kanuj builds to fixtures/local customer-state seams and consumes the merged contract.
+
+- **S-FREE-1 access contract:** distinguish anonymous from permanent identity; expose canonical free-check access independently from managed entitlement; keep managed actions separately gated; document the FREE / MANAGED / BOTH classification for each current Edge Function/RPC and the exact errors/state transitions. Anonymous Supabase Auth remains `authenticated` role with an anonymous identity claim. Re-review RLS, grants, Storage, RPCs and Edge Function checks before enabling any anonymous path.
+- **S-FREE-2 profile/fit contract:** persist only the approved minimal free fields; accept evidence-backed product/formula state and explicit user context; return categorical fit, evidence used, uncertainty and a safe unknown state. No universal score, invented concentration, diagnostic output, or model-provider hard dependency. Sami defines and merges this contract; Kanuj consumes it for K-FREE-2.
+- **S-FREE-3 context contract:** owner-bound current products, considered/using/stopped state, check history and supported reactions/tolerance. Anonymous owner identity must be explicit. No client-authoritative ownership or cross-user projection.
+- **S-FREE-4 evidence contract:** private product evidence and candidate/resolution states reuse S6. Mobile capture submits evidence; only server/catalog authority determines canonical product/formula identity. Ambiguous, missing, or unsupported formula evidence stays unknown or enters review.
+- **S-PAID-1 managed contract:** permanent identity plus server-owned managed entitlement is required for managed operations. Founder-created routines use the existing validated publication authority; no client/RLS bypass. Free profile/context reuse during managed enrollment must preserve owner and safety boundaries.
+
+A shared contract is not co-owned implementation. The owning milestone records request, response, ownership, failure states, security rules, and compatibility; merges it; then names the dependent milestone. No same-contract parallel edits.

@@ -1,5 +1,15 @@
 # Derive System Architecture
 
+## Strategy status: implemented system and approved target
+
+**Implemented today:** the detailed topology below documents the existing C1 mobile app and E1 managed-membership access model. Remote mode currently requires a permanent signed-in account and active membership for managed onboarding/surfaces; the Remote Check route remains hidden. `anon` has no application-table privileges under the current policy baseline. Catalog search, S6 resolver contracts, and PR #39 identity preservation are implemented, but coverage is small and H1P live-provider behavior is unproven.
+
+**Approved target, not implemented:** free Check works for anonymous or permanent identities without managed entitlement. First launch silently creates a Supabase anonymous Auth identity and opens Check. A Supabase anonymous user is still an authenticated-role user with an anonymous identity claim; it is not the public `anon` key/role. S-FREE-1 must inspect every relevant table, function, Storage bucket and RPC, classify each operation FREE / MANAGED / BOTH, and review the exact anonymous RLS policy surface before enabling access. Do not assume current active-membership policies are safe for anonymous users.
+
+Target identity/access separates anonymous identity, permanent identity, free product intelligence, and paid Managed Skincare. Managed enrollment requires permanent identity plus a managed entitlement. Product facts and baseline fit remain separate services; the deterministic fit service must work without a model provider. Public or shareable factual product evidence does not weaken owner-bound private shelf, profile, reaction, history, or evidence-photo storage.
+
+The target root navigation is CHECK / MY STUFF / PLAN / SHOP. Existing C1 tabs remain shipped architecture until a later Kanuj implementation changes them. The roadmap's waves define interface owners and integration order.
+
 ## Architecture Overview
 
 Derive couples an Apple-grade client application with a privacy-first, model-orchestrated backend platform.
@@ -184,6 +194,11 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 ---
 
 ## 6. Telemetry & Analytics
+
+**Current transmission state:** live `src/services/analytics.ts` only logs allowlisted events to the console in development; it has no PostHog/network sender, and session replay is disabled. The event type currently includes product names/IDs for some scan/shop events. Do not transmit product/ingredient text or any skin/profile text when analytics is added. Do not describe planned measurement as active analytics.
+
+**Future conceptual funnel (not implemented):** first app open → first product check started → factual result viewed → personalization offered → personalization completed or skipped → personalized result viewed → current products added → repeat check → permanent account saved → Managed Skincare interest → Managed Skincare activation. Future events may record these milestone names and coarse outcomes only. Never include product/ingredient text, goals, skin behavior, prescriptions, sensitivities, pregnancy/nursing answers, photos, or free-text in event payloads.
+
 * **Provider**: Planned privacy-safe telemetry (PostHog; client-side allowlist implemented in `src/services/analytics.ts`; SDK integration planned).
 * **Strict Privacy Guardrails**:
   - `disable_session_recording: true` (Session replay strictly disabled).

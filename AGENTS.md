@@ -1,60 +1,31 @@
 # Derive Agent Guide
 
-## Purpose
-Derive is a managed skincare service ("Your skincare, handled"). This guide defines repository-wide rules, boundaries, and source-of-truth pointers for AI agents and human contributors.
+## Current product truth (2026-09-23)
 
-## Sources of Truth
-GitHub is the sole durable project context. The working tree records in-progress implementation; `main` is the shared implementation and documentation checkpoint. When information conflicts, actual implementation, runtime behavior, and tests outrank accepted repository decisions and docs. Drive holds customer-research artifacts only; it is not an architecture, roadmap, or agent handoff source. Before substantial work, read `docs/ROADMAP.md` and `docs/OWNERSHIP.md`, then the references relevant to the task:
-- `docs/CONTEXT_SYNC.md`: Meaningful repository-native cross-agent checkpoints and historical ledger.
-- `docs/OWNERSHIP.md`: Detailed directory ownership boundaries between founders.
-- `docs/ROADMAP.md`: Project milestones, deliverables, and execution phases.
-- `docs/DECISIONS.md`: Architectural decision records (ADRs).
-- `docs/ARCHITECTURE.md`: System topology, data flow, and runtime services.
-- `docs/INTERFACES.md`: Shared contracts, domain types, and service boundaries.
-- `docs/SAFETY_PRIVACY.md`: Clinical safety, privacy invariants, and dermatological boundaries.
+Derive's founder-approved direction is **personalized skincare product intelligence first**, with free Check a Product as the acquisition wedge and optional **$25 Managed Skincare** for ongoing care. A universal numerical product score is not part of the product.
 
-Read documents relevant to your specific task rather than loading all documentation indiscriminately.
+**Implemented today:** the mobile app still runs the C1 managed-first navigation (Today, Plan, Shop, Ask, Progress), and its shipped scanner result still uses the “FORMULA QUALITY” label. Remote access still follows the existing Auth and managed-membership gates; the anonymous free-check flow is not implemented. PRs #36/#37 added catalog search and Check a Product, but Remote Staging keeps that route hidden. S6 product identity and formula evidence remain fail-closed. PR #39 closed the selected catalog UUID handoff into routine persistence. The hosted catalog handoff count is 4 products, 1 sourced product, 1 alias, 0 variants, 0 identifiers, and 0 formula versions. `propose-routine` v3 is ACTIVE with JWT verification enabled; live provider-backed behavior remains unproven.
+
+**Approved target, not yet implemented:** replace the legacy formula label with factual “FORMULA DETAILS” beside separate “PERSONAL FIT”; silently create a Supabase anonymous authenticated identity; launch to Check; show factual product evidence before offering optional short personalization; use CHECK / MY STUFF / PLAN / SHOP; permit free checking without managed membership; require a permanent account plus managed entitlement for Managed Skincare. Anonymous Auth users have an authenticated-role identity claim and require explicit RLS/security review. Do not describe the target as unauthenticated or claim that this pass changed runtime behavior.
+
+The canonical current plan is [docs/ROADMAP.md](docs/ROADMAP.md), founder lanes and milestone handoffs are in [docs/OWNERSHIP.md](docs/OWNERSHIP.md), and accepted target decisions are in [docs/DECISIONS.md](docs/DECISIONS.md). See [docs/CONTEXT_SYNC.md](docs/CONTEXT_SYNC.md) for the PR #39 closure and strategy checkpoint.
 
 ## Ownership
-- **Kanuj (Customer Experience + Mobile)**: `app/**`, `src/components/**`, `src/constants/**`, customer-facing client state/helpers, mobile recovery UX, device/TestFlight acceptance.
-- **Sami (Platform + Intelligence + Operations)**: `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted configuration, server billing, product resolution, founder operations.
-- **Shared Contracts**: `src/contracts/**`, `src/domain/**`, `src/types/schema.ts`, manifests, CI, and architecture docs are interfaces, not co-owned implementation milestones. One milestone owns each required change and records the handoff.
 
-## Commercial truth
-- **Implemented (I1-B4A)**: Founding Beta membership display is `$25/month` via `config.betaPriceMonthly` (display only; Stripe/S5 owns charged money). Canonical identity is `founding_beta`. Products are purchased separately. Routine-derived all-in pricing (`src/pricing/**`) has been removed.
-- **Implemented (I1-B4B)**: optional multi-select weekly check-in context tags + one optional context note, persisted through real `submit-checkin` and RLS-backed progress reads. Tags are context, not causation.
-- **Implemented (S1–S4)**: platform foundation, core domain persistence, server intelligence, and founder operations console are on `main`.
-- **Implemented (S5)**: server-owned Stripe membership Checkout, Billing Portal, and signed webhook projection. Hosted Stripe/Supabase activation smoke remains pending. Production Remote mode remains disabled.
-- **Implemented (C1)**: member Shop V1 uses Today, Plan, Shop, Ask, and Progress as the five root tabs, with one Scan route inside Shop. Public Shop routing remains a future activation step.
-- **E1 entitlement**: Remote managed skincare requires canonical `CustomerBootstrapState.membershipStatus === 'active'`. Auth identity and onboarding readiness are separate. Production/non-concierge Remote still depends on S5 Checkout and its signed webhook. Remote staging Build 9 instead uses the server-owned `open_external_testflight_beta` flag to grant an authenticated account a non-Stripe Founding Beta membership, then rereads canonical state. Premium writes remain gated by Edge checks and RLS; production Remote remains disabled.
-- **C1.5A landed**: Shop-only merchant/listing/offer presentation and Where to Buy foundation. Production listings are empty until product, variant, and formula equivalence can be supported; `isCatalogStandard` alone is not acquisition authority. C1.5B feeds, C1.5C Shopify checkout, affiliate work, public Shop, and physical commerce automation are parked. See `docs/COMMERCE.md` and ADR-32.
-- **L0/L1A landed**: the `remote-staging` EAS profile selects preview public configuration and Remote mode, while development and production remain Mock. H1A verified the exact Derive project and placed its public URL/key in EAS preview. L1A subsequently installed and physically verified signed-out build `1.0.0 (5)` on an iPhone.
-- **H1A hosted baseline**: Kanuj's one-time platform assignment proved disposable post-auth entitlement, intake/Shelf/reaction snapshot, private photos, founder authorization, selected security and deletion in project `snojlbqovlawewwqbviz`. A synthetic admin entitlement is not Stripe proof. The model/provider choice remains open; a verified free-tier key could not be stored by this account's Supabase permissions, and direct adapter diagnostics received Google 503 high-demand. Hosted `propose-routine` returned `MODEL_UNAVAILABLE`; routine publication and dependent member surfaces remain blocked. See `docs/HOSTED_REMOTE_SMOKE.md`.
-- **AUTH-V1 / Build 9 landed**: Remote staging now has real email/password signup and sign-in, with hosted email confirmation disabled for the small Founding Beta. OTP code remains dormant and password reset is deliberately deferred. Build 9 can grant canonical free external-beta access through a private hosted release flag; while that flag is enabled, every authenticated staging account is eligible—it is a release gate, not an invite allowlist. Paused, cancelled, and Stripe-linked memberships are never overwritten. This is staging access, not payment proof.
-- **Build 10 landed**: native onboarding photo upload now sends Expo FileSystem `ArrayBuffer` data to the existing private bucket and server-issued path. Hosted adapter proof passed; physical TestFlight acceptance remains Kanuj-owned and pending. See `docs/BUILD10_PHOTO_UPLOAD.md`.
-- **L1A complete**: store-signed Remote staging `1.0.0 (5)` is installed and physically verified on an iPhone 17 Pro Max. Signed-out launch, identity diagnostics, validation, restart, background/foreground and offline/recovery passed. AUTH-V1 removes the earlier H1E blocker, but authenticated routine/device acceptance still belongs to L1B/L1C.
-- **Next work**: Sami owns F1 manual routine fallback now; H1P model-provider activation and H1B Stripe remain separate platform gates. H1E email OTP is no longer a Founding-Beta prerequisite and is parked as a future verified-email/recovery decision. Kanuj starts L1B after F1 and starts L1C after H1P using the current AUTH-V1 path. See `docs/ROADMAP.md` and `docs/OWNERSHIP.md`.
+- **Kanuj: customer and mobile lane.** Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client state/helpers, presentation, and physical device/TestFlight acceptance. The next mobile milestone is K-FREE-1, Scanner-First App Shell. It may use fixtures or a local customer-state abstraction while Sami builds the platform lane.
+- **Sami: platform and intelligence lane.** Owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted configuration, product identity, access control, and founder operations. The next platform milestone is S-FREE-1, Anonymous / Free Access Platform, including FREE / MANAGED / BOTH function classification and an explicit anonymous-user RLS/security review.
+- Shared contracts are interfaces, not co-owned implementation. The first milestone that needs a contract owns its minimal change, documents and merges it, then hands it off. Do not have both founders edit the same contract in parallel.
 
-Never silently implement the other founder's work. Record a cross-lane defect with exact evidence, affected interface, owner, and blocker status; continue safely or stop at the dependency. Update relevant repository docs when durable state changes, and record material shared-contract or milestone handoffs in `docs/CONTEXT_SYNC.md`.
+See the roadmap for all K-FREE, S-FREE, paid, operations, catalog, and acceptance milestones and the wave order. F1 is incorporated into S-PAID-1. H1P remains useful for richer provider-backed intelligence but does not block factual Check or deterministic baseline fit. H1E stays parked unless identity recovery needs reopen it.
 
-## Repository Freshness
-Before substantial work, fetch upstream and establish whether the working branch is in sync, behind, ahead, dirty, or diverged. Treat local repository state as authoritative only after this check.
-- **Clean and only behind `origin/main`**: Fast-forward safely using `git merge --ff-only origin/main`.
-- **Dirty, ahead, or diverged**: Preserve local work and reconcile deliberately. Never reset, force-push, overwrite, or silently discard uncommitted or unpushed work.
+## Sources of truth and working rules
 
-## Working Rules
-- **Inspect Before Inventing**: Review existing code, tests, and schema before introducing new abstractions or dependencies.
-- **Minimal Coherent Changes**: Prefer the smallest coherent change that completely solves the problem.
-- **Evidence-Grounded Refactoring**: Code and passing tests supersede stale documentation. Challenge architectural assumptions with code or test evidence, but never silently alter shared architecture.
-- **Security & Secrets**: Secrets, service-role keys, and LLM credentials belong strictly in server-side environments (`supabase/functions/**`, uncommitted `.env`). Never expose secrets in client bundles or `EXPO_PUBLIC_*` variables.
-- **Safety & Privacy Invariants**: Never weaken Auth, RLS, storage boundaries, or clinical safety guards for implementation convenience. Skincare advice is strictly cosmetic (non-diagnostic); emergency symptoms escalate immediately. Session replay is strictly disabled; sensitive photos/notes remain private.
-- **Repository checkpoint**: Update the canonical doc and add a concise `docs/CONTEXT_SYNC.md` entry when a material contract, architecture, safety rule, ownership handoff, or milestone state changes. Historical entries are not current instructions.
+GitHub `main` is the shared durable checkpoint. Before substantial work, fetch upstream and inspect branch state; preserve dirty or unpushed work. Current implementation, runtime, tests, and hosted evidence establish what exists. Accepted ADRs establish intended decisions. A target section never proves runtime implementation.
 
-## Validation
-Before claiming any substantial implementation complete:
-1. `npm test`: Unit test suite must pass 100%.
-2. `npx tsc --noEmit`: Strict application TypeScript check (0 errors).
-3. `npm run typecheck:tests`: Test TypeScript check (0 errors).
-4. `EXPO_NO_TELEMETRY=1 npx expo export -p web`: Production web export must build cleanly.
-5. Backend/database changes must additionally satisfy Supabase migrations and pgTAP tests (`supabase test db`).
-6. Inspect final `git diff`: Ensure zero unintended files, leaked secrets, temporary artifacts, or ownership boundary violations.
+Read [ROADMAP.md](docs/ROADMAP.md) and [OWNERSHIP.md](docs/OWNERSHIP.md), then only the relevant contracts and safety docs: [CONTEXT_SYNC.md](docs/CONTEXT_SYNC.md), [DECISIONS.md](docs/DECISIONS.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [INTERFACES.md](docs/INTERFACES.md), [SAFETY_PRIVACY.md](docs/SAFETY_PRIVACY.md), and the task-specific reference. Historical roadmap and context entries preserve evidence; their old next-action or navigation language is not current instruction. Drive holds customer-research artifacts only.
+
+Keep `service_role` keys, Stripe secrets, and model-provider credentials server-side; never place them in client bundles or `EXPO_PUBLIC_*` variables. Client routes use `src/services/deriveClient.ts` and `IDeriveService`; `app/**` must not import `src/services/ai-workflows/**`. Record material decisions, handoffs, and durable state changes in the canonical doc and a concise `docs/CONTEXT_SYNC.md` entry.
+
+Do not silently change the other founder's lane. Record cross-lane defects with reproduction, evidence, affected interface, owner, and blocker status. Never weaken Auth, RLS, private storage, deletion, or cosmetic/non-diagnostic boundaries for convenience. Keep photos and sensitive skin context private; do not infer race, ethnicity, ancestry, or Fitzpatrick category. Do not place sensitive skin or ingredient text in analytics. Session replay remains disabled.
+
+For docs-only tasks, validate links and scope, run `git diff --check`, and verify that no non-documentation files changed. Run implementation tests only when the task requires them.
