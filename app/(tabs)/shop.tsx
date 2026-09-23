@@ -50,6 +50,9 @@ import { membershipDisplayLabel } from '@/src/domain/types';
 import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { resolveShopHomeState } from '@/src/commerce/shopState';
 import { hydratePlanState } from '@/src/services/deriveClient';
+import { PreviewShopShell } from '@/src/components/shop/PreviewShopShell';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 
 export default function ShopScreen() {
   const router = useRouter();
@@ -66,6 +69,10 @@ export default function ShopScreen() {
   } = useRoutineStore();
 
   const audience = useShopAudience();
+  const targetShell = resolveShellPresentation({
+    buildFlavor: publicEnvironment.buildFlavor,
+    remoteEnabled: isRemoteServiceEnabled(),
+  }) === 'scanner_first_preview';
   const isMember = audience === 'member';
   const isPublished = routine?.status === 'published';
 
@@ -162,6 +169,8 @@ export default function ShopScreen() {
       'Founder quality review during beta',
     ],
   };
+
+  if (targetShell) return <PreviewShopShell />;
 
   // =============================================
   // RENDER: MEMBER SHOP

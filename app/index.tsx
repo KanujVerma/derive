@@ -7,6 +7,8 @@ import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveAuthRoute } from '@/src/utils/authRouting';
 import { colors } from '@/src/constants/theme';
+import { publicEnvironment } from '@/src/config/environment';
+import { resolveShellLanding, resolveShellPresentation } from '@/src/utils/shellPresentation';
 
 export default function Index() {
   const isCompleted = useOnboardingStore((s) => s.isCompleted);
@@ -17,6 +19,7 @@ export default function Index() {
   const bootstrapRefreshing = useBootstrapStore((s) => s.isRefreshing);
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
   const remoteEnabled = isRemoteServiceEnabled();
+  const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled });
 
   const destination = resolveAuthRoute({
     remoteEnabled,
@@ -35,6 +38,10 @@ export default function Index() {
         <ActivityIndicator size="small" color={colors.ink} />
       </View>
     );
+  }
+
+  if (shell === 'scanner_first_preview') {
+    return <Redirect href={resolveShellLanding(shell, 'free')} />;
   }
 
   return <Redirect href={destination.route!} />;

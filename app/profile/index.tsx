@@ -30,8 +30,19 @@ import { signOutSession } from '@/src/services/authClient';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import { useAuthStore } from '@/src/stores/authStore';
+import { PreviewAccountShell } from '@/src/components/account/PreviewAccountShell';
+import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 
 export default function ProfileScreen() {
+  const shell = resolveShellPresentation({
+    buildFlavor: publicEnvironment.buildFlavor,
+    remoteEnabled: isRemoteServiceEnabled(),
+  });
+  if (shell === 'scanner_first_preview') return <PreviewAccountShell />;
+  return <LegacyProfileScreen />;
+}
+
+function LegacyProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { fullName, email, loadArthurDemoUser, resetToDefault } = useUserStore();

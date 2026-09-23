@@ -8,6 +8,8 @@ import { GlassContainer } from '@/src/components/ui/GlassContainer';
 import { Icon, IconName } from '@/src/components/ui/Icon';
 import { publicEnvironment } from '@/src/config/environment';
 import { usesFreeExternalBetaPresentation } from '@/src/utils/membershipPresentation';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 
 const TAB_BAR_HEIGHT = 56;
 
@@ -25,6 +27,10 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomOffset = Math.max(insets.bottom, 12);
   const hideAsk = usesFreeExternalBetaPresentation(publicEnvironment.buildFlavor);
+  const targetShell = resolveShellPresentation({
+    buildFlavor: publicEnvironment.buildFlavor,
+    remoteEnabled: isRemoteServiceEnabled(),
+  }) === 'scanner_first_preview';
 
   return (
     <Tabs
@@ -65,9 +71,26 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
+        name="check"
+        options={{
+          title: 'Check',
+          href: targetShell ? undefined : null,
+          tabBarIcon: ({ focused }) => <TabIcon label="Check" icon="scan" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="my-stuff"
+        options={{
+          title: 'My Stuff',
+          href: targetShell ? undefined : null,
+          tabBarIcon: ({ focused }) => <TabIcon label="My Stuff" icon="bottle" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: 'Today',
+          href: targetShell ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <TabIcon label="Today" icon="today" focused={focused} />
           ),
@@ -102,7 +125,7 @@ export default function TabLayout() {
         name="ask"
         options={{
           title: 'Ask',
-          href: hideAsk ? null : undefined,
+          href: targetShell || hideAsk ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <TabIcon label="Ask" icon="ask" focused={focused} />
           ),
@@ -112,6 +135,7 @@ export default function TabLayout() {
         name="progress"
         options={{
           title: 'Progress',
+          href: targetShell ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <TabIcon label="Progress" icon="progress" focused={focused} />
           ),

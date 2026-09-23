@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
@@ -21,6 +21,8 @@ import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
 import { publicEnvironment } from '@/src/config/environment';
 import { showsProviderBetaFeatures } from '@/src/utils/membershipPresentation';
+import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import {
   ensureInitialRoutineProposal,
   hydrateResearchInsights,
@@ -28,6 +30,15 @@ import {
 } from '@/src/services/deriveClient';
 
 export default function TodayScreen() {
+  const shell = resolveShellPresentation({
+    buildFlavor: publicEnvironment.buildFlavor,
+    remoteEnabled: isRemoteServiceEnabled(),
+  });
+  if (shell === 'scanner_first_preview') return <Redirect href="/(tabs)/check" />;
+  return <LegacyTodayScreen />;
+}
+
+function LegacyTodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {

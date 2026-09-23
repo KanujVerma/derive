@@ -8477,9 +8477,14 @@ test('C1 Shop: only five member root tabs exist (no sixth tab)', () => {
 test('C1 Shop: only one scanner implementation (no duplicate)', () => {
   const tabScanContent = fs.readFileSync(path.resolve('app/(tabs)/scan.tsx'), 'utf8');
   assert.ok(tabScanContent.includes('Redirect'), 'app/(tabs)/scan.tsx must be a redirect shim');
-  assert.ok(!tabScanContent.includes('CameraView'), 'app/(tabs)/scan.tsx must NOT contain CameraView — scanner is in shop/scan.tsx');
+  assert.ok(!tabScanContent.includes('CameraView'), 'legacy tab redirect must not contain a scanner');
   const shopScanContent = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
-  assert.ok(shopScanContent.includes('CameraView'), 'app/shop/scan.tsx must be the canonical scanner');
+  const targetCheckContent = fs.readFileSync(path.resolve('app/(tabs)/check.tsx'), 'utf8');
+  const sharedCheckContent = fs.readFileSync(path.resolve('src/components/check/CheckProductScreen.tsx'), 'utf8');
+  assert.ok(shopScanContent.includes('CheckProductScreen'));
+  assert.ok(targetCheckContent.includes('CheckProductScreen'));
+  assert.ok(!shopScanContent.includes('CameraView') && !targetCheckContent.includes('CameraView'));
+  assert.ok(sharedCheckContent.includes('CameraView'), 'shared Check component must own the one scanner');
 });
 
 test('C1 Shop: legacy /(tabs)/scan redirects to /shop/scan', () => {
@@ -8559,9 +8564,9 @@ test('C1 Shop: product detail resolves canonical member product by productId and
 
 test('C1 Shop: non-member Scan entry and direct route are locked', () => {
   const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
-  const scanContent = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  const scanContent = fs.readFileSync(path.resolve('src/components/check/CheckProductScreen.tsx'), 'utf8');
   assert.ok(shopContent.includes('Available with membership when enabled'));
-  assert.ok(scanContent.includes("if (audience !== 'member')"));
+  assert.ok(scanContent.includes("if (!preview && audience !== 'member')"));
   assert.ok(scanContent.includes('Product checking requires Derive membership in supported releases.'));
 });
 
@@ -8881,7 +8886,7 @@ test('C1.1 Scan access: Today and Shop headers expose the canonical scanner', ()
 });
 
 test('C1.1 Scan result: product identity and verdict precede formula detail', () => {
-  const scan = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  const scan = fs.readFileSync(path.resolve('src/components/check/CheckProductScreen.tsx'), 'utf8');
   const invalidBranch = scan.indexOf("resultPresentation.kind === 'invalid'");
   const readyBranch = scan.indexOf("resultPresentation.kind === 'ready'");
   const result = scan.slice(readyBranch, scan.indexOf('if (isSearching)'));
@@ -8939,7 +8944,7 @@ test('C1.1 Scan result boundary: every canonical verdict keeps its category labe
 });
 
 test('C1.1 Scan failure remains recoverable when camera permission is denied', () => {
-  const scan = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  const scan = fs.readFileSync(path.resolve('src/components/check/CheckProductScreen.tsx'), 'utf8');
   const failureBranch = scan.indexOf('if (invalidResult || (evaluationError && !scanResult))');
   const permissionBranch = scan.indexOf('if (permission && !permission.granted)');
   assert.ok(failureBranch > 0 && failureBranch < permissionBranch,
@@ -9059,7 +9064,7 @@ test('C1.5A: safe handoff tracks only successful open with minimal payload', asy
 test('C1.5A: presentation and boundary avoid Scan, Orders, checkout and backend changes', () => {
   const detail = fs.readFileSync(path.resolve('app/shop/[productId].tsx'), 'utf8');
   const section = fs.readFileSync(path.resolve('src/components/shop/ProductCommerceSection.tsx'), 'utf8');
-  const scan = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
+  const scan = fs.readFileSync(path.resolve('src/components/check/CheckProductScreen.tsx'), 'utf8');
   const recommendation = fs.readFileSync(path.resolve('src/services/ai-workflows/routine-generator.ts'), 'utf8');
   assert.match(detail, /resolvePurchaseOptions/);
   assert.match(section, /Where to Buy/);
