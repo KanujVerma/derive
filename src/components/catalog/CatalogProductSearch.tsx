@@ -6,6 +6,7 @@ import { colors, radii, spacing, typography } from '../../constants/theme';
 
 interface Props {
   onSelect: (product: CatalogProductSummary) => void;
+  search?: (query: string) => Promise<CatalogProductSummary[]>;
   selectedIds?: readonly string[];
   actionLabel?: string;
   label?: string;
@@ -18,6 +19,7 @@ interface Props {
 
 export function CatalogProductSearch({
   onSelect, selectedIds = [], actionLabel = 'Add', label = 'Add Product',
+  search = searchCatalogProducts,
   placeholder = 'Search brand or product name', keepFocusAfterSelect = true, onQueryChange,
   errorCopy = 'Search is unavailable right now. You can still add a product manually.',
   emptyCopy = 'No catalog match yet. Try another name or add it manually.',
@@ -41,13 +43,13 @@ export function CatalogProductSearch({
     setLoading(true);
     setError(false);
     const timer = setTimeout(() => {
-      searchCatalogProducts(cleaned)
+      search(cleaned)
         .then((items) => { if (requestVersion.current === version) setResults({ query: cleaned, items }); })
         .catch(() => { if (requestVersion.current === version) { setResults({ query: cleaned, items: [] }); setError(true); } })
         .finally(() => { if (requestVersion.current === version) setLoading(false); });
     }, 275);
     return () => { clearTimeout(timer); requestVersion.current++; };
-  }, [query]);
+  }, [query, search]);
 
   const select = (item: CatalogProductSummary) => {
     onSelect(item);

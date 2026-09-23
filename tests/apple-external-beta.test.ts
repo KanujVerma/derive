@@ -68,7 +68,7 @@ test('Build 8: remote-staging hides price, Ask, and Scan entry points', () => {
     'app/(auth)/signup.tsx',
   ].map(read).join('\n');
   assert.ok(files.includes('usesFreeExternalBetaPresentation') || files.includes('showsProviderBetaFeatures') || files.includes('conciergeAccess'));
-  assert.ok(read('app/(tabs)/_layout.tsx').includes('href: hideAsk ? null'));
+  assert.ok(read('app/(tabs)/_layout.tsx').includes('href: targetShell || hideAsk ? null'));
   assert.ok(read('app/(tabs)/shop.tsx').includes('showProviderFeatures'));
   assert.ok(read('app/(tabs)/index.tsx').includes('showsProviderBetaFeatures'));
   assert.ok(read('app/profile/index.tsx').includes("freeBeta ? 'Support'"));

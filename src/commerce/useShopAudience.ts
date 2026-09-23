@@ -3,6 +3,8 @@ import { useBootstrapStore } from '../stores/bootstrapStore';
 import { useUserStore } from '../stores/userStore';
 import { isRemoteServiceEnabled } from '../services/DeriveService';
 import { resolveShopAudience } from './types';
+import { publicEnvironment } from '../config/environment';
+import { resolveShellPresentation, resolveShellShopAudience } from '../utils/shellPresentation';
 
 /** One presentation boundary for Shop, product detail, and Scan. */
 export function useShopAudience() {
@@ -12,8 +14,9 @@ export function useShopAudience() {
   const bootstrapMembershipStatus = useBootstrapStore((state) => state.bootstrapState?.membershipStatus);
   const mockUserId = useUserStore((state) => state.userId);
   const mockMembershipStatus = useUserStore((state) => state.membershipStatus);
-  return resolveShopAudience({
-    remote: isRemoteServiceEnabled(),
+  const remoteEnabled = isRemoteServiceEnabled();
+  const audience = resolveShopAudience({
+    remote: remoteEnabled,
     sessionUserId,
     bootstrapUserId,
     bootstrapReady,
@@ -21,4 +24,8 @@ export function useShopAudience() {
     mockUserId,
     mockMembershipStatus,
   });
+  return resolveShellShopAudience(
+    resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled }),
+    audience,
+  );
 }

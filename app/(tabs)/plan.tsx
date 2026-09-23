@@ -19,8 +19,21 @@ import { InfoBanner } from '@/src/components/ui/InfoBanner';
 import { analytics } from '@/src/services/analytics';
 import { ensureInitialRoutineProposal } from '@/src/services/deriveClient';
 import { useShopAudience } from '@/src/commerce/useShopAudience';
+import { PreviewPlanShell } from '@/src/components/plan/PreviewPlanShell';
+import { publicEnvironment } from '@/src/config/environment';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 
 export default function PlanScreen() {
+  const shell = resolveShellPresentation({
+    buildFlavor: publicEnvironment.buildFlavor,
+    remoteEnabled: isRemoteServiceEnabled(),
+  });
+  if (shell === 'scanner_first_preview') return <PreviewPlanShell />;
+  return <LegacyManagedPlanScreen />;
+}
+
+function LegacyManagedPlanScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
