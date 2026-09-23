@@ -28,4 +28,23 @@ Keep `service_role` keys, Stripe secrets, and model-provider credentials server-
 
 Do not silently change the other founder's lane. Record cross-lane defects with reproduction, evidence, affected interface, owner, and blocker status. Never weaken Auth, RLS, private storage, deletion, or cosmetic/non-diagnostic boundaries for convenience. Keep photos and sensitive skin context private; do not infer race, ethnicity, ancestry, or Fitzpatrick category. Do not place sensitive skin or ingredient text in analytics. Session replay remains disabled.
 
-For docs-only tasks, validate links and scope, run `git diff --check`, and verify that no non-documentation files changed. Run implementation tests only when the task requires them.
+## Implementation validation
+
+Before claiming any substantial implementation complete:
+
+1. `npm test` must pass with all tests passing.
+2. `npx tsc --noEmit` must pass with zero errors.
+3. `npm run typecheck:tests` must pass with zero errors.
+4. `EXPO_NO_TELEMETRY=1 npx expo export -p web` must build cleanly.
+5. For mobile changes that affect native/customer runtime, also run the repository's iOS JavaScript/export validation where applicable, such as `EXPO_NO_TELEMETRY=1 npx expo export -p ios`.
+6. For backend, database, Auth, or RLS changes, additionally:
+   - replay migrations from a fresh local database state (`supabase db reset`);
+   - run the full pgTAP/database suite (`supabase test db`);
+   - run the relevant existing Edge/local integration smoke checks;
+   - verify least-privilege and RLS behavior for every changed identity or role.
+7. Inspect the final diff for unintended files, secrets, temporary artifacts, and ownership-boundary violations. Run `git diff --check`.
+8. Require exact-head CI to be green before merging substantial implementation work.
+
+## Docs-only validation
+
+For docs-only tasks, validate links and scope, run `git diff --check`, and verify that no non-documentation files changed. The application suite is not required unless the documentation scope itself requires it.
