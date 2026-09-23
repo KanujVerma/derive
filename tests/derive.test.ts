@@ -9349,7 +9349,7 @@ test('S6 integration: personalized Scan accepts only an owner-bound verified res
   assert.match(founderFunction, /founder_resolve_product_identity/);
 });
 
-test('S6 endpoint: authenticates and checks entitlement before parsing evidence, with no model authority', () => {
+test('S6 endpoint: authenticates before evidence parsing and keeps photo/queue privilege managed-only', () => {
   const resolverFunction = fs.readFileSync(
     path.join(process.cwd(), 'supabase/functions/resolve-product-identity/index.ts'),
     'utf8',
@@ -9357,8 +9357,12 @@ test('S6 endpoint: authenticates and checks entitlement before parsing evidence,
   const authenticateIndex = resolverFunction.indexOf('await authenticate(req)');
   const entitlementIndex = resolverFunction.indexOf('await requireMemberEntitlement(admin, userId)');
   const bodyIndex = resolverFunction.indexOf('parseRequest(await readJsonObject(req), userId)');
-  assert.ok(authenticateIndex >= 0 && authenticateIndex < entitlementIndex);
-  assert.ok(entitlementIndex < bodyIndex);
+  assert.ok(authenticateIndex >= 0 && authenticateIndex < bodyIndex);
+  assert.ok(bodyIndex < entitlementIndex);
+  assert.match(resolverFunction, /identityKindFromVerifiedUser\(user\)/);
+  assert.match(resolverFunction, /PHOTO_EVIDENCE_MANAGED_ONLY/);
+  assert.match(resolverFunction, /managedAccess && decision\.requiresFounderReview/);
+  assert.match(resolverFunction, /loadCatalog\(admin, !managedAccess\)/);
   assert.match(resolverFunction, /\^\(file\|ph\|content\|https\?\):\\\/\\\//i);
   assert.match(resolverFunction, /source_authority, observed_at, verified_at/);
   assert.match(resolverFunction, /loadPagedCatalogRows/);

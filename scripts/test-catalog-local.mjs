@@ -67,6 +67,10 @@ try {
 
   const addedVariant = await admin.from('product_variants').insert({
     product_id: catalogProductId, variant_name: 'Test US bottle', region_code: 'US',
+    catalog_verification_status: 'verified',
+    catalog_source_reference: 'https://manufacturer.example/test-bottle',
+    catalog_public_source_url: 'https://manufacturer.example/test-bottle',
+    catalog_observed_at: '2026-09-22T00:00:00Z',
   }).select('id').single();
   assert.ifError(addedVariant.error);
   variantId = addedVariant.data.id;
@@ -92,7 +96,7 @@ try {
   assert.deepEqual(verifiedDetail.data.product.variants[0].formula.ingredients, ['Water', 'Glycerin']);
   assert.equal(verifiedDetail.data.product.variants[0].formula.provenanceType, 'manufacturer');
   assert.equal(verifiedDetail.data.product.variants[0].formula.sourceReference, null);
-  assert.equal(verifiedDetail.data.product.variants[0].sourceReference, null);
+  assert.equal(verifiedDetail.data.product.variants[0].sourceReference, 'https://manufacturer.example/test-bottle');
 
   const secondFormula = await admin.from('product_formula_versions').insert({
     variant_id: variantId, ingredients: ['Water', 'Niacinamide'], normalized_ingredient_fingerprint: 'water|niacinamide',

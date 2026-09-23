@@ -8,7 +8,7 @@ Derive is **personalized skincare product intelligence first**. Free Check answe
 
 ### Implemented today
 
-- The current app still uses the older Today / Plan / Shop / Ask / Progress C1 navigation. Authenticated Remote behavior still has the existing managed-membership boundary. Free anonymous access and the target navigation are not implemented.
+- The current app still uses the older Today / Plan / Shop / Ask / Progress C1 navigation. Its Remote routing retains the managed-membership boundary. S-FREE-1 implements the local guest/free **platform**, not mobile guest routing or hosted anonymous activation; the target free navigation is not yet customer-ready.
 - PRs #36 and #37 landed searchable catalog foundation and mobile Check a Product. The Remote Staging route remains hidden and the current hosted catalog has 4 products, 1 sourced product, 1 alias, and no variants, identifiers, or formula versions.
 - S6 provides product identity and formula evidence states. Unknown identity/formula stays unknown. Camera capture is not proof of identity; visual/OCR provider behavior remains unproven. The shipped C1 result still says “FORMULA QUALITY”; the target label is factual “FORMULA DETAILS,” separate from Personal Fit.
 - PR #39 closed the selected catalog UUID handoff into routine persistence. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md) and the current checkpoint in [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
@@ -88,7 +88,7 @@ The target is not yet implemented. Required gates include K-FREE-1 and S-FREE-1,
 
 Anonymous identity is device/session-bound until linked to a permanent identity; if the local session is lost first, the customer may lose access to that guest account and its context. S-OPS-1 owns cleanup policy, rate/abuse controls, account-link conflict handling, and explicit loss/deletion behavior.
 
-S-FREE-1 must decide and document the exact FREE / MANAGED / BOTH operation matrix and anonymous RLS policy after security review. Catalog and product-identity operations are likely FREE candidates; routine, managed check-in and founder-care operations remain managed candidates pending Sami's full matrix and security review. S-FREE-2 must define the minimal persisted profile and deterministic fit rules only from supported evidence. S-OPS-1 must settle anonymous-to-existing-account conflict, session-loss, cleanup, and deletion handling. S-FREE-4 must select an evidence-supported extraction path without elevating OCR/model candidates to identity truth. These are milestone decisions, not blockers to the approved product strategy.
+S-FREE-1's local platform audit and exact FREE / MANAGED / BOTH / INTERNAL matrix are recorded in [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md). Hosted guest activation remains gated by S-OPS-1 abuse/lifecycle controls; mobile guest routing remains Kanuj's lane. S-FREE-2 must define the minimal persisted profile and deterministic fit rules only from supported evidence. S-OPS-1 must settle anonymous-to-existing-account conflict, session-loss, cleanup, and deletion handling. S-FREE-4 must select an evidence-supported extraction path without elevating OCR/model candidates to identity truth.
 
 
 

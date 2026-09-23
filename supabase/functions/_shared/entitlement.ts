@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.39.8";
+import { resolveIdentityKind } from "./access.ts";
 
 export class MembershipEntitlementError extends Error {
   constructor(
-    readonly code: "MEMBERSHIP_REQUIRED" | "MEMBERSHIP_UNAVAILABLE",
+    readonly code: "MEMBERSHIP_REQUIRED" | "MEMBERSHIP_UNAVAILABLE" | "PERMANENT_ACCOUNT_REQUIRED",
     message: string,
     readonly status: number,
   ) {
@@ -12,6 +13,19 @@ export class MembershipEntitlementError extends Error {
 
 /** Resolve the same latest membership projection used by S5 billing. */
 export async function requireActiveMembership(admin: SupabaseClient, userId: string): Promise<void> {
+  let identityKind;
+  try {
+    identityKind = await resolveIdentityKind(admin, userId);
+  } catch {
+    throw new MembershipEntitlementError(
+      "MEMBERSHIP_UNAVAILABLE", "Account identity could not be verified", 503,
+    );
+  }
+  if (identityKind !== "permanent") {
+    throw new MembershipEntitlementError(
+      "PERMANENT_ACCOUNT_REQUIRED", "A permanent account is required for Managed Skincare", 403,
+    );
+  }
   const { data, error } = await admin.from("memberships")
     .select("status")
     .eq("user_id", userId)
