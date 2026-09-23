@@ -163,7 +163,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         const result = spawnSync(cli, commandArgs, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] });
         if (result.status !== 0) throw new Error(`Ingestion failed: ${result.stderr?.trim().slice(0,300) || 'management query error'}`);
         const response = JSON.parse(result.stdout);
-        console.log(JSON.stringify({ result: response.rows?.[0]?.result ?? null }));
+        console.log(JSON.stringify({ applied: true, result: response.rows?.[0]?.result ?? null, readbackRequired: !response.rows?.[0]?.result }));
       } finally { rmSync(dir, { recursive: true, force: true }); }
     }
   } catch (error) {

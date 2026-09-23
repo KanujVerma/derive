@@ -18,13 +18,18 @@ let provisionalId;
 let variantId;
 
 try {
-  const ingest = execFileSync(process.execPath, [
+  execFileSync(process.execPath, [
     '--experimental-strip-types', 'scripts/catalog-ingest.mjs',
     '--file', 'docs/catalog-seeds/cerave-renewing-sa-cleanser.json', '--local', '--apply',
   ], { encoding: 'utf8', env: { ...process.env, SUPABASE_CLI: cli }, stdio: ['ignore','pipe','pipe'] });
-  const lines = ingest.trim().split('\n');
-  catalogProductId = JSON.parse(lines.at(-1)).result.productId;
-  assert.ok(catalogProductId);
+  // CLI result envelopes vary by host. Verify the actual sourced row instead.
+  const ingested = await admin.from('products')
+    .select('id,is_catalog_standard,catalog_source_reference,catalog_public_source_url')
+    .eq('brand','CeraVe').eq('name','Renewing SA Cleanser').single();
+  assert.ifError(ingested.error);
+  assert.equal(ingested.data.is_catalog_standard, true);
+  assert.equal(ingested.data.catalog_public_source_url, 'https://www.cerave.com/skincare/cleansers/renewing-sa-cleanser');
+  catalogProductId = ingested.data.id;
 
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   assert.ifError(created.error);
