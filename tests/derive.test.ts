@@ -8560,9 +8560,9 @@ test('C1 Shop: product detail resolves canonical member product by productId and
 test('C1 Shop: non-member Scan entry and direct route are locked', () => {
   const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
   const scanContent = fs.readFileSync(path.resolve('app/shop/scan.tsx'), 'utf8');
-  assert.ok(shopContent.includes('Available with Derive membership'));
+  assert.ok(shopContent.includes('Available with membership when enabled'));
   assert.ok(scanContent.includes("if (audience !== 'member')"));
-  assert.ok(scanContent.includes('Personalized Scan is available with Derive membership.'));
+  assert.ok(scanContent.includes('Product checking requires Derive membership in supported releases.'));
 });
 
 test('C1 Shop: Mock Ask handoff preserves the scanned verdict', async () => {

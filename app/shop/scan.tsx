@@ -18,13 +18,16 @@ import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { Button } from '@/src/components/ui/Button';
 import { analytics } from '@/src/services/analytics';
-import {
-  findProductByBarcode,
-  PROTOTYPE_CATALOG,
-  ScannableProductInput,
-} from '@/src/services/catalog';
+import { PROTOTYPE_CATALOG, ScannableProductInput } from '@/src/services/catalog';
+import { CatalogProductSearch } from '@/src/components/catalog/CatalogProductSearch';
+import type { CatalogProductSummary, CatalogProductDetail } from '@/src/contracts/ProductCatalog';
+import type { ProductResolutionResult, ProductResolutionCandidate, ResolveProductIdentityInput } from '@/src/contracts/ProductIdentityResolver';
+import { createCatalogRequestId, getCatalogProductDetail, resolveCatalogIdentity } from '@/src/services/productCatalog';
+import { describeCheckProductFit, getVerifiedFormulaForResolution, resolvedCatalogDetailId } from '@/src/commerce/checkProductPresentation';
+import { publicEnvironment } from '@/src/config/environment';
+import { showsProviderBetaFeatures } from '@/src/utils/membershipPresentation';
 import { evaluateProduct } from '@/src/services/deriveClient';
-import { ProductScanResult, ProductScanVerdict } from '@/src/types/schema';
+import { ProductScanResult, ProductScanVerdict, type ProductCategory } from '@/src/types/schema';
 import { resolveScanResultPresentation, resolveScanVerdictLabel } from '@/src/commerce/scanPresentation';
 import { normalizeBarcode } from '@/src/utils/barcode';
 import { useScanContextStore } from '@/src/stores/scanContextStore';
@@ -43,12 +46,18 @@ export default function ScanScreen() {
   const [confirmedProduct, setConfirmedProduct] = useState<ScannableProductInput | null>(null);
   const [scanResult, setScanResult] = useState<ProductScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [isSearching, setIsSearching] = useState(true);
+  const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
+  const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
+  const [candidates, setCandidates] = useState<ProductResolutionCandidate[]>([]);
+  const [isCheckingProduct, setIsCheckingProduct] = useState(false);
+  const showProviderFeatures = showsProviderBetaFeatures(publicEnvironment.buildFlavor);
   const [torchOn, setTorchOn] = useState(false);
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const isScanningLockedRef = useRef(false);
+  const pendingResolutionRef = useRef<{ key: string; requestId: string } | null>(null);
 
   const performEvaluation = async (item: ScannableProductInput, barcode?: string) => {
     if (audience !== 'member') throw new Error('Membership required for personalized Scan');
@@ -82,7 +91,7 @@ export default function ScanScreen() {
   };
 
   useEffect(() => {
-    if (audience !== 'member') return;
+    if (audience !== 'member' || !showProviderFeatures) return;
     analytics.track('shop_scan_opened', { source: 'shop_tab' });
     if (__DEV__ && params?.sim) {
       const search = params.sim.toLowerCase();
@@ -102,50 +111,80 @@ export default function ScanScreen() {
         setUnknownBarcode(params.sim);
       }
     }
-  }, [audience, params?.sim]);
+  }, [audience, params?.sim, showProviderFeatures]);
+
+  const openResolution = async (
+    evidence: Omit<ResolveProductIdentityInput, 'requestId'>,
+    knownProductId?: string,
+  ) => {
+    const key = JSON.stringify(evidence);
+    if (pendingResolutionRef.current?.key !== key) {
+      pendingResolutionRef.current = { key, requestId: createCatalogRequestId() };
+    }
+    setIsCheckingProduct(true);
+    setEvaluationError(null);
+    setIsSearching(false);
+    setUnknownBarcode(null);
+    setCatalogDetail(null);
+    setResolution(null);
+    setCandidates([]);
+    setConfirmedProduct(null);
+    setScanResult(null);
+    try {
+      const result = await resolveCatalogIdentity({
+        ...evidence,
+        requestId: pendingResolutionRef.current.requestId,
+      });
+      pendingResolutionRef.current = null;
+      setResolution(result);
+      setCandidates(result.state === 'ambiguous_candidates' ? result.candidates : []);
+      if (knownProductId && result.product && result.product.productId !== knownProductId) {
+        throw new Error('Catalog and resolver identities disagree');
+      }
+      const selectedId = resolvedCatalogDetailId(result, knownProductId);
+      if (selectedId) {
+        const detail = await getCatalogProductDetail(selectedId);
+        setCatalogDetail(detail);
+        setConfirmedProduct({
+          name: detail.name, brand: detail.brand,
+          category: detail.category as ProductCategory, keyActives: [],
+        });
+      } else if (evidence.barcode && result.state === 'insufficient_evidence') {
+        setUnknownBarcode(evidence.barcode);
+      }
+    } catch {
+      setEvaluationError('We could not check this product right now. Please try again.');
+      isScanningLockedRef.current = false;
+      setIsLocked(false);
+    } finally {
+      setIsCheckingProduct(false);
+    }
+  };
 
   const handleBarcodeScanned = (scanningResult: BarcodeScanningResult) => {
     if (isScanningLockedRef.current) return;
     isScanningLockedRef.current = true;
     setIsLocked(true);
+    void openResolution({ consumer: 'scan', barcode: scanningResult.data });
+  };
 
-    const rawData = scanningResult.data;
-    const matched = findProductByBarcode(rawData);
+  const handleSelectSearchResult = (item: CatalogProductSummary) => {
+    void Haptics.selectionAsync().catch(() => {});
+    void openResolution({ consumer: 'scan', brand: item.brand, productName: item.name }, item.productId);
+  };
 
-    if (matched) {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
+  const handleSelectCandidate = (candidate: ProductResolutionCandidate) => {
+    if (!candidate.brand || !candidate.name) return;
+    void openResolution({
+      consumer: 'scan', brand: candidate.brand, productName: candidate.name,
+      variantName: candidate.variantName,
+    }, candidate.productId);
+  };
 
-      setConfirmedProduct(matched);
-      performEvaluation(matched, rawData)
-        .then((result) => {
-          analytics.track('product_scan_recognized', {
-            productName: matched.name,
-          });
-          analytics.track('product_scan_completed', {
-            success: true,
-          });
-          analytics.track('scan_verdict_viewed', {
-            productName: matched.name,
-            verdict: result.verdict,
-          });
-        })
-        .catch((err) => {
-          console.warn('Scan evaluation failed:', err);
-          isScanningLockedRef.current = false;
-          setIsLocked(false);
-          setEvaluationError(getCustomerErrorMessage('scan'));
-        });
-    } else {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      } catch {}
-      setUnknownBarcode(rawData);
-      analytics.track('product_scan_completed', {
-        success: false,
-      });
-    }
+  const handleManualNameCheck = () => {
+    const name = searchQuery.trim();
+    if (name.length < 2) return;
+    void openResolution({ consumer: 'scan', productName: name });
   };
 
   const handleSelectCatalogItem = (item: ScannableProductInput) => {
@@ -174,11 +213,16 @@ export default function ScanScreen() {
   const handleResetScan = () => {
     Haptics.selectionAsync();
     setConfirmedProduct(null);
+    setCatalogDetail(null);
+    setResolution(null);
+    setCandidates([]);
+    setIsCheckingProduct(false);
+    pendingResolutionRef.current = null;
     setScanResult(null);
     setUnknownBarcode(null);
     setEvaluationError(null);
     setSearchQuery('');
-    setIsSearching(false);
+    setIsSearching(true);
     setTimeout(() => {
       isScanningLockedRef.current = false;
       setIsLocked(false);
@@ -245,15 +289,37 @@ export default function ScanScreen() {
 
   const resultPresentation = resolveScanResultPresentation(scanResult);
   const invalidResult = Boolean(scanResult && confirmedProduct && resultPresentation.kind === 'invalid');
+  const currentFormula = getVerifiedFormulaForResolution(catalogDetail, resolution);
+
+  if (!showProviderFeatures) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
+        <Text style={styles.screenTitle}>Check a Product</Text>
+        <Text style={{ color: colors.inkMuted, marginVertical: spacing.lg }}>
+          Product checking is being prepared for a later beta release.
+        </Text>
+        <Button label="Return to Shop" variant="secondary" size="medium" onPress={() => router.replace('/(tabs)/shop')} />
+      </View>
+    );
+  }
 
   if (audience !== 'member') {
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
         <Text style={styles.screenTitle}>Personalized Scan</Text>
         <Text style={{ color: colors.inkMuted, marginVertical: spacing.lg }}>
-          Personalized Scan is available with Derive membership.
+          Product checking requires Derive membership in supported releases.
         </Text>
         <Button label="Return to Shop" variant="secondary" size="medium" onPress={() => router.replace('/(tabs)/shop')} />
+      </View>
+    );
+  }
+
+  if (isCheckingProduct) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.brand} />
+        <Text style={{ color: colors.inkMuted, marginTop: spacing.md }}>Checking product identity...</Text>
       </View>
     );
   }
@@ -394,6 +460,95 @@ export default function ScanScreen() {
     );
   }
 
+  if (catalogDetail) {
+    const fit = describeCheckProductFit(resolution?.state ?? 'identified_formula_unverified');
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.screenTitle}>Check a Product</Text>
+          <TouchableOpacity onPress={handleResetScan} accessibilityRole="button" accessibilityLabel="Check another product">
+            <Text style={styles.resetButtonText}>Check Another</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}>
+          <View style={styles.verdictCard}>
+            <Text style={styles.productBrandText}>{catalogDetail.brand.toUpperCase()}</Text>
+            <Text style={styles.productNameText}>{catalogDetail.name}</Text>
+            <Text style={styles.sectionCategoryTag}>PERSONAL FIT</Text>
+            <View style={styles.summaryBox}><Text style={styles.summaryText}>{fit.message}</Text></View>
+            {resolution?.requiresFounderReview && (
+              <Text style={styles.factText}>A founder review is pending for this identity evidence.</Text>
+            )}
+          </View>
+          {candidates.length > 0 && (
+            <View style={styles.formulaCard}>
+              <Text style={styles.sectionCategoryTag}>POSSIBLE MATCHES</Text>
+              {candidates.map((candidate, index) => (
+                <TouchableOpacity
+                  key={`${candidate.productId ?? 'unknown'}-${candidate.variantId ?? index}`}
+                  style={styles.catalogItemRow}
+                  onPress={() => handleSelectCandidate(candidate)}
+                  disabled={!candidate.brand || !candidate.name}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.catalogItemName}>{candidate.brand} {candidate.name}{candidate.variantName ? ` · ${candidate.variantName}` : ''}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          <View style={styles.formulaCard}>
+            <Text style={styles.sectionCategoryTag}>FORMULA DETAILS</Text>
+            <Text style={styles.formulaTitle}>{catalogDetail.category.replace('_', ' ')}</Text>
+            {catalogDetail.variants.map((variant) => (
+              <View key={variant.variantId} style={styles.formulaRow}>
+                <Text style={styles.formulaLabel}>Variant</Text>
+                <Text style={styles.formulaValue}>
+                  {[variant.name, variant.regionCode, variant.packageSize].filter(Boolean).join(' · ')}
+                </Text>
+              </View>
+            ))}
+            {currentFormula ? (
+              <>
+                <Text style={styles.formulaLabel}>Verified ingredients for this exact package</Text>
+                <Text style={styles.formulaValue}>{currentFormula.ingredients.join(', ')}</Text>
+                <Text style={styles.formulaLabel}>Provenance</Text>
+                <Text style={styles.formulaValue}>{currentFormula.provenanceType.replace('_', ' ')} · Observed {new Date(currentFormula.observedAt).toLocaleDateString()}</Text>
+                {currentFormula.sourceReference && <Text style={styles.formulaValue}>Source: {currentFormula.sourceReference}</Text>}
+              </>
+            ) : (
+              <Text style={styles.formulaValue}>The formula in your exact package is not verified yet.</Text>
+            )}
+            {catalogDetail.sourceReference && <Text style={styles.formulaValue}>Product source: {catalogDetail.sourceReference}</Text>}
+          </View>
+          <Button label="Check another product" variant="outline" size="medium" onPress={handleResetScan} />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (resolution && !catalogDetail) {
+    const fit = describeCheckProductFit(resolution.state);
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
+        <Text style={styles.screenTitle}>Check a Product</Text>
+        <Text style={{ color: colors.inkMuted, marginVertical: spacing.md }}>{fit.message}</Text>
+        {resolution.requiresFounderReview && <Text style={{ color: colors.inkMuted, marginBottom: spacing.md }}>This check is saved for founder review.</Text>}
+        {candidates.map((candidate, index) => (
+          <TouchableOpacity
+            key={`${candidate.productId ?? 'unknown'}-${candidate.variantId ?? index}`}
+            onPress={() => handleSelectCandidate(candidate)}
+            disabled={!candidate.brand || !candidate.name}
+            style={styles.catalogItemRow}
+            accessibilityRole="button"
+          >
+            <Text style={styles.catalogItemName}>{candidate.brand} {candidate.name}{candidate.variantName ? ` · ${candidate.variantName}` : ''}</Text>
+          </TouchableOpacity>
+        ))}
+        <Button label="Check another product" variant="secondary" size="medium" onPress={handleResetScan} />
+      </View>
+    );
+  }
+
   if (confirmedProduct && !evaluationError) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -411,82 +566,29 @@ export default function ScanScreen() {
   }
 
 
-  // 3. MANUAL SEARCH FALLBACK VIEW
+  // Search is the primary Check a Product path. Barcode remains available below.
   if (isSearching) {
-    const filtered = PROTOTYPE_CATALOG.filter(
-      (p) =>
-        !searchQuery ||
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.brand.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => {
-              setIsSearching(false);
-              handleRetryScan();
-            }}
-            style={styles.backButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Back to scanner"
-          >
-            <Icon name="back" size={20} color={colors.ink} />
-          </TouchableOpacity>
-          <Text style={styles.screenTitle}>Search Product</Text>
-          <View style={{ width: 32 }} />
+          <Text style={styles.screenTitle}>Check a Product</Text>
         </View>
-
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Icon name="search" size={18} color={colors.inkMuted} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search brand or product name..."
-              placeholderTextColor={colors.inkSubtle}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoFocus
-            />
-          </View>
-
-          <ScrollView
-            contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.catalogHeading}>COMMON BETA PRODUCTS</Text>
-            <View style={styles.catalogList}>
-              {filtered.map((item, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.catalogItemRow}
-                  onPress={() => handleSelectCatalogItem(item)}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Evaluate ${item.brand} ${item.name}`}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.catalogItemBrand}>{item.brand}</Text>
-                    <Text style={styles.catalogItemName}>{item.name}</Text>
-                  </View>
-                  <Icon name="forward" size={14} color={colors.brand} />
-                </TouchableOpacity>
-              ))}
-              {filtered.length === 0 && (
-                <View style={styles.searchEmpty}>
-                  <Text style={styles.searchEmptyTitle}>No match in the beta catalog</Text>
-                  <Text style={styles.searchEmptyText}>Try another name or return to the scanner.</Text>
-                  <Button label="Back to Scanner" variant="secondary" size="small" onPress={() => {
-                    setIsSearching(false);
-                    handleRetryScan();
-                  }} />
-                </View>
-              )}
-            </View>
-          </ScrollView>
-        </View>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]} keyboardShouldPersistTaps="handled">
+          <Text style={styles.subtitle}>Search by product name. A barcode is optional.</Text>
+          <CatalogProductSearch
+            label="Search products"
+            actionLabel="Check"
+            onSelect={handleSelectSearchResult}
+            onQueryChange={setSearchQuery}
+            keepFocusAfterSelect={false}
+            errorCopy="Search is unavailable right now. You can still request founder review."
+            emptyCopy="No catalog match yet. Try another name or request founder review."
+          />
+          {searchQuery.trim().length >= 2 && (
+            <Button label="Can't find it? Request review" variant="ghost" size="medium" onPress={handleManualNameCheck} style={{ marginTop: spacing.md }} />
+          )}
+          <Button label="Use barcode camera" variant="outline" size="medium" onPress={() => { setIsSearching(false); handleRetryScan(); }} style={{ marginTop: spacing.lg }} />
+        </ScrollView>
       </View>
     );
   }
@@ -497,7 +599,7 @@ export default function ScanScreen() {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.scannerHeader}>
           <View style={styles.headerTopRow}>
-            <Text style={styles.screenTitle}>Scan</Text>
+            <Text style={styles.screenTitle}>Check a Product</Text>
             <TouchableOpacity
               style={styles.profileButton}
               onPress={() => router.push('/profile')}
@@ -517,7 +619,7 @@ export default function ScanScreen() {
             </View>
             <Text style={styles.permissionTitle}>Camera Access Required</Text>
             <Text style={styles.permissionSubtitle}>
-              Derive uses the camera to scan product barcodes and immediately evaluate formulas against your routine.
+              Camera access reads barcodes for product identity. Personal fit is shown only when verified and available.
             </Text>
             <Button
               label="Allow Camera Access"
@@ -544,7 +646,7 @@ export default function ScanScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.scannerHeader}>
         <View style={styles.headerTopRow}>
-          <Text style={styles.screenTitle}>Scan</Text>
+          <Text style={styles.screenTitle}>Check a Product</Text>
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => router.push('/profile')}
@@ -556,7 +658,7 @@ export default function ScanScreen() {
           </TouchableOpacity>
         </View>
         <Text style={styles.subtitle}>
-          Align barcode within the guide for instant evaluation.
+          Align a barcode within the guide, or search by name instead.
         </Text>
       </View>
 

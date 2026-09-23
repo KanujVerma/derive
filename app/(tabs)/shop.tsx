@@ -157,8 +157,8 @@ export default function ShopScreen() {
     valuePoints: [
       'Personalized canonical routine',
       'Weekly check-ins and ongoing adjustments',
-      'Personalized product-fit guidance',
-      ...(showProviderFeatures ? ['Personalized Scan'] : []),
+      'Product identity and formula information',
+      ...(showProviderFeatures ? ['Check a Product'] : []),
       'Founder quality review during beta',
     ],
   };
@@ -179,11 +179,11 @@ export default function ShopScreen() {
               style={styles.headerScanAction}
               onPress={handleScanPress}
               accessibilityRole="button"
-              accessibilityLabel="Scan a product"
+              accessibilityLabel="Check a product"
               activeOpacity={0.8}
             >
               <Icon name="scan" size={18} color={colors.brand} />
-              <Text style={styles.headerScanText}>Scan</Text>
+              <Text style={styles.headerScanText}>Check</Text>
             </TouchableOpacity>
             ) : null}
           </View>
@@ -303,7 +303,7 @@ export default function ShopScreen() {
             activeOpacity={0.85}
             onPress={handleScanPress}
             accessibilityRole="button"
-            accessibilityLabel="Scan a product with camera or search by name"
+            accessibilityLabel="Check a product by name or barcode"
           >
             <View style={styles.scanCardLeft}>
               <View style={styles.scanIconCircle}>
@@ -313,8 +313,8 @@ export default function ShopScreen() {
                 <Text style={styles.scanCardTitle}>Considering something else?</Text>
                 <Text style={styles.scanCardSub}>
                   {shopState === 'needs_products' || shopState === 'covered'
-                    ? 'Scan it to see how it fits your plan.'
-                    : 'Get a personalized product fit check.'}
+                    ? 'Look up its identity and known formula facts.'
+                    : 'Check a name or barcode. Personal fit comes later.'}
                 </Text>
               </View>
             </View>
@@ -386,11 +386,10 @@ export default function ShopScreen() {
           <Text style={styles.publicBannerText}>
             {/*
               C1.5: Real public catalog API needed here.
-              Current backend does not expose a general browseable product catalog.
-              Displaying an honest limited state rather than fabricated products.
+              The catalog is searchable in supported member releases but there
+              is not yet a general Shop browsing experience.
             */}
-            A curated product catalog is coming soon. Personalized product scanning
-            is available with Derive membership.
+            A sourced product catalog is growing. Product checking is available to members in supported releases.
           </Text>
         </View>
 
@@ -401,8 +400,8 @@ export default function ShopScreen() {
               <Icon name="scan" size={22} color={colors.brand} />
             </View>
             <View>
-              <Text style={styles.scanCardTitle}>Personalized Scan</Text>
-              <Text style={styles.scanCardSub}>Available with Derive membership</Text>
+              <Text style={styles.scanCardTitle}>Check a Product</Text>
+              <Text style={styles.scanCardSub}>Available with membership when enabled</Text>
             </View>
           </View>
         </View>
