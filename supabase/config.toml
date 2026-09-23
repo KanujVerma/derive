@@ -131,3 +131,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/stripe-membership-webhook/deno.json"
 entrypoint = "./functions/stripe-membership-webhook/index.ts"
+
+[functions.catalog-products]
+enabled = true
+verify_jwt = true
+import_map = "./functions/catalog-products/deno.json"
+entrypoint = "./functions/catalog-products/index.ts"

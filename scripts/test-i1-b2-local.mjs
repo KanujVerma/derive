@@ -399,11 +399,13 @@ async function run() {
       .order('order_index', { ascending: true });
     assert.ok(itemRows.length > 0);
 
-    // B. Query user_products joined with products
-    const { data: upRows } = await userClient
+    // B. Query user_products joined with only member-readable product columns.
+    // Catalog provenance has a separate server-only grant, so wildcard joins must fail.
+    const { data: upRows, error: upReadError } = await userClient
       .from('user_products')
-      .select('*, products(*)')
+      .select('*, products(id,brand,name,category,key_actives,full_ingredients,retail_price_approx,is_catalog_standard)')
       .eq('user_id', userId);
+    assert.ifError(upReadError);
     assert.ok(upRows.length > 0);
     assert.ok(upRows[0].products, 'Joined products row must be populated');
     console.log('   ✓ RLS and joined queries succeed for authenticated user');

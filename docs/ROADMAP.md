@@ -4,6 +4,12 @@ This opening section is the current execution plan. Earlier delivery records bel
 
 **Company gate:** customer #1 can pay $25/month for the Derive management membership, buy products separately, complete the real app journey, and receive a trustworthy routine. The first 10 members are a concierge MVP: manual founder recovery is acceptable; fabricated product/formula truth and unrecoverable automation are not.
 
+## Product catalog and Check a Product V1 assignment
+
+- **Catalog foundation (PR A):** Kanuj is authorized by this customer-requested integration milestone to deliver a bounded platform catalog search/ingestion interface on top of S6. This is a one-time assignment, not a transfer of Sami's F1, H1P, H1B, or ongoing product-resolution ownership. It must land and deploy before the mobile consumer.
+- **Mobile consumer (PR B):** Kanuj owns onboarding search and Check a Product UX against the stable catalog interface. Current Remote Staging Ask/Scan gating stays in place; this milestone creates no TestFlight submission.
+- **Source boundary:** demand-driven, operator-verified catalog entries only. Product-only records are valid; formula and package identity require separate S6 evidence. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md).
+
 ## Current milestone sequence
 
 ```text
