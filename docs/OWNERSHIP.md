@@ -1,6 +1,8 @@
 # Derive Founder Ownership
 
-Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. Wave-1 foundations and local mobile/platform integration are landed; Wave 2 is next. [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
+Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. Wave-1 foundations and local mobile/platform integration are landed; K-FREE-2, K-FREE-3, K-FREE-4, and K-PAID-1A can now proceed in parallel. [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
+
+**Max-parallel implementation rule:** A counterpart contract is a prerequisite for integration, not a prerequisite for beginning or completing owned implementation. Kanuj presentation milestones may build against Kanuj-owned view models/fixtures while Sami builds platform contracts independently. After completing an owned milestone, each founder advances to the next non-overlapping milestone. Integration is a separate bounded task.
 
 ## Kanuj: customer and mobile lane
 
@@ -9,10 +11,10 @@ Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client s
 - **K-FREE-1 / Wave 1 foundation, LANDED:** Scanner-First App Shell and target CHECK / MY STUFF / PLAN / SHOP presentation. No Supabase backend, hosted Auth/RLS, or free entitlement implementation.
 - **K-FREE-1B, LANDED:** scanner-first UX polish.
 - **Wave-1 integration, LANDED locally:** consume Sami's unchanged `FreeAccessState` in the local Development Remote app. Free Check uses live factual catalog and resolver; managed routes remain gated. Hosted activation remains with S-OPS-1.
-- **K-FREE-2 / Wave 2:** optional minimal personalization after factual first Check, same-result refresh, skip/remind and later editing. Consumes S-FREE-2's merged profile/fit contract.
-- **K-FREE-3 / Wave 3:** MY STUFF presentation for profile, current products, product states, history and reactions. No backend persistence.
-- **K-FREE-4 / Wave 4:** capture and candidate-confirmation UX. It emits evidence, not authoritative product/formula identity.
-- **K-PAID-1 / Wave 5:** free Plan presentation and managed upgrade, plus actual managed Plan/care experience using Sami's entitlement and F1 interfaces.
+- **K-FREE-2, parallel presentation:** optional minimal personalization after factual first Check, same-result refresh and edit seams; fixture-backed. A later integration consumes S-FREE-2.
+- **K-FREE-3, parallel presentation:** MY STUFF profile, products, history and reaction/tolerance states; fixture-backed, no persistence. Later composition connects K-FREE-2 editing.
+- **K-FREE-4, parallel presentation:** capture, retake and candidate/unknown UX for product evidence, without authoritative identity claims. Later composition wires canonical Check; later integration consumes S-FREE-4.
+- **K-PAID-1A, parallel presentation foundation:** free Managed Skincare offer, upgrade states, context reuse, managed intake/photo and Plan states; fixture-backed. Later K-PAID composition/integration consumes stable Sami contracts.
 - **K-ACCEPT-1:** scanner-first physical/TestFlight acceptance after platform contracts and release hardening.
 - **K-GROWTH, later:** shareable Check result and referral UX.
 
@@ -36,10 +38,10 @@ H1P remains a provider-backed intelligence milestone. H1B remains later managed 
 | --- | --- | --- |
 | Wave-1 foundations (landed) | K-FREE-1 / K-FREE-1B (Kanuj); S-FREE-1 (Sami) | The stable access contract is consumed locally. Hosted anonymous signup remains gated. |
 | Wave-1 integration (landed, local only) | Kanuj consumes S-FREE-1 in mobile; Sami's platform lane is unchanged. | Local guest lifecycle and factual Check are verified. Wave 2 is unblocked; hosted activation is separate. |
-| 2 | K-FREE-2 / S-FREE-2 | Starts only after Wave-1 integration; Sami owns and merges the profile/fit contract before Kanuj consumes it. |
-| 3 | K-FREE-3 / S-FREE-3 | Sami merges free-context/history read/write contracts; Kanuj integrates after handoff. |
-| 4 | K-FREE-4 / S-FREE-4 | Sami merges private evidence/resolution contract; Kanuj sends evidence and renders explicit candidate/unknown states. |
-| 5 | K-PAID-1 / S-PAID-1 | Sami merges permanent identity, managed entitlement and F1 interfaces; Kanuj consumes them. |
+| 2, independent implementation | K-FREE-2 / S-FREE-2 | Presentation and platform build concurrently; contract arrival gates only the bounded K2/S2 integration. |
+| 3, independent implementation | K-FREE-3 / S-FREE-3 | Fixture-backed My Stuff and owner-bound persistence build concurrently; integrate after both exist. |
+| 4, independent implementation | K-FREE-4 / S-FREE-4 | Capture UX and private evidence/resolution build concurrently; compose and integrate after stable handoffs. |
+| 5, independent foundation | K-PAID-1A / S-PAID-1 | Managed presentation and platform authority build concurrently; later composition/integration handles upgrade and real Plan. |
 | Release | K-ACCEPT-1 / S-OPS-1 | Operations/security behavior and mobile acceptance are evidenced before scanner-first external beta. |
 
 ## Shared-contract rule
