@@ -24,6 +24,7 @@ Derive is **personalized skincare product intelligence first**. Free Check answe
 - PRs #36 and #37 landed searchable catalog foundation and mobile Check a Product. The Remote Staging route remains hidden and the current hosted catalog has 4 products, 1 sourced product, 1 alias, and no variants, identifiers, or formula versions.
 - S6 provides product identity and formula evidence states. Unknown identity/formula stays unknown. Camera capture is not proof of identity; visual/OCR provider behavior remains unproven. Wave-1 Check labels factual “FORMULA DETAILS” separately from unavailable Personal Fit.
 - PR #39 closed the selected catalog UUID handoff into routine persistence. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md) and the current checkpoint in [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
+- S-FREE-2 has a branch-local optional free-profile/fit platform implementation, separate from paid intake. It has not been hosted or wired to Kanuj's mobile UX; see [S_FREE_2_PERSONAL_FIT.md](S_FREE_2_PERSONAL_FIT.md). With the current hosted catalog's zero verified formulas, live personal fit would return unknown.
 - Hosted `propose-routine` is v3, ACTIVE, with JWT verification enabled. The live model-provider path remains H1P-unproven. This limits provider-backed Ask/routine automation and does not block free factual Check or the planned deterministic fit service.
 - The current $25/month Founding Beta display/Stripe code is implementation history, not proof of hosted billing activation and not proof that the new Managed Skincare entitlement model exists.
 

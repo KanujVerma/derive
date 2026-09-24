@@ -146,3 +146,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/catalog-products/deno.json"
 entrypoint = "./functions/catalog-products/index.ts"
+
+[functions.free-personal-fit]
+enabled = true
+verify_jwt = true
+import_map = "./functions/free-personal-fit/deno.json"
+entrypoint = "./functions/free-personal-fit/index.ts"

@@ -1,6 +1,6 @@
 # Derive Founder Ownership
 
-Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. Wave-1 foundations and local mobile/platform integration are landed; Wave 2 is next. [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
+Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. Wave-1 foundations and local mobile/platform integration are landed; Wave 2 is K-FREE-2 (Kanuj) and S-FREE-2 (Sami). [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
 
 ## Kanuj: customer and mobile lane
 
@@ -21,7 +21,7 @@ Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client s
 Owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted Supabase/Auth/RLS/configuration, server billing, product identity/formula truth, and founder operations. Sami does not implement customer mobile UI.
 
 - **S-FREE-1 / Wave 1 foundation, LANDED:** anonymous identity and free access, account-kind distinction, free/managed separation, FREE / MANAGED / BOTH operation inventory, least-privilege RLS review, and stable access contract. No mobile UI and no fake `founding_beta` membership for free users.
-- **S-FREE-2 / Wave 2:** persisted minimal profile and deterministic categorical fit with evidence explanation and safe unknown behavior. No provider hard dependency and no diagnosis.
+- **S-FREE-2 / Wave 2:** branch-local minimal free profile and deterministic categorical fit with evidence explanation and safe unknown behavior; Kanuj integration follows contract merge. No provider hard dependency and no diagnosis. See [S_FREE_2_PERSONAL_FIT.md](S_FREE_2_PERSONAL_FIT.md).
 - **S-FREE-3 / Wave 3:** owner-bound free Check history, shelf/product states, reactions/tolerance and profile context data plane, including anonymous ownership.
 - **S-FREE-4 / Wave 4:** private evidence storage, S6 candidate/formula resolution and review states. OCR/model output is not authoritative identity.
 - **S-PAID-1 / Wave 5:** permanent identity and managed entitlement separation plus F1 founder construction, validation, publication and member readback. F1 is part of this milestone.
