@@ -14,8 +14,8 @@ K-FREE-4 (#49) ✅  K-PAID-1A (#52) ✅
 PR #50 max-parallel rule ✅  PR #53 test discovery ✅
 K4-COMPOSE handoff prep (#55) ✅  KPAID-COMPOSE (#56) ✅
 → K2-COMPOSE (in progress); K4 canonical Check composition follows K2
-S-FREE-2 PR #54 OPEN, deterministic-fit defect blocks landing
-→ K2/S2 platform integration waits for #54 fix and landing
+S-FREE-2 PR #54 OPEN, Retinyl Propionate regression fixed on branch
+→ K2/S2 platform integration waits for exact-head review and landing
 ```
 
 Wave-1 mobile now consumes S-FREE-1 in Development Remote against an exact local Supabase host. A missing session becomes an anonymous Auth identity, server `FreeAccessState` selects Check or managed Plan, and free Check uses live sourced catalog and factual typed/barcode resolution. Remote Staging keeps its legacy route and hosted anonymous signup remains deliberately gated. The scanner-first external beta is not ready.
@@ -68,17 +68,17 @@ Managed upgrade target: start Managed Skincare → link/create a permanent ident
 
 ## Current next work and parallel waves
 
-Wave 0 and Wave-1 local integration are complete. K-FREE-2, K-FREE-3, K-FREE-4, and K-PAID-1A are landed in PRs #51, #48, #49, and #52; max-parallel guidance (#50) and test discovery (#53) are also landed. K4-COMPOSE handoff prep (#55) and KPAID-COMPOSE (#56) are landed; K2-COMPOSE is in progress. K4 canonical Check composition follows K2. S-FREE-2 PR #54 remains open and blocks K2/S2 platform integration until its deterministic-fit defect is fixed and the PR lands. Hosted guest activation still requires S-OPS-1.
+Wave 0 and Wave-1 local integration are complete. K-FREE-2, K-FREE-3, K-FREE-4, and K-PAID-1A are landed in PRs #51, #48, #49, and #52; max-parallel guidance (#50) and test discovery (#53) are also landed. K4-COMPOSE handoff prep (#55) and KPAID-COMPOSE (#56) are landed; K2-COMPOSE is in progress. K4 canonical Check composition follows K2. S-FREE-2 PR #54 remains open; its reproduced Retinyl Propionate defect is fixed on the branch, but K2/S2 platform integration waits for exact-head validation and landing. Hosted guest activation still requires S-OPS-1.
 
 **Max-parallel implementation rule:** A counterpart contract is a prerequisite for integration, not a prerequisite for beginning or completing owned implementation. Kanuj presentation milestones may build against Kanuj-owned view models/fixtures while Sami builds platform contracts independently. After completing an owned milestone, each founder advances to the next non-overlapping milestone. Integration is a separate bounded task. High-contention Check, root routing, Plan, Account, and shell-mode files belong to later composition passes, not simultaneous feature branches.
 
-Landed checkpoints: K-FREE-3 PR #48 at `c56090aa67ef9e85c786e91dffa60407ade194fe`; test discovery PR #53 at `ca8aac2ad91696fa8abb201bc5c78bb927b2a0de`; max-parallel docs PR #50 at `a36cacc`; K-FREE-2 PR #51 at `747f217`; K-FREE-4 PR #49 at `c4e2c5c`; and K-PAID-1A PR #52 at `18a4a19`. K4-COMPOSE handoff prep (#55) and KPAID-COMPOSE (#56) are landed; K2-COMPOSE is in progress. K4 canonical Check composition follows K2. S-FREE-2 PR #54 is OPEN: read-only local review reproduced a fit-classification defect for verified moisturizer ingredients Water plus Retinyl Propionate with pregnancyStatus yes. `determinePersonalFit` returns `COULD_WORK` / `goal_role_match` because the RETINOIDS allowlist omits this vitamin A propionate. Sami owns the fix. K2/S2 platform integration cannot start until #54 is fixed and landed; no hosted deployment occurred.
+Landed checkpoints: K-FREE-3 PR #48 at `c56090aa67ef9e85c786e91dffa60407ade194fe`; test discovery PR #53 at `ca8aac2ad91696fa8abb201bc5c78bb927b2a0de`; max-parallel docs PR #50 at `a36cacc`; K-FREE-2 PR #51 at `747f217`; K-FREE-4 PR #49 at `c4e2c5c`; and K-PAID-1A PR #52 at `18a4a19`. K4-COMPOSE handoff prep (#55) and KPAID-COMPOSE (#56) are landed; K2-COMPOSE is in progress. K4 canonical Check composition follows K2. S-FREE-2 PR #54 remains OPEN: review found a positive fit for Retinyl Propionate with reported pregnancy because the retinoid allowlist omitted that ester. The branch now recognizes whole-token retinyl ingredient names and tests pregnancy, unknown context, and no-positive-fit behavior. Integration still waits for exact-head review and landing; no hosted deployment occurred.
 
 | Wave | Kanuj | Sami | Prerequisite / handoff |
 | --- | --- | --- | --- |
 | Wave-1 foundations (landed) | **K-FREE-1 ✅ / K-FREE-1B ✅ (Kanuj):** scanner-first Mock shell and UX polish. | **S-FREE-1 ✅ (Sami):** anonymous/free platform and stable access contract. | Contract consumed by the local Wave-1 integration; hosted anonymous signup remains gated. |
 | Wave-1 integration (landed, local only) | Kanuj consumes `FreeAccessState` in Auth, routing, Check, Plan, Shop, and Account. | Sami's platform contract is unchanged. | Local Auth/catalog/resolver and managed denials verified. No hosted activation or TestFlight build. |
-| 2, presentation landed; platform blocked | **K-FREE-2 Progressive Personalization UX ✅ (PR #51).** | **S-FREE-2 Minimal Profile + Deterministic Personal Fit (PR #54 OPEN).** | Read-only review reproduced the Retinyl Propionate pregnancy-fit defect described above. Sami owns the fix; K2/S2 platform integration waits for #54 to land. |
+| 2, presentation landed; platform open | **K-FREE-2 Progressive Personalization UX ✅ (PR #51).** | **S-FREE-2 Minimal Profile + Deterministic Personal Fit (PR #54 OPEN).** | Retinyl Propionate regression fixed on branch; K2/S2 platform integration waits for exact-head review and landing. |
 | 3, Kanuj presentation landed | **K-FREE-3 MY STUFF:** fixture-backed profile, products, history, and reaction/tolerance presentation landed in PR #48; the real anonymous state remains empty. | **S-FREE-3 Free Context / Check History Data Plane**: owner-bound persistence for anonymous and permanent identities. | A later pass integrates reads/writes and K-FREE-2 editing. |
 | 4, presentation landed; K4 handoff prep landed | **K-FREE-4 Camera Product Evidence UX ✅ (PR #49).** | **S-FREE-4 Product Evidence Resolution**: private evidence, S6 resolution, candidate/uncertainty states. | K4 handoff prep (PR #55) is landed; canonical Check composition follows K2-COMPOSE, then contract integration follows stable handoff. |
 | 5, presentation and composition landed | **K-PAID-1A Managed Upgrade / Plan Presentation ✅ (PR #52).** | **S-PAID-1 Managed Entitlement Separation + F1**: permanent identity, founder routine construction/review/publish and member readback. | KPAID-COMPOSE (PR #56) is landed; contract integration consumes the stable contract. Billing remains H1B. |
@@ -87,7 +87,7 @@ Landed checkpoints: K-FREE-3 PR #48 at `c56090aa67ef9e85c786e91dffa60407ade194fe
 
 Free access alone does not create virality. K-GROWTH follows near-zero time to first value, useful personalized results, strong catalog coverage, a good unknown-product fallback, and repeated utility; shareable result cards and referrals are later work.
 
-**Composition status:** K2-COMPOSE is in progress. K4-COMPOSE handoff prep (PR #55) and KPAID-COMPOSE (PR #56) are landed. K4 canonical Check composition follows K2. K2/S2 platform integration remains held until S-FREE-2 PR #54 is fixed and landed. Composition and contract integration remain separate bounded passes.
+**Composition status:** K2-COMPOSE is in progress. K4-COMPOSE handoff prep (PR #55) and KPAID-COMPOSE (PR #56) are landed. K4 canonical Check composition follows K2. K2/S2 platform integration remains held until S-FREE-2 PR #54 passes exact-head review and lands. Composition and contract integration remain separate bounded passes.
 
 ### Deterministic fit and evidence boundary
 

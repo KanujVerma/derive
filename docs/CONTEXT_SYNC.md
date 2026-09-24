@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-24: S-FREE-2 Retinyl Propionate regression correction (branch-only)
+
+- **Predecessor:** `main@5153b38b1e3d16aee2fe1b36d1298c524bb94edf` and S-FREE-2 PR #54 before this fix.
+- **Review finding addressed:** a verified moisturizer listing Retinyl Propionate previously returned `COULD_WORK` despite reported pregnancy. The narrow retinoid detector now recognizes whole-token `retinyl` ingredient names, and focused tests cover pregnancy, withheld context, and no positive fit. This is conservative cosmetic triage, not a claim of individual medical safety.
+- **Boundary:** PR #54 is still open and not hosted. K2/S2 integration still waits for exact-head validation, review, and landing. Historical review entries below retain the original finding.
+
 ## 2026-09-24: Composition status refresh
 
 - **Predecessor:** main@aa3873596916e79bb878befa841700fbc7411d0e, after K4-COMPOSE handoff prep PR #55 landed.
