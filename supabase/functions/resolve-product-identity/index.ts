@@ -143,17 +143,20 @@ function parseStringArray(value: unknown, field: string, maxItems: number): stri
   });
 }
 
+function isFreePhotoPath(userId: string, role: ProductEvidencePhotoRole, path: string): boolean {
+  const parts = path.split("/");
+  return parts.length === 4 && parts[0] === userId && parts[1] === "free_scan"
+    && parts[2] === role && /^[0-9a-f-]{36}\.(jpg|png|webp|heic|heif)$/.test(parts[3]);
+}
+
 function validateOwnedPhotoPath(userId: string, role: ProductEvidencePhotoRole, path: string): void {
   if (/^(file|ph|content|https?):\/\//i.test(path)) {
     throw new ServiceError("INVALID_EVIDENCE_PATH", "Product evidence must be uploaded before resolution", 400);
   }
   const parts = path.split("/");
-  if (
-    parts.length !== 3
-    || parts[0] !== userId
-    || parts[1] !== role
-    || parts.some((part) => !part || part === "." || part === "..")
-  ) {
+  const legacyManaged = parts.length === 3 && parts[0] === userId && parts[1] === role
+    && parts.every((part) => part && part !== "." && part !== "..");
+  if (!legacyManaged && !isFreePhotoPath(userId, role, path)) {
     throw new ServiceError("INVALID_EVIDENCE_PATH", "Product evidence path is invalid", 400);
   }
 }
@@ -223,11 +226,27 @@ function parseRequest(body: Record<string, unknown>, userId: string): ParsedRequ
   return request;
 }
 
-async function verifyEvidencePhotos(admin: SupabaseClient, photos: ParsedEvidencePhoto[]): Promise<void> {
+async function verifyEvidencePhotos(admin: SupabaseClient, userId: string,
+  photos: ParsedEvidencePhoto[], managedAccess: boolean): Promise<void> {
   for (const photo of photos) {
-    const [owner, role, fileName] = photo.storagePath.split("/");
+    const freePath = isFreePhotoPath(userId, photo.role, photo.storagePath);
+    if (!freePath && !managedAccess) {
+      throw new ServiceError("PHOTO_EVIDENCE_MANAGED_ONLY", "This product photo path requires managed access", 403);
+    }
+    if (freePath) {
+      const { data: grant, error: grantError } = await admin.from("free_product_evidence_grants")
+        .select("id").eq("user_id", userId).eq("role", photo.role)
+        .eq("storage_path", photo.storagePath).maybeSingle();
+      if (grantError) {
+        console.error("free evidence grant lookup failed:", grantError.code);
+        throw new ServiceError("EVIDENCE_UNAVAILABLE", "Product evidence could not be verified", 500);
+      }
+      if (!grant) throw new ServiceError("INVALID_EVIDENCE_PATH", "Product evidence path is not authorized", 403);
+    }
+    const parts = photo.storagePath.split("/");
+    const fileName = parts.pop()!;
     const { data, error } = await admin.storage.from(PRODUCT_EVIDENCE_BUCKET)
-      .list(`${owner}/${role}`, { search: fileName, limit: 2 });
+      .list(parts.join("/"), { search: fileName, limit: 2 });
     if (error) {
       console.error("product evidence storage lookup failed");
       throw new ServiceError("EVIDENCE_UNAVAILABLE", "Product evidence could not be verified", 500);
@@ -428,8 +447,8 @@ Deno.serve(async (req: Request) => {
     try { identityKind = identityKindFromVerifiedUser(user); }
     catch { throw new ServiceError("IDENTITY_UNAVAILABLE", "Account identity could not be verified", 503); }
     const request = parseRequest(await readJsonObject(req), userId);
-    // Wave 1 accepts typed, barcode, and catalog evidence. Product photos
-    // remain managed-only until S-FREE-4 reviews guest Storage/lifecycle.
+    // Free Check can use server-granted private photos. Managed Shelf remains
+    // separate, and legacy managed photo paths never become guest-accessible.
     let managedAccess = false;
     if (identityKind === "permanent") {
       try {
@@ -439,10 +458,10 @@ Deno.serve(async (req: Request) => {
         if (!(error instanceof ServiceError) || error.code !== "MEMBERSHIP_REQUIRED") throw error;
       }
     }
-    if (request.evidencePhotos.length > 0 && !managedAccess) {
-      throw new ServiceError("PHOTO_EVIDENCE_MANAGED_ONLY", "Photo evidence is not available for free Check yet", 403);
+    if (request.consumer === "shelf" && !managedAccess) {
+      throw new ServiceError("MEMBERSHIP_REQUIRED", "Managed Shelf requires an active membership", 403);
     }
-    await verifyEvidencePhotos(admin, request.evidencePhotos);
+    await verifyEvidencePhotos(admin, userId, request.evidencePhotos, managedAccess);
     const catalog = await loadCatalog(admin, !managedAccess);
 
     const { data: replay, error: replayError } = await admin.from("product_resolution_cases")
