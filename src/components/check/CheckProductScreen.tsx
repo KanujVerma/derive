@@ -17,6 +17,7 @@ import { colors, typography, spacing, radii, shadows, layout } from '@/src/const
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useAuthStore } from '@/src/stores/authStore';
+import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { Button } from '@/src/components/ui/Button';
 import { analytics } from '@/src/services/analytics';
@@ -50,6 +51,9 @@ import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/pre
 import { remotePersonalizationGateway } from '@/src/presentation/personalization/remoteGateway';
 import { selectFreeFitTarget } from '@/src/presentation/personalization/fitTarget';
 import type { PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
+import { canPublishCheckResult, createCheckMemorySaver, selectFreeCheckOwner,
+  selectSavableCheckCaseId, shouldHideCheckForOwner, validateCheckResolution } from '@/src/presentation/check/checkMemory';
+import { recordFreeCheck } from '@/src/services/remote/freeContext';
 
 export default function CheckProductScreen() {
   const router = useRouter();
@@ -66,6 +70,13 @@ export default function CheckProductScreen() {
   const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
+  const authStatus = useAuthStore((s) => s.status);
+  const accessStatus = useFreeAccessStore((s) => s.status);
+  const accessUserId = useFreeAccessStore((s) => s.userId);
+  const accessOwnerId = useFreeAccessStore((s) => s.access?.userId ?? null);
+  const liveCheckOwner = selectFreeCheckOwner({
+    shell, authStatus, sessionUserId, accessStatus, accessUserId, accessOwnerId,
+  });
   const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
   const gateway = integrated ? remotePersonalizationGateway : personalizationGateway;
   const [personalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
@@ -119,6 +130,73 @@ export default function CheckProductScreen() {
   const [isLocked, setIsLocked] = useState(false);
   const isScanningLockedRef = useRef(false);
   const pendingResolutionRef = useRef<{ key: string; requestId: string } | null>(null);
+  const resolutionOwnerRef = useRef<string | null>(null);
+  const previousCheckOwnerRef = useRef(sessionUserId);
+  const resolutionSequenceRef = useRef(0);
+  const checkMemorySaverRef = useRef(createCheckMemorySaver(recordFreeCheck, createCatalogRequestId));
+  const [, refreshCheckMemory] = useState(0);
+
+  const currentLiveCheckOwner = () => {
+    const auth = useAuthStore.getState();
+    const access = useFreeAccessStore.getState();
+    return selectFreeCheckOwner({
+      shell, authStatus: auth.status, sessionUserId: auth.sessionUserId,
+      accessStatus: access.status, accessUserId: access.userId,
+      accessOwnerId: access.access?.userId ?? null,
+    });
+  };
+
+  useEffect(() => {
+    if (!integrated || previousCheckOwnerRef.current === sessionUserId) return;
+    previousCheckOwnerRef.current = sessionUserId;
+    resolutionSequenceRef.current += 1;
+    resolutionOwnerRef.current = null;
+    pendingResolutionRef.current = null;
+    checkMemorySaverRef.current = createCheckMemorySaver(recordFreeCheck, createCatalogRequestId);
+    setCatalogDetail(null);
+    setResolution(null);
+    setCandidates([]);
+    setConfirmedProduct(null);
+    setScanResult(null);
+    setCaptureRole(null);
+    setCaptureEvidence(null);
+    setUnknownBarcode(null);
+    setEvaluationError(null);
+    setPersonalFitState({ kind: 'factual_only' });
+    setSearchQuery('');
+    setIsCheckingProduct(false);
+    setIsSearching(false);
+  }, [integrated, sessionUserId]);
+
+  const renderSaveCheckAction = (caseId?: string) => {
+    const savableCaseId = selectSavableCheckCaseId({
+      caseId: caseId ?? null, liveOwner: liveCheckOwner,
+      resultOwner: resolutionOwnerRef.current, hasError: Boolean(evaluationError),
+    });
+    if (!liveCheckOwner || !savableCaseId) return null;
+    const status = checkMemorySaverRef.current.status(liveCheckOwner, savableCaseId);
+    return (
+      <View style={styles.saveCheckAction}>
+        <Button
+          label={status === 'saved' ? 'Check saved to My Stuff'
+            : status === 'failed' ? 'Try saving check again' : 'Save this check to My Stuff'}
+          variant="outline"
+          size="medium"
+          loading={status === 'saving'}
+          disabled={status === 'saved'}
+          onPress={() => {
+            const currentOwner = currentLiveCheckOwner();
+            if (currentOwner !== liveCheckOwner || resolutionOwnerRef.current !== currentOwner
+              || resolution?.caseId !== caseId) return;
+            const save = checkMemorySaverRef.current.save(currentOwner, savableCaseId);
+            refreshCheckMemory((value) => value + 1);
+            void save.then(() => refreshCheckMemory((value) => value + 1));
+          }}
+        />
+        {status === 'failed' && <Text style={styles.saveCheckMessage}>Could not save this check. Try again.</Text>}
+      </View>
+    );
+  };
 
   const handleSearchNamePress = () => {
     void Haptics.selectionAsync().catch(() => {});
@@ -195,6 +273,9 @@ export default function CheckProductScreen() {
     knownProductId?: string,
     barcode?: string,
   ) => {
+    const requestOwner = liveCheckOwner;
+    const requestSequence = ++resolutionSequenceRef.current;
+    resolutionOwnerRef.current = null;
     setIsCheckingProduct(true);
     setEvaluationError(null);
     setIsSearching(false);
@@ -205,15 +286,15 @@ export default function CheckProductScreen() {
     setConfirmedProduct(null);
     setScanResult(null);
     try {
-      const result = await loadResult();
+      const result = validateCheckResolution(await loadResult(), knownProductId);
+      const selectedId = resolvedCatalogDetailId(result, knownProductId);
+      const detail = selectedId ? await getCatalogProductDetail(selectedId) : null;
+      if (requestSequence !== resolutionSequenceRef.current
+        || !canPublishCheckResult(integrated, requestOwner, currentLiveCheckOwner())) return;
+      resolutionOwnerRef.current = requestOwner;
       setResolution(result);
       setCandidates(result.state === 'ambiguous_candidates' ? result.candidates : []);
-      if (knownProductId && result.product && result.product.productId !== knownProductId) {
-        throw new Error('Catalog and resolver identities disagree');
-      }
-      const selectedId = resolvedCatalogDetailId(result, knownProductId);
-      if (selectedId) {
-        const detail = await getCatalogProductDetail(selectedId);
+      if (detail) {
         setCatalogDetail(detail);
         setConfirmedProduct({
           name: detail.name, brand: detail.brand,
@@ -223,11 +304,16 @@ export default function CheckProductScreen() {
         setUnknownBarcode(barcode);
       }
     } catch {
+      if (requestSequence !== resolutionSequenceRef.current
+        || !canPublishCheckResult(integrated, requestOwner, currentLiveCheckOwner())) return;
+      resolutionOwnerRef.current = null;
+      setResolution(null);
+      setCandidates([]);
       setEvaluationError('We could not check this product right now. Please try again.');
       isScanningLockedRef.current = false;
       setIsLocked(false);
     } finally {
-      setIsCheckingProduct(false);
+      if (requestSequence === resolutionSequenceRef.current) setIsCheckingProduct(false);
     }
   };
 
@@ -236,6 +322,7 @@ export default function CheckProductScreen() {
     knownProductId?: string,
   ) => {
     if (preview) {
+      resolutionOwnerRef.current = null;
       setIsSearching(false);
       setCatalogDetail(null);
       setResolution(null);
@@ -285,6 +372,7 @@ export default function CheckProductScreen() {
       const detail = getPreviewCatalogDetail(item.productId);
       if (!detail) return;
       setCatalogDetail(detail);
+      resolutionOwnerRef.current = null;
       setResolution(null);
       setScanResult(null);
       setUnknownBarcode(null);
@@ -334,6 +422,8 @@ export default function CheckProductScreen() {
 
   const handleResetScan = () => {
     void Haptics.selectionAsync().catch(() => {});
+    resolutionSequenceRef.current += 1;
+    resolutionOwnerRef.current = null;
     setConfirmedProduct(null);
     setCatalogDetail(null);
     setResolution(null);
@@ -414,6 +504,19 @@ export default function CheckProductScreen() {
   const resultPresentation = resolveScanResultPresentation(scanResult);
   const invalidResult = Boolean(scanResult && confirmedProduct && resultPresentation.kind === 'invalid');
   const currentFormula = getVerifiedFormulaForResolution(catalogDetail, resolution);
+
+  if (shouldHideCheckForOwner({
+    integrated, previousOwner: previousCheckOwnerRef.current, sessionUserId,
+    liveOwner: liveCheckOwner, resultOwner: resolutionOwnerRef.current,
+    hasResult: Boolean(catalogDetail || resolution),
+  })) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
+        <RootShellHeader title="Check" />
+        <Text style={styles.entryBody}>Preparing Check for this account…</Text>
+      </View>
+    );
+  }
 
   if (!targetShell && !showProviderFeatures) {
     return (
@@ -704,6 +807,7 @@ export default function CheckProductScreen() {
           </View>
           </>
           )}
+          {renderSaveCheckAction(resolution?.caseId)}
           <Button label="Check another product" variant="outline" size="medium" onPress={handleResetScan} />
         </ScrollView>
       </View>
@@ -736,6 +840,7 @@ export default function CheckProductScreen() {
             <Text style={styles.catalogItemName}>{candidate.brand} {candidate.name}{candidate.variantName ? ` · ${candidate.variantName}` : ''}</Text>
           </TouchableOpacity>
         ))}
+        {renderSaveCheckAction(resolution.caseId)}
         {targetShell && <Button label="Search by name" variant="brand" size="medium" onPress={handleSearchNamePress} style={{ marginBottom: spacing.md }} />}
         <Button label="Check another product" variant="secondary" size="medium" onPress={handleResetScan} />
       </View>
@@ -1004,6 +1109,8 @@ export default function CheckProductScreen() {
 }
 
 const styles = StyleSheet.create({
+  saveCheckAction: { marginBottom: spacing.md },
+  saveCheckMessage: { color: colors.inkMuted, marginTop: spacing.xs },
   container: {
     flex: 1,
     backgroundColor: colors.canvas,
