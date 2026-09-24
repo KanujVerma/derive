@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createPersonalizationDraft } from '../src/presentation/personalization/draft.ts';
-import { createPersonalizationGateway } from '../src/presentation/personalization/gateway.ts';
+import { createPersonalizationGateway, resolvePersonalizationOwnerId } from '../src/presentation/personalization/gateway.ts';
 import { describePersonalFitRefresh } from '../src/presentation/personalization/result.ts';
 import { resolveLocalAccessRoute } from '../src/utils/localAccessRouting.ts';
 
@@ -54,7 +54,7 @@ test('K2 retains Mock preview and Remote Staging legacy branches', () => {
   assert.match(check, /if \(!targetShell && audience !== 'member'\)/);
   assert.match(check, /evaluateProduct/); // Legacy member path remains available only outside target shell.
   const owned = [read('../app/personalize/index.tsx'), read('../app/(tabs)/my-stuff.tsx'), read('../src/presentation/personalization/gateway.ts')].join('\n');
-  assert.doesNotMatch(owned, /deriveClient|scan-evaluator|skin_profiles|AsyncStorage|supabase|ai-workflows/);
+  assert.doesNotMatch(owned, /deriveClient|scan-evaluator|skin_profiles|AsyncStorage|services\/supabase|ai-workflows/);
 });
 
 test('K2 editor route is reachable from free and managed local shells', () => {
@@ -108,6 +108,19 @@ test('K2 gateway clears transient status and demo answers when Auth UUID changes
   const editor = read('../app/personalize/index.tsx');
   assert.match(check, /lastSaveStatus\(sessionUserId\)/);
   assert.match(check, /\[sessionUserId, catalogDetail\?\.productId\]/);
-  assert.match(editor, /key=\{sessionUserId \?\? 'signed-out'\}/);
+  assert.match(editor, /key=\{ownerId \?\? 'signed-out'\}/);
   assert.match(editor, /saveProfile\(ownerId, answers\)/);
+});
+
+test('K2 Mock My Stuff opens the same local editor without an Auth UUID', () => {
+  assert.equal(resolvePersonalizationOwnerId(null, 'scanner_first_preview'), 'mock-preview:local-session');
+  assert.equal(resolvePersonalizationOwnerId(null, 'local_free_integration'), null);
+  assert.equal(resolvePersonalizationOwnerId(null, 'legacy'), null);
+  assert.equal(resolvePersonalizationOwnerId('guest-A', 'scanner_first_preview'), 'guest-A');
+  const stuff = read('../app/(tabs)/my-stuff.tsx');
+  const editor = read('../app/personalize/index.tsx');
+  assert.match(stuff, /onEditProfile=.*router\.push\('\/personalize'\)/);
+  assert.match(editor, /resolvePersonalizationOwnerId/);
+  assert.match(editor, /PersonalizationFlow/);
+  assert.doesNotMatch(editor, /mock-preview.*supabase|legacy.*mock-preview/s);
 });

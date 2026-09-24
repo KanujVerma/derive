@@ -1,5 +1,14 @@
 import { createPersonalizationDraft, type PersonalizationDraft } from './draft.ts';
 import type { PersonalFitRefreshInput } from './result.ts';
+import type { ShellPresentation } from '../../utils/shellPresentation.ts';
+
+/** Mock-only presentation key; it is never a backend identity or persisted profile. */
+export function resolvePersonalizationOwnerId(
+  sessionUserId: string | null,
+  shell: ShellPresentation,
+): string | null {
+  return sessionUserId ?? (shell === 'scanner_first_preview' ? 'mock-preview:local-session' : null);
+}
 
 export type ProfileLoad =
   | { kind: 'unavailable' }

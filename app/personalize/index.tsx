@@ -3,14 +3,23 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { PersonalizationFlow } from '@/src/components/personalization/PersonalizationFlow';
 import { colors } from '@/src/constants/theme';
-import { personalizationGateway } from '@/src/presentation/personalization/gateway';
+import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/presentation/personalization/gateway';
 import type { PersonalizationDraft } from '@/src/presentation/personalization/draft';
 import { useAuthStore } from '@/src/stores/authStore';
+import { publicEnvironment } from '@/src/config/environment';
+import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
+import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 
 /** The same optional editor is opened from Check and My Stuff. Back retains the originating screen. */
 export default function PersonalizeScreen() {
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
-  return <PersonalizeEditor key={sessionUserId ?? 'signed-out'} ownerId={sessionUserId} />;
+  const shell = resolveShellPresentation({
+    buildFlavor: publicEnvironment.buildFlavor,
+    remoteEnabled: isRemoteServiceEnabled(),
+    supabaseUrl: publicEnvironment.supabaseUrl,
+  });
+  const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
+  return <PersonalizeEditor key={ownerId ?? 'signed-out'} ownerId={ownerId} />;
 }
 
 function PersonalizeEditor({ ownerId }: { ownerId: string | null }) {
