@@ -10,7 +10,9 @@ const PREGNANCY = new Set(['yes', 'no', 'prefer_not_to_say', 'unanswered']);
 const SENSITIVITY = new Set(['none_known', 'reported', 'unanswered']);
 const TREATMENT_STATUS = new Set(['none', 'reported', 'unanswered']);
 const TREATMENTS = new Set(['topical_retinoid', 'benzoyl_peroxide', 'exfoliating_acid', 'other_prescription']);
-const RETINOIDS = new Set(['retinol', 'retinal', 'retinaldehyde', 'retinyl palmitate', 'retinyl acetate', 'tretinoin', 'adapalene', 'tazarotene']);
+// Match the whole retinyl token so ester names such as retinyl propionate
+// cannot slip through a short, inevitably incomplete list of ester suffixes.
+const RETINOIDS = new Set(['retinol', 'retinal', 'retinaldehyde', 'retinyl', 'tretinoin', 'adapalene', 'tazarotene']);
 const EXFOLIANTS = new Set(['glycolic acid', 'lactic acid', 'mandelic acid', 'salicylic acid']);
 const BENZOYL_PEROXIDE = 'benzoyl peroxide';
 const AAD_PREGNANCY = 'https://www.aad.org/public/everyday-care/skin-care-secrets/routine/pregnancy-skin-care';
