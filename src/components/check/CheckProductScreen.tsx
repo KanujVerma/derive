@@ -63,7 +63,6 @@ export default function CheckProductScreen() {
   const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
   const [personalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
-  const [profileSaveStatus, setProfileSaveStatus] = useState(personalizationGateway.lastSaveStatus());
   const openPersonalization = () => router.push('/personalize');
   const { routine, userProducts, checkIns } = useRoutineStore();
   const { productReactions, routineComplexity, primaryGoal, costPreference } = useOnboardingStore();
@@ -76,13 +75,15 @@ export default function CheckProductScreen() {
   useFocusEffect(React.useCallback(() => {
     let active = true;
     const status = personalizationGateway.lastSaveStatus();
-    setProfileSaveStatus(status);
-    if (status) {
-      setPersonalFitState({ kind: 'unavailable' });
-      if (status.kind === 'ready' && catalogDetail?.productId) {
+    if (status?.kind === 'unavailable') {
+      setPersonalFitState({ kind: 'unavailable', reason: 'answers_not_saved' });
+    } else if (status?.kind === 'ready') {
+      setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' });
+      if (catalogDetail?.productId) {
         void personalizationGateway.getFit(catalogDetail.productId).then((fit) => {
-          if (active) setPersonalFitState(fit);
-        }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable' }); });
+          if (active) setPersonalFitState(fit.kind === 'unavailable'
+            ? { kind: 'unavailable', reason: 'client_session_ready' } : fit);
+        }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' }); });
       }
     }
     return () => { active = false; };
@@ -590,9 +591,7 @@ export default function CheckProductScreen() {
                 </View>
               </GroupedSection>
               {integrated ? <>
-                {profileSaveStatus?.kind === 'ready' ? <Text style={styles.previewFactText}>Personalization ready for this client session. Personal Fit is unavailable without product evidence.</Text> : null}
-                {profileSaveStatus?.kind === 'unavailable' ? <Text style={styles.previewFactText}>Personalization unavailable. Your answers were not saved.</Text> : null}
-                {personalFitState.kind === 'factual_only' ? <Text style={styles.previewFactText}>Not personalized yet.</Text> : null}
+                {/* Factual-only Personal Fit presents "Not personalized yet" within one section. */}
                 <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />
               </> : <GroupedSection header="Personal Fit"><Text style={styles.previewFactText}>Not available yet.</Text></GroupedSection>}
             </>

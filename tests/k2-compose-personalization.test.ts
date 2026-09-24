@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createPersonalizationDraft } from '../src/presentation/personalization/draft.ts';
 import { createPersonalizationGateway } from '../src/presentation/personalization/gateway.ts';
+import { describePersonalFitRefresh } from '../src/presentation/personalization/result.ts';
 import { resolveLocalAccessRoute } from '../src/utils/localAccessRouting.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -62,4 +63,29 @@ test('K2 editor route is reachable from free and managed local shells', () => {
   assert.equal(resolveLocalAccessRoute(['personalize', 'index'], free), null);
   assert.equal(resolveLocalAccessRoute(['personalize', 'index'], managed), null);
   assert.match(read('../app/_layout.tsx'), /Stack.Screen name=\"personalize\/index\"/);
+});
+
+test('K2 Personal Fit copy is concise and states an unavailable save once', () => {
+  const factual = describePersonalFitRefresh({ kind: 'factual_only' });
+  assert.equal(factual.title, 'Not personalized yet');
+  assert.ok(factual.message.length < 80);
+  assert.doesNotMatch(factual.message, /45 seconds|below/i);
+  const unsaved = describePersonalFitRefresh({ kind: 'unavailable', reason: 'answers_not_saved' });
+  assert.match(unsaved.message, /answers were not saved/i);
+  assert.equal((unsaved.message.match(/answers were not saved/gi) ?? []).length, 1);
+  assert.doesNotMatch(unsaved.message, /below/i);
+  const ready = describePersonalFitRefresh({ kind: 'unavailable', reason: 'client_session_ready' });
+  assert.match(ready.message, /this session/i);
+  assert.doesNotMatch(ready.message, /fit.*great|fits you|below/i);
+});
+
+test('K2 Check renders one Personal Fit section with a minimal action', () => {
+  const check = read('../src/components/check/CheckProductScreen.tsx');
+  const section = read('../src/components/personalization/PersonalFitSection.tsx');
+  const integratedResult = check.slice(check.indexOf('if (catalogDetail) {'), check.indexOf('if (resolution && !catalogDetail)'));
+  assert.equal((integratedResult.match(/<PersonalFitSection/g) ?? []).length, 1);
+  assert.doesNotMatch(integratedResult, /<Text[^>]*>Not personalized yet/);
+  assert.doesNotMatch(integratedResult, /Personalization unavailable\. Your answers were not saved/);
+  assert.match(section, /label=\"Personalize\"/);
+  assert.doesNotMatch(section, /label=\"Personalize Derive\"/);
 });
