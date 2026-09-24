@@ -91,6 +91,12 @@ verify_jwt = true
 import_map = "./functions/resolve-product-identity/deno.json"
 entrypoint = "./functions/resolve-product-identity/index.ts"
 
+[functions.prepare-free-product-evidence]
+enabled = true
+verify_jwt = true
+import_map = "./functions/prepare-free-product-evidence/deno.json"
+entrypoint = "./functions/prepare-free-product-evidence/index.ts"
+
 [functions.access-state]
 enabled = true
 verify_jwt = true
