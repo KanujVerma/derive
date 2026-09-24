@@ -3,7 +3,7 @@ import test from 'node:test';
 import type { FreeSkinProfile } from '../src/contracts/FreePersonalFit.ts';
 import type { FreeSavedProduct, FreeCheckEntry, FreeExperienceEntry } from '../src/contracts/FreeContext.ts';
 import { mapFreeMyStuff } from '../src/presentation/my-stuff/liveMyStuff.ts';
-import { buildMyStuffPresentation } from '../src/presentation/my-stuff/myStuffPresentation.ts';
+import { buildMyStuffPresentation, myStuffCopy, formatMyStuffDate } from '../src/presentation/my-stuff/myStuffPresentation.ts';
 import { createMyStuffStore } from '../src/stores/myStuffStore.ts';
 
 const profile: FreeSkinProfile = {
@@ -43,6 +43,22 @@ test('K3/S3 maps the real profile and free memory without upgrading user reports
 test('K3/S3 describes broader profile goals without calling them skin concerns', () => {
   const model = mapFreeMyStuff({ ...profile, goals: ['simplify', 'maintain'] }, [], [], []);
   assert.equal(buildMyStuffPresentation(model).profile.summary, '2 skin goals');
+});
+
+test('K3/S3 keeps legacy My Stuff wording and dates outside live local free context', () => {
+  assert.deepEqual(myStuffCopy(false), {
+    productHeader: 'Current products',
+    experienceHeader: 'Reactions & tolerance',
+    experienceFooter: 'Your own observations, separate from a medical diagnosis.',
+  });
+  assert.equal(formatMyStuffDate('Sep 21', false), 'Sep 21');
+  assert.equal(formatMyStuffDate('2026-09-24T12:00:00Z', false), '2026-09-24T12:00:00Z');
+  assert.deepEqual(myStuffCopy(true), {
+    productHeader: 'Saved products',
+    experienceHeader: 'Product experiences',
+    experienceFooter: 'Your reports, separate from a medical diagnosis.',
+  });
+  assert.match(formatMyStuffDate('2026-09-24T12:00:00Z', true), /2026/);
 });
 
 test('K3/S3 keeps pagination cursors and appends the next page without losing the first', async () => {

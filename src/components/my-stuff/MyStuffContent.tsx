@@ -6,6 +6,8 @@ import { StatusBadge, type StatusBadgeVariant } from '@/src/components/ui/Status
 import { colors, layout, spacing, typography } from '@/src/constants/theme';
 import {
   buildMyStuffPresentation,
+  myStuffCopy,
+  formatMyStuffDate,
   type ExperienceKind,
   type MyStuffViewModel,
   type ProductState,
@@ -30,6 +32,7 @@ function EmptyRow({ text }: { text: string }) {
 /** Pure presentation: caller supplies owner-scoped context and an optional edit action. */
 export function MyStuffContent({
   model,
+  liveFree = false,
   onEditProfile,
   onChangeProductState,
   onRemoveProduct,
@@ -40,6 +43,7 @@ export function MyStuffContent({
   busyId,
 }: {
   model: MyStuffViewModel;
+  liveFree?: boolean;
   onEditProfile?: () => void;
   onChangeProductState?: (id: string, state: ProductState) => void;
   onRemoveProduct?: (id: string) => void;
@@ -50,6 +54,7 @@ export function MyStuffContent({
   busyId?: string | null;
 }) {
   const view = buildMyStuffPresentation(model);
+  const copy = myStuffCopy(liveFree);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const removeControl = (section: 'products' | 'checks' | 'experiences', id: string) => {
@@ -97,7 +102,7 @@ export function MyStuffContent({
         ) : profileRow}
       </GroupedSection>
 
-      <GroupedSection header="Saved products">
+      <GroupedSection header={copy.productHeader}>
         {view.products.length ? view.products.map((product) => (
           <View key={product.id} style={styles.row}>
             <View style={styles.horizontal}>
@@ -131,7 +136,7 @@ export function MyStuffContent({
           <View key={check.id} style={styles.row}>
             <View style={styles.horizontal}>
               <Text style={[styles.title, styles.main]}>{check.productName}</Text>
-              <Text style={styles.detail}>{formatDate(check.checkedAt)}</Text>
+              <Text style={styles.detail}>{formatMyStuffDate(check.checkedAt, liveFree)}</Text>
             </View>
             {onRemoveEntry ? removeControl('checks', check.id) : null}
           </View>
@@ -139,7 +144,7 @@ export function MyStuffContent({
         {moreControl('checks')}
       </GroupedSection>
 
-      <GroupedSection header="Product experiences" footer="Your reports, separate from a medical diagnosis.">
+      <GroupedSection header={copy.experienceHeader} footer={copy.experienceFooter}>
         {view.experiences.length ? view.experiences.map((experience) => (
           <View key={experience.id} style={styles.row}>
             <View style={styles.horizontal}>
@@ -147,7 +152,7 @@ export function MyStuffContent({
                 <Text style={styles.title}>{experience.productName}</Text>
                 {experience.source === 'user_reported' ? <Text style={styles.detail}>Added by you</Text> : null}
                 {experience.note ? <Text style={styles.detail}>{experience.note}</Text> : null}
-                {experience.notedAt ? <Text style={styles.detail}>{formatDate(experience.notedAt)}</Text> : null}
+                {experience.notedAt ? <Text style={styles.detail}>{formatMyStuffDate(experience.notedAt, liveFree)}</Text> : null}
               </View>
               <StatusBadge label={experience.kind} variant={experienceBadge[experience.kind]} />
             </View>
@@ -165,11 +170,6 @@ function Action({ label, onPress, disabled }: { label: string; onPress: () => vo
     style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
     <Text style={styles.actionText}>{label}</Text>
   </Pressable>;
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const styles = StyleSheet.create({

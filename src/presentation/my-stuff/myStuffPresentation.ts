@@ -20,6 +20,25 @@ export interface MyStuffViewModel {
 const countLabel = (count: number, singular: string, plural = `${singular}s`) =>
   `${count} ${count === 1 ? singular : plural}`;
 
+export function myStuffCopy(liveFree: boolean) {
+  return liveFree ? {
+    productHeader: 'Saved products',
+    experienceHeader: 'Product experiences',
+    experienceFooter: 'Your reports, separate from a medical diagnosis.',
+  } : {
+    productHeader: 'Current products',
+    experienceHeader: 'Reactions & tolerance',
+    experienceFooter: 'Your own observations, separate from a medical diagnosis.',
+  };
+}
+
+export function formatMyStuffDate(value: string, liveFree: boolean): string {
+  if (!liveFree) return value;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value
+    : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export function buildMyStuffPresentation(model: MyStuffViewModel) {
   const concernCount = model.profile?.concerns.length ?? 0;
   return {

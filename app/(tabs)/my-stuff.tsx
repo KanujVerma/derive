@@ -81,6 +81,7 @@ export default function MyStuffScreen() {
           </Pressable> : null}
         </View> : null}
         {!hideEmptyUntilResolved ? <MyStuffContent key={liveOwner ?? 'preview'} model={live ? model : anonymousEmptyMyStuff}
+          liveFree={shell === 'local_free_integration'}
           onEditProfile={targetShell ? () => router.push('/personalize') : undefined}
           onChangeProductState={live ? (id: string, state: ProductState) => runAction(id,
             () => myStuffStore.getState().changeProductState(id, state)) : undefined}
