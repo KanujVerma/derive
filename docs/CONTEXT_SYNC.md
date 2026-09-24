@@ -6,6 +6,20 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-24: Composition status refresh
+
+- **Predecessor:** main@aa3873596916e79bb878befa841700fbc7411d0e, after K4-COMPOSE handoff prep PR #55 landed.
+- **Landed:** K-FREE-2 (#51), K-FREE-3 (#48), K-FREE-4 (#49), K-PAID-1A (#52), test discovery (#53), and the max-parallel rule (#50). KPAID-COMPOSE PR #56 and K4-COMPOSE handoff prep PR #55 are also landed.
+- **In progress:** K2-COMPOSE. K4 canonical Check composition follows K2. S-FREE-2 PR #54 remains open with the reproduced Sami-owned Retinyl Propionate pregnancy-fit defect; K2/S2 platform integration waits for its fix and landing.
+- **Release status:** hosted beta is not ready. Historical predecessor entries below are preserved as recorded.
+
+## 2026-09-24: Parallel presentation landing and S-FREE-2 blocker
+
+- **Predecessor:** clean `main@18a4a19f10de74a1fbb40d05e744d50154ab3a49`.
+- **Landed:** K-FREE-3 PR #48 (`c56090a`); test discovery PR #53 (`ca8aac2`); max-parallel docs PR #50 (`a36cacc`); K-FREE-2 PR #51 (`747f217`); K-FREE-4 PR #49 (`c4e2c5c`); K-PAID-1A PR #52 (`18a4a19`). K4-COMPOSE handoff prep and KPAID-COMPOSE are in progress; canonical Check wiring is not yet active.
+- **Open blocker:** S-FREE-2 PR #54 is OPEN. A read-only local review reproduced `determinePersonalFit` returning `COULD_WORK` / `goal_role_match` for verified moisturizer ingredients Water plus Retinyl Propionate with pregnancyStatus yes, because the RETINOIDS allowlist omits this vitamin A propionate. Sami owns the fix. K2/S2 integration cannot start until #54 is fixed and landed. No hosted deployment occurred.
+- **Release status:** the scanner-first external beta is not ready. The public-repository audit result and its scope remain recorded in the preceding 2026-09-23 checkpoint; no secret values are recorded here.
+
 ## 2026-09-23: Kanuj max-parallel presentation execution opened
 
 - **Predecessor:** clean `main` and `origin/main@669b475b971a7abd682bff59e458a655be7c058b`, after Wave-1 local integration. Four isolated presentation worktrees were created from this same commit: `kanuj/k-free-2-progressive-personalization`, `kanuj/k-free-3-my-stuff-presentation`, `kanuj/k-free-4-capture-ux`, and `kanuj/k-paid-1a-managed-presentation`. Creation does not imply implementation, PR, CI, or merge completion.
