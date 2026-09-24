@@ -1,12 +1,12 @@
 # Derive Product Specification: Current Strategy and Historical V1
 
-## Current strategy (approved target; local shell preview only)
+## Current strategy (local Wave-1 integration; broader target approved)
 
 Derive is personalized skincare product intelligence first. **Free Check** answers “Should I use this?” through product-name search, barcode, front-label/package capture, and ingredient capture; later share/paste flows may follow. It presents only supported product identity, formula facts, uncertainty and provenance. If enough context exists, it adds categorical personal fit with no universal numerical score.
 
-K-FREE-1B's local Mock shell opens CHECK around the supported barcode camera when permitted, with name search one tap away. Permission is requested only after a Scan barcode action. This mobile presentation does not activate anonymous backend access, OCR, or deterministic Personal Fit.
+K-FREE-1B's shell opens CHECK around the supported barcode camera when permitted, with name search one tap away. Permission is requested only after a Scan barcode action. Development Mock uses a sourced sample; Development Remote with local Supabase uses anonymous Auth, live catalog facts, and factual typed/barcode resolution. OCR and deterministic Personal Fit are not active.
 
-The first launch should silently establish a Supabase anonymous authenticated identity and open CHECK. The user sees factual first-check value before an optional, roughly 45-second profile. Current shelf/history is optional progressive context. The target roots are CHECK / MY STUFF / PLAN / SHOP; account/settings stays in the header. Free use requires no managed entitlement. **$25 Managed Skincare** requires a permanent identity plus managed entitlement and adds routine construction and longitudinal care. K-FREE-1 implements only a local Mock presentation preview of these roots. Current Remote and Remote Staging continue the legacy C1 managed-first routing until the separate S-FREE-1 integration.
+The local integrated first launch silently establishes a Supabase anonymous authenticated identity and opens CHECK. The user sees factual first-check value before a later optional, roughly 45-second profile. Current shelf/history is optional future context. The roots are CHECK / MY STUFF / PLAN / SHOP; account/settings stays in the header. Free use requires no managed entitlement. **$25 Managed Skincare** requires a permanent identity plus managed entitlement and adds routine construction and longitudinal care. Remote Staging and production retain legacy C1 managed-first routing; hosted anonymous access remains gated.
 
 | Capability | Free Check target | Managed Skincare target |
 | --- | --- | --- |

@@ -57,8 +57,8 @@ test('K-FREE-1: one Check component serves both target and legacy routes', () =>
   assert.match(shared, /CatalogProductSearch/);
   assert.match(shared, /FORMULA DETAILS/);
   assert.doesNotMatch(shared, /FORMULA QUALITY/);
-  assert.match(shared, /if \(!preview && !showProviderFeatures\)/, 'Remote Staging still hides Check');
-  assert.match(shared, /if \(!preview && audience !== 'member'\)/);
+  assert.match(shared, /if \(!targetShell && !showProviderFeatures\)/, 'Remote Staging still hides Check');
+  assert.match(shared, /if \(!targetShell && audience !== 'member'\)/);
   assert.ok(shared.indexOf('if (preview) {') < shared.indexOf('await resolveCatalogIdentity'), 'preview never calls S6');
   assert.match(shared, /setUnknownBarcode\(evidence\.barcode \?\? null\)/, 'unknown preview barcodes remain unresolved');
 });

@@ -9,6 +9,7 @@ import { resolveAuthRoute } from '@/src/utils/authRouting';
 import { colors } from '@/src/constants/theme';
 import { publicEnvironment } from '@/src/config/environment';
 import { resolveShellLanding, resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 
 export default function Index() {
   const isCompleted = useOnboardingStore((s) => s.isCompleted);
@@ -19,7 +20,9 @@ export default function Index() {
   const bootstrapRefreshing = useBootstrapStore((s) => s.isRefreshing);
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
   const remoteEnabled = isRemoteServiceEnabled();
-  const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled });
+  const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled, supabaseUrl: publicEnvironment.supabaseUrl });
+  const access = useFreeAccessStore((s) => s.access);
+  const accessStatus = useFreeAccessStore((s) => s.status);
 
   const destination = resolveAuthRoute({
     remoteEnabled,
@@ -31,6 +34,13 @@ export default function Index() {
     bootstrapState,
     bootstrapRefreshing,
   });
+
+  if (shell === 'local_free_integration') {
+    if (accessStatus === 'READY' && access?.userId === sessionUserId) {
+      return <Redirect href={resolveShellLanding(shell, access.managedAccess ? 'managed' : 'free')} />;
+    }
+    return <View style={styles.loadingContainer}><ActivityIndicator size="small" color={colors.ink} /></View>;
+  }
 
   if (destination.type === 'AUTH_LOADING') {
     return (

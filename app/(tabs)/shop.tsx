@@ -53,6 +53,8 @@ import { hydratePlanState } from '@/src/services/deriveClient';
 import { PreviewShopShell } from '@/src/components/shop/PreviewShopShell';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
+import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 
 export default function ShopScreen() {
   const router = useRouter();
@@ -69,10 +71,14 @@ export default function ShopScreen() {
   } = useRoutineStore();
 
   const audience = useShopAudience();
-  const targetShell = resolveShellPresentation({
+  const shell = resolveShellPresentation({
     buildFlavor: publicEnvironment.buildFlavor,
     remoteEnabled: isRemoteServiceEnabled(),
-  }) === 'scanner_first_preview';
+    supabaseUrl: publicEnvironment.supabaseUrl,
+  });
+  const managedAccess = useFreeAccessStore((s) => s.status === 'READY' && s.access?.managedAccess === true);
+  const bootstrapReady = useBootstrapStore((s) => s.status === 'READY');
+  const targetShell = shell === 'scanner_first_preview' || (shell === 'local_free_integration' && !managedAccess);
   const isMember = audience === 'member';
   const isPublished = routine?.status === 'published';
 
@@ -102,10 +108,11 @@ export default function ShopScreen() {
   React.useEffect(() => {
     // Deduplicates an in-flight read and recovers a stale loading projection
     // after entitlement refresh remounts Shop.
-    if (isMember && (planHydrationStatus === 'idle' || planHydrationStatus === 'loading')) {
+    if (isMember && (!isRemoteServiceEnabled() || bootstrapReady)
+      && (planHydrationStatus === 'idle' || planHydrationStatus === 'loading')) {
       void hydratePlanState().catch(() => {});
     }
-  }, [isMember, planHydrationStatus]);
+  }, [isMember, bootstrapReady, planHydrationStatus]);
 
   const stateNotice = shopState === 'loading'
     ? { title: 'Loading your plan', body: 'Your product guidance is on its way.', icon: 'sparkle' as const }
