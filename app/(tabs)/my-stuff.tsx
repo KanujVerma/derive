@@ -1,26 +1,31 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AccountSettingsButton } from '@/src/components/account/AccountSettingsButton';
-import { colors, radii, spacing, typography } from '@/src/constants/theme';
+import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
+import { GroupedSection } from '@/src/components/ui/GroupedSection';
+import { colors, layout, spacing, typography } from '@/src/constants/theme';
 
-/** Information architecture shell only. No member or demo records are read here. */
+const sections = [
+  { title: 'Skin profile', status: 'Not set up' },
+  { title: 'Current products', status: 'None yet' },
+  { title: 'Check history', status: 'None yet' },
+] as const;
+
+/** Information architecture only; no member or demo records are read here. */
 export default function MyStuffScreen() {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Stuff</Text>
-        <AccountSettingsButton />
-      </View>
+      <RootShellHeader title="My Stuff" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}>
-        <Text style={styles.intro}>Products you use and checks you save will appear here.</Text>
-        {['Skin profile', 'Current products', 'Check history'].map((label) => (
-          <View key={label} style={styles.card}>
-            <Text style={styles.cardTitle}>{label}</Text>
-            <Text style={styles.cardBody}>Nothing saved yet.</Text>
-          </View>
-        ))}
+        <GroupedSection>
+          {sections.map(({ title, status }) => (
+            <View key={title} style={styles.row}>
+              <Text style={styles.rowTitle}>{title}</Text>
+              <Text style={styles.rowStatus}>{status}</Text>
+            </View>
+          ))}
+        </GroupedSection>
       </ScrollView>
     </View>
   );
@@ -28,11 +33,8 @@ export default function MyStuffScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
-  header: { minHeight: 64, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: colors.ink, fontSize: typography.sizes.screenTitle, fontWeight: typography.weights.bold },
-  content: { padding: spacing.lg, gap: spacing.md },
-  intro: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: 23, marginBottom: spacing.sm },
-  card: { borderRadius: radii.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.xs },
-  cardTitle: { color: colors.ink, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold },
-  cardBody: { color: colors.inkMuted, fontSize: typography.sizes.caption },
+  content: { paddingHorizontal: layout.gutter, paddingTop: spacing.lg },
+  row: { minHeight: 68, justifyContent: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  rowTitle: { color: colors.ink, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold },
+  rowStatus: { color: colors.inkMuted, fontSize: typography.sizes.caption, marginTop: spacing.xxs },
 });

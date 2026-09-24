@@ -79,11 +79,12 @@ test('K-FREE-1: target preview keeps managed hydration out of Plan and sample da
   assert.match(plan, /ensureInitialRoutineProposal/);
   assert.ok(plan.indexOf('scanner_first_preview') < plan.indexOf('ensureInitialRoutineProposal().catch'));
   assert.doesNotMatch(stuff, /loadArthur|useRoutineStore|hydrateProgress|ensureInitialRoutineProposal/);
-  assert.match(stuff, /AccountSettingsButton/);
+  assert.match(stuff, /RootShellHeader/);
   assert.match(read('src/components/account/AccountSettingsButton.tsx'), /Account and Settings/);
-  assert.match(read('src/components/shop/PreviewShopShell.tsx'), /AccountSettingsButton/);
-  assert.match(read('src/components/plan/PreviewPlanShell.tsx'), /AccountSettingsButton/);
-  assert.match(read('src/components/check/CheckProductScreen.tsx'), /AccountSettingsButton/);
+  assert.match(read('src/components/shell/RootShellHeader.tsx'), /AccountSettingsButton/);
+  assert.match(read('src/components/shop/PreviewShopShell.tsx'), /RootShellHeader/);
+  assert.match(read('src/components/plan/PreviewPlanShell.tsx'), /RootShellHeader/);
+  assert.match(read('src/components/check/CheckProductScreen.tsx'), /RootShellHeader/);
   assert.match(read('app/(tabs)/shop.tsx'), /if \(targetShell\) return <PreviewShopShell \/>/);
   assert.match(read('app/profile/index.tsx'), /if \(shell === 'scanner_first_preview'\) return <PreviewAccountShell \/>/);
   assert.doesNotMatch(read('src/components/account/PreviewAccountShell.tsx'), /useUserStore|hydrateCustomerProfile|loadArthur/);

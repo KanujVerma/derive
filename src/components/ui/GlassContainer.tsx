@@ -26,6 +26,7 @@ export const GlassContainer: React.FC<GlassContainerProps> = ({
   isFloating = false,
 }) => {
   const isIOS = Platform.OS === 'ios';
+  const darkTint = tintColor === colors.glass.tintDark;
 
   // On iOS with native glass effect support
   if (isIOS && NativeGlassView) {
@@ -49,6 +50,7 @@ export const GlassContainer: React.FC<GlassContainerProps> = ({
       style={[
         styles.wrapper,
         styles.fallbackSurface,
+        darkTint && styles.fallbackDarkSurface,
         Platform.OS === 'web' && ({ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any),
         isFloating && styles.floatingShadow,
         style,
@@ -71,6 +73,9 @@ const styles = StyleSheet.create({
   },
   fallbackSurface: {
     backgroundColor: 'rgba(255, 254, 251, 0.92)',
+  },
+  fallbackDarkSurface: {
+    backgroundColor: 'rgba(23, 26, 24, 0.92)',
   },
   borderOverlay: {
     position: 'absolute',

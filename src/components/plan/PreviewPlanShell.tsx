@@ -1,36 +1,46 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AccountSettingsButton } from '../account/AccountSettingsButton';
-import { colors, radii, spacing, typography } from '../../constants/theme';
+import { RootShellHeader } from '../shell/RootShellHeader';
+import { GroupedSection } from '../ui/GroupedSection';
+import { colors, layout, spacing, typography } from '../../constants/theme';
 
-/** No routine reads or writes: K-PAID-1 owns the later managed-care presentation. */
+const managedBenefits = [
+  'Routine built for you',
+  'Adjusted from your check-ins',
+  'Products purchased separately',
+] as const;
+
+/** No routine reads or writes; K-PAID-1 owns enrollment. */
 export function PreviewPlanShell() {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Plan</Text>
-        <AccountSettingsButton />
-      </View>
-      <View style={styles.content}>
-        <View style={styles.card}>
-          <Text style={styles.overline}>MANAGED SKINCARE</Text>
-          <Text style={styles.heading}>Care that keeps your routine on track</Text>
-          <Text style={styles.body}>A managed plan can bring your products, schedule, and ongoing adjustments together. No plan is connected in this preview.</Text>
-        </View>
-      </View>
+      <RootShellHeader title="Plan" />
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}>
+        <Text style={styles.name}>Managed Skincare</Text>
+        <Text style={styles.price}>$25/month</Text>
+        <Text style={styles.summary}>Your full skincare routine, managed over time.</Text>
+        <GroupedSection>
+          {managedBenefits.map((benefit) => (
+            <View key={benefit} style={styles.row}>
+              <Text style={styles.rowText}>{benefit}</Text>
+            </View>
+          ))}
+        </GroupedSection>
+        <Text style={styles.status}>Enrollment coming soon</Text>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
-  header: { minHeight: 64, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: colors.ink, fontSize: typography.sizes.screenTitle, fontWeight: typography.weights.bold },
-  content: { padding: spacing.lg },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
-  overline: { color: colors.brand, fontSize: typography.sizes.micro, fontWeight: typography.weights.bold },
-  heading: { color: colors.ink, fontSize: typography.sizes.sectionTitle, fontWeight: typography.weights.semibold },
-  body: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: 23 },
+  content: { paddingHorizontal: layout.gutter, paddingTop: spacing.lg },
+  name: { color: colors.ink, fontSize: typography.sizes.sectionTitle, fontWeight: typography.weights.semibold },
+  price: { color: colors.brand, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold, marginTop: spacing.xxs },
+  summary: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, marginTop: spacing.md, marginBottom: spacing.xl },
+  row: { minHeight: 54, paddingHorizontal: spacing.lg, justifyContent: 'center' },
+  rowText: { color: colors.ink, fontSize: typography.sizes.bodyRegular },
+  status: { color: colors.inkMuted, fontSize: typography.sizes.caption, marginTop: spacing.sm },
 });

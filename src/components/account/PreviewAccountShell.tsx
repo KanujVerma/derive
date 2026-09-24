@@ -18,7 +18,7 @@ export function PreviewAccountShell() {
         <Text style={styles.title}>Account & Settings</Text>
       </View>
       <View style={styles.content}>
-        <Text style={styles.body}>This is a local product-check preview. No account or managed plan is connected.</Text>
+        <Text style={styles.body}>No account set up.</Text>
       </View>
     </View>
   );
