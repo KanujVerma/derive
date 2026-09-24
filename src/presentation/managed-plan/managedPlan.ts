@@ -47,3 +47,8 @@ export function deriveManagedPlanView(snapshot: ManagedPlanSnapshot): ManagedPla
     showCheckIn: snapshot.status === 'check_in_due',
   };
 }
+
+/** Clear the floating root tab bar when the illustrative Plan scrolls. */
+export function managedPlanBottomPadding(safeAreaBottom: number): number {
+  return Math.max(0, safeAreaBottom) + 120;
+}
