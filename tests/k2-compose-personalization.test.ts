@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createPersonalizationDraft } from '../src/presentation/personalization/draft.ts';
-import { createPersonalizationGateway, resolvePersonalizationOwnerId } from '../src/presentation/personalization/gateway.ts';
+import { createPersonalizationGateway, resolvePersonalizationOwnerId, canOpenPersonalizationRoute } from '../src/presentation/personalization/gateway.ts';
 import { describePersonalFitRefresh } from '../src/presentation/personalization/result.ts';
 import { resolveLocalAccessRoute } from '../src/utils/localAccessRouting.ts';
+import { resolveShellPresentation } from '../src/utils/shellPresentation.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -123,4 +124,25 @@ test('K2 Mock My Stuff opens the same local editor without an Auth UUID', () => 
   assert.match(editor, /resolvePersonalizationOwnerId/);
   assert.match(editor, /PersonalizationFlow/);
   assert.doesNotMatch(editor, /mock-preview.*supabase|legacy.*mock-preview/s);
+});
+
+test('K2 personalization deep links deny legacy Remote Staging and production shells', () => {
+  const staging = resolveShellPresentation({ buildFlavor: 'remote-staging', remoteEnabled: true, supabaseUrl: 'https://example.invalid' });
+  const production = resolveShellPresentation({ buildFlavor: 'production', remoteEnabled: true, supabaseUrl: 'https://example.invalid' });
+  const mock = resolveShellPresentation({ buildFlavor: 'development', remoteEnabled: false });
+  const local = resolveShellPresentation({ buildFlavor: 'development', remoteEnabled: true, supabaseUrl: 'http://127.0.0.1:54321' });
+  assert.equal(canOpenPersonalizationRoute(staging, true), false);
+  assert.equal(canOpenPersonalizationRoute(production, true), false);
+  assert.equal(canOpenPersonalizationRoute(mock, false), true);
+  assert.equal(canOpenPersonalizationRoute(local, false), false);
+  assert.equal(canOpenPersonalizationRoute(local, true), true); // Free and managed local access use the same READY projection.
+  const layout = read('../app/_layout.tsx');
+  assert.match(layout, /Stack.Protected guard=\{canOpenPersonalizationRoute\(shell, localReady\)\}/);
+  assert.match(layout, /Stack.Protected guard=\{canOpenPersonalizationRoute[\s\S]*Stack.Screen name=\"personalize\/index\"/);
+});
+
+test('K2 My Stuff offers the shared editor only in scanner-first shells', () => {
+  const stuff = read('../app/(tabs)/my-stuff.tsx');
+  assert.match(stuff, /const targetShell = shell !== 'legacy'/);
+  assert.match(stuff, /onEditProfile=\{targetShell \? .*router\.push\('\/personalize'\).* : undefined\}/);
 });
