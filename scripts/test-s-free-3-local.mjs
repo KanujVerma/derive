@@ -77,6 +77,7 @@ try {
   assert.equal(saved.data.product.name, sourced.data.name);
   assert.equal((await invoke(first, saveRequest)).data.product.id, saved.data.product.id);
   assert.equal((await invoke(first, { ...saveRequest, product: { name: 'Different product' } })).status, 409);
+  assert.equal((await invoke(first, { ...saveRequest, state: 'considering' })).status, 409);
   assert.equal((await invoke(second, { operation: 'set_product_state', id: saved.data.product.id, state: 'stopped' })).status, 404);
   const updated = await invoke(first, { operation: 'set_product_state', id: saved.data.product.id, state: 'stopped' });
   assert.ifError(updated.error);

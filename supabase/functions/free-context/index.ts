@@ -102,7 +102,7 @@ async function saveProduct(admin: SupabaseClient, userId: string,
   const row = await insertOnce(admin, userId, 'products', request.requestId,
     { ...product, state: request.state },
     (existing) => existing.product_id === product.product_id && existing.name === product.name
-      && existing.brand === product.brand && existing.source === product.source);
+      && existing.brand === product.brand && existing.source === product.source && existing.state === request.state);
   return project('products', row);
 }
 
