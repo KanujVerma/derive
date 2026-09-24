@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
-import { deriveManagedPlanView, type ManagedPlanSnapshot, type ProductDecision } from '../../../presentation/managed-plan/managedPlan';
+import { deriveManagedPlanView, managedPlanBottomPadding, type ManagedPlanSnapshot, type ProductDecision } from '../../../presentation/managed-plan/managedPlan';
 import { GroupedSection } from '../../ui/GroupedSection';
 import { StatusBadge, type StatusBadgeVariant } from '../../ui/StatusBadge';
 
@@ -11,8 +12,9 @@ interface Props { snapshot: ManagedPlanSnapshot; onRetry?: () => void; onCheckIn
 
 /** Read-only Plan presentation. Supplied actions are navigation hooks, never service calls. */
 export function ManagedPlanPresentation({ snapshot, onRetry, onCheckIn }: Props) {
+  const insets = useSafeAreaInsets();
   const view = deriveManagedPlanView(snapshot);
-  return <ScrollView contentContainerStyle={styles.content}>
+  return <ScrollView contentContainerStyle={[styles.content, { paddingBottom: managedPlanBottomPadding(insets.bottom) }]}>
     {view.illustrative && <Text style={styles.preview}>ILLUSTRATIVE PREVIEW</Text>}
     <Text style={styles.title}>{view.title}</Text>
     <Text style={styles.body}>{view.message || view.detail}</Text>
@@ -39,7 +41,7 @@ export function ManagedPlanPresentation({ snapshot, onRetry, onCheckIn }: Props)
 }
 
 const styles = StyleSheet.create({
-  content: { padding: layout.gutter, paddingBottom: spacing.xxxl, gap: spacing.sm },
+  content: { padding: layout.gutter, gap: spacing.sm },
   preview: { color: colors.brand, fontSize: typography.sizes.micro, fontWeight: typography.weights.bold, letterSpacing: 1 },
   title: { color: colors.ink, fontSize: typography.sizes.screenTitle, lineHeight: typography.lineHeights.screenTitle, fontWeight: typography.weights.semibold },
   body: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
