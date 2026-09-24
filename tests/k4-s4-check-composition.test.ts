@@ -27,3 +27,10 @@ test('photo handoff shows its existing server case and retains K2 result separat
   assert.match(check, /<PersonalFitSection state=\{personalFitState\} onPersonalize=\{openPersonalization\}/);
   assert.match(check, /if \(!targetShell && audience !== 'member'\)/);
 });
+
+test('unresolved product copy describes evidence limits without implying the owner has no profile', () => {
+  const unresolved = check.slice(check.indexOf('if (resolution && !catalogDetail) {'), check.indexOf('if (confirmedProduct && !evaluationError)'));
+  assert.match(unresolved, /Personal Fit cannot be assessed/);
+  assert.match(unresolved, /We could not identify this product from the photos yet/);
+  assert.doesNotMatch(unresolved, /Not personalized yet|profile is missing|answers were not saved/i);
+});

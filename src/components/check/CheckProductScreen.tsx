@@ -712,15 +712,16 @@ export default function CheckProductScreen() {
 
   if (resolution && !catalogDetail) {
     const fit = describeCheckProductFit(resolution.state);
+    const identityMessage = resolution.state === 'insufficient_evidence' && captureEvidence?.localPhotos.length
+      ? 'We could not identify this product from the photos yet.'
+      : 'Product identity is not confirmed.';
     const selectedCandidate = resolution.candidates.find((_, index) =>
       `${resolution.caseId}:${index}` === captureEvidence?.review.selectedCandidateId);
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
         <Text style={styles.screenTitle}>Check a Product</Text>
         <Text style={{ color: colors.inkMuted, marginVertical: spacing.md }}>{integrated
-          ? resolution.state === 'insufficient_evidence' && captureEvidence?.localPhotos.length
-            ? 'We could not identify this product from the photos yet. Personal Fit: Not personalized yet.'
-            : 'Product identity is not confirmed. Personal Fit: Not personalized yet.'
+          ? `${identityMessage} Personal Fit cannot be assessed from this evidence.`
           : fit.message}</Text>
         {selectedCandidate?.brand && selectedCandidate.name && <Text style={{ color: colors.inkMuted, marginBottom: spacing.md }}>You selected {selectedCandidate.brand} {selectedCandidate.name} as a possible match. Product and formula details still need confirmation.</Text>}
         {!integrated && resolution.requiresFounderReview && <Text style={{ color: colors.inkMuted, marginBottom: spacing.md }}>This check is saved for founder review.</Text>}
