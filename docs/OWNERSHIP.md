@@ -1,12 +1,13 @@
 # Derive Founder Ownership
 
-Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. The current next wave is K-FREE-1 (Kanuj) and S-FREE-1 (Sami); [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
+Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. K-FREE-1, S-FREE-1, and K-FREE-1B are landed; the next shared handoff is Wave-1 integration. [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
 
 ## Kanuj: customer and mobile lane
 
 Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client state/helpers, customer navigation/presentation, and physical device/TestFlight acceptance. Kanuj may build against fixtures or a local customer-state abstraction while the platform contract is being built.
 
-- **K-FREE-1, next / Wave 1:** Scanner-First App Shell and target CHECK / MY STUFF / PLAN / SHOP presentation. No Supabase backend, hosted Auth/RLS, or free entitlement implementation.
+- **K-FREE-1 / Wave 1 foundation, LANDED:** Scanner-First App Shell and target CHECK / MY STUFF / PLAN / SHOP presentation. No Supabase backend, hosted Auth/RLS, or free entitlement implementation.
+- **K-FREE-1B, LANDED:** scanner-first UX polish. Mobile still does not consume the S-FREE-1 access contract.
 - **K-FREE-2 / Wave 2:** optional minimal personalization after factual first Check, same-result refresh, skip/remind and later editing. Consumes S-FREE-2's merged profile/fit contract.
 - **K-FREE-3 / Wave 3:** MY STUFF presentation for profile, current products, product states, history and reactions. No backend persistence.
 - **K-FREE-4 / Wave 4:** capture and candidate-confirmation UX. It emits evidence, not authoritative product/formula identity.
@@ -18,7 +19,7 @@ Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client s
 
 Owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted Supabase/Auth/RLS/configuration, server billing, product identity/formula truth, and founder operations. Sami does not implement customer mobile UI.
 
-- **S-FREE-1, next / Wave 1:** anonymous identity and free access, account-kind distinction, free/managed separation, FREE / MANAGED / BOTH operation inventory, least-privilege RLS review, and stable access contract. No mobile UI and no fake `founding_beta` membership for free users.
+- **S-FREE-1 / Wave 1 foundation, LANDED:** anonymous identity and free access, account-kind distinction, free/managed separation, FREE / MANAGED / BOTH operation inventory, least-privilege RLS review, and stable access contract. No mobile UI and no fake `founding_beta` membership for free users.
 - **S-FREE-2 / Wave 2:** persisted minimal profile and deterministic categorical fit with evidence explanation and safe unknown behavior. No provider hard dependency and no diagnosis.
 - **S-FREE-3 / Wave 3:** owner-bound free Check history, shelf/product states, reactions/tolerance and profile context data plane, including anonymous ownership.
 - **S-FREE-4 / Wave 4:** private evidence storage, S6 candidate/formula resolution and review states. OCR/model output is not authoritative identity.
@@ -32,8 +33,9 @@ H1P remains a provider-backed intelligence milestone. H1B remains later managed 
 
 | Wave | Parallel owner pair | Handoff required before integration |
 | --- | --- | --- |
-| 1 | K-FREE-1 / S-FREE-1 | Sami merges stable anonymous/free access contract; Kanuj can develop to fixtures meanwhile. |
-| 2 | K-FREE-2 / S-FREE-2 | Sami merges profile and fit contract; Kanuj consumes it. |
+| Wave-1 foundations (landed) | K-FREE-1 / K-FREE-1B (Kanuj); S-FREE-1 (Sami) | S-FREE-1 stable access contract exists; mobile consumption is still pending. Hosted anonymous signup remains gated. |
+| Wave-1 integration (next shared handoff) | Kanuj consumes the S-FREE-1 access contract in mobile; Sami owns platform-side changes in Sami’s lane. | Mobile/platform free funnel integration is next. Keep contract edits single-owner; do not start K-FREE-2 / S-FREE-2 until integration is complete. |
+| 2 | K-FREE-2 / S-FREE-2 | Starts only after Wave-1 integration; Sami owns and merges the profile/fit contract before Kanuj consumes it. |
 | 3 | K-FREE-3 / S-FREE-3 | Sami merges free-context/history read/write contracts; Kanuj integrates after handoff. |
 | 4 | K-FREE-4 / S-FREE-4 | Sami merges private evidence/resolution contract; Kanuj sends evidence and renders explicit candidate/unknown states. |
 | 5 | K-PAID-1 / S-PAID-1 | Sami merges permanent identity, managed entitlement and F1 interfaces; Kanuj consumes them. |

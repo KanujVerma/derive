@@ -6,6 +6,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-23: Wave-1 foundations and K-FREE-1B landed
+
+- **Predecessor:** current `main@70db6ab3c7f2c76315d5b71d2e95aa4919372660`.
+- **Landed:** PR #43 K-FREE-1 at `86dfee7880982654f1f367ed5a55d9c369046009`; PR #44 S-FREE-1 at `f9cfc8aeb91e1ab0fb10984f90fe61404b011a82`; PR #45 K-FREE-1B at `70db6ab3c7f2c76315d5b71d2e95aa4919372660`.
+- **Contracts and UX:** S-FREE-1's stable access contract is documented in [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md). K-FREE-1B's scanner-first shell polish is landed.
+- **Remaining boundary:** mobile does not yet consume the S-FREE-1 access contract, so the remote/mobile free funnel is not integrated. Hosted anonymous signup remains deliberately gated pending lifecycle/abuse controls. The scanner-first external beta is not ready.
+- **Next handoff:** Wave-1 mobile/platform integration. K-FREE-2 and S-FREE-2 start only after that integration is complete. This checkpoint records status only and starts no integration work.
+
 ## 2026-09-23: S-FREE-1 anonymous/free platform branch handoff
 
 - **Predecessor:** clean `origin/main@86dfee7880982654f1f367ed5a55d9c369046009`, including K-FREE-1. Work is isolated on `sami/s-free-1-anonymous-free-access`; the founder's dirty main checkout and Kanuj-owned UI were not modified. This entry does not predict its own resulting commit or merge SHA.

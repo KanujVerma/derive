@@ -2,13 +2,25 @@
 
 This is the current approved product direction and execution plan. It distinguishes implementation that exists from work approved for later milestones. Each implementation milestone has one founder owner. [OWNERSHIP.md](OWNERSHIP.md) defines lanes and the shared-contract handoff rule.
 
+## Current Wave-1 sequence
+
+```text
+K-FREE-1 ✅
+S-FREE-1 ✅
+K-FREE-1B ✅
+→ Wave-1 integration
+→ K-FREE-2 || S-FREE-2
+```
+
+K-FREE-1, S-FREE-1, and K-FREE-1B are landed. The remote/mobile free funnel is not yet integrated: mobile does not consume the S-FREE-1 access contract, and hosted anonymous signup remains deliberately gated. The scanner-first external beta is not ready.
+
 ## Current product model
 
 Derive is **personalized skincare product intelligence first**. Free Check answers “Should I use this?” with supported product/formula facts and, when enough evidence and user context exist, categorical personal fit. It does not use a universal numerical score. The paid layer is **$25 Managed Skincare**: routine construction and longitudinal management, check-ins/progress, proactive adaptation, and founder/expert review in beta. Future clinician-reviewed plans and commerce/member benefits require separate operational and legal review.
 
 ### Implemented today
 
-- The current app still uses the older Today / Plan / Shop / Ask / Progress C1 navigation. Its Remote routing retains the managed-membership boundary. S-FREE-1 implements the local guest/free **platform**, not mobile guest routing or hosted anonymous activation; the target free navigation is not yet customer-ready.
+- The K-FREE-1 scanner-first shell and K-FREE-1B UX polish are landed. S-FREE-1 provides the platform access contract. Mobile does not yet consume that contract; Remote/mobile free access is not integrated, and hosted anonymous signup remains gated. Existing Remote routing retains the managed-membership boundary.
 - PRs #36 and #37 landed searchable catalog foundation and mobile Check a Product. The Remote Staging route remains hidden and the current hosted catalog has 4 products, 1 sourced product, 1 alias, and no variants, identifiers, or formula versions.
 - S6 provides product identity and formula evidence states. Unknown identity/formula stays unknown. Camera capture is not proof of identity; visual/OCR provider behavior remains unproven. The shipped C1 result still says “FORMULA QUALITY”; the target label is factual “FORMULA DETAILS,” separate from Personal Fit.
 - PR #39 closed the selected catalog UUID handoff into routine persistence. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md) and the current checkpoint in [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
@@ -49,12 +61,13 @@ Managed upgrade target: start Managed Skincare → link/create a permanent ident
 
 ## Current next work and parallel waves
 
-Wave 0 is the documentation/architecture reconciliation only; it changes no product code and does not start K-FREE-1 / S-FREE-1.
+Wave 0 documentation/architecture reconciliation is complete. Wave-1 foundations are landed; the next shared handoff is mobile/platform integration. K-FREE-2 / S-FREE-2 start only after that integration.
 
 | Wave | Kanuj | Sami | Prerequisite / handoff |
 | --- | --- | --- | --- |
-| 1 | **K-FREE-1 Scanner-First App Shell**: make CHECK the free home and establish CHECK / MY STUFF / PLAN / SHOP presentation; label factual formula evidence “FORMULA DETAILS” separately from Personal Fit; preserve fixture/local customer-state seams; no backend or free-entitlement logic. | **S-FREE-1 Anonymous / Free Access Platform**: safe Supabase anonymous identity; distinguish anonymous from permanent; make free catalog/identity access independent of managed membership; preserve managed gates; classify each current function FREE / MANAGED / BOTH; explicit RLS/security review; no fabricated `founding_beta` memberships. | Kanuj can build against fixtures while Sami owns and publishes the first stable access contract. Merge the contract before mobile integration. |
-| 2 | **K-FREE-2 Progressive Personalization UX**: optional ~45-second, three-concept profile; skip/remind; refresh the same result; edit later in MY STUFF; no managed photos, budget, or routine complexity. | **S-FREE-2 Minimal Profile + Deterministic Personal Fit**: canonical minimal profile persistence and explainable categorical fit based on supported facts; evidence-used explanation, safe unknown, no model-provider dependency, no diagnostic claims. | Sami owns and merges the profile/fit contract first; Kanuj may build the presentation with fixtures in parallel and consumes the stable contract at integration. |
+| Wave-1 foundations (landed) | **K-FREE-1 ✅ / K-FREE-1B ✅ (Kanuj):** scanner-first Mock shell and UX polish. | **S-FREE-1 ✅ (Sami):** anonymous/free platform and stable access contract. | Mobile consumption of the S-FREE-1 contract remains pending; hosted anonymous signup remains gated. |
+| Wave-1 integration (next shared handoff) | Kanuj consumes the stable S-FREE-1 access contract in mobile. | Sami owns platform-side changes within Sami’s lane. | Remote/mobile free funnel integration is next. Keep contract changes single-owner. Do not start Wave 2 until integration is complete. |
+| 2 (after Wave-1 integration) | **K-FREE-2 Progressive Personalization UX**: optional ~45-second, three-concept profile; skip/remind; refresh the same result; edit later in MY STUFF; no managed photos, budget, or routine complexity. | **S-FREE-2 Minimal Profile + Deterministic Personal Fit**: canonical minimal profile persistence and explainable categorical fit based on supported facts; evidence-used explanation, safe unknown, no model-provider dependency, no diagnostic claims. | Starts only after Wave-1 integration; Sami owns and merges the profile/fit contract before Kanuj consumes it. |
 | 3 | **K-FREE-3 MY STUFF**: profile, current products, using/considering/stopped, check history, reactions/tolerance UX. No backend persistence. | **S-FREE-3 Free Context / Check History Data Plane**: owner-bound persistence for checks, products, state, supported reaction/tolerance history, and context needed by fit, including anonymous ownership. | Sami publishes persistence/read contracts; Kanuj builds to fixtures in parallel and integrates after handoff. |
 | 4 | **K-FREE-4 Camera Product Evidence UX**: one Check capture path for barcode, front label, ingredients, useful packaging, evidence-supported on-device extraction, ambiguity and candidate confirmation. Capture provides evidence, never authoritative identity. | **S-FREE-4 Product Evidence Resolution**: private owner-isolated evidence, barcode/label/ingredient/packaging inputs through S6, candidate/formula matching, unresolved/founder review; no invented truth. | Reuse S6. Kanuj owns capture/OCR on-device if selected; Sami owns server identity and formula truth. Merge the evidence contract before integration. |
 | 5 | **K-PAID-1 Managed Plan UX**: free Plan presentation, permanent-account/link and managed-upgrade UX, actual managed Plan / Today-like care, check-ins/progress, reuse free context, no duplicate long onboarding. | **S-PAID-1 Managed Entitlement Separation + F1**: permanent identity plus managed entitlement, free Check independent of membership, founder routine construction/validation/publication/member readback, safe reuse of free context, no client/RLS bypass. | Sami publishes entitlement and F1 interfaces; Kanuj consumes them after merge. F1 is part of this milestone, not a separate current assignment. |
@@ -82,13 +95,13 @@ H1P is retained for richer explanations, broader model reasoning, conversational
 
 ## What blocks the next scanner-first external beta
 
-The target is not yet implemented. Required gates include K-FREE-1 and S-FREE-1, anonymous-user RLS/security review, deterministic fit and its evidence contract, useful sourced catalog coverage and safe unknown fallback, private evidence resolution/capture, anonymous lifecycle and abuse controls, and K-ACCEPT-1 physical end-to-end proof. Apple submission text, reviewer access, privacy/support information, and screenshots must match the actual future binary. H1P is not a free Check gate; provider-backed Ask, richer explanations, and routine automation remain separately gated.
+The scanner-first external beta is not ready. K-FREE-1, S-FREE-1, and K-FREE-1B are landed, but mobile/platform free-funnel integration is pending and hosted anonymous signup remains gated. Remaining gates include deterministic fit and its evidence contract, useful sourced catalog coverage and safe unknown fallback, private evidence resolution/capture, anonymous lifecycle and abuse controls, and K-ACCEPT-1 physical end-to-end proof. Apple submission text, reviewer access, privacy/support information, and screenshots must match the actual future binary. H1P is not a free Check gate; provider-backed Ask, richer explanations, and routine automation remain separately gated.
 
 ## Open implementation questions
 
 Anonymous identity is device/session-bound until linked to a permanent identity; if the local session is lost first, the customer may lose access to that guest account and its context. S-OPS-1 owns cleanup policy, rate/abuse controls, account-link conflict handling, and explicit loss/deletion behavior.
 
-S-FREE-1's local platform audit and exact FREE / MANAGED / BOTH / INTERNAL matrix are recorded in [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md). Hosted guest activation remains gated by S-OPS-1 abuse/lifecycle controls; mobile guest routing remains Kanuj's lane. S-FREE-2 must define the minimal persisted profile and deterministic fit rules only from supported evidence. S-OPS-1 must settle anonymous-to-existing-account conflict, session-loss, cleanup, and deletion handling. S-FREE-4 must select an evidence-supported extraction path without elevating OCR/model candidates to identity truth.
+S-FREE-1's local platform audit and exact FREE / MANAGED / BOTH / INTERNAL matrix are recorded in [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md). Hosted guest activation remains gated by S-OPS-1 abuse/lifecycle controls; mobile guest routing is pending the Wave-1 integration handoff in Kanuj's lane. S-FREE-2 must define the minimal persisted profile and deterministic fit rules only from supported evidence. S-OPS-1 must settle anonymous-to-existing-account conflict, session-loss, cleanup, and deletion handling. S-FREE-4 must select an evidence-supported extraction path without elevating OCR/model candidates to identity truth.
 
 
 
