@@ -9,12 +9,20 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 ## 2026-09-24: K2/S2, K3/S3, and K4/S4 local integrations landed
 
 - **Predecessor:** clean `main@5806f4664f0e44712b833d28ccd0ea3459405ed9`. K3/S3 integration PR #64 merged at `85b5b01de3735dc79d6b6f6ef4fb33827466a69b`; K2/S2 integration PR #63 merged at `718ef0ecf0b632f729407d2cb7f57bf08f4b3659`; K4/S4 integration PR #65 merged at `5806f4664f0e44712b833d28ccd0ea3459405ed9`.
+- **Post-merge CI:** K4/S4 main run `36033847599` passed.
 - **CI evidence:** K2/S2 post-merge main CI run `36030536787` passed; K3/S3 post-merge main CI run `36029366556` passed. K4/S4 exact-head CI run `36032814663` passed both jobs.
 - **K2/S2:** the customer personalization path uses typed free-profile and deterministic-fit services through a Kanuj presentation gateway and explicit field mappings. It saves/reads the owner-bound profile and refreshes categorical fit on the same Check result.
 - **K3/S3:** MY STUFF reads and writes the local owner-bound free context for profile, saved products, Check history, and reported experiences. Paid Shelf and legacy presentation boundaries remain preserved.
 - **K4/S4:** camera evidence connects to S-FREE-4 and the S6 resolver locally. Candidate and unknown states remain non-authoritative. The merged UX describes unresolved fit as evidence-limited, including for a personalized user.
 - **Open S-FREE-4 client gap:** prepare-evidence HTTP 429 quota errors currently collapse to generic `PREPARE_FAILED`; typed client quota handling remains open. This is an error-mapping gap in the mobile integration; the backend 429 response is unchanged.
 - **Boundary:** all three are local app/platform integrations. No hosted migration/function deployment or hosted guest activation is claimed. S-OPS-1 remains required before hosted guest activation, and K-ACCEPT-1 physical hardware acceptance remains open; the scanner-first beta is not ready.
+
+## 2026-09-24: S-FREE-2/3/4 landed, mobile/hosted handoff still open
+
+- **Predecessor:** `main@cfdbf97b410b8c64d007e819a2a7155c9e3613a7` before this docs-only status checkpoint. S-FREE-2 PR #54 merged at `5f764d7715ca6ba0a4a585ee46c5f13dc78dc855`; S-FREE-3 PR #58 at `fad55ce4fd38a91fa549c86bda1a8fc77c9e569c`; S-FREE-4 PR #61 at `cfdbf97b410b8c64d007e819a2a7155c9e3613a7`. Each had green exact-head CI after reconciliation; post-merge main run `36013988653` passed both jobs.
+- **Scope:** merged platform contracts, migrations, and Edge code only. No `app/**` change, hosted migration/function deployment, hosted guest activation, or physical acceptance occurred. Retinyl Propionate review regression was fixed and tested before S-FREE-2 merge.
+- **Kanuj mobile handoff:** the typed services `src/services/remote/freePersonalFit.ts`, `freeContext.ts`, and `freeProductEvidence.ts` are now on main, but no customer-facing app/component/presentation code imports them. `CheckCaptureHost` still defaults to `pendingCaptureProcessor`, so photo capture does not call S-FREE-4 resolution. Kanuj owns profile save/read and same-result fit refresh, MY STUFF persistence projection, and capture-to-resolver wiring. Keep unknown/candidate states truthful; do not infer verified formula from photos or OCR.
+- **Sami next gate:** S-OPS-1 guest lifecycle, abuse/cleanup, linking/conflicts, deletion, and lost-session behavior precedes hosted anonymous activation. K-ACCEPT-1 then requires physical end-to-end proof. The scanner-first beta is not ready.
 
 ## 2026-09-24: S-FREE-4 private product-evidence branch
 
