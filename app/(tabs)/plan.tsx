@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
@@ -25,17 +25,41 @@ import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 import { useBootstrapStore } from '@/src/stores/bootstrapStore';
+import { useAuthStore } from '@/src/stores/authStore';
+import { ManagedPlanPresentation } from '@/src/components/plan/managed/ManagedPlanPresentation';
+import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
+import { resolvePlanPresentation } from '@/src/presentation/managed-plan/planComposition';
 
 export default function PlanScreen() {
+  const { managedPlanFixture } = useLocalSearchParams<{ managedPlanFixture?: string }>();
+  const sessionUserId = useAuthStore((s) => s.sessionUserId);
   const shell = resolveShellPresentation({
     buildFlavor: publicEnvironment.buildFlavor,
     remoteEnabled: isRemoteServiceEnabled(),
     supabaseUrl: publicEnvironment.supabaseUrl,
   });
-  const managedAccess = useFreeAccessStore((s) => s.access?.managedAccess === true && s.status === 'READY');
-  if (shell === 'scanner_first_preview') return <PreviewPlanShell />;
-  if (shell === 'local_free_integration' && !managedAccess) return <PreviewPlanShell />;
+  const managedAccess = useFreeAccessStore((s) => s.status === 'READY'
+    && s.userId === sessionUserId && s.access?.userId === sessionUserId
+    && s.access?.managedAccess === true);
+  const presentation = resolvePlanPresentation({
+    shell, managedAccess,
+    fixtureStatus: typeof managedPlanFixture === 'string' ? managedPlanFixture : undefined,
+  });
+  if (shell === 'scanner_first_preview') {
+    if (presentation.kind === 'fixture') return <IllustrativeManagedPlan snapshot={presentation.snapshot} />;
+    return <PreviewPlanShell />;
+  }
+  if (presentation.kind === 'free') return <PreviewPlanShell />;
+  if (presentation.kind === 'fixture') return <IllustrativeManagedPlan snapshot={presentation.snapshot} />;
   return <LegacyManagedPlanScreen />;
+}
+
+function IllustrativeManagedPlan({ snapshot }: { snapshot: React.ComponentProps<typeof ManagedPlanPresentation>['snapshot'] }) {
+  const insets = useSafeAreaInsets();
+  return <View style={[styles.container, { paddingTop: insets.top }]}>
+    <RootShellHeader title="Plan" />
+    <ManagedPlanPresentation snapshot={snapshot} />
+  </View>;
 }
 
 function LegacyManagedPlanScreen() {

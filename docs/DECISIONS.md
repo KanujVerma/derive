@@ -2,7 +2,7 @@
 
 Key technical and product decisions for Derive. Approved target decisions do not claim runtime implementation.
 
-**Current approved product strategy (ADR-33)**: Derive is free personalized product intelligence first, with Check as the acquisition home and optional paid Managed Skincare for longitudinal care. Target navigation is CHECK / MY STUFF / PLAN / SHOP. The C1 Today / Plan / Shop / Ask / Progress navigation remains implemented runtime history, not the target IA. Anonymous Auth, free access, deterministic fit, and the target navigation are approved but not yet implemented. ADR-33 below records the accepted decisions; older rationale remains preserved with affected clauses superseded.
+**Current approved product strategy (ADR-33)**: Derive is free personalized product intelligence first, with Check as the acquisition home and optional paid Managed Skincare for longitudinal care. CHECK / MY STUFF / PLAN / SHOP runs in Development Mock and locally integrated Development Remote; Remote Staging and production retain the C1 legacy tabs. Local anonymous Auth and factual free Check are implemented. Deterministic Personal Fit and hosted anonymous activation remain future work. ADR-33 below records the accepted decisions; older rationale remains preserved with affected clauses superseded.
 
 ---
 

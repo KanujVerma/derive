@@ -10,7 +10,9 @@ For current implementation status and milestones, use [ROADMAP.md](docs/ROADMAP.
 
 Kanuj owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client state/helpers, navigation/presentation, and device/TestFlight acceptance. Sami owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted Auth/RLS/configuration, product identity, access control, and founder operations.
 
-Wave-1 foundations and mobile/platform integration are landed. Development Remote with an exact local Supabase host consumes S-FREE-1's access state and opens the scanner-first shell; Remote Staging retains legacy routing. Hosted anonymous signup remains gated. K-FREE-2 and S-FREE-2 are the next approved wave. Shared contracts are single-owner handoffs, not co-owned parallel edits. See [OWNERSHIP.md](docs/OWNERSHIP.md) for founder/file boundaries and [ROADMAP.md](docs/ROADMAP.md) for milestones.
+Wave-1 foundations, local mobile/platform integration, and K-FREE-3 My Stuff presentation are landed. Development Remote with an exact local Supabase host consumes S-FREE-1's access state and opens the scanner-first shell; Remote Staging retains legacy routing. Hosted anonymous signup remains gated. K-FREE-2, K-FREE-4, and K-PAID-1A may advance concurrently in Kanuj's lane. Shared contracts are single-owner handoffs, not co-owned parallel edits. See [OWNERSHIP.md](docs/OWNERSHIP.md) for founder/file boundaries and [ROADMAP.md](docs/ROADMAP.md) for milestones.
+
+**Max-parallel implementation rule:** A counterpart contract is a prerequisite for integration, not a prerequisite for beginning or completing owned implementation. Kanuj presentation milestones may build against Kanuj-owned view models/fixtures while Sami builds platform contracts independently. After completing an owned milestone, each founder advances to the next non-overlapping milestone. Integration is a separate bounded task. Keep simultaneous branches off shared composition files and preserve Sami's platform ownership.
 
 ## Sources of truth
 
