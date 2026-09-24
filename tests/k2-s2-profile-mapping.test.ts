@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { createPersonalizationDraft } from '../src/presentation/personalization/draft.ts';
 import type { FreeSkinProfile } from '../src/contracts/FreePersonalFit.ts';
 
@@ -59,4 +60,23 @@ test('K2/S2 loads a complete canonical snapshot without losing its supported voc
     skinBehavior: 'balanced', reactivity: 'reacts_easily', pregnancy: 'prefer_not_to_say',
     sensitivityOrAllergy: 'yes', knownSensitivities: ['Fragrance'],
     treatmentStatus: 'reported', treatments: ['retinoids', 'acids'] });
+});
+
+test('K2/S2 pregnancy question matches the stored context and keeps all four answer states', () => {
+  const flow = readFileSync(new URL('../src/components/personalization/PersonalizationFlow.tsx', import.meta.url), 'utf8');
+  assert.match(flow, /Pregnant or nursing\?/);
+  assert.doesNotMatch(flow, /trying to conceive/i);
+  const convert = mapping.toFreeSkinProfileInput as (draft: ReturnType<typeof createPersonalizationDraft>) => Record<string, unknown>;
+  for (const [answer, expected] of [
+    [null, 'unanswered'], ['yes', 'yes'], ['no', 'no'], ['prefer_not_to_say', 'prefer_not_to_say'],
+  ] as const) {
+    assert.equal(convert({ ...createPersonalizationDraft(), pregnancy: answer }).pregnancyStatus, expected);
+  }
+});
+
+test('K2/S2 sensitivity prompt asks for reported ingredient reactions', () => {
+  const flow = readFileSync(new URL('../src/components/personalization/PersonalizationFlow.tsx', import.meta.url), 'utf8');
+  assert.match(flow, /Known ingredient reactions/);
+  assert.match(flow, /Which ingredients\?/);
+  assert.doesNotMatch(flow, /Known sensitivity or allergy/);
 });

@@ -116,7 +116,7 @@ export function PersonalizationFlow({ initialDraft, onComplete, onSkip, onRemind
             <ChoiceChip label="Not sure" selected={draft.treatmentStatus === 'unanswered'}
               onSelect={() => setDraft((current) => ({ ...current, treatments: [], treatmentStatus: 'unanswered' }))} />
           </View>
-          <Text style={styles.groupTitle}>Known sensitivity or allergy</Text>
+          <Text style={styles.groupTitle}>Known ingredient reactions</Text>
           <View style={styles.chips}>
             {(['yes', 'no', 'unsure'] as const).map((value) => <ChoiceChip key={value}
               label={value === 'unsure' ? 'Not sure' : value === 'yes' ? 'Yes' : 'No'}
@@ -124,13 +124,13 @@ export function PersonalizationFlow({ initialDraft, onComplete, onSkip, onRemind
               onSelect={() => setDraft((current) => ({ ...current, sensitivityOrAllergy: value }))} />)}
           </View>
           {draft.sensitivityOrAllergy === 'yes' && <>
-            <Text style={styles.groupTitle}>Any ingredients you know you react to?</Text>
+            <Text style={styles.groupTitle}>Which ingredients?</Text>
             <Text style={styles.description}>Enter one ingredient per line.</Text>
             <TextInput value={sensitivityText} onChangeText={(value) => { setSensitivityText(value); setError(null); }}
               multiline accessibilityLabel="Known ingredient sensitivities"
               placeholder="Ingredient name" style={styles.ingredientInput} />
           </>}
-          <Text style={styles.groupTitle}>Pregnant, trying to conceive, or nursing?</Text>
+          <Text style={styles.groupTitle}>Pregnant or nursing?</Text>
           <View style={styles.chips}>
             {(['yes', 'no', 'prefer_not_to_say'] as const).map((value) => <ChoiceChip key={value}
               label={value === 'prefer_not_to_say' ? 'Prefer not to say' : value === 'yes' ? 'Yes' : 'No'}
