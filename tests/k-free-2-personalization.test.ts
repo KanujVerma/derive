@@ -26,7 +26,19 @@ test('K-FREE-2: skipped questions remain unknown in completion output', () => {
   assert.equal(nextPersonalizationStep('context'), 'complete');
   assert.deepEqual(completePersonalization(draft), {
     goals: [], skinBehavior: null, reactivity: null, treatments: [],
-    sensitivityOrAllergy: null, pregnancy: null,
+    treatmentStatus: 'unanswered', sensitivityOrAllergy: null,
+    knownSensitivities: [], pregnancy: null,
+  });
+});
+
+test('K2/S2: choosing none remains distinct from leaving treatments unanswered', () => {
+  const unanswered = createPersonalizationDraft();
+  assert.equal(unanswered.treatmentStatus, 'unanswered');
+  assert.deepEqual(unanswered.treatments, []);
+  const none = { ...unanswered, treatmentStatus: 'none' as const };
+  assert.equal(completePersonalization(none).treatmentStatus, 'none');
+  assert.deepEqual(toggleTreatment(none, 'retinoids'), {
+    ...none, treatmentStatus: 'reported', treatments: ['retinoids'],
   });
 });
 

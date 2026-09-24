@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/src/components/ui/Button';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
@@ -10,6 +10,7 @@ import {
   type PersonalizationDraft, type PersonalizationStep, type Reactivity,
   type SkinBehavior, type Treatment,
 } from '@/src/presentation/personalization/draft';
+import { validatePersonalizationDraft } from '@/src/presentation/personalization/mapping';
 
 const behaviorChoices: { value: SkinBehavior; label: string }[] = [
   { value: 'dry_tight', label: 'Dry or tight' }, { value: 'balanced', label: 'Balanced' },
@@ -40,11 +41,19 @@ export function PersonalizationFlow({ initialDraft, onComplete, onSkip, onRemind
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState(() => createPersonalizationDraft(initialDraft));
   const [step, setStep] = useState<PersonalizationStep>('goals');
+  const [sensitivityText, setSensitivityText] = useState(() => initialDraft?.knownSensitivities.join('\n') ?? '');
+  const [error, setError] = useState<string | null>(null);
   const stepNumber = step === 'goals' ? 1 : step === 'behavior' ? 2 : 3;
 
   const advance = () => {
     const next = nextPersonalizationStep(step);
-    if (next === 'complete') onComplete(completePersonalization(draft));
+    if (next === 'complete') {
+      const answers = completePersonalization({ ...draft,
+        knownSensitivities: sensitivityText.split(/\r?\n/).map((name) => name.trim()).filter(Boolean) });
+      const message = validatePersonalizationDraft(answers);
+      if (message) { setError(message); return; }
+      onComplete(answers);
+    }
     else setStep(next);
   };
   const back = () => {
@@ -102,6 +111,10 @@ export function PersonalizationFlow({ initialDraft, onComplete, onSkip, onRemind
             {treatmentChoices.map(({ value, label }) => <ChoiceChip key={value} label={label}
               selected={draft.treatments.includes(value)}
               onSelect={() => setDraft((current) => toggleTreatment(current, value))} />)}
+            <ChoiceChip label="None" selected={draft.treatmentStatus === 'none'}
+              onSelect={() => setDraft((current) => ({ ...current, treatments: [], treatmentStatus: 'none' }))} />
+            <ChoiceChip label="Not sure" selected={draft.treatmentStatus === 'unanswered'}
+              onSelect={() => setDraft((current) => ({ ...current, treatments: [], treatmentStatus: 'unanswered' }))} />
           </View>
           <Text style={styles.groupTitle}>Known sensitivity or allergy</Text>
           <View style={styles.chips}>
@@ -110,6 +123,13 @@ export function PersonalizationFlow({ initialDraft, onComplete, onSkip, onRemind
               selected={draft.sensitivityOrAllergy === value}
               onSelect={() => setDraft((current) => ({ ...current, sensitivityOrAllergy: value }))} />)}
           </View>
+          {draft.sensitivityOrAllergy === 'yes' && <>
+            <Text style={styles.groupTitle}>Any ingredients you know you react to?</Text>
+            <Text style={styles.description}>Enter one ingredient per line.</Text>
+            <TextInput value={sensitivityText} onChangeText={(value) => { setSensitivityText(value); setError(null); }}
+              multiline accessibilityLabel="Known ingredient sensitivities"
+              placeholder="Ingredient name" style={styles.ingredientInput} />
+          </>}
           <Text style={styles.groupTitle}>Pregnant, trying to conceive, or nursing?</Text>
           <View style={styles.chips}>
             {(['yes', 'no', 'prefer_not_to_say'] as const).map((value) => <ChoiceChip key={value}
@@ -118,12 +138,13 @@ export function PersonalizationFlow({ initialDraft, onComplete, onSkip, onRemind
               onSelect={() => setDraft((current) => ({ ...current, pregnancy: value }))} />)}
           </View>
         </>}
+        {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       </ScrollView>
       <View style={styles.footer}>
         <Button variant="brand" label={step === 'context' ? 'Complete' : 'Continue'} onPress={advance} />
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Skip this step" onPress={advance} style={styles.skipStep}>
+        {step !== 'context' && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Skip this step" onPress={advance} style={styles.skipStep}>
           <Text style={styles.skipText}>Skip this step</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
         {onRemindLater && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remind me later" onPress={onRemindLater} style={styles.skipStep}>
           <Text style={styles.skipText}>Remind me later</Text>
         </TouchableOpacity>}
@@ -146,6 +167,10 @@ const styles = StyleSheet.create({
   description: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, marginTop: spacing.sm },
   groupTitle: { color: colors.ink, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold, marginTop: spacing.xxl, marginBottom: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xl },
+  ingredientInput: { minHeight: 64, marginTop: spacing.sm, padding: spacing.md,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 8, color: colors.ink,
+    backgroundColor: colors.surface, textAlignVertical: 'top' },
+  error: { color: colors.actionStop.text, marginTop: spacing.md, fontSize: typography.sizes.bodyRegular },
   footer: { paddingHorizontal: layout.gutter, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.hairline },
   skipStep: { minHeight: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs },
   skipText: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular },
