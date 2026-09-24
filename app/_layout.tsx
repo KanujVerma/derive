@@ -206,6 +206,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="profile/index" options={{ headerShown: false }} />
           <Stack.Screen name="shop/scan" options={{ headerShown: false }} />
+          <Stack.Screen name="personalize/index" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={localFreeIntegration ? managedAccess : (!remoteEnabled || destination.type === 'REMOTE_TABS')}>
           <Stack.Screen name="orders/index" options={{ headerShown: false }} />

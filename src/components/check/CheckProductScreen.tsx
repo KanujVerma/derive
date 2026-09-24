@@ -10,7 +10,7 @@ import {
   Linking,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -43,6 +43,9 @@ import { resolveCheckEntryState } from '@/src/commerce/checkEntryState';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { GlassContainer } from '@/src/components/ui/GlassContainer';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
+import { PersonalFitSection } from '@/src/components/personalization/PersonalFitSection';
+import { personalizationGateway } from '@/src/presentation/personalization/gateway';
+import type { PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
 
 export default function CheckProductScreen() {
   const router = useRouter();
@@ -59,6 +62,9 @@ export default function CheckProductScreen() {
   const integrated = shell === 'local_free_integration';
   const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
+  const [personalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
+  const [profileSaveStatus, setProfileSaveStatus] = useState(personalizationGateway.lastSaveStatus());
+  const openPersonalization = () => router.push('/personalize');
   const { routine, userProducts, checkIns } = useRoutineStore();
   const { productReactions, routineComplexity, primaryGoal, costPreference } = useOnboardingStore();
 
@@ -67,6 +73,20 @@ export default function CheckProductScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(!targetShell);
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
+  useFocusEffect(React.useCallback(() => {
+    let active = true;
+    const status = personalizationGateway.lastSaveStatus();
+    setProfileSaveStatus(status);
+    if (status) {
+      setPersonalFitState({ kind: 'unavailable' });
+      if (status.kind === 'ready' && catalogDetail?.productId) {
+        void personalizationGateway.getFit(catalogDetail.productId).then((fit) => {
+          if (active) setPersonalFitState(fit);
+        }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable' }); });
+      }
+    }
+    return () => { active = false; };
+  }, [catalogDetail?.productId]));
   const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
   const [candidates, setCandidates] = useState<ProductResolutionCandidate[]>([]);
   const [isCheckingProduct, setIsCheckingProduct] = useState(false);
@@ -550,11 +570,6 @@ export default function CheckProductScreen() {
                 <Text style={styles.productBrandText}>{catalogDetail.brand.toUpperCase()}</Text>
                 <Text style={styles.productNameText}>{catalogDetail.name}</Text>
               </View>
-              <GroupedSection header="Personal Fit">
-                <View style={styles.previewFactRow}>
-                  <Text style={styles.previewFactText}>{integrated ? 'Not personalized yet.' : 'Not available yet.'}</Text>
-                </View>
-              </GroupedSection>
               <GroupedSection header="Formula Details">
                 <View style={styles.previewFactRow}>
                   <Text style={styles.previewFactType}>{catalogDetail.category.replace('_', ' ')}</Text>
@@ -574,6 +589,12 @@ export default function CheckProductScreen() {
                   )}
                 </View>
               </GroupedSection>
+              {integrated ? <>
+                {profileSaveStatus?.kind === 'ready' ? <Text style={styles.previewFactText}>Personalization ready for this client session. Personal Fit is unavailable without product evidence.</Text> : null}
+                {profileSaveStatus?.kind === 'unavailable' ? <Text style={styles.previewFactText}>Personalization unavailable. Your answers were not saved.</Text> : null}
+                {personalFitState.kind === 'factual_only' ? <Text style={styles.previewFactText}>Not personalized yet.</Text> : null}
+                <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />
+              </> : <GroupedSection header="Personal Fit"><Text style={styles.previewFactText}>Not available yet.</Text></GroupedSection>}
             </>
           ) : (
           <>
