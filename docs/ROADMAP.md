@@ -9,7 +9,8 @@ K-FREE-1 ✅
 S-FREE-1 ✅
 K-FREE-1B ✅
 Wave-1 integration ✅ (local only)
-→ K-FREE-2 || K-FREE-3 || K-FREE-4 || K-PAID-1A (independent presentation)
+K-FREE-3 presentation ✅
+→ K-FREE-2 || K-FREE-4 || K-PAID-1A (independent presentation)
   S-FREE-2 || S-FREE-3 || S-FREE-4 || S-PAID-1 (independent platform)
 → bounded composition and contract integration after each side is ready
 ```
@@ -63,18 +64,18 @@ Managed upgrade target: start Managed Skincare → link/create a permanent ident
 
 ## Current next work and parallel waves
 
-Wave 0 and Wave-1 local integration are complete. K-FREE-2, K-FREE-3, K-FREE-4, and K-PAID-1A are independent presentation tracks that may proceed concurrently with Sami's platform tracks. They do not wait for corresponding server contracts. Hosted guest activation still requires S-OPS-1.
+Wave 0, Wave-1 local integration, and K-FREE-3 presentation are complete. K-FREE-2, K-FREE-4, and K-PAID-1A remain independent presentation tracks that may proceed concurrently with Sami's platform tracks. They do not wait for corresponding server contracts. Hosted guest activation still requires S-OPS-1.
 
 **Max-parallel implementation rule:** A counterpart contract is a prerequisite for integration, not a prerequisite for beginning or completing owned implementation. Kanuj presentation milestones may build against Kanuj-owned view models/fixtures while Sami builds platform contracts independently. After completing an owned milestone, each founder advances to the next non-overlapping milestone. Integration is a separate bounded task. High-contention Check, root routing, Plan, Account, and shell-mode files belong to later composition passes, not simultaneous feature branches.
 
-Current Kanuj presentation branches, all based on `main@669b475b971a7abd682bff59e458a655be7c058b`, are `kanuj/k-free-2-progressive-personalization`, `kanuj/k-free-3-my-stuff-presentation`, `kanuj/k-free-4-capture-ux`, and `kanuj/k-paid-1a-managed-presentation`. These are implementation tracks, not completed or integrated features.
+K-FREE-3 landed in PR #48 at `c56090aa67ef9e85c786e91dffa60407ade194fe`. K-FREE-2, K-FREE-4, and K-PAID-1A presentation branches remain separate PRs; their server integration and shared composition are not landed. PR #53 added automatic discovery of top-level unit test files at `ca8aac2ad91696fa8abb201bc5c78bb927b2a0de`.
 
 | Wave | Kanuj | Sami | Prerequisite / handoff |
 | --- | --- | --- | --- |
 | Wave-1 foundations (landed) | **K-FREE-1 ✅ / K-FREE-1B ✅ (Kanuj):** scanner-first Mock shell and UX polish. | **S-FREE-1 ✅ (Sami):** anonymous/free platform and stable access contract. | Contract consumed by the local Wave-1 integration; hosted anonymous signup remains gated. |
 | Wave-1 integration (landed, local only) | Kanuj consumes `FreeAccessState` in Auth, routing, Check, Plan, Shop, and Account. | Sami's platform contract is unchanged. | Local Auth/catalog/resolver and managed denials verified. No hosted activation or TestFlight build. |
 | 2, parallel implementation | **K-FREE-2 Progressive Personalization UX**: optional ~45-second, three-concept profile; skip/remind; same-result refresh and edit seams; no managed photos, budget, or routine complexity. | **S-FREE-2 Minimal Profile + Deterministic Personal Fit**: persisted minimal profile and evidence-backed categorical fit. | Both sides build independently. A later K2/S2 integration maps Sami's contract into the finished presentation. |
-| 3, parallel implementation | **K-FREE-3 MY STUFF**: profile, current products, using/considering/stopped, check history, reactions/tolerance UX; fixtures only. | **S-FREE-3 Free Context / Check History Data Plane**: owner-bound persistence for anonymous and permanent identities. | Both sides build independently. A later pass integrates reads/writes and K-FREE-2 editing. |
+| 3, Kanuj presentation landed | **K-FREE-3 MY STUFF:** fixture-backed profile, products, history, and reaction/tolerance presentation landed in PR #48; the real anonymous state remains empty. | **S-FREE-3 Free Context / Check History Data Plane**: owner-bound persistence for anonymous and permanent identities. | A later pass integrates reads/writes and K-FREE-2 editing. |
 | 4, parallel implementation | **K-FREE-4 Camera Product Evidence UX**: barcode, front label, ingredients, packaging, retake, candidate and unknown states; evidence never establishes identity. | **S-FREE-4 Product Evidence Resolution**: private evidence, S6 resolution, candidate/uncertainty states. | Both sides build independently. A later K4 composition pass wires canonical Check, then consumes the stable server contract. |
 | 5, parallel foundation | **K-PAID-1A Managed Upgrade / Plan Presentation**: free offer, identity-upgrade states, context reuse, missing intake and photo presentation, managed Plan states; fixtures only. | **S-PAID-1 Managed Entitlement Separation + F1**: permanent identity, founder routine construction/review/publish and member readback. | Both sides build independently. Later KPAID composition/integration consumes the stable contract; billing remains H1B. |
 | Release hardening | **K-ACCEPT-1 Scanner-First Physical / TestFlight Acceptance**: first open, silent guest identity, factual Check, optional profile, repeat launch, MY STUFF, linking, managed transition, camera/barcode, privacy/support/deletion, and no Mock leakage. | **S-OPS-1 Anonymous Lifecycle / Abuse / Upgrade**: cleanup, abuse/rate controls, identity linking and same-user preservation, conflict behavior, deletion, lost-device expectations, and privacy-safe operational observability. | Both start after free and paid interfaces stabilize. No beta release until hosted security and physical customer acceptance evidence is recorded. |
