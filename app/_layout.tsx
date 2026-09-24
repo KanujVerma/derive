@@ -15,6 +15,7 @@ import { getFreeAccessState } from '@/src/services/remote/freeAccess';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 import { publicEnvironment } from '@/src/config/environment';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { canOpenPersonalizationRoute } from '@/src/presentation/personalization/gateway';
 import { resolveLocalAccessRoute } from '@/src/utils/localAccessRouting';
 import { refreshCustomerBootstrap, resolveCustomerBootstrap } from '@/src/services/deriveClient';
 import { resolveAuthRoute, getAuthRedirectRoute } from '@/src/utils/authRouting';
@@ -206,6 +207,9 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="profile/index" options={{ headerShown: false }} />
           <Stack.Screen name="shop/scan" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={canOpenPersonalizationRoute(shell, localReady)}>
+          <Stack.Screen name="personalize/index" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={localFreeIntegration ? managedAccess : (!remoteEnabled || destination.type === 'REMOTE_TABS')}>
           <Stack.Screen name="orders/index" options={{ headerShown: false }} />

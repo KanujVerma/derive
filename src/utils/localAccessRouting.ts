@@ -1,7 +1,7 @@
 import type { FreeAccessState } from '../contracts/FreeAccess.ts';
 
 const FREE_TABS = new Set(['check', 'my-stuff', 'plan', 'shop']);
-const MANAGED_ROUTES = new Set(['(tabs)', 'profile', 'orders', 'insights', 'shop', 'check-in', 'refill', '(onboarding)']);
+const MANAGED_ROUTES = new Set(['(tabs)', 'profile', 'orders', 'insights', 'shop', 'check-in', 'refill', '(onboarding)', 'personalize']);
 
 /** Route visibility is a client projection of the server access state. */
 export function resolveLocalAccessRoute(
@@ -11,7 +11,7 @@ export function resolveLocalAccessRoute(
   const root = segments[0];
   if (!root || root === 'index') return landing;
   if (access.managedAccess) return MANAGED_ROUTES.has(root) ? null : landing;
-  if (root === 'profile') return null;
+  if (root === 'profile' || root === 'personalize') return null;
   if (root === 'shop' && segments[1] === 'scan') return null;
   if (root === '(tabs)' && FREE_TABS.has(segments[1] ?? '')) return null;
   return landing;

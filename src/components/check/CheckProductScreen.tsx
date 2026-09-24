@@ -10,13 +10,14 @@ import {
   Linking,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows, layout } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
+import { useAuthStore } from '@/src/stores/authStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { Button } from '@/src/components/ui/Button';
 import { analytics } from '@/src/services/analytics';
@@ -43,6 +44,9 @@ import { resolveCheckEntryState } from '@/src/commerce/checkEntryState';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { GlassContainer } from '@/src/components/ui/GlassContainer';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
+import { PersonalFitSection } from '@/src/components/personalization/PersonalFitSection';
+import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/presentation/personalization/gateway';
+import type { PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
 
 export default function CheckProductScreen() {
   const router = useRouter();
@@ -59,6 +63,10 @@ export default function CheckProductScreen() {
   const integrated = shell === 'local_free_integration';
   const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
+  const sessionUserId = useAuthStore((s) => s.sessionUserId);
+  const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
+  const [personalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
+  const openPersonalization = () => router.push('/personalize');
   const { routine, userProducts, checkIns } = useRoutineStore();
   const { productReactions, routineComplexity, primaryGoal, costPreference } = useOnboardingStore();
 
@@ -67,6 +75,24 @@ export default function CheckProductScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(!targetShell);
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
+  useFocusEffect(React.useCallback(() => {
+    let active = true;
+    const status = personalizationGateway.lastSaveStatus(ownerId);
+    if (status?.kind === 'unavailable') {
+      setPersonalFitState({ kind: 'unavailable', reason: 'answers_not_saved' });
+    } else if (status?.kind === 'ready') {
+      setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' });
+      if (catalogDetail?.productId) {
+        void personalizationGateway.getFit(ownerId, catalogDetail.productId).then((fit) => {
+          if (active) setPersonalFitState(fit.kind === 'unavailable'
+            ? { kind: 'unavailable', reason: 'client_session_ready' } : fit);
+        }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' }); });
+      }
+    } else {
+      setPersonalFitState({ kind: 'factual_only' });
+    }
+    return () => { active = false; };
+  }, [ownerId, catalogDetail?.productId]));
   const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
   const [candidates, setCandidates] = useState<ProductResolutionCandidate[]>([]);
   const [isCheckingProduct, setIsCheckingProduct] = useState(false);
@@ -550,11 +576,6 @@ export default function CheckProductScreen() {
                 <Text style={styles.productBrandText}>{catalogDetail.brand.toUpperCase()}</Text>
                 <Text style={styles.productNameText}>{catalogDetail.name}</Text>
               </View>
-              <GroupedSection header="Personal Fit">
-                <View style={styles.previewFactRow}>
-                  <Text style={styles.previewFactText}>{integrated ? 'Not personalized yet.' : 'Not available yet.'}</Text>
-                </View>
-              </GroupedSection>
               <GroupedSection header="Formula Details">
                 <View style={styles.previewFactRow}>
                   <Text style={styles.previewFactType}>{catalogDetail.category.replace('_', ' ')}</Text>
@@ -574,6 +595,8 @@ export default function CheckProductScreen() {
                   )}
                 </View>
               </GroupedSection>
+              {/* Mock and local Remote use the same factual-only Personal Fit presentation. */}
+              <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />
             </>
           ) : (
           <>

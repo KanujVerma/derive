@@ -2,8 +2,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { resolvePlanPresentation } from '../src/presentation/managed-plan/planComposition.ts';
+import { managedPlanBottomPadding } from '../src/presentation/managed-plan/managedPlan.ts';
 
 const readPlan = () => readFileSync(new URL('../app/(tabs)/plan.tsx', import.meta.url), 'utf8');
+
+test('KPAID-COMPOSE keeps the last illustrative section above the floating tab bar', () => {
+  assert.equal(managedPlanBottomPadding(0), 120);
+  assert.equal(managedPlanBottomPadding(34), 154);
+  assert.equal(managedPlanBottomPadding(-4), 120);
+  const presentation = readFileSync(new URL('../src/components/plan/managed/ManagedPlanPresentation.tsx', import.meta.url), 'utf8');
+  assert.match(presentation, /managedPlanBottomPadding\(insets\.bottom\)/);
+});
 
 test('KPAID-COMPOSE keeps free Plan on the truthful enrollment presentation by default', () => {
   assert.deepEqual(resolvePlanPresentation({ shell: 'scanner_first_preview', managedAccess: false }), { kind: 'free' });
