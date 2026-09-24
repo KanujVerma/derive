@@ -22,6 +22,23 @@ export function selectSavableCheckCaseId(input: {
     ? input.caseId : null;
 }
 
+export function shouldHideCheckForOwner(input: {
+  integrated: boolean;
+  previousOwner: string | null;
+  sessionUserId: string | null;
+  liveOwner: string | null;
+  resultOwner: string | null;
+  hasResult: boolean;
+}): boolean {
+  return input.integrated && (input.previousOwner !== input.sessionUserId
+    || (input.hasResult && (!input.liveOwner || input.resultOwner !== input.liveOwner)));
+}
+
+export function canPublishCheckResult(integrated: boolean,
+  requestOwner: string | null, currentOwner: string | null): boolean {
+  return !integrated || Boolean(requestOwner && requestOwner === currentOwner);
+}
+
 export function selectFreeCheckOwner(input: {
   shell: ShellPresentation;
   authStatus: 'INITIALIZING' | 'SIGNED_OUT' | 'SIGNED_IN';

@@ -51,8 +51,8 @@ import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/pre
 import { remotePersonalizationGateway } from '@/src/presentation/personalization/remoteGateway';
 import { selectFreeFitTarget } from '@/src/presentation/personalization/fitTarget';
 import type { PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
-import { createCheckMemorySaver, selectFreeCheckOwner, selectSavableCheckCaseId,
-  validateCheckResolution } from '@/src/presentation/check/checkMemory';
+import { canPublishCheckResult, createCheckMemorySaver, selectFreeCheckOwner,
+  selectSavableCheckCaseId, shouldHideCheckForOwner, validateCheckResolution } from '@/src/presentation/check/checkMemory';
 import { recordFreeCheck } from '@/src/services/remote/freeContext';
 
 export default function CheckProductScreen() {
@@ -131,8 +131,42 @@ export default function CheckProductScreen() {
   const isScanningLockedRef = useRef(false);
   const pendingResolutionRef = useRef<{ key: string; requestId: string } | null>(null);
   const resolutionOwnerRef = useRef<string | null>(null);
+  const previousCheckOwnerRef = useRef(sessionUserId);
+  const resolutionSequenceRef = useRef(0);
   const checkMemorySaverRef = useRef(createCheckMemorySaver(recordFreeCheck, createCatalogRequestId));
   const [, refreshCheckMemory] = useState(0);
+
+  const currentLiveCheckOwner = () => {
+    const auth = useAuthStore.getState();
+    const access = useFreeAccessStore.getState();
+    return selectFreeCheckOwner({
+      shell, authStatus: auth.status, sessionUserId: auth.sessionUserId,
+      accessStatus: access.status, accessUserId: access.userId,
+      accessOwnerId: access.access?.userId ?? null,
+    });
+  };
+
+  useEffect(() => {
+    if (!integrated || previousCheckOwnerRef.current === sessionUserId) return;
+    previousCheckOwnerRef.current = sessionUserId;
+    resolutionSequenceRef.current += 1;
+    resolutionOwnerRef.current = null;
+    pendingResolutionRef.current = null;
+    checkMemorySaverRef.current = createCheckMemorySaver(recordFreeCheck, createCatalogRequestId);
+    setCatalogDetail(null);
+    setResolution(null);
+    setCandidates([]);
+    setConfirmedProduct(null);
+    setScanResult(null);
+    setCaptureRole(null);
+    setCaptureEvidence(null);
+    setUnknownBarcode(null);
+    setEvaluationError(null);
+    setPersonalFitState({ kind: 'factual_only' });
+    setSearchQuery('');
+    setIsCheckingProduct(false);
+    setIsSearching(false);
+  }, [integrated, sessionUserId]);
 
   const renderSaveCheckAction = (caseId?: string) => {
     const savableCaseId = selectSavableCheckCaseId({
@@ -151,13 +185,7 @@ export default function CheckProductScreen() {
           loading={status === 'saving'}
           disabled={status === 'saved'}
           onPress={() => {
-            const auth = useAuthStore.getState();
-            const access = useFreeAccessStore.getState();
-            const currentOwner = selectFreeCheckOwner({
-              shell, authStatus: auth.status, sessionUserId: auth.sessionUserId,
-              accessStatus: access.status, accessUserId: access.userId,
-              accessOwnerId: access.access?.userId ?? null,
-            });
+            const currentOwner = currentLiveCheckOwner();
             if (currentOwner !== liveCheckOwner || resolutionOwnerRef.current !== currentOwner
               || resolution?.caseId !== caseId) return;
             const save = checkMemorySaverRef.current.save(currentOwner, savableCaseId);
@@ -165,7 +193,6 @@ export default function CheckProductScreen() {
             void save.then(() => refreshCheckMemory((value) => value + 1));
           }}
         />
-        {status === 'saved' && <Text style={styles.saveCheckMessage}>Saved to My Stuff.</Text>}
         {status === 'failed' && <Text style={styles.saveCheckMessage}>Could not save this check. Try again.</Text>}
       </View>
     );
@@ -247,6 +274,7 @@ export default function CheckProductScreen() {
     barcode?: string,
   ) => {
     const requestOwner = liveCheckOwner;
+    const requestSequence = ++resolutionSequenceRef.current;
     resolutionOwnerRef.current = null;
     setIsCheckingProduct(true);
     setEvaluationError(null);
@@ -261,6 +289,8 @@ export default function CheckProductScreen() {
       const result = validateCheckResolution(await loadResult(), knownProductId);
       const selectedId = resolvedCatalogDetailId(result, knownProductId);
       const detail = selectedId ? await getCatalogProductDetail(selectedId) : null;
+      if (requestSequence !== resolutionSequenceRef.current
+        || !canPublishCheckResult(integrated, requestOwner, currentLiveCheckOwner())) return;
       resolutionOwnerRef.current = requestOwner;
       setResolution(result);
       setCandidates(result.state === 'ambiguous_candidates' ? result.candidates : []);
@@ -274,6 +304,8 @@ export default function CheckProductScreen() {
         setUnknownBarcode(barcode);
       }
     } catch {
+      if (requestSequence !== resolutionSequenceRef.current
+        || !canPublishCheckResult(integrated, requestOwner, currentLiveCheckOwner())) return;
       resolutionOwnerRef.current = null;
       setResolution(null);
       setCandidates([]);
@@ -281,7 +313,7 @@ export default function CheckProductScreen() {
       isScanningLockedRef.current = false;
       setIsLocked(false);
     } finally {
-      setIsCheckingProduct(false);
+      if (requestSequence === resolutionSequenceRef.current) setIsCheckingProduct(false);
     }
   };
 
@@ -390,6 +422,7 @@ export default function CheckProductScreen() {
 
   const handleResetScan = () => {
     void Haptics.selectionAsync().catch(() => {});
+    resolutionSequenceRef.current += 1;
     resolutionOwnerRef.current = null;
     setConfirmedProduct(null);
     setCatalogDetail(null);
@@ -471,6 +504,19 @@ export default function CheckProductScreen() {
   const resultPresentation = resolveScanResultPresentation(scanResult);
   const invalidResult = Boolean(scanResult && confirmedProduct && resultPresentation.kind === 'invalid');
   const currentFormula = getVerifiedFormulaForResolution(catalogDetail, resolution);
+
+  if (shouldHideCheckForOwner({
+    integrated, previousOwner: previousCheckOwnerRef.current, sessionUserId,
+    liveOwner: liveCheckOwner, resultOwner: resolutionOwnerRef.current,
+    hasResult: Boolean(catalogDetail || resolution),
+  })) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
+        <RootShellHeader title="Check" />
+        <Text style={styles.entryBody}>Preparing Check for this account…</Text>
+      </View>
+    );
+  }
 
   if (!targetShell && !showProviderFeatures) {
     return (

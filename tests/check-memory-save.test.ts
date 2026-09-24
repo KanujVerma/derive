@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createCheckMemorySaver, selectFreeCheckOwner, validateCheckResolution,
-  selectSavableCheckCaseId } from '../src/presentation/check/checkMemory.ts';
+  selectSavableCheckCaseId, shouldHideCheckForOwner, canPublishCheckResult } from '../src/presentation/check/checkMemory.ts';
 import { recordFreeCheck } from '../src/services/remote/freeContext.ts';
 import type { ProductResolutionResult } from '../src/contracts/ProductIdentityResolver.ts';
 
@@ -126,4 +126,21 @@ test('an error or account switch cannot expose the save action for an old result
   assert.equal(selectSavableCheckCaseId({ ...shown, hasError: true }), null);
   assert.equal(selectSavableCheckCaseId({ ...shown, liveOwner: 'owner-b' }), null);
   assert.equal(selectSavableCheckCaseId({ ...shown, caseId: null }), null);
+});
+
+test('a retained Check result is hidden immediately across owner or access changes', () => {
+  const shown = {
+    integrated: true, previousOwner: 'owner-a', sessionUserId: 'owner-a',
+    liveOwner: 'owner-a', resultOwner: 'owner-a', hasResult: true,
+  };
+  assert.equal(shouldHideCheckForOwner(shown), false);
+  assert.equal(shouldHideCheckForOwner({ ...shown, sessionUserId: 'owner-b', liveOwner: 'owner-b' }), true);
+  assert.equal(shouldHideCheckForOwner({ ...shown, sessionUserId: 'owner-b', liveOwner: 'owner-b', hasResult: false }), true);
+  assert.equal(shouldHideCheckForOwner({ ...shown, sessionUserId: null, liveOwner: null }), true);
+  assert.equal(shouldHideCheckForOwner({ ...shown, liveOwner: null }), true);
+  assert.equal(shouldHideCheckForOwner({ ...shown, integrated: false, sessionUserId: 'owner-b' }), false);
+  assert.equal(canPublishCheckResult(true, 'owner-a', 'owner-b'), false);
+  assert.equal(canPublishCheckResult(true, 'owner-a', null), false);
+  assert.equal(canPublishCheckResult(true, 'owner-a', 'owner-a'), true);
+  assert.equal(canPublishCheckResult(false, null, null), true);
 });
