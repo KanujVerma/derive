@@ -152,3 +152,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/free-personal-fit/deno.json"
 entrypoint = "./functions/free-personal-fit/index.ts"
+
+[functions.free-context]
+enabled = true
+verify_jwt = true
+import_map = "./functions/free-context/deno.json"
+entrypoint = "./functions/free-context/index.ts"

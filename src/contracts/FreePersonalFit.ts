@@ -26,7 +26,7 @@ export type PersonalFitReason =
   | 'profile_missing' | 'formula_unverified' | 'profile_context_missing'
   | 'reported_ingredient_sensitivity' | 'retinoid_pregnancy_context' | 'multiple_cautions'
   | 'active_overlap' | 'reactive_active' | 'sensitivity_unresolved'
-  | 'goal_role_match' | 'no_supported_fit_rule';
+  | 'goal_role_match' | 'no_supported_fit_rule' | 'prior_product_reaction';
 
 export interface PersonalFitResult {
   productId: string;

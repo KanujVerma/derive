@@ -50,18 +50,22 @@ async function saveProfile(admin: SupabaseClient, userId: string, profile: FreeS
 }
 
 async function fit(admin: SupabaseClient, userId: string, productId: string, variantId?: string): Promise<PersonalFitResult> {
-  const [profile, productResult] = await Promise.all([
+  const [profile, productResult, historyResult] = await Promise.all([
     loadProfile(admin, userId),
     admin.from('products').select('id,category,is_catalog_standard,catalog_verified_at').eq('id', productId).maybeSingle(),
+    admin.from('free_product_experiences').select('id').eq('user_id', userId)
+      .eq('product_id', productId).eq('kind', 'reacted').limit(1),
   ]);
   if (productResult.error) throw new ServiceError('CATALOG_UNAVAILABLE', 'Product facts are temporarily unavailable', 503);
+  if (historyResult.error) throw new ServiceError('PROFILE_UNAVAILABLE', 'Skin context is temporarily unavailable', 503);
+  const history = { reactedToSameProduct: (historyResult.data?.length ?? 0) > 0 };
   const product = productResult.data;
   if (!product || product.is_catalog_standard !== true || !product.catalog_verified_at) {
     throw new ServiceError('PRODUCT_NOT_FOUND', 'Product was not found in the verified catalog', 404);
   }
   if (!variantId) return determinePersonalFit(profile, {
     productId, variantId: null, formulaVersionId: null, category: product.category, ingredients: null,
-  });
+  }, history);
   const variantResult = await admin.from('product_variants')
     .select('id,product_id,lifecycle_status,catalog_verification_status')
     .eq('id', variantId).eq('product_id', productId).maybeSingle();
@@ -91,7 +95,7 @@ async function fit(admin: SupabaseClient, userId: string, productId: string, var
     category: product.category,
     ingredients: resolved.state === 'verified' ? resolved.formula.ingredients : null,
     sourceReference: resolved.state === 'verified' ? resolved.formula.sourceReference : null,
-  });
+  }, history);
 }
 
 Deno.serve(async (req: Request) => {

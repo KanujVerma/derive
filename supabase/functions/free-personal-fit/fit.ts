@@ -107,7 +107,8 @@ interface VerifiedFormulaContext {
 }
 
 /** Conservative cosmetic fit only. Never treats an ingredient list as proof of concentration or safety. */
-export function determinePersonalFit(profile: FreeSkinProfileInput | null, formula: VerifiedFormulaContext): PersonalFitResult {
+export function determinePersonalFit(profile: FreeSkinProfileInput | null, formula: VerifiedFormulaContext,
+  history: { reactedToSameProduct: boolean } = { reactedToSameProduct: false }): PersonalFitResult {
   const base = {
     productId: formula.productId, variantId: formula.variantId, formulaVersionId: formula.formulaVersionId,
     sources: formula.sourceReference ? [formula.sourceReference] : [] as string[],
@@ -167,6 +168,12 @@ export function determinePersonalFit(profile: FreeSkinProfileInput | null, formu
     return { ...base, label: 'USE_WITH_CAUTION', reason: 'reactive_active',
       explanation: 'You reported easily reactive skin, and this formula lists an active ingredient that may need individual tolerance review.',
       evidenceUsed: [ingredientEvidence, 'reported_reactivity'], missingEvidence: ['individual_tolerance'] };
+  }
+  if (history.reactedToSameProduct) {
+    return { ...base, label: 'USE_WITH_CAUTION', reason: 'prior_product_reaction',
+      explanation: 'You previously reported a reaction to this catalog product. The earlier package or formula may differ; this is a tolerance signal, not an ingredient allergy diagnosis.',
+      evidenceUsed: [ingredientEvidence, 'user_reported_same_product_reaction'],
+      missingEvidence: ['exact_prior_variant_and_formula', 'individual_tolerance'] };
   }
   if (profile.goals.includes('dryness') && profile.skinBehavior === 'dry_tight'
     && formula.category === 'moisturizer'
