@@ -21,7 +21,7 @@ export interface ProductEvidencePhoto {
   /** Private `customer-product-evidence` object path owned by the caller. */
   storagePath: string;
   role: ProductEvidencePhotoRole;
-  /** Optional OCR supplied by a trusted extractor. It is candidate evidence only. */
+  /** Optional OCR or typed text. It is untrusted, candidate-only evidence. */
   extractedText?: string;
 }
 

@@ -13,8 +13,8 @@ K-FREE-2 (#51) ✅  K-FREE-3 (#48) ✅
 K-FREE-4 (#49) ✅  K-PAID-1A (#52) ✅
 PR #50 max-parallel rule ✅  PR #53 test discovery ✅
 K4-COMPOSE handoff prep (#55) ✅  KPAID-COMPOSE (#56) ✅
-→ K2-COMPOSE (in progress); K4 canonical Check composition follows K2
-S-FREE-2 PR #54 OPEN, Retinyl Propionate regression fixed on branch
+→ K2-COMPOSE (#60) ✅; K4 canonical Check composition follows
+S-FREE-2 PR #54 OPEN, Retinyl Propionate regression fixed; CI green
 → K2/S2 platform integration waits for exact-head review and landing
 ```
 
@@ -31,7 +31,8 @@ Derive is **personalized skincare product intelligence first**. Free Check answe
 - S6 provides product identity and formula evidence states. Unknown identity/formula stays unknown. Camera capture is not proof of identity; visual/OCR provider behavior remains unproven. Wave-1 Check labels factual “FORMULA DETAILS” separately from unavailable Personal Fit.
 - PR #39 closed the selected catalog UUID handoff into routine persistence. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md) and the current checkpoint in [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
 - S-FREE-2 has a branch-local optional free-profile/fit platform implementation, separate from paid intake. It has not been hosted or wired to Kanuj's mobile UX; see [S_FREE_2_PERSONAL_FIT.md](S_FREE_2_PERSONAL_FIT.md). With the current hosted catalog's zero verified formulas, live personal fit would return unknown.
-- S-FREE-3 is being implemented as a separate stacked platform branch: owner-bound saved products, Check history, and reported experiences for anonymous/permanent free identities. It is not yet merged, hosted, or connected to MY STUFF; see [S_FREE_3_CONTEXT_HISTORY.md](S_FREE_3_CONTEXT_HISTORY.md).
+- S-FREE-3 is a separate stacked platform PR: owner-bound saved products, Check history, and reported experiences for anonymous/permanent free identities. It is not yet merged, hosted, or connected to MY STUFF; see [S_FREE_3_CONTEXT_HISTORY.md](S_FREE_3_CONTEXT_HISTORY.md).
+- S-FREE-4 is a separate local stacked platform branch: server-granted private free product photos, S6 candidate/unknown resolution, and paid Shelf separation. It is not hosted or connected to Kanuj's camera UI; no OCR provider is added. See [S_FREE_4_PRODUCT_EVIDENCE.md](S_FREE_4_PRODUCT_EVIDENCE.md).
 - Hosted `propose-routine` is v3, ACTIVE, with JWT verification enabled. The live model-provider path remains H1P-unproven. This limits provider-backed Ask/routine automation and does not block free factual Check or the planned deterministic fit service.
 - The current $25/month Founding Beta display/Stripe code is implementation history, not proof of hosted billing activation and not proof that the new Managed Skincare entitlement model exists.
 
@@ -69,7 +70,7 @@ Managed upgrade target: start Managed Skincare → link/create a permanent ident
 
 ## Current next work and parallel waves
 
-Wave 0 and Wave-1 local integration are complete. K-FREE-2, K-FREE-3, K-FREE-4, and K-PAID-1A are landed in PRs #51, #48, #49, and #52; max-parallel guidance (#50) and test discovery (#53) are also landed. K4-COMPOSE handoff prep (#55) and KPAID-COMPOSE (#56) are landed; K2-COMPOSE is in progress. K4 canonical Check composition follows K2. S-FREE-2 PR #54 remains open; its reproduced Retinyl Propionate defect is fixed on the branch, but K2/S2 platform integration waits for exact-head validation and landing. Hosted guest activation still requires S-OPS-1.
+Wave 0 and Wave-1 local integration are complete. K-FREE-2, K-FREE-3, K-FREE-4, and K-PAID-1A are landed in PRs #51, #48, #49, and #52; max-parallel guidance (#50) and test discovery (#53) are also landed. K4-COMPOSE handoff prep (#55), KPAID-COMPOSE (#56), and K2-COMPOSE (#60) are landed. K4 canonical Check composition follows. S-FREE-2 PR #54 remains open; its reproduced Retinyl Propionate defect is fixed with exact-head CI green, but K2/S2 platform integration waits for landing. Hosted guest activation still requires S-OPS-1.
 
 **Max-parallel implementation rule:** A counterpart contract is a prerequisite for integration, not a prerequisite for beginning or completing owned implementation. Kanuj presentation milestones may build against Kanuj-owned view models/fixtures while Sami builds platform contracts independently. After completing an owned milestone, each founder advances to the next non-overlapping milestone. Integration is a separate bounded task. High-contention Check, root routing, Plan, Account, and shell-mode files belong to later composition passes, not simultaneous feature branches.
 

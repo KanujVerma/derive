@@ -1,6 +1,6 @@
 # S-FREE-3: Free Context and Check History
 
-Status: stacked on S-FREE-2 PR #54; local implementation only. Do not deploy this migration or Edge Function until S-FREE-2 lands and the exact-head checks run. GitHub Actions is currently blocked before job startup by the repository billing/spending gate.
+Status: stacked on S-FREE-2 PR #54; local implementation only. Do not deploy this migration or Edge Function until S-FREE-2 lands and exact-head checks run. The prior GitHub Actions billing/spending gate cleared; #54 and #58 have green checks at their current heads.
 
 ## What exists
 
@@ -18,4 +18,4 @@ Consume the typed functions in `src/services/remote/freeContext.ts` and the exac
 
 ## Still gated
 
-Hosted anonymous Auth, abuse/rate limits, identity linking and lost-session handling remain S-OPS-1. Product-photo capture/storage remains S-FREE-4. This branch has no customer-visible MY STUFF persistence until Kanuj integrates it, and has no hosted deployment. The present hosted catalog also lacks verified formulas, so reaction-aware positive-fit behavior cannot be demonstrated on production catalog data yet.
+Hosted anonymous Auth, abuse/rate limits, identity linking and lost-session handling remain S-OPS-1. Product-photo capture/storage has a separate, local S-FREE-4 stacked branch; it is not hosted or wired to Kanuj's camera UX. This branch has no customer-visible MY STUFF persistence until Kanuj integrates it, and has no hosted deployment. The present hosted catalog also lacks verified formulas, so reaction-aware positive-fit behavior cannot be demonstrated on production catalog data yet.

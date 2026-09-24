@@ -55,3 +55,6 @@ K-FREE-1 owns silent sign-in, routing and presentation. S-FREE-2 owns determinis
 ## Activation and verification
 
 Local `supabase/config.toml` enables anonymous sign-ins for the test stack. Hosted project `snojlbqovlawewwqbviz` must remain **DELIBERATELY GATED**: no hosted anonymous Auth setting was enabled by S-FREE-1. Before enabling it, S-OPS-1 must provide abuse/rate/CAPTCHA and anonymous lifecycle controls, then repeat hosted RLS, beta-claim, direct managed denial, free catalog/resolver, deletion and rollback checks. The hosted catalog remains too sparse for a useful general release. The only new database migration is `20260923180000_s_free_1_identity_boundary.sql`; `access-state` is the new function and existing resolver/shared access checks change. Local acceptance: fresh reset, complete pgTAP suite, real guest HTTP smoke, unit/TypeScript/export checks. See the S-FREE-1 `CONTEXT_SYNC` checkpoint for exact counts and CI/PR disposition.
+# S-FREE-4 supersession note (local branch, not hosted)
+
+The S-FREE-1 matrix below records the Wave-1 checkpoint. S-FREE-4 now adds a separate, grant-bound private product-photo path for free Check and denies the `shelf` consumer without managed membership. Its exact current local contract is [S_FREE_4_PRODUCT_EVIDENCE.md](S_FREE_4_PRODUCT_EVIDENCE.md). Hosted guest/photo activation is still gated by S-OPS-1.
