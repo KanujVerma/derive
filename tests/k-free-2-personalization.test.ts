@@ -9,6 +9,7 @@ import {
   toggleTreatment,
 } from '../src/presentation/personalization/draft.ts';
 import { describePersonalFitRefresh } from '../src/presentation/personalization/result.ts';
+import type { SupportedPersonalFit } from '../src/presentation/personalization/result.ts';
 import { fixturePersonalFit } from '../src/fixtures/personalization/fixtureAdapter.ts';
 
 test('K-FREE-2: goals have a three-choice maximum and can be deselected', () => {
@@ -25,8 +26,14 @@ test('K-FREE-2: skipped questions remain unknown in completion output', () => {
   assert.equal(nextPersonalizationStep('context'), 'complete');
   assert.deepEqual(completePersonalization(draft), {
     goals: [], skinBehavior: null, reactivity: null, treatments: [],
-    sensitivityOrAllergy: null, pregnancy: 'prefer_not_to_say',
+    sensitivityOrAllergy: null, pregnancy: null,
   });
+});
+
+test('K-FREE-2: an explicit privacy choice stays distinct from an unanswered pregnancy question', () => {
+  const draft = createPersonalizationDraft();
+  assert.equal(draft.pregnancy, null);
+  assert.equal(completePersonalization({ ...draft, pregnancy: 'prefer_not_to_say' }).pregnancy, 'prefer_not_to_say');
 });
 
 test('K-FREE-2: editing starts from a copy and treatment choices toggle without affecting the source', () => {
@@ -38,6 +45,11 @@ test('K-FREE-2: editing starts from a copy and treatment choices toggle without 
 });
 
 test('K-FREE-2: result stays factual until a supported fit is supplied', () => {
+  if (false) {
+    // @ts-expect-error Personal Fit accepts only approved categories.
+    const invalid: SupportedPersonalFit = { ...fixturePersonalFit, label: 'CUSTOM SCORE' };
+    void invalid;
+  }
   assert.equal(describePersonalFitRefresh({ kind: 'factual_only' }).kind, 'factual_only');
   assert.equal(describePersonalFitRefresh({ kind: 'loading' }).kind, 'loading');
   assert.equal(describePersonalFitRefresh({ kind: 'insufficient' }).kind, 'insufficient');

@@ -15,13 +15,13 @@ export interface PersonalizationDraft {
   reactivity: Reactivity | null;
   treatments: Treatment[];
   sensitivityOrAllergy: 'yes' | 'no' | 'unsure' | null;
-  pregnancy: 'yes' | 'no' | 'prefer_not_to_say';
+  pregnancy: 'yes' | 'no' | 'prefer_not_to_say' | null;
 }
 
 export function createPersonalizationDraft(existing?: PersonalizationDraft): PersonalizationDraft {
   return existing ? { ...existing, goals: [...existing.goals], treatments: [...existing.treatments] } : {
     goals: [], skinBehavior: null, reactivity: null, treatments: [],
-    sensitivityOrAllergy: null, pregnancy: 'prefer_not_to_say',
+    sensitivityOrAllergy: null, pregnancy: null,
   };
 }
 

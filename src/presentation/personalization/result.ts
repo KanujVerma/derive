@@ -1,5 +1,6 @@
 export interface SupportedPersonalFit {
-  label: string;
+  label: 'GREAT FIT' | 'COULD WORK' | 'NOT NEEDED' | 'BETTER AS A REPLACEMENT'
+    | 'USE WITH CAUTION' | 'NOT A GOOD FIT RIGHT NOW';
   explanation: string;
   evidenceUsed: string[];
   uncertainty: string | null;

@@ -110,7 +110,7 @@ export function PersonalizationFlow({ initialDraft, onComplete, onSkip, onRemind
               selected={draft.sensitivityOrAllergy === value}
               onSelect={() => setDraft((current) => ({ ...current, sensitivityOrAllergy: value }))} />)}
           </View>
-          <Text style={styles.groupTitle}>Pregnant or trying to conceive?</Text>
+          <Text style={styles.groupTitle}>Pregnant, trying to conceive, or nursing?</Text>
           <View style={styles.chips}>
             {(['yes', 'no', 'prefer_not_to_say'] as const).map((value) => <ChoiceChip key={value}
               label={value === 'prefer_not_to_say' ? 'Prefer not to say' : value === 'yes' ? 'Yes' : 'No'}
