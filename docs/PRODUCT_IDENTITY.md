@@ -24,9 +24,11 @@ Supported evidence is:
 - ingredient-list text;
 - up to three privately uploaded photos: front label, ingredients, packaging.
 
-Local device URIs and arbitrary HTTP URLs are rejected. Product photos must
-already exist under the member's immutable
+Local device URIs and arbitrary HTTP URLs are rejected. Managed product photos
+must already exist under the immutable
 `customer-product-evidence/<member-id>/<role>/<opaque-file-name>` namespace.
+S-FREE-4 adds a separately granted private guest Check path; see
+[S_FREE_4_PRODUCT_EVIDENCE.md](S_FREE_4_PRODUCT_EVIDENCE.md).
 
 ## Trust states
 
@@ -85,7 +87,9 @@ not silently changed by S6.
 
 ## Operational invariants
 
-- Active membership is required to upload new evidence or resolve a product.
+- A verified Auth session is required for every resolution. Managed Shelf and
+  legacy managed photo paths require active membership; free Check can resolve
+  sourced catalog evidence and use a server-granted private photo path locally.
 - Evidence photos are private, immutable, excluded from analytics, and deleted
   Storage-first before account deletion completes.
 - There is no numerical confidence or quality score in the customer contract.

@@ -9,6 +9,13 @@ Code definitions:
 - Implementation remote: [`src/services/remote/RemoteDeriveService.ts`](../src/services/remote/RemoteDeriveService.ts)
 - S6 product identity: [`src/contracts/ProductIdentityResolver.ts`](../src/contracts/ProductIdentityResolver.ts)
 - S-FREE-3 free Check context: [`src/contracts/FreeContext.ts`](../src/contracts/FreeContext.ts)
+- S-FREE-4 private product evidence: [`src/contracts/FreeProductEvidence.ts`](../src/contracts/FreeProductEvidence.ts)
+
+### S-FREE-4 Free Product Evidence (stacked branch, not hosted)
+
+`prepare-free-product-evidence` issues a bounded private owner path; `freeProductEvidence.ts` supplies the typed upload seam. Free Check passes uploaded path plus optional candidate OCR to S6 `resolve-product-identity`. The resolver verifies grant, owner and object, and denies `consumer: 'shelf'` without managed membership. No client-supplied photo/OCR establishes verified formula identity. Exact request, retry, error, deletion and integration rules are in [S_FREE_4_PRODUCT_EVIDENCE.md](S_FREE_4_PRODUCT_EVIDENCE.md). Kanuj owns the camera adapter and customer UI; no `app/**` file is changed here.
+
+---
 
 ### S-FREE-3 Free Context (stacked branch, not hosted)
 

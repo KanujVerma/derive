@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-24: S-FREE-4 private product-evidence branch
+
+- **Predecessor:** S-FREE-3 PR #58 head `eff5e85` after the S2 retinoid correction; `main@5153b38b1e3d16aee2fe1b36d1298c524bb94edf` at branch start. Work is isolated to `sami/s-free-4-product-evidence`; the dirty founder checkout and Kanuj-owned customer UI remain untouched.
+- **Contract:** a JWT-authenticated server issues opaque owner-bound free product-photo paths at a six-per-24-hour per-owner limit. Private Storage RLS accepts only issued paths; S6 verifies the grant and object before resolution. Free Shelf is denied. Photo/OCR text yields candidates/unknown, not formula authority. Managed direct-upload policy is retained, and account deletion removes orphaned and referenced product evidence.
+- **Boundary:** local platform only, stacked on unmerged S2/S3. No hosted anonymous activation, Kanuj camera integration, or image/OCR provider is implied. S-OPS-1 remains the release gate for account-farming, retention, cleanup, linking and wider abuse controls.
+
 ## 2026-09-24: S-FREE-3 free context/history stacked branch
 
 - **Predecessor:** S-FREE-2 PR #54 head `b484d983f43ea2890775d74ee96c5839e2c7efd0` at start; later S-FREE-2 reconciled through `main@aa3873596916e79bb878befa841700fbc7411d0e` in commit `862f108`. S-FREE-3 is isolated on `sami/s-free-3-history`; the dirty founder checkout and Kanuj-owned customer UI are untouched. The old GitHub billing gate subsequently cleared; both #54 and #58 reached green CI before the later S2 review finding.
