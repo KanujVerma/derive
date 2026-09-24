@@ -45,7 +45,7 @@ import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { GlassContainer } from '@/src/components/ui/GlassContainer';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { PersonalFitSection } from '@/src/components/personalization/PersonalFitSection';
-import { personalizationGateway } from '@/src/presentation/personalization/gateway';
+import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/presentation/personalization/gateway';
 import type { PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
 
 export default function CheckProductScreen() {
@@ -64,6 +64,7 @@ export default function CheckProductScreen() {
   const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
+  const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
   const [personalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
   const openPersonalization = () => router.push('/personalize');
   const { routine, userProducts, checkIns } = useRoutineStore();
@@ -76,13 +77,13 @@ export default function CheckProductScreen() {
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
   useFocusEffect(React.useCallback(() => {
     let active = true;
-    const status = personalizationGateway.lastSaveStatus(sessionUserId);
+    const status = personalizationGateway.lastSaveStatus(ownerId);
     if (status?.kind === 'unavailable') {
       setPersonalFitState({ kind: 'unavailable', reason: 'answers_not_saved' });
     } else if (status?.kind === 'ready') {
       setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' });
       if (catalogDetail?.productId) {
-        void personalizationGateway.getFit(sessionUserId, catalogDetail.productId).then((fit) => {
+        void personalizationGateway.getFit(ownerId, catalogDetail.productId).then((fit) => {
           if (active) setPersonalFitState(fit.kind === 'unavailable'
             ? { kind: 'unavailable', reason: 'client_session_ready' } : fit);
         }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' }); });
@@ -91,7 +92,7 @@ export default function CheckProductScreen() {
       setPersonalFitState({ kind: 'factual_only' });
     }
     return () => { active = false; };
-  }, [sessionUserId, catalogDetail?.productId]));
+  }, [ownerId, catalogDetail?.productId]));
   const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
   const [candidates, setCandidates] = useState<ProductResolutionCandidate[]>([]);
   const [isCheckingProduct, setIsCheckingProduct] = useState(false);
@@ -594,10 +595,8 @@ export default function CheckProductScreen() {
                   )}
                 </View>
               </GroupedSection>
-              {integrated ? <>
-                {/* Factual-only Personal Fit presents "Not personalized yet" within one section. */}
-                <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />
-              </> : <GroupedSection header="Personal Fit"><Text style={styles.previewFactText}>Not available yet.</Text></GroupedSection>}
+              {/* Mock and local Remote use the same factual-only Personal Fit presentation. */}
+              <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />
             </>
           ) : (
           <>

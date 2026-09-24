@@ -51,7 +51,8 @@ test('K2 retains Mock preview and Remote Staging legacy branches', () => {
   const check = read('../src/components/check/CheckProductScreen.tsx');
   assert.match(check, /const preview = shell === 'scanner_first_preview'/);
   assert.match(check, /const integrated = shell === 'local_free_integration'/);
-  assert.match(check, /integrated \? <>[\s\S]*<PersonalFitSection[\s\S]*: <GroupedSection header=\"Personal Fit\">/);
+  assert.match(check, /targetShell \? \([\s\S]*<PersonalFitSection/);
+  assert.doesNotMatch(check.slice(check.indexOf('if (catalogDetail) {'), check.indexOf('if (resolution && !catalogDetail)')), /Not available yet/);
   assert.match(check, /if \(!targetShell && audience !== 'member'\)/);
   assert.match(check, /evaluateProduct/); // Legacy member path remains available only outside target shell.
   const owned = [read('../app/personalize/index.tsx'), read('../app/(tabs)/my-stuff.tsx'), read('../src/presentation/personalization/gateway.ts')].join('\n');
@@ -107,8 +108,8 @@ test('K2 gateway clears transient status and demo answers when Auth UUID changes
   assert.equal((await demo.loadProfile('guest-A')).kind, 'unavailable');
   const check = read('../src/components/check/CheckProductScreen.tsx');
   const editor = read('../app/personalize/index.tsx');
-  assert.match(check, /lastSaveStatus\(sessionUserId\)/);
-  assert.match(check, /\[sessionUserId, catalogDetail\?\.productId\]/);
+  assert.match(check, /lastSaveStatus\(ownerId\)/);
+  assert.match(check, /\[ownerId, catalogDetail\?\.productId\]/);
   assert.match(editor, /key=\{ownerId \?\? 'signed-out'\}/);
   assert.match(editor, /saveProfile\(ownerId, answers\)/);
 });
@@ -145,4 +146,19 @@ test('K2 My Stuff offers the shared editor only in scanner-first shells', () => 
   const stuff = read('../app/(tabs)/my-stuff.tsx');
   assert.match(stuff, /const targetShell = shell !== 'legacy'/);
   assert.match(stuff, /onEditProfile=\{targetShell \? .*router\.push\('\/personalize'\).* : undefined\}/);
+});
+
+test('K2 Mock Check exposes factual Personal Fit and returns unavailable after optional completion', async () => {
+  const ownerId = resolvePersonalizationOwnerId(null, 'scanner_first_preview');
+  const gateway = createPersonalizationGateway();
+  assert.equal(gateway.lastSaveStatus(ownerId), null);
+  await gateway.saveProfile(ownerId, createPersonalizationDraft());
+  assert.equal(gateway.lastSaveStatus(ownerId)?.kind, 'unavailable');
+  assert.equal((await gateway.getFit(ownerId, 'preview-product')).kind, 'unavailable');
+  const check = read('../src/components/check/CheckProductScreen.tsx');
+  const result = check.slice(check.indexOf('if (catalogDetail) {'), check.indexOf('if (resolution && !catalogDetail)'));
+  assert.match(check, /resolvePersonalizationOwnerId\(sessionUserId, shell\)/);
+  assert.match(result, /<PersonalFitSection state=\{personalFitState\} onPersonalize=\{openPersonalization\}/);
+  assert.ok(result.indexOf('header=\"Formula Details\"') < result.indexOf('<PersonalFitSection'));
+  assert.doesNotMatch(result, /GREAT FIT|COULD WORK|Not available yet/);
 });
