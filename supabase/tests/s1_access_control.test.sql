@@ -92,10 +92,11 @@ select results_eq(
     order by policyname
   $$,
   array[
+    'customer_product_evidence_free_insert_granted:INSERT:authenticated',
     'customer_product_evidence_insert_own:INSERT:authenticated',
     'customer_skin_photos_insert_own:INSERT:authenticated'
   ],
-  'Storage has only the two audited immutable member-path upload policies'
+  'Storage has only the audited managed and grant-bound free upload policies'
 );
 
 select results_eq(

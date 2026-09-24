@@ -48,6 +48,7 @@ interface ParsedRequest extends ResolverEvidence {
 
 interface ResolutionCaseRow {
   id: string;
+  consumer: "scan" | "shelf";
   resolution_state: ProductResolutionResult["state"];
   product_id: string | null;
   variant_id: string | null;
@@ -465,13 +466,18 @@ Deno.serve(async (req: Request) => {
     const catalog = await loadCatalog(admin, !managedAccess);
 
     const { data: replay, error: replayError } = await admin.from("product_resolution_cases")
-      .select("id, resolution_state, product_id, variant_id, formula_version_id, next_action, requires_founder_review")
+      .select("id, consumer, resolution_state, product_id, variant_id, formula_version_id, next_action, requires_founder_review")
       .eq("user_id", userId).eq("request_id", request.requestId).maybeSingle();
     if (replayError) {
       console.error("product resolution replay lookup failed:", replayError.code);
       throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
     }
-    if (replay) return jsonResponse(await responseForCase(admin, replay as ResolutionCaseRow, catalog));
+    if (replay) {
+      if (replay.consumer !== request.consumer) {
+        throw new ServiceError("REQUEST_CONFLICT", "This request ID belongs to a different product workflow", 409);
+      }
+      return jsonResponse(await responseForCase(admin, replay as ResolutionCaseRow, catalog));
+    }
 
     const photoText = request.evidencePhotos.filter((photo) => photo.extractedText);
     const decision = resolveProductIdentity({
