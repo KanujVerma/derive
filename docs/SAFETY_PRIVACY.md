@@ -3,7 +3,7 @@
 Derive operates under uncompromising safety and privacy standards appropriate for handling sensitive consumer health information.
 
 
-## Approved scanner-first privacy requirements (future; not implemented)
+## Approved scanner-first privacy requirements (partially implemented locally)
 
 - Free skincare context remains sensitive whether the owner is anonymous or permanent. Anonymous Auth is an authenticated-role account with an anonymous identity claim, not the public `anon` API key/role. S-FREE-1 locally reviewed RLS, grants, Storage, RPCs, and Edge authorization and opened only sourced factual catalog/resolution plus owner-bound cases; free profile/history persistence and product-photo uploads remain closed pending later milestones. A guest identity is device/session-bound until linked to a permanent identity; losing the local session first can make that guest account and its context inaccessible to the customer. Hosted guest signup remains gated pending S-OPS-1 controls. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md).
 - The free profile is optional and limited to selected goals, skin behavior/reactivity, materially relevant treatments/prescriptions, explicit sensitivities/allergies, and pregnancy/nursing answer with Yes / No / Prefer not to say. Never infer race, ethnicity, ancestry, or Fitzpatrick. Do not add photos, budget or routine-complexity intake to the free flow.
