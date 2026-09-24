@@ -7,6 +7,7 @@ const FIT_REASONS = new Set([
   'profile_missing', 'formula_unverified', 'profile_context_missing',
   'reported_ingredient_sensitivity', 'retinoid_pregnancy_context', 'multiple_cautions',
   'active_overlap', 'reactive_active', 'sensitivity_unresolved', 'goal_role_match', 'no_supported_fit_rule',
+  'prior_product_reaction',
 ]);
 
 async function invoke(body: object, client: FunctionClient = supabase as FunctionClient): Promise<Record<string, unknown>> {

@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-24: S-FREE-3 free context/history stacked branch
+
+- **Predecessor:** S-FREE-2 PR #54 head `b484d983f43ea2890775d74ee96c5839e2c7efd0` at start; later S-FREE-2 reconciled through `main@aa3873596916e79bb878befa841700fbc7411d0e` in commit `862f108`. S-FREE-3 is isolated on `sami/s-free-3-history`; the dirty founder checkout and Kanuj-owned customer UI are untouched. The old GitHub billing gate subsequently cleared; both #54 and #58 reached green CI before the later S2 review finding.
+- **Contract:** `FreeContext.ts` and `free-context` provide owner-bound paged products, Checks, and reported experiences to real anonymous or permanent Auth identities. Product UUIDs require sourced catalog truth; manual entries remain user reports. Check history can reference only the caller's S6 scan case. Request IDs make create retries idempotent, and cross-owner reads/mutations are denied. No managed entitlement, paid Shelf/reaction writes, photo capture, or hosted activation is introduced.
+- **Fit handoff:** S-FREE-2's deterministic fit reads same-catalog-product `reacted` history and can downgrade a verified-formula positive case to caution. It does not infer ingredient causation or pretend the old variant/formula is known. Kanuj owns the MY STUFF projection and all mobile wiring after platform merge.
+- **Verification:** fresh full local migration reset, pgTAP, Auth/Edge guest and cross-owner smoke, full unit/TypeScript/export checks and exact-head CI passed at the previous #58 head. The subsequent S2 regression fix requires a fresh exact-head run. Neither PR is deployed.
+
 ## 2026-09-24: S-FREE-2 Retinyl Propionate regression correction (branch-only)
 
 - **Predecessor:** `main@5153b38b1e3d16aee2fe1b36d1298c524bb94edf` and S-FREE-2 PR #54 before this fix.
