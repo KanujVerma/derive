@@ -17,18 +17,19 @@ export function resolvePersonalizationOwnerId(
 
 export type ProfileLoad =
   | { kind: 'unavailable' }
-  | { kind: 'ready'; scope: 'client_session'; profile: PersonalizationDraft };
+  | { kind: 'empty' }
+  | { kind: 'ready'; scope: 'client_session' | 'owner_bound'; profile: PersonalizationDraft };
 export type ProfileSave =
   | { kind: 'unavailable' }
-  | { kind: 'ready'; scope: 'client_session' };
+  | { kind: 'ready'; scope: 'client_session' | 'owner_bound' };
 export type PersonalizationGateway = {
   loadProfile(ownerId: string | null): Promise<ProfileLoad>;
   saveProfile(ownerId: string | null, profile: PersonalizationDraft): Promise<ProfileSave>;
-  getFit(ownerId: string | null, productId: string): Promise<PersonalFitRefreshInput>;
+  getFit(ownerId: string | null, productId: string, variantId?: string): Promise<PersonalFitRefreshInput>;
   lastSaveStatus(ownerId: string | null): ProfileSave | null;
 };
 
-/** Client presentation seam. Real-main has no S-FREE-2 adapter yet, so it fails closed. */
+/** Mock presentation seam; the local free shell uses the owner-bound adapter. */
 export function createPersonalizationGateway(mode: 'unavailable' | 'session_demo' = 'unavailable'): PersonalizationGateway {
   let currentOwnerId: string | null = null;
   let profile: PersonalizationDraft | null = null;
@@ -62,5 +63,5 @@ export function createPersonalizationGateway(mode: 'unavailable' | 'session_demo
   };
 }
 
-/** Real-main composition stays unavailable until an owner-bound adapter lands. */
+/** Mock keeps its factual-only presentation without a backend identity. */
 export const personalizationGateway = createPersonalizationGateway();

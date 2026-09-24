@@ -7,7 +7,8 @@ export interface SupportedPersonalFit {
 }
 
 export type PersonalFitRefreshInput =
-  | { kind: 'factual_only' | 'loading' | 'insufficient' }
+  | { kind: 'factual_only' | 'loading' }
+  | { kind: 'insufficient'; message?: string }
   | { kind: 'unavailable'; reason?: 'answers_not_saved' | 'client_session_ready' }
   | { kind: 'supported'; fit: SupportedPersonalFit | null };
 
@@ -36,7 +37,9 @@ export function describePersonalFitRefresh(input: PersonalFitRefreshInput): Pers
     fit: null,
   };
   if (input.kind === 'insufficient' || input.kind === 'supported') return {
-    kind: 'insufficient', title: 'Not enough to say yet', message: 'We need more reliable product details to assess your fit.', fit: null,
+    kind: 'insufficient', title: 'Not enough to say yet',
+    message: input.kind === 'insufficient' && input.message
+      ? input.message : 'We need more reliable product details to assess your fit.', fit: null,
   };
   return {
     kind: 'factual_only', title: 'Not personalized yet', message: 'Optional: add your skin preferences.', fit: null,

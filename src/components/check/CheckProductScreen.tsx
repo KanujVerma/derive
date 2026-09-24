@@ -46,6 +46,8 @@ import { GlassContainer } from '@/src/components/ui/GlassContainer';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { PersonalFitSection } from '@/src/components/personalization/PersonalFitSection';
 import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/presentation/personalization/gateway';
+import { remotePersonalizationGateway } from '@/src/presentation/personalization/remoteGateway';
+import { selectFreeFitTarget } from '@/src/presentation/personalization/fitTarget';
 import type { PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
 
 export default function CheckProductScreen() {
@@ -65,6 +67,7 @@ export default function CheckProductScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
   const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
+  const gateway = integrated ? remotePersonalizationGateway : personalizationGateway;
   const [personalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
   const openPersonalization = () => router.push('/personalize');
   const { routine, userProducts, checkIns } = useRoutineStore();
@@ -75,25 +78,36 @@ export default function CheckProductScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(!targetShell);
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
+  const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
   useFocusEffect(React.useCallback(() => {
     let active = true;
-    const status = personalizationGateway.lastSaveStatus(ownerId);
+    const status = gateway.lastSaveStatus(ownerId);
+    const target = integrated ? selectFreeFitTarget(catalogDetail, resolution) : null;
+    const refreshFit = () => {
+      if (!catalogDetail?.productId) return;
+      if (!target) { setPersonalFitState({ kind: 'insufficient' }); return; }
+      setPersonalFitState({ kind: 'loading' });
+      void gateway.getFit(ownerId, target.productId, target.variantId).then((fit) => {
+        if (active) setPersonalFitState(fit);
+      }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable' }); });
+    };
     if (status?.kind === 'unavailable') {
       setPersonalFitState({ kind: 'unavailable', reason: 'answers_not_saved' });
     } else if (status?.kind === 'ready') {
-      setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' });
-      if (catalogDetail?.productId) {
-        void personalizationGateway.getFit(ownerId, catalogDetail.productId).then((fit) => {
-          if (active) setPersonalFitState(fit.kind === 'unavailable'
-            ? { kind: 'unavailable', reason: 'client_session_ready' } : fit);
-        }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' }); });
-      }
+      if (integrated) refreshFit();
+      else setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' });
+    } else if (integrated && ownerId) {
+      setPersonalFitState({ kind: 'loading' });
+      void gateway.loadProfile(ownerId).then((result) => {
+        if (!active) return;
+        if (result.kind === 'ready') refreshFit();
+        else setPersonalFitState({ kind: 'factual_only' });
+      }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable' }); });
     } else {
       setPersonalFitState({ kind: 'factual_only' });
     }
     return () => { active = false; };
-  }, [ownerId, catalogDetail?.productId]));
-  const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
+  }, [ownerId, catalogDetail, resolution, gateway, integrated]));
   const [candidates, setCandidates] = useState<ProductResolutionCandidate[]>([]);
   const [isCheckingProduct, setIsCheckingProduct] = useState(false);
   const showProviderFeatures = showsProviderBetaFeatures(publicEnvironment.buildFlavor);

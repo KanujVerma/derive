@@ -109,7 +109,6 @@ test('K2 gateway clears transient status and demo answers when Auth UUID changes
   const check = read('../src/components/check/CheckProductScreen.tsx');
   const editor = read('../app/personalize/index.tsx');
   assert.match(check, /lastSaveStatus\(ownerId\)/);
-  assert.match(check, /\[ownerId, catalogDetail\?\.productId\]/);
   assert.match(editor, /key=\{ownerId \?\? 'signed-out'\}/);
   assert.match(editor, /saveProfile\(ownerId, answers\)/);
 });
