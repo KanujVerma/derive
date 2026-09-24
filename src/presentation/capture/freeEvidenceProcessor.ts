@@ -43,9 +43,18 @@ export function mapFreeResolutionToCapture(result: ProductResolutionResult): Cap
 }
 
 /** One processor instance belongs to one capture host and retains retry IDs in memory. */
-export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcessor {
+export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcessor & {
+  resolutionFor(review: CaptureResult): ProductResolutionResult | null;
+} {
   const photoAttempts = new Map<string, { requestId: string; target?: FreeProductEvidenceUpload; uploaded: boolean }>();
+  const resolutions = new WeakMap<CaptureResult, ProductResolutionResult>();
   let caseAttempt: { key: string; requestId: string } | null = null;
+
+  const present = (result: ProductResolutionResult): CaptureResult => {
+    const review = mapFreeResolutionToCapture(result);
+    resolutions.set(review, result);
+    return review;
+  };
 
   return {
     async process(evidence: readonly CaptureEvidence[]): Promise<CaptureResult> {
@@ -55,7 +64,7 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
         const key = `barcode:${barcode.value}`;
         if (caseAttempt?.key !== key) caseAttempt = { key, requestId: deps.createRequestId() };
         try {
-          return mapFreeResolutionToCapture(await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', barcode: barcode.value }));
+          return present(await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', barcode: barcode.value }));
         } catch { throw new CaptureProcessingError('RESOLVE_FAILED'); }
       }
 
@@ -99,8 +108,11 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
       const key = photos.map((item) => `${item.role}\u0000${item.value}`).join('\u0001');
       if (caseAttempt?.key !== key) caseAttempt = { key, requestId: deps.createRequestId() };
       try {
-        return mapFreeResolutionToCapture(await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', evidencePhotos }));
+        return present(await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', evidencePhotos }));
       } catch { throw new CaptureProcessingError('RESOLVE_FAILED'); }
+    },
+    resolutionFor(review: CaptureResult): ProductResolutionResult | null {
+      return resolutions.get(review) ?? null;
     },
   };
 }

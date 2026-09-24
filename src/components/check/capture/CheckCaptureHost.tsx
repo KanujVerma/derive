@@ -20,6 +20,7 @@ export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRo
     <ProductEvidenceCapture
       onClose={onClose}
       initialRole={initialRole}
+      autoFinishBarcode
       processor={bridge.processor}
       onEvidenceReady={(handoff) => onCaptureReady(bridge.handoff(handoff))}
     />

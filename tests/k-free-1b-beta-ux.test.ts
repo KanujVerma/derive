@@ -14,17 +14,16 @@ test('K-FREE-1B: permission state chooses camera, landing, denied, or search wit
   assert.equal(resolveCheckEntryState({ preview: false, searching: true, permission: 'granted' }), 'search');
 });
 
-test('K-FREE-1B: one Check component has explicit scan and search actions', () => {
+test('K-FREE-1B: one Check component keeps explicit scan and search actions', () => {
   const check = read('src/components/check/CheckProductScreen.tsx');
-  assert.match(check, /handleScanBarcodePress/);
-  assert.match(check, /requestPermission\(\)/);
+  const entry = read('src/components/check/capture/CaptureEntry.tsx');
+  const capture = read('src/components/check/capture/ProductEvidenceCapture.tsx');
+  assert.match(entry, /onOpenCapture\('barcode'\)/);
+  assert.match(entry, /onSearchName/);
+  assert.match(capture, /requestPermission\(\)/);
   assert.match(check, /handleSearchNamePress/);
-  const scanHandler = check.indexOf('const handleScanBarcodePress');
-  const request = check.indexOf('await requestPermission()');
-  const mountEffect = check.indexOf('useEffect(() => {');
-  assert.ok(scanHandler >= 0 && scanHandler < request && request < mountEffect, 'permission request stays inside the explicit Scan action');
-  assert.match(check.slice(scanHandler, mountEffect), /setIsSearching\(false\)/);
-  assert.match(check.slice(check.indexOf('const handleSearchNamePress'), scanHandler), /setIsSearching\(true\)/);
+  assert.ok(capture.indexOf('requestPermission()') > capture.indexOf("'Enable camera'"), 'permission request stays in capture action');
+  assert.match(check.slice(check.indexOf('const handleSearchNamePress'), check.indexOf('const openCapture')), /setIsSearching\(true\)/);
   assert.match(check, /CameraView/);
   assert.match(check, /CatalogProductSearch/);
   assert.match(check, /FORMULA DETAILS/);

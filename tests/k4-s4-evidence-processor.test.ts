@@ -113,6 +113,18 @@ test('candidate and unknown states stay unresolved without fabricating product i
     { state: 'insufficient_evidence', candidates: [] });
 });
 
+test('processor retains the exact server resolution for the returned photo review', async () => {
+  const resolution = { caseId: 'case', state: 'ambiguous_candidates' as const, candidates: [{ productId: 'product-1', brand: 'A', name: 'Lotion', basis: 'label_text' as const, matchReasons: [] }], nextAction: 'choose_candidate' as const, requiresFounderReview: false };
+  const processor = createFreeEvidenceProcessor({
+    readPhoto: async () => ({ bytes: JPEG.slice().buffer, mimeType: 'image/jpeg' }), createRequestId: () => 'id',
+    prepare: async (input) => ({ bucket: 'customer-product-evidence', storagePath: 'issued/path', role: input.role, mimeType: input.mimeType, maxBytes: 10 * 1024 * 1024 }),
+    upload: async () => {}, resolve: async () => resolution,
+  });
+  const review = await processor.process([photo]);
+  assert.deepEqual(processor.resolutionFor(review), resolution);
+  assert.equal(processor.resolutionFor({ state: 'insufficient_evidence', candidates: [] }), null);
+});
+
 test('preparation failure never loops grants and reuses its request ID only on an explicit retry', async () => {
   const ids: string[] = [];
   let next = 0;

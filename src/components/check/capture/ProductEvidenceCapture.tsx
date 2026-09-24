@@ -27,9 +27,10 @@ interface Props {
   onEvidenceReady: (handoff: CaptureHandoff) => void;
   processor?: CaptureProcessor;
   initialRole?: CaptureRole;
+  autoFinishBarcode?: boolean;
 }
 
-export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode' }: Props) {
+export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false }: Props) {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [session, setSession] = useState(createCaptureSession);
@@ -78,8 +79,12 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const onBarcode = ({ data }: BarcodeScanningResult) => {
     if (role !== 'barcode' || scanLocked.current || !/^\d{8,14}$/.test(data)) return;
     scanLocked.current = true;
-    setSession((previous) => reduceCapture(previous, { type: 'barcode', value: data }));
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (autoFinishBarcode) {
+      onEvidenceReady(toCaptureHandoff(reduceCapture(createCaptureSession(), { type: 'barcode', value: data })));
+      return;
+    }
+    setSession((previous) => reduceCapture(previous, { type: 'barcode', value: data }));
   };
 
   const retake = () => {
