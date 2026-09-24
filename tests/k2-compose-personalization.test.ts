@@ -10,18 +10,18 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 
 test('K2 gateway fails closed by default and never invents fit or persistence', async () => {
   const gateway = createPersonalizationGateway();
-  assert.equal((await gateway.loadProfile()).kind, 'unavailable');
-  assert.equal((await gateway.saveProfile(createPersonalizationDraft())).kind, 'unavailable');
-  assert.equal((await gateway.getFit('product-1')).kind, 'unavailable');
+  assert.equal((await gateway.loadProfile('guest-A')).kind, 'unavailable');
+  assert.equal((await gateway.saveProfile('guest-A', createPersonalizationDraft())).kind, 'unavailable');
+  assert.equal((await gateway.getFit('guest-A', 'product-1')).kind, 'unavailable');
 });
 
 test('K2 explicit session demo retains answers only for its gateway instance and never invents fit', async () => {
   const gateway = createPersonalizationGateway('session_demo');
   const profile = { ...createPersonalizationDraft(), goals: ['breakouts'] as const };
-  assert.deepEqual(await gateway.saveProfile({ ...profile, goals: [...profile.goals] }), { kind: 'ready', scope: 'client_session' });
-  assert.deepEqual(await gateway.loadProfile(), { kind: 'ready', scope: 'client_session', profile: { ...profile, goals: [...profile.goals] } });
-  assert.equal((await gateway.getFit('product-1')).kind, 'unavailable');
-  assert.equal((await createPersonalizationGateway('session_demo').loadProfile()).kind, 'unavailable');
+  assert.deepEqual(await gateway.saveProfile('guest-A', { ...profile, goals: [...profile.goals] }), { kind: 'ready', scope: 'client_session' });
+  assert.deepEqual(await gateway.loadProfile('guest-A'), { kind: 'ready', scope: 'client_session', profile: { ...profile, goals: [...profile.goals] } });
+  assert.equal((await gateway.getFit('guest-A', 'product-1')).kind, 'unavailable');
+  assert.equal((await createPersonalizationGateway('session_demo').loadProfile('guest-A')).kind, 'unavailable');
 });
 
 test('K2 Check puts factual result before separate Personal Fit and keeps Formula Details', () => {
@@ -88,4 +88,26 @@ test('K2 Check renders one Personal Fit section with a minimal action', () => {
   assert.doesNotMatch(integratedResult, /Personalization unavailable\. Your answers were not saved/);
   assert.match(section, /label=\"Personalize\"/);
   assert.doesNotMatch(section, /label=\"Personalize Derive\"/);
+});
+
+test('K2 gateway clears transient status and demo answers when Auth UUID changes A to B', async () => {
+  const real = createPersonalizationGateway();
+  await real.saveProfile('guest-A', createPersonalizationDraft());
+  assert.equal(real.lastSaveStatus('guest-A')?.kind, 'unavailable');
+  assert.equal(real.lastSaveStatus(null), null);
+  assert.equal(real.lastSaveStatus('guest-B'), null);
+  assert.equal(real.lastSaveStatus('guest-A'), null);
+
+  const demo = createPersonalizationGateway('session_demo');
+  await demo.saveProfile('guest-A', { ...createPersonalizationDraft(), goals: ['breakouts'] });
+  assert.equal((await demo.loadProfile('guest-A')).kind, 'ready');
+  assert.equal((await demo.loadProfile('guest-B')).kind, 'unavailable');
+  assert.equal(demo.lastSaveStatus('guest-B'), null);
+  assert.equal((await demo.loadProfile('guest-A')).kind, 'unavailable');
+  const check = read('../src/components/check/CheckProductScreen.tsx');
+  const editor = read('../app/personalize/index.tsx');
+  assert.match(check, /lastSaveStatus\(sessionUserId\)/);
+  assert.match(check, /\[sessionUserId, catalogDetail\?\.productId\]/);
+  assert.match(editor, /key=\{sessionUserId \?\? 'signed-out'\}/);
+  assert.match(editor, /saveProfile\(ownerId, answers\)/);
 });

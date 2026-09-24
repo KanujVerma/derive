@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radii, shadows, layout } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
+import { useAuthStore } from '@/src/stores/authStore';
 import { Icon } from '@/src/components/ui/Icon';
 import { Button } from '@/src/components/ui/Button';
 import { analytics } from '@/src/services/analytics';
@@ -62,6 +63,7 @@ export default function CheckProductScreen() {
   const integrated = shell === 'local_free_integration';
   const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
+  const sessionUserId = useAuthStore((s) => s.sessionUserId);
   const [personalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
   const openPersonalization = () => router.push('/personalize');
   const { routine, userProducts, checkIns } = useRoutineStore();
@@ -74,20 +76,22 @@ export default function CheckProductScreen() {
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
   useFocusEffect(React.useCallback(() => {
     let active = true;
-    const status = personalizationGateway.lastSaveStatus();
+    const status = personalizationGateway.lastSaveStatus(sessionUserId);
     if (status?.kind === 'unavailable') {
       setPersonalFitState({ kind: 'unavailable', reason: 'answers_not_saved' });
     } else if (status?.kind === 'ready') {
       setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' });
       if (catalogDetail?.productId) {
-        void personalizationGateway.getFit(catalogDetail.productId).then((fit) => {
+        void personalizationGateway.getFit(sessionUserId, catalogDetail.productId).then((fit) => {
           if (active) setPersonalFitState(fit.kind === 'unavailable'
             ? { kind: 'unavailable', reason: 'client_session_ready' } : fit);
         }).catch(() => { if (active) setPersonalFitState({ kind: 'unavailable', reason: 'client_session_ready' }); });
       }
+    } else {
+      setPersonalFitState({ kind: 'factual_only' });
     }
     return () => { active = false; };
-  }, [catalogDetail?.productId]));
+  }, [sessionUserId, catalogDetail?.productId]));
   const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
   const [candidates, setCandidates] = useState<ProductResolutionCandidate[]>([]);
   const [isCheckingProduct, setIsCheckingProduct] = useState(false);
