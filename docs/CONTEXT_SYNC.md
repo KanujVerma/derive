@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-24: S-FREE-2 Retinyl Propionate regression correction (branch-only)
+
+- **Predecessor:** `main@5153b38b1e3d16aee2fe1b36d1298c524bb94edf` and S-FREE-2 PR #54 before this fix.
+- **Review finding addressed:** a verified moisturizer listing Retinyl Propionate previously returned `COULD_WORK` despite reported pregnancy. The narrow retinoid detector now recognizes whole-token `retinyl` ingredient names, and focused tests cover pregnancy, withheld context, and no positive fit. This is conservative cosmetic triage, not a claim of individual medical safety.
+- **Boundary:** PR #54 is still open and not hosted. K2/S2 integration still waits for exact-head validation, review, and landing. Historical review entries below retain the original finding.
+
 ## 2026-09-24: Composition status refresh
 
 - **Predecessor:** main@aa3873596916e79bb878befa841700fbc7411d0e, after K4-COMPOSE handoff prep PR #55 landed.
@@ -45,6 +51,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 - **Contracts and UX:** S-FREE-1's stable access contract is documented in [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md). K-FREE-1B's scanner-first shell polish is landed.
 - **Remaining boundary:** mobile does not yet consume the S-FREE-1 access contract, so the remote/mobile free funnel is not integrated. Hosted anonymous signup remains deliberately gated pending lifecycle/abuse controls. The scanner-first external beta is not ready.
 - **Next handoff:** Wave-1 mobile/platform integration. K-FREE-2 and S-FREE-2 start only after that integration is complete. This checkpoint records status only and starts no integration work.
+## 2026-09-23: S-FREE-2 optional free profile and deterministic fit branch handoff
+
+- **Predecessor and reconciliation:** started from clean `origin/main@f9cfc8aeb91e1ab0fb10984f90fe61404b011a82` after S-FREE-1 PR #44, then reconciled with `origin/main@669b475` after Wave-1 mobile integration landed. Work is isolated on `sami/s-free-2-personal-fit`; the dirty main checkout and Kanuj-owned `app/**` were not changed. This entry does not predict its own resulting commit or CI result.
+- **Platform contract:** a separate `free_skin_profiles` table keeps optional goals, skin behavior, reactivity, reported sensitivity/treatment context and noncollapsed pregnancy/nursing state without paid onboarding or membership. `free-personal-fit` provides JWT-bound read/save/fit operations through `src/contracts/FreePersonalFit.ts`; owner RLS and Edge-only table grants protect the raw context. No caller-supplied user ID or formula is trusted.
+- **Fit boundary:** only a sourced canonical product plus exact verified variant/formula provenance can produce a non-unknown fit. Narrow deterministic rules return categorical, explained results with evidence/missing-evidence and public sources; unknown/ambiguous formulas fail closed. No model provider, universal score, diagnosis, cross-user projection, free Shelf/history, camera, or managed UI change. See [S_FREE_2_PERSONAL_FIT.md](S_FREE_2_PERSONAL_FIT.md).
+- **Hosted/release boundary:** no hosted migration/function deployment or anonymous Auth activation is part of this branch. The hosted catalog has no verified formulas, so useful live personal fit also needs S-CATALOG coverage. K-FREE-2 owns optional presentation/same-result refresh; S-OPS-1 and physical acceptance remain release gates. Verification numbers and exact-head CI/PR outcome belong in the PR after all checks finish.
 
 ## 2026-09-23: S-FREE-1 anonymous/free platform branch handoff
 

@@ -110,3 +110,6 @@ jobs:
 
       - name: Run Wave-1 mobile free-access integration harness
         run: node --experimental-strip-types scripts/test-wave1-local.mjs
+
+      - name: Run S-FREE-2 personal fit E2E harness
+        run: node scripts/test-s-free-2-local.mjs
