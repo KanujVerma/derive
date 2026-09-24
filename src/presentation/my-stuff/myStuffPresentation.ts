@@ -1,15 +1,17 @@
-/** UI-only context. A future owner-bound read adapter may supply this model. */
+/** Customer-facing free memory. Server records are mapped before reaching components. */
 export type ProductState = 'using' | 'considering' | 'stopped';
 export type ExperienceKind = 'tolerated' | 'reacted' | 'liked' | 'finished';
+export type ProductSource = 'catalog' | 'user_reported';
 
 export interface MyStuffViewModel {
-  profile: null | { concerns: readonly string[]; skinFeel?: string };
-  products: readonly { id: string; name: string; brand?: string; state: ProductState }[];
+  profile: null | { concerns: readonly string[]; skinFeel?: string; summaryUnit?: 'skin goal' };
+  products: readonly { id: string; name: string; brand?: string; state: ProductState; source?: ProductSource }[];
   checks: readonly { id: string; productName: string; checkedAt: string; outcome: 'checked' }[];
   experiences: readonly {
     id: string;
     productName: string;
     kind: ExperienceKind;
+    source?: ProductSource;
     note?: string;
     notedAt?: string;
   }[];
@@ -24,7 +26,7 @@ export function buildMyStuffPresentation(model: MyStuffViewModel) {
     profile: {
       summary: model.profile
         ? concernCount > 0
-          ? countLabel(concernCount, 'skin concern')
+          ? countLabel(concernCount, model.profile.summaryUnit ?? 'skin concern')
           : 'Profile started'
         : 'Not set up',
       concerns: model.profile?.concerns ?? [],
