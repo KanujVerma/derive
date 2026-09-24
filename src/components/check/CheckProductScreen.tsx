@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing, radii, shadows } from '@/src/constants/theme';
+import { colors, typography, spacing, radii, shadows, layout } from '@/src/constants/theme';
 import { useRoutineStore } from '@/src/stores/routineStore';
 import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { Icon } from '@/src/components/ui/Icon';
@@ -37,11 +39,16 @@ import { AccountSettingsButton } from '@/src/components/account/AccountSettingsB
 import { getPreviewCatalogDetail, searchPreviewCatalog } from '@/src/commerce/checkPreview';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { resolveCheckEntryState } from '@/src/commerce/checkEntryState';
+import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
+import { GlassContainer } from '@/src/components/ui/GlassContainer';
+import { GroupedSection } from '@/src/components/ui/GroupedSection';
 
 export default function CheckProductScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ sim?: string }>();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const audience = useShopAudience();
   const preview = resolveShellPresentation({
     buildFlavor: publicEnvironment.buildFlavor,
@@ -54,7 +61,7 @@ export default function CheckProductScreen() {
   const [confirmedProduct, setConfirmedProduct] = useState<ScannableProductInput | null>(null);
   const [scanResult, setScanResult] = useState<ProductScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(true);
+  const [isSearching, setIsSearching] = useState(!preview);
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
   const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
   const [candidates, setCandidates] = useState<ProductResolutionCandidate[]>([]);
@@ -66,6 +73,37 @@ export default function CheckProductScreen() {
   const [isLocked, setIsLocked] = useState(false);
   const isScanningLockedRef = useRef(false);
   const pendingResolutionRef = useRef<{ key: string; requestId: string } | null>(null);
+  const permissionState = permission?.granted ? 'granted'
+    : permission?.status === 'denied' ? 'denied'
+    : permission?.status === 'undetermined' ? 'undetermined' : 'unknown';
+  const entryState = resolveCheckEntryState({ preview, searching: isSearching, permission: permissionState });
+
+  const handleSearchNamePress = () => {
+    void Haptics.selectionAsync().catch(() => {});
+    setUnknownBarcode(null);
+    setIsSearching(true);
+  };
+
+  const handleScanBarcodePress = async () => {
+    // The existing Button supplies one light impact haptic for this action.
+    if (permission?.granted) {
+      isScanningLockedRef.current = false;
+      setIsLocked(false);
+      setUnknownBarcode(null);
+      setIsSearching(false);
+      return;
+    }
+    if (permission?.status === 'denied' && !permission.canAskAgain) {
+      setIsSearching(false);
+      return;
+    }
+    try {
+      await requestPermission();
+    } catch {
+      // The state resolver retains the search/permission fallback.
+    }
+    setIsSearching(false);
+  };
 
   const performEvaluation = async (item: ScannableProductInput, barcode?: string) => {
     if (audience !== 'member') throw new Error('Membership required for personalized Scan');
@@ -241,7 +279,7 @@ export default function CheckProductScreen() {
   };
 
   const handleResetScan = () => {
-    Haptics.selectionAsync();
+    void Haptics.selectionAsync().catch(() => {});
     setConfirmedProduct(null);
     setCatalogDetail(null);
     setResolution(null);
@@ -252,7 +290,7 @@ export default function CheckProductScreen() {
     setUnknownBarcode(null);
     setEvaluationError(null);
     setSearchQuery('');
-    setIsSearching(true);
+    setIsSearching(!preview);
     setTimeout(() => {
       isScanningLockedRef.current = false;
       setIsLocked(false);
@@ -320,6 +358,7 @@ export default function CheckProductScreen() {
   const resultPresentation = resolveScanResultPresentation(scanResult);
   const invalidResult = Boolean(scanResult && confirmedProduct && resultPresentation.kind === 'invalid');
   const currentFormula = getVerifiedFormulaForResolution(catalogDetail, resolution);
+  const cameraHeight = Math.max(360, Math.min(560, windowHeight - insets.top - insets.bottom - layout.gutter * 5));
 
   if (!preview && !showProviderFeatures) {
     return (
@@ -494,17 +533,48 @@ export default function CheckProductScreen() {
     const fit = describeCheckProductFit(resolution?.state ?? 'identified_formula_unverified');
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.screenTitle}>Check a Product</Text>
-          <AccountSettingsButton />
-        </View>
+        {preview ? <RootShellHeader title="Check" /> : (
+          <View style={styles.header}>
+            <Text style={styles.screenTitle}>Check a Product</Text>
+            <AccountSettingsButton />
+          </View>
+        )}
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}>
-          {preview && <Text style={styles.subtitle}>Sourced product sample · Local preview</Text>}
+          {preview ? (
+            <>
+              <View style={styles.previewProductHeading}>
+                <Text style={styles.productBrandText}>{catalogDetail.brand.toUpperCase()}</Text>
+                <Text style={styles.productNameText}>{catalogDetail.name}</Text>
+              </View>
+              <GroupedSection header="Personal Fit">
+                <View style={styles.previewFactRow}>
+                  <Text style={styles.previewFactText}>Not available yet.</Text>
+                </View>
+              </GroupedSection>
+              <GroupedSection header="Formula Details">
+                <View style={styles.previewFactRow}>
+                  <Text style={styles.previewFactType}>{catalogDetail.category.replace('_', ' ')}</Text>
+                  <Text style={styles.previewFactText}>Exact package formula not verified.</Text>
+                  {catalogDetail.sourceReference && (
+                    <TouchableOpacity
+                      onPress={() => void Linking.openURL(catalogDetail.sourceReference!).catch(() => {})}
+                      style={styles.sourceLink}
+                      accessibilityRole="link"
+                      accessibilityLabel={`View ${catalogDetail.brand} product source`}
+                    >
+                      <Text style={styles.sourceLinkText}>Source: {catalogDetail.brand}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </GroupedSection>
+            </>
+          ) : (
+          <>
           <View style={styles.verdictCard}>
             <Text style={styles.productBrandText}>{catalogDetail.brand.toUpperCase()}</Text>
             <Text style={styles.productNameText}>{catalogDetail.name}</Text>
             <Text style={styles.sectionCategoryTag}>PERSONAL FIT</Text>
-            <View style={styles.summaryBox}><Text style={styles.summaryText}>{preview ? 'Personal fit is unavailable in this local preview.' : fit.message}</Text></View>
+            <View style={styles.summaryBox}><Text style={styles.summaryText}>{fit.message}</Text></View>
             {resolution?.requiresFounderReview && (
               <Text style={styles.factText}>A founder review is pending for this identity evidence.</Text>
             )}
@@ -549,6 +619,8 @@ export default function CheckProductScreen() {
             )}
             {catalogDetail.sourceReference && <Text style={styles.formulaValue}>Product source: {catalogDetail.sourceReference}</Text>}
           </View>
+          </>
+          )}
           <Button label="Check another product" variant="outline" size="medium" onPress={handleResetScan} />
         </ScrollView>
       </View>
@@ -595,32 +667,65 @@ export default function CheckProductScreen() {
   }
 
 
-  // Search is the primary Check a Product path. Barcode remains available below.
-  if (isSearching) {
+  if (entryState === 'search') {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.screenTitle}>Check a Product</Text>
-          <AccountSettingsButton />
-        </View>
+        {preview ? <RootShellHeader title="Check" /> : (
+          <View style={styles.header}>
+            <Text style={styles.screenTitle}>Check a Product</Text>
+            <AccountSettingsButton />
+          </View>
+        )}
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]} keyboardShouldPersistTaps="handled">
-          <Text style={styles.subtitle}>Search by product name. A barcode is optional.</Text>
-          {preview && <Text style={styles.subtitle}>Local preview: one sourced product sample, no live free account or personal fit.</Text>}
+          {!preview && <Text style={styles.subtitle}>Search by product name. A barcode is optional.</Text>}
           <CatalogProductSearch
-            label={preview ? 'Search sample product' : 'Search products'}
+            label={preview ? 'Search by name' : 'Search products'}
             actionLabel="Check"
             search={preview ? searchPreviewCatalog : undefined}
             onSelect={handleSelectSearchResult}
             onQueryChange={setSearchQuery}
             keepFocusAfterSelect={false}
-            errorCopy={preview ? 'The local sample is unavailable.' : 'Search is unavailable right now. You can still request founder review.'}
-            emptyCopy={preview ? 'No sample match. Try CeraVe SA Cleanser.' : 'No catalog match yet. Try another name or request founder review.'}
+            errorCopy={preview ? 'Search is unavailable right now.' : 'Search is unavailable right now. You can still request founder review.'}
+            emptyCopy={preview ? 'No product match yet.' : 'No catalog match yet. Try another name or request founder review.'}
           />
           {!preview && searchQuery.trim().length >= 2 && (
             <Button label="Can't find it? Request review" variant="ghost" size="medium" onPress={handleManualNameCheck} style={{ marginTop: spacing.md }} />
           )}
-          <Button label="Use barcode camera" variant="outline" size="medium" onPress={() => { setIsSearching(false); handleRetryScan(); }} style={{ marginTop: spacing.lg }} />
+          <Button label={preview ? 'Scan barcode' : 'Use barcode camera'} variant="outline" size="medium" onPress={() => { if (preview) void handleScanBarcodePress(); else { setIsSearching(false); handleRetryScan(); } }} style={{ marginTop: spacing.lg }} />
         </ScrollView>
+      </View>
+    );
+  }
+
+  if (preview && entryState === 'landing') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <RootShellHeader title="Check" />
+        <View style={styles.entryContent}>
+          <View style={styles.entryIcon}><Icon name="scan" size={28} color={colors.brand} /></View>
+          <Text style={styles.entryTitle}>Scan a barcode</Text>
+          <Text style={styles.entryBody}>Use the barcode on the product package.</Text>
+          <Button label="Scan barcode" variant="brand" onPress={() => void handleScanBarcodePress()} style={styles.entryAction} />
+          <TouchableOpacity onPress={handleSearchNamePress} style={styles.modeSwitch} accessibilityRole="button" accessibilityLabel="Search by name" activeOpacity={0.7}>
+            <Text style={styles.modeSwitchText}>Search by name</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (preview && entryState === 'denied') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <RootShellHeader title="Check" />
+        <View style={styles.entryContent}>
+          <View style={styles.entryIcon}><Icon name="camera" size={28} color={colors.brand} /></View>
+          <Text style={styles.entryTitle}>Camera access is off</Text>
+          <Text style={styles.entryBody}>You can still check a product by name.</Text>
+          <TouchableOpacity onPress={handleSearchNamePress} style={[styles.entryAction, styles.primaryModeSwitch]} accessibilityRole="button" accessibilityLabel="Search by name" activeOpacity={0.8}>
+            <Text style={styles.primaryModeSwitchText}>Search by name</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -673,26 +778,26 @@ export default function CheckProductScreen() {
     );
   }
 
-  // 4. CANONICAL CAMERA-FIRST VIEW (Pure Viewfinder with Continuous Barcode Scanning)
+  // 4. One barcode viewfinder for the target root and legacy route.
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.scannerHeader}>
-        <View style={styles.headerTopRow}>
-          <Text style={styles.screenTitle}>Check a Product</Text>
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => router.push('/profile')}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Account and Settings"
-            accessibilityRole="button"
-          >
-            <Icon name="person" size={18} color={colors.inkMuted} />
-          </TouchableOpacity>
+      {preview ? <RootShellHeader title="Check" /> : (
+        <View style={styles.scannerHeader}>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.screenTitle}>Check a Product</Text>
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => router.push('/profile')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityLabel="Account and Settings"
+              accessibilityRole="button"
+            >
+              <Icon name="person" size={18} color={colors.inkMuted} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.subtitle}>Align a barcode within the guide, or search by name instead.</Text>
         </View>
-        <Text style={styles.subtitle}>
-          Align a barcode within the guide, or search by name instead.
-        </Text>
-      </View>
+      )}
 
       <ScrollView
         contentContainerStyle={[
@@ -703,7 +808,7 @@ export default function CheckProductScreen() {
       >
         <View style={styles.cameraFrameContainer}>
           {/* Live Barcode Camera Viewport */}
-          <View style={styles.cameraViewport}>
+          <View style={[styles.cameraViewport, preview && { height: cameraHeight }]}>
             <CameraView
               facing="back"
               enableTorch={torchOn}
@@ -738,19 +843,27 @@ export default function CheckProductScreen() {
               </View>
               <Text style={styles.reticleGuideText}>Center barcode in box</Text>
             </View>
+            {preview && (
+              <GlassContainer isFloating style={styles.searchGlass} glassEffectStyle="regular" tintColor={colors.glass.tintDark}>
+                <TouchableOpacity onPress={handleSearchNamePress} style={styles.glassSearchControl} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Search by name">
+                  <Icon name="search" size={18} color={colors.inkInverse} />
+                  <Text style={styles.glassSearchText}>Search by name</Text>
+                </TouchableOpacity>
+              </GlassContainer>
+            )}
           </View>
 
           {/* Name Search Fallback Button */}
-          <TouchableOpacity
+          {!preview && <TouchableOpacity
             style={styles.manualSearchLink}
-            onPress={() => setIsSearching(true)}
+            onPress={handleSearchNamePress}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel="Search beta products by name"
           >
             <Icon name="search" size={16} color={colors.brand} />
             <Text style={styles.manualSearchText}>Can't scan barcode? Search by name</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
 
           {/* Quick Shortcuts for Instant Testing (Dev only) */}
           {__DEV__ && !preview && (
@@ -790,7 +903,7 @@ export default function CheckProductScreen() {
             <Text style={styles.unknownTitle}>Barcode Not Recognized</Text>
             <Text style={styles.unknownText}>
               {preview
-                ? 'This local sample has no verified barcode. Try searching by product name.'
+                ? 'No verified barcode match. Search by name.'
                 : `We couldn't find a formula match for barcode ${unknownBarcode} in our beta catalog yet.`}
             </Text>
             <View style={styles.unknownButtons}>
@@ -884,6 +997,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
   },
+  entryContent: {
+    paddingHorizontal: layout.gutter,
+    paddingTop: spacing.xxl,
+  },
+  entryIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.full,
+    backgroundColor: colors.brandLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  entryTitle: {
+    color: colors.ink,
+    fontSize: typography.sizes.sectionTitle,
+    lineHeight: typography.lineHeights.sectionTitle,
+    fontWeight: typography.weights.semibold,
+  },
+  entryBody: {
+    color: colors.inkMuted,
+    fontSize: typography.sizes.bodyRegular,
+    lineHeight: typography.lineHeights.bodyRegular,
+    marginTop: spacing.xs,
+  },
+  entryAction: { marginTop: spacing.xl },
+  modeSwitch: { minHeight: layout.minTouchTarget, justifyContent: 'center', alignSelf: 'flex-start', marginTop: spacing.sm },
+  modeSwitchText: { color: colors.brand, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold },
+  primaryModeSwitch: { minHeight: layout.ctaHeight, width: '100%', alignItems: 'center', backgroundColor: colors.brand, borderRadius: radii.full },
+  primaryModeSwitchText: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.bold },
   cameraFrameContainer: {
     gap: spacing.md,
   },
@@ -1212,6 +1355,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     position: 'relative',
   },
+  searchGlass: { position: 'absolute', bottom: spacing.md, alignSelf: 'center' },
+  glassSearchControl: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg },
+  glassSearchText: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold },
+  previewProductHeading: { marginBottom: spacing.lg },
+  previewFactRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.xs },
+  previewFactType: { color: colors.ink, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold, textTransform: 'capitalize' },
+  previewFactText: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
+  sourceLink: { minHeight: layout.minTouchTarget, alignSelf: 'flex-start', justifyContent: 'center', marginTop: spacing.xs },
+  sourceLinkText: { color: colors.brand, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold },
   torchButton: {
     position: 'absolute',
     top: spacing.md,

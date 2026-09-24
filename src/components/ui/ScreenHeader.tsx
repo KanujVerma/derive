@@ -24,6 +24,7 @@ interface ScreenHeaderProps {
     onPress: () => void;
     accessibilityLabel: string;
   };
+  rightAccessory?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   hasBottomDivider?: boolean;
 }
@@ -35,6 +36,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   onBack,
   titleFont = 'sans',
   rightAction,
+  rightAccessory,
   style,
   hasBottomDivider = false,
 }) => {
@@ -84,7 +86,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
           </Text>
         </View>
 
-        {rightAction ? (
+        {rightAccessory ? rightAccessory : rightAction ? (
           <TouchableOpacity
             onPress={rightAction.onPress}
             style={styles.actionButton}
