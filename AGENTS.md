@@ -10,7 +10,7 @@ For current implementation status and milestones, use [ROADMAP.md](docs/ROADMAP.
 
 Kanuj owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client state/helpers, navigation/presentation, and device/TestFlight acceptance. Sami owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted Auth/RLS/configuration, product identity, access control, and founder operations.
 
-K-FREE-1 is Kanuj’s next mobile milestone; S-FREE-1 is Sami’s next platform milestone. Shared contracts are single-owner handoffs, not co-owned parallel edits. See [OWNERSHIP.md](docs/OWNERSHIP.md) for founder/file boundaries and [ROADMAP.md](docs/ROADMAP.md) for milestones.
+Wave-1 foundations (K-FREE-1 and S-FREE-1) and K-FREE-1B UX polish are landed. The next milestone is Wave-1 mobile/platform integration. K-FREE-2 and S-FREE-2 follow integration. Mobile does not yet consume the S-FREE-1 access contract, and hosted anonymous signup remains gated. Shared contracts are single-owner handoffs, not co-owned parallel edits. See [OWNERSHIP.md](docs/OWNERSHIP.md) for founder/file boundaries and [ROADMAP.md](docs/ROADMAP.md) for milestones.
 
 ## Sources of truth
 
