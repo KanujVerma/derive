@@ -1,4 +1,5 @@
 import type { CaptureEvidence, CaptureHandoff, CaptureProcessor, CaptureResult, PhotoRole } from './productEvidence';
+import type { ProductResolutionResult } from '../../contracts/ProductIdentityResolver';
 
 export interface CheckCaptureHandoff {
   authority: 'customer_evidence';
@@ -8,6 +9,8 @@ export interface CheckCaptureHandoff {
     state: CaptureResult['state'] | 'pending';
     selectedCandidateId: string | null;
   };
+  /** Server result already produced from these exact photos; Check must not resolve them again. */
+  resolvedCase?: ProductResolutionResult | null;
 }
 
 // This is a local handoff only. The host decides when or whether to resolve evidence.
@@ -30,7 +33,9 @@ export function mapCaptureForCheck(handoff: CaptureHandoff, outcome?: CaptureRes
   };
 }
 
-export function createCheckCaptureBridge(processor: CaptureProcessor): {
+export function createCheckCaptureBridge(processor: CaptureProcessor & {
+  resolutionFor?: (review: CaptureResult) => ProductResolutionResult | null;
+}): {
   processor: CaptureProcessor;
   handoff: (capture: CaptureHandoff) => CheckCaptureHandoff;
 } {
@@ -67,7 +72,10 @@ export function createCheckCaptureBridge(processor: CaptureProcessor): {
           const current = capture.evidence[index];
           return current.role === item.role && current.kind === item.kind && current.value === item.value;
         });
-      return mapCaptureForCheck(capture, stillCurrent ? outcome : undefined);
+      return {
+        ...mapCaptureForCheck(capture, stillCurrent ? outcome : undefined),
+        resolvedCase: stillCurrent && outcome ? processor.resolutionFor?.(outcome) ?? null : null,
+      };
     },
   };
 }

@@ -148,7 +148,8 @@ test('Wave-1 UI consumption keeps free flows apart from managed work', () => {
   assert.match(root, /local_free_integration/);
   assert.match(check, /searchPreviewCatalog/);
   assert.match(check, /resolveCatalogIdentity/);
-  assert.match(check, /Not personalized yet/);
+  assert.match(check, /<PersonalFitSection/);
+  assert.match(read('src/presentation/personalization/result.ts'), /Not personalized yet/);
   assert.match(check, /local_free_integration/);
   assert.doesNotMatch(check, /label="Can't find it\? Request review"/, 'free name fallback cannot promise founder review');
   assert.match(plan, /managedAccess/);

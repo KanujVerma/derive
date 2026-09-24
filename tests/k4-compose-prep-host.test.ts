@@ -45,3 +45,17 @@ test('older processing completion cannot replace a newer review', async () => {
   await first;
   assert.deepEqual(bridge.handoff(toCaptureHandoff(session)).review, { state: 'unknown', selectedCandidateId: null });
 });
+
+test('photo handoff carries the matching S6 case and drops it after retake', async () => {
+  const resolution = { caseId: 'case', state: 'ambiguous_candidates' as const, candidates: [], nextAction: 'choose_candidate' as const, requiresFounderReview: false };
+  const review: CaptureResult = { state: 'ambiguous', candidates: [{ id: 'case:0', label: 'Possible A' }] };
+  const bridge = createCheckCaptureBridge({
+    async process() { return review; },
+    resolutionFor(result) { return result === review ? resolution : null; },
+  });
+  let session = reduceCapture(createCaptureSession(), { type: 'photo', role: 'front_label', uri: 'file://old.jpg' });
+  await bridge.processor.process(session.evidence);
+  assert.deepEqual(bridge.handoff(toCaptureHandoff(session)).resolvedCase, resolution);
+  session = reduceCapture(session, { type: 'retake', role: 'front_label' });
+  assert.equal(bridge.handoff(toCaptureHandoff(session)).resolvedCase, null);
+});

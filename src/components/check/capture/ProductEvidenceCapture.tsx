@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
 import { GlassContainer } from '../../ui/GlassContainer';
+import { CaptureProcessingError } from '../../../presentation/capture/freeEvidenceProcessor';
 import {
   captureRoles, createCaptureSession, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
   type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
@@ -25,16 +26,19 @@ interface Props {
   onClose: () => void;
   onEvidenceReady: (handoff: CaptureHandoff) => void;
   processor?: CaptureProcessor;
+  initialRole?: CaptureRole;
+  autoFinishBarcode?: boolean;
 }
 
-export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor }: Props) {
+export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false }: Props) {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [session, setSession] = useState(createCaptureSession);
-  const [role, setRole] = useState<CaptureRole>('barcode');
+  const [role, setRole] = useState<CaptureRole>(initialRole);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
   const camera = useRef<CameraView>(null);
   const scanLocked = useRef(false);
   const requestSequence = useRef(0);
@@ -45,6 +49,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
     setRole(nextRole);
     setPreviewUri(null);
     setError(null);
+    setCanRetry(false);
     void Haptics.selectionAsync().catch(() => {});
   };
 
@@ -74,8 +79,12 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const onBarcode = ({ data }: BarcodeScanningResult) => {
     if (role !== 'barcode' || scanLocked.current || !/^\d{8,14}$/.test(data)) return;
     scanLocked.current = true;
-    setSession((previous) => reduceCapture(previous, { type: 'barcode', value: data }));
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (autoFinishBarcode) {
+      onEvidenceReady(toCaptureHandoff(reduceCapture(createCaptureSession(), { type: 'barcode', value: data })));
+      return;
+    }
+    setSession((previous) => reduceCapture(previous, { type: 'barcode', value: data }));
   };
 
   const retake = () => {
@@ -84,6 +93,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
     setPreviewUri(null);
     scanLocked.current = false;
     setError(null);
+    setCanRetry(false);
     void Haptics.selectionAsync().catch(() => {});
   };
 
@@ -93,14 +103,20 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
     const evidence = session.evidence;
     setSession((previous) => reduceCapture(previous, { type: 'process' }));
     setError(null);
+    setCanRetry(false);
     try {
       const result = await processor.process(evidence);
       if (sequence !== requestSequence.current) return;
       setSession((previous) => reduceCapture(previous, { type: 'resolved', result }));
-    } catch {
+    } catch (cause) {
       if (sequence !== requestSequence.current) return;
       setSession((previous) => reduceCapture(previous, { type: 'resolved', result: { state: 'insufficient_evidence', candidates: [] } }));
-      setError('We could not review this evidence yet. Your captures are still here.');
+      setCanRetry(!(cause instanceof CaptureProcessingError && (cause.code === 'PHOTO_TOO_LARGE' || cause.code === 'PHOTO_MIME_UNSUPPORTED')));
+      setError(cause instanceof CaptureProcessingError && cause.code === 'PHOTO_TOO_LARGE'
+        ? 'This photo is too large. Retake it and try again.'
+        : cause instanceof CaptureProcessingError && cause.code === 'PHOTO_MIME_UNSUPPORTED'
+          ? 'This photo format could not be used. Retake it and try again.'
+          : 'We could not review this evidence yet. Your captures are still here.');
     }
   };
 
@@ -185,8 +201,9 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
             ))}
             {error && <Text style={styles.error}>{error}</Text>}
             <View style={styles.outcomeActions}>
+              {error && canRetry && <Action label="Try review again" onPress={() => void processEvidence()} />}
               {session.phase !== 'processing' && <Action label="Add or retake evidence" secondary onPress={collectMore} />}
-              {session.phase !== 'processing' && <Action label="Continue with evidence" onPress={finish} />}
+              {session.phase !== 'processing' && !error && <Action label="Continue with evidence" onPress={finish} />}
             </View>
           </ScrollView>
         </View>
