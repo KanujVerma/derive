@@ -33,8 +33,9 @@ export default function TodayScreen() {
   const shell = resolveShellPresentation({
     buildFlavor: publicEnvironment.buildFlavor,
     remoteEnabled: isRemoteServiceEnabled(),
+    supabaseUrl: publicEnvironment.supabaseUrl,
   });
-  if (shell === 'scanner_first_preview') return <Redirect href="/(tabs)/check" />;
+  if (shell !== 'legacy') return <Redirect href="/(tabs)/check" />;
   return <LegacyTodayScreen />;
 }
 

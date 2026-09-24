@@ -23,19 +23,25 @@ import { PreviewPlanShell } from '@/src/components/plan/PreviewPlanShell';
 import { publicEnvironment } from '@/src/config/environment';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
+import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 
 export default function PlanScreen() {
   const shell = resolveShellPresentation({
     buildFlavor: publicEnvironment.buildFlavor,
     remoteEnabled: isRemoteServiceEnabled(),
+    supabaseUrl: publicEnvironment.supabaseUrl,
   });
+  const managedAccess = useFreeAccessStore((s) => s.access?.managedAccess === true && s.status === 'READY');
   if (shell === 'scanner_first_preview') return <PreviewPlanShell />;
+  if (shell === 'local_free_integration' && !managedAccess) return <PreviewPlanShell />;
   return <LegacyManagedPlanScreen />;
 }
 
 function LegacyManagedPlanScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const bootstrapReady = useBootstrapStore((s) => s.status === 'READY');
   const {
     routine,
     userProducts,
@@ -50,8 +56,9 @@ function LegacyManagedPlanScreen() {
   const isShopMember = useShopAudience() === 'member';
 
   React.useEffect(() => {
+    if (isRemoteServiceEnabled() && !bootstrapReady) return;
     ensureInitialRoutineProposal().catch((e) => console.warn('Failed to ensure routine proposal:', e));
-  }, []);
+  }, [bootstrapReady]);
 
   const handleTabSwitch = (tab: 'routine' | 'products') => {
     setActiveTab(tab);

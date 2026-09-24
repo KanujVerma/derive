@@ -107,3 +107,6 @@ jobs:
 
       - name: Run S-FREE-1 anonymous access E2E harness
         run: node scripts/test-s-free-1-local.mjs
+
+      - name: Run Wave-1 mobile free-access integration harness
+        run: node --experimental-strip-types scripts/test-wave1-local.mjs

@@ -2,13 +2,13 @@
 
 ## Strategy status: implemented system and approved target
 
-**Implemented today:** the detailed topology below documents the existing C1 mobile app and E1 managed-membership access model. Remote mode currently requires a permanent signed-in account and active membership for managed onboarding/surfaces; the Remote Check route remains hidden. The S-FREE-1 platform supports local authenticated guest sessions, free sourced catalog and factual product resolution, and separate free/managed access state. Hosted guest signup is deliberately gated. `anon` has no application-table privileges. Catalog coverage is small and H1P live-provider behavior is unproven. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the backend operation matrix and Kanuj handoff.
+**Implemented today:** Development Remote with an exact local Supabase URL silently establishes a guest Auth session when none exists, consumes server `FreeAccessState`, and opens the four-root scanner shell. Free Check reads sourced `catalog-products` and factual `resolve-product-identity`; active permanent managed users land Plan and retain managed bootstrap. Development Mock stays a sample preview. Remote Staging and production retain the existing C1/E1 legacy routing, and hosted guest signup is deliberately gated. `anon` has no application-table privileges. Catalog coverage is small and H1P live-provider behavior is unproven. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the backend operation matrix.
 
-**Approved customer target, not yet implemented in the mobile app:** free Check works for anonymous or permanent identities without managed entitlement. First launch silently creates a Supabase anonymous Auth identity and opens Check. A Supabase anonymous user is still an authenticated-role user with an anonymous identity claim; it is not the public `anon` key/role. S-FREE-1 completed the local platform/RLS boundary, but mobile integration, abuse controls and hosted activation remain separate gates.
+**Approved broader target:** the local first-launch and factual Check path is implemented. Free Personal Fit, profile/history persistence, camera evidence beyond barcode, hosted guest activation, and physical release acceptance remain later gates. A Supabase anonymous user has the authenticated role with an anonymous identity claim; it is not the public `anon` key/role.
 
 Target identity/access separates anonymous identity, permanent identity, free product intelligence, and paid Managed Skincare. Managed enrollment requires permanent identity plus a managed entitlement. Product facts and baseline fit remain separate services; the deterministic fit service must work without a model provider. Public or shareable factual product evidence does not weaken owner-bound private shelf, profile, reaction, history, or evidence-photo storage.
 
-The target root navigation is CHECK / MY STUFF / PLAN / SHOP. Existing C1 tabs remain shipped architecture until a later Kanuj implementation changes them. The roadmap's waves define interface owners and integration order.
+The target root navigation is CHECK / MY STUFF / PLAN / SHOP in Development Mock and local integrated Remote. Existing C1 tabs remain the Remote Staging and production architecture. The roadmap's waves define interface owners and integration order.
 
 ## Architecture Overview
 

@@ -8566,7 +8566,7 @@ test('C1 Shop: non-member Scan entry and direct route are locked', () => {
   const shopContent = fs.readFileSync(path.resolve('app/(tabs)/shop.tsx'), 'utf8');
   const scanContent = fs.readFileSync(path.resolve('src/components/check/CheckProductScreen.tsx'), 'utf8');
   assert.ok(shopContent.includes('Available with membership when enabled'));
-  assert.ok(scanContent.includes("if (!preview && audience !== 'member')"));
+  assert.ok(scanContent.includes("if (!targetShell && audience !== 'member')"));
   assert.ok(scanContent.includes('Product checking requires Derive membership in supported releases.'));
 });
 

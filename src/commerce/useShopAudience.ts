@@ -5,6 +5,7 @@ import { isRemoteServiceEnabled } from '../services/DeriveService';
 import { resolveShopAudience } from './types';
 import { publicEnvironment } from '../config/environment';
 import { resolveShellPresentation, resolveShellShopAudience } from '../utils/shellPresentation';
+import { useFreeAccessStore } from '../stores/freeAccessStore';
 
 /** One presentation boundary for Shop, product detail, and Scan. */
 export function useShopAudience() {
@@ -15,6 +16,9 @@ export function useShopAudience() {
   const mockUserId = useUserStore((state) => state.userId);
   const mockMembershipStatus = useUserStore((state) => state.membershipStatus);
   const remoteEnabled = isRemoteServiceEnabled();
+  const freeAccess = useFreeAccessStore((state) => state.status === 'READY' && state.userId === sessionUserId ? state.access : null);
+  const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled, supabaseUrl: publicEnvironment.supabaseUrl });
+  if (shell === 'local_free_integration') return freeAccess?.managedAccess ? 'member' : 'non_member';
   const audience = resolveShopAudience({
     remote: remoteEnabled,
     sessionUserId,
@@ -25,7 +29,7 @@ export function useShopAudience() {
     mockMembershipStatus,
   });
   return resolveShellShopAudience(
-    resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled }),
+    shell,
     audience,
   );
 }

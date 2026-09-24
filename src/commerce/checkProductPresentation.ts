@@ -40,7 +40,7 @@ export function resolvedCatalogDetailId(
 }
 
 
-/** Catalog formula evidence is displayable for this member only after exact S6 package resolution. */
+/** Catalog formula evidence is displayable only after exact S6 package resolution. */
 export function getVerifiedFormulaForResolution(
   detail: CatalogProductDetail | null,
   resolution: Pick<ProductResolutionResult, 'state' | 'product' | 'formula'> | null,

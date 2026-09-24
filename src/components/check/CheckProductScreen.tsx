@@ -50,10 +50,14 @@ export default function CheckProductScreen() {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const audience = useShopAudience();
-  const preview = resolveShellPresentation({
+  const shell = resolveShellPresentation({
     buildFlavor: publicEnvironment.buildFlavor,
     remoteEnabled: isRemoteServiceEnabled(),
-  }) === 'scanner_first_preview';
+    supabaseUrl: publicEnvironment.supabaseUrl,
+  });
+  const preview = shell === 'scanner_first_preview';
+  const integrated = shell === 'local_free_integration';
+  const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
   const { routine, userProducts, checkIns } = useRoutineStore();
   const { productReactions, routineComplexity, primaryGoal, costPreference } = useOnboardingStore();
@@ -61,7 +65,7 @@ export default function CheckProductScreen() {
   const [confirmedProduct, setConfirmedProduct] = useState<ScannableProductInput | null>(null);
   const [scanResult, setScanResult] = useState<ProductScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(!preview);
+  const [isSearching, setIsSearching] = useState(!targetShell);
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
   const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
   const [candidates, setCandidates] = useState<ProductResolutionCandidate[]>([]);
@@ -76,7 +80,7 @@ export default function CheckProductScreen() {
   const permissionState = permission?.granted ? 'granted'
     : permission?.status === 'denied' ? 'denied'
     : permission?.status === 'undetermined' ? 'undetermined' : 'unknown';
-  const entryState = resolveCheckEntryState({ preview, searching: isSearching, permission: permissionState });
+  const entryState = resolveCheckEntryState({ preview: targetShell, searching: isSearching, permission: permissionState });
 
   const handleSearchNamePress = () => {
     void Haptics.selectionAsync().catch(() => {});
@@ -290,7 +294,7 @@ export default function CheckProductScreen() {
     setUnknownBarcode(null);
     setEvaluationError(null);
     setSearchQuery('');
-    setIsSearching(!preview);
+    setIsSearching(!targetShell);
     setTimeout(() => {
       isScanningLockedRef.current = false;
       setIsLocked(false);
@@ -360,7 +364,7 @@ export default function CheckProductScreen() {
   const currentFormula = getVerifiedFormulaForResolution(catalogDetail, resolution);
   const cameraHeight = Math.max(360, Math.min(560, windowHeight - insets.top - insets.bottom - layout.gutter * 5));
 
-  if (!preview && !showProviderFeatures) {
+  if (!targetShell && !showProviderFeatures) {
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
         <Text style={styles.screenTitle}>Check a Product</Text>
@@ -372,7 +376,7 @@ export default function CheckProductScreen() {
     );
   }
 
-  if (!preview && audience !== 'member') {
+  if (!targetShell && audience !== 'member') {
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
         <Text style={styles.screenTitle}>Personalized Scan</Text>
@@ -533,14 +537,14 @@ export default function CheckProductScreen() {
     const fit = describeCheckProductFit(resolution?.state ?? 'identified_formula_unverified');
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        {preview ? <RootShellHeader title="Check" /> : (
+        {targetShell ? <RootShellHeader title="Check" /> : (
           <View style={styles.header}>
             <Text style={styles.screenTitle}>Check a Product</Text>
             <AccountSettingsButton />
           </View>
         )}
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}>
-          {preview ? (
+          {targetShell ? (
             <>
               <View style={styles.previewProductHeading}>
                 <Text style={styles.productBrandText}>{catalogDetail.brand.toUpperCase()}</Text>
@@ -548,13 +552,16 @@ export default function CheckProductScreen() {
               </View>
               <GroupedSection header="Personal Fit">
                 <View style={styles.previewFactRow}>
-                  <Text style={styles.previewFactText}>Not available yet.</Text>
+                  <Text style={styles.previewFactText}>{integrated ? 'Not personalized yet.' : 'Not available yet.'}</Text>
                 </View>
               </GroupedSection>
               <GroupedSection header="Formula Details">
                 <View style={styles.previewFactRow}>
                   <Text style={styles.previewFactType}>{catalogDetail.category.replace('_', ' ')}</Text>
-                  <Text style={styles.previewFactText}>Exact package formula not verified.</Text>
+                  {currentFormula ? <>
+                    <Text style={styles.previewFactText}>Verified ingredients for this exact package: {currentFormula.ingredients.join(', ')}</Text>
+                    <Text style={styles.previewFactText}>Provenance: {currentFormula.provenanceType.replace('_', ' ')}</Text>
+                  </> : <Text style={styles.previewFactText}>Exact package formula not verified.</Text>}
                   {catalogDetail.sourceReference && (
                     <TouchableOpacity
                       onPress={() => void Linking.openURL(catalogDetail.sourceReference!).catch(() => {})}
@@ -632,8 +639,8 @@ export default function CheckProductScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
         <Text style={styles.screenTitle}>Check a Product</Text>
-        <Text style={{ color: colors.inkMuted, marginVertical: spacing.md }}>{fit.message}</Text>
-        {resolution.requiresFounderReview && <Text style={{ color: colors.inkMuted, marginBottom: spacing.md }}>This check is saved for founder review.</Text>}
+        <Text style={{ color: colors.inkMuted, marginVertical: spacing.md }}>{integrated ? 'Product identity is not confirmed. Personal Fit: Not personalized yet.' : fit.message}</Text>
+        {!integrated && resolution.requiresFounderReview && <Text style={{ color: colors.inkMuted, marginBottom: spacing.md }}>This check is saved for founder review.</Text>}
         {candidates.map((candidate, index) => (
           <TouchableOpacity
             key={`${candidate.productId ?? 'unknown'}-${candidate.variantId ?? index}`}
@@ -670,34 +677,34 @@ export default function CheckProductScreen() {
   if (entryState === 'search') {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        {preview ? <RootShellHeader title="Check" /> : (
+        {targetShell ? <RootShellHeader title="Check" /> : (
           <View style={styles.header}>
             <Text style={styles.screenTitle}>Check a Product</Text>
             <AccountSettingsButton />
           </View>
         )}
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]} keyboardShouldPersistTaps="handled">
-          {!preview && <Text style={styles.subtitle}>Search by product name. A barcode is optional.</Text>}
+          {!targetShell && <Text style={styles.subtitle}>Search by product name. A barcode is optional.</Text>}
           <CatalogProductSearch
-            label={preview ? 'Search by name' : 'Search products'}
+            label={targetShell ? 'Search by name' : 'Search products'}
             actionLabel="Check"
             search={preview ? searchPreviewCatalog : undefined}
             onSelect={handleSelectSearchResult}
             onQueryChange={setSearchQuery}
             keepFocusAfterSelect={false}
-            errorCopy={preview ? 'Search is unavailable right now.' : 'Search is unavailable right now. You can still request founder review.'}
-            emptyCopy={preview ? 'No product match yet.' : 'No catalog match yet. Try another name or request founder review.'}
+            errorCopy={targetShell ? 'Search is unavailable right now.' : 'Search is unavailable right now. You can still request founder review.'}
+            emptyCopy={targetShell ? 'No product match yet.' : 'No catalog match yet. Try another name or request founder review.'}
           />
-          {!preview && searchQuery.trim().length >= 2 && (
-            <Button label="Can't find it? Request review" variant="ghost" size="medium" onPress={handleManualNameCheck} style={{ marginTop: spacing.md }} />
+          {integrated && searchQuery.trim().length >= 2 && (
+            <Button label="Check name as entered" variant="ghost" size="medium" onPress={handleManualNameCheck} style={{ marginTop: spacing.md }} />
           )}
-          <Button label={preview ? 'Scan barcode' : 'Use barcode camera'} variant="outline" size="medium" onPress={() => { if (preview) void handleScanBarcodePress(); else { setIsSearching(false); handleRetryScan(); } }} style={{ marginTop: spacing.lg }} />
+          <Button label={targetShell ? 'Scan barcode' : 'Use barcode camera'} variant="outline" size="medium" onPress={() => { if (targetShell) void handleScanBarcodePress(); else { setIsSearching(false); handleRetryScan(); } }} style={{ marginTop: spacing.lg }} />
         </ScrollView>
       </View>
     );
   }
 
-  if (preview && entryState === 'landing') {
+  if (targetShell && entryState === 'landing') {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
@@ -714,7 +721,7 @@ export default function CheckProductScreen() {
     );
   }
 
-  if (preview && entryState === 'denied') {
+  if (targetShell && entryState === 'denied') {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
@@ -781,7 +788,7 @@ export default function CheckProductScreen() {
   // 4. One barcode viewfinder for the target root and legacy route.
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {preview ? <RootShellHeader title="Check" /> : (
+      {targetShell ? <RootShellHeader title="Check" /> : (
         <View style={styles.scannerHeader}>
           <View style={styles.headerTopRow}>
             <Text style={styles.screenTitle}>Check a Product</Text>
@@ -808,7 +815,7 @@ export default function CheckProductScreen() {
       >
         <View style={styles.cameraFrameContainer}>
           {/* Live Barcode Camera Viewport */}
-          <View style={[styles.cameraViewport, preview && { height: cameraHeight }]}>
+          <View style={[styles.cameraViewport, targetShell && { height: cameraHeight }]}>
             <CameraView
               facing="back"
               enableTorch={torchOn}
@@ -843,7 +850,7 @@ export default function CheckProductScreen() {
               </View>
               <Text style={styles.reticleGuideText}>Center barcode in box</Text>
             </View>
-            {preview && (
+            {targetShell && (
               <GlassContainer isFloating style={styles.searchGlass} glassEffectStyle="regular" tintColor={colors.glass.tintDark}>
                 <TouchableOpacity onPress={handleSearchNamePress} style={styles.glassSearchControl} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Search by name">
                   <Icon name="search" size={18} color={colors.inkInverse} />
@@ -854,7 +861,7 @@ export default function CheckProductScreen() {
           </View>
 
           {/* Name Search Fallback Button */}
-          {!preview && <TouchableOpacity
+          {!targetShell && <TouchableOpacity
             style={styles.manualSearchLink}
             onPress={handleSearchNamePress}
             activeOpacity={0.7}
@@ -866,7 +873,7 @@ export default function CheckProductScreen() {
           </TouchableOpacity>}
 
           {/* Quick Shortcuts for Instant Testing (Dev only) */}
-          {__DEV__ && !preview && (
+          {__DEV__ && !targetShell && (
             <View style={styles.quickShortcuts}>
               <Text style={styles.shortcutHeading}>TEST PRESETS</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcutPillRow}>
@@ -902,7 +909,7 @@ export default function CheckProductScreen() {
             </View>
             <Text style={styles.unknownTitle}>Barcode Not Recognized</Text>
             <Text style={styles.unknownText}>
-              {preview
+              {targetShell
                 ? 'No verified barcode match. Search by name.'
                 : `We couldn't find a formula match for barcode ${unknownBarcode} in our beta catalog yet.`}
             </Text>

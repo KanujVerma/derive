@@ -10,6 +10,7 @@ import { publicEnvironment } from '@/src/config/environment';
 import { usesFreeExternalBetaPresentation } from '@/src/utils/membershipPresentation';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 
 const TAB_BAR_HEIGHT = 56;
 
@@ -27,10 +28,13 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomOffset = Math.max(insets.bottom, 12);
   const hideAsk = usesFreeExternalBetaPresentation(publicEnvironment.buildFlavor);
-  const targetShell = resolveShellPresentation({
+  const shell = resolveShellPresentation({
     buildFlavor: publicEnvironment.buildFlavor,
     remoteEnabled: isRemoteServiceEnabled(),
-  }) === 'scanner_first_preview';
+    supabaseUrl: publicEnvironment.supabaseUrl,
+  });
+  const targetShell = shell !== 'legacy';
+  const managedAccess = useFreeAccessStore((s) => s.status === 'READY' && s.access?.managedAccess === true);
 
   return (
     <Tabs
@@ -121,6 +125,7 @@ export default function TabLayout() {
           href: null, // hide from tab bar
         }}
       />
+      <Tabs.Protected guard={shell !== 'local_free_integration' || managedAccess}>
       <Tabs.Screen
         name="ask"
         options={{
@@ -141,6 +146,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      </Tabs.Protected>
     </Tabs>
   );
 }

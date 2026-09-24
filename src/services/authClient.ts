@@ -54,6 +54,7 @@ export interface AuthAdapter {
   verifyOtp(email: string, token: string): Promise<{ data: { session: any; user: any }; error: any }>;
   signUp?(input: AuthSignUpRequest): Promise<{ data: { session: any; user: any }; error: any }>;
   signInWithPassword?(input: AuthPasswordRequest): Promise<{ data: { session: any; user: any }; error: any }>;
+  signInAnonymously?(): Promise<{ data: { session: any; user: any }; error: any }>;
   getSession(): Promise<{ data: { session: any }; error: any }>;
   signOut(options?: SignOutOptions): Promise<{ error: any }>;
   onAuthStateChange(callback: (event: string, session: any) => void): {
@@ -139,6 +140,13 @@ const defaultSupabaseAdapter: AuthAdapter = {
     });
   },
 
+  async signInAnonymously() {
+    if (!supabase) {
+      return { data: { session: null, user: null }, error: new Error('Supabase client not configured') };
+    }
+    return supabase.auth.signInAnonymously();
+  },
+
   async getSession() {
     if (!supabase) {
       return { data: { session: null }, error: null };
@@ -187,6 +195,26 @@ function projectAuthenticatedSession(user: { id: string; email?: string | null }
   useAuthStore.getState().setSession(userId, sessionEmail);
   useUserStore.getState().setRemoteSessionUser(userId, sessionEmail || '');
   return userId;
+}
+
+let anonymousStart: Promise<string> | null = null;
+
+/** Local-only caller: preserve the persisted session; create a guest only when none exists. */
+export function ensureLocalAnonymousSession(): Promise<string> {
+  if (anonymousStart) return anonymousStart;
+  anonymousStart = (async () => {
+    const existing = await activeAdapter.getSession();
+    if (existing.error) throw new Error('Auth session could not be checked');
+    if (existing.data?.session?.user?.id) return projectAuthenticatedSession(existing.data.session.user);
+    if (!activeAdapter.signInAnonymously) throw new Error('Anonymous Auth is unavailable');
+    const created = await activeAdapter.signInAnonymously();
+    if (created.error || !created.data?.session?.user?.id || !created.data?.user?.id
+      || created.data.session.user.id !== created.data.user.id) {
+      throw new Error('Anonymous Auth could not be established');
+    }
+    return projectAuthenticatedSession(created.data.user);
+  })().finally(() => { anonymousStart = null; });
+  return anonymousStart;
 }
 
 /**

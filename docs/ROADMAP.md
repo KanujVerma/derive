@@ -8,11 +8,11 @@ This is the current approved product direction and execution plan. It distinguis
 K-FREE-1 ✅
 S-FREE-1 ✅
 K-FREE-1B ✅
-→ Wave-1 integration
+Wave-1 integration ✅ (local only)
 → K-FREE-2 || S-FREE-2
 ```
 
-K-FREE-1, S-FREE-1, and K-FREE-1B are landed. The remote/mobile free funnel is not yet integrated: mobile does not consume the S-FREE-1 access contract, and hosted anonymous signup remains deliberately gated. The scanner-first external beta is not ready.
+Wave-1 mobile now consumes S-FREE-1 in Development Remote against an exact local Supabase host. A missing session becomes an anonymous Auth identity, server `FreeAccessState` selects Check or managed Plan, and free Check uses live sourced catalog and factual typed/barcode resolution. Remote Staging keeps its legacy route and hosted anonymous signup remains deliberately gated. The scanner-first external beta is not ready.
 
 ## Current product model
 
@@ -20,9 +20,9 @@ Derive is **personalized skincare product intelligence first**. Free Check answe
 
 ### Implemented today
 
-- The K-FREE-1 scanner-first shell and K-FREE-1B UX polish are landed. S-FREE-1 provides the platform access contract. Mobile does not yet consume that contract; Remote/mobile free access is not integrated, and hosted anonymous signup remains gated. Existing Remote routing retains the managed-membership boundary.
+- K-FREE-1 and K-FREE-1B supply the four-root scanner shell. Wave-1 integrates S-FREE-1 only for Development Remote with local Supabase. Mock development remains a sample preview, while Remote Staging and production retain their previous behavior. Free users get sourced product facts with Personal Fit unavailable; managed-only routines and check-ins remain gated.
 - PRs #36 and #37 landed searchable catalog foundation and mobile Check a Product. The Remote Staging route remains hidden and the current hosted catalog has 4 products, 1 sourced product, 1 alias, and no variants, identifiers, or formula versions.
-- S6 provides product identity and formula evidence states. Unknown identity/formula stays unknown. Camera capture is not proof of identity; visual/OCR provider behavior remains unproven. The shipped C1 result still says “FORMULA QUALITY”; the target label is factual “FORMULA DETAILS,” separate from Personal Fit.
+- S6 provides product identity and formula evidence states. Unknown identity/formula stays unknown. Camera capture is not proof of identity; visual/OCR provider behavior remains unproven. Wave-1 Check labels factual “FORMULA DETAILS” separately from unavailable Personal Fit.
 - PR #39 closed the selected catalog UUID handoff into routine persistence. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md) and the current checkpoint in [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
 - Hosted `propose-routine` is v3, ACTIVE, with JWT verification enabled. The live model-provider path remains H1P-unproven. This limits provider-backed Ask/routine automation and does not block free factual Check or the planned deterministic fit service.
 - The current $25/month Founding Beta display/Stripe code is implementation history, not proof of hosted billing activation and not proof that the new Managed Skincare entitlement model exists.
@@ -61,12 +61,12 @@ Managed upgrade target: start Managed Skincare → link/create a permanent ident
 
 ## Current next work and parallel waves
 
-Wave 0 documentation/architecture reconciliation is complete. Wave-1 foundations are landed; the next shared handoff is mobile/platform integration. K-FREE-2 / S-FREE-2 start only after that integration.
+Wave 0 and Wave-1 local integration are complete. K-FREE-2 / S-FREE-2 are unblocked as the next separately owned wave. Hosted guest activation still requires S-OPS-1.
 
 | Wave | Kanuj | Sami | Prerequisite / handoff |
 | --- | --- | --- | --- |
-| Wave-1 foundations (landed) | **K-FREE-1 ✅ / K-FREE-1B ✅ (Kanuj):** scanner-first Mock shell and UX polish. | **S-FREE-1 ✅ (Sami):** anonymous/free platform and stable access contract. | Mobile consumption of the S-FREE-1 contract remains pending; hosted anonymous signup remains gated. |
-| Wave-1 integration (next shared handoff) | Kanuj consumes the stable S-FREE-1 access contract in mobile. | Sami owns platform-side changes within Sami’s lane. | Remote/mobile free funnel integration is next. Keep contract changes single-owner. Do not start Wave 2 until integration is complete. |
+| Wave-1 foundations (landed) | **K-FREE-1 ✅ / K-FREE-1B ✅ (Kanuj):** scanner-first Mock shell and UX polish. | **S-FREE-1 ✅ (Sami):** anonymous/free platform and stable access contract. | Contract consumed by the local Wave-1 integration; hosted anonymous signup remains gated. |
+| Wave-1 integration (landed, local only) | Kanuj consumes `FreeAccessState` in Auth, routing, Check, Plan, Shop, and Account. | Sami's platform contract is unchanged. | Local Auth/catalog/resolver and managed denials verified. No hosted activation or TestFlight build. |
 | 2 (after Wave-1 integration) | **K-FREE-2 Progressive Personalization UX**: optional ~45-second, three-concept profile; skip/remind; refresh the same result; edit later in MY STUFF; no managed photos, budget, or routine complexity. | **S-FREE-2 Minimal Profile + Deterministic Personal Fit**: canonical minimal profile persistence and explainable categorical fit based on supported facts; evidence-used explanation, safe unknown, no model-provider dependency, no diagnostic claims. | Starts only after Wave-1 integration; Sami owns and merges the profile/fit contract before Kanuj consumes it. |
 | 3 | **K-FREE-3 MY STUFF**: profile, current products, using/considering/stopped, check history, reactions/tolerance UX. No backend persistence. | **S-FREE-3 Free Context / Check History Data Plane**: owner-bound persistence for checks, products, state, supported reaction/tolerance history, and context needed by fit, including anonymous ownership. | Sami publishes persistence/read contracts; Kanuj builds to fixtures in parallel and integrates after handoff. |
 | 4 | **K-FREE-4 Camera Product Evidence UX**: one Check capture path for barcode, front label, ingredients, useful packaging, evidence-supported on-device extraction, ambiguity and candidate confirmation. Capture provides evidence, never authoritative identity. | **S-FREE-4 Product Evidence Resolution**: private owner-isolated evidence, barcode/label/ingredient/packaging inputs through S6, candidate/formula matching, unresolved/founder review; no invented truth. | Reuse S6. Kanuj owns capture/OCR on-device if selected; Sami owns server identity and formula truth. Merge the evidence contract before integration. |
@@ -95,7 +95,7 @@ H1P is retained for richer explanations, broader model reasoning, conversational
 
 ## What blocks the next scanner-first external beta
 
-The scanner-first external beta is not ready. K-FREE-1, S-FREE-1, and K-FREE-1B are landed, but mobile/platform free-funnel integration is pending and hosted anonymous signup remains gated. Remaining gates include deterministic fit and its evidence contract, useful sourced catalog coverage and safe unknown fallback, private evidence resolution/capture, anonymous lifecycle and abuse controls, and K-ACCEPT-1 physical end-to-end proof. Apple submission text, reviewer access, privacy/support information, and screenshots must match the actual future binary. H1P is not a free Check gate; provider-backed Ask, richer explanations, and routine automation remain separately gated.
+The scanner-first external beta is not ready. Wave-1 mobile/platform free-funnel integration is locally complete, while hosted anonymous signup remains gated. Remaining gates include deterministic fit and its evidence contract, useful sourced catalog coverage and safe unknown fallback, private evidence resolution/capture, anonymous lifecycle and abuse controls, and K-ACCEPT-1 physical end-to-end proof. Apple submission text, reviewer access, privacy/support information, and screenshots must match the actual future binary. H1P is not a free Check gate; provider-backed Ask, richer explanations, and routine automation remain separately gated.
 
 ## Open implementation questions
 
