@@ -7,7 +7,8 @@ export interface SupportedPersonalFit {
 }
 
 export type PersonalFitRefreshInput =
-  | { kind: 'factual_only' | 'loading' | 'insufficient' | 'unavailable' }
+  | { kind: 'factual_only' | 'loading' | 'insufficient' }
+  | { kind: 'unavailable'; reason?: 'answers_not_saved' | 'client_session_ready' }
   | { kind: 'supported'; fit: SupportedPersonalFit | null };
 
 export type PersonalFitRefreshView = {
@@ -26,12 +27,18 @@ export function describePersonalFitRefresh(input: PersonalFitRefreshInput): Pers
     kind: 'loading', title: 'Checking your fit', message: 'Your product details are still here.', fit: null,
   };
   if (input.kind === 'unavailable') return {
-    kind: 'unavailable', title: 'Personal Fit unavailable', message: 'You can still use the product facts below.', fit: null,
+    kind: 'unavailable', title: 'Personal Fit unavailable',
+    message: input.reason === 'answers_not_saved'
+      ? 'Your answers were not saved. Product facts remain available.'
+      : input.reason === 'client_session_ready'
+        ? 'Your answers are ready for this session. A supported product fit is unavailable.'
+        : 'A supported product fit is unavailable. Product facts remain available.',
+    fit: null,
   };
   if (input.kind === 'insufficient' || input.kind === 'supported') return {
     kind: 'insufficient', title: 'Not enough to say yet', message: 'We need more reliable product details to assess your fit.', fit: null,
   };
   return {
-    kind: 'factual_only', title: 'Personal Fit', message: 'Want to know if this fits you? Personalize Derive in about 45 seconds.', fit: null,
+    kind: 'factual_only', title: 'Not personalized yet', message: 'Optional: add your skin preferences.', fit: null,
   };
 }

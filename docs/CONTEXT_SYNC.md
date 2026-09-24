@@ -8,10 +8,30 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 
 ## 2026-09-24: S-FREE-3 free context/history stacked branch
 
-- **Predecessor:** S-FREE-2 PR #54 head `b484d983f43ea2890775d74ee96c5839e2c7efd0` at start; later S-FREE-2 reconciled through `main@aa3873596916e79bb878befa841700fbc7411d0e` in commit `862f108`. S-FREE-2 remains unmerged because GitHub Actions jobs fail before startup on a repository billing/spending gate. S-FREE-3 is isolated on `sami/s-free-3-history`; the dirty founder checkout and Kanuj-owned customer UI are untouched.
+- **Predecessor:** S-FREE-2 PR #54 head `b484d983f43ea2890775d74ee96c5839e2c7efd0` at start; later S-FREE-2 reconciled through `main@aa3873596916e79bb878befa841700fbc7411d0e` in commit `862f108`. S-FREE-3 is isolated on `sami/s-free-3-history`; the dirty founder checkout and Kanuj-owned customer UI are untouched. The old GitHub billing gate subsequently cleared; both #54 and #58 reached green CI before the later S2 review finding.
 - **Contract:** `FreeContext.ts` and `free-context` provide owner-bound paged products, Checks, and reported experiences to real anonymous or permanent Auth identities. Product UUIDs require sourced catalog truth; manual entries remain user reports. Check history can reference only the caller's S6 scan case. Request IDs make create retries idempotent, and cross-owner reads/mutations are denied. No managed entitlement, paid Shelf/reaction writes, photo capture, or hosted activation is introduced.
 - **Fit handoff:** S-FREE-2's deterministic fit reads same-catalog-product `reacted` history and can downgrade a verified-formula positive case to caution. It does not infer ingredient causation or pretend the old variant/formula is known. Kanuj owns the MY STUFF projection and all mobile wiring after platform merge.
-- **Verification:** fresh full local migration reset, pgTAP, Auth/Edge guest and cross-owner smoke, full unit/TypeScript/export checks and exact-head CI are required for closure. Do not treat this in-progress entry as a green-CI or deployed claim.
+- **Verification:** fresh full local migration reset, pgTAP, Auth/Edge guest and cross-owner smoke, full unit/TypeScript/export checks and exact-head CI passed at the previous #58 head. The subsequent S2 regression fix requires a fresh exact-head run. Neither PR is deployed.
+
+## 2026-09-24: S-FREE-2 Retinyl Propionate regression correction (branch-only)
+
+- **Predecessor:** `main@5153b38b1e3d16aee2fe1b36d1298c524bb94edf` and S-FREE-2 PR #54 before this fix.
+- **Review finding addressed:** a verified moisturizer listing Retinyl Propionate previously returned `COULD_WORK` despite reported pregnancy. The narrow retinoid detector now recognizes whole-token `retinyl` ingredient names, and focused tests cover pregnancy, withheld context, and no positive fit. This is conservative cosmetic triage, not a claim of individual medical safety.
+- **Boundary:** PR #54 is still open and not hosted. K2/S2 integration still waits for exact-head validation, review, and landing. Historical review entries below retain the original finding.
+
+## 2026-09-24: Composition status refresh
+
+- **Predecessor:** main@aa3873596916e79bb878befa841700fbc7411d0e, after K4-COMPOSE handoff prep PR #55 landed.
+- **Landed:** K-FREE-2 (#51), K-FREE-3 (#48), K-FREE-4 (#49), K-PAID-1A (#52), test discovery (#53), and the max-parallel rule (#50). KPAID-COMPOSE PR #56 and K4-COMPOSE handoff prep PR #55 are also landed.
+- **In progress:** K2-COMPOSE. K4 canonical Check composition follows K2. S-FREE-2 PR #54 remains open with the reproduced Sami-owned Retinyl Propionate pregnancy-fit defect; K2/S2 platform integration waits for its fix and landing.
+- **Release status:** hosted beta is not ready. Historical predecessor entries below are preserved as recorded.
+
+## 2026-09-24: Parallel presentation landing and S-FREE-2 blocker
+
+- **Predecessor:** clean `main@18a4a19f10de74a1fbb40d05e744d50154ab3a49`.
+- **Landed:** K-FREE-3 PR #48 (`c56090a`); test discovery PR #53 (`ca8aac2`); max-parallel docs PR #50 (`a36cacc`); K-FREE-2 PR #51 (`747f217`); K-FREE-4 PR #49 (`c4e2c5c`); K-PAID-1A PR #52 (`18a4a19`). K4-COMPOSE handoff prep and KPAID-COMPOSE are in progress; canonical Check wiring is not yet active.
+- **Open blocker:** S-FREE-2 PR #54 is OPEN. A read-only local review reproduced `determinePersonalFit` returning `COULD_WORK` / `goal_role_match` for verified moisturizer ingredients Water plus Retinyl Propionate with pregnancyStatus yes, because the RETINOIDS allowlist omits this vitamin A propionate. Sami owns the fix. K2/S2 integration cannot start until #54 is fixed and landed. No hosted deployment occurred.
+- **Release status:** the scanner-first external beta is not ready. The public-repository audit result and its scope remain recorded in the preceding 2026-09-23 checkpoint; no secret values are recorded here.
 
 ## 2026-09-23: Kanuj max-parallel presentation execution opened
 

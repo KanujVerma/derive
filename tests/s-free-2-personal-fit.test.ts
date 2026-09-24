@@ -82,6 +82,13 @@ test('S-FREE-2: retinoid context never yields an unqualified positive label', ()
   const annotated = determinePersonalFit({ ...profile, pregnancyStatus: 'yes' },
     { ...formula, ingredients: ['Water', 'Retinol (0.3%)'] });
   assert.equal(annotated.reason, 'retinoid_pregnancy_context');
+  const withRetinylPropionate = { ...formula, ingredients: ['Water', 'Retinyl Propionate'] };
+  const esterPregnancy = determinePersonalFit({ ...profile, pregnancyStatus: 'yes' }, withRetinylPropionate);
+  assert.equal(esterPregnancy.label, 'USE_WITH_CAUTION');
+  assert.equal(esterPregnancy.reason, 'retinoid_pregnancy_context');
+  assert.equal(determinePersonalFit({ ...profile, pregnancyStatus: 'unanswered' }, withRetinylPropionate).label,
+    'NOT_ENOUGH_INFORMATION');
+  assert.notEqual(determinePersonalFit(profile, withRetinylPropionate).label, 'COULD_WORK');
 });
 
 test('S-FREE-2: narrow role match and unsupported cases are distinct', () => {

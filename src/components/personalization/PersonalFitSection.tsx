@@ -22,7 +22,7 @@ export function PersonalFitSection({ state, onPersonalize }: PersonalFitSectionP
       {view.fit.evidenceUsed.map((item) => <Text key={item} style={styles.evidence}>• {item}</Text>)}
     </> : null}
     {view.fit?.uncertainty ? <Text style={styles.uncertainty}>{view.fit.uncertainty}</Text> : null}
-    {view.kind === 'factual_only' && onPersonalize ? <Button label="Personalize Derive" variant="brand" onPress={onPersonalize} style={styles.action} /> : null}
+    {view.kind === 'factual_only' && onPersonalize ? <Button label="Personalize" variant="brand" onPress={onPersonalize} style={styles.action} /> : null}
   </View>;
 }
 

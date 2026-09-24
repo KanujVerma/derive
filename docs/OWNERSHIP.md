@@ -1,6 +1,6 @@
 # Derive Founder Ownership
 
-Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. Wave-1 foundations, local mobile/platform integration, and K-FREE-3 presentation are landed; K-FREE-2, K-FREE-4, and K-PAID-1A remain independent tracks. [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
+Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. Wave-1 foundations and local mobile/platform integration are landed. K-FREE-2 (#51), K-FREE-3 (#48), K-FREE-4 (#49), and K-PAID-1A (#52) are landed, as are max-parallel guidance (#50) and test discovery (#53). K4-COMPOSE handoff prep (PR #55) and KPAID-COMPOSE (PR #56) are landed; K2-COMPOSE is in progress, and K4 canonical Check composition follows K2. S-FREE-2 PR #54 is open with its deterministic-fit regression fixed on branch; K2/S2 platform integration waits for exact-head review and landing. [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
 
 **Max-parallel implementation rule:** A counterpart contract is a prerequisite for integration, not a prerequisite for beginning or completing owned implementation. Kanuj presentation milestones may build against Kanuj-owned view models/fixtures while Sami builds platform contracts independently. After completing an owned milestone, each founder advances to the next non-overlapping milestone. Integration is a separate bounded task.
 
@@ -11,10 +11,10 @@ Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client s
 - **K-FREE-1 / Wave 1 foundation, LANDED:** Scanner-First App Shell and target CHECK / MY STUFF / PLAN / SHOP presentation. No Supabase backend, hosted Auth/RLS, or free entitlement implementation.
 - **K-FREE-1B, LANDED:** scanner-first UX polish.
 - **Wave-1 integration, LANDED locally:** consume Sami's unchanged `FreeAccessState` in the local Development Remote app. Free Check uses live factual catalog and resolver; managed routes remain gated. Hosted activation remains with S-OPS-1.
-- **K-FREE-2, parallel presentation:** optional minimal personalization after factual first Check, same-result refresh and edit seams; fixture-backed. A later integration consumes S-FREE-2.
-- **K-FREE-3, LANDED presentation:** MY STUFF profile, products, history and reaction/tolerance states; fixture-backed, no persistence. Later composition connects K-FREE-2 editing.
-- **K-FREE-4, parallel presentation:** capture, retake and candidate/unknown UX for product evidence, without authoritative identity claims. Later composition wires canonical Check; later integration consumes S-FREE-4.
-- **K-PAID-1A, parallel presentation foundation:** free Managed Skincare offer, upgrade states, context reuse, managed intake/photo and Plan states; fixture-backed. Later K-PAID composition/integration consumes stable Sami contracts.
+- **K-FREE-2, LANDED (PR #51):** optional minimal personalization after factual first Check, same-result refresh and edit seams; fixture-backed. K2/S2 platform integration waits for S-FREE-2 PR #54 to pass exact-head review and land.
+- **K-FREE-3, LANDED presentation (PR #48):** MY STUFF profile, products, history and reaction/tolerance states; fixture-backed, no persistence. Composition connects K-FREE-2 editing after its S-FREE-2 integration gate clears.
+- **K-FREE-4, LANDED presentation (PR #49):** capture, retake and candidate/unknown UX for product evidence, without authoritative identity claims. K4-COMPOSE handoff prep (PR #55) is landed; canonical Check composition follows K2-COMPOSE. Later integration consumes S-FREE-4.
+- **K-PAID-1A, LANDED presentation foundation (PR #52):** free Managed Skincare offer, upgrade states, context reuse, managed intake/photo and Plan states; fixture-backed. KPAID-COMPOSE (PR #56) is landed; integration consumes stable Sami contracts.
 - **K-ACCEPT-1:** scanner-first physical/TestFlight acceptance after platform contracts and release hardening.
 - **K-GROWTH, later:** shareable Check result and referral UX.
 
@@ -23,8 +23,8 @@ Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client s
 Owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted Supabase/Auth/RLS/configuration, server billing, product identity/formula truth, and founder operations. Sami does not implement customer mobile UI.
 
 - **S-FREE-1 / Wave 1 foundation, LANDED:** anonymous identity and free access, account-kind distinction, free/managed separation, FREE / MANAGED / BOTH operation inventory, least-privilege RLS review, and stable access contract. No mobile UI and no fake `founding_beta` membership for free users.
-- **S-FREE-2 / Wave 2:** branch-local minimal free profile and deterministic categorical fit with evidence explanation and safe unknown behavior; Kanuj integration follows contract merge. No provider hard dependency and no diagnosis. See [S_FREE_2_PERSONAL_FIT.md](S_FREE_2_PERSONAL_FIT.md).
-- **S-FREE-3 / Wave 3, stacked PR in progress:** owner-bound free Check history, shelf/product states, reactions/tolerance and profile context data plane, including anonymous ownership. Kanuj's UI remains fixture-only until the reviewed contract is merged.
+- **S-FREE-2 / Wave 2, PR #54 OPEN:** branch-local minimal free profile and deterministic categorical fit. The Retinyl Propionate pregnancy-fit defect found in review has a regression fix on this branch; merge and K2/S2 integration still require exact-head validation. No hosted deployment. See [S_FREE_2_PERSONAL_FIT.md](S_FREE_2_PERSONAL_FIT.md).
+- **S-FREE-3 / Wave 3, PR #58 OPEN:** owner-bound free Check history, shelf/product states, reactions/tolerance and profile context data plane, including anonymous ownership. Kanuj's UI remains fixture-only until the reviewed contract is merged.
 - **S-FREE-4 / Wave 4:** private evidence storage, S6 candidate/formula resolution and review states. OCR/model output is not authoritative identity.
 - **S-PAID-1 / Wave 5:** permanent identity and managed entitlement separation plus F1 founder construction, validation, publication and member readback. F1 is part of this milestone.
 - **S-OPS-1:** anonymous cleanup, rate/abuse controls, account linking/conflicts, deletion, session-loss behavior and privacy-safe operational observability.
@@ -38,10 +38,10 @@ H1P remains a provider-backed intelligence milestone. H1B remains later managed 
 | --- | --- | --- |
 | Wave-1 foundations (landed) | K-FREE-1 / K-FREE-1B (Kanuj); S-FREE-1 (Sami) | The stable access contract is consumed locally. Hosted anonymous signup remains gated. |
 | Wave-1 integration (landed, local only) | Kanuj consumes S-FREE-1 in mobile; Sami's platform lane is unchanged. | Local guest lifecycle and factual Check are verified. Wave 2 is unblocked; hosted activation is separate. |
-| 2, independent implementation | K-FREE-2 / S-FREE-2 | Presentation and platform build concurrently; contract arrival gates only the bounded K2/S2 integration. |
-| 3, Kanuj presentation landed | K-FREE-3 / S-FREE-3 | K-FREE-3 landed in PR #48. Owner-bound persistence and later integration remain separate. |
-| 4, independent implementation | K-FREE-4 / S-FREE-4 | Capture UX and private evidence/resolution build concurrently; compose and integrate after stable handoffs. |
-| 5, independent foundation | K-PAID-1A / S-PAID-1 | Managed presentation and platform authority build concurrently; later composition/integration handles upgrade and real Plan. |
+| 2, presentation landed; platform open | K-FREE-2 landed (PR #51) / S-FREE-2 PR #54 open | Retinyl Propionate regression fixed on branch; exact-head review and landing precede K2/S2 platform integration. |
+| 3, presentation landed | K-FREE-3 (PR #48) / S-FREE-3 | Owner-bound persistence and later integration remain separate. |
+| 4, Kanuj presentation landed; K4 handoff prep landed | K-FREE-4 (PR #49) / S-FREE-4 | K4 handoff prep (PR #55) is landed; canonical Check composition follows K2-COMPOSE, then contract integration follows stable handoff. |
+| 5, presentation and composition landed | K-PAID-1A (PR #52) / S-PAID-1 | KPAID-COMPOSE (PR #56) is landed; integration handles upgrade and real Plan. |
 | Release | K-ACCEPT-1 / S-OPS-1 | Operations/security behavior and mobile acceptance are evidenced before scanner-first external beta. |
 
 ## Shared-contract rule
