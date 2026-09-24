@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-24: Explicit Check-history save and owner-switch clearing
+
+- **Predecessor:** clean `main@0e20febc755918d833d70e79d4218bb3dc314c50`. Check-memory PR #66 head `abaef0306c372e7b5afc7cdc230e092a96fb2282` merged at `0e20febc755918d833d70e79d4218bb3dc314c50`; exact-head CI passed both jobs.
+- **Explicit save:** in the local free Check flow, a customer must choose “Save to My Stuff” to write the owner-bound scan case to Check history. Searches and capture attempts are not automatically logged.
+- **Owner change:** when the local Check owner changes, the displayed result and related Check state clear. In-flight resolution results are discarded unless the request owner still matches the current owner, preventing stale results from crossing account boundaries.
+- **Boundary:** this is local integration. Hosted deployment and hosted guest activation remain gated by S-OPS-1; physical hardware acceptance remains open.
+
 ## 2026-09-24: K2/S2, K3/S3, and K4/S4 local integrations landed
 
 - **Predecessor:** clean `main@5806f4664f0e44712b833d28ccd0ea3459405ed9`. K3/S3 integration PR #64 merged at `85b5b01de3735dc79d6b6f6ef4fb33827466a69b`; K2/S2 integration PR #63 merged at `718ef0ecf0b632f729407d2cb7f57bf08f4b3659`; K4/S4 integration PR #65 merged at `5806f4664f0e44712b833d28ccd0ea3459405ed9`.

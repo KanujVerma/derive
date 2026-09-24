@@ -12,7 +12,7 @@ Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client s
 - **K-FREE-1B, LANDED:** scanner-first UX polish.
 - **Wave-1 integration, LANDED locally:** consume Sami's unchanged `FreeAccessState` in the local Development Remote app. Free Check uses live factual catalog and resolver; managed routes remain gated. Hosted activation remains with S-OPS-1.
 - **K-FREE-2 / K2-S2, LANDED (PRs #51 and #63):** optional minimal personalization after factual first Check, with typed profile save/read and same-result fit refresh connected locally. Hosted deployment remains gated.
-- **K-FREE-3 / K3-S3, LANDED (PRs #48 and #64):** MY STUFF profile, products, history and reaction/tolerance states read/write through the owner-bound local free context contract. Hosted deployment remains gated.
+- **K-FREE-3 / K3-S3 / Check memory, LANDED (PRs #48, #64 and #66):** MY STUFF reads/writes through owner-bound local free context. Check history saves only after an explicit customer action; retained Check results clear on local owner change. Hosted deployment remains gated.
 - **K-FREE-4 / K4-S4, LANDED locally (PRs #49 and #65):** K4-COMPOSE handoff prep (PR #55) is also landed. Camera evidence connects to S-FREE-4 and S6; candidate/unknown states remain non-authoritative, and no hosted deployment is implied. Typed client handling for the S-FREE-4 429 quota response remains open.
 - **K-PAID-1A, LANDED presentation foundation (PR #52):** free Managed Skincare offer, upgrade states, context reuse, managed intake/photo and Plan states; fixture-backed. KPAID-COMPOSE (PR #56) is landed; integration consumes stable Sami contracts.
 - **K-ACCEPT-1:** scanner-first physical/TestFlight acceptance after platform contracts and release hardening.
@@ -39,7 +39,7 @@ H1P remains a provider-backed intelligence milestone. H1B remains later managed 
 | Wave-1 foundations (landed) | K-FREE-1 / K-FREE-1B (Kanuj); S-FREE-1 (Sami) | The stable access contract is consumed locally. Hosted anonymous signup remains gated. |
 | Wave-1 integration (landed, local only) | Kanuj consumes S-FREE-1 in mobile; Sami's platform lane is unchanged. | Local guest lifecycle and factual Check are verified. Wave 2 is unblocked; hosted activation is separate. |
 | 2, live integration landed | K-FREE-2 (PR #51), K2-COMPOSE (PR #60), K2/S2 (PR #63) / S-FREE-2 (PR #54) | Local profile and fit integration is merged; hosted deployment remains gated. |
-| 3, live integration landed | K-FREE-3 (PR #48), K3/S3 (PR #64) / S-FREE-3 (PR #58) | Local MY STUFF reads/writes use owner-bound persistence; hosted deployment remains gated. |
+| 3, live integration landed | K-FREE-3 (PR #48), K3/S3 (PR #64), Check memory (PR #66) / S-FREE-3 (PR #58) | MY STUFF uses owner-bound persistence; Check history is explicit-save only and Check state clears on local owner change. Hosted deployment remains gated. |
 | 4, local integration landed | K-FREE-4 (PR #49), K4/S4 (PR #65) / S-FREE-4 (PR #61) | Camera-to-resolver integration is merged locally; typed handling for the 429 quota response remains open. |
 | 5, presentation and composition landed | K-PAID-1A (PR #52) / S-PAID-1 | KPAID-COMPOSE (PR #56) is landed; integration handles upgrade and real Plan. |
 | Release | K-ACCEPT-1 / S-OPS-1 | Operations/security behavior and mobile acceptance are evidenced before scanner-first external beta. |
