@@ -75,6 +75,14 @@ test('K-PAID-1A post-submission presentation hides draft intake controls', () =>
   assert.match(presentation, /showsDraftManagedIntake\(view\.stage\)/);
 });
 
+test('K-PAID-1A repeated actions announce their field or photo angle', () => {
+  const presentation = read('src/components/managed-upgrade/ManagedUpgradePresentation.tsx');
+  assert.match(presentation, /accessibilityLabel=\{accessibilityLabel \|\| label\}/);
+  assert.match(presentation, /button\('Add',[^\n]*`Add \$\{managedFieldLabels\[field\]\}`\)/);
+  assert.match(presentation, /button\('Capture',[^\n]*`Capture \$\{angle\} baseline photo`\)/);
+  assert.match(presentation, /action: \{ minHeight: layout\.minTouchTarget/);
+});
+
 test('K-PAID-1A managed Plan fixtures cover every display state', () => {
   const statuses: ManagedPlanStatus[] = ['preparing', 'draft_review', 'active', 'adjustment_pending', 'check_in_due', 'error'];
   for (const status of statuses) {

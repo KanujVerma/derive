@@ -23,8 +23,8 @@ export function ManagedUpgradePresentation({
 }: Props) {
   const view = deriveManagedUpgradeView(input);
   const isDraft = showsDraftManagedIntake(view.stage);
-  const button = (label: string, onPress?: () => void) => (
-    <Pressable key={label} accessibilityRole="button" accessibilityState={{ disabled: !onPress }} disabled={!onPress} onPress={onPress} style={[styles.action, !onPress && styles.disabled]}>
+  const button = (label: string, onPress?: () => void, accessibilityLabel?: string) => (
+    <Pressable key={label} accessibilityRole="button" accessibilityLabel={accessibilityLabel || label} accessibilityState={{ disabled: !onPress }} disabled={!onPress} onPress={onPress} style={[styles.action, !onPress && styles.disabled]}>
       <Text style={styles.actionText}>{label}</Text>
     </Pressable>
   );
@@ -54,7 +54,7 @@ export function ManagedUpgradePresentation({
       </GroupedSection>
       {view.missingFields.length > 0 && <GroupedSection header="Complete your managed details">
         {view.missingFields.map((field) => <View key={field} style={styles.row}>
-          <Text style={styles.rowText}>{managedFieldLabels[field]}</Text>{button('Add', onCompleteField ? () => onCompleteField(field) : undefined)}
+          <Text style={styles.rowText}>{managedFieldLabels[field]}</Text>{button('Add', onCompleteField ? () => onCompleteField(field) : undefined, `Add ${managedFieldLabels[field]}`)}
         </View>)}
       </GroupedSection>}
       {!input.safetyReviewed && <GroupedSection header="Safety review">
@@ -63,7 +63,7 @@ export function ManagedUpgradePresentation({
       <GroupedSection header="Baseline photos" footer="Front, left, and right captures are required for managed intake. These photos are private.">
         {baselineAngles.map((angle) => <View key={angle} style={styles.row}>
           <Text style={styles.rowText}>{angle[0].toUpperCase() + angle.slice(1)}</Text>
-          {view.missingBaselineAngles.includes(angle) ? button('Capture', onCaptureBaseline ? () => onCaptureBaseline(angle) : undefined) : <StatusBadge label="Captured" variant="active" />}
+          {view.missingBaselineAngles.includes(angle) ? button('Capture', onCaptureBaseline ? () => onCaptureBaseline(angle) : undefined, `Capture ${angle} baseline photo`) : <StatusBadge label="Captured" variant="active" />}
         </View>)}
       </GroupedSection>
       {view.stage === 'ready_to_submit' && <GroupedSection header="Ready for review"><View style={styles.cardInner}>
