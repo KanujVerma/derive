@@ -8,6 +8,17 @@ Code definitions:
 - Implementation mock: [`src/services/mock/MockDeriveService.ts`](../src/services/mock/MockDeriveService.ts)
 - Implementation remote: [`src/services/remote/RemoteDeriveService.ts`](../src/services/remote/RemoteDeriveService.ts)
 - S6 product identity: [`src/contracts/ProductIdentityResolver.ts`](../src/contracts/ProductIdentityResolver.ts)
+- S-FREE-3 free Check context: [`src/contracts/FreeContext.ts`](../src/contracts/FreeContext.ts)
+
+### S-FREE-3 Free Context (stacked branch, not hosted)
+
+`free-context` requires a valid Supabase Auth bearer token for every operation, including anonymous guests. The server derives the owner from the token; no request accepts a user ID. `src/services/remote/freeContext.ts` exposes `listFreeProducts`, `listFreeChecks`, `listFreeExperiences`, `saveFreeProduct`, `setFreeProductState`, `deleteFreeProduct`, `recordFreeCheck`, `recordFreeExperience`, and `deleteFreeEntry`.
+
+- Lists are owner-bound, newest first, at most 50 per call, with an owner-bound last-entry-ID cursor. Raw tables and notes are not directly readable through PostgREST.
+- `save_product` takes a stable caller-generated UUID request ID, a catalog product UUID **or** a user-entered name/brand, and `using` / `considering` / `stopped`. The server verifies catalog IDs and labels manual entries `user_reported`; manual text never establishes formula truth. `set_product_state` modifies only the owner's saved row.
+- `record_check` takes a request ID plus either a sourced catalog product UUID or the caller's S6 **scan** case UUID. Unresolved cases are saved truthfully as unidentified, never upgraded to a product claim. This is an explicit “result viewed/saved” write, not an automatic log of searches or camera attempts.
+- `record_experience` takes a request ID, a catalog/manual product reference, `tolerated` / `reacted` / `liked` / `finished`, and an optional bounded note. It records what the user reported, not a diagnosed allergy. Check/experience rows are append-only through the service, with owner deletion available. A reported reaction to the same catalog product can downgrade a later verified-formula S-FREE-2 fit to `USE_WITH_CAUTION`; it does **not** attribute causation to an ingredient or assume the prior variant/formula matches.
+- Existing paid `user_products`, `product_reactions`, `check_ins`, membership and intake tables are not repurposed. Kanuj owns projection into `MyStuffViewModel`, calling these methods after his mobile integration milestone. No app screen is changed in this platform PR.
 
 ---
 

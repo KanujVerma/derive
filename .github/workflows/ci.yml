@@ -113,3 +113,6 @@ jobs:
 
       - name: Run S-FREE-2 personal fit E2E harness
         run: node scripts/test-s-free-2-local.mjs
+
+      - name: Run S-FREE-3 free context E2E harness
+        run: node scripts/test-s-free-3-local.mjs

@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-24: S-FREE-3 free context/history stacked branch
+
+- **Predecessor:** S-FREE-2 PR #54 head `b484d983f43ea2890775d74ee96c5839e2c7efd0`, itself reconciled with `main@c56090aa67ef9e85c786e91dffa60407ade194fe`. S-FREE-2 remains unmerged because GitHub Actions jobs fail before startup on a repository billing/spending gate. S-FREE-3 is isolated on `sami/s-free-3-history`; the dirty founder checkout and Kanuj-owned customer UI are untouched.
+- **Contract:** `FreeContext.ts` and `free-context` provide owner-bound paged products, Checks, and reported experiences to real anonymous or permanent Auth identities. Product UUIDs require sourced catalog truth; manual entries remain user reports. Check history can reference only the caller's S6 scan case. Request IDs make create retries idempotent, and cross-owner reads/mutations are denied. No managed entitlement, paid Shelf/reaction writes, photo capture, or hosted activation is introduced.
+- **Fit handoff:** S-FREE-2's deterministic fit reads same-catalog-product `reacted` history and can downgrade a verified-formula positive case to caution. It does not infer ingredient causation or pretend the old variant/formula is known. Kanuj owns the MY STUFF projection and all mobile wiring after platform merge.
+- **Verification:** fresh full local migration reset, pgTAP, Auth/Edge guest and cross-owner smoke, full unit/TypeScript/export checks and exact-head CI are required for closure. Do not treat this in-progress entry as a green-CI or deployed claim.
+
 ## 2026-09-23: Wave-1 local mobile/free-access integration
 
 - **Predecessor:** clean `main@2f17237a5be8e51d8d682f49976e7cbfb80e1ef2`; branch `kanuj/wave1-free-access-integration`.

@@ -22,7 +22,7 @@ Owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workf
 
 - **S-FREE-1 / Wave 1 foundation, LANDED:** anonymous identity and free access, account-kind distinction, free/managed separation, FREE / MANAGED / BOTH operation inventory, least-privilege RLS review, and stable access contract. No mobile UI and no fake `founding_beta` membership for free users.
 - **S-FREE-2 / Wave 2:** branch-local minimal free profile and deterministic categorical fit with evidence explanation and safe unknown behavior; Kanuj integration follows contract merge. No provider hard dependency and no diagnosis. See [S_FREE_2_PERSONAL_FIT.md](S_FREE_2_PERSONAL_FIT.md).
-- **S-FREE-3 / Wave 3:** owner-bound free Check history, shelf/product states, reactions/tolerance and profile context data plane, including anonymous ownership.
+- **S-FREE-3 / Wave 3, stacked PR in progress:** owner-bound free Check history, shelf/product states, reactions/tolerance and profile context data plane, including anonymous ownership. Kanuj's UI remains fixture-only until the reviewed contract is merged.
 - **S-FREE-4 / Wave 4:** private evidence storage, S6 candidate/formula resolution and review states. OCR/model output is not authoritative identity.
 - **S-PAID-1 / Wave 5:** permanent identity and managed entitlement separation plus F1 founder construction, validation, publication and member readback. F1 is part of this milestone.
 - **S-OPS-1:** anonymous cleanup, rate/abuse controls, account linking/conflicts, deletion, session-loss behavior and privacy-safe operational observability.
