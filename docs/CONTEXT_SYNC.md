@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-24: S-FREE-2/3/4 landed, mobile/hosted handoff still open
+
+- **Predecessor:** `main@cfdbf97b410b8c64d007e819a2a7155c9e3613a7` before this docs-only status checkpoint. S-FREE-2 PR #54 merged at `5f764d7715ca6ba0a4a585ee46c5f13dc78dc855`; S-FREE-3 PR #58 at `fad55ce4fd38a91fa549c86bda1a8fc77c9e569c`; S-FREE-4 PR #61 at `cfdbf97b410b8c64d007e819a2a7155c9e3613a7`. Each had green exact-head CI after reconciliation; post-merge main run `36013988653` passed both jobs.
+- **Scope:** merged platform contracts, migrations, and Edge code only. No `app/**` change, hosted migration/function deployment, hosted guest activation, or physical acceptance occurred. Retinyl Propionate review regression was fixed and tested before S-FREE-2 merge.
+- **Kanuj mobile handoff:** the typed services `src/services/remote/freePersonalFit.ts`, `freeContext.ts`, and `freeProductEvidence.ts` are now on main, but no customer-facing app/component/presentation code imports them. `CheckCaptureHost` still defaults to `pendingCaptureProcessor`, so photo capture does not call S-FREE-4 resolution. Kanuj owns profile save/read and same-result fit refresh, MY STUFF persistence projection, and capture-to-resolver wiring. Keep unknown/candidate states truthful; do not infer verified formula from photos or OCR.
+- **Sami next gate:** S-OPS-1 guest lifecycle, abuse/cleanup, linking/conflicts, deletion, and lost-session behavior precedes hosted anonymous activation. K-ACCEPT-1 then requires physical end-to-end proof. The scanner-first beta is not ready.
+
 ## 2026-09-24: S-FREE-4 private product-evidence branch
 
 - **Predecessor:** S-FREE-3 PR #58 head `eff5e85` after the S2 retinoid correction; `main@5153b38b1e3d16aee2fe1b36d1298c524bb94edf` at branch start. Work is isolated to `sami/s-free-4-product-evidence`; the dirty founder checkout and Kanuj-owned customer UI remain untouched.

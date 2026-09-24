@@ -1,6 +1,6 @@
 # S-FREE-2: optional free profile and personal fit
 
-This is the platform handoff for K-FREE-2. It does not change `app/**`, managed onboarding, membership, skin photos, Shelf/history, or hosted anonymous activation. The implementation is local/branch-only until reviewed and deployed separately.
+This is the merged local platform handoff for K-FREE-2. It does not change `app/**`, managed onboarding, membership, skin photos, Shelf/history, or hosted anonymous activation. The implementation has not been deployed or consumed by the mobile UI.
 
 ## Interface
 
@@ -22,7 +22,7 @@ The endpoint checks a sourced canonical product, an active verified variant, and
 
 The deliberately narrow first rules are: an exact normalized ingredient-list match to a user-reported sensitivity warrants caution, while a reported sensitivity with no exact match remains unknown (aliases and triggers are not inferred); a listed retinoid with reported pregnancy/nursing or withheld/unknown context never gets an unqualified positive fit; overlap with reported retinoid/acid/benzoyl-peroxide treatment or easily reactive skin and a listed active warrants caution; a verified moisturizer without those actives *could work* for someone who reports both a dryness goal and dry/tight skin behavior. The retinoid check matches a whole `retinyl` ingredient token rather than enumerating only palmitate/acetate, so retinyl propionate and other named retinyl esters cannot receive a positive moisturizer label by omission. This is a conservative rule, not a claim about individual exposure or risk; [PubChem identifies retinyl propionate as a retinol ester](https://pubchem.ncbi.nlm.nih.gov/compound/Retinyl-propionate). That final label is not proof of effectiveness, tolerance, formula concentration, allergy status, or medical safety. All other cases return `NOT_ENOUGH_INFORMATION` until a separately reviewed rule is justified. The retinoid pregnancy caution is anchored to [AAD pregnancy skin-care guidance](https://www.aad.org/public/everyday-care/skin-care-secrets/routine/pregnancy-skin-care); it tells the customer to consult a clinician, not to self-diagnose or stop a prescription.
 
-No shelf/history or reaction-derived inference is part of S-FREE-2; S-FREE-3 will own those evidence sources. No OCR, camera, or user-provided formula authority is part of this service; S-FREE-4 owns private evidence capture. Formula Details remains factual and separate from Personal Fit. The current hosted catalog has no verified formula versions, so deploying this alone would yield unknown results rather than personalized product claims.
+Shelf/history persistence belongs to S-FREE-3, which is now merged; the fit service may use same-catalog-product user-reported reactions only as a cautious signal, never ingredient causation. No OCR, camera, or user-provided formula authority is part of this service; S-FREE-4 owns private evidence capture and is also merged locally. Formula Details remains factual and separate from Personal Fit. The current hosted catalog has no verified formula versions, so deploying this alone would yield unknown results rather than personalized product claims.
 
 ## Security and release gates
 
@@ -32,4 +32,4 @@ Local verification includes a fresh full migration reset, pgTAP owner/RLS/grant 
 
 ## Kanuj handoff
 
-K-FREE-2 can keep the three-screen profile optional, save the complete snapshot after completion, then call `getPersonalFit(productId, variantId)` to refresh the **same** result. If variant or formula is unresolved, show the returned unknown explanation; do not turn `COULD_WORK` into "safe" or "recommended" and do not infer a global score. `getFreeSkinProfile()` supports editing later in MY STUFF. Use fixtures until this contract is merged. Do not wire the legacy paid `skin_profiles` or model-backed `scan-product` into free Check.
+K-FREE-2 can keep the three-screen profile optional, save the complete snapshot after completion, then call `getPersonalFit(productId, variantId)` to refresh the **same** result. If variant or formula is unresolved, show the returned unknown explanation; do not turn `COULD_WORK` into "safe" or "recommended" and do not infer a global score. `getFreeSkinProfile()` supports editing later in MY STUFF. The contract is merged; fixture replacement is a separate Kanuj-owned integration. Do not wire the legacy paid `skin_profiles` or model-backed `scan-product` into free Check.

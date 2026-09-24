@@ -1,6 +1,6 @@
 # S-FREE-3: Free Context and Check History
 
-Status: stacked on S-FREE-2 PR #54; local implementation only. Do not deploy this migration or Edge Function until S-FREE-2 lands and exact-head checks run. The prior GitHub Actions billing/spending gate cleared; #54 and #58 have green checks at their current heads.
+Status: merged into main in PR #58 after S-FREE-2 PR #54, with exact-head and post-merge checks green. Local platform implementation only; hosted deployment and mobile consumption remain gated separately.
 
 ## What exists
 
@@ -14,8 +14,8 @@ Removing a free history entry removes it from this free-memory store. If the ent
 
 ## Kanuj handoff
 
-Consume the typed functions in `src/services/remote/freeContext.ts` and the exact request/response types in `src/contracts/FreeContext.ts`. On MY STUFF, load the S-FREE-2 profile separately, then page products, checks, and experiences. Present manual entries and unresolved Checks explicitly. Call `recordFreeCheck` only after a result is actually shown/saved. Generate a stable UUID per mutation and reuse it for retries. Do not infer allergy from `reacted`, elevate user text to catalog truth, or show raw notes in analytics. Kanuj owns mapping to `MyStuffViewModel` and all screen/copy integration; this branch deliberately changes no `app/**` or `src/components/**` files.
+Consume the typed functions in `src/services/remote/freeContext.ts` and the exact request/response types in `src/contracts/FreeContext.ts`. On MY STUFF, load the S-FREE-2 profile separately, then page products, checks, and experiences. Present manual entries and unresolved Checks explicitly. Call `recordFreeCheck` only after a result is actually shown/saved. Generate a stable UUID per mutation and reuse it for retries. Do not infer allergy from `reacted`, elevate user text to catalog truth, or show raw notes in analytics. Kanuj owns mapping to `MyStuffViewModel` and all screen/copy integration; this platform milestone deliberately changes no `app/**` or `src/components/**` files.
 
 ## Still gated
 
-Hosted anonymous Auth, abuse/rate limits, identity linking and lost-session handling remain S-OPS-1. Product-photo capture/storage has a separate, local S-FREE-4 stacked branch; it is not hosted or wired to Kanuj's camera UX. This branch has no customer-visible MY STUFF persistence until Kanuj integrates it, and has no hosted deployment. The present hosted catalog also lacks verified formulas, so reaction-aware positive-fit behavior cannot be demonstrated on production catalog data yet.
+Hosted anonymous Auth, abuse/rate limits, identity linking and lost-session handling remain S-OPS-1. Product-photo capture/storage is merged locally in S-FREE-4 but not hosted or wired to Kanuj's camera UX. This contract has no customer-visible MY STUFF persistence until Kanuj integrates it, and has no hosted deployment. The present hosted catalog also lacks verified formulas, so reaction-aware positive-fit behavior cannot be demonstrated on production catalog data yet.
