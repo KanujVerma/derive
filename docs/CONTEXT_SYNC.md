@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-25: S-PAID-1 / F1 manual routine fallback, platform increment
+
+- **Predecessor:** clean `origin/main@51a0e527b464c74495fa5ff1c0e90cfa21bea4fa` before this isolated Sami branch.
+- **Scope:** founder-only, model-independent initial managed routine draft with existing safety validation, transactional idempotency, permanent-account/active-membership checks, and existing founder publish/readback pipeline. See [S_PAID_1_MANUAL_ROUTINE.md](S_PAID_1_MANUAL_ROUTINE.md).
+- **Boundary:** this increment does not add the founder console create form, change the `$25` managed display or product billing, deploy to hosted Supabase, enable guest Auth, or complete S-PAID-1. S-OPS-1 and K-ACCEPT-1 remain separate release gates.
+
 ## 2026-09-25: S-FREE-4 daily-limit remote error handoff
 
 - **Predecessor:** clean `origin/main@6b71352ddcaa0234008fcec56f5ce8032851f6b9` before this isolated Sami branch.

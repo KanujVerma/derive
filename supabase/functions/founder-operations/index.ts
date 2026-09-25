@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { identityKindFromVerifiedUser } from "../_shared/access.ts";
+import { MembershipEntitlementError, requireActiveMembership } from "../_shared/entitlement.ts";
 import {
   validateRoutineProposal,
   validateSensitivities,
@@ -430,6 +431,12 @@ async function validateFounderRoutine(
   if (productById.size !== productIds.length) {
     throw new FounderError("VALIDATION_FAILED", "Every routine step must reference a known catalog product", 409);
   }
+  for (const item of items) {
+    const product = productById.get(item.product_id);
+    if (!product || item.product_name !== product.name || item.brand !== product.brand || item.category !== product.category) {
+      throw new FounderError("VALIDATION_FAILED", "Routine step identity must match its catalog product", 409);
+    }
+  }
 
   const steps: RoutineProposalStep[] = items.map((item) => ({
     order: item.order_index,
@@ -496,7 +503,7 @@ async function rpcOrThrow(admin: SupabaseClient, name: string, args: Record<stri
   if (error) {
     const known = [
       "NOT_FOUND", "NOT_AWAITING_REVIEW", "INVALID_", "REQUIRED", "TOO_LONG",
-      "ALREADY_RESOLVED", "FOUNDER_ACCESS_REQUIRED",
+      "ALREADY_RESOLVED", "ALREADY_EXISTS", "REQUEST_CONFLICT", "FOUNDER_ACCESS_REQUIRED",
     ].some((token) => error.message?.includes(token));
     console.error(`${name} failed:`, error.code);
     throw new FounderError(known ? "CONFLICT" : "OPERATIONS_UNAVAILABLE", known ? error.message : "Operation could not be completed", known ? 409 : 500);
@@ -525,6 +532,29 @@ Deno.serve(async (req) => {
     }
     if (action === "product_identity_detail") {
       return json(req, await productIdentityDetail(admin, requireUuid(body.caseId, "caseId")));
+    }
+    if (action === "create_manual_routine_draft") {
+      const memberId = requireUuid(body.memberId, "memberId");
+      const requestId = requireUuid(body.requestId, "requestId");
+      const summary = requireString(body.summarySentence, "summarySentence", 600);
+      const items = parseRoutineItems(body.items);
+      try { await requireActiveMembership(admin, memberId); }
+      catch (error) {
+        if (error instanceof MembershipEntitlementError) {
+          throw new FounderError(error.code, error.message, error.status);
+        }
+        throw error;
+      }
+      await validateFounderRoutine(admin, memberId, summary, items);
+      const data = await rpcOrThrow(admin, "founder_create_manual_routine_draft", {
+        p_actor_user_id: founderId,
+        p_member_id: memberId,
+        p_summary_sentence: summary,
+        p_items: items,
+        p_founder_notes: optionalString(body.founderNotes, "founderNotes", 4000),
+        p_request_id: requestId,
+      });
+      return json(req, { result: data });
     }
     if (action === "publish_routine") {
       const routineId = requireUuid(body.routineId, "routineId");
