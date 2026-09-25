@@ -1,6 +1,6 @@
 # S-FREE-4: Private Free Product Evidence
 
-Status: merged local platform implementation in PR #61 after S-FREE-3 PR #58. It is not hosted or wired into Kanuj's camera flow. Hosted anonymous access remains gated by S-OPS-1.
+Status: merged local platform implementation in PR #61 after S-FREE-3 PR #58, with K4/S4 camera integration merged in PR #65. It is not hosted. Hosted anonymous access remains gated by S-OPS-1.
 
 ## Exact mobile handoff
 
@@ -10,6 +10,8 @@ Status: merged local platform implementation in PR #61 after S-FREE-3 PR #58. It
 4. Call the existing `resolve-product-identity` with a fresh case `requestId`, `consumer: 'scan'`, and at most three `evidencePhotos: [{storagePath,role,extractedText?}]`. An on-device OCR string, when available, is only candidate evidence. A photo without extractable text can legitimately return `insufficient_evidence`. Render S6 `state`, `candidates`, and `nextAction` truthfully; never label a candidate verified. The contract is merged; Kanuj owns the capture-to-resolver adapter and UI copy.
 
 `prepare-free-product-evidence` accepts exactly `requestId` (UUID), `role` (`front_label`, `ingredients`, `packaging`), and `mimeType` (JPEG/PNG/WebP/HEIC/HEIF). It returns `bucket`, `storagePath`, `role`, `mimeType`, `maxBytes`. Invalid requests are 400; retrying a UUID with a different role/type is 409; six issued paths per owner per rolling 24 hours yield 429. The grant is not an upload completion signal: if Storage upload fails, retry the same path, or use a new request UUID as quota permits. A path grant authorizes a single immutable object only. The resolver checks the Auth owner, exact grant, role, and object existence before saving evidence.
+
+The remote helper now throws `FreeProductEvidenceDailyLimitError` (`code: 'DAILY_LIMIT'`) only when the HTTP 429 body is the server's `DAILY_LIMIT` response. Other failures remain generic; it does not trust message text or treat every 429 as the daily quota. Kanuj's capture processor still converts all preparation errors to `PREPARE_FAILED`; its customer-facing mapping is a separate Kanuj-owned follow-up. The server quota and hosted activation are unchanged.
 
 ## Security and truth boundaries
 

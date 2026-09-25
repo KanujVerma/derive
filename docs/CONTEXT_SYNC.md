@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-25: S-FREE-4 daily-limit remote error handoff
+
+- **Predecessor:** clean `origin/main@6b71352ddcaa0234008fcec56f5ce8032851f6b9` before this isolated Sami branch.
+- **Sami remote contract:** `prepareFreeProductEvidence` exposes `FreeProductEvidenceDailyLimitError` with `code: 'DAILY_LIMIT'` only for an HTTP 429 whose server response body carries `DAILY_LIMIT`. Other 429s and failed responses remain generic. No backend quota, hosted configuration, or guest signup changes.
+- **Kanuj handoff:** `src/presentation/capture/freeEvidenceProcessor.ts` still catches all prepare errors as `PREPARE_FAILED`; Kanuj owns its typed mapping and customer copy. Until then, this is not an end-to-end quota UX fix. Hosted anonymous activation remains gated by S-OPS-1.
+
 ## 2026-09-24: Explicit Check-history save and owner-switch clearing
 
 - **Predecessor:** clean `main@0e20febc755918d833d70e79d4218bb3dc314c50`. Check-memory PR #66 head `abaef0306c372e7b5afc7cdc230e092a96fb2282` merged at `0e20febc755918d833d70e79d4218bb3dc314c50`; exact-head CI passed both jobs.
