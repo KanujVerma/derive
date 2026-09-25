@@ -66,6 +66,20 @@ async function run() {
       founderNotes: 'Private founder note',
     };
 
+    assert.equal((await invoke(outsider, { action: 'managed_member_lookup', email: memberUser.email })).status,
+      403, 'non-founder cannot look up managed members');
+    const lookup = await invoke(founder, { action: 'managed_member_lookup', email: memberUser.email });
+    assert.equal(lookup.status, 200);
+    assert.equal(lookup.data.member.id, memberUser.id);
+    assert.equal(lookup.data.skinProfile.onboarding_completed, true);
+    const noMembership = await invoke(founder, { action: 'managed_member_lookup', email: outsiderUser.email });
+    assert.equal(noMembership.status, 403);
+    const search = await invoke(founder, { action: 'routine_catalog_search', query: 'Gentle Cleanser' });
+    assert.equal(search.status, 200);
+    assert.ok(search.data.products.some((row) => row.id === productId));
+    assert.ok(search.data.products.every((row) => !('full_ingredients' in row)), 'picker returns minimum metadata');
+    assert.equal((await invoke(founder, { action: 'routine_catalog_search', query: '%' })).status, 400);
+
     assert.equal((await invoke(member, request)).status, 403, 'member cannot create founder draft');
     assert.equal((await invoke(outsider, request)).status, 403, 'outsider cannot create founder draft');
     const mismatched = await invoke(founder, { ...request, requestId: crypto.randomUUID(),
@@ -84,6 +98,8 @@ async function run() {
     assert.equal(collision.status, 403, 'different member cannot reuse request ID');
     const duplicate = await invoke(founder, { ...request, requestId: crypto.randomUUID() });
     assert.equal(duplicate.status, 409, 'another initial draft is rejected');
+    assert.equal((await invoke(founder, { action: 'managed_member_lookup', email: memberUser.email })).status,
+      409, 'member with an existing routine cannot be selected for another initial draft');
 
     const rows = await admin.from('routines').select('id, version, status, founder_notes').eq('user_id', memberUser.id);
     assert.ifError(rows.error);

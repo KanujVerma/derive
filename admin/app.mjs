@@ -209,13 +209,137 @@ async function routineModal(row) {
 
 function renderRoutines() {
   const rows = state.dashboard?.routineQueue ?? [];
-  if (rows.length === 0) return emptyState("No routines awaiting review", "New proposals will appear here before member publication.");
-  return element("div", { className: "card-grid" }, rows.map((routine) => element("article", { className: "queue-card" }, [
+  const heading = element("div", { className: "queue-heading" }, [
+    element("div", {}, [element("h2", { text: "Managed routines" }),
+      element("p", { className: "subtle", text: "Create a founder draft when model generation is unavailable, then review it before publication." })]),
+    button("Create founder draft", newRoutineModal, "primary"),
+  ]);
+  if (rows.length === 0) return element("div", {}, [heading,
+    emptyState("No routines awaiting review", "Founder drafts and AI proposals will appear here before member publication.")]);
+  return element("div", {}, [heading, element("div", { className: "card-grid" }, rows.map((routine) => element("article", { className: "queue-card" }, [
     cardHeader(`VERSION ${routine.version}`, formatMember(routine.member), "AWAITING REVIEW", "review"),
     memberLine(routine.member), element("p", { className: "card-copy", text: routine.summary_sentence }),
     element("p", { className: "timestamp", text: `Generated ${formatDate(routine.created_at)}` }),
     element("div", { className: "card-actions" }, [button("Open review", () => routineModal(routine), "primary")]),
-  ])));
+  ])))]);
+}
+
+function newRoutineModal() {
+  const form = element("form", { className: "modal-form routine-editor" });
+  const email = element("input", { type: "email", required: true, placeholder: "member@example.com" });
+  const memberStatus = element("div", { className: "context-strip", text: "Look up an active managed member with completed intake and no existing routine." });
+  const summary = element("textarea", { required: true, attrs: { rows: "3", maxlength: "600" }, placeholder: "A simple, member-facing summary of this routine" });
+  const founderNotes = element("textarea", { attrs: { rows: "3", maxlength: "4000" }, placeholder: "Private rationale or review notes" });
+  const search = element("input", { type: "search", placeholder: "Search catalog by product or brand (2+ characters)" });
+  const results = element("div", { className: "catalog-results" });
+  const steps = element("div", { className: "routine-steps" });
+  const stepEditors = [];
+  let selectedMember = null;
+  const mutationId = requestId();
+
+  const findMember = async () => {
+    if (!email.reportValidity()) return;
+    const requestedEmail = email.value.trim().toLowerCase();
+    selectedMember = null;
+    memberStatus.textContent = "Checking membership and intake…";
+    setBusy(true);
+    try {
+      const data = await founderRequest("managed_member_lookup", { email: requestedEmail });
+      if (email.value.trim().toLowerCase() !== requestedEmail) return;
+      selectedMember = data.member;
+      const safety = data.skinProfile;
+      memberStatus.replaceChildren(
+        element("strong", { text: `${formatMember(data.member)} · active managed member` }),
+        element("span", { text: `Goal: ${safety.primary_goal ?? "unanswered"}` }),
+        element("span", { text: `Pregnancy: ${safety.pregnancy_status ?? "unanswered"}` }),
+        element("span", { text: `Sensitivities: ${safety.sensitivities_status ?? "unanswered"}${(safety.known_sensitivities ?? []).length ? ` (${safety.known_sensitivities.join(", ")})` : ""}` }),
+        element("span", { text: `Prescriptions: ${(safety.active_prescriptions ?? []).join(", ") || "not listed — confirm if unknown"}` }),
+      );
+    } catch (error) {
+      memberStatus.textContent = "Member not eligible or not found. Check the email and intake status.";
+      showBanner(friendlyError(error), "error");
+    } finally { setBusy(false); }
+  };
+
+  const addStep = (product, timing) => {
+    if (stepEditors.length >= 24) return showBanner("Use no more than 24 routine steps.", "error");
+    const amount = element("input", { required: true, placeholder: "e.g., one pump" });
+    const area = element("input", { required: true, value: "face" });
+    const days = element("input", { placeholder: "Leave blank for daily, or enter mon, tue…" });
+    const purpose = element("textarea", { required: true, attrs: { rows: "2" }, placeholder: "What this step does" });
+    const why = element("textarea", { required: true, attrs: { rows: "2" }, placeholder: "Why this product fits this member" });
+    const watch = element("textarea", { attrs: { rows: "2" }, placeholder: "What to watch for, if relevant" });
+    const container = element("fieldset", { className: "step-editor" }, [
+      element("legend", { text: `${timing.toUpperCase()} · ${product.brand} ${product.name}` }),
+      element("div", { className: "field-grid" }, [labelField("Amount", amount), labelField("Area", area), labelField("Days", days)]),
+      labelField("Purpose", purpose), labelField("Why chosen", why), labelField("Watch for", watch),
+      button("Remove step", () => {
+        const at = stepEditors.findIndex((item) => item.container === container);
+        if (at >= 0) stepEditors.splice(at, 1);
+        container.remove();
+      }, "ghost danger"),
+    ]);
+    stepEditors.push({ product, timing, amount, area, days, purpose, why, watch, container });
+    steps.append(container);
+  };
+
+  const findProducts = async () => {
+    const query = search.value.trim();
+    if (query.length < 2) return showBanner("Enter at least two characters to search the catalog.", "error");
+    setBusy(true);
+    try {
+      const data = await founderRequest("routine_catalog_search", { query });
+      results.replaceChildren(...data.products.map((product) => element("div", { className: "catalog-result" }, [
+        element("span", { text: `${product.brand} ${product.name} · ${product.category}` }),
+        button("Add AM", () => addStep(product, "am")),
+        button("Add PM", () => addStep(product, "pm")),
+      ])));
+      if (!data.products.length) results.textContent = "No standard catalog products found. Verify the product before drafting.";
+    } catch (error) { showBanner(friendlyError(error), "error"); }
+    finally { setBusy(false); }
+  };
+
+  const memberButton = button("Find member", findMember);
+  email.addEventListener("input", () => { selectedMember = null; memberStatus.textContent = "Look up this member before saving."; });
+  form.append(
+    element("p", { className: "eyebrow", text: "FOUNDER-AUTHORED DRAFT" }),
+    element("h2", { text: "Create a managed routine", attrs: { id: "modal-title" } }),
+    element("p", { className: "subtle", text: "For an active member with completed intake. A draft is never sent to the member until separately reviewed and published." }),
+    labelField("Member email", email), memberButton, memberStatus,
+    labelField("Member-facing summary", summary),
+    element("h3", { text: "Catalog steps" }),
+    element("p", { className: "fine-print", text: "Select only catalog products you have checked against this member’s reported sensitivities, treatments, and preferences. The server validates again." }),
+    labelField("Find a product", search), button("Search catalog", findProducts), results, steps,
+    labelField("Private founder notes", founderNotes),
+    element("div", { className: "form-actions" }, [button("Cancel", closeModal, "ghost"), element("button", { text: "Save draft for review", type: "submit", className: "primary" })]),
+  );
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!selectedMember) return showBanner("Find and confirm an eligible member first.", "error");
+    if (stepEditors.length === 0) return showBanner("Add at least one catalog step.", "error");
+    let items;
+    try {
+      const orders = { am: 0, pm: 0 };
+      items = stepEditors.map(({ product, timing, amount, area, days, purpose, why, watch }) => ({
+        product_id: product.id, product_name: product.name, brand: product.brand, category: product.category,
+        timing, order_index: ++orders[timing], amount: amount.value.trim(), area: area.value.trim(),
+        days: parseList(days.value, 7), purpose: purpose.value.trim(), why_chosen: why.value.trim(),
+        watch_for: watch.value.trim() || null,
+      }));
+    } catch (error) { return showBanner(error.message, "error"); }
+    setBusy(true);
+    try {
+      await founderRequest("create_manual_routine_draft", {
+        requestId: mutationId, memberId: selectedMember.id, summarySentence: summary.value.trim(),
+        items, founderNotes: founderNotes.value.trim() || null,
+      });
+      closeModal();
+      showBanner("Founder draft saved. Open it in the review queue before publishing.", "success");
+      await loadDashboard();
+    } catch (error) { showBanner(friendlyError(error), "error"); }
+    finally { setBusy(false); }
+  });
+  openModal(form);
 }
 
 function refillModal(refill, next) {
@@ -326,6 +450,7 @@ async function loadDashboard() {
 }
 
 function showLogin(error = "") {
+  closeModal();
   $("#console-view").classList.add("hidden");
   $("#login-view").classList.remove("hidden");
   $("#login-error").textContent = error;

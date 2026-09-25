@@ -21,7 +21,7 @@ Never put `SUPABASE_SERVICE_ROLE_KEY` in `config.js`, browser storage, an Expo v
 ## Supported operations
 
 Lightweight administrative tools for operating the first 10 Founding Beta customers ($25/mo Derive-management membership; products purchased separately):
-- **Routine Review Queue**: Review and publish AI-generated routine proposals before customer notification.
+- **Founder Draft + Routine Review Queue**: Look up an eligible managed member, select standard catalog products, author a model-independent initial draft, then separately review and publish it before customer notification. The picker is deliberately bounded; it does not imply that a product is clinically appropriate or that every catalog formula is verified.
 - **Safety Escalation Queue**: Inspect flagged medical/sensitization warnings from Ask conversations.
 - **Managed Refill Operations**: Track replenishment requests, mark as ordered/shipped, and assign tracking numbers.
 - **Product & Formula Verification**: Review user-scanned counter products and audited formula snapshots.
