@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-25: S-PAID-1 founder draft console increment
+
+- **Predecessor:** merged `origin/main@4b9fdaa558cb060efff37126db67ccfd407257f4` after platform PR #69.
+- **Scope:** founder-only member eligibility lookup and standard-catalog search, plus a small admin form for model-independent AM/PM draft construction. The server still validates eligibility, product identity, and safety before the transactional draft write; publication is a separate review action.
+- **Boundary:** no customer UI, pricing change, hosted deployment, guest activation, Stripe activation, or clinical certification claim. See [S_PAID_1_MANUAL_ROUTINE.md](S_PAID_1_MANUAL_ROUTINE.md).
+
 ## 2026-09-25: S-PAID-1 / F1 manual routine fallback, platform increment
 
 - **Predecessor:** clean `origin/main@51a0e527b464c74495fa5ff1c0e90cfa21bea4fa` before this isolated Sami branch.

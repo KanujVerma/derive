@@ -251,6 +251,54 @@ async function dashboard(admin: SupabaseClient): Promise<Record<string, unknown>
   };
 }
 
+async function managedMemberLookup(admin: SupabaseClient, email: string): Promise<Record<string, unknown>> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    throw new FounderError("INVALID_PAYLOAD", "Enter a complete member email address", 400);
+  }
+  const { data: member, error: profileError } = await admin.from("profiles")
+    .select("id, email, full_name")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+  if (profileError) queryFailure("managed member lookup", profileError);
+  if (!member) throw new FounderError("NOT_FOUND", "No member has that email address", 404);
+  try { await requireActiveMembership(admin, member.id); }
+  catch (error) {
+    if (error instanceof MembershipEntitlementError) throw new FounderError(error.code, error.message, error.status);
+    throw error;
+  }
+  const [skin, routine] = await Promise.all([
+    admin.from("skin_profiles")
+      .select("onboarding_completed, primary_goal, pregnancy_status, sensitivities_status, known_sensitivities, active_prescriptions")
+      .eq("user_id", member.id).maybeSingle(),
+    admin.from("routines").select("id").eq("user_id", member.id).limit(1),
+  ]);
+  if (skin.error) queryFailure("managed intake lookup", skin.error);
+  if (routine.error) queryFailure("existing routine lookup", routine.error);
+  if (skin.data?.onboarding_completed !== true) throw new FounderError("INTAKE_REQUIRED", "Member intake must be completed first", 409);
+  if ((routine.data ?? []).length > 0) throw new FounderError("ROUTINE_ALREADY_EXISTS", "Member already has a routine; review it instead", 409);
+  return { member, skinProfile: skin.data };
+}
+
+async function routineCatalogSearch(admin: SupabaseClient, query: string): Promise<Record<string, unknown>> {
+  const term = query.trim();
+  if (term.length < 2 || term.length > 60 || /[%_\\]/.test(term)) {
+    throw new FounderError("INVALID_PAYLOAD", "Search must be 2–60 characters without wildcard characters", 400);
+  }
+  const pattern = `%${term}%`;
+  const [names, brands] = await Promise.all([
+    admin.from("products").select("id, brand, name, category")
+      .eq("is_catalog_standard", true).ilike("name", pattern).order("name").limit(12),
+    admin.from("products").select("id, brand, name, category")
+      .eq("is_catalog_standard", true).ilike("brand", pattern).order("name").limit(12),
+  ]);
+  if (names.error) queryFailure("routine catalog name search", names.error);
+  if (brands.error) queryFailure("routine catalog brand search", brands.error);
+  const products = [...new Map([...(names.data ?? []), ...(brands.data ?? [])].map((row) => [row.id, row])).values()]
+    .sort((a, b) => `${a.brand} ${a.name}`.localeCompare(`${b.brand} ${b.name}`)).slice(0, 20);
+  return { products };
+}
+
 async function routineDetail(admin: SupabaseClient, routineId: string): Promise<Record<string, unknown>> {
   const { data: routine, error } = await admin.from("routines")
     .select("id, user_id, version, status, summary_sentence, founder_notes, created_at, updated_at, published_at")
@@ -529,6 +577,12 @@ Deno.serve(async (req) => {
     }
     if (action === "routine_detail") {
       return json(req, await routineDetail(admin, requireUuid(body.routineId, "routineId")));
+    }
+    if (action === "managed_member_lookup") {
+      return json(req, await managedMemberLookup(admin, requireString(body.email, "email", 254)));
+    }
+    if (action === "routine_catalog_search") {
+      return json(req, await routineCatalogSearch(admin, requireString(body.query, "query", 60)));
     }
     if (action === "product_identity_detail") {
       return json(req, await productIdentityDetail(admin, requireUuid(body.caseId, "caseId")));
