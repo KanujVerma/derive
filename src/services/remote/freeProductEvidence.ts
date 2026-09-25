@@ -8,10 +8,35 @@ type PhotoClient = {
   }) => Promise<{ error: unknown }> } };
 };
 
+/** A server-enforced daily photo-grant limit, not a network or upload failure. */
+export class FreeProductEvidenceDailyLimitError extends Error {
+  readonly code = 'DAILY_LIMIT' as const;
+
+  constructor() {
+    super('Daily product-photo limit reached');
+    this.name = 'FreeProductEvidenceDailyLimitError';
+  }
+}
+
+async function isDailyLimit(error: unknown): Promise<boolean> {
+  if (!error || typeof error !== 'object' || !('context' in error)) return false;
+  const context = error.context;
+  if (!context || typeof context !== 'object' || !('status' in context) || context.status !== 429) return false;
+  try {
+    const response = 'clone' in context && typeof context.clone === 'function' ? context.clone() : context;
+    if (!response || typeof response !== 'object' || !('json' in response) || typeof response.json !== 'function') return false;
+    const payload: unknown = await response.json();
+    return !!payload && typeof payload === 'object' && 'code' in payload && payload.code === 'DAILY_LIMIT';
+  } catch {
+    return false;
+  }
+}
+
 export async function prepareFreeProductEvidence(input: PrepareFreeProductEvidenceInput,
   client: PhotoClient | null = supabase as PhotoClient | null): Promise<FreeProductEvidenceUpload> {
   if (!client) throw new Error('Supabase client is not configured');
   const { data, error } = await client.functions.invoke('prepare-free-product-evidence', { body: input });
+  if (await isDailyLimit(error)) throw new FreeProductEvidenceDailyLimitError();
   if (error || !data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Photo upload is unavailable');
   const target = data as FreeProductEvidenceUpload;
   if (target.bucket !== 'customer-product-evidence' || typeof target.storagePath !== 'string'
