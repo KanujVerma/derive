@@ -1,22 +1,67 @@
 # Derive System Architecture
 
-## Strategy status: implemented system and approved target
+## Architecture status and authority
 
-**Implemented today:** Development Remote with an exact local Supabase URL silently establishes a guest Auth session when none exists, consumes server `FreeAccessState`, and opens the four-root scanner shell. Free Check reads sourced `catalog-products` and factual `resolve-product-identity`; active permanent managed users land Plan and retain managed bootstrap. Development Mock stays a sample preview. Remote Staging and production retain the existing C1/E1 legacy routing, and hosted guest signup is deliberately gated. `anon` has no application-table privileges. Catalog coverage is small and H1P live-provider behavior is unproven. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the backend operation matrix.
+This document separates current runtime evidence from the approved target. The target is not evidence that a service, type, migration, model, or provider exists.
 
-**Approved broader target:** the local first-launch and factual Check path is implemented. Free Personal Fit, profile/history persistence, camera evidence beyond barcode, hosted guest activation, and physical release acceptance remain later gates. A Supabase anonymous user has the authenticated role with an anonymous identity claim; it is not the public `anon` key/role.
+### CURRENT IMPLEMENTATION
 
-Target identity/access separates anonymous identity, permanent identity, free product intelligence, and paid Managed Skincare. Managed enrollment requires permanent identity plus a managed entitlement. Product facts and baseline fit remain separate services; the deterministic fit service must work without a model provider. Public or shareable factual product evidence does not weaken owner-bound private shelf, profile, reaction, history, or evidence-photo storage.
+At main d793639, Development Mock and exact-local-Supabase Development Remote contain the scanner-first free path. Remote Staging and production retain legacy managed routing; hosted anonymous guest activation remains gated. The public anon database role has no application-table privileges. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the local platform access matrix.
 
-The target root navigation is CHECK / MY STUFF / PLAN / SHOP in Development Mock and local integrated Remote. Existing C1 tabs remain the Remote Staging and production architecture. The roadmap's waves define interface owners and integration order.
+The mobile Check path uses Expo Camera directly. S6 has product, variant, identifier, append-only formula-version, provenance, evidence, and resolution-case concepts. Private product evidence and K4/S4 camera-to-evidence integration exist locally, but photo-only input has no working OCR/image-recognition extraction. Candidate or user-supplied text cannot establish verified formula truth.
 
-## Architecture Overview
+The local free profile, first-match Personal Fit, saved-product/check/experience history, and evidence upload are bounded implementations. Personal Fit returns a narrow sequential result, not every applicable finding or a versioned personal decision packet. Free event history is not a canonical routine/exposure timeline. ProductTruthSnapshot, concentration assertions, regulatory-constraint records, the full scientific-claim model, and multi-finding decision packet are not implemented. Physical scanner acceptance is unverified.
+
+### APPROVED TARGET, NOT YET IMPLEMENTED
+
+The target access model separates anonymous identity, permanent identity, free product intelligence, and paid Managed Skincare. Managed access requires permanent identity plus server-owned entitlement. Product facts may be shared only under their source/rights rules; profiles, routines, experiences, and evidence photos remain owner-bound and private.
+
+The product decision flow is:
+
+CAPTURE / SEARCH
+→ PERCEPTION / EVIDENCE COLLECTION
+→ PRODUCT + FORMULA TRUTH RESOLUTION
+→ VERSIONED PRODUCT TRUTH SNAPSHOT
+→ USER PROFILE + ROUTINE + HISTORY CONTEXT
+→ ALL APPLICABLE FINDINGS
+→ DETERMINISTIC DECISION POLICY
+→ PERSONAL DECISION PACKET
+→ EVIDENCE-BOUND CUSTOMER EXPLANATION
+→ CUSTOMER
+
+The durable target concepts are:
+
+- Product; ProductAlias; ProductVariant; ProductIdentifierAssertion; ObservedPackaging.
+- FormulaVersion; ordered IngredientOccurrence; IngredientEntity; ConcentrationAssertion; RegulatoryConstraint.
+- ScientificEvidenceClaim; SourceProvenance; ReformulationLineage; ResolutionCase; ProductTruthSnapshot.
+- Time-aware user profile, routine/exposure, experience, and decision provenance.
+- Finding records that retain evidence, applicability, uncertainty, and conflicts.
+- A deterministic decision policy, versioned PersonalDecisionPacket, and renderer restricted to packet-supported claims.
+
+Product truth is versioned: Product → Variant → FormulaVersion → ordered IngredientOccurrence records → evidence and provenance. A GTIN is an identifier assertion, not a product key, exact-formula key, or authenticity proof. Visual/model resemblance and user confirmation can support a candidate or resolution case but cannot independently promote formula truth. Unknown and conflicting evidence remain explicit.
+
+Concentration and regulatory constraints are independent. A concentration assertion records its evidence basis (label-declared, manufacturer-declared, analytically measured, derived constraint, scenario assumption), quantity shape (point, interval, inequality, order-only, unknown), review state (proposed, accepted, disputed, superseded), and scope such as substance/blend, unit, w/w versus w/v when known, active-equivalent basis when relevant, formula/version, market, observation date, and source. A legal maximum is not an observed formulation quantity; it cannot silently become one.
+
+Scientific claims preserve source and version, date, study design and method, claim type and endpoint, formula/ingredient scope, population, route/exposure, outcome, limitations, and applicability. Toxicological hazard, exposure, product risk, efficacy, and a person's likely response are distinct. Evidence frameworks are applied only within a stated method and question.
+
+Provider-neutral target seams separate capture observations, barcode/photo capture, evidence extraction, and candidate retrieval. A port returns evidence, ambiguity, no result, cancellation, unsupported-input, and failure states without creating canonical truth. Models may propose bounded evidence or findings and may abstain. Deterministic policy controls the final customer action. Scandit, OCR/VLM providers, MobileCLIP, and Jev remain evaluation choices; no winner is selected here.
+
+### Ownership boundaries
+
+Each active feature has one founder DRI accountable end-to-end. Sami stewards platform and product-truth invariants; Kanuj stewards customer experience. A steward does not become the feature owner by default. Independent work can proceed on disjoint contracts or fixtures; shared contracts, migration ordering, canonical truth promotion, and high-contention composition files have one active writer at a time. See [OWNERSHIP.md](OWNERSHIP.md).
+
+## Historical architecture and implementation snapshot
+
+The sections below preserve the earlier managed-first and fixed client/platform-lane architecture for historical implementation context. Their old “current”, owner, and provider-selection wording is not the approved future ownership model; verify runtime claims against current source and tests before relying on them.
+
+### Historical architecture overview
+
 
 Derive couples an Apple-grade client application with a privacy-first, model-orchestrated backend platform.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                 MOBILE CLIENT (Kanuj Lane)                  │
+│                 MOBILE CLIENT (historical)                  │
 │       Expo Router • React Native • TypeScript • Zustand     │
 │   Today  •  Plan  •  Shop  •  Ask  •  Progress              │
 └──────────────────────────────┬──────────────────────────────┘
@@ -34,7 +79,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
                                                │ HTTPS / Signed JWT
                                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                PLATFORM BACKEND (Sami Lane)                 │
+│                PLATFORM BACKEND (historical)                 │
 │  Supabase Postgres • Auth • Private Storage • RLS Policies   │
 │                                                             │
 │  ┌────────────────────────┐    ┌─────────────────────────┐  │
@@ -55,7 +100,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ---
 
-## 1. Mobile Client Layer (Kanuj)
+### 1. Mobile Client Layer (historical file-lane label)
 * **Framework**: React Native 0.86 on Expo SDK 57, structured via Expo Router (file-system routing in `app/`).
 * **State Management**: Zustand stores (`useRoutineStore`, `useOnboardingStore`, `useUserStore`, and ephemeral `useScanContextStore`) for reactive client UI state and transient full-fidelity Scan → Ask context preservation.
 * **Scan & Ask Context Resolution (`src/utils/scanContext.ts`)**: Pure utilities `resolveAskDisplayBanner` and `resolveAskServiceContext` that cleanly decouple visual banner display continuity (supporting deep link route parameters) from domain service context. Route query strings are never synthesized into artificial `ProductScanResult` domain records; `IDeriveService.askDerive` receives strictly full typed `ProductScanResult` records from the ephemeral store.
@@ -83,7 +128,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ---
 
-## 2. Platform & Database Layer (Sami)
+### 2. Platform & Database Layer (historical file-lane label)
 * **Database**: Managed PostgreSQL on Supabase.
 * **Auth Data Lifecycle (S1 Implemented)**: Inserts into `auth.users` provision a matching `public.profiles` row through a `SECURITY DEFINER` trigger in the unexposed `private` schema with an empty pinned search path. Email and non-authoritative display metadata are synchronized without granting customers profile creation or email-write authority.
 * **Row-Level Security (S1 Implemented)**: Every existing public application table has RLS enabled. `anon` has no application-table privileges. Authenticated members receive an explicit least-privilege operation matrix: owner-scoped profile/skin/shelf/photo/check-in/refill access, read-only membership/routine/catalog access, and no access to founder review tasks, payment identifiers, founder notes, AI analysis fields, or fulfillment state changes. Trusted service-role operations stay server-side.
@@ -130,7 +175,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ---
 
-## 3. Intelligence Orchestration Layer
+### 3. Intelligence Orchestration Layer
 * **Provider-Neutral Architecture (`RoutineIntelligenceProvider`)**:
   - The routine intelligence pipeline is decoupled behind a provider-neutral interface: `{ readonly providerId: string; generateProposal(context: AssembledRoutineContext): Promise<RoutineIntelligenceProposal>; }`.
   - Production model/provider selection is explicitly OPEN / DEFERRED (`ARCHITECTURE_CHALLENGE-05`). Swapping providers requires implementing a thin adapter and verification, not a redesign of routine generation.
@@ -171,7 +216,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ---
 
-## 4. Founder Console & Concierge Operations (`admin/**`)
+### 4. Founder Console & Concierge Operations (`admin/**`)
 * Dedicated administrative and concierge operations interface for Kanuj and Sami to run the 10-member Founding Beta:
   - **Routine Review Queue**: Manually review, adjust, and approve proposed routines before initial member publication or subsequent material routine changes.
   - **Fulfillment Desk**: Manually source, purchase, and track product shipments and replenishments (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
@@ -180,7 +225,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ---
 
-## 5. Commerce & Billing
+### 5. Commerce & Billing
 * **Platform**: S5 implements hosted Stripe Checkout and Billing Portal sessions for the Founding Beta **membership**. Implemented display truth is **$25/month** Derive-management (ADR-26 / I1-B4A), while `STRIPE_FOUNDING_BETA_PRICE_ID` is the server-side charged-price authority. `config.betaPriceMonthly` remains display-only.
 * **Trust Boundary**: Authenticated checkout/portal functions re-verify the member session and derive user/email server-side. The mobile app receives only a short-lived HTTPS destination; Stripe secret key, webhook secret, customer ID, subscription ID, and price ID never cross into Expo.
 * **Lifecycle**: `stripe-membership-webhook` has Supabase JWT verification disabled because Stripe sends no Supabase JWT, but it verifies the raw body against `Stripe-Signature` before mutation. It handles Checkout completion and subscription create/update/delete/pause/resume events. `active`/`trialing` map to canonical `active`; `canceled`/`incomplete_expired` map to `cancelled`; other non-entitled billing states map conservatively to `paused`.
@@ -193,7 +238,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ---
 
-## 6. Telemetry & Analytics
+### 6. Telemetry & Analytics
 
 **Current transmission state:** live `src/services/analytics.ts` only logs allowlisted events to the console in development; it has no PostHog/network sender, and session replay is disabled. The event type currently includes product names/IDs for some scan/shop events. Do not transmit product/ingredient text or any skin/profile text when analytics is added. Do not describe planned measurement as active analytics.
 
@@ -207,7 +252,7 @@ Derive couples an Apple-grade client application with a privacy-first, model-orc
 
 ---
 
-## 7. S6 backend: one Product Identity Resolver for Scan and Shelf
+### 7. S6 backend: one Product Identity Resolver for Scan and Shelf
 
 Current Scan has a client barcode lookup, while `ScanProductInput.imageUri` is only an input field: hosted `scan-product` still requires `productName` and does not perform image identity resolution. Onboarding Shelf has a capture UI, but production `recognizeShelfProducts()` returns no detected products; historical demo fixtures are not recognition authority.
 

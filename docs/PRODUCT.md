@@ -1,29 +1,54 @@
 # Derive Product Specification: Current Strategy and Historical V1
 
-## Current strategy (local Wave-1 integration; broader target approved)
+## Current product direction (approved target; runtime status is separate)
 
-Derive is personalized skincare product intelligence first. **Free Check** answers “Should I use this?” through product-name search, barcode, front-label/package capture, and ingredient capture; later share/paste flows may follow. It presents only supported product identity, formula facts, uncertainty and provenance. If enough context exists, it adds categorical personal fit with no universal numerical score.
+Derive is **scanner-first personalized skincare product intelligence**. The free product's central question is **“Should I use this product?”** A customer can point at or search for a skincare product and Derive tells them what it actually knows, how it fits their skin, current routine and prior experience, and what they should do next. “Personalized Yuka for skincare” is internal shorthand only, not customer-facing positioning.
 
-K-FREE-1B's shell opens CHECK around the supported barcode camera when permitted, with name search one tap away. Permission is requested only after a Scan barcode action. Development Mock uses a sourced sample; Development Remote with local Supabase uses anonymous Auth, live catalog facts, and factual typed/barcode resolution. OCR and deterministic Personal Fit are not active.
+There is no universal numerical compatibility, health, safety, or product-quality score. Formula Details are factual product/formula evidence; Personal Fit is contextual guidance for one person. A supported formula can still be a poor fit, and missing identity or formula evidence stays unknown.
 
-The local integrated first launch silently establishes a Supabase anonymous authenticated identity and opens CHECK. The user sees factual first-check value before a later optional, roughly 45-second profile. Current shelf/history is optional future context. The roots are CHECK / MY STUFF / PLAN / SHOP; account/settings stays in the header. Free use requires no managed entitlement. **$25 Managed Skincare** requires a permanent identity plus managed entitlement and adds routine construction and longitudinal care. Remote Staging and production retain legacy C1 managed-first routing; hosted anonymous access remains gated.
+The intended differentiator is that the same product may lead to a different decision for a different person, routine, or history. The decision must remain bound to the exact supported product and formula revision.
 
-| Capability | Free Check target | Managed Skincare target |
-| --- | --- | --- |
-| Access | Anonymous or permanent identity; no managed membership | Permanent identity plus managed entitlement |
-| Product facts | Supported catalog/formula facts and exact unknown states | Same Check |
-| Personal fit | Deterministic, categorical, explainable when evidence supports it | Same Check plus ongoing routine management |
-| Context | Optional goals, skin behavior/reactivity, material treatment/sensitivity/pregnancy context, shelf/history | Reuse free context; ask only missing detailed managed-care questions |
-| Photos | Private product evidence only when needed | Required baseline Front / Left / Right photos for managed intake |
-| Navigation | CHECK, MY STUFF, PLAN, SHOP | CHECK, MY STUFF, PLAN, SHOP; open PLAN |
+### Current implementation
 
-Free personalization covers up to about three goals (breakouts, dark/post-breakout marks, dryness/barrier, redness/sensitivity, texture, oiliness, aging/fine lines); dry/tight, balanced, combination, oily, or unsure behavior; reacts easily, generally tolerates, or unsure; and only material treatment/prescription (including retinoids, benzoyl peroxide and exfoliating acids), known sensitivity/allergy, and pregnancy/nursing context (Yes / No / Prefer not to say). Reuse existing canonical goal enums where sensible. Do not collect baseline photos, budget or routine complexity in this free flow. Do not infer race, ethnicity, ancestry, or Fitzpatrick.
+Development Mock and exact-local-Supabase Development Remote contain a scanner-first free path. Remote Staging and production retain legacy managed routing, and hosted guest activation is gated. S6 has sourced product identity and versioned formula evidence; K4/S4 connects the mobile camera to private product-evidence handling locally. Check uses Expo Camera directly. Photo-only evidence has no working OCR or image-recognition extraction.
 
-“Formula Details” is factual product/formula evidence. “Personal Fit” is user-contextual. The K-FREE-1 Check result uses “FORMULA DETAILS” and keeps Personal Fit unavailable in the local preview. Fit may consider supported roles, duplicate active classes, retinoid/exfoliant stacking, known sensitivities, current treatments, redundancy/gaps, and sufficiently supported user-reported tolerance. It must explain evidence used, state uncertainty, and fail closed without reliable identity/formula evidence. Model-provider output may improve explanation but must not be required for free Check.
+The local free profile, saved-product/check/experience history, and Personal Fit exist in bounded forms. Current Personal Fit is a narrow sequential first-match result, not a multi-finding engine. Local history is not the target canonical routine/exposure timeline. Physical scanner acceptance is not established. Consult [ROADMAP.md](ROADMAP.md) and [CONTEXT_SYNC.md](CONTEXT_SYNC.md) for point-in-time gates.
 
-Catalog coverage is an acquisition risk: current hosted count is 4 products, 1 sourced product, 1 alias, and 0 variants, identifiers, or formula versions. Do not claim broad coverage or guess unknown products. The next scanner-first external beta needs the new flow, safe unknown fallback, anonymous RLS review, deterministic fit, and physical acceptance; H1P is not the factual Check gate.
+### Customer value progression
 
-Dermatologist review is future trust/operations work. Say an individual plan was reviewed by a named dermatologist only when that person reviewed that plan. Protocol/advisory review needs different wording and separate legal/operational review. No dermatologist-certified feature exists today.
+A successful Check progressively answers:
+
+1. What should I do?
+2. Why for me?
+3. How does this affect what I already use?
+4. What should I do next?
+5. What does Derive know versus not know?
+
+Quality has independent dimensions: correctness, relevance, actionability, uncertainty honesty, and customer effort. Do not call a higher personalization level better when it reduces correctness.
+
+- **Level 0: fail.** generic skincare statement.
+- **Level 1:** product-specific supported facts.
+- **Level 2:** basic profile-aware guidance.
+- **Level 3:** routine-aware personal decision.
+- **Level 4:** history-aware personal decision.
+
+Free Check should provide factual first value before offering optional personalization. Ask only for context that can materially change a decision; allow customers to skip or withhold it. A future result may consider supported ingredient roles, repeated active classes, routine overlap, current treatments, stated sensitivities, and reported product experience, but it must state its evidence and fail closed when identity, formula, or relevant context is insufficient.
+
+### Progressive personalization and safety context
+
+A minimal optional profile may collect customer-stated goals, skin behavior/reactivity, relevant treatment or prescription use, known sensitivities, and prior product experience. Keep unanswered, unsure, withheld, and no as distinct states. Do not require baseline photos, budget, or routine complexity for free Check.
+
+Ask pregnancy, trying-to-conceive, and breastfeeding/nursing questions only when materially relevant to the current product decision. These contexts are distinct; never infer them from a photo or unrelated attributes. Do not infer race, ethnicity, ancestry, or Fitzpatrick. Keep advice cosmetic and non-diagnostic, and never modify prescription care.
+
+Routine and history should grow progressively when they improve a decision. A future canonical model records what product/formula was used, when, and what the customer reported, so history can inform later checks without turning context tags or reactions into causal proof. Do not manufacture a routine, paid status, or progress when the underlying records do not support it.
+
+### Free and Managed relationship
+
+The free scanner is the acquisition wedge for supported product facts and personal guidance. **$25/month Managed Skincare** is an ongoing routine-management hypothesis: routine construction, check-ins, adaptation, progress/history, and product decisions, with founder support during early beta where needed. Do not claim validated pricing, retention, or hosted billing activation from a display price, founder console, or local flow. Routine products remain separate from membership pricing.
+
+The initial external-beta target is U.S. adults 18 and older; this is a target scope, not a claim of an implemented runtime age gate. Makeup, layering, and tint/shade guidance may follow later and must preserve confirmation, provenance, and non-discrimination rules.
+
+Dermatologist review is future trust and operations work. Say an individual plan was reviewed by a named dermatologist only when that person reviewed that plan. Protocol/advisory review needs different wording and separate legal/operational review. No dermatologist-certified feature is claimed today.
 
 ## Historical managed-first specification (superseded 2026-09-23)
 
