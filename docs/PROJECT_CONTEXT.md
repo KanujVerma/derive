@@ -1,12 +1,18 @@
 # Project Context: Derive
 
-## Current approved strategy (2026-09-23)
+## Current approved strategy (2026-09-26)
 
-Derive is personalized skincare product intelligence first: a free Check acquisition wedge for factual, evidence-bounded product information and optional personal fit. The paid target is **$25 Managed Skincare**, ongoing routine construction and management. No universal score. See [ROADMAP.md](ROADMAP.md) for the current product flow, access matrix, milestones, gates and open implementation questions.
+Derive is **scanner-first personalized skincare product intelligence**. Free Check asks **“Should I use this product?”** and first returns supported facts about what Derive actually knows. When supported personal context exists, it explains what that person should do and why. There is no universal numerical product, compatibility, or health score. “Personalized Yuka for skincare” is internal shorthand only.
 
-**Not implemented yet:** silent Supabase anonymous Auth, free access without managed entitlement, optional minimal profile persistence, deterministic baseline fit, target CHECK / MY STUFF / PLAN / SHOP navigation, and scanner-first external beta. Current C1/E1 runtime remains managed-first. The anonymous target is authenticated-role Auth with an anonymous identity claim and requires a dedicated RLS/security review.
+The paid hypothesis is **$25/month Managed Skincare** for ongoing routine management, adaptation, check-ins, progress, and product decisions. Pricing, retention, and hosted billing activation are not validated by the display price or local flows. See [ROADMAP.md](ROADMAP.md), [OWNERSHIP.md](OWNERSHIP.md), and [AGENTS.md](../AGENTS.md) for active plans and agent routing.
 
-**Current evidence:** PR #36/#37 catalog search and Check routes exist, but Remote Staging hides Check. The hosted catalog handoff has 4 products, 1 sourced product, 1 alias and no variants, identifiers or formula versions. PR #39 closes the catalog UUID handoff to routine persistence; hosted live-provider behavior remains H1P-unproven.
+## Current implementation status at main 35a015c
+
+A bounded scanner-first free path exists locally in Development Mock and exact-local-Supabase Development Remote. S-FREE-2/3/4 and K2/S2, K3/S3, and K4/S4 are integrated locally. The current Check camera/barcode path uses Expo Camera directly, and private product evidence is captured and handled locally. Photo-only OCR/image recognition is not implemented; Scandit is not selected; Gemini/Luna image extraction has not been benchmarked.
+
+Optional free profile persistence, saved products, Check history, reported experiences, and private product evidence exist in bounded local forms. The current free profile stores a goals array, skin behavior, reactivity, treatment and sensitivity context, and one pregnancy/nursing status field. It does not implement a separate decision-intent field, an explicit primary-goal field, or distinct just-in-time pregnancy, trying-to-conceive, and breastfeeding states. Free product memory currently stores using/considering/stopped, checks, and reported experiences; it is not a canonical routine/exposure timeline. Personal Fit is a narrow sequential first-match result, not the approved multi-finding decision system. PersonalDecisionPacketV1 is target architecture only.
+
+Remote Staging and production retain legacy managed routing. Hosted guest activation remains gated, and scanner-first external beta is not ready. Physical scanner acceptance remains unverified. Do not describe local integration as hosted release or target behavior as shipped behavior.
 
 ## Historical managed-first project context (superseded as product strategy)
 
