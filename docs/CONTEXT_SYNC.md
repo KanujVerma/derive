@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-26: Sami GTM document publication
+
+- **Predecessor:** `origin/main@d793639b6ee95c1eabdc91956c16aaa413fb056c`.
+- **Context:** [GTM Doc M](GTM_DOC_M.md) publishes Sami's existing September 26 acquisition plan unchanged: three combined free daily scan/link checks, proposed $4.99 scanner premium, chronological readiness/distribution gates, club/creator outreach, Product Hunt, and Madison content planning.
+- **Boundary:** strategy handoff only, not a replacement implementation specification or proof of shipped quota/link/premium capabilities. No application code, hosted configuration, pricing contract, deployment, or external marketing activity changed.
+
 ## 2026-09-25: S-PAID-1 founder draft console increment
 
 - **Predecessor:** merged `origin/main@4b9fdaa558cb060efff37126db67ccfd407257f4` after platform PR #69.
