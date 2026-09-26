@@ -1,24 +1,33 @@
 # Scanner-First External Beta Acceptance Plan
 
-**Purpose:** Future scanner-first beta acceptance. This is a target checklist, not evidence that the new flow or hosted anonymous access exists.
+**Purpose:** Target criteria for a future scanner-first external beta. This is not evidence that the complete target flow or hosted anonymous access exists.
 
-**Owner:** Kanuj owns physical customer/mobile acceptance (K-ACCEPT-1). Sami owns anonymous Auth, RLS/security review, access contracts, deterministic fit, data lifecycle, and hosted evidence. Route cross-lane defects with exact evidence and owner.
+**Acceptance ownership:** Acceptance follows the active feature-DRI model. P0-A Capture + Product Resolution is currently recommended to Sami; P0-B Personal Decision Intelligence is currently recommended to Kanuj. Name a cross-product composition/release DRI before final release acceptance. Platform/truth and customer-experience stewardship remain cross-cutting review roles.
+
+**Current implementation boundary:** A bounded free scanner-first path, profile/history, private evidence handling, and K4/S4 camera integration exist locally. Check uses Expo Camera directly. Current free Personal Fit is first-match; free product memory does not contain the canonical routine schedule model. Photo OCR/image recognition is absent, hosted guest activation is gated, and physical scanner acceptance is unverified. The target details below must not be marked complete until observed in an eligible future build.
 
 ## Target first-launch and first-check flow
 
-- [ ] Fresh install silently establishes a Supabase anonymous authenticated identity; the UI does not show create account, sign-in, email, password, membership activation, long onboarding, baseline photos, or managed-routine setup.
-- [ ] The free user lands on CHECK and can start a check with product-name search, barcode, front-label/package capture, or ingredient capture. Verify permission and retry behavior for available capture paths.
-- [ ] Factual result appears before profile prompts. Record supported canonical identity, variant/package state, formula details only when exact evidence supports it, provenance that is customer-safe, and explicit uncertainty. Unknown stays unknown; no universal score.
-- [ ] Offer optional “Want to know if this fits you?” / “Personalize Derive in about 45 seconds.” Skip leaves factual checking useful. Completion refreshes the same product result.
-- [ ] Optional profile checks: up to about three goals (breakouts, dark/post-breakout marks, dryness/barrier, redness/sensitivity, texture, oiliness, aging/fine lines); skin behavior (dry/tight, balanced, combination, oily, unsure); reactivity (reacts easily, generally tolerates, unsure); material current treatments/prescriptions, retinoid/adapalene/tretinoin, benzoyl peroxide, exfoliating acids, known sensitivities/allergies, and pregnancy/nursing Yes / No / Prefer not to say. No race, ethnicity, ancestry or Fitzpatrick inference.
-- [ ] Add current products only as an optional later step. Verify explicit “add what you're using for overlap and stacking checks” messaging and using/considering/stopped states. Verify profile edit in MY STUFF and repeat check history when implemented.
-- [ ] Personal Fit is categorical, deterministic, explainable and based only on supported formula and user evidence; it is independent of H1P. It distinguishes formula facts from personal fit, exposes uncertainty, and gives no diagnosis or invented concentration.
-- [ ] Verify identity linking and loss/deletion/privacy behavior only after Sami's approved S-FREE-1/S-OPS-1 paths exist. Permanent identity is required before managed enrollment; test account linking without recording credentials or sensitive disclosures.
-- [ ] Verify target CHECK / MY STUFF / PLAN / SHOP navigation, free CHECK launch, and managed PLAN launch only after implementation. No Mock fixture leakage.
+- [ ] A fresh install in the scanner-first free build establishes the intended guest identity and lands on CHECK without account creation, sign-in, email/password, membership activation, long onboarding, baseline photos, or managed-routine setup. Hosted guest access remains gated until its separate lifecycle and abuse requirements are met.
+- [ ] Start a Check with product-name search and barcode capture when available. Verify camera permission, cancel, retry, and back/reset behavior. If private front-label or ingredient evidence is enabled in the build, verify capture and private handling; do not claim that OCR or image recognition works.
+- [ ] Show factual value before profile prompts: supported product identity, variant/package state, formula details only when exact evidence supports them, customer-safe provenance, and explicit unknowns. Unknown remains unknown; no universal score.
+- [ ] Offer personalization only after factual value. It is optional; skipping it leaves factual Check useful. When supported context is added, refresh the same product result.
+- [ ] When the customer chooses to personalize, capture decision intent: add something new, replace something already used, or check something already in use.
+- [ ] Capture one primary goal and optional secondary goals, up to roughly three goals total. Goal examples include breakouts, dark/post-breakout marks, dryness/barrier, redness/sensitivity, texture, oiliness, or fine lines. Capture skin behavior and reactivity, plus treatment or sensitivity context when it can materially change the decision.
+- [ ] Do not require routine-complexity preference during initial free personalization.
+- [ ] Ask about pregnancy, trying to conceive, and breastfeeding/nursing just in time, only when materially relevant to the product decision. Keep the states distinct; unknown, unanswered, and withheld must never become “no.”
+- [ ] **These profile details are target, not current behavior:** the existing free profile has a goals array, not a separate decision-intent or primary-goal field, and uses one pregnancy/nursing status field without a distinct trying-to-conceive state.
+- [ ] Return a personal action, reason, and next step only when supported evidence permits it. The target preserves all material supported findings and applies a deterministic, versioned policy to select the action. Current runtime remains a narrower first-match Personal Fit implementation.
+- [ ] Progressively capture routine context when useful. The approved target includes product, AM/PM/both/unknown, frequency, current/paused/stopped, and routine completeness. Preserve unknown values rather than assuming a complete routine.
+- [ ] **This routine model is target, not current free history:** current free memory stores using/considering/stopped product state, checks, and reported experiences; it does not store the target schedule and completeness model.
+- [ ] Keep formula facts separate from Personal Fit. Do not invent concentrations, diagnoses, or ingredient claims. A reported reaction is not proof of an ingredient allergy or causation. Do not infer race, ethnicity, ancestry, or Fitzpatrick.
+- [ ] Verify profile edits, explicit Check-history saves, owner-switch clearing, identity linking, privacy, and deletion only on their corresponding implemented paths. Do not record credentials or sensitive disclosures.
+- [ ] Verify the target CHECK / MY STUFF / PLAN / SHOP navigation and CHECK launch when available. Do not let Mock fixtures leak into a customer session.
+- [ ] Never infer physical-device acceptance from simulator or export evidence.
 
 ## Beta release evidence required
 
-A scanner-first external beta requires real hosted anonymous/free access with explicit RLS/security review; supported factual result and safe unknown fallback; useful catalog coverage; deterministic fit and its evidence contract; private product evidence paths; anonymous cleanup, rate/abuse, linking and deletion behavior; physical first-launch/repeat-launch acceptance; and current privacy, support, and App Store Connect information generated from the actual future binary. H1P is not required for factual Check or baseline deterministic fit. No build, submission, or public link is created by this documentation plan.
+Before broad scanner-first outreach, require supported factual results and safe unknown recovery, useful catalog coverage, hosted free access with explicit RLS and lifecycle/abuse review, a working private evidence fallback, a supported personal decision where context exists, and physical-device acceptance on the actual release candidate. Current privacy, support, and store information must match that binary. H1P is not required for factual Check or the current deterministic baseline fit. Do not create a build or public release as part of this documentation plan.
 
 ## Historical managed-first acceptance script
 
