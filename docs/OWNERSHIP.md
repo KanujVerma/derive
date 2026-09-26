@@ -1,10 +1,52 @@
-# Derive Founder Ownership
+# Derive Feature Ownership
+
+## Active ownership model
+
+Every active milestone/feature has exactly one founder DRI accountable for its customer outcome end-to-end. The DRI may own client/UI, server, persistence, tests, integration and physical acceptance required by that feature. There is no permanent frontend/backend owner split.
+
+## Recommended initial P0 features
+
+| Feature | DRI | Scope and status |
+| --- | --- | --- |
+| P0-A Capture + Product Resolution | Sami | End-to-end Check capture, barcode/photo evidence, extraction/evaluation adapters if selected, S6 truth resolution, catalog/review and device acceptance. Current Check uses Expo Camera directly; no photo OCR provider or Scandit adapter is implemented. |
+| P0-B Personal Decision Intelligence | Kanuj | End-to-end optional profile, routine/history context, multi-finding policy, decision packet, renderer and physical acceptance. Local first-match Personal Fit exists; the multi-finding target does not. |
+| P0-C Hosted Beta Operations | DRI assigned explicitly before activation | Hosted guest abuse/lifecycle, linking, cleanup, retention and activation review. Hosted guest activation remains gated. |
+| P0-D Cross-product physical/release acceptance | Composition/release DRI named explicitly before activation | Cross-feature physical and release composition. Do not infer an owner from a permanent client/server lane. |
+
+These are the approved initial split, not a prediction that every P0 feature is currently active or complete. Current implementation and gate status are in [ROADMAP.md](ROADMAP.md).
+
+## Horizontal stewardship
+
+Feature ownership does not remove review of cross-cutting invariants. Default platform/truth steward: **Sami**, covering Auth, RLS, Storage, ownership/linking/deletion, billing, service-role boundaries, canonical product/formula semantics, scientific-evidence model and migration discipline. Default customer-experience steward: **Kanuj**, covering root navigation, shared design system, global Check, result hierarchy, app shell, cross-feature behavior and physical-device acceptance. A steward reviews invariant changes; the feature DRI remains accountable for shipping.
+
+## Maximum independent parallelism
+
+**Every active milestone has one founder DRI. The DRI may decompose the milestone into parallel agent-owned workstreams with disjoint write-sets. A dependency may block final integration, but it must not block independent implementation when a stable contract, fixture or view model can be used. Shared contracts, migration ordering, authoritative truth promotion and high-contention composition files have one active writer at a time. After independent modules are complete, one bounded composition pass integrates them.**
+
+Founder-level and subagent-level parallelism are both expected where write-sets do not conflict. A simple structure is:
+
+```text
+Feature A DRI -> independent agents -> bounded composition
+Feature B DRI -> independent agents -> bounded composition
+Feature A || Feature B when dependencies allow
+```
+
+Use one writer at a time for shared public contracts, migration ordering, central Auth/runtime composition, root navigation/layout, high-contention Check composition, authoritative catalog/science promotion, and final release composition. A stable contract or fixture lets the dependent feature progress without waiting for a live integration.
+
+## Future assignment
+
+Assign each future feature to one founder DRI using workload, context, dependencies, relevant expertise and parallelism. Explicitly name a DRI before starting hosted beta operations or cross-product physical/release acceptance. Do not turn a steward role into an implicit feature assignment.
+
+## Historical ownership model (superseded for new features)
+
+The following previous guide records the older fixed file-lane model at its checkpoint. It is retained for historical implementation context; it does not assign future milestones.
+
 
 Every implementation milestone has one founder owner. This approved split supports long parallel work with minimal file overlap. Wave-1 foundations and local mobile/platform integration are landed. K-FREE-2 (#51), K-FREE-3 (#48), K-FREE-4 (#49), K-PAID-1A (#52), K4-COMPOSE handoff prep (#55), KPAID-COMPOSE (#56), and K2-COMPOSE (#60) are landed. S-FREE-2 (#54), S-FREE-3 (#58), and S-FREE-4 (#61) are merged as local platform contracts and integrated in PRs #63, #64, and #65. Hosted deployment remains separate. [ROADMAP.md](ROADMAP.md) has the full sequence and acceptance gates.
 
 **Max-parallel implementation rule:** A counterpart contract is a prerequisite for integration, not a prerequisite for beginning or completing owned implementation. Kanuj presentation milestones may build against Kanuj-owned view models/fixtures while Sami builds platform contracts independently. After completing an owned milestone, each founder advances to the next non-overlapping milestone. Integration is a separate bounded task.
 
-## Kanuj: customer and mobile lane
+### Kanuj: customer and mobile lane
 
 Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client state/helpers, customer navigation/presentation, and physical device/TestFlight acceptance. Kanuj may build against fixtures or a local customer-state abstraction while the platform contract is being built.
 
@@ -18,7 +60,7 @@ Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client s
 - **K-ACCEPT-1:** scanner-first physical/TestFlight acceptance after platform contracts and release hardening.
 - **K-GROWTH, later:** shareable Check result and referral UX.
 
-## Sami: platform, intelligence, and operations lane
+### Sami: platform, intelligence, and operations lane
 
 Owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted Supabase/Auth/RLS/configuration, server billing, product identity/formula truth, and founder operations. Sami does not implement customer mobile UI.
 
@@ -32,7 +74,7 @@ Owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workf
 
 H1P remains a provider-backed intelligence milestone. H1B remains later managed billing/entitlement activation. H1E remains parked unless recovery needs it. None reinstates a hard H1P dependency for free factual Check or deterministic fit.
 
-## Wave handoffs
+### Wave handoffs
 
 | Wave | Parallel owner pair | Handoff required before integration |
 | --- | --- | --- |
@@ -44,10 +86,10 @@ H1P remains a provider-backed intelligence milestone. H1B remains later managed 
 | 5, presentation and composition landed | K-PAID-1A (PR #52) / S-PAID-1 | KPAID-COMPOSE (PR #56) is landed; integration handles upgrade and real Plan. |
 | Release | K-ACCEPT-1 / S-OPS-1 | Operations/security behavior and mobile acceptance are evidenced before scanner-first external beta. |
 
-## Shared-contract rule
+### Shared-contract rule
 
 A shared contract is not co-owned implementation. The milestone that first requires a contract owns its minimal change, records the exact request/response and failure states, validates and merges it, then hands it to the dependent milestone. The dependent owner does not edit that contract in parallel. Do not create “Kanuj + Sami” implementation milestones.
 
-## Historical ownership and evidence
+### Historical ownership and evidence
 
 Older F1, H1P, L1/L2, C1, Build 8/9/10, and catalog branch entries preserve their checkpoint-specific assignments and evidence. They do not override the current milestone table. PR #39's selected catalog UUID preservation is closed; Sami does not own that same fix as current work. Cross-lane defects still require exact evidence, affected interface, owner, and blocker status in the PR or [CONTEXT_SYNC.md](CONTEXT_SYNC.md).

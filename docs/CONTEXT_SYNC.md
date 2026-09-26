@@ -6,6 +6,16 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+
+## 2026-09-26: Canonical architecture and ownership documentation reconciliation
+
+- **Predecessor:** clean `origin/main@d793639b6ee95c1eabdc91956c16aaa413fb056c`. PR #68 merged as `51a0e527b464c74495fa5ff1c0e90cfa21bea4fa`; PR #69 as `4b9fdaa558cb060efff37126db67ccfd407257f4`; PR #70 as `d793639b6ee95c1eabdc91956c16aaa413fb056c`. This checkpoint is documentation-only and makes no runtime, schema, hosted, CI or release changes.
+- **Approved target:** scanner-first personalized skincare product intelligence; evidence-backed/versioned product truth; a personal decision that preserves multiple findings and is selected by deterministic policy; evidence-bound explanation; progressive routine/history context; no universal score. Target concepts such as `ProductTruthSnapshot`, concentration assertions, scientific claims, multi-finding engine and `PersonalDecisionPacketV1` are conceptual, not source types.
+- **Current implementation:** Development Mock and exact-local-Supabase modes contain scanner-first/free paths. Product resolution, free profile/fit, free history and private evidence are implemented locally in bounded forms. Capture uses Expo Camera directly; photo-only resolution has no working OCR/image extractor; current Personal Fit returns one first-match result; free routines/exposure revisions and packet provenance are not implemented. Remote staging/production and hosted guest activation remain gated.
+- **Evaluation boundary:** Expo is the scanner implementation; Scandit is a challenger, not selected. Gemini image extraction, GPT/Luna, on-device OCR, MobileCLIP and Jev remain candidates/evaluations without a benchmark winner or production Jev.
+- **Ownership target:** one end-to-end feature DRI with Sami platform/truth stewardship and Kanuj customer-experience stewardship. P0-A recommends Sami; P0-B recommends Kanuj. P0-C/P0-D require named DRIs before activation. Independent work may proceed on disjoint write-sets; shared/high-contention surfaces remain single-writer.
+- **Preserved history:** prior fixed frontend/backend lanes, Wave plans, and PR/runtime evidence remain in dated records below. They are not current future ownership assignments.
+
 ## 2026-09-25: S-PAID-1 founder draft console increment
 
 - **Predecessor:** merged `origin/main@4b9fdaa558cb060efff37126db67ccfd407257f4` after platform PR #69.

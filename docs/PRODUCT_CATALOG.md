@@ -1,6 +1,21 @@
-# Shared product catalog and Check a Product
+# Shared Product Catalog and Check a Product
 
-## Current strategy and implementation status (2026-09-23)
+## Current status at main d793639
+
+Check is the scanner-first free acquisition path in Development Mock and exact-local-Supabase Development Remote. Local integration includes sourced catalog search, S6 product/formula resolution, a narrow first-match Personal Fit path, free profile/history, and private product evidence. Remote Staging and production retain legacy managed routing; hosted guest activation remains gated.
+
+Catalog identity and formula truth are separate. A product name, alias, variant, identifier assertion, packaging observation, and formula version are not interchangeable. A GTIN is evidence of an identifier, not an exact formula or authenticity proof. Full formula facts are shown only when supported by the applicable verified identity/formula evidence. Unknown and conflicting cases remain unresolved and enter review; candidate resemblance, manual text, or a retailer offer does not establish canonical truth.
+
+Current mobile capture uses Expo Camera directly. Private product-evidence integration exists locally, but no working OCR/image-recognition extractor or provider-neutral scanner adapter is implemented. Scandit and image/model providers remain evaluation candidates. Physical scanner acceptance is not established.
+
+Catalog coverage must be measured against intended customer demand. The previous hosted catalog handoff recorded four products, one sourced product, one alias, and no variants, identifiers, or formula versions at that checkpoint; this is not asserted as a live count at current main. Prefer demand-driven authoritative sources and indexed candidate retrieval before scale. Do not scrape broadly, infer variants/formulas, or reuse product images without compatible rights and provenance. Review [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md), [SAFETY_PRIVACY.md](SAFETY_PRIVACY.md), and [ROADMAP.md](ROADMAP.md).
+
+## Historical catalog and integration records
+
+The following sections preserve earlier milestone contracts, PR results, and implementation instructions. Their “current”, future-owner, rollout, and hosted-count wording is a dated record, not a substitute for current runtime or release verification.
+
+
+### Current strategy and implementation status (2026-09-23)
 
 Check a Product is the approved free acquisition surface. S-FREE-1 opens the **local platform** for authenticated guests to search sourced catalog facts and resolve typed/barcode product identity without managed membership; the mobile Remote Staging route remains hidden and hosted anonymous signup remains gated. The hosted catalog handoff currently records 4 products, 1 sourced product, 1 alias, and 0 variants, identifiers, or formula versions. Catalog coverage is therefore a direct first-value risk; use demand-driven authoritative sources and truthful unknown fallback. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the exact access/evidence boundary.
 
@@ -8,11 +23,11 @@ The current PR #36/#37 search and Check paths and S6 evidence model are implemen
 
 **PR #39 is closed:** merge `2b9ed059b6572949aae1d3d2a4673e83dd6e21df` validates a committed sourced catalog UUID, sends only an opaque Shelf reference to the provider, binds the output back to the verified canonical UUID before routine persistence, and preserves the UUID through routine/user-product/member readback. Cross-product substitution fails closed; manual/provisional fallback and S6 variant/formula identity are unchanged. The recorded validation was 334 unit tests, 403 pgTAP assertions, both TypeScript checks, web/iOS exports, green PR and main CI, and a controlled hosted provider-free intake → routine → member readback proof. Hosted `propose-routine` v3 is ACTIVE with JWT verification enabled; the live provider path remains H1P-unproven. Do not reopen this completed UUID fix absent contradictory code evidence.
 
-## Boundary
+### Boundary
 
 One trusted catalog begins with `public.products` and extends through S6's `product_variants`, `product_identifiers`, and append-only `product_formula_versions`. A product name, variant, GTIN, formula version, and package provenance remain separate facts. At the start of the original catalog milestone, the three observed products were provisional (`is_catalog_standard = false`) and could not appear in customer catalog search. The current hosted handoff has 4 total products, 1 sourced product, 1 alias, and 0 variants, identifiers, or formulas. There is no blanket ingredient or formula truth for an identified product.
 
-## PR A: searchable knowledge foundation
+### PR A: searchable knowledge foundation
 
 `catalog-products` is an authenticated Edge Function with two bounded operations. `search` accepts 2-80 visible characters and returns at most 20 canonical product summaries. `detail` accepts a catalog product UUID and optional variant UUID and returns identity, variant metadata, and only formula evidence that meets S6's verified provenance constraints. It returns no member-specific records or verdict. Internal source references stay in server-only database columns. Customer detail includes a source link only from a separate operator-approved `publicSourceUrl`; HTTPS on an internal source is never enough. Public URLs reject credentials and query strings. A service-only SQL search function ranks exact brand plus name, exact name or alias, prefix, then trigram similarity, followed by stable brand/name/UUID ordering. PostgreSQL B-tree prefix and `pg_trgm` indexes bound typeahead work. The mobile app never downloads the full catalog.
 
@@ -20,23 +35,23 @@ Variant source reference, observation date, and verification state are stored ad
 
 A source-backed initial product may be added after deployment only if the founder confirms the choice. No variant, GTIN, or formula is inferred from a product page. Manufacturer pages can identify a product family but commonly warn that ingredients change by package and time.
 
-## PR B: mobile consumers
+### PR B: mobile consumers
 
 The Shelf screen leads with debounced catalog search and one-tap Add. Selection stores the canonical product UUID and `isCatalogStandard = true` with no invented ingredients. `Can't find it? Add manually` retains the existing provisional builder, duplicate checks, and ability to continue. Editing catalog identity into a different name converts it to a provisional customer entry, rather than retaining an unrelated catalog UUID.
 
 Check a Product uses the same catalog search and S6 resolver for typed/barcode identity. Search and barcode converge on the canonical product UUID. Barcode, typed identity, and future private label/ingredient photo evidence preserve S6's five trust states and candidate/founder review boundary. Product detail splits known formula facts from personal fit. Current member Scan behavior remains bounded by its existing provider/evidence gates. The approved target adds a deterministic baseline Personal Fit independent of H1P; until S-FREE-2 lands, do not present that target as implemented. No invented verdict or numeric score. Prototype products remain developer/test fixtures only. Current Remote Staging hides the Check a Product entry and guards direct routes until a separate release decision; no TestFlight submission is part of these PRs.
 
-## Acceptance and ownership
+### Acceptance and ownership
 
 PR A is a bounded catalog-platform assignment under this customer-requested milestone; it does not alter S6 trust decisions or Sami's separate F1/H1P/H1B work. PR B is Kanuj's mobile consumer of PR A's stable contract. Each PR runs the full relevant suite, exact-head CI, and an ownership/security review. PR A merges and deploys before PR B is built against hosted behavior. Demand-driven ingestion, rather than broad scraping, supplies beta products.
 
-## Stable catalog API
+### Stable catalog API
 
 `POST /functions/v1/catalog-products` accepts an authenticated session. Search request: `{"operation":"search","query":"CeraVe","limit":10}`. Its response is `{items: CatalogProductSummary[]}` with canonical ID, brand, name, category, no image until public image provenance exists, active variant count, and a conservative formula-availability state. Empty or one-character queries return no results; valid requests are capped at 20. Search never returns provisional products or user-specific records. Ranking is exact brand plus name, exact product name, exact alias, prefix, substring, then indexed trigram word similarity. Equal matches sort by brand, product name, and UUID.
 
 Detail request: `{"operation":"detail","productId":"<uuid>"}` with optional `variantId`. It returns one canonical product and up to 30 active variants. Formula facts appear only when an S6 verified formula has exactly one authoritative verified identifier link for the selected variant. Multiple linked versions produce `multiple_versions` with no ingredients rather than choosing a package formula. The Edge function returns no personalized fit and never calls a model.
 
-## Operator workflow
+### Operator workflow
 
 The operator input is one JSON entry with `product` (`brand`, `name`, `category`, `sourceReference`, optional `publicSourceUrl`, `observedAt`), optional sourced `aliases`, and optional sourced `variant`, `formula`, and `identifier`. A product-only record is valid. A formula entry requires exact ordered ingredients, provenance, source, observation time, and verification state. The CLI derives S6's normalized fingerprint; verified formula status rejects member-photo-only provenance. GTIN type, length, and check digit must match; an authoritative verified identifier can link to the exact verified formula of the same variant. Replays reuse the product/alias/variant and matching append-only evidence without rewriting source history.
 
@@ -44,7 +59,7 @@ Run a read-only preview with Node 22: `node --experimental-strip-types scripts/c
 
 The approved first live entry is [`cerave-renewing-sa-cleanser.json`](catalog-seeds/cerave-renewing-sa-cleanser.json), sourced from [CeraVe's official product page](https://www.cerave.com/skincare/cleansers/renewing-sa-cleanser). Its alias helps search. It intentionally contains no package variant, GTIN, formula ingredients, or actives because the manufacturer warns that ingredient lists change and the customer's exact package is not known.
 
-## Mobile consumer implementation
+### Mobile consumer implementation
 
 The onboarding Shelf now starts with a debounced authenticated catalog search. One tap adds the selected canonical UUID immediately with `isCatalogStandard = true` and empty chemistry. The search field clears for another selection. A separate `Can't find it? Add manually` path keeps the V1A provisional builder and allows continuation without a catalog match. Editing a catalog product into a different identity creates a new provisional manual entry instead of retaining the catalog UUID. Optional shelf photography remains available, but does not pretend that live visual recognition is active.
 

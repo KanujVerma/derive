@@ -1,20 +1,33 @@
 # Derive Interface & Service Contracts
 
-This document formalizes the runtime interface contracts between the client application (Kanuj) and the backend intelligence platform (Sami).
+## Current contracts and approved target seams
 
-Code definitions:
-- Interface definition: [`src/contracts/DeriveService.ts`](../src/contracts/DeriveService.ts)
-- Shared domain types: [`src/domain/types.ts`](../src/domain/types.ts)
-- Implementation mock: [`src/services/mock/MockDeriveService.ts`](../src/services/mock/MockDeriveService.ts)
-- Implementation remote: [`src/services/remote/RemoteDeriveService.ts`](../src/services/remote/RemoteDeriveService.ts)
-- S6 product identity: [`src/contracts/ProductIdentityResolver.ts`](../src/contracts/ProductIdentityResolver.ts)
-- S-FREE-3 free Check context: [`src/contracts/FreeContext.ts`](../src/contracts/FreeContext.ts)
-- S-FREE-4 private product evidence: [`src/contracts/FreeProductEvidence.ts`](../src/contracts/FreeProductEvidence.ts)
+### CURRENT IMPLEMENTATION
+
+The code-linked contracts below are real runtime interfaces. IDeriveService, ProductIdentityResolver, FreeAccess, FreePersonalFit, FreeContext, and FreeProductEvidence describe implemented boundaries, subject to their environment and release gates. Local scanner-first mobile integration is present in Development Mock and exact-local-Supabase Development Remote; hosted guest activation remains gated.
+
+Mobile Check currently calls Expo Camera directly. K4/S4 connects camera evidence to private S6 product-evidence resolution locally. This does not mean OCR, photo recognition, or provider-neutral capture adapters exist. The current free Personal Fit contract returns a narrow first-match result. The free context contract stores bounded saved-product, check, and experience events; it is not the canonical routine/exposure model.
+
+### APPROVED TARGET, NOT YET IMPLEMENTED
+
+These names describe semantic concepts only. They are not current TypeScript interfaces, database tables, or approved method signatures.
+
+- **CaptureObservation:** immutable record of what a capture attempt observed and when, with permission/cancel/error state. It does not establish product identity.
+- **BarcodeCapturePort:** returns raw barcode observations and supported format/device errors; it does not assert exact product or formula.
+- **PhotoCapturePort:** returns a private image observation or permission, cancellation, unsupported-input, or capture failure state.
+- **ProductEvidenceExtractor:** proposes label text or attributes with source and uncertainty, or abstains. It cannot verify truth.
+- **ProductCandidateRetriever:** returns ranked candidate identities, no match, or ambiguity; ranking is retrieval evidence, not authority.
+- **ProductTruthSnapshot:** binds product/variant/formula revision, provenance, conflicts, and unresolved evidence to one assessment.
+- **Finding:** a bounded applicable, conflicting, or unknown conclusion with its supporting evidence, context, rule/source, and uncertainty.
+- **PersonalDecisionPacketV1:** versioned set of findings and the deterministic selected action, bound to one truth snapshot, minimum-necessary customer context, and policy version.
+- **SoftJudgmentProvider:** optional provider that contributes a constrained finding or abstains. It cannot write truth or override deterministic safety and decision policy. Jev is an evaluation candidate, not a production dependency.
+- **ExplanationRenderer:** renders only supported packet claims, action, rationale, uncertainty, and next step; it cannot add product or scientific claims.
+
+All target seams preserve explicit states for unsupported capture, denied permission, cancellation, no result, ambiguity, insufficient evidence, conflicting formula versions, stale truth revision, provider unavailability, and abstention. None is silently converted to a negative answer or a product match.
 
 ### S-FREE-4 Free Product Evidence (merged local contract, not hosted)
 
-`prepare-free-product-evidence` issues a bounded private owner path; `freeProductEvidence.ts` supplies the typed upload seam. Free Check passes uploaded path plus optional candidate OCR to S6 `resolve-product-identity`. The resolver verifies grant, owner and object, and denies `consumer: 'shelf'` without managed membership. No client-supplied photo/OCR establishes verified formula identity. Exact request, retry, error, deletion and integration rules are in [S_FREE_4_PRODUCT_EVIDENCE.md](S_FREE_4_PRODUCT_EVIDENCE.md). Kanuj owns the camera adapter and customer UI; no `app/**` file is changed here.
-
+The prepare-free-product-evidence function issues a bounded private owner path; the freeProductEvidence.ts service supplies the typed upload seam. Free Check submits uploaded private evidence to S6 resolve-product-identity; no working OCR/image extractor is implemented. If proposed text is present, it remains untrusted evidence and cannot establish verified formula identity. The resolver verifies grant, owner, and object, and denies shelf use without managed membership. Exact request, retry, error, deletion, and integration rules are in [S_FREE_4_PRODUCT_EVIDENCE.md](S_FREE_4_PRODUCT_EVIDENCE.md). Current mobile capture uses Expo Camera directly; future ownership follows the feature DRI and stewardship model in [OWNERSHIP.md](OWNERSHIP.md).
 ---
 
 ### S-FREE-3 Free Context (merged local contract, not hosted)
@@ -25,7 +38,7 @@ Code definitions:
 - `save_product` takes a stable caller-generated UUID request ID, a catalog product UUID **or** a user-entered name/brand, and `using` / `considering` / `stopped`. The server verifies catalog IDs and labels manual entries `user_reported`; manual text never establishes formula truth. `set_product_state` modifies only the owner's saved row.
 - `record_check` takes a request ID plus either a sourced catalog product UUID or the caller's S6 **scan** case UUID. Unresolved cases are saved truthfully as unidentified, never upgraded to a product claim. This is an explicit “result viewed/saved” write, not an automatic log of searches or camera attempts.
 - `record_experience` takes a request ID, a catalog/manual product reference, `tolerated` / `reacted` / `liked` / `finished`, and an optional bounded note. It records what the user reported, not a diagnosed allergy. Check/experience rows are append-only through the service, with owner deletion available. A reported reaction to the same catalog product can downgrade a later verified-formula S-FREE-2 fit to `USE_WITH_CAUTION`; it does **not** attribute causation to an ingredient or assume the prior variant/formula matches.
-- Existing paid `user_products`, `product_reactions`, `check_ins`, membership and intake tables are not repurposed. Kanuj owns projection into `MyStuffViewModel`, calling these methods after his mobile integration milestone. No app screen is changed in this platform PR.
+- Existing paid application tables are not repurposed. The statement that no app screen changed described the original platform PR; K3/S3 and later local integration now consume free context. Feature ownership follows the current end-to-end DRI and stewardship rules.
 
 ---
 
@@ -198,7 +211,7 @@ export interface IDeriveService {
   - `recommendedAction`: Next step for the user
   - `safety`: `SafetyClassification`
 
-### S3 Edge Endpoint Binding (Implemented, Client Wiring Pending)
+### S3 Edge Endpoint Binding (historical platform milestone; local integration later landed)
 
 All S3 functions require a valid Supabase bearer token at the gateway and
 re-verify it in the handler. The authenticated UUID is canonical; request-body
@@ -280,21 +293,24 @@ export interface SafetyClassification {
 
 ---
 
-## 6. Client vs Remote Service Switch
+## 6. Historical client/remote switch notes for the managed-first app
+
+The following notes describe the former managed-first route. Current scanner-first local integration and hosted gates are summarized above.
+
 The service factory selects the remote adapter with:
 ```bash
 # In .env:
 EXPO_PUBLIC_USE_REMOTE_SERVICE=true
 ```
-The factory in `src/services/DeriveService.ts` then instantiates `RemoteDeriveService` for callers of that factory. Current screens still operate primarily through local Zustand stores, and the remote adapter still lacks complete row-to-domain mapping and live function coverage; therefore this flag alone does **not** make the current app a production-ready remote experience. Client/service wiring requires a coordinated integration slice.
+The factory switch describes the former managed-first app, not the scanner-first free integration, which uses dedicated local access and context seams. Development Remote with an exact local Supabase host is integrated for free Check; Remote Staging and production retain legacy managed routing. This flag alone does not activate hosted guest access or make the full app a production-ready remote experience.
 
 Live model invocation happens only in trusted server Edge Functions. Routine generation resolves a server-configured `RoutineIntelligenceProvider`; scan and Ask currently use the guarded Gemini adapter. `MockDeriveService` uses deterministic local reasoning and never requires a client model key.
 
 ---
 
-## 7. Semantic Requirements for Backend Evolution (For Sami Review)
+## 7. Semantic Requirements for Future Service Evolution
 
-The following semantic requirements emerge from the client prototypes (`src/phenotype/` and `src/pricing/`). They are documented here to inform backend architecture without prescribing database schemas, table layouts, or specific column designs.
+The following semantic requirements preserve earlier client-prototype notes. They do not prescribe schemas, tables, or columns. The personalized/all-in pricing proposal below is historical and superseded by ADR-26. Future feature work follows one feature DRI, with steward review for cross-cutting platform/truth changes.
 
 ### A. Phenotype & PIH Signal Semantics
 The backend must preserve full evidence provenance for any captured phenotype signal, rather than flattening it to an unprovenanced string:
@@ -305,7 +321,7 @@ The backend must preserve full evidence provenance for any captured phenotype si
   - `confidence`: Categorical confidence (`low`, `medium`, `high`).
   - `userConfirmed`: Boolean invariant ensuring member-confirmed values outrank estimates.
   - `observedAt`: ISO timestamp of observation/confirmation.
-- **Storage Decision**: Sami may persist this via JSONB attributes, relational fact tables, event ledgers, or dedicated profile columns as best fits backend normalization and RLS performance.
+- **Storage Decision**: The feature DRI, with platform/truth steward review, chooses a representation that meets normalization, owner-isolation, and RLS performance requirements.
 
 ### B. Personalized Pricing Semantics
 Pricing is dynamic, versioned relative to routine and subscription lifecycle, and requires versioned state tracking rather than a static single profile column:
@@ -408,7 +424,7 @@ To truthfully determine whether an authenticated user requires onboarding or is 
 
 ## 10. Free-access and fit interfaces
 
-The contracts below distinguish landed local behavior from future milestones; they do not bypass current E1 gates. Sami owns each platform contract when its milestone first needs it; Kanuj builds to fixtures/local customer-state seams and consumes the merged contract.
+The contracts below distinguish local implementation from gated hosted behavior; they do not bypass current access controls. The original platform/mobile sequencing is historical. New work uses one end-to-end feature DRI with horizontal stewardship; see [OWNERSHIP.md](OWNERSHIP.md).
 
 - **S-FREE-1 access contract (local platform implemented; hosted gated):** `src/contracts/FreeAccess.ts` and `getFreeAccessState()` expose verified `userId`, `identityKind`, `freeProductAccess`, `managedMembershipStatus`, and `managedAccess` without changing managed bootstrap. `access-state` is JWT-gated; sourced `catalog-products` and factual non-photo `resolve-product-identity` accept authenticated guests. Managed endpoints require permanent identity and active membership; guests cannot claim Founding Beta. The exact FREE / MANAGED / BOTH / INTERNAL matrix, 401/403/503 errors and evidence limits are in [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md). Hosted anonymous signup is not activated.
 - **Wave-1 mobile consumption (local only):** `authClient` preserves a persisted session or silently signs in anonymously only in `local_free_integration`; `freeAccessStore` projects the returned server state for the current Auth UUID. Free identities use the four-root shell, factual catalog/resolver, and Check landing. Active permanent managed identities use Plan landing and retain managed bootstrap. A missing email, Mock membership fixture, or route parameter never determines identity or managed access. Development Remote with an exact local Supabase host is the sole activation; Remote Staging remains legacy.
@@ -417,4 +433,4 @@ The contracts below distinguish landed local behavior from future milestones; th
 - **S-FREE-4 evidence contract:** private product evidence and candidate/resolution states reuse S6. Mobile capture submits evidence; only server/catalog authority determines canonical product/formula identity. Ambiguous, missing, or unsupported formula evidence stays unknown or enters review.
 - **S-PAID-1 managed contract:** permanent identity plus server-owned managed entitlement is required for managed operations. Founder-created routines use the existing validated publication authority; no client/RLS bypass. Free profile/context reuse during managed enrollment must preserve owner and safety boundaries.
 
-A shared contract is not co-owned implementation. The owning milestone records request, response, ownership, failure states, security rules, and compatibility; merges it; then names the dependent milestone. No same-contract parallel edits.
+A shared contract has one active writer and an explicit owner for request/response semantics, failure states, security, and compatibility. Independent implementation may proceed against a stable contract or fixture; integrate in one bounded composition pass.

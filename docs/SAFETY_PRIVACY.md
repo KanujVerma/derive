@@ -3,6 +3,20 @@
 Derive operates under uncompromising safety and privacy standards appropriate for handling sensitive consumer health information.
 
 
+## Current safety boundary and approved beta target
+
+### CURRENT IMPLEMENTATION
+
+Local free profile, history, and private product-evidence paths are owner-bound and remain local integrations; hosted guest activation is gated. The camera-to-private-evidence path does not imply OCR or image recognition. Existing pregnancy/nursing and sensitivity fields must preserve unanswered, no, yes, and prefer-not-to-say semantics where the underlying contract provides them. Reported product reactions are not diagnosed allergies or proof of ingredient causation.
+
+### APPROVED TARGET, NOT YET IMPLEMENTED
+
+The initial external-beta population is U.S. adults age 18 and older. This target does not claim that runtime age-gating is implemented.
+
+Ask sensitive context only at the point a product or routine decision materially depends on it. Pregnancy, trying to conceive, and breastfeeding/nursing are separate contexts; do not collapse them into a single inferred state. “Prefer not to say,” unanswered, unsure, and no remain distinguishable. Do not infer reproductive status, allergy, race, ethnicity, ancestry, or Fitzpatrick from images or unrelated data.
+
+Product photos and skin photos remain private, purpose-limited customer evidence. Never reuse or contribute a customer image or product image without explicit rights and consent that cover the proposed purpose. Do not send customer photos or sensitive context to a third-party model/provider until provider terms, privacy handling, retention, training use, region, and access controls have been reviewed and approved. Provider credentials remain server-side. Model output is untrusted and cannot establish product truth or override deterministic safety policy.
+
 ## Approved scanner-first privacy requirements (partially implemented locally)
 
 - Free skincare context remains sensitive whether the owner is anonymous or permanent. Anonymous Auth is an authenticated-role account with an anonymous identity claim, not the public `anon` API key/role. S-FREE-1 locally reviewed RLS, grants, Storage, RPCs, and Edge authorization and opened only sourced factual catalog/resolution plus owner-bound cases. S-FREE-2 and S-FREE-3 add free profile/history persistence in merged local code, not hosted. S-FREE-4 adds a private, server-granted product-photo lane in merged local code, also not hosted. A guest identity is device/session-bound until linked to a permanent identity; losing the local session first can make that guest account and its context inaccessible to the customer. Hosted guest signup remains gated pending S-OPS-1 controls. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md).

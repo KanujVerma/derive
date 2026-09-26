@@ -1,8 +1,77 @@
-# Derive Roadmap: Scanner-First Product Intelligence
+# Derive Roadmap
 
-This is the current approved product direction and execution plan. It distinguishes implementation that exists from work approved for later milestones. Each implementation milestone has one founder owner. [OWNERSHIP.md](OWNERSHIP.md) defines lanes and the shared-contract handoff rule.
+## Current company objective
 
-## Current Wave-1 sequence
+Ship scanner-first personalized skincare product intelligence where a U.S. adult user can point at or search for a skincare product, see what Derive actually knows, get a supported personal action and reason, know what to do next, and improve later checks by adding useful context. The intended quality bar is correctness, relevance, actionability, honest uncertainty and low customer effort. More context must not make a less-correct result appear better.
+
+## Product model
+
+**Free Check** is the acquisition wedge for product/formula facts and contextual personal decision support. There is no universal numerical compatibility/health score. Internally, “personalized Yuka for skincare” is an analogy only, not customer-facing positioning. The paid hypothesis is **$25/month Managed Skincare** for ongoing routine management, check-ins, adaptation, progress and product decisions, with founder support during early beta where needed. Price, retention and billing activation are not validated by the existing display price or local flows.
+
+## Approved target architecture
+
+```text
+CAPTURE / SEARCH
+→ PERCEPTION / EVIDENCE COLLECTION
+→ PRODUCT + FORMULA TRUTH RESOLUTION
+→ VERSIONED PRODUCT TRUTH SNAPSHOT
+→ PROFILE + ROUTINE + HISTORY CONTEXT
+→ ALL APPLICABLE FINDINGS
+→ DETERMINISTIC DECISION POLICY
+→ PERSONAL DECISION PACKET
+→ EVIDENCE-BOUND CUSTOMER EXPLANATION
+→ CUSTOMER
+```
+
+Probabilistic systems may contribute bounded candidate evidence or findings. They cannot create canonical product truth or unrestricted recommendations. See [ARCHITECTURE.md](ARCHITECTURE.md), [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md), and [INTERFACES.md](INTERFACES.md) for the target concepts and current implementation boundary.
+
+## Current implementation versus target
+
+**Implemented locally at `d793639`:** the scanner-first shell and free Auth/catalog/profile/context/evidence integrations work in Development Mock or Development Remote with an exact local Supabase host. S-FREE-2 has a narrow first-match deterministic `PersonalFitResult`; S-FREE-3 stores explicit saved-product/check/experience events; S-FREE-4 grants private product-evidence uploads; K4/S4 connects Check capture to S6 locally. S-PAID-1 routine draft fallback and founder-console drafting are also local implementation. These pieces do not imply hosted deployment or a public beta.
+
+**Still not implemented or not selected:** photo OCR/image recognition, provider-neutral barcode/photo adapter ports, Scandit adoption, image-extraction model selection/benchmark, multi-finding decision engine, `PersonalDecisionPacketV1`, canonical free routine/exposure revisions, concentration assertions, hosted guest activation, and physical scanner acceptance. The Check camera uses Expo Camera directly; capture/evidence types exist but do not make the device SDK provider-neutral. The typed S-FREE-4 `DAILY_LIMIT` error exists at the remote boundary, while K4/S4 capture still maps preparation failure generically. See [CONTEXT_SYNC.md](CONTEXT_SYNC.md) for exact merged/runtime evidence.
+
+Remote Staging and production retain legacy managed-first routing. Hosted anonymous signup is gated pending lifecycle and abuse controls. The scanner-first public external beta is not ready.
+
+## Active P0 features
+
+| P0 feature | Recommended DRI | End-to-end customer outcome | Status/boundary |
+| --- | --- | --- | --- |
+| P0-A Capture + Product Resolution | Sami | Capture/search resolves supported product and formula truth or asks for the missing evidence; candidate/photo/barcode flow, S6 resolution, catalog/review and device acceptance. | Current Check directly uses Expo Camera and S6; no working photo OCR, Scandit adapter or formula-truth snapshot. Sami may own client changes required by this feature. |
+| P0-B Personal Decision Intelligence | Kanuj | Use verified product truth plus profile, routine and history to return a supported action, reason and next step. | K2/S2 and related local context flows are present. Fit is still narrow and first-match; no all-findings engine or personal decision packet. Kanuj may own backend/persistence changes required by this feature. |
+| P0-C Hosted Beta Operations | DRI explicitly assigned before activation | Safely enable and operate hosted guest lifecycle, abuse/rate/CAPTCHA, linking/conflict, cleanup, retention and recovery. | Not active. Hosted guest signup remains gated. Do not infer the DRI from a platform steward role. |
+| P0-D Cross-product physical/release acceptance | Composition/release DRI explicitly named before activation | Verify the integrated customer journey, exact binary, offer, support/privacy and release gates across P0 features. | Not active; no composition/release owner is implicit. Name one owner before work starts. |
+
+## Beta gates
+
+Delay broad scanner-first outreach until Derive has honest identity/unknown recovery, useful coverage for the intended cohort, a working image/evidence fallback, a genuinely personal decision when required context exists, supported safety rules, owner/session/privacy lifecycle, physical-device acceptance and an offer/binary/support/privacy package matching actual runtime. Do not gate on Jev production adoption, Scandit specifically, MobileCLIP, millions of products, every concentration, all languages, makeup, tint matching, a graph database or a generic agent framework.
+
+## Near-term evaluated choices
+
+| Area | Current implementation | Evaluation, not selection |
+| --- | --- | --- |
+| Barcode capture | Expo Camera / Expo barcode. | Scandit is the commercial challenger; the Yuka/Scandit story is vendor/customer evidence, not an independent Derive benchmark. Decide only from real skincare-package/device tests and useful-resolved-product outcomes. |
+| Image evidence extraction | Private photo capture/upload and S6 evidence path exist locally; no working OCR/VLM extraction is claimed. | Gemini fast multimodal is an initial candidate; GPT/Luna is a challenger. Compare on a frozen real image benchmark, including exact variant, ingredient transcription, critical number/unit error, hallucination, abstention, multilingual text, latency, cost and review burden. No winner yet. |
+| Soft judgment | Narrow deterministic personal-fit rules. | Jev is an optional experiment, not an authority or production dependency. Compare it with the deterministic baseline and structured model candidates on labeled Derive cases. Do not invent confidence thresholds. |
+| On-device perception | Barcode and Expo Camera are current. | On-device OCR may be useful later; ML Kit, Apple Vision and other native tools are candidates only. MobileCLIP/image retrieval depends on a rights-cleared package corpus and is not active. |
+
+Derive currently has no funding. Evaluate scanner/model choices against cost per activated user, cost per useful repeat user, free volume, fixed minimums, per-device/per-scan pricing and fallback quality. Do not lock a quote-based core acquisition dependency without production-economics evidence.
+
+## Later capabilities
+
+Makeup/layering and shade/tint can extend the event and product truth model later, but do not delay the initial cosmetic-skincare beta. Tint depth/undertone must be self-selected or explicitly confirmed; never infer demographic categories from imagery. Later capabilities must meet the same evidence, ownership and privacy rules.
+
+## Landed implementation history
+
+K-FREE-1/K-FREE-1B, S-FREE-1 and local Wave-1 integration are landed. K2/S2, K3/S3, K4/S4 and Check-memory composition are in main as local behavior. PRs #68–#70 add typed daily-limit backend errors and local founder-managed routine drafting/console support. Hosted free activation, photo extraction, full personal decision architecture and physical acceptance remain separate gates. Exact point-in-time proof stays in the dated ledger below.
+
+## Historical roadmap snapshots and delivery records
+
+> The following prior Wave/managed-first plans are preserved as checkpoint-specific history. Their old “current”, owner and next-action language does not override the P0 and feature-DRI model above.
+
+### Prior active roadmap snapshot at d793
+
+### Prior Wave-1 sequence/status snapshot
 
 ```text
 K-FREE-1 ✅
@@ -19,11 +88,11 @@ K4-COMPOSE handoff prep (#55) ✅  KPAID-COMPOSE (#56) ✅
 
 Wave-1 mobile now consumes S-FREE-1 in Development Remote against an exact local Supabase host. A missing session becomes an anonymous Auth identity, server `FreeAccessState` selects Check or managed Plan, and free Check uses live sourced catalog and factual typed/barcode resolution. Remote Staging keeps its legacy route and hosted anonymous signup remains deliberately gated. The scanner-first external beta is not ready.
 
-## Current product model
+### Product model recorded in the prior snapshot
 
 Derive is **personalized skincare product intelligence first**. Free Check answers “Should I use this?” with supported product/formula facts and, when enough evidence and user context exist, categorical personal fit. It does not use a universal numerical score. The paid layer is **$25 Managed Skincare**: routine construction and longitudinal management, check-ins/progress, proactive adaptation, and founder/expert review in beta. Future clinician-reviewed plans and commerce/member benefits require separate operational and legal review.
 
-### Implemented today
+#### Implementation status recorded in the prior snapshot
 
 - K-FREE-1 and K-FREE-1B supply the four-root scanner shell. Wave-1 integrates S-FREE-1 only for Development Remote with local Supabase. Mock development remains a sample preview, while Remote Staging and production retain their previous behavior. K2/S2 now enables optional profile save/read and categorical Personal Fit when product and formula evidence support it; otherwise fit stays unavailable. Managed-only routines and check-ins remain gated.
 - PRs #36 and #37 landed searchable catalog foundation and mobile Check a Product. The Remote Staging route remains hidden and the current hosted catalog has 4 products, 1 sourced product, 1 alias, and no variants, identifiers, or formula versions.
@@ -35,7 +104,7 @@ Derive is **personalized skincare product intelligence first**. Free Check answe
 - Hosted `propose-routine` is v3, ACTIVE, with JWT verification enabled. The live model-provider path remains H1P-unproven. This limits provider-backed Ask/routine automation and does not block free factual Check or the planned deterministic fit service.
 - The current $25/month Founding Beta display/Stripe code is implementation history, not proof of hosted billing activation and not proof that the new Managed Skincare entitlement model exists.
 
-### Approved target flow
+#### Target flow recorded in the prior snapshot
 
 **First launch:** open Derive → silently establish a Supabase anonymous authenticated identity → land on Check. Do not present account creation, sign-in, email, password, membership activation, long onboarding, baseline photos, or managed-routine setup before first value.
 
@@ -45,7 +114,7 @@ Derive is **personalized skincare product intelligence first**. Free Check answe
 
 Current products and check history remain optional progressive context: using, considering, stopped, reacted to, tolerated, liked, current shelf, and prior checks. When no shelf exists, say: “Personalized for your skin. Add what you're using for routine-overlap and stacking checks.” Explain that adding a shelf enables overlap and stacking checks. Describe improved guidance as using saved user context and history, not magical ML learning.
 
-### Target access and navigation
+#### Target access/navigation recorded in the prior snapshot
 
 | Area | Free product intelligence | Managed Skincare |
 | --- | --- | --- |
@@ -67,7 +136,7 @@ Target root navigation is **CHECK / MY STUFF / PLAN / SHOP**, with account/setti
 
 Managed upgrade target: start Managed Skincare → link/create a permanent identity if needed → review existing goals, profile, products and history → ask only for missing managed-care details → collect routine complexity/cost only if still useful, plus detailed safety/prescription review → capture required Front / Left / Right baseline photos → review and submit managed intake. Free Check does not require those photos or long intake. Build 10 photo work remains relevant to managed care. C1's old tabs remain implemented history; do not delete them in this docs pass.
 
-## Current next work and parallel waves
+### Prior next-work and parallel-waves snapshot
 
 Wave 0 and Wave-1 local integration are complete. K2/S2 (#63), K3/S3 (#64), K4/S4 (#65), and Check-memory composition (#66) are merged locally against S-FREE-2/3/4. Check history is saved only by explicit user action, and retained Check state clears on local owner changes. The Retinyl Propionate regression is corrected. The S-FREE-4 client currently maps prepare-evidence 429 quota errors to generic `PREPARE_FAILED`; typed quota handling remains open and the backend 429 response is unchanged. No hosted deployment or hosted guest activation occurred; S-OPS-1 guest lifecycle and abuse controls remain open before hosted activation, and K-ACCEPT-1 physical hardware acceptance remains open.
 
@@ -90,13 +159,13 @@ Free access alone does not create virality. K-GROWTH follows near-zero time to f
 
 **Composition status:** K2-COMPOSE (PR #60), K4-COMPOSE handoff prep (PR #55), and KPAID-COMPOSE (PR #56) are landed. K2/S2, K3/S3, and K4/S4 live integrations are merged in PRs #63, #64, and #65. All three S-FREE platform contracts remain local; hosted deployment and hosted guest activation are separate gates. Typed client handling for S-FREE-4's 429 quota response remains open.
 
-### Deterministic fit and evidence boundary
+#### Deterministic fit boundary recorded in the prior snapshot
 
 The free fit baseline is categorical and explainable, separate from Formula Details. It may use supported product roles, duplicate active classes, known retinoid/exfoliant stacking, explicitly reported sensitivities, supported current treatment context, redundancy/gaps, and sufficiently supported user-reported tolerance/reaction history. It must state which evidence it used, expose missing evidence, fail closed when formula identity is insufficient, and never invent concentrations, safety claims, or diagnoses. Formula Details presents product/formula evidence and its exact uncertainty. No numeric compatibility or universal product score.
 
 H1P is retained for richer explanations, broader model reasoning, conversational Ask, managed routine automation, and later intelligence. A model may improve wording or depth but cannot be the only reason free Check works. No provider availability claim is made here.
 
-## Reframed milestones and release gates
+### Milestone/release status recorded in the prior snapshot
 
 - **F1** remains useful and is incorporated into S-PAID-1.
 - **H1P** remains open for provider-backed capabilities; it is no longer a dependency for free factual Check or deterministic fit.
@@ -107,31 +176,29 @@ H1P is retained for richer explanations, broader model reasoning, conversational
 - Build 8/9/10 and their Apple/TestFlight packets remain build-specific historical evidence. Build 10 physical photo acceptance remains pending where recorded. The next intended public external beta is scanner-first; regenerate App Store Connect information from the actual future binary and require a permanent reviewer account only if that binary requires one. Do not submit the old managed-first packet as future truth.
 - The future dermatologist-reviewed plan is a trust/operations milestone, not a current feature. Use an individual's name/credentials only when they review that individual plan. Protocol/advisory review needs different language. Individual clinician review requires a separate operational and legal/regulatory assessment before launch; no “dermatologist certified” claim.
 
-## What blocks the next scanner-first external beta
+### Beta blockers recorded in the prior snapshot
 
 The scanner-first external beta is not ready. Wave-1 mobile/platform free-funnel integration is locally complete, while hosted anonymous signup remains gated. Remaining gates include useful sourced catalog coverage and safe unknown fallback, typed client handling for S-FREE-4's 429 quota response, anonymous lifecycle and abuse controls, hosted guest activation after S-OPS-1, and K-ACCEPT-1 physical hardware end-to-end proof. Apple submission text, reviewer access, privacy/support information, and screenshots must match the actual future binary. H1P is not a free Check gate; provider-backed Ask, richer explanations, and routine automation remain separately gated.
 
-## Open implementation questions
+### Open questions recorded in the prior snapshot
 
 Anonymous identity is device/session-bound until linked to a permanent identity; if the local session is lost first, the customer may lose access to that guest account and its context. S-OPS-1 owns cleanup policy, rate/abuse controls, account-link conflict handling, and explicit loss/deletion behavior.
 
 S-FREE-1's local platform audit and exact FREE / MANAGED / BOTH / INTERNAL matrix are recorded in [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md). Hosted guest activation remains gated by S-OPS-1 abuse/lifecycle controls; local Wave-1 guest routing is integrated. S-FREE-2 defines the minimal persisted profile and deterministic fit rules only from supported evidence. S-OPS-1 must settle anonymous-to-existing-account conflict, session-loss, cleanup, and deletion handling. A future extraction path must be evidence-supported without elevating OCR/model candidates to identity truth.
 
-
-
-## Historical managed-first roadmap detail (preserved)
+### Historical managed-first roadmap detail (preserved)
 
 > The following sections preserve the full pre-pivot milestone plan and its checkpoint-specific “current” and “next action” language. Those assignments and dependencies are superseded by the active scanner-first plan above; the detailed delivery record below remains historical evidence.
 
 **Former company gate (superseded):** the first customer would pay $25/month for Founding Beta management and receive a trustworthy routine, with products purchased separately. This historical gate is retained to explain the managed-first milestones below; it is not the current free acquisition strategy.
 
-### Historical catalog and Check a Product V1 assignment
+#### Historical catalog and Check a Product V1 assignment
 
 - **Catalog foundation (PR A):** Kanuj completed the bounded platform catalog search/ingestion interface on top of S6 in PR #36, merged at `7b910486192af79a06d0801a81fd117bc965b5f1` and deployed to the verified hosted project. This one-time assignment does not transfer Sami's F1, H1P, H1B, or ongoing product-resolution ownership.
 - **Mobile consumer (PR B):** Kanuj landed onboarding search and Check a Product UX in PR #37 at `50b58b941d47cf32a7c876916a174be12a11f580`. Current Remote Staging Ask/Scan gating stays in place; this milestone created no TestFlight submission. The narrow routine-service UUID handoff is documented in [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md).
 - **Source boundary:** demand-driven, operator-verified catalog entries only. Product-only records are valid; formula and package identity require separate S6 evidence. See [PRODUCT_CATALOG.md](PRODUCT_CATALOG.md).
 
-### Historical milestone sequence (checkpoint-specific)
+#### Historical milestone sequence (checkpoint-specific)
 
 ```text
 Landed foundation: V1A -> L0 -> H1A hosted baseline
@@ -146,7 +213,7 @@ Final: Kanuj L2B customer #1 acceptance
 
 H1A's verified hosted intake, photos, entitlement fixture, founder authorization and selected security boundaries are in [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md). Subsequent AUTH-V1 replaced the earlier proposed OTP prerequisite for this beta with real email/password signup and sign-in; Build 9 grants server-owned free staging access behind a private release flag. Email confirmation, SMTP, OTP, and password-reset mail remain deliberately outside this cohort. The final model/provider remains undecided; this account could not store the user's verified free-tier key in hosted Supabase secrets, and bounded direct adapter calls received upstream 503 high-demand. H1P is Sami's separate provider-activation milestone, independent of F1 manual routine recovery. No proposal, publication, or published-member path is proven; customer #1 launch cannot claim working Ask/Scan intelligence while H1P remains blocked. Stripe remains a separate Sami gate. S6 does not block customer #1 when manual recovery works.
 
-#### V1A: First-Customer Intake Integrity
+##### V1A: First-Customer Intake Integrity
 
 - **Owner:** Kanuj. **Status:** COMPLETE. **Prerequisites:** C1.5A landed.
 - **Owned surfaces:** customer mobile onboarding/Shelf, client recovery/support presentation, acceptance documentation, repository roadmap and ownership docs.
@@ -155,7 +222,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** brand, exact name and category can be added, edited, viewed, removed and retained through empty or failed recognition/retake; no canned product or invented actives/formula/catalog provenance; truthful Shelf and support copy.
 - **Handoff to:** L0 prepares an explicit Remote staging customer build; hosted and founder-operation baselines follow separately.
 
-#### L0: Remote Customer Build Readiness
+##### L0: Remote Customer Build Readiness
 
 - **Owner:** Kanuj. **Status:** COMPLETE. **Prerequisites:** V1A landed.
 - **Owned surfaces:** `eas.json`, public mobile environment validation, staging-only build diagnostics, Remote client route/state tests, and build documentation.
@@ -164,7 +231,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** Invalid flavor, missing or malformed hosted URL/key, local URL, or inconsistent Remote mode fail closed. H1A subsequently verified and configured the preview public URL/key; no device binary has been accepted.
 - **Handoff to:** L1A builds and installs from this profile without a new build architecture milestone.
 
-#### H1A: Hosted Remote Core
+##### H1A: Hosted Remote Core
 
 - **Owner:** Kanuj for this single milestone by founder authorization. **Status:** HOSTED BASELINE PROVEN; provider-dependent routine/member gates BLOCKED. **Prerequisites:** L0 landed, current `main` reconciled, exact hosted project verified.
 - **Owned surfaces:** hosted Supabase readback, guarded post-auth staging fixture/entitlement, Remote onboarding/photos, founder authorization, selected security smoke, and still-valid evidence from old draft PR #21.
@@ -173,7 +240,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** current hosted matrix in [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md) states each PASS, WARN and BLOCKED gate. Real model/proposal, founder routine edit/publish, published customer read and dependent member surfaces remain blocked until a model decision or separate F1 path. Production Remote remains off.
 - **Handoff to:** Sami resumes platform ownership for F1, H1P provider activation, H1E and H1B; Kanuj starts L1A signed-out physical preflight with explicit Auth and routine blockers.
 
-#### F1: Founder Manual Routine Fallback
+##### F1: Founder Manual Routine Fallback
 
 - **Owner:** Sami. **Status:** CURRENT. **Prerequisites:** H1A hosted baseline and AUTH-V1 access landed.
 - **Owned surfaces:** `admin/**`, founder operations, backend routine validation and publication.
@@ -182,7 +249,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** founder creation, edit, validation, publication, member readback and refusal of incomplete or unsupported product truth pass on hosted disposable accounts. No client or RLS bypass.
 - **Handoff to:** Kanuj L1B manual-fallback acceptance after the stable interface is documented.
 
-#### L1A: Remote Staging Device Preflight
+##### L1A: Remote Staging Device Preflight
 
 - **Owner:** Kanuj. **Status:** COMPLETE for its historical signed-out physical-device scope; post-auth journey remains outside L1A and is no longer H1E-blocked after AUTH-V1. **Prerequisites:** L0 and H1A hosted baseline.
 - **Owned surfaces:** store-signed Remote staging/TestFlight build, physical-device installation, signed-out login/recovery, staging diagnostics, reachable native camera/haptics/layout checks, and customer mobile defects.
@@ -191,7 +258,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** installed build reports Remote Staging, Remote service, verified Derive host, valid public configuration shape and `App: 1.0.0 (5)` with no key/token. Signed-out cold launch, USB restart, invalid email, background/foreground, offline OTP-request failure and restored-network recovery passed. Scan and photo deep links did not grant a supported post-auth session. At that checkpoint, authenticated intake/routine/member and camera module runtime remained assigned to later Auth-dependent milestones rather than bypassed; AUTH-V1 subsequently supplied the approved beta session path.
 - **Handoff to:** Kanuj L1B for F1 fallback and L1C for H1P provider-path acceptance through the current AUTH-V1 session; Sami receives exact provider/backend blockers.
 
-#### L1B: Manual-Fallback Acceptance
+##### L1B: Manual-Fallback Acceptance
 
 - **Owner:** Kanuj. **Status:** PLANNED for Wave 2. **Prerequisites:** F1 hosted publication interface, current AUTH-V1 hosted access, and L1A device baseline.
 - **Owned surfaces:** device journey and mobile recovery when automated routine preparation is unavailable.
@@ -200,7 +267,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** one controlled device run observes unavailable automation, F1 construction, guarded publication and member readback; no manual off-app promise is counted as success.
 - **Handoff to:** L2A customer launch readiness for the manual recovery path.
 
-#### L1C: Authenticated Remote Provider-Path Acceptance
+##### L1C: Authenticated Remote Provider-Path Acceptance
 
 - **Owner:** Kanuj. **Status:** PLANNED; independent of L1B after its own prerequisites. **Prerequisites:** L1A physical staging baseline, current AUTH-V1 hosted access, H1P hosted routine/Ask/Scan provider proof, and a controlled staging entitlement.
 - **Owned surfaces:** physical-device customer Auth, intake/photos, automated proposal-to-founder publication handoff, published member readback and customer-visible Today, Plan, Shop/Scan, Ask, Check-In and Progress states.
@@ -209,7 +276,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** hosted email/password creates the intended mobile session; a trusted staging-only entitlement is read canonically; intake/photos persist; H1P proposal is validated and published through current founder authority; member tabs and known/unknown Scan and Ask states reflect hosted truth. Customer errors recover safely and no Mock fixtures or fabricated product/formula claims appear. Billing remains separately unverified until H1B.
 - **Handoff to:** L2A launch readiness after both L1B manual recovery and L1C provider-path evidence, or a founder-approved narrower launch scope that explicitly withholds unavailable intelligence.
 
-#### H1P: Hosted Model Provider Activation
+##### H1P: Hosted Model Provider Activation
 
 - **Owner:** Sami. **Status:** PLANNED, blocked on approved model choice, hosted Edge secret permission and provider availability. **Prerequisites:** H1A hosted baseline; independent of F1.
 - **Owned surfaces:** approved server-side model credential and runtime configuration, real hosted routine proposal, Ask and Scan provider calls, output validation and provider error behavior.
@@ -218,7 +285,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** credential remains in trusted server storage; actual provider calls for routine, Ask and Scan are observed; structured outputs pass existing validators; failure stays recoverable and does not fabricate routine, ingredient, product or diagnosis truth. A direct key lookup or local adapter call alone cannot pass H1P.
 - **Handoff to:** Kanuj L1C authenticated provider-path device acceptance and Sami P1 production backend readiness. F1 remains the independent manual routine recovery path.
 
-#### H1E: Verified Email Delivery and Recovery
+##### H1E: Verified Email Delivery and Recovery
 
 - **Owner:** Sami. **Status:** PARKED; superseded as a Founding-Beta sign-in prerequisite by AUTH-V1. **Prerequisites:** founder approval to add verified email/recovery plus sender/domain access.
 - **Owned surfaces:** future sender, DNS, custom SMTP, verified-email, password-reset, or OTP delivery selected for a later cohort.
@@ -227,7 +294,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** dedicated inbox delivery, verification/reset or code recovery, retry behavior, and identity readback pass; link-only or local tests do not count.
 - **Handoff to:** the later mobile milestone that explicitly adopts the approved recovery interface. H1E does not block current L1B/L1C.
 
-#### H1B: Hosted Billing Activation
+##### H1B: Hosted Billing Activation
 
 - **Owner:** Sami. **Status:** PLANNED for Wave 2 after his Stripe infrastructure work. **Prerequisites:** correct Derive Stripe account and hosted S5 baseline.
 - **Owned surfaces:** $25 monthly test Price, Checkout, signed webhook, canonical membership, Portal, pause/cancel/downgrade and event ordering/idempotency.
@@ -236,7 +303,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** actual test Checkout, signed webhook, member activation, Portal change, downgrade and replay/order guards pass against the correct account.
 - **Handoff to:** P1 live-mode readiness and Kanuj's later provider/device acceptance.
 
-#### L2A: Customer Launch Readiness
+##### L2A: Customer Launch Readiness
 
 - **Owner:** Kanuj. **Status:** PLANNED for Wave 3. **Prerequisites:** L1B, L1C or a founder-approved narrower intelligence scope, H1B activation, and H1P proof or an explicit founder-approved limit on Ask/Scan claims.
 - **Owned surfaces:** production customer build preparation, customer contact path, launch copy, founder-approved policy surfaces, operating checklist and physical-device launch QA.
@@ -245,7 +312,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** working contact route, reviewed copy/policies, correct production build identity and physical-device journey pass without claiming backend gates from UI alone.
 - **Handoff to:** L2B after Sami's P1.
 
-#### P1: Production Backend Readiness
+##### P1: Production Backend Readiness
 
 - **Owner:** Sami. **Status:** PLANNED for Wave 3. **Prerequisites:** accepted production Auth configuration, H1B, F1 and H1P proof or an explicit founder-approved limit on provider-backed features.
 - **Owned surfaces:** production Auth, optional email recovery if approved, live Stripe, production founder access, backend/security smoke and production environment.
@@ -254,7 +321,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** production Auth, signed live billing, routine origin/recovery, RLS/Storage/privacy, advisor review and deletion/operations checks are evidenced. Ask/Scan intelligence is proven through H1P or plainly unavailable in the approved launch scope.
 - **Handoff to:** Kanuj L2B final acceptance.
 
-#### L2B: Final Customer #1 Acceptance
+##### L2B: Final Customer #1 Acceptance
 
 - **Owner:** Kanuj. **Status:** PLANNED after Wave 3. **Prerequisites:** L2A and P1 both accepted.
 - **Owned surfaces:** final customer-facing end-to-end acceptance and go/no-go record.
@@ -263,7 +330,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Acceptance criteria:** full real customer journey, support contact, billing, routine delivery and privacy gates pass. Do not charge customer #1 before this gate.
 - **Handoff to:** first-customer operation and learning.
 
-#### S6: Visual Product Identity and Formula Resolution
+##### S6: Visual Product Identity and Formula Resolution
 
 - **Owner:** Sami. **Status:** BACKEND RESOLVER IMPLEMENTED; mobile consumption and live visual/OCR extraction remain separate handoffs. Not a customer-#1 launch dependency.
 - **Owned surfaces:** backend product identity, formula/provenance resolution, intelligence serving both Shelf and Scan.
@@ -273,7 +340,7 @@ H1A's verified hosted intake, photos, entitlement fixture, founder authorization
 - **Implemented:** stable typed contract, deterministic trust resolver, provenance-preserving schema, private product-evidence storage, idempotent Edge Function, founder review/audit flow, owner-bound Scan case integration, deletion lifecycle, and regression coverage.
 - **Handoff to:** Kanuj may now plan a separately owned mobile consumer against [`ProductIdentityResolver.ts`](../src/contracts/ProductIdentityResolver.ts). H1P still owns any live visual/OCR provider decision; model resemblance remains candidate-only.
 
-### Historical parked commerce execution
+#### Historical parked commerce execution
 
 C1.5A is **LANDED** (PR #23, merge `6f6a556`): Shop-only Where to Buy foundation. Production merchant listings remain zero and Ulta is test-only. `Product.isCatalogStandard` indicates narrow catalog provenance, not merchant/package/formula equivalence. No fake live price or availability; commerce never changes recommendation or Scan truth.
 
@@ -288,7 +355,7 @@ When reopened, split each implementation:
 | C1.5C platform | Sami | Shopify product/variant, inventory, checkout, order and fulfillment lifecycle. Publish a stable interface. |
 | C1.5C mobile | Kanuj | Customer checkout and order UX after the platform interface. |
 
-### Historical next action snapshot
+#### Historical next action snapshot
 
 - **Kanuj:** L1A and AUTH-V1 are complete. Start L1B after F1; start L1C after H1P using the current AUTH-V1 session. Until those handoffs, do not add Auth shortcuts or take Sami platform work.
 - **Sami:** start F1 from the H1A hosted baseline. H1P is a separate model-provider activation gate; H1B is separate billing work with Stripe intentionally later. H1E verified-email/recovery work is parked unless the founders reopen it. Own platform defects and hand tested interfaces to Kanuj. Do not take L1A/L1B/L1C/L2 mobile implementation.
@@ -297,22 +364,22 @@ Future tickets use: **Milestone, Owner, Status, Prerequisites, Owned surfaces, E
 
 ---
 
-## Historical delivery record
+### Historical delivery record
 
 > The entries below preserve implementation and release evidence from the managed-first roadmap. Their former current status, next-action, navigation, and dependency language is historical and superseded by the scanner-first plan above. Do not discard accepted test or hosted evidence.
 
 The following entries preserve earlier scope and checkpoint language. The current plan above overrides old next-step, tab, pricing, and commerce-status wording.
 
-## Kanuj Workstream (Customer Experience + Mobile)
+### Kanuj Workstream (Customer Experience + Mobile)
 
-### K1: Native Mobile Foundation [COMPLETE]
+#### K1: Native Mobile Foundation [COMPLETE]
 * **Scope**: True native 5-tab bar, Apple Liquid Glass materials, tab bottom safe-area insets (`paddingBottom: insets.bottom + 120`), native iOS haptics, motion curves, and Reduce Motion / Reduce Transparency accessibility support.
 * **Acceptance Criteria**:
   - Five tabs switch instantly with correct active icons and mineral green accent.
   - Scrollable content and primary CTA buttons never collide with or get trapped behind the tab bar on any iOS device.
   - Haptics fire reliably on physical devices; fallback cleanly on simulators.
 
-### K2: Customer Onboarding & Intake [COMPLETE]
+#### K2: Customer Onboarding & Intake [COMPLETE]
 * **Scope**: Production camera capture for bathroom shelf bottles, confirmed product rows, adverse reaction history with progressive Yes/No disclosure, reordered safety questionnaire with pregnancy/sensitivity tri-state audit, guided sequential 3-step photos (`1 Front` → `2 Left` → `3 Right`) with voice context note, and audit summary with direct edit links.
 * **Acceptance Criteria**:
   - Member can complete full onboarding in under 4 minutes.
@@ -321,7 +388,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Generates initial routine proposal with non-blocking review status (`awaiting_review`).
   - Full flow executable against `MockDeriveService`.
 
-### K3: Core Five Tabs Experience [COMPLETE]
+#### K3: Core Five Tabs Experience [COMPLETE]
 * **Scope**:
   - **Today**: 2-second status card, non-blocking review banner, tappable tonight routine preview, refill shipping tracker banner, and clinical insight card.
   - **Plan**: Segmented control (`ROUTINE` vs `PRODUCTS`), canonical routine drawer with dosages, application zones, rationales, and consolidated managed refill action.
@@ -333,14 +400,14 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Scan → Ask handoff carries product state without re-scanning.
   - Zero streak counters or anxiety triggers.
 
-### K4: Semantic Design System & Customer Polish [COMPLETE]
+#### K4: Semantic Design System & Customer Polish [COMPLETE]
 * **Scope**: Centralized semantic UI primitives in `src/components/ui/` (`Screen`, `ScreenHeader`, `StatusBadge`, `StickyActionFooter`, `SelectionRow`, `SelectionCard`, `ChoiceChip`, `SegmentedControl`, `GroupedSection`, `TextField`, `VoiceTextArea`, `InfoBanner`, `EmptyState`), spatial layout grammar (`layout.gutter: 24`, `sectionGap: 32`, `itemGap: 16`), contrast compliance (WCAG AA), zero emojis, and cleaned customer profile (internal founder desk removed).
 * **Acceptance Criteria**:
   - Replaces ad-hoc inline styles across all onboarding and core screens.
   - All interactive controls satisfy 44pt minimum touch target.
   - Cleaned profile dedicated strictly to member account and history.
 
-### K4.1: Personalized Pricing Architecture & Tab UX Refinements [COMPLETE]
+#### K4.1: Personalized Pricing Architecture & Tab UX Refinements [COMPLETE]
 * **Scope**:
   - Prototype personalized all-in monthly pricing engine in `src/pricing/**` (provisional client simulation pending co-founder review with Sami).
   - Explicitly distinguish steady-state consumption, current inventory, and initial fulfillment.
@@ -355,7 +422,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Full TypeScript typecheck passes with 0 errors.
   - Zero arbitrary subscription tiers.
 
-### K4.2: Phenotype Architecture, Provenance & Dermatological Evidence [COMPLETE]
+#### K4.2: Phenotype Architecture, Provenance & Dermatological Evidence [COMPLETE]
 * **Scope**:
   - Implement client/mock phenotype module in `src/phenotype/` (`types.ts`, `profile.ts`, `evidence-policy.ts`, `tint-compatibility.ts`, `fixtures.ts`).
   - Categorical provenance & confidence modeling (`ProvenancedValue<T>`) with strict confirmation invariant (`setOrConfirmPhenotypeValue`: member confirmation outranks unconfirmed photo estimates).
@@ -367,7 +434,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Clean TypeScript typecheck (0 errors) and web export.
   - Zero race/ethnicity classifiers, CV colorimeters, or Fitzpatrick ML inference.
 
-### K4.3: Founding Beta Client Readiness [COMPLETE]
+#### K4.3: Founding Beta Client Readiness [COMPLETE]
 * **Scope**:
   - Customer-facing first-10 beta pricing truth ($100/mo) centralized via `src/constants/config.ts` across Account Profile, Managed Orders, and Onboarding Summary.
   - UserStore demo isolation: decoupled tier string from price literals (`Founding Beta`), isolated Arthur demo identity in explicit `loadArthurDemoUser()`, default state initialized cleanly to `Beta Member`.
@@ -383,7 +450,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Zero customer-facing `$129` promises in Kanuj-owned paths.
   - Zero unsupported E2EE or medical claims in customer-facing copy.
 
-### K4.4: Baseline Capture Intelligence, Instant Product Scanning & Beta State Finalization [WIRED & COMPILATION READY / PHYSICAL DEVICE VALIDATION IN K5]
+#### K4.4: Baseline Capture Intelligence, Instant Product Scanning & Beta State Finalization [WIRED & COMPILATION READY / PHYSICAL DEVICE VALIDATION IN K5]
 * **Scope**:
   - Purged remaining default demo state contamination from `routineStore`: initialized `routine: null`, `userProducts: []`, `checkIns: []`, `refillRequests: []`, and empty history by default; isolated Arthur fixture into explicit `loadArthurDemoRoutine()` and `getArthurDemoRoutineState()`; removed misleading `initializeDefaultRoutine` action.
   - Gated development surfaces (`ProfileScreen` demo controls, `Scan` test presets, `params.sim` parameter) behind `__DEV__`; simulation fails closed without match (zero silent fallback to `PROTOTYPE_CATALOG[0]`).
@@ -402,7 +469,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Zero unconfirmed demo data leaks into fresh client launches; dev controls hidden in production.
   - Barcode lookup correctly identifies products across UPC and EAN formats without shutter press.
 
-### K5: Mobile Release & TestFlight [IMPLEMENTATION COMPLETE · ASC UPLOADED · PHYSICAL SMOKE DEFERRED TO I1]
+#### K5: Mobile Release & TestFlight [IMPLEMENTATION COMPLETE · ASC UPLOADED · PHYSICAL SMOKE DEFERRED TO I1]
 * **Scope**: EAS configuration, development client builds, production provisioning profiles, TestFlight deployment, physical device validation, and first-customer test script.
 * **Landed**:
   - `expo-dev-client`, `eas.json` (development + production profiles, remote `appVersionSource`, Mock/local `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`), first-customer script.
@@ -415,7 +482,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
 * **Deferred to I1**:
   - Physical TestFlight installation and hardware validation on connected device.
 
-### K6: Mobile Service Boundary & Remote-Readiness [COMPLETE]
+#### K6: Mobile Service Boundary & Remote-Readiness [COMPLETE]
 * **Scope**:
   - Centralize client-side domain operations through `src/services/deriveClient.ts` delegating strictly to `IDeriveService` (`getDeriveService()`).
   - Partition local camera catalog and barcode lookup fixtures into `src/services/catalog.ts` (`findProductByBarcode`, `PROTOTYPE_CATALOG`, `recognizeShelfProducts`).
@@ -442,7 +509,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - Zero Gemini API key on client.
 
-### K6.1: Service Boundary Hardening & Fail-Closed State [COMPLETE]
+#### K6.1: Service Boundary Hardening & Fail-Closed State [COMPLETE]
 * **Scope**:
   - Fix Scan-to-Ask route parameters: aligned to `{ productName, brand, verdict, reason }` with legacy fallback support, avoiding fake `ProductScanResult` synthesis from partial strings.
   - Remote identity fail-closed validation: `isRemoteServiceEnabled()` helper added to `DeriveService.ts`; `getActiveUserId()` and `resolveUserId()` in `deriveClient.ts` fail closed and throw in Remote mode if unauthenticated, empty, or mock IDs (`usr_beta_member`, `usr_beta_001`) are used.
@@ -455,7 +522,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - Zero contracts or backend code modified.
 
-### K6.2: Integration-Semantics & Error Hardening [COMPLETE]
+#### K6.2: Integration-Semantics & Error Hardening [COMPLETE]
 * **Scope**:
   - Full-fidelity Scan → Ask context preservation: `useScanContextStore` in `src/stores/scanContextStore.ts` carries the full typed `ProductScanResult` across navigation boundaries; Ask synchronously delivers it to `askQuestion` on initial and subsequent queries; banner dismissal or "New chat" clears context.
   - Remote identity guard refinement: `resolveUserId()` rejects missing, empty, and whitespace-only (`'   '`) strings with clear client guard messaging (`Valid member identity required: Remote operations require a non-mock customer identity.`).
@@ -464,7 +531,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - 100% test suite passing (64/64 tests in `tests/derive.test.ts`), with 4 new K6.2 regression tests.
   - TypeScript typecheck passes with 0 errors (`npx tsc --noEmit`).
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
-### K6.3: Test Integrity, CI Typechecking & Contract Truth [COMPLETE]
+#### K6.3: Test Integrity, CI Typechecking & Contract Truth [COMPLETE]
 * **Scope**:
   - Close false-green CI hole: add `tsconfig.tests.json`, `"typecheck:tests": "tsc -p tsconfig.tests.json --noEmit"` in `package.json`, dedicated test typecheck step in `.github/workflows/ci.yml`, and enforce in `AGENTS.md` completion rules.
   - Canonical contract truth & fixture realignment: audit all test fixtures against canonical schemas, eradicating hallucinated fields (`barcode`, `confidence`, `ingredientsIdentified`, `safetyFlags`, `fitScore`) and illegal verdicts (`verdict: 'keep'`), restoring required canonical `ProductScanResult` properties (`category`, `keyActives`, `factsUsedToDecide`) and legal verdicts (`fits_plan`, `great_fit`). Production contracts remain authoritative; tests adapt strictly to contracts.
@@ -476,7 +543,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - Zero contracts or backend code modified.
 
-### I1-A1: Mobile Auth & Session Spine [COMPLETE]
+#### I1-A1: Mobile Auth & Session Spine [COMPLETE]
 * **Scope**:
   - Implement mobile passwordless Email OTP flow (`signInWithOtp` -> `verifyOtp`) in `src/services/authClient.ts` with Direction A Mineral UI (`app/(auth)/login.tsx`, `app/(auth)/verify-otp.tsx`).
   - Configure `@react-native-async-storage/async-storage` session persistence for Supabase client in `src/services/supabase.ts`.
@@ -491,7 +558,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Zero contracts or backend code modified.
 
-### I1-A1.1: Session Isolation & Post-Auth Routing Hardening [COMPLETE]
+#### I1-A1.1: Session Isolation & Post-Auth Routing Hardening [COMPLETE]
 * **Scope**:
   - Establish neutral profile-resolution holding state (`/holding`, `app/holding.tsx`) in Remote mode: authenticated sessions route to `/holding` rather than branching on local `onboardingStore.isCompleted`, leaving canonical onboarding and membership determination to future remote profile hydration (I1-A2).
   - Centralize production routing policy in pure testable helper `resolveAuthRoute` (`src/utils/authRouting.ts`) shared identically by `app/index.tsx`, `app/_layout.tsx`, `app/(auth)/verify-otp.tsx`, and `tests/derive.test.ts`.
@@ -508,7 +575,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Test typecheck passes with 0 errors (`npm run typecheck:tests`).
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
-### I1-A1.2: Final Auth Route & Session-Truth Closure [COMPLETE]
+#### I1-A1.2: Final Auth Route & Session-Truth Closure [COMPLETE]
 * **Scope**:
   - Global Remote Route Enforcement: Implement pure helper `getAuthRedirectRoute` in `src/utils/authRouting.ts` and integrate into root `app/_layout.tsx`, guaranteeing that Remote authenticated sessions (`SIGNED_IN`) cannot bypass `/holding` via direct links, tab URLs, onboarding paths, profile, orders, check-ins, or modal routes, while preventing self-redirect loops when already on `/holding` or inside `(auth)`.
   - Fail-Closed Sign-Out Verification Truth Table: Refactor `signOutSession()` in `src/services/authClient.ts` to implement a strict 7-case fail-closed truth table. Verification errors or exceptions from `getSession()` fail closed (returning failure and preserving customer caches) rather than guessing logout success.
@@ -521,7 +588,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Zero contracts or backend code modified.
 
-### I1-A2: Remote Customer Bootstrap Resolution & Profile Handshake [COMPLETE]
+#### I1-A2: Remote Customer Bootstrap Resolution & Profile Handshake [COMPLETE]
 * **Scope**:
   - Replace temporary static `/holding` dead-end with canonical Remote bootstrap resolution handshake (`CustomerBootstrapState`).
   - Distinguish auth identity (`auth.users`), profile existence (`public.profiles`), and canonical onboarding completion (`public.skin_profiles.onboarding_completed`).
@@ -538,7 +605,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Web export passes cleanly (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
 
-### I1-A2.1: Bootstrap Freshness & Founder Surface Isolation [COMPLETE]
+#### I1-A2.1: Bootstrap Freshness & Founder Surface Isolation [COMPLETE]
 * **Scope**:
   - Bound async bootstrap resolution (`resolveCustomerBootstrap`) and profile hydration (`hydrateCustomerProfile`) to active authenticated session UUID (`useAuthStore.sessionUserId`) and monotonic attempt generation (`resolutionAttempt`).
   - Stale success, error, membership projection, or profile projection from prior attempts or switched identities ($A \rightarrow B$) are discarded.
@@ -554,7 +621,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Zero shared contract or backend modifications.
 
-### I1-B0: Onboarding Persistence Contract & Safety Alignment [COMPLETE]
+#### I1-B0: Onboarding Persistence Contract & Safety Alignment [COMPLETE]
 * **Scope**:
   - Resolved `ARCHITECTURE_CHALLENGE-02` (Safety Status Provenance) and `ARCHITECTURE_CHALLENGE-03` (Routine Action Alignment):
   - Additive database migration `20260918203554_onboarding_safety_status_and_action_pause.sql`:
@@ -582,7 +649,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Database runtime verification status truthfully reported (Docker daemon absent).
 
-### I1-B1: Authenticated Remote Onboarding Intake Commit & Private Photo Pipeline [COMPLETE]
+#### I1-B1: Authenticated Remote Onboarding Intake Commit & Private Photo Pipeline [COMPLETE]
 * **Scope**:
   - Additive database migration `20260918213146_onboarding_intake_submission_and_idempotency.sql`:
     - Created `public.onboarding_submissions` table for durable intake staging with unique partial index on `(user_id) WHERE status = 'draft'`.
@@ -616,7 +683,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - End-to-end intake verified on local Supabase container stack.
 
-### I1-B1.1: Transactional Intake Finalization, Auth Gate & Canonical Post-Commit Routing [COMPLETE]
+#### I1-B1.1: Transactional Intake Finalization, Auth Gate & Canonical Post-Commit Routing [COMPLETE]
 * **Scope**:
   - Additive database migration `20260918230000_transactional_intake_and_replay_idempotency.sql`:
     - Enforced at most one committed initial intake per member via partial unique index `onboarding_submissions (user_id) WHERE status = 'committed'`.
@@ -647,7 +714,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Database & integration tests automated in GitHub Actions CI.
 
-### I1-B2: Initial Routine Intelligence Integration [COMPLETE · SERVER IMPLEMENTATION & PERSISTENCE DELIVERED]
+#### I1-B2: Initial Routine Intelligence Integration [COMPLETE · SERVER IMPLEMENTATION & PERSISTENCE DELIVERED]
 * **Scope**:
   - **Server-Side Intelligence & Persistence (Sami Primary)**:
     - Context assembly: Ingests committed intake snapshot from `public.onboarding_submissions.payload_snapshot` (reading `pihTendencyAnswer` for PIH signal) and canonical `skin_profiles` (goals, midday feel, tightness, `is_pregnant_or_nursing`, `pregnancy_status`), confirmed shelf products, and baseline photo metadata.
@@ -681,7 +748,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Database & integration tests automated in GitHub Actions CI (`ci.yml`).
 
-### I1-B2.1: Real Model Intelligence, Trust Semantics & Error-Boundary Closure [COMPLETE · SERVER INTELLIGENCE DELIVERED]
+#### I1-B2.1: Real Model Intelligence, Trust Semantics & Error-Boundary Closure [COMPLETE · SERVER INTELLIGENCE DELIVERED]
 * **Scope**:
   - **Real Server-Side Gemini Structured Output (Sami Primary)**:
     - Integrated `gemini-3.8-flash` (configurable via `GEMINI_MODEL`, secret `GEMINI_API_KEY`) via Google AI Studio REST endpoint with `responseMimeType: 'application/json'` and `responseSchema: GEMINI_PROPOSAL_RESPONSE_SCHEMA`.
@@ -708,7 +775,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
 
-### I1-B2.2: Provider-Neutral Intelligence Boundary, Catalog Provenance & Trust Closure [COMPLETE · SERVER INTELLIGENCE DELIVERED]
+#### I1-B2.2: Provider-Neutral Intelligence Boundary, Catalog Provenance & Trust Closure [COMPLETE · SERVER INTELLIGENCE DELIVERED]
 * **Scope**:
   - **Provider-Neutral Intelligence Boundary (Sami Primary)**:
     - Decoupled routine generation behind the `RoutineIntelligenceProvider` interface (`providerId`, `generateProposal(context)`).
@@ -739,7 +806,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
 
-### I1-B2.3: Final Server Boundary Cleanup [COMPLETE · B2 SERVER LANE CLOSED]
+#### I1-B2.3: Final Server Boundary Cleanup [COMPLETE · B2 SERVER LANE CLOSED]
 * **Scope**:
   - **Removal of Filesystem Fallback**:
     - Eliminated `.server-provider-config`, founder-machine `/Users/` paths, and `Deno.readTextFile` lookups from `supabase/functions/propose-routine/provider.ts` and test harnesses.
@@ -762,7 +829,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
   - Kanuj's provider-independent mobile integration is unblocked.
 
-### I1-B3: Provider-Independent Initial Routine Mobile Integration [COMPLETE]
+#### I1-B3: Provider-Independent Initial Routine Mobile Integration [COMPLETE]
 * **Scope**:
   - Connect mobile application to consume real B2 initial routine state through shared service boundary.
   - Shared contract updates: added `getUserProducts(userId: string): Promise<UserProduct[]>` and optional `proposeRoutine(input?: RoutineProposalInput)` to `IDeriveService`.
@@ -789,7 +856,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Clean Expo web production export (`EXPO_NO_TELEMETRY=1 npx expo export -p web`).
   - `eas.json` strictly preserves `EXPO_PUBLIC_USE_REMOTE_SERVICE: "false"`.
 
-### I1-B3.1: Client Hardening — Cold-Restart Hydration, Read-Failure Generation Guard, Promise-Identity In-Flight Cleanup [COMPLETE]
+#### I1-B3.1: Client Hardening: Cold-Restart Hydration, Read-Failure Generation Guard, Promise-Identity In-Flight Cleanup [COMPLETE]
 * **Scope**:
   - Cold Remote restart: authenticated + bootstrap `READY` + `onboardingCompleted === true` + failed plan read preserves `routine = null`, `isRoutineBeingPrepared = true`, `isPlanUnderReview = false`, `planHydrationStatus = 'error'`, customer-safe `planHydrationError`. Onboarded members do not fall into "Start Routine Setup" empty-state.
   - Read failure must not call `proposeRoutine()`. Retry with `planHydrationStatus === 'error'` re-runs hydration first even if `isRoutineBeingPrepared` is already true. Proposal runs only after successful hydration proves `routine === null` and pending-generation is still true.
@@ -800,7 +867,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Unit tests, app/test typecheck, and Expo web export remain green. Backend schema unchanged.
   - `eas.json` Remote flag remains `false`.
 
-### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [COMPLETE]
+#### I1-B4: Membership, Commerce & Check-In Context Model Reconciliation [COMPLETE]
 * **Implemented in I1-B4A**:
   - Founding Beta membership display is **$25/month** (`config.betaPriceMonthly`). Membership pays for Derive managing skincare. Products are purchased separately. Membership price does not depend on routine size or product cost.
   - Canonical identity `founding_beta` via additive migration `20260919075053_i1_b4_membership_identity_reconciliation.sql` (legacy `founding_beta_129` backfilled; unknown tiers fail closed). `src/pricing/**` all-in engine removed.
@@ -816,9 +883,9 @@ The following entries preserve earlier scope and checkpoint language. The curren
 * **B4B — Weekly Check-In Context Model & Persistence** [COMPLETE]
 * **Not in B4**: Shop tab, Stripe checkout amounts, coupons, affiliates, food diary, period tracker, membership tiers, provider selection.
 
-## Sami Workstream (Platform + Intelligence + Operations)
+### Sami Workstream (Platform + Intelligence + Operations)
 
-### S1: Platform Foundation [COMPLETE]
+#### S1: Platform Foundation [COMPLETE]
 * **Scope**: Supabase setup, baseline PostgreSQL schema, reproducible migration scripts, customer authentication, private photo storage buckets, Row-Level Security (RLS) policies, and secure environment secrets management.
 * **Implemented**:
   - Committed local Supabase configuration and an additive migration chain.
@@ -843,7 +910,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - [x] Account deletion removes private Storage objects before relational/auth deletion.
   - [x] Zero secrets are committed to version control; public and trusted-runtime environment boundaries are explicit.
 
-### S2: Core Domain Persistence [COMPLETE]
+#### S2: Core Domain Persistence [COMPLETE]
 * **Scope**: Relational tables and queries for customer profiles, skin profiles, catalog products, formula snapshots, product reactions, ingredient signals, routine versions, weekly check-ins, photo records, and refill orders.
 * **Implemented**:
   - Audited and extended the existing baseline through one additive migration; no baseline table was recreated or rewritten.
@@ -861,7 +928,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - [x] Routine updates create new version snapshots rather than overwriting historical records.
   - [x] Product reactions persist historical formula snapshots at the exact time of the reaction.
 
-### S3: Server-Side Intelligence Services [COMPLETE]
+#### S3: Server-Side Intelligence Services [COMPLETE]
 * **Scope**: Edge Functions for routine proposal generation, product scan evaluation with categorical verdicts, Ask Derive conversation synthesis, safety classifier circuit breaker, and probabilistic ingredient signal inference.
 * **Implemented**:
   - Added JWT-gated `propose-routine`, `scan-product`, `ask-derive`, and `infer-ingredient-signals` Edge Functions. Handler identity is derived from the verified token; caller-supplied profile truth and spoofed member IDs are rejected or ignored.
@@ -880,7 +947,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - [x] Ingredient signals update confidence using distinct multi-product overlap and tolerated-exposure discounting.
   - [x] Unknown/withheld pregnancy status fails closed for pregnancy-excluded actives, and recognized prescription schedules are preserved exactly or require clarification.
 
-### S4: Founder Operations Console [COMPLETE]
+#### S4: Founder Operations Console [COMPLETE]
 * **Scope**: Lightweight internal administrative portal (`admin/**`) for managing the initial 10 Founding Beta members. After I1-B4A, customer-facing membership truth is the $25/month Derive-management experiment with products purchased separately; S4 itself remains founder review/edit/publish of routines, refill status, formula audit, and internal notes. Do not treat full Shop as an S4 acceptance criterion.
 * **Implemented**: Founder-only `admin/**` console, JWT-gated `founder-operations`, allowlisted `founder_accounts`, immutable routine review/publish, refill transitions, formula verification, safety queue, internal notes, and append-only audit. Landed on shared `main` via cumulative PR #16.
 * **Acceptance Criteria**:
@@ -888,7 +955,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - Refill orders can be transitioned (`requested` → `ordered` → `shipped` → `delivered`) with carrier tracking numbers.
   - Safety escalation flags appear in an urgent review queue.
 
-### S5: Membership Billing Integration [IMPLEMENTED; HOSTED ACTIVATION PENDING]
+#### S5: Membership Billing Integration [IMPLEMENTED; HOSTED ACTIVATION PENDING]
 * **Status**: Membership billing implementation merged on `main` through PR #18. Hosted Stripe/Supabase activation smoke remains pending. Production Remote mode remains disabled.
 * **Scope**: Trusted Stripe-hosted Founding Beta membership Checkout and Billing Portal, signed webhook lifecycle projection, and `RemoteDeriveService` hosted-session adapters. The server-configured Stripe Price owns the charge; `config.betaPriceMonthly` is display only. Products remain separate purchases.
 * **Acceptance Criteria**:
@@ -899,7 +966,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - [x] Product SKU checkout, ProductOffer, cart, and physical orders are outside S5.
   - [ ] Run hosted test-mode Checkout to signed webhook to membership state to Billing Portal smoke before claiming billing is live.
 
-### S6: Visual Product Identity & Formula Resolution [BACKEND RESOLVER IMPLEMENTED]
+#### S6: Visual Product Identity & Formula Resolution [BACKEND RESOLVER IMPLEMENTED]
 * **Owner**: Sami / backend-platform. The S6 backend is additive and does not modify C1.5A commerce or Kanuj mobile UI.
 * **Goal**: Interactive product resolution in seconds when evidence suffices, including products without visible barcode, unknown catalog items, unfamiliar packaging, changed packaging and ingredient-list photos. Manual review is an edge-case fallback; no fixed SLA is promised before measurement.
 * **Shared resolver**: One future Product Identity Resolver serves both Scan and onboarding Shelf. Camera/user evidence flows through extraction, candidate retrieval, identity resolution, formula verification, user confirmation when needed, then personalized Scan evaluation. Barcode/GTIN, front-label OCR, brand/name/variant, packaging image, ingredient OCR, user text, catalog, merchant listing identity and authoritative external product sources are candidate evidence. Verified product/variant identity and FormulaSnapshot linkage may later support Shop listing activation. Merchant economics never affect identity or skincare verdicts.
@@ -910,9 +977,9 @@ The following entries preserve earlier scope and checkpoint language. The curren
 
 ---
 
-## Kanuj Commerce Stream (Shop & Customer Acquisition)
+### Kanuj Commerce Stream (Shop & Customer Acquisition)
 
-### C1: Shop V1 Personalized Commerce UX [IMPLEMENTED]
+#### C1: Shop V1 Personalized Commerce UX [IMPLEMENTED]
 * **Scope**: Five member root tabs (`Today · Plan · Shop · Ask · Progress`) with one Scan implementation inside Shop. A canonical product detail route uses member context only. Shop, Today, and Plan commerce entry points require active membership; ADD acquisition and managed refills require a published routine.
 * **Acceptance Criteria**:
   - [x] Shop replaces Scan as a root tab; legacy and Ask Scan links reach `/shop/scan`.
@@ -923,7 +990,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - [x] Recommendation and safety decisions remain independent of commercial inputs.
   - [x] C1 adds no backend migration or physical-commerce shared contract.
 
-### C1.1: Shop and Scan Experience Hardening [IMPLEMENTED]
+#### C1.1: Shop and Scan Experience Hardening [IMPLEMENTED]
 * **Scope**: Make Scan a visible one-tap utility from the active-member Today
   and Shop headers while keeping one `/shop/scan` implementation and five root
   tabs. Clarify Shop state and product-detail presentation without physical
@@ -944,7 +1011,7 @@ The following entries preserve earlier scope and checkpoint language. The curren
 * **Non-overlap**: No H1, Sami backend, Stripe, SMTP, membership, shared contract,
   ProductOffer, physical checkout, or app-wide UI cleanup.
 
-### E1: Membership Entitlements and Checkout UX [IMPLEMENTED LOCALLY; HOSTED ACTIVATION PENDING]
+#### E1: Membership Entitlements and Checkout UX [IMPLEMENTED LOCALLY; HOSTED ACTIVATION PENDING]
 * **Scope**: Sign in, activate the Founding Beta membership through S5 Checkout, then onboard. Canonical active membership gates the managed app; profile readiness is a separate dimension. Paused, cancelled, and not-yet-active accounts receive one Membership screen with trusted Checkout or Portal links where S5 supports them.
 * **Acceptance**:
   - [x] Root and direct routes enforce member access, while Mock mode remains billing-free.
@@ -954,24 +1021,24 @@ The following entries preserve earlier scope and checkpoint language. The curren
   - [x] Local unit, pgTAP, OTP, E1 lifecycle, and S1-S5 integration tests cover the boundary.
   - [ ] Configure and smoke the hosted six-digit OTP template, Supabase functions/migrations, Gemini secret, and test-mode Stripe Checkout to signed webhook to Portal lifecycle before enabling production Remote mode.
 
-### C1.5A: Multi-Merchant Acquisition Foundation [LANDED]
+#### C1.5A: Multi-Merchant Acquisition Foundation [LANDED]
 * **Scope**: Shop-owned exact identity resolver, merchant/listing/optional offer presentation and member Where to Buy UI. The production listing registry is empty until merchant destination, product variant and formula equivalence can be supported. The reviewed Ulta listing remains a test-only fixture. Product/recommendation truth remains upstream; provisional products and unpublished ADD fail closed. No backend migration, live price, checkout or public routing.
 
-### C1.5B: Official Retailer Feeds, Live Offers & Attribution [PARKED]
+#### C1.5B: Official Retailer Feeds, Live Offers & Attribution [PARKED]
 * **Scope**: Verify official merchant APIs/feeds or approved networks, establish merchant product identity and listing verification, then ingest live prices, availability, identifiers, freshness and approved affiliate attribution with provenance. S6 may supply stronger product/variant/formula evidence, but price, availability and commission never decide product truth or recommendations. HTML scraping is not the core data source. No C1.5B code in A.
 
-### C1.5C: Derive Shopify Merchant & Integrated Checkout [PARKED]
+#### C1.5C: Derive Shopify Merchant & Integrated Checkout [PARKED]
 * **Scope**: Derive becomes a first-class merchant through Shopify product/variant mapping, real offer, inventory, cart/checkout, physical orders, fulfillment, returns and member benefits. External alternatives stay visible. No C1.5C code in A. Public catalog/Shop and factual non-member Scan each need independent routing, data and authorization gates.
 
-### C2: Personalized Discovery & Cart [DEFERRED]
+#### C2: Personalized Discovery & Cart [DEFERRED]
 * **Scope**: Search, categories, alternatives, and multi-item cart only after customer evidence supports them.
 
 
 ---
 
-## Historical integration objective (not an active implementation milestone)
+### Historical integration objective (not an active implementation milestone)
 
-### I1: Mock → Remote DeriveService Integration
+#### I1: Mock → Remote DeriveService Integration
 * **Historical scope**: Earlier end-to-end integration objective. Current ownership and acceptance are H1, F1, L1 and L2 above. The earlier test described:
   Onboarding → Profile → Routine Generation → Founder Review & Approval → Today Display → Shelf Audit → Product Scan → Ask Context → Weekly Check-In → Refill Request → Tracking.
 * **Acceptance Criteria**:

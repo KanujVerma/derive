@@ -2,7 +2,9 @@
 
 Key technical and product decisions for Derive. Approved target decisions do not claim runtime implementation.
 
-**Current approved product strategy (ADR-33)**: Derive is free personalized product intelligence first, with Check as the acquisition home and optional paid Managed Skincare for longitudinal care. CHECK / MY STUFF / PLAN / SHOP runs in Development Mock and locally integrated Development Remote; Remote Staging and production retain the C1 legacy tabs. Local anonymous Auth and factual free Check are implemented. Deterministic Personal Fit and hosted anonymous activation remain future work. ADR-33 below records the accepted decisions; older rationale remains preserved with affected clauses superseded.
+**Current approved direction:** scanner-first personalized skincare product intelligence. Free Check answers “Should I use this product?” with supported facts, contextual guidance, and honest unknowns; there is no universal numerical compatibility or health score. The $25/month Managed Skincare offer remains a hypothesis whose pricing, retention, and hosted billing activation are not validated.
+
+**Implementation status at d793639:** the scanner-first free path and bounded profile, fit, history, and private product-evidence integrations exist locally in Development Mock and exact-local-Supabase Development Remote. Personal Fit is a narrow first-match result, not the target multi-finding decision system. Remote Staging/production retain legacy managed routing; hosted guest activation, physical scanner acceptance, OCR/image recognition, and the complete target decision architecture remain open. ADR-33 records approved product intent; later ADRs below distinguish implementation, target, and evaluation.
 
 ---
 
@@ -30,7 +32,8 @@ Key technical and product decisions for Derive. Approved target decisions do not
 * **Decision**: Freeze `IDeriveService` shared contract; mobile consumes `MockDeriveService` while backend implements `RemoteDeriveService`.
 * **Rationale**: Unblocks Kanuj (mobile) and Sami (backend) to work independently for days without blocking on each other.
 
-### ADR-07: Kanuj & Sami Ownership Split
+### ADR-07: [HISTORICAL; SUPERSEDED FOR FUTURE FEATURES] Kanuj & Sami Ownership Split
+* **Status:** Historical file-lane assignment. New milestones use one end-to-end feature DRI with horizontal stewardship under ADR-40; this record does not assign future work.
 * **Decision**: Kanuj owns mobile UX, client AI experience, navigation, components, and design tokens. Sami owns Supabase, migrations, RLS, server AI workflows, operations console, and commerce.
 * **Rationale**: Eliminates cross-lane merge conflicts and establishes crystal-clear accountability.
 
@@ -48,6 +51,7 @@ Key technical and product decisions for Derive. Approved target decisions do not
 * **Rationale**: High-touch founder concierge ensures quality and fast customer learning before premature operational automation.
 
 ### ADR-11: Gemini Credentials Stay Server-Side
+* **Ownership note:** Founder names in the original rationale below record the former client/server lane and do not assign future work; see ADR-40.
 * **Decision**: The Expo/mobile client never embeds a Gemini API key and never calls Gemini directly. Live model invocation belongs in the trusted Supabase/server environment behind `RemoteDeriveService`.
 * **Rationale**: A client-visible Gemini key would expose a paid API credential and send customer health context from the device. Kanuj continues on `MockDeriveService` with deterministic local reasoning; Sami owns server secrets and Edge Function orchestration.
 
@@ -60,7 +64,8 @@ Key technical and product decisions for Derive. Approved target decisions do not
 * **Decision**: In the scalable long-term product, weekly check-ins and routine adaptations are 100% AI-led and automated based on logged skin tolerance and progress comparisons; there are zero recurring manual consultations. Only the first proposed routine generated at onboarding receives a manual quality check by the founders before activation (`awaiting_review`). This review state is strictly non-blocking: members retain full access to Today, Plan preview, Scan, Ask, and Profile, accompanied by a quiet, reassuring `InfoBanner` indicating verification is underway.
 * **Rationale**: Scales the service efficiently without founder burnout while providing a human safety net during initial customer intake. Eliminates frustrating modal lockouts that prevent new members from using their app.
 
-### ADR-14: Canonical Single Scanner Architecture & Split Verdict Model
+### ADR-14: [HISTORICAL; PARTIALLY SUPERSEDED] Canonical Single Scanner Architecture & Split Verdict Model
+* **Status:** Preserve as historical design rationale. The “FORMULA QUALITY” customer label is superseded by factual Formula Details, and the old scanner assumptions do not select a future capture provider.
 * **Decision**: Consolidate camera scanning into a single, uncluttered camera-first viewfinder on the `Scan` tab. Remove manual mode selector buttons (Front / Barcode / Ingredients) in favor of automatic multi-attribute recognition with fallback text search. Route all scanner prompts from Ask to `/scan`. Structure product evaluations into two distinct sections: (1) `FIT FOR YOU RIGHT NOW` (categorical verdict, active routine impact, personalized rationale) and (2) `FORMULA QUALITY` (objective category, key actives, formulation standard).
 * **Rationale**: Eliminates user confusion over scanner modes, deletes redundant camera code in the Ask tab, and cleanly decouples an ingredient's objective cosmetic quality from whether it is safe and beneficial for this user's current skin barrier and prescription schedule.
 
@@ -96,7 +101,8 @@ Key technical and product decisions for Derive. Approved target decisions do not
 * **Confirmation Invariant**: Every phenotype attribute carries explicit provenance (`ProvenancedValue<T>`) with categorical confidence (`low` | `medium` | `high`). Explicit member confirmation strictly outranks unconfirmed photo estimates (`setOrConfirmPhenotypeValue`). Stale estimates cannot overwrite confirmed truth.
 * **V1 Onboarding Invariant**: Normal V1 onboarding funnels only collect one single new adaptive phenotype signal: *"Do breakouts or irritation usually leave dark marks that stick around?"* (shown only when `breakouts` or `dark_spots` goals are selected). Shade depth, undertone, sunscreen white cast, and shaving habits are collected contextually (e.g. during tinted sunscreen evaluation or shaving questions) rather than lengthening onboarding.
 
-### ADR-18: Research Evidence Grading & Member Applicability Policy
+### ADR-18: [HISTORICAL; EVIDENCE-GRADE MODEL SUPERSEDED BY ADR-36] Research Evidence Grading & Member Applicability Policy
+* **Status:** Preserve as the former internal grading proposal. Its universal A-D categories are not the approved general evidence model; ADR-36 controls future evidence assessment.
 * **Decision**: Decouple scientific evidence quality from individual member applicability.
 * **Evidence Hierarchy**:
   - **Grade A / B**: High-quality RCTs, systematic reviews, or robust cohort studies. Eligible to influence routine decisions ONLY IF `directRoutineInfluenceAllowed` is true and all member applicability criteria and required product context (`EvidenceApplicabilityContext`) match (failing closed if context is missing).
@@ -236,7 +242,7 @@ Key technical and product decisions for Derive. Approved target decisions do not
 * **Acquisition**: Use exact normalized trusted brand and full name as a beta lookup seam when production UUIDs are runtime-generated. Existing `is_catalog_standard` provenance reaches the client; false or missing suppresses acquisition. Trusted canonical Product is not verified retailer package/formula equivalence. The production listing registry stays empty until destination, variant and formula evidence supports activation. Future evidence may use GTIN/UPC, official merchant identity, exact size, brand-direct identity, FormulaSnapshot and S6 resolution; no new formula-link contract is set here. Unverified or marketplace-seller links are omitted. Retailer clicks are outbound intent, not orders.
 * **Future Derive merchant**: C1.5C will map Derive to Shopify products/variants, real offers and integrated checkout. A real active Derive offer may appear first, while legitimate external alternatives remain visible. S5 Stripe membership stays separate from physical commerce.
 * **Data and money**: C1.5B verifies official APIs, feeds or approved networks before ingesting current price/availability and approved attribution. HTML scraping is not foundational. Prices need source and observed time. Membership ARR, product GMV, Derive commerce revenue and gross profit are distinct; retailer commission is Derive revenue only to the extent attributable.
-* **Phasing**: C1.5A is client acquisition/presentation only. When reopened, Sami owns C1.5B feeds/attribution backend and C1.5C Shopify/order backend; Kanuj owns separate downstream mobile consumer milestones after stable interfaces. No affiliate identifiers, backend schema, public Shop/Scan, S6 resolver or physical checkout is part of A.
+* **Phasing (historical; superseded for future assignment)**: C1.5A is client acquisition/presentation only. The original plan named Sami for C1.5B feeds/attribution backend and C1.5C Shopify/order backend and Kanuj for downstream mobile consumer milestones after stable interfaces. If C1.5 work resumes, assign one end-to-end feature DRI under ADR-40. No affiliate identifiers, backend schema, public Shop/Scan, S6 resolver or physical checkout is part of A.
 
 ---
 
@@ -304,7 +310,7 @@ These findings are review evidence, not accepted contract changes. S1A does not 
 - **Decision A — Free Check first:** Free Derive provides factual product intelligence and supported categorical personal fit. It is not intentionally crippled to force an upgrade. No arbitrary universal numerical product score or compatibility number is allowed.
 - **Decision B — Value before personalization:** First Check returns supported factual value before asking profile questions. A compact personalization offer is optional; skipping it preserves factual checking. Completing it refreshes the same product result.
 - **Decision C — Accountless experience, authenticated target:** The first-launch UX should silently establish a Supabase anonymous authenticated identity and open Check. Such users are authenticated-role users with an anonymous identity claim, not the public `anon` API role. Anonymous Auth requires explicit RLS/security review before use.
-- **Decision D — Free access and managed entitlement are separate:** Free Check is available to anonymous or permanent identities without managed entitlement. Do not create a `founding_beta` membership row for each free guest. Current E1 behavior remains runtime truth until a future implementation changes it.
+- **Decision D: Free access and managed entitlement are separate:** Free Check is available to anonymous or permanent identities without managed entitlement. Do not create a `founding_beta` membership row for each free guest. Remote Staging and production retain E1 managed routing; Development Mock and exact-local-Supabase Development Remote have a locally integrated free path. Hosted guest activation remains gated.
 - **Decision E — Target root navigation:** CHECK / MY STUFF / PLAN / SHOP, with account/settings in the header. Free launch opens CHECK; managed launch opens PLAN / Today-like care. ASK can remain contextual; PROGRESS belongs within managed care unless evidence warrants a separate destination. Existing C1 code and evidence remain preserved.
 - **Decision F — Deterministic baseline fit:** Free fit must work without a model provider. It is categorical, explainable, evidence-backed, cosmetic/non-diagnostic, and fails closed when product/formula identity or relevant context is insufficient. A model may enrich explanation but cannot be the sole working path.
 - **Decision G — Separate facts from fit:** Use factual “Formula Details” separately from “Personal Fit.” A supported formula can still be a poor match for one person's context; unknown formula evidence stays unknown. No numeric compatibility score.
@@ -312,4 +318,56 @@ These findings are review evidence, not accepted contract changes. S1A does not 
 - **Decision I — No universal numerical product score:** Fit labels such as GREAT FIT, COULD WORK, NOT NEEDED, BETTER AS A REPLACEMENT, USE WITH CAUTION, and NOT A GOOD FIT RIGHT NOW communicate contextual categorical guidance, not a global product grade.
 - **Managed layer:** Target positioning is “$25 Managed Skincare”: routine construction and keep/add/remove/change decisions, longitudinal management, check-ins/progress, proactive adaptation, founder/expert review in beta, and separately reviewed future clinician and commerce benefits. Current Founding Beta display/billing code does not prove the target entitlement or hosted payment flow.
 - **Supersession:** The affected root-navigation and mandatory managed-first clauses in ADR-02, ADR-03, ADR-26, ADR-31 and C1 product docs are superseded as target behavior. ADR-14’s “FORMULA QUALITY” presentation label is superseded by factual “FORMULA DETAILS,” separate from Personal Fit. Their historical implementation and rationale remain intact. Older $100 all-in, $129 tier, and routine-derived price decisions stay superseded as already recorded.
-- **Consequences and gates:** S-FREE-1 owns anonymous identity, free access and RLS/security review; S-FREE-2 owns minimal profile persistence and deterministic fit; Kanuj consumes stable interfaces for mobile work. Anonymous lifecycle and abuse controls, catalog coverage and physical beta acceptance remain explicit roadmap gates.
+- **Historical milestone assignment:** S-FREE-1 and S-FREE-2 delivered the local access and fit foundations, and later K/S integration consumed their contracts. Future work follows ADR-40's single feature DRI and stewardship model. Hosted guest lifecycle/abuse controls, catalog coverage, and physical beta acceptance remain gates.
+
+
+---
+
+### ADR-34: Scanner-First Personalized Product Intelligence Without a Universal Score
+
+- **Status:** ACCEPTED TARGET; product direction is implemented locally in bounded flows.
+- **Decision:** Free Check is the acquisition wedge and answers “Should I use this product?” The result progresses from supported product facts to profile-, routine-, and history-aware guidance only when evidence supports each step. Use factual Formula Details separately from Personal Fit. Do not produce a universal numerical product, compatibility, health, safety, or ingredient score.
+- **Customer-quality bar:** a successful Check answers what to do, why for this person, how it affects current use, what to do next, and what is known versus unknown. Correctness, relevance, actionability, uncertainty honesty, and customer effort are independent quality dimensions. A more personalized answer is not better if it is less correct.
+- **Consequences:** “Personalized Yuka for skincare” is internal analogy only. It is not customer-facing positioning. The $25/month Managed Skincare proposition remains a paid hypothesis, not validated pricing, retention, or hosted activation.
+
+### ADR-35: Versioned Product Truth, Independent Concentration and Regulatory Evidence
+
+- **Status:** ACCEPTED TARGET; some product, identifier, formula-version, and provenance records are implemented; the complete model is not.
+- **Decision:** Preserve Product, ProductAlias, ProductVariant, ProductIdentifierAssertion, ObservedPackaging, FormulaVersion, ordered IngredientOccurrence, IngredientEntity, ConcentrationAssertion, RegulatoryConstraint, ScientificEvidenceClaim, SourceProvenance, ReformulationLineage, ResolutionCase, and ProductTruthSnapshot as separate concepts. Do not model timeless Product.ingredients.
+- **Semantics:** A GTIN is an identifier assertion, not a product primary key, exact formula key, or authenticity proof. Visual resemblance, model output, user confirmation, and retailer data are evidence or candidates, not canonical formula authority. Unknown stays unknown.
+- **Concentration:** Keep evidence basis, quantity shape, review state, and substance/unit/formula/market/time/source scope separate from regulatory limits. A derived constraint is not an observed concentration. A regulatory maximum is not a measured formulation quantity.
+- **Snapshot invariant:** A personal decision must bind to the same identity, variant, formula evidence, conflict state, and provenance revision shown to the customer. The target ProductTruthSnapshot is not a current source type.
+
+### ADR-36: Contextual Scientific Claims and Scoped Evidence Assessment
+
+- **Status:** ACCEPTED TARGET; current data does not implement the complete scientific-claim model.
+- **Decision:** A scientific claim retains its source and version/date, study design and method, claim type and endpoint, ingredient/formula scope, population, route/exposure, outcome, limitations, review status, and applicability. Hazard, exposure, finished-product risk, efficacy, and personal relevance are distinct questions.
+- **Evidence assessment:** Do not use Klimisch as a universal evidence-quality scale; it was developed for reliability assessment of toxicology/ecotoxicology studies. GRADE is a certainty framework for a defined body of evidence and question, not a universal grade to assign automatically to individual product claims. Adopt either only inside an explicit, reviewed method with its scope documented.
+- **Consequence:** An evidence grade alone cannot create a product fact, clinical claim, concentration, or personal action.
+
+### ADR-37: Multi-Finding Personal Decision and Evidence-Bound Explanation
+
+- **Status:** ACCEPTED TARGET; current free Personal Fit is only a narrow sequential first-match implementation.
+- **Decision:** Gather all applicable supported findings, preserve their evidence and uncertainty, and apply a deterministic final policy to select the customer action. The versioned PersonalDecisionPacket binds that action to the ProductTruthSnapshot and minimum-necessary user context, findings, conflicts, unknowns, and policy revision.
+- **Soft judgment:** A probabilistic provider may contribute bounded, typed findings or abstain. It cannot establish canonical product truth, bypass deterministic safety/policy, or invent a conclusion from missing evidence. Jev is an optional bounded experiment, not a selected provider or production dependency.
+- **Explanation:** An evidence-bound renderer explains only claims present in the packet. It cannot add new scientific or product claims. No PersonalDecisionPacket or multi-finding decision service is currently implemented.
+
+### ADR-38: Provider-Neutral Capture and Perception; Scanner Selection by Evaluation
+
+- **Status:** ACCEPTED TARGET for seams; scanner and model choices remain EVALUATION.
+- **Decision:** Keep capture observations, barcode and photo capture, product-evidence extraction, and candidate retrieval behind replaceable semantic boundaries. Capture produces evidence with permission, cancellation, unsupported-input, and error states; it does not establish identity. Extractors propose evidence and may abstain; retrievers return candidates or ambiguity, never canonical truth.
+- **Current implementation:** Mobile Check uses Expo Camera directly. Existing capture/evidence types do not constitute BarcodeCapturePort or PhotoCapturePort adapters. No working photo OCR/image recognition is claimed.
+- **Evaluation:** Scandit is an unselected challenger to the current Expo path. Gemini and GPT/Luna image extraction, on-device OCR, MobileCLIP, and Jev require rights-cleared benchmarks and remain unselected. Do not infer a winner from vendor case studies.
+
+### ADR-39: Progressive Routine and History Context With Just-in-Time Safety Questions
+
+- **Status:** ACCEPTED TARGET; local free profile, saved products, checks, and reported experiences exist in bounded forms.
+- **Decision:** Ask only for context that can materially change the current decision, allow the customer to skip or withhold it, and preserve unknown separately from no. A future canonical routine/exposure model binds products and formula versions to time, use, and changes; current event-based free history is not that model.
+- **Sensitive context:** Pregnancy, trying to conceive, and breastfeeding/nursing are distinct contextual states and must be asked only when relevant. Never infer them from imagery or other profile attributes. Keep the product within cosmetic, non-diagnostic guidance.
+- **Beta scope:** Initial external beta targets U.S. adults 18 and older. This is an approved target scope, not a current age gate unless runtime evidence proves one exists.
+
+### ADR-40: Vertical Feature DRI, Horizontal Stewardship, and Maximum Independent Parallelism
+
+- **Status:** ACCEPTED OWNERSHIP POLICY.
+- **Decision:** Every feature has one founder DRI accountable end-to-end, including client, service, persistence, tests, integration, and acceptance needed for the outcome. There is no permanent frontend/backend split. Sami stewards platform and truth invariants; Kanuj stewards customer experience. Stewardship reviews invariants without transferring feature accountability.
+- **Parallelism:** A DRI may delegate independent work to agents on disjoint write-sets. Founders and their agents may work in parallel across independent features. Stable contracts and fixtures allow work to proceed before final integration. Keep one active writer for shared contracts, migration ordering, authoritative truth promotion, and high-contention composition files; integrate in one bounded composition pass. P0-C and P0-D require a named DRI before activation.

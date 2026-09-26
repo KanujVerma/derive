@@ -2,13 +2,45 @@
 
 High-signal findings synthesized from founder research, customer discovery conversations, dermatological literature, and competitive teardowns.
 
+## External research update: scanner, product truth, and evidence (2026-09-26)
+
+These links describe external products, vendor claims, standards, or data policies. They are research inputs, not Derive implementation, endorsements, or provider selections.
+
+### Yuka: verification workflow and score limits
+
+Yuka's official help material describes product verification through automatic image/text checks, with manual transcription and review when data is not recognized; unverified products may remain unrated pending verification. Its product-data guidance describes brand-provided product spreadsheets and product/INCI/package sources. Its ingredient methodology discusses concentration estimates, exposure, frequency, route, and population, while its EU/UK terms distinguish the finished-product score from exact ingredient quantities in the particular formula and from product efficacy. These materials support separating ingredient hazard/exposure evidence from finished-product claims; they do not establish that Derive should copy Yuka's score or workflow.
+
+Sources: [Yuka verification information](https://help.yuka.io/l/en/article/p0ka7o7xcm-verification-information), [Yuka product-data sharing](https://help.yuka.io/l/en/article/wvb7mrfady-how-to-share-product-data-with-yuka), [Yuka ingredient methodology](https://help.yuka.io/l/en/article/vt1zfwxjxb-untitled-article-en), [Yuka EU/UK terms](https://help.yuka.io/l/en/article/nui6tegnjw), and [Yuka limitations](https://help.yuka.io/l/en/article/wz3cbbztf3-what-are-yuka-s-limitations).
+
+### Scanner precedent and competing product descriptions
+
+Scandit's Yuka case study is vendor/customer evidence. It reports Yuka's scanner evaluation history and selection rationale, but is not a neutral benchmark of current Derive package capture, difficult lighting, or device performance. Treat Scandit as a challenger to Expo, not a selected dependency. OnSkin and Skin Bliss publicly describe product scanning, ingredient/safety information, personalized fit, or routine features; these are vendor self-descriptions, not independent measurements of correctness or retention.
+
+Sources: [Scandit/Yuka case study](https://www.scandit.com/resources/case-studies/yuka/), [OnSkin FAQ](https://onskin.com/faq/), and [Skin Bliss](https://getskinbliss.com/).
+
+### Product-data schemas, licensing, and image rights
+
+Open Food Facts/Open Beauty Facts documentation provides public examples of product records, ingredient structures, source tags, image roles, and schema versioning. This is a schema and operations reference, not permission to import data or images into Derive. Its documentation describes database licensing and separate image licensing; product image contribution requires compatible rights. Derive must review license terms and provenance for each intended data use and obtain explicit rights/consent before reusing customer-submitted images.
+
+Sources: [Open Food Facts product schema](https://openfoodfacts.github.io/documentation/docs/Product-Opener/schemas/schemas/product/), [schema changelog](https://github.com/openfoodfacts/openfoodfacts-server/blob/main/docs/api/ref-api-and-product-schema-change-log.md), [licensing guidance](https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/tutorials/license-be-on-the-legal-side/), and [photo contribution rights](https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/tutorial-uploading-photo-to-a-product/).
+
+### Evidence grading boundaries
+
+Klimisch's method was developed for reliability assessment of toxicology/ecotoxicology study records; it is not a universal evidence grade for cosmetic efficacy, product truth, or personal fit. GRADE describes certainty in a defined body of evidence for a question and outcome; it should not be assigned as a universal per-ingredient badge without a reviewed method.
+
+Sources: [Klimisch et al. paper (PubMed)](https://pubmed.ncbi.nlm.nih.gov/9056496/), [ECHA information requirements](https://echa.europa.eu/en/support/mixture-classification/examine-available-information), [GRADE Working Group](https://www.gradeworkinggroup.org/), and [GRADE criteria paper](https://www.gradeworkinggroup.org/docs/Criteria_for_using_GRADE_2016-04-05.pdf).
+
+### Open Derive evaluation questions
+
+No barcode or image provider has been selected beyond the current Expo implementation. Benchmark real, rights-cleared skincare packages across exact variant/region, ingredient-panel transcription, critical number/unit errors, hallucination and abstention, multilingual labels, lighting/reflection/curved packaging, latency, cost, offline behavior, device support, privacy/retention, and review burden. Measure useful resolved products and safe unknown recovery, not scan throughput alone. Compare any soft-judgment provider, including Jev, with deterministic rules on labeled cases; it may contribute bounded findings or abstain but cannot set product truth or final policy.
+
 ## Commerce source policy (C1.5A direction)
 
 Brand-direct and major trusted retailer product pages are first-class acquisition options when destination, product variant and formula equivalence can be supported. Landed C1.5A has an empty production listing registry and a test-only Ulta example; exact brand/name and `isCatalogStandard` are insufficient activation evidence. C1.5B and C1.5C execution is parked for first-10 operability. When reopened, C1.5B should prefer official merchant APIs, affiliate/product feeds, approved commerce networks and trusted providers for listing identity and verification, then current prices, availability and approved attribution. Verify each integration's current terms then. HTML scraping is a last-resort research fallback, not production commerce infrastructure. C1.5C plans a future Derive Shopify merchant. Merchant payout never changes product identity, formula verification or Scan/recommendation decisions.
 
 ---
 
-## 1. Competitive Teardowns & Critical Lessons
+## Historical competitive hypotheses and internal interpretations
 
 ### A. Yuka & OnSkin (The Hazard of Universal Scoring)
 * **[FACT]**: Barcode scanning apps assign fixed 0–100 or green/red scores to products based on static ingredient databases.
@@ -18,7 +50,7 @@ Brand-direct and major trusted retailer product pages are first-class acquisitio
 ### B. Skin Bliss (The Hazard of Feature Bloat & Optimization Theater)
 * **[FACT]**: Skin Bliss surfaces 30+ skin metrics, full chemical encyclopedias, and pseudo-precise compatibility percentages (e.g. "87% match").
 * **[INFERENCE]**: Users experience cognitive fatigue and anxiety. They do not know what bottle to open next.
-* **[DERIVE TAKEAWAY]**: **Zero optimization theater.** No fake percentages or arbitrary scores. If skin is stable, Derive says: *"Everything looks on track. Keep your routine the same."*
+* **[DERIVE TAKEAWAY - RETAINED PRODUCT PRINCIPLE]**: **Zero optimization theater.** No fake percentages or arbitrary scores. If skin is stable, Derive says: *"Everything looks on track. Keep your routine the same."*
 
 ### C. Curology (The Walled Garden & Care-Loop Lesson)
 * **[FACT]**: Curology pioneered guided 3-angle photo submissions and provider oversight, but locks customers into a single proprietary custom bottle.

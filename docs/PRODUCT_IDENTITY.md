@@ -8,10 +8,22 @@ Shelf. It separates four questions that must not be collapsed:
 3. Which formula version does that exact package support?
 4. Is the evidence authoritative enough to evaluate the product for this member?
 
+## Current implementation and approved target
+
+**CURRENT IMPLEMENTATION:** S6 stores product identity, variants, identifier assertions, append-only formula versions, provenance, evidence, resolution cases, and candidates. K4/S4 connects mobile capture to private product-evidence handling locally. The customer capture path uses Expo Camera directly. Photo evidence can be stored and reviewed, but no working OCR, image-recognition extractor, or package-authentication system is claimed. Current free Personal Fit is first-match and local integrations do not imply hosted activation.
+
+**APPROVED TARGET, NOT YET IMPLEMENTED:** preserve product family, alias, variant, identifier assertion, observed packaging, formula version, ordered ingredient occurrences, ingredient entity, concentration assertion, regulatory constraint, scientific evidence claim, source provenance, reformulation lineage, resolution case, and a versioned ProductTruthSnapshot as separate concepts.
+
+Formula truth is time-bound: Product → Variant → FormulaVersion → ordered IngredientOccurrence records → evidence/provenance. A GTIN is an identifier assertion, not a product primary key, exact-formula key, or proof of authenticity. A model resemblance or customer confirmation can contribute evidence or a candidate, but neither alone verifies a formula. Unknown and conflict remain explicit.
+
+A future ProductTruthSnapshot binds the identity, variant, formula evidence, unresolved conflicts, and provenance revision used in one personal assessment to the same truth revision shown to the customer. Concentration assertions preserve independent evidence basis, quantity shape, review state, unit, w/w versus w/v when known, active-equivalent basis when relevant, formula/version, market, date, and source. Regulatory limits remain separate constraints; a derived legal maximum is not an observed concentration.
+
+User, brand, and manual submissions may create proposals or resolution cases. New and conflicting proposals stay in a review queue; accepted catalog truth requires source review, provenance, conflict handling, and an auditable promotion decision. Indexed candidate retrieval must replace broad unindexed matching before catalog scale. Do not use barcode lookup as a formula shortcut or bulk scrape product pages/images.
+
 ## Stable interface
 
-`POST /functions/v1/resolve-product-identity` requires an authenticated active
-member and the contract in
+`POST /functions/v1/resolve-product-identity` requires an authenticated caller under the applicable free or managed access gate
+and the contract in
 [`src/contracts/ProductIdentityResolver.ts`](../src/contracts/ProductIdentityResolver.ts).
 Every request carries a caller-generated UUID for idempotency and declares its
 consumer as `scan` or `shelf`.
@@ -76,14 +88,14 @@ than guessing which formula is in the member's package.
 
 `scan-product` accepts an optional `resolutionCaseId`. When present, it derives
 product labels from an owner-bound `verified_product_formula` case, rejects label
-mismatches, and refuses unresolved cases. Existing manual-name evaluation stays
-backward compatible until Kanuj adopts the new mobile contract.
+mismatches, and refuses unresolved cases. The local K4/S4 mobile integration now submits private capture evidence through the free Check path. Identity and formula results still follow the S6 trust states; this local path does not enable hosted guest activation.
 
 The resolver securely stores photo evidence but does not yet perform live visual
-or OCR extraction. Provider activation is a separate H1P decision. A future
+or OCR extraction. Provider activation and extractor selection remain separate decisions. A future
 extractor may propose candidate text or candidates; it may not bypass these trust
-states. Mobile Shelf/Scan capture and confirmation UX remains Kanuj-owned and is
-not silently changed by S6.
+states. Current capture uses Expo Camera directly. Future work is assigned by
+feature DRI with platform/truth and customer-experience stewardship, not by a
+permanent client/server lane.
 
 ## Operational invariants
 
@@ -99,7 +111,7 @@ not silently changed by S6.
   retrieval milestone replaces bounded in-memory matching; it never silently
   searches a truncated catalog.
 
-## Review and rollout checklist
+## Historical S6 review and rollout checklist
 
 S6 requires no new API key or model credential. Its deterministic resolver uses
 the existing Supabase project configuration. A future OCR or visual provider is

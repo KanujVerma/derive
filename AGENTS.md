@@ -2,55 +2,50 @@
 
 ## Product direction
 
-Derive’s approved direction is free personalized skincare product intelligence first, centered on Check a Product, with optional $25 Managed Skincare for ongoing routine management. The scanner-first architecture is approved target behavior, not proof of current runtime implementation. Do not use a universal numerical product score; keep Formula Details separate from Personal Fit.
+Derive's approved direction is **scanner-first personalized skincare product intelligence**. Free Check asks “Should I use this product?” and returns only supported facts and context-sensitive actions. `$25/month Managed Skincare` is a paid hypothesis, not validated pricing or activated hosted billing. No universal numerical compatibility, health, or product-quality score.
 
-For current implementation status and milestones, use [ROADMAP.md](docs/ROADMAP.md). For recent landed/runtime evidence, use [CONTEXT_SYNC.md](docs/CONTEXT_SYNC.md). For accepted product and architecture decisions, use [DECISIONS.md](docs/DECISIONS.md).
+The target architecture is not proof of runtime behavior. Development Mock and exact-local-Supabase modes contain a scanner-first free path; Remote Staging and production retain legacy managed access. S-FREE-2/3/4 and K2/S2, K3/S3, K4/S4 are integrated locally, not hosted. Photo-only input has no working OCR/image recognition; hosted guest activation and physical acceptance remain gated. See [ROADMAP.md](docs/ROADMAP.md) and [CONTEXT_SYNC.md](docs/CONTEXT_SYNC.md) for current status.
 
-## Ownership
+## Truth and references
 
-Kanuj owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client state/helpers, navigation/presentation, and device/TestFlight acceptance. Sami owns `supabase/**`, `admin/**`, `src/services/remote/**`, `src/services/ai-workflows/**`, hosted Auth/RLS/configuration, product identity, access control, and founder operations.
+GitHub `main` is the durable checkpoint. For what exists, prefer runtime, source and tests over stale prose. Accepted ADRs describe intent, not implementation. Before substantial work, fetch/inspect branch freshness and preserve dirty or unpushed work. Read only references relevant to the task:
 
-Wave-1 foundations and local mobile/platform integration are landed. K-FREE-2 (#51), K-FREE-3 (#48), K-FREE-4 (#49), K-PAID-1A (#52), K2-COMPOSE (#60), K4-COMPOSE handoff prep (#55), and KPAID-COMPOSE (#56) are landed. K2/S2 live personalization integration (#63), K3/S3 live MY STUFF integration (#64), K4/S4 camera-to-evidence integration (#65), and explicit Check-memory save/owner-switch clearing (#66) are merged into main as local capabilities. S-FREE-2 (#54), S-FREE-3 (#58), and S-FREE-4 (#61) are not hosted; hosted guest activation and physical hardware acceptance remain open. Sami owns S-OPS-1 before hosted guest activation. The scanner-first beta is not ready. Shared contracts are single-owner handoffs, not co-owned parallel edits. See [OWNERSHIP.md](docs/OWNERSHIP.md) and [ROADMAP.md](docs/ROADMAP.md).
+- [ROADMAP.md](docs/ROADMAP.md): objective, active P0s, gates and history.
+- [OWNERSHIP.md](docs/OWNERSHIP.md): feature DRIs, stewards and parallel work.
+- [DECISIONS.md](docs/DECISIONS.md): accepted decisions and evaluation status.
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): current system versus target architecture.
+- [INTERFACES.md](docs/INTERFACES.md): current and conceptual boundaries.
+- [PRODUCT.md](docs/PRODUCT.md), [PRODUCT_CATALOG.md](docs/PRODUCT_CATALOG.md), [PRODUCT_IDENTITY.md](docs/PRODUCT_IDENTITY.md): customer value and product truth.
+- [SAFETY_PRIVACY.md](docs/SAFETY_PRIVACY.md), [RESEARCH.md](docs/RESEARCH.md), [CONTEXT_SYNC.md](docs/CONTEXT_SYNC.md): safety, evidence and handoffs.
 
-**Max-parallel implementation rule:** A counterpart contract is a prerequisite for integration, not a prerequisite for beginning or completing owned implementation. Kanuj presentation milestones may build against Kanuj-owned view models/fixtures while Sami builds platform contracts independently. After completing an owned milestone, each founder advances to the next non-overlapping milestone. Integration is a separate bounded task. Keep simultaneous branches off shared composition files and preserve Sami's platform ownership.
+## Feature ownership and parallel work
 
-## Sources of truth
+Every feature has one founder DRI who owns the customer outcome end-to-end; the DRI may work across client, server, persistence, tests, integration and physical acceptance. There is no permanent frontend/backend assignment. Current recommended P0 DRIs are Sami for P0-A Capture + Product Resolution and Kanuj for P0-B Personal Decision Intelligence. P0-C hosted operations and P0-D cross-product release acceptance require an explicit DRI before activation.
 
-GitHub `main` is the durable shared checkpoint. Current implementation, runtime, and tests outrank stale prose about what exists; accepted ADRs describe intended decisions. Before substantial work, fetch and inspect branch freshness. Preserve dirty or unpushed work. Read only the references relevant to the task.
+Sami stewards platform/truth invariants; Kanuj stewards customer experience. Stewardship reviews cross-cutting changes but does not transfer the feature DRI. **Every active milestone has one founder DRI. The DRI may decompose the milestone into parallel agent-owned workstreams with disjoint write-sets. A dependency may block final integration, but it must not block independent implementation when a stable contract, fixture or view model can be used. Shared contracts, migration ordering, authoritative truth promotion and high-contention composition files have one active writer at a time. After independent modules are complete, one bounded composition pass integrates them.**
 
-- [ROADMAP.md](docs/ROADMAP.md): current execution plan and milestones.
-- [OWNERSHIP.md](docs/OWNERSHIP.md): founder and file boundaries.
-- [DECISIONS.md](docs/DECISIONS.md): accepted ADRs.
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md): service and data boundaries.
-- [INTERFACES.md](docs/INTERFACES.md): shared contracts.
-- [SAFETY_PRIVACY.md](docs/SAFETY_PRIVACY.md): safety and privacy invariants.
-- [CONTEXT_SYNC.md](docs/CONTEXT_SYNC.md): recent durable handoffs and runtime evidence.
+Founder workstreams and subagents may run concurrently when their write-sets and dependencies are independent. Keep one writer for shared contracts, migration order, auth/runtime composition, root navigation/layout, Check composition, authoritative truth promotion and release composition. Use fixtures or stable target contracts to keep independent work moving. See [OWNERSHIP.md](docs/OWNERSHIP.md).
 
 ## Non-negotiables
 
-- Keep service-role, Stripe, and model-provider secrets out of client code.
-- `app/**` must not import server AI workflows.
-- Do not silently implement the other founder’s lane. Record cross-lane defects with evidence and owner.
-- Never weaken Auth, RLS, private Storage, or deletion for convenience.
-- Skincare behavior remains cosmetic/non-diagnostic. Keep private photos and sensitive context private; do not infer race, ethnicity, ancestry, or Fitzpatrick.
+- Keep service-role, Stripe and model-provider secrets out of client code; `app/**` must not import server AI workflows.
+- Never silently implement another feature DRI's work. Record cross-feature defects with evidence and owner.
+- Never weaken Auth, RLS, private Storage or deletion for convenience.
+- Guidance remains cosmetic/non-diagnostic. Keep photos and sensitive context private; do not infer race, ethnicity, ancestry or Fitzpatrick.
 - Do not place sensitive skin or ingredient text in analytics. Session replay remains disabled.
 - Record material durable changes in canonical docs and `CONTEXT_SYNC.md`.
 
 ## Implementation validation
 
-Before claiming any substantial implementation complete:
+Before claiming substantial implementation complete:
 
 1. `npm test` must pass 100%.
 2. `npx tsc --noEmit` must pass with zero errors.
 3. `npm run typecheck:tests` must pass with zero errors.
 4. `EXPO_NO_TELEMETRY=1 npx expo export -p web` must build cleanly.
-5. For mobile changes affecting native/customer runtime, run the applicable iOS JavaScript/export validation, such as `EXPO_NO_TELEMETRY=1 npx expo export -p ios`.
-6. For backend/database/Auth/RLS changes, additionally:
-   - replay migrations from a fresh local database state with `supabase db reset`;
-   - run the full pgTAP/database suite with `supabase test db`;
-   - run relevant Edge/local integration smoke checks;
-   - verify least-privilege/RLS behavior for changed identities or roles.
-7. Inspect the final diff for unintended files, secrets, temporary artifacts, and ownership-boundary violations; run `git diff --check`.
+5. For mobile/native runtime changes, run the applicable iOS JavaScript/export validation.
+6. For backend/database/Auth/RLS changes, replay migrations with `supabase db reset`, run `supabase test db`, run relevant Edge/local integration smoke, and verify least-privilege/RLS for changed identities/roles.
+7. Inspect the final diff for unintended files, secrets, temporary artifacts and boundary violations; run `git diff --check`.
 8. Require exact-head CI green before merging substantial implementation.
 
 ## Docs-only validation
