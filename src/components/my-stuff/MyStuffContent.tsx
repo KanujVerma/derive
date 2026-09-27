@@ -34,6 +34,7 @@ export function MyStuffContent({
   model,
   liveFree = false,
   onEditProfile,
+  profileContent, experienceHeader, experienceEmptyText,
   onChangeProductState,
   onRemoveProduct,
   onRemoveEntry,
@@ -44,6 +45,9 @@ export function MyStuffContent({
 }: {
   model: MyStuffViewModel;
   liveFree?: boolean;
+  profileContent?: React.ReactNode;
+  experienceHeader?: string;
+  experienceEmptyText?: string;
   onEditProfile?: () => void;
   onChangeProductState?: (id: string, state: ProductState) => void;
   onRemoveProduct?: (id: string) => void;
@@ -89,6 +93,7 @@ export function MyStuffContent({
 
   return (
     <>
+      {profileContent ?? (
       <GroupedSection header="Skin profile">
         {onEditProfile ? (
           <Pressable
@@ -101,6 +106,7 @@ export function MyStuffContent({
           </Pressable>
         ) : profileRow}
       </GroupedSection>
+      )}
 
       <GroupedSection header={copy.productHeader}>
         {view.products.length ? view.products.map((product) => (
@@ -144,7 +150,7 @@ export function MyStuffContent({
         {moreControl('checks')}
       </GroupedSection>
 
-      <GroupedSection header={copy.experienceHeader} footer={copy.experienceFooter}>
+      <GroupedSection header={experienceHeader ?? copy.experienceHeader} footer={copy.experienceFooter}>
         {view.experiences.length ? view.experiences.map((experience) => (
           <View key={experience.id} style={styles.row}>
             <View style={styles.horizontal}>
@@ -158,7 +164,7 @@ export function MyStuffContent({
             </View>
             {onRemoveEntry ? removeControl('experiences', experience.id) : null}
           </View>
-        )) : <EmptyRow text={view.experienceSummary} />}
+        )) : <EmptyRow text={experienceEmptyText ?? view.experienceSummary} />}
         {moreControl('experiences')}
       </GroupedSection>
     </>

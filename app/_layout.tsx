@@ -1,3 +1,5 @@
+import { customerController, currentCustomerOwner, ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
+import { bindCustomerOwnerLifecycle } from '@/src/presentation/personal-decision/customerController';
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +23,7 @@ import { refreshCustomerBootstrap, resolveCustomerBootstrap } from '@/src/servic
 import { resolveAuthRoute, getAuthRedirectRoute } from '@/src/utils/authRouting';
 
 export default function RootLayout() {
+  useEffect(() => bindCustomerOwnerLifecycle(customerController, currentCustomerOwner, listener => useAuthStore.subscribe(listener), listener => useFreeAccessStore.subscribe(listener), () => ownerPinnedLegacyGateway.clear()), []);
   const router = useRouter();
   const segments = useSegments();
   const authStatus = useAuthStore((s) => s.status);
@@ -217,6 +220,9 @@ export default function RootLayout() {
           <Stack.Screen name="shop/[productId]" options={{ headerShown: false }} />
           <Stack.Screen name="check-in/index" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="refill/index" options={{ presentation: 'modal', headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development' && shell !== 'legacy' && (!localFreeIntegration || localReady)}>
+          <Stack.Screen name="personalize/fixture" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!remoteEnabled}>
           <Stack.Screen name="founder/index" options={{ headerShown: false }} />
