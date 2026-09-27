@@ -68,6 +68,26 @@ try{
  const large=await good(a,'personal-decision',{operation:'evaluate',requestId:randomUUID(),caseId:activeResolution.caseId,snapshotId:activeResolution.truthSnapshot.snapshotId});
  assert.equal(large.runtime,'authoritative');assert.equal(large.packet.action.kind,'USE_WITH_CAUTION');assert(large.packet.findings.length>=250);assert.equal(large.packet.routineImpacts.length,150);assert.equal(large.packet.findings.filter(f=>f.kind==='routine_experience_caution').length,100);
  const largeStored=await admin.from('personal_decision_assessments').select('packet,input').eq('id',large.assessmentId).single();assert.ifError(largeStored.error);const largePacketBytes=Buffer.byteLength(JSON.stringify(largeStored.data.packet),'utf8');assert(largePacketBytes>200000);assert(largePacketBytes<1048576);assert.deepEqual(largeStored.data.packet,large.packet);assert(!JSON.stringify(large.packet).includes('https://fixture.invalid'));
+ // Withdraw only the seeded routine category assertions; verified package/formula evidence remains independent.
+ const categoryFixtureIds=largeFixtures.map(record=>record.productId);
+ const noCategoryRequest={operation:'evaluate',requestId:randomUUID(),caseId:activeResolution.caseId,snapshotId:activeResolution.truthSnapshot.snapshotId};let noCategoryPacket;
+ assert.ifError((await admin.from('products').update({catalog_verified_at:null,catalog_source_reference:null}).in('id',categoryFixtureIds)).error);
+ try{
+  const noCategory=await good(a,'personal-decision',noCategoryRequest);noCategoryPacket=noCategory.packet;
+  assert.equal(noCategory.contextRevision,large.contextRevision,'Catalog assertion edits do not change owner context');
+  assert.equal(noCategory.packet.action.kind,'USE_WITH_CAUTION');
+  assert(!noCategory.packet.findings.some(f=>f.kind==='role_redundancy'||f.kind==='replacement_candidate'));
+  assert.equal(noCategory.packet.routineImpacts.filter(impact=>impact.kind==='active_overlap').length,100);
+  for(const currentItem of largeItems){
+   const overlaps=noCategory.packet.findings.filter(f=>f.kind==='active_overlap'&&f.display?.kind==='routine_relation'&&f.display.routineItemIds.includes(currentItem.id));
+   assert.equal(overlaps.length,2);for(const finding of overlaps){assert.equal(finding.display.role,'unknown');assert(finding.evidence.some(e=>e.kind==='routine_product_fact'&&e.scope==='formula'&&e.formulaVersionId===currentItem.reference.formulaVersionId));assert(!finding.evidence.some(e=>e.kind==='routine_product_fact'&&e.scope==='category'));}
+  }
+  const noCategoryStored=await admin.from('personal_decision_assessments').select('input').eq('id',noCategory.assessmentId).single();assert.ifError(noCategoryStored.error);
+  const frozenRoutine=noCategoryStored.data.input.evaluatedFacts.routine;assert.equal(frozenRoutine.length,50);
+  for(const fact of frozenRoutine){assert.equal(fact.category.state,'unknown');assert.equal(fact.formulaEvidence.state,'known');assert.deepEqual(fact.formulaEvidence.sourceIds,[`routine:formula:${fact.formulaVersionId}`]);assert.equal(fact.sources.length,1);assert.equal(fact.sources[0].id,`routine:formula:${fact.formulaVersionId}`);assert.equal(fact.provenance.length,1);assert.equal(fact.provenance[0].scope,'formula');assert.equal(fact.provenance[0].source_reference,'https://fixture.invalid/routine-formula');assert.equal(fact.provenance[0].formulaVersionId,fact.formulaVersionId);assert.equal(new Date(fact.provenance[0].observed_at).toISOString(),now);}
+ }finally{assert.ifError((await admin.from('products').update({catalog_verified_at:now,catalog_source_reference:'https://fixture.invalid/routine'}).in('id',categoryFixtureIds)).error);}
+ assert.equal((await get()).revision,large.contextRevision);
+ const frozenNoCategory=await good(a,'personal-decision',noCategoryRequest);assert.equal(frozenNoCategory.replayed,true);assert.deepEqual(frozenNoCategory.packet,noCategoryPacket);
  const unicodeIngredients=Array.from({length:300},(_,n)=>n===0?'Retinol':'界'.repeat(295)+String(n).padStart(3,'0'));
  const unicodeFormula=await admin.from('product_formula_versions').insert({variant_id:VARIANT,ingredients:unicodeIngredients,normalized_ingredient_fingerprint:'unicode-capacity-fixture',provenance_type:'founder_review',source_reference:'https://fixture.invalid/unicode',catalog_public_source_url:'https://fixture.invalid/unicode',observed_at:now,verification_status:'verified'}).select('id').single();assert.ifError(unicodeFormula.error);unicodeFormulaId=unicodeFormula.data.id;
  const unicodeIdentifier=await admin.from('product_identifiers').insert({variant_id:VARIANT,formula_version_id:unicodeFormulaId,identifier_type:'gtin_12',identifier_value:'012345678929',source_authority:'founder',source_reference:'https://fixture.invalid/unicode',observed_at:now,verified_at:now}).select('id').single();assert.ifError(unicodeIdentifier.error);unicodeIdentifierId=unicodeIdentifier.data.id;

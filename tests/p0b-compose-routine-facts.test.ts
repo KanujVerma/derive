@@ -14,7 +14,7 @@ function setup() {
   const formula = { id: formulaId, variant_id: variant, verification_status: 'verified', ingredients: ['Retinol'],
     observed_at: now, source_reference: 'https://fixture.invalid/label', provenance_type: 'package_label' };
   const tables: Record<string, unknown> = {
-    products: { id: product, category: 'moisturizer', is_catalog_standard: true, catalog_verified_at: now, catalog_source_reference: null },
+    products: { id: product, category: 'moisturizer', is_catalog_standard: true, catalog_verified_at: null, catalog_source_reference: null },
     product_variants: { id: variant, product_id: product, catalog_verification_status: 'verified', lifecycle_status: 'active' },
     product_formula_versions: formula,
     product_identifiers: [{ variant_id: variant, formula_version_id: formulaId, source_authority: 'founder', verified_at: now }],
