@@ -3,6 +3,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from 'zustand';
+import { Button } from '@/src/components/ui/Button';
+import { currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
 import { MyStuffContent } from '@/src/components/my-stuff/MyStuffContent';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { colors, layout, spacing } from '@/src/constants/theme';
@@ -80,9 +82,14 @@ export default function MyStuffScreen() {
             <Text style={styles.retry}>Try again</Text>
           </Pressable> : null}
         </View> : null}
+        {liveOwner && currentCustomerOwner() === liveOwner && <View>
+          <Button label="Edit decision context" variant="outline" onPress={() => router.push({ pathname: '/personalize', params: { p0b: '1', mode: 'profile' } })} />
+          <Button label="Edit routine context" variant="ghost" onPress={() => router.push({ pathname: '/personalize', params: { p0b: '1', mode: 'routine' } })} />
+          <Button label="Product experiences" variant="ghost" onPress={() => router.push({ pathname: '/personalize', params: { p0b: '1', mode: 'history' } })} />
+        </View>}
         {!hideEmptyUntilResolved ? <MyStuffContent key={liveOwner ?? 'preview'} model={live ? model : anonymousEmptyMyStuff}
           liveFree={shell === 'local_free_integration'}
-          onEditProfile={targetShell ? () => router.push('/personalize') : undefined}
+          onEditProfile={targetShell ? () => liveOwner ? router.push({ pathname: '/personalize', params: { p0b: '1', mode: 'profile' } }) : router.push('/personalize') : undefined}
           onChangeProductState={live ? (id: string, state: ProductState) => runAction(id,
             () => myStuffStore.getState().changeProductState(id, state)) : undefined}
           onRemoveProduct={live ? (id: string) => runAction(id,

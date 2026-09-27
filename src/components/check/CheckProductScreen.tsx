@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   View,
   Text,
@@ -53,6 +53,10 @@ import { selectFreeFitTarget } from '@/src/presentation/personalization/fitTarge
 import type { PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
 import { canPublishCheckResult, createCheckMemorySaver, selectFreeCheckOwner,
   selectSavableCheckCaseId, shouldHideCheckForOwner, validateCheckResolution } from '@/src/presentation/check/checkMemory';
+import { PersonalDecisionPanel } from '@/src/components/personal-decision/PersonalDecisionPanel';
+import { customerController, currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
+import { selectVisibleCustomerDecision, selectCustomerCheckFacts } from '@/src/presentation/personal-decision/customerController';
+import type { DecisionNextStep } from '@/src/contracts/PersonalDecision';
 import { recordFreeCheck } from '@/src/services/remote/freeContext';
 
 export default function CheckProductScreen() {
@@ -79,7 +83,11 @@ export default function CheckProductScreen() {
   });
   const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
   const gateway = integrated ? remotePersonalizationGateway : personalizationGateway;
-  const [personalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
+  const [legacyPersonalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
+  const customerState = useSyncExternalStore(customerController.subscribe, customerController.getState);
+  const personalFitState: PersonalFitRefreshInput = customerState.ownerId === liveCheckOwner && customerState.context && (customerState.context.profile || customerState.context.routine || customerState.context.experiences.length) ? { kind: 'factual_only' } : legacyPersonalFitState;
+  const resultScroll = useRef<ScrollView>(null);
+  const [nextStepMessage, setNextStepMessage] = useState<{ snapshotId: string; contextRevision: number; text: string } | null>(null);
   const openPersonalization = () => router.push('/personalize');
   const { routine, userProducts, checkIns } = useRoutineStore();
   const { productReactions, routineComplexity, primaryGoal, costPreference } = useOnboardingStore();
@@ -92,6 +100,31 @@ export default function CheckProductScreen() {
   const [captureEvidence, setCaptureEvidence] = useState<CheckCaptureHandoff | null>(null);
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
   const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
+  const personalTarget = integrated && liveCheckOwner ? resolution?.truthSnapshot ?? null : null;
+  const visibleDecision = selectVisibleCustomerDecision(customerState, liveCheckOwner, personalTarget);
+  const showNextStep = (text: string) => { if (personalTarget && visibleDecision) setNextStepMessage({ snapshotId: personalTarget.snapshotId, contextRevision: visibleDecision.contextRevision, text }); };
+  useFocusEffect(React.useCallback(() => {
+    let active = true;
+    const liveOwner = currentCustomerOwner();
+    customerController.setOwner(liveOwner);
+    customerController.setOriginSnapshot(liveOwner, personalTarget);
+    setNextStepMessage(null);
+    if (liveOwner) void customerController.load().then(loaded => { if (active && loaded && personalTarget) void customerController.assess(personalTarget); });
+    return () => { active = false; };
+  }, [liveCheckOwner, personalTarget]));
+  useEffect(() => { customerController.setOwner(currentCustomerOwner()); }, [sessionUserId, authStatus, accessStatus, accessUserId, accessOwnerId]);
+  const openDecisionEditor = (mode: 'profile' | 'routine' | 'history') => router.push({ pathname: '/personalize', params: { p0b: '1', mode } });
+  const handleDecisionStep = (step: DecisionNextStep) => {
+    if (!visibleDecision) return;
+    if (step === 'add_context') { openDecisionEditor('profile'); return; }
+    if (step === 'review_routine' || step === 'keep_current') { openDecisionEditor('routine'); return; }
+    if (step === 'view_product_facts') { showNextStep('Review the formula details and remaining uncertainty for this same product.'); resultScroll.current?.scrollTo({ y: 0, animated: true }); return; }
+    if (step === 'confirm_formula') { showNextStep('Review the formula details for this exact product. Confirm its package evidence before relying on a personal decision.'); resultScroll.current?.scrollTo({ y: 0, animated: true }); return; }
+    if (step === 'ask_clinician') { showNextStep('Bring this product formula, your routine, and the relevant caution to a qualified professional. Derive cannot review or change prescriptions.'); return; }
+    if (step === 'skip_product') { showNextStep('Keep this product out of your routine for now. You can check another product when ready.'); return; }
+    showNextStep('Review the product facts and remaining uncertainty before deciding to use it.'); resultScroll.current?.scrollTo({ y: 0, animated: true });
+  };
+
   useFocusEffect(React.useCallback(() => {
     let active = true;
     const status = gateway.lastSaveStatus(ownerId);
@@ -717,6 +750,7 @@ export default function CheckProductScreen() {
 
   if (catalogDetail) {
     const fit = describeCheckProductFit(resolution?.state ?? 'identified_formula_unverified');
+    const facts = selectCustomerCheckFacts(personalTarget, { brand: catalogDetail.brand, name: catalogDetail.name, categoryLabel: catalogDetail.category.replace('_', ' '), formula: currentFormula, source: catalogDetail.sourceReference ?? null });
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {targetShell ? <RootShellHeader title="Check" /> : (
@@ -725,34 +759,38 @@ export default function CheckProductScreen() {
             <AccountSettingsButton />
           </View>
         )}
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}>
+        <ScrollView ref={resultScroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}>
           {targetShell ? (
             <>
               <View style={styles.previewProductHeading}>
-                <Text style={styles.productBrandText}>{catalogDetail.brand.toUpperCase()}</Text>
-                <Text style={styles.productNameText}>{catalogDetail.name}</Text>
+                <Text style={styles.productBrandText}>{facts.brand.toUpperCase()}</Text>
+                <Text style={styles.productNameText}>{facts.name}</Text>
               </View>
               <GroupedSection header="Formula Details">
                 <View style={styles.previewFactRow}>
-                  <Text style={styles.previewFactType}>{catalogDetail.category.replace('_', ' ')}</Text>
-                  {currentFormula ? <>
-                    <Text style={styles.previewFactText}>Verified ingredients for this exact package: {currentFormula.ingredients.join(', ')}</Text>
-                    <Text style={styles.previewFactText}>Provenance: {currentFormula.provenanceType.replace('_', ' ')}</Text>
+                  <Text style={styles.previewFactType}>{facts.categoryLabel}</Text>
+                  {facts.formula ? <>
+                    <Text style={styles.previewFactText}>Verified ingredients for this exact package: {facts.formula.ingredients.join(', ')}</Text>
+                    <Text style={styles.previewFactText}>Provenance: {facts.formula.provenanceType.replace('_', ' ')}</Text>
                   </> : <Text style={styles.previewFactText}>Exact package formula not verified.</Text>}
-                  {catalogDetail.sourceReference && (
+                  {facts.source && (
                     <TouchableOpacity
-                      onPress={() => void Linking.openURL(catalogDetail.sourceReference!).catch(() => {})}
+                      onPress={() => void Linking.openURL(facts.source!).catch(() => {})}
                       style={styles.sourceLink}
                       accessibilityRole="link"
-                      accessibilityLabel={`View ${catalogDetail.brand} product source`}
+                      accessibilityLabel={`View ${facts.brand} product source`}
                     >
-                      <Text style={styles.sourceLinkText}>Source: {catalogDetail.brand}</Text>
+                      <Text style={styles.sourceLinkText}>Source: {facts.brand}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
               </GroupedSection>
-              {/* Mock and local Remote use the same factual-only Personal Fit presentation. */}
-              <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />
+              {personalTarget && customerState.ownerId === liveCheckOwner ? <>
+                {visibleDecision ? <PersonalDecisionPanel packet={visibleDecision.packet} expectedBinding={visibleDecision.expectedBinding} onNextStep={handleDecisionStep} /> : <View style={styles.previewFactRow}><Text style={styles.previewFactText}>{customerState.decision.kind === 'loading' ? 'Updating this personal decision...' : customerState.decision.kind === 'unavailable' ? customerState.decision.reason : 'Product facts are ready. Optional context can improve a supported personal decision.'}</Text></View>}
+                {nextStepMessage?.snapshotId === personalTarget.snapshotId && nextStepMessage.contextRevision === customerState.context?.revision && <Text accessibilityLiveRegion="polite" style={styles.previewFactText}>{nextStepMessage.text}</Text>}
+                <Button label="Edit decision context" variant="ghost" onPress={() => openDecisionEditor('profile')} />
+              </> : <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />}
+
             </>
           ) : (
           <>
