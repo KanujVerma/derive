@@ -21,7 +21,9 @@ export const decisionBindingSchema: z.ZodType<DecisionBinding> = z.strictObject(
 });
 const evidence = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('product_fact'), snapshotRevision: ref, sourceId: ref, sourceRevision: ref,
-    scope: z.enum(['identity', 'formula', 'category']), productId: ref, variantId: ref, formulaVersionId: ref.nullable() }),
+    scope: z.enum(['identity', 'formula', 'category']), productId: ref, variantId: ref.nullable(), formulaVersionId: ref.nullable() }),
+  z.strictObject({ kind: z.literal('routine_product_fact'), ownerId: ref, routineRevision: ref, routineItemId: ref,
+    productId: ref, variantId: ref.nullable(), formulaVersionId: ref.nullable(), scope: z.enum(['category', 'formula']), sourceId: ref, sourceRevision: ref }),
   z.strictObject({ kind: z.literal('context_fact'), section, ownerId: ref, revision: ref, recordId: ref }),
   z.strictObject({ kind: z.literal('reviewed_claim'), claimId: ref, claimRevision: ref, sourceId: ref, sourceRevision: ref,
     applicability: z.enum(['applicable', 'uncertain']), limitations: texts }),
@@ -34,6 +36,7 @@ const display = z.discriminatedUnion('kind', [
     timing: z.enum(['am', 'pm', 'both', 'unknown']),
     frequency: z.enum(['daily', 'few_times_weekly', 'weekly', 'occasional', 'unknown']), evidenceIndexes }),
   z.strictObject({ kind: z.literal('prior_reaction'), historyEventId: ref, historicalFormulaVersionId: ref.nullable(), evidenceIndexes }),
+  z.strictObject({ kind: z.literal('routine_experience'), routineItemIds: refs, historyEventId: ref, outcome: z.enum(['reaction', 'ineffective']), evidenceIndexes }),
   z.strictObject({ kind: z.literal('ingredient_context'), ingredient: z.string().min(1).max(120),
     context: z.enum(['reported_sensitivity', 'reactivity', 'treatment_overlap', 'pregnancy', 'trying_to_conceive', 'nursing']), evidenceIndexes }),
   z.strictObject({ kind: z.literal('evidence_gap'), code: evidenceNeedCode, evidenceIndexes }),
@@ -41,7 +44,7 @@ const display = z.discriminatedUnion('kind', [
 const finding = z.strictObject({
   id: ref, kind: z.enum(['goal_role_match', 'role_redundancy', 'replacement_candidate', 'active_overlap',
     'reported_ingredient_sensitivity', 'reactive_active', 'prior_product_reaction', 'reproductive_context_caution',
-    'formula_changed', 'missing_evidence', 'no_supported_rule']),
+    'routine_experience_caution', 'formula_changed', 'missing_evidence', 'no_supported_rule']),
   applicability: z.enum(['applicable', 'uncertain', 'not_applicable']),
   severity: z.enum(['informational', 'caution', 'blocker']), confidence: z.enum(['supported', 'limited', 'unknown']),
   ruleId: ref, ruleVersion: ref, evidence: z.array(evidence).max(100), uncertainty: texts,

@@ -97,3 +97,24 @@ test('P0-B renderer cannot invent a routine impact from unrelated goal evidence'
     routineItemIds: ['unbound-item'], findingIds: ['goal-role'], uncertainty: [] }];
   assert.equal(describePersonalDecision(packet, binding).kind, 'unavailable');
 });
+
+test('P0-B renderer separates current-routine experience from reaction to the scanned product', () => {
+  const { packet, binding } = fixture('routine-experience');
+  const view = describePersonalDecision(packet, binding);
+  assert.equal(view.kind, 'ready');
+  if (view.kind !== 'ready') return;
+  assert.match(view.primaryReason, /product already in your routine/i);
+  assert.doesNotMatch(view.primaryReason, /reaction to this product/i);
+  assert.equal(view.nextStep, 'review_routine');
+});
+
+test('P0-B renderer uses sourced routine role and preserves qualitative frequency', () => {
+  const { packet, binding } = fixture('redundancy');
+  const view = describePersonalDecision(packet, binding);
+  assert.equal(view.kind, 'ready');
+  if (view.kind !== 'ready') return;
+  assert.equal(view.action, 'KEEP_CURRENT');
+  assert.match(view.primaryReason, /moisturizer.*evening.*few times a week/i);
+  assert.doesNotMatch(view.primaryReason, /three|3|better/i);
+  assert.ok(view.routineImpacts.some((text) => /duplicate/i.test(text)));
+});

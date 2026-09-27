@@ -73,6 +73,12 @@ function reasonFor(finding: Finding, packet: PersonalDecisionPacketV1): string |
     case 'prior_product_reaction':
       return display?.kind === 'prior_reaction'
         ? 'You previously reported a reaction to this product. That is a tolerance signal, not proof of an ingredient cause.' : null;
+    case 'routine_experience_caution':
+      return display?.kind === 'routine_experience'
+        ? display.outcome === 'reaction'
+          ? 'You reported a reaction to a product already in your routine. Review that experience before keeping or changing this routine role.'
+          : 'You reported that a product already in your routine was ineffective. Review that experience before keeping or changing this routine role.'
+        : null;
     case 'reported_ingredient_sensitivity':
       return display?.kind === 'ingredient_context' && display.context === 'reported_sensitivity' ? ingredientCopy[display.context] : null;
     case 'reactive_active':
@@ -118,6 +124,7 @@ function supportedImpact(impact: RoutineImpact, packet: PersonalDecisionPacketV1
 }
 const evidenceCopy = (finding: Finding): string[] => [...new Set(finding.evidence.filter((e) => e.kind !== 'observation').map((e) => {
   if (e.kind === 'product_fact') return `Verified ${e.scope} evidence`;
+  if (e.kind === 'routine_product_fact') return `Verified routine-product ${e.scope} evidence`;
   if (e.kind === 'context_fact') return `Your reported ${e.section} context`;
   return 'Reviewed claim evidence';
 }))];
