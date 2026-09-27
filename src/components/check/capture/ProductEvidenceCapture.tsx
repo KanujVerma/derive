@@ -5,7 +5,6 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
-import { GlassContainer } from '../../ui/GlassContainer';
 import { captureRecovery } from '../../../presentation/capture/captureRecovery';
 import { createCaptureOperationGate } from '../../../presentation/capture/captureOperationGate';
 import {
@@ -166,7 +165,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         <Pressable accessibilityRole="button" accessibilityLabel="Close product capture" onPress={close} style={styles.iconButton}>
           <Icon name="close" size={20} color={colors.inkInverse} />
         </Pressable>
-        <Text style={styles.topTitle}>Product evidence</Text>
+        <Text style={styles.topTitle}>Capture product</Text>
         <View style={styles.iconButton} />
       </View>
 
@@ -180,34 +179,51 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           }} />
         </View>
       ) : session.phase === 'collecting' ? (
-        <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-          <GlassContainer tintColor={colors.glass.tintDark} style={styles.panel}>
-            <Text style={styles.prompt}>{previewUri ? `Review ${roleLabels[role].toLowerCase()}` : currentEvidence ? `${roleLabels[role]} saved` : prompts[role]}</Text>
-            <Text style={styles.hint}>Photos and scans are evidence. Product and formula details need verification.</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roleRow}>
-              {captureRoles.map((item) => {
-                const saved = session.evidence.some((entry) => entry.role === item);
-                return (
-                  <Pressable key={item} accessibilityRole="button" accessibilityLabel={`${roleLabels[item]}${saved ? ', captured' : ''}`} disabled={busy} onPress={() => selectRole(item)} style={[styles.roleChip, role === item && styles.roleChipActive]}>
-                    <Text style={[styles.roleText, role === item && styles.roleTextActive]}>{saved ? '✓ ' : ''}{roleLabels[item]}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            {error && <Text style={styles.error}>{error}</Text>}
-            {previewUri ? (
-              <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => setPreviewUri(null)} /><Action label="Use photo" onPress={usePhoto} /></View>
-            ) : currentEvidence ? (
-              <View style={styles.actionRow}><Action label="Retake" secondary onPress={retake} /><Action label="Review evidence" onPress={() => void processEvidence()} /></View>
-            ) : role === 'barcode' ? (
-              <View style={styles.actionRow}><Text style={styles.scanHint}>Scanning barcode…</Text>{session.evidence.length > 0 && <Action label="Review evidence" onPress={() => void processEvidence()} />}</View>
-            ) : (
-              <View style={styles.actionRow}><Pressable accessibilityRole="button" accessibilityLabel={`Take ${roleLabels[role]} photo`} disabled={busy} onPress={() => void capturePhoto()} style={styles.shutter}><View style={styles.shutterInner} /></Pressable>{session.evidence.length > 0 && <Action label="Review evidence" onPress={() => void processEvidence()} />}</View>
-            )}
-          </GlassContainer>
+        <View style={styles.collecting}>
+          <View pointerEvents="none" style={styles.guideArea}>
+            {role === 'barcode' && !currentEvidence && !previewUri ? (
+              // Alignment aid only: Expo still detects barcodes across the whole preview.
+              <View testID="barcode-alignment-guide" style={styles.barcodeGuide} />
+            ) : null}
+          </View>
+          <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+            <View style={styles.panel}>
+              <ScrollView style={styles.controlScroll} contentContainerStyle={styles.controlContent}>
+                <Text style={styles.prompt}>{previewUri ? `Review ${roleLabels[role].toLowerCase()}` : currentEvidence ? `${roleLabels[role]} saved` : prompts[role]}</Text>
+                <Text style={styles.hint}>{role === 'barcode' ? 'Hold steady. The barcode scans automatically.' : 'Capture package details. Photos do not verify the formula.'}</Text>
+                <View style={styles.roleRow}>
+                  {captureRoles.map((item) => {
+                    const saved = session.evidence.some((entry) => entry.role === item);
+                    return (
+                      <Pressable key={item} accessibilityRole="button" accessibilityLabel={`${roleLabels[item]}${saved ? ', captured' : ''}`} accessibilityState={{ selected: role === item, disabled: busy }} disabled={busy} onPress={() => selectRole(item)} style={[styles.roleChip, role === item && styles.roleChipActive]}>
+                        <Text style={[styles.roleText, role === item && styles.roleTextActive]}>{saved ? '✓ ' : ''}{roleLabels[item]}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {error && <Text style={styles.error}>{error}</Text>}
+              </ScrollView>
+              <View style={styles.captureActions}>
+                {previewUri ? (
+                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => setPreviewUri(null)} /><Action label="Use photo" onPress={usePhoto} /></View>
+                ) : currentEvidence ? (
+                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={retake} /><Action label="Review evidence" onPress={() => void processEvidence()} /></View>
+                ) : role === 'barcode' ? (
+                  <View style={styles.actionRow}><Text style={styles.scanHint}>Scanning barcode…</Text>{session.evidence.length > 0 && <Action label="Review evidence" onPress={() => void processEvidence()} />}</View>
+                ) : (
+                  <View style={styles.actionRow}>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Take ${roleLabels[role]} photo`} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void capturePhoto()} style={[styles.shutter, busy && styles.shutterBusy]}>
+                      {busy ? <ActivityIndicator color={colors.inkInverse} /> : <View style={styles.shutterInner} />}
+                    </Pressable>
+                    {session.evidence.length > 0 && <Action label="Review evidence" onPress={() => void processEvidence()} />}
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
         </View>
       ) : (
-        <View style={[styles.outcomeWrap, { paddingTop: Math.max(insets.top, spacing.md) + 72, paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <View style={[styles.outcomeWrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
           <ScrollView contentContainerStyle={styles.outcomeScroll}>
             <Text style={styles.outcomeTitle}>{session.phase === 'processing' ? 'Reviewing evidence' : session.phase === 'candidates' ? 'Possible product' : session.phase === 'ambiguous' ? 'Several possible products' : session.phase === 'candidate_selected' ? 'Candidate noted' : session.phase === 'unknown' ? 'Product unknown' : 'More evidence needed'}</Text>
             <Text style={styles.outcomeBody}>{session.phase === 'processing' ? 'Checking the details you captured.' : session.phase === 'candidate_selected' ? 'Your selection is recorded as a possible match. It does not add verification.' : session.phase === 'unknown' ? 'We could not identify this product from the available evidence.' : session.phase === 'insufficient_evidence' ? 'We could not confirm this product. Try its barcode or search by name. Automatic photo identification is not available yet.' : 'Choose a possible match if you recognize it. Your choice does not verify the product or formula.'}</Text>
@@ -239,32 +255,39 @@ function Action({ label, onPress, secondary = false }: { label: string; onPress:
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.ink },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingBottom: spacing.md, backgroundColor: 'rgba(23,26,24,0.45)' },
+  top: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingBottom: spacing.sm, backgroundColor: 'rgba(23,26,24,0.7)' },
   iconButton: { minWidth: layout.minTouchTarget, minHeight: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
-  topTitle: { color: colors.inkInverse, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold },
-  bottom: { marginTop: 'auto', paddingHorizontal: spacing.md },
-  panel: { padding: spacing.md },
-  prompt: { color: colors.inkInverse, fontSize: typography.sizes.sectionTitle, fontWeight: typography.weights.semibold, lineHeight: typography.lineHeights.sectionTitle },
+  topTitle: { flexShrink: 1, textAlign: 'center', color: colors.inkInverse, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold },
+  collecting: { flex: 1 },
+  guideArea: { flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  barcodeGuide: { width: '90%', maxWidth: 340, height: 140, borderWidth: 2, borderColor: colors.inkInverse, borderRadius: radii.md, backgroundColor: 'rgba(23,26,24,0.12)' },
+  bottom: { flexShrink: 1, maxHeight: '75%', paddingHorizontal: spacing.md },
+  panel: { flexShrink: 1, padding: spacing.md, borderRadius: radii.xl, backgroundColor: 'rgba(23,26,24,0.94)' },
+  controlScroll: { flexGrow: 0, flexShrink: 1 },
+  controlContent: { paddingBottom: spacing.sm },
+  captureActions: { flexShrink: 0, paddingTop: spacing.sm },
+  prompt: { color: colors.inkInverse, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold, lineHeight: typography.lineHeights.bodyLarge },
   hint: { color: '#E6E9E5', fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, marginTop: spacing.xs },
-  roleRow: { gap: spacing.xs, paddingVertical: spacing.md },
-  roleChip: { minHeight: layout.minTouchTarget, borderRadius: radii.full, borderWidth: 1, borderColor: '#A9B5AC', justifyContent: 'center', paddingHorizontal: spacing.md },
+  roleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingTop: spacing.sm },
+  roleChip: { flexBasis: '45%', flexGrow: 1, minHeight: layout.minTouchTarget, borderRadius: radii.full, borderWidth: 1, borderColor: '#A9B5AC', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   roleChipActive: { backgroundColor: colors.surface },
-  roleText: { color: colors.inkInverse, fontSize: typography.sizes.caption, fontWeight: typography.weights.medium },
+  roleText: { color: colors.inkInverse, textAlign: 'center', fontSize: typography.sizes.caption, fontWeight: typography.weights.medium },
   roleTextActive: { color: colors.ink },
-  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  action: { minHeight: layout.ctaHeight, minWidth: 116, paddingHorizontal: spacing.md, borderRadius: radii.full, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  action: { minHeight: layout.ctaHeight, minWidth: 116, maxWidth: '100%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.full, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   secondaryAction: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.surface },
   actionText: { color: colors.ink, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold, textAlign: 'center' },
   secondaryText: { color: colors.inkInverse },
   shutter: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   shutterInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: colors.surface },
+  shutterBusy: { opacity: 0.6 },
   scanHint: { color: colors.inkInverse, minHeight: layout.minTouchTarget, textAlignVertical: 'center' },
   error: { color: '#FFD5D1', fontSize: typography.sizes.caption, marginVertical: spacing.xs },
   permissionCenter: { flex: 1, padding: spacing.xl, justifyContent: 'center', alignItems: 'center', gap: spacing.md },
   permissionTitle: { color: colors.inkInverse, fontSize: typography.sizes.screenTitle, fontWeight: typography.weights.semibold },
   permissionText: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, textAlign: 'center' },
   outcomeWrap: { flex: 1, backgroundColor: colors.canvas },
-  outcomeScroll: { paddingHorizontal: spacing.xl, gap: spacing.md },
+  outcomeScroll: { paddingHorizontal: spacing.xl, paddingVertical: spacing.xl, gap: spacing.md },
   outcomeTitle: { fontSize: typography.sizes.screenTitle, color: colors.ink, fontWeight: typography.weights.semibold },
   outcomeBody: { fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, color: colors.inkMuted },
   candidate: { minHeight: 72, borderRadius: radii.md, borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surface, padding: spacing.md, justifyContent: 'center' },
