@@ -129,7 +129,7 @@ files were loaded into the export. This is offline tooling/source evidence, not
 new RLS, hosted security, cleanup execution or physical acceptance evidence.
 Exact-head CI remains the portfolio orchestrator's pre-merge gate.
 
-### Current-main reconciliation
+### Reconciliation checkpoint: `24529ae`
 
 Reconciled onto canonical `24529aeb8125d82085f5e3ccad8cb0513c145bb5` without
 conflicts. The eight inspected source files are unchanged at this checkpoint;
@@ -143,3 +143,18 @@ Fresh validation passes all 75 current test files (57 TAP-reporting files,
 627 registered TAP tests, zero failures; assertion-style files also run), both
 TypeScript checks, web/iOS exports and scope/diff checks. No hosted setting,
 runtime, schema, rate limit, cleanup job or privacy invariant was changed.
+
+### Latest reconciliation: `4b71bdd`
+
+Reconciled without conflicts onto canonical
+`4b71bdd39b06dd396ebecda6bfa2ba7f61dab3a0`, preserving the merged offline
+perception benchmark, catalog proposal foundation, smart camera and Kanuj work.
+Fresh full validation passes all 77 current test files (59 TAP-reporting files,
+653 registered TAP tests, zero failures; assertion-style files also run), both
+TypeScript checks, web/iOS exports and diff/scope checks. The earlier checkpoints
+above remain historical evidence rather than current test counts.
+
+All eight inspected source files remain unchanged and match the reconciled head.
+All 12 hosted gates remain `UNKNOWN`; activation remains `BLOCKED`. This pass
+changes no runtime, hosted setting, schema, security control or cleanup behavior.
+Exact-head CI is still required before merge.
