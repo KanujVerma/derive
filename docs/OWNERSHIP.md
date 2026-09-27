@@ -17,7 +17,7 @@ These are the approved initial split, not a prediction that every P0 feature is 
 
 ## Horizontal stewardship
 
-Feature ownership does not remove review of cross-cutting invariants. Default platform/truth steward: **Sami**, covering Auth, RLS, Storage, ownership/linking/deletion, billing, service-role boundaries, canonical product/formula semantics, scientific-evidence model and migration discipline. Default customer-experience steward: **Kanuj**, covering root navigation, shared design system, global Check, result hierarchy, app shell, cross-feature behavior and physical-device acceptance. A steward reviews invariant changes; the feature DRI remains accountable for shipping.
+Feature ownership does not remove review of cross-cutting invariants. Default platform/truth steward: **Sami**, covering Auth, RLS, Storage, ownership/linking/deletion, billing, service-role boundaries, canonical product/formula semantics, scientific-evidence model and migration discipline. Default customer-experience steward: **Kanuj**, covering root navigation, shared design system, global Check, result hierarchy, app shell, cross-feature behavior and physical-device acceptance. A steward reviews invariant changes; the feature DRI remains accountable for shipping. Stewardship review is advisory and valuable, not a required merge approval or blocking gate unless GitHub branch protection or a concrete unresolved invariant finding requires it. The feature DRI owns the end-to-end merge decision and must independently verify focused diffs, required validation and exact-head CI. Keep the steward requested/notified; after each merge reconcile every remaining feature PR onto the new main and rerun its required exact-head validation.
 
 ## Maximum independent parallelism
 

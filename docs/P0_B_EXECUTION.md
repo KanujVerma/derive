@@ -4,7 +4,7 @@
 
 **P0-B PARTIAL, BLOCKERS REMAIN**
 
-The publication continuation explicitly authorized reviewed public source pushes. B1, B2 and B4 are now published as focused PRs #91, #92 and #90 respectively; all three exact heads passed Verify & Build and Database & Integration. Required Sami stewardship requests are confirmed, but no reviews have been submitted. No P0-B PR has merged. Later public waves are held by the requested current-main dependency order, not by an implementation wait.
+The publication continuation explicitly authorized reviewed public source pushes. B1, B2 and B4 are now published as focused PRs #91, #92 and #90 respectively; all three exact heads passed Verify & Build and Database & Integration. Sami stewardship requests are confirmed; review is advisory unless branch protection or a concrete unresolved invariant finding requires a hold. Kanuj is P0-B DRI and owns the merge decision. B1 #91 merged7ed5a9f, B4 #90 merged6a76456 and B2 #92 merged853ceac. Every remaining PR is being reconciled and revalidated after each main advancement. Later public waves are held by the requested current-main dependency order, not by an implementation wait.
 
 The new compactness gate exposed excessive expanded rows. Original B5 was corrected locally at `31712a2d49bdec92dbef05634ca5f13e8196f43a`; independent component SSR confirms bounded semantic/evidence pages, one immediate secondary cue, explicit further-caution review and visible critical warnings. All raw findings and provenance remain retained. The updated combined LOCAL validation bundle is `651cf3a0d8b3ff1d66f4366ce3a98b31cd0079fc`; it is not a public feature PR.
 
@@ -112,7 +112,7 @@ Requests pin the captured owner session's Authorization. Actual SDK testing repr
 - Independent engine/renderer recheck: 12 checks pass; repeated-history cap regression repaired without dropping raw reports.
 - Independent SDK ownership/JIT review: no material findings; focused tests and separate actual-SDK harness pass. No physical/React-mount proof implied.
 - Final combined diff: 70 scoped files, no existing P0-A implementation edits; source/config/root exceptions assigned explicitly. Diff checks pass; concrete credential-pattern audit found zero matches. No sensitive analytics/replay additions; controls use 44-point minimum/shared primitives.
-- P0-B exact-head GitHub CI: B1/B2/B4 **SUCCESS, both jobs** at the exact heads below; later waves NOT RUN because publication awaits prerequisite reviews/merges.
+- P0-B exact-head GitHub CI: B1/B2/B4 **SUCCESS, both jobs** at the exact heads below; later waves NOT RUN because publication awaits prerequisite merges and current-main validation.
 
 ## Physical/customer acceptance
 
@@ -124,13 +124,13 @@ The contract and actual snapshot producer/reader dependency is resolved locally.
 
 ## Documentation and source of truth
 
-Root's isolated `kanuj/p0b-docs` prepares updates to ARCHITECTURE, INTERFACES, DECISIONS, ROADMAP, OWNERSHIP and CONTEXT_SYNC plus this execution packet. Leaf docs describe decision/context/policy semantics. These docs are local, unpublished; they do not falsely mark code merged or hosted. [Parent #74](https://github.com/KanujVerma/derive/issues/74) is the authorized live issue ledger. Required source/CI/review evidence must replace this local checkpoint before any eventual docs merge.
+Root's isolated `kanuj/p0b-docs` prepares updates to ARCHITECTURE, INTERFACES, DECISIONS, ROADMAP, OWNERSHIP and CONTEXT_SYNC plus this execution packet. Leaf docs describe decision/context/policy semantics. These docs are local, unpublished; they do not falsely mark code merged or hosted. [Parent #74](https://github.com/KanujVerma/derive/issues/74) is the authorized live issue ledger. Verified source/CI and advisory stewardship evidence must replace this local checkpoint before any eventual docs merge.
 
 ## Remaining blockers and next authorized steps
 
-1. Required stewardship review on the published foundation/editor/context PRs; requests are pending with no submitted review.
-2. Merge prerequisites after review, then reconcile/publish B3/B5/B6/B7 own commits on actual merged main and require exact-head CI. B6 imports B5’s strict parser, so B5 is an additional actual source prerequisite.
-3. Sami stewardship review for material context/migration/RLS/service-role/source/scientific boundaries, including ownership transport. This review has not been obtained.
+1. Advisory stewardship requests remain visible. No required human approval exists in verified main branch protection; a concrete unresolved invariant finding would hold only the affected PR.
+2. B1/B4/B2 have merged after independent review and exact-head CI. Reconcile/publish B3/B5/B6/B7 own commits on actual merged main and require exact-head CI. B6 imports B5’s strict parser, so B5 is an additional actual source prerequisite.
+3. Keep Sami requested for material context/migration/RLS/service-role/source/scientific boundaries. Kanuj independently verifies those invariants; advisory review does not block landing.
 4. Physical/customer acceptance with a usable device/runtime and interaction tools.
 
 Independent P0-B implementation did not wait for Sami. No hosted rollout, free guest operations, OCR/provider choice, billing or release build is authorized by this packet.
@@ -138,18 +138,22 @@ Independent P0-B implementation did not wait for Sami. No hosted rollout, free g
 
 ## Publication continuation: exact current PR gates
 
-Starting and ending shared main for this continuation: `105b3a3c41132287e7b4df1331eefe72111e58d4`. No merge performed while required reviews are absent.
+Starting shared main: `105b3a3c41132287e7b4df1331eefe72111e58d4`. Current main after the foundation wave: `853ceacf711b400632e6d280d85bfb4cc7cf6682`. After every main advancement, all remaining PRs must reconcile and rerun exact-head gates.
 
 | Workstream | PR / exact head | Files / validation | Exact-head CI | Stewardship / merge |
 | --- | --- | --- | --- | --- |
 | B4 / #77 | [#90](https://github.com/KanujVerma/derive/pull/90), `c5fa9d7a5236220125e8c99c1836995c98b827a8` | 15 own files; six focused assertion scripts; full unit, both TS, web/iOS, scope/secret/diff pass | [36315658000](https://github.com/KanujVerma/derive/actions/runs/36315658000), both success | Sami requested, no review; unmerged |
-| B1 / #75 | [#91](https://github.com/KanujVerma/derive/pull/91), `65f0e7ae57798c98abd8eccbaf11d94897eef575` | 4 own files; 18 focused/530 full registered tests; both TS/web/iOS/scope/secret/diff pass | [36315663590](https://github.com/KanujVerma/derive/actions/runs/36315663590), both success | Sami requested, no review; unmerged |
+| B1 / #75 | [#91](https://github.com/KanujVerma/derive/pull/91), `65f0e7ae57798c98abd8eccbaf11d94897eef575` | 4 own files; 18 focused/530 full registered tests; both TS/web/iOS/scope/secret/diff pass | [36315663590](https://github.com/KanujVerma/derive/actions/runs/36315663590), both success | Sami requested advisory; merged7ed5a9f |
 | B2 / #76 | [#92](https://github.com/KanujVerma/derive/pull/92), `36084f0c7c12f13455da56bfc58a0af46e5e54f8` | 14 own files; 521 registered tests, both TS/web/iOS; fresh local reset, pgTAP21/524, authenticated context/RLS/correction/deletion smoke pass | [36316218680](https://github.com/KanujVerma/derive/actions/runs/36316218680), both success | Sami requested, no review; unmerged |
 | B3 / #78 | Frozen `511aa72`; no PR until B1 merges | Existing own four commits, no redesign | Not published | Source prerequisite / scientific stewardship |
-| B5 / #79 | Corrective `31712a2`; no PR until B1 merges | 505 registered tests; four compactness tests, both TS/web/iOS/diff/secret; independent SSR pass | Not published | Source prerequisite / relevant review |
+| B5 / #79 | Corrective `31712a2`; no PR until B1 merges | 505 registered tests; four compactness tests, both TS/web/iOS/diff/secret; independent SSR pass | Not published | Source prerequisite / independent review |
 | B6 / #80 | Frozen `cdf0b3e`; no PR until B1/B2/B3/B5 merge | Own commits90decd9/7b5bc32/cdf0b3e; actual P0-A snapshot remains consumed | Not published | Required platform/truth stewardship |
-| B7 / #88 | Own commits35f8824/5852084; no PR until B4/B5/B6 merge | Updated local bundle651cf3a:60 unit files/563 registered cases; TS/web/iOS, owner/JIT/MyStuff/Check regressions pass | Not published | Final review / physical gate open |
+| B7 / #88 | Own commits35f8824/5852084; no PR until B4/B5/B6 merge | Updated local bundle651cf3a:60 unit files/563 registered cases; TS/web/iOS, owner/JIT/MyStuff/Check regressions pass | Not published | Independent review / physical gate open |
 
 Local Docker initially failed because a forced registry caused new image pulls through a missing Desktop credential helper. Using the installed CLI’s default cached image tags restored startup without editing global credential configuration. Fresh B2 tests passed. Local advisors report zero security issues and one existing duplicate-index performance warning on public.routines, outside B2 scope; no unrelated schema fix made.
 
 All raw471 finding/source objects remain byte-identical through compactness presentation. Actual SSR defaults15 text nodes; explanation pages10/10/9 structured groups with lazy evidence, no append growth. Default1secondary cue plus explicit7-caution review in3/3/1 pages; all4critical unknowns and a synthetic known blocker remain immediate. No analytics/raw packet data added. This is component/SSR evidence, not physical rendering.
+
+## Advisory-policy landing checkpoint
+
+B1#91 exact65f0e7a / CI36315663590 / merge7ed5a9f; B4#90 exact46077f74 / CI36321124552 / merge6a76456; B2#92 exact48ec2806 / CI36321573300 / merge853ceac. Both jobs succeeded for each. B2 fresh current-head validation:539registered tests/42TAPfiles, both TS/web/iOS, reset + pgTAP21/524 and authenticated owner/history/replay/deletion smoke pass; independent cleanup counts0. #93 renderer and #94 engine are public and must rerun after the B2 main advancement. Independent review found two actual defects in unpublished B6/B7: missing category provenance suppresses independently verified routine formula; reachable legacy profile save lacks owner-pinned transport. Those workstreams are held for narrow own corrections, while independent leaf landing continues.
