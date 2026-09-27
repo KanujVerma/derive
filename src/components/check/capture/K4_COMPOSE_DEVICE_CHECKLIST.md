@@ -4,6 +4,8 @@ Use a physical iPhone with a product bearing a readable UPC/EAN barcode. These c
 
 ## Physical hardware UX
 
+- [x] Capture hides the tab bar and the photo shutter is fully visible: founder-confirmed in Expo Go on the physical iPhone, 2026-09-27, capture-UX increment following reconciled `a391de9`. This check does not certify the remaining hardware flows.
+- [ ] Repeat at a smaller viewport and large accessibility font size; instructions/modes scroll without covering the action footer.
 - [ ] Open Check, close capture, and return to the compact entry without losing Search by name.
 - [ ] Allow camera permission on first request; deny it and use the settings fallback in a separate run.
 - [ ] Scan a real barcode, then try an unknown barcode. Both preserve a factual Search by name fallback.
