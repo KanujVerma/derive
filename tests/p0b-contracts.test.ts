@@ -33,10 +33,12 @@ test('P0-B cannot promote a positive action while critical evidence is missing',
   assert.ok(validatePersonalDecisionPacket(packet, binding).includes('positive_action_blocked'));
 });
 
-test('P0-B observations and scores cannot become supporting evidence', () => {
-  const { packet, binding } = clone(personalDecisionFixtures[0]);
-  packet.findings[0].evidence = [{ kind: 'observation', observationId: 'raw-text:1', source: 'raw_text' }];
-  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('unsupported_positive_finding'));
+test('P0-B raw, commercial and model observations cannot become supporting evidence', () => {
+  for (const source of ['raw_text', 'commercial', 'model'] as const) {
+    const { packet, binding } = clone(personalDecisionFixtures[0]);
+    packet.findings[0].evidence = [{ kind: 'observation', observationId: 'observation:1', source }];
+    assert.ok(validatePersonalDecisionPacket(packet, binding).includes('unsupported_positive_finding'));
+  }
 });
 
 test('P0-B fixture distinctions preserve partial routine and prior-formula history uncertainty', () => {
@@ -69,4 +71,23 @@ test('P0-B a severe consequence with unknown support cannot itself authorize cau
   const { packet, binding } = clone(personalDecisionFixtures.find((f) => f.id === 'caution')!);
   packet.findings.find((finding) => finding.id === 'prior-reaction')!.confidence = 'unknown';
   assert.ok(validatePersonalDecisionPacket(packet, binding).includes('unsupported_action'));
+});
+
+test('P0-B a missing-evidence blocker cannot authorize keep-current or skip', () => {
+  const { packet, binding } = clone(personalDecisionFixtures.find((f) => f.id === 'missing-formula')!);
+  packet.findings[1].confidence = 'supported';
+  packet.findings[1].evidence = [packet.findings[0].evidence[1]];
+  for (const action of ['KEEP_CURRENT', 'SKIP'] as const) {
+    packet.action.kind = action;
+    packet.action.nextStep = action === 'KEEP_CURRENT' ? 'keep_current' : 'skip_product';
+    assert.ok(validatePersonalDecisionPacket(packet, binding).includes('unsupported_action'));
+  }
+});
+
+test('P0-B display facts cannot cite absent evidence or unbound personal context', () => {
+  const { packet, binding } = clone(personalDecisionFixtures[0]);
+  packet.findings[0].display = { kind: 'role_match', goal: 'dryness', category: 'moisturizer', evidenceIndexes: [99] };
+  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_reference'));
+  packet.findings[0].display.evidenceIndexes = [0];
+  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_scope'));
 });

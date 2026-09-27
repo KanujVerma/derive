@@ -16,7 +16,9 @@ The host supplies `DecisionBinding` from authenticated ownership and independent
 
 `EvidenceNeed` distinguishes missing, unknown, withheld and conflict. Critical needs block `COULD_WORK`; they do not erase a known caution. Unknown tolerance is not intolerance. A partial routine cannot prove absence of use. History about an old formula cannot prove tolerance of a new formula. Self-reported product reactions are not ingredient allergy diagnoses.
 
-The action vocabulary is `COULD_WORK`, `USE_WITH_CAUTION`, `KEEP_CURRENT`, `SKIP` and `NOT_ENOUGH_INFORMATION`. No universal score or unrestricted model action is defined. Next steps are bounded identifiers for evidence-bound presentation, not arbitrary instructions.
+Optional `Finding.display` carries fixed-template arguments for role match, routine relation with qualitative timing/frequency, prior reaction event, ingredient context or evidence gap. Its evidence indexes must reference the same finding's evidence with the appropriate product/context scope. The trusted evaluator copies these values from bound records; the renderer cannot join an unrelated live profile or derive arguments from arbitrary text. Item display names, if used later, require an authenticated lookup from those bound item IDs and revisions. Evidence indexes validate provenance shape; they do not independently prove a field's scientific meaning.
+
+The action vocabulary is `COULD_WORK`, `USE_WITH_CAUTION`, `KEEP_CURRENT`, `SKIP` and `NOT_ENOUGH_INFORMATION`. `KEEP_CURRENT` requires supported role redundancy and routine evidence. `SKIP` requires that redundancy or a supported prior-reaction/reported-sensitivity finding; a missing-evidence blocker alone cannot authorize either. No universal score or unrestricted model action is defined. Next steps are bounded identifiers for evidence-bound presentation, not arbitrary instructions.
 
 ## Integrity validation and limits
 

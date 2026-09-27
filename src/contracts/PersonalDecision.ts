@@ -1,3 +1,5 @@
+import type { Goal } from '../types/schema.ts';
+
 /** P0-B evaluation boundary only. P0-A owns the authoritative ProductTruthSnapshot.
  * None of these types establish catalog facts, authentication or scientific review.
  */
@@ -46,6 +48,20 @@ export type FindingKind =
   | 'reported_ingredient_sensitivity' | 'reactive_active' | 'prior_product_reaction'
   | 'reproductive_context_caution' | 'formula_changed' | 'missing_evidence' | 'no_supported_rule';
 
+/** Fixed-template arguments copied by the trusted evaluator from bound facts.
+ * References identify evidence, not permission to invent or upgrade its meaning.
+ */
+export type FindingDisplayFacts = (
+  | { kind: 'role_match'; goal: Goal; category: string }
+  | { kind: 'routine_relation'; routineItemIds: string[]; role: string;
+      timing: 'am' | 'pm' | 'both' | 'unknown';
+      frequency: 'daily' | 'few_times_weekly' | 'weekly' | 'occasional' | 'unknown' }
+  | { kind: 'prior_reaction'; historyEventId: string; historicalFormulaVersionId: string | null }
+  | { kind: 'ingredient_context'; ingredient: string;
+      context: 'reported_sensitivity' | 'reactivity' | 'treatment_overlap' | 'pregnancy' | 'trying_to_conceive' | 'nursing' }
+  | { kind: 'evidence_gap'; code: EvidenceNeedCode }
+) & { evidenceIndexes: number[] };
+
 export interface Finding {
   id: string;
   kind: FindingKind;
@@ -59,6 +75,8 @@ export interface Finding {
   uncertainty: string[];
   /** Evidence needs remain visible even if a different finding chooses the action. */
   evidenceNeedIds: string[];
+  /** Optional when bounded generic presentation suffices; no arbitrary prose. */
+  display?: FindingDisplayFacts;
 }
 
 export interface RoutineImpact {
@@ -117,7 +135,8 @@ export type PacketIntegrityIssue =
   | 'binding_mismatch' | 'duplicate_finding_id' | 'duplicate_evidence_need_id' | 'duplicate_routine_impact_id'
   | 'action_finding_reference' | 'need_finding_reference' | 'finding_need_reference'
   | 'routine_finding_reference' | 'evidence_binding_mismatch' | 'unsupported_positive_finding'
-  | 'positive_action_blocked' | 'unsupported_action' | 'routine_candidate_mismatch' | 'action_next_step_mismatch';
+  | 'positive_action_blocked' | 'unsupported_action' | 'routine_candidate_mismatch' | 'action_next_step_mismatch'
+  | 'display_evidence_reference' | 'display_evidence_scope';
 
 const BINDING_KEYS: Array<keyof DecisionBinding> = [
   'ownerId', 'productSnapshotId', 'productSnapshotRevision', 'sourceBoundaryRevision',
@@ -168,6 +187,26 @@ export function validatePersonalDecisionPacket(
             || evidence.formulaVersionId !== packet.binding.formulaVersionId))) issues.add('evidence_binding_mismatch');
       }
     }
+    if (finding.display) {
+      const display = finding.display;
+      if (display.evidenceIndexes.some((index) => !Number.isInteger(index) || index < 0 || index >= finding.evidence.length)) {
+        issues.add('display_evidence_reference');
+      }
+      const cited = display.evidenceIndexes.map((index) => finding.evidence[index]).filter((e) => e !== undefined);
+      const hasContext = (section: 'profile' | 'routine' | 'history') => cited.some((e) => e.kind === 'context_fact' && e.section === section);
+      const hasProduct = cited.some((e) => e.kind === 'product_fact');
+      if (display.kind === 'role_match' && (!hasProduct || !hasContext('profile'))) issues.add('display_evidence_scope');
+      if (display.kind === 'ingredient_context' && (!cited.some((e) => e.kind === 'product_fact' && e.scope === 'formula')
+        || (!hasContext('profile') && !hasContext('routine')))) issues.add('display_evidence_scope');
+      if (display.kind === 'prior_reaction' && !cited.some((e) => e.kind === 'context_fact' && e.section === 'history'
+        && e.recordId === display.historyEventId)) issues.add('display_evidence_scope');
+      if (display.kind === 'routine_relation' && (!hasContext('routine') || !display.routineItemIds.length
+        || display.routineItemIds.some((id) => !cited.some((e) => e.kind === 'context_fact' && e.section === 'routine' && e.recordId === id)))) {
+        issues.add('display_evidence_scope');
+      }
+      if (display.kind === 'evidence_gap' && !packet.evidenceNeeds.some((need) => need.code === display.code
+        && finding.evidenceNeedIds.includes(need.id))) issues.add('display_evidence_scope');
+    }
     if (POSITIVE_KINDS.includes(finding.kind) && finding.applicability === 'applicable') {
       const product = finding.evidence.some((e) => e.kind === 'product_fact');
       const context = finding.evidence.some((e) => e.kind === 'context_fact');
@@ -187,7 +226,11 @@ export function validatePersonalDecisionPacket(
   } else if (packet.action.kind === 'USE_WITH_CAUTION') {
     if (!supported.some((f) => f.severity === 'caution' || f.severity === 'blocker')) issues.add('unsupported_action');
   } else if (packet.action.kind === 'KEEP_CURRENT' || packet.action.kind === 'SKIP') {
-    if (!supported.some((f) => f.kind === 'role_redundancy' || f.severity === 'blocker')) issues.add('unsupported_action');
+    const redundancy = supported.some((f) => f.kind === 'role_redundancy' && f.confidence === 'supported'
+      && f.evidence.some((e) => e.kind === 'context_fact' && e.section === 'routine'));
+    const knownReasonToSkip = supported.some((f) => f.confidence === 'supported'
+      && (f.kind === 'prior_product_reaction' || f.kind === 'reported_ingredient_sensitivity'));
+    if (!redundancy && (packet.action.kind === 'KEEP_CURRENT' || !knownReasonToSkip)) issues.add('unsupported_action');
   }
   const allowedSteps: Record<PersonalDecisionActionKind, DecisionNextStep[]> = {
     COULD_WORK: ['consider_use'],

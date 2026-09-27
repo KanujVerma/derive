@@ -36,6 +36,7 @@ const role: Finding = {
   id: 'goal-role', kind: 'goal_role_match', applicability: 'applicable', severity: 'informational', confidence: 'supported',
   ruleId: 'fixture:role-match', ruleVersion: '1', evidence: [categoryEvidence, profileEvidence],
   uncertainty: ['Role match cannot establish individual results or tolerance.'], evidenceNeedIds: ['tolerance'],
+  display: { kind: 'role_match', goal: 'dryness', category: 'moisturizer', evidenceIndexes: [0, 1] },
 };
 const tolerance: EvidenceNeed = {
   id: 'tolerance', code: 'individual_tolerance', state: 'unknown', critical: false, findingIds: ['goal-role'],
@@ -45,6 +46,7 @@ const caution: Finding = {
   ruleId: 'fixture:prior-reaction', ruleVersion: '1',
   evidence: [{ kind: 'context_fact', section: 'history', ownerId: binding.ownerId, revision: 'history:1', recordId: 'experience:1' }],
   uncertainty: ['Self-reported product reaction does not identify an ingredient cause.'], evidenceNeedIds: [],
+  display: { kind: 'prior_reaction', historyEventId: 'experience:1', historicalFormulaVersionId: null, evidenceIndexes: [0] },
 };
 const basePacket: PersonalDecisionPacketV1 = {
   schemaVersion: 'personal-decision/v1', id: 'fixture-packet:1', evaluatedAt: '2026-09-26T00:00:00.000Z', binding,
