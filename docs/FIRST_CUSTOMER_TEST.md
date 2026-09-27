@@ -2,9 +2,9 @@
 
 **Purpose:** Target criteria for a future scanner-first external beta. This is not evidence that the complete target flow or hosted anonymous access exists.
 
-**Acceptance ownership:** Acceptance follows the active feature-DRI model. P0-A Capture + Product Resolution is currently recommended to Sami; P0-B Personal Decision Intelligence is currently recommended to Kanuj. Name a cross-product composition/release DRI before final release acceptance. Platform/truth and customer-experience stewardship remain cross-cutting review roles.
+**Acceptance ownership:** Sami owns active camera/capture and P0-A. Kanuj owns P0-B acceptance and the now-active P0-D integrated customer/release feature (#100). Platform/truth and CX stewardship remain cross-cutting advisory roles. The full Kanuj DAG and reserved surfaces are in [KANUJ_PORTFOLIO.md](KANUJ_PORTFOLIO.md).
 
-**Current implementation boundary:** A bounded free scanner-first path, profile/history, private evidence handling, and K4/S4 camera integration exist locally. Check uses Expo Camera directly. Current free Personal Fit is first-match; free product memory does not contain the canonical routine schedule model. Photo OCR/image recognition is absent, hosted guest activation is gated, and physical scanner acceptance is unverified. The target details below must not be marked complete until observed in an eligible future build.
+**Current implementation boundary:** Scanner-first free/local integrations and P0-B source are merged at main22a210a: intent, primary/secondary goals, distinct reproductive states, canonical reported routine/use and corrected history, multi-finding packet/policy and same-snapshot Check/editor/My Stuff are implemented with local/CI proof. Retained S2 first-match fit and legacy free memory remain distinct. Photo OCR/image recognition, hosted guest activation and full physical/release acceptance are unproven. The rows below are acceptance criteria, not checkmarks earned by code or DEVELOPMENT FIXTURE screens. The user will arrange an eligible unassisted tester later.
 
 ## Target first-launch and first-check flow
 
@@ -16,14 +16,20 @@
 - [ ] Capture one primary goal and optional secondary goals, up to roughly three goals total. Goal examples include breakouts, dark/post-breakout marks, dryness/barrier, redness/sensitivity, texture, oiliness, or fine lines. Capture skin behavior and reactivity, plus treatment or sensitivity context when it can materially change the decision.
 - [ ] Do not require routine-complexity preference during initial free personalization.
 - [ ] Ask about pregnancy, trying to conceive, and breastfeeding/nursing just in time, only when materially relevant to the product decision. Keep the states distinct; unknown, unanswered, and withheld must never become “no.”
-- [ ] **These profile details are target, not current behavior:** the existing free profile has a goals array, not a separate decision-intent or primary-goal field, and uses one pregnancy/nursing status field without a distinct trying-to-conceive state.
-- [ ] Return a personal action, reason, and next step only when supported evidence permits it. The target preserves all material supported findings and applies a deterministic, versioned policy to select the action. Current runtime remains a narrower first-match Personal Fit implementation.
+- [ ] Exercise the actual P0-B committed profile path for separate intent, primary/secondary goals and reproductive answers. Do not substitute the older S2 goals-array/combined pregnancy-nursing contract or a synthetic fixture for that acceptance.
+- [ ] Return a personal action, reason, and next step only when supported evidence permits it. The target preserves all material supported findings and applies a deterministic, versioned policy to select the action. P0-B source implements that baseline; retained S2 is still first-match. Observe the actual service/customer path before passing the row.
 - [ ] Progressively capture routine context when useful. The approved target includes product, AM/PM/both/unknown, frequency, current/paused/stopped, and routine completeness. Preserve unknown values rather than assuming a complete routine.
-- [ ] **This routine model is target, not current free history:** current free memory stores using/considering/stopped product state, checks, and reported experiences; it does not store the target schedule and completeness model.
+- [ ] Verify current P0-B reported routine schedule/completeness and append-only experience correction through the actual service. Keep older S3 using/considering/stopped products/checks/reports distinct; do not infer canonical schedule/formula/tolerance from them.
 - [ ] Keep formula facts separate from Personal Fit. Do not invent concentrations, diagnoses, or ingredient claims. A reported reaction is not proof of an ingredient allergy or causation. Do not infer race, ethnicity, ancestry, or Fitzpatrick.
 - [ ] Verify profile edits, explicit Check-history saves, owner-switch clearing, identity linking, privacy, and deletion only on their corresponding implemented paths. Do not record credentials or sensitive disclosures.
 - [ ] Verify the target CHECK / MY STUFF / PLAN / SHOP navigation and CHECK launch when available. Do not let Mock fixtures leak into a customer session.
 - [ ] Never infer physical-device acceptance from simulator or export evidence.
+
+## P0-B unassisted comprehension acceptance
+
+Use an eligible U.S. adult18+ who has not worked on Derive. The user will arrange the participant later; this gate stays unrun until a real participant completes it. Provide the task and environment explanation without coaching the ordinary happy path. Ask the participant to explain: (1) the recommendation, (2) why, (3) what changes in their routine, (4) what is uncertain, and (5) the next step. Record unprompted confusion/recovery and the screen/state, without names, audio/video, photos or sensitive disclosures. Founder engineering feedback and agent simulations do not clear this gate.
+
+Mark code/local API/Simulator/physical/current beta binary/hosted/TestFlight/real-user results separately. Physical iPhone availability is not proof that its installed build contains current source. An older legacy build10 or DEVELOPMENT FIXTURE screen cannot clear current P0-B live-service acceptance.
 
 ## Beta release evidence required
 
