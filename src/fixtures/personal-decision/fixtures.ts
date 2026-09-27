@@ -1,0 +1,101 @@
+import type {
+  DecisionBinding, DecisionEvidence, EvidenceNeed, Finding, PersonalDecisionPacketV1,
+  P0BProductEvaluationProjectionV1, RoutineImpact,
+} from '../../contracts/PersonalDecision.ts';
+
+/** Synthetic semantic examples, not scientific gold labels or authoritative P0-A snapshots. */
+export interface PersonalDecisionFixture {
+  id: string;
+  product: P0BProductEvaluationProjectionV1;
+  binding: DecisionBinding;
+  packet: PersonalDecisionPacketV1;
+}
+
+const product: P0BProductEvaluationProjectionV1 = {
+  schemaVersion: 'p0b-product-evaluation/v1', snapshotId: 'fixture-snapshot:1', snapshotRevision: 'snapshot:1',
+  sourceBoundaryRevision: 'sources:1',
+  identity: { state: 'known', value: { productId: 'fixture-product:1', variantId: 'fixture-variant:1' }, sourceIds: ['fixture-label'] },
+  formula: { state: 'known', value: { formulaVersionId: 'fixture-formula:1', ingredients: ['Glycerin'] }, sourceIds: ['fixture-label'] },
+  category: { state: 'known', value: 'moisturizer', sourceIds: ['fixture-label'] },
+  sources: [{ id: 'fixture-label', revision: 'label:1' }],
+};
+const binding: DecisionBinding = {
+  ownerId: 'fixture-owner:1', productSnapshotId: product.snapshotId, productSnapshotRevision: product.snapshotRevision,
+  sourceBoundaryRevision: product.sourceBoundaryRevision,
+  productId: 'fixture-product:1', variantId: 'fixture-variant:1', formulaVersionId: 'fixture-formula:1',
+  profileRevision: 'profile:1', routineRevision: 'routine:1', historyRevision: 'history:1',
+};
+const categoryEvidence: DecisionEvidence = {
+  kind: 'product_fact', scope: 'category', snapshotRevision: 'snapshot:1', sourceId: 'fixture-label',
+  sourceRevision: 'label:1', productId: binding.productId!, variantId: binding.variantId!, formulaVersionId: null,
+};
+const profileEvidence: DecisionEvidence = {
+  kind: 'context_fact', section: 'profile', ownerId: binding.ownerId, revision: 'profile:1', recordId: 'profile-record:1',
+};
+const role: Finding = {
+  id: 'goal-role', kind: 'goal_role_match', applicability: 'applicable', severity: 'informational', confidence: 'supported',
+  ruleId: 'fixture:role-match', ruleVersion: '1', evidence: [categoryEvidence, profileEvidence],
+  uncertainty: ['Role match cannot establish individual results or tolerance.'], evidenceNeedIds: ['tolerance'],
+};
+const tolerance: EvidenceNeed = {
+  id: 'tolerance', code: 'individual_tolerance', state: 'unknown', critical: false, findingIds: ['goal-role'],
+};
+const caution: Finding = {
+  id: 'prior-reaction', kind: 'prior_product_reaction', applicability: 'applicable', severity: 'caution', confidence: 'supported',
+  ruleId: 'fixture:prior-reaction', ruleVersion: '1',
+  evidence: [{ kind: 'context_fact', section: 'history', ownerId: binding.ownerId, revision: 'history:1', recordId: 'experience:1' }],
+  uncertainty: ['Self-reported product reaction does not identify an ingredient cause.'], evidenceNeedIds: [],
+};
+const basePacket: PersonalDecisionPacketV1 = {
+  schemaVersion: 'personal-decision/v1', id: 'fixture-packet:1', evaluatedAt: '2026-09-26T00:00:00.000Z', binding,
+  versions: { engine: 'fixture-only/1', policy: 'fixture-only/1', projection: 'p0b-product-evaluation/v1' },
+  findings: [role], routineImpacts: [], evidenceNeeds: [tolerance],
+  action: { kind: 'COULD_WORK', findingIds: ['goal-role'], primaryFindingId: 'goal-role', nextStep: 'consider_use' },
+};
+function fixture(id: string, changes: Partial<PersonalDecisionPacketV1> = {},
+  projectedProduct: P0BProductEvaluationProjectionV1 = product): PersonalDecisionFixture {
+  const packet = { ...basePacket, ...changes, id: `fixture-packet:${id}` };
+  return structuredClone({ id, product: projectedProduct, binding: packet.binding, packet });
+}
+const missingFormula: Finding = {
+  id: 'missing-formula', kind: 'missing_evidence', applicability: 'applicable', severity: 'blocker', confidence: 'unknown',
+  ruleId: 'fixture:formula-required', ruleVersion: '1', evidence: [],
+  uncertainty: ['Exact formula is unavailable.'], evidenceNeedIds: ['formula'],
+};
+const formulaNeed: EvidenceNeed = { id: 'formula', code: 'verified_formula', state: 'missing', critical: true, findingIds: ['missing-formula'] };
+const partialRoutine: Finding = {
+  id: 'partial-routine', kind: 'missing_evidence', applicability: 'uncertain', severity: 'informational', confidence: 'unknown',
+  ruleId: 'fixture:partial-routine', ruleVersion: '1',
+  evidence: [{ kind: 'context_fact', section: 'routine', ownerId: binding.ownerId, revision: 'routine:1', recordId: 'routine-head:1' }],
+  uncertainty: ['An absent item in a partial routine does not establish absence of use.'], evidenceNeedIds: ['routine-completeness'],
+};
+const unknownImpact: RoutineImpact = {
+  id: 'routine-impact:1', kind: 'unknown', candidate: { productId: binding.productId, variantId: binding.variantId, formulaVersionId: binding.formulaVersionId },
+  routineItemIds: [], findingIds: ['partial-routine'], uncertainty: ['Routine is partial.'],
+};
+const formulaChanged: Finding = {
+  id: 'formula-changed', kind: 'formula_changed', applicability: 'applicable', severity: 'informational', confidence: 'supported',
+  ruleId: 'fixture:formula-changed', ruleVersion: '1',
+  evidence: [{ kind: 'context_fact', section: 'history', ownerId: binding.ownerId, revision: 'history:1', recordId: 'old-formula-tolerance:1' }],
+  uncertainty: ['Earlier tolerance belongs to fixture-formula:0; it does not prove current-formula tolerance.'],
+  evidenceNeedIds: ['current-experience'],
+};
+export const personalDecisionFixtures: PersonalDecisionFixture[] = [
+  fixture('positive-role-match'),
+  fixture('caution', { findings: [role, caution],
+    action: { kind: 'USE_WITH_CAUTION', findingIds: ['prior-reaction', 'goal-role'], primaryFindingId: 'prior-reaction', nextStep: 'ask_clinician' } }),
+  fixture('missing-formula', {
+    binding: { ...binding, formulaVersionId: null }, findings: [role, missingFormula], evidenceNeeds: [tolerance, formulaNeed],
+    action: { kind: 'NOT_ENOUGH_INFORMATION', findingIds: ['missing-formula'], primaryFindingId: 'missing-formula', nextStep: 'confirm_formula' },
+  }, { ...product, formula: { state: 'unknown', reason: 'Exact formula not verified.' } }),
+  fixture('partial-routine', { findings: [role, partialRoutine], routineImpacts: [unknownImpact],
+    evidenceNeeds: [tolerance, { id: 'routine-completeness', code: 'routine_completeness', state: 'unknown', critical: true, findingIds: ['partial-routine'] }],
+    action: { kind: 'NOT_ENOUGH_INFORMATION', findingIds: ['partial-routine'], primaryFindingId: 'partial-routine', nextStep: 'review_routine' } }),
+  fixture('prior-reaction', { binding: { ...binding, formulaVersionId: null, profileRevision: null },
+    findings: [caution, missingFormula], evidenceNeeds: [formulaNeed],
+    action: { kind: 'USE_WITH_CAUTION', findingIds: ['prior-reaction', 'missing-formula'], primaryFindingId: 'prior-reaction', nextStep: 'ask_clinician' },
+  }, { ...product, formula: { state: 'unknown', reason: 'Exact formula not verified.' } }),
+  fixture('reformulation', { findings: [role, formulaChanged], evidenceNeeds: [tolerance,
+    { id: 'current-experience', code: 'current_formula_experience', state: 'unknown', critical: true, findingIds: ['formula-changed'] }],
+    action: { kind: 'NOT_ENOUGH_INFORMATION', findingIds: ['formula-changed', 'goal-role'], primaryFindingId: 'formula-changed', nextStep: 'add_context' } }),
+];

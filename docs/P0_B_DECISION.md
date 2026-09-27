@@ -1,0 +1,31 @@
+# P0-B personal decision boundary
+
+`src/contracts/PersonalDecision.ts` defines the additive P0-B decision contract. It is not connected to the current first-match Personal Fit runtime. ADR-34, ADR-35, ADR-36, ADR-37 and ADR-39 govern its intended semantics.
+
+## Implemented semantics
+
+`PersonalDecisionPacketV1` retains every evaluator finding, routine impact and evidence need. A deterministic policy selects one action and references the retained finding IDs, including a primary finding. The renderer must use those references and may not add facts or change the action. Packet, engine, policy and projection versions are separate.
+
+The host supplies `DecisionBinding` from authenticated ownership and independently loaded product/context revisions. It binds snapshot, source boundary, product, variant, formula, profile, routine and history. A null section revision means unavailable context, never an empty or negative report. IDs and revisions are opaque strings; this boundary does not generate revision values or authenticate them.
+
+`P0BProductEvaluationProjectionV1` is a local evaluation projection for adapters and fixtures. It is explicitly **not** the authoritative P0-A `ProductTruthSnapshot`. Identity, formula and category carry known, unknown or conflict state. Known data must retain accepted source references. P0-A integration must map the exact snapshot and displayed evidence revision into this projection, preserving source conflict and scope. Ingredients establish neither concentration nor finished-product safety.
+
+`Finding` keeps applicability, consequence severity, support confidence, rule revision, evidence and uncertainty separate. Product facts, owner context, reviewed scientific claims and observations are distinct evidence kinds. Raw text, model output and commercial observations cannot serve as product or user authority. A reviewed claim reference records applicability and limitations; its presence is not proof of correct scientific review.
+
+`RoutineImpact` expresses addition, duplication, replacement candidate, overlap, keep-current, none or unknown. Candidate identity is bound to the packet. Existing item IDs refer to the owner's routine. Finding references explain the impact; a replacement candidate does not assert comparative efficacy.
+
+`EvidenceNeed` distinguishes missing, unknown, withheld and conflict. Critical needs block `COULD_WORK`; they do not erase a known caution. Unknown tolerance is not intolerance. A partial routine cannot prove absence of use. History about an old formula cannot prove tolerance of a new formula. Self-reported product reactions are not ingredient allergy diagnoses.
+
+The action vocabulary is `COULD_WORK`, `USE_WITH_CAUTION`, `KEEP_CURRENT`, `SKIP` and `NOT_ENOUGH_INFORMATION`. No universal score or unrestricted model action is defined. Next steps are bounded identifiers for evidence-bound presentation, not arbitrary instructions.
+
+## Integrity validation and limits
+
+`validatePersonalDecisionPacket(packet, expectedBinding)` checks already typed evaluator output: trusted binding equality, ID uniqueness, reference integrity, evidence revision/owner scope, routine candidate scope, supported action basis, positive-action blockers and compatible next steps. The host must obtain `expectedBinding` independently. Passing `packet.binding` back as authority defeats the owner/staleness check.
+
+This helper is not an untrusted JSON parser, authentication mechanism, source approval verifier, scientific claim reviewer or complete decision policy. Trusted adapters must verify source registries and provenance before constructing facts; an evaluator must retain all material findings and implement reviewed rules. The helper cannot discover an omitted finding or an invented scientific rule. API composition will require an explicit transport parser rather than casting external JSON to these types.
+
+## Fixtures and handoff
+
+`src/fixtures/personal-decision/fixtures.ts` contains synthetic semantic examples: positive role match, caution plus positive finding, missing formula, partial routine, prior reaction with missing profile/formula, and reformulation. They exercise packet integrity, not clinical correctness or production behavior. `tests/p0b-contracts.test.ts` covers valid packets and corrupted bindings, references, authority and action choices.
+
+B2 owns the persisted personal-context DTO. B3 owns normalized evaluator input and deterministic finding/policy execution. Adapters must preserve unanswered/withheld/answered context, distinct pregnancy/trying-to-conceive/nursing states, qualitative frequency and section revisions. This contract does not copy that storage model. P0-A retains authoritative truth ownership. Runtime, database migrations, rendering and physical acceptance remain separate workstreams.
