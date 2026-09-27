@@ -347,10 +347,10 @@ These findings are review evidence, not accepted contract changes. S1A does not 
 
 ### ADR-37: Multi-Finding Personal Decision and Evidence-Bound Explanation
 
-- **Status:** ACCEPTED TARGET; merged free Personal Fit is a narrow first-match implementation. P0-B's local multi-finding branches and bounded composition are under validation, with publication and acceptance gates open.
+- **Status:** ACCEPTED; P0-B's deterministic baseline, packet, canonical reported context and customer composition are merged at source checkpoint `7775a42`. Hosted activation and physical/customer acceptance remain unverified; retained S2 first-match fit stays distinct.
 - **Decision:** Gather all applicable supported findings, preserve their evidence and uncertainty, and apply a deterministic final policy to select the customer action. The versioned PersonalDecisionPacket binds that action to the ProductTruthSnapshot and minimum-necessary user context, findings, conflicts, unknowns, and policy revision.
 - **Soft judgment:** A probabilistic provider may contribute bounded, typed findings or abstain. It cannot establish canonical product truth, bypass deterministic safety/policy, or invent a conclusion from missing evidence. Jev is an optional bounded experiment, not a selected provider or production dependency.
-- **Explanation:** An evidence-bound renderer explains only claims present in the packet. It cannot add new scientific or product claims. P0-B implements the packet, deterministic baseline and renderer on isolated local branches; these are not merged or hosted. See [P0_B_EXECUTION.md](P0_B_EXECUTION.md).
+- **Explanation:** An evidence-bound renderer explains only claims present in the packet. It cannot add new scientific or product claims. P0-B implements the packet, deterministic baseline and bounded renderer in merged source with actual local snapshot/persistence proof. It ports bounded reviewed S2 meanings, not a new general scientific-claim system. Hosted and physical acceptance remain open. See [P0_B_EXECUTION.md](P0_B_EXECUTION.md).
 
 ### ADR-38: Provider-Neutral Capture and Perception; Scanner Selection by Evaluation
 
@@ -361,13 +361,13 @@ These findings are review evidence, not accepted contract changes. S1A does not 
 
 ### ADR-39: Progressive Routine and History Context With Just-in-Time Safety Questions
 
-- **Status:** ACCEPTED TARGET; local free profile, saved products, checks, and reported experiences exist in bounded forms.
-- **Decision:** Ask only for context that can materially change the current decision, allow the customer to skip or withhold it, and preserve unknown separately from no. A future canonical routine/exposure model binds products and formula versions to time, use, and changes; current event-based free history is not that model.
+- **Status:** ACCEPTED; P0-B implements reported routine/use and corrected experience revisions with scoped optional questions. A full scientific exposure model and physical/customer acceptance remain targets.
+- **Decision:** Ask only for context that can materially change the current decision, allow the customer to skip or withhold it, and preserve unknown separately from no. P0-B stores immutable reported routine/use and corrected experience revisions with separate product/variant/formula references. Unknown timing/frequency and historical formula stay unknown; legacy events are not promoted into exposure or tolerance truth. A full scientific exposure model remains a target.
 - **Sensitive context:** Pregnancy, trying to conceive, and breastfeeding/nursing are distinct contextual states and must be asked only when relevant. Never infer them from imagery or other profile attributes. Keep the product within cosmetic, non-diagnostic guidance.
 - **Beta scope:** Initial external beta targets U.S. adults 18 and older. This is an approved target scope, not a current age gate unless runtime evidence proves one exists.
 
 ### ADR-40: Vertical Feature DRI, Horizontal Stewardship, and Maximum Independent Parallelism
 
 - **Status:** ACCEPTED OWNERSHIP POLICY.
-- **Decision:** Every feature has one founder DRI accountable end-to-end, including client, service, persistence, tests, integration, and acceptance needed for the outcome. There is no permanent frontend/backend split. Sami stewards platform and truth invariants; Kanuj stewards customer experience. Stewardship reviews invariants without transferring feature accountability.
+- **Decision:** Every feature has one founder DRI accountable end-to-end, including client, service, persistence, tests, integration, and acceptance needed for the outcome. There is no permanent frontend/backend split. Sami stewards platform and truth invariants; Kanuj stewards customer experience. Stewardship reviews invariants without transferring feature accountability. Review is advisory, not a blocking merge approval unless branch protection or a concrete unresolved invariant finding requires a hold. The feature DRI independently verifies scope/invariants, required tests and exact-head CI, and owns the merge decision. After each merge reconcile every remaining feature PR onto new main and rerun its required exact-head validation.
 - **Parallelism:** A DRI may delegate independent work to agents on disjoint write-sets. Founders and their agents may work in parallel across independent features. Stable contracts and fixtures allow work to proceed before final integration. Keep one active writer for shared contracts, migration ordering, authoritative truth promotion, and high-contention composition files; integrate in one bounded composition pass. P0-C and P0-D require a named DRI before activation.

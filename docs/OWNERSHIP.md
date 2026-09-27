@@ -9,7 +9,7 @@ Every active milestone/feature has exactly one founder DRI accountable for its c
 | Feature | DRI | Scope and status |
 | --- | --- | --- |
 | P0-A Capture + Product Resolution | Sami | End-to-end Check capture, barcode/photo evidence, extraction/evaluation adapters if selected, S6 truth resolution, catalog/review and device acceptance. Current Check uses Expo Camera directly; no photo OCR provider or Scandit adapter is implemented. |
-| P0-B Personal Decision Intelligence | Kanuj | End-to-end optional profile, routine/history context, multi-finding policy, decision packet, renderer and physical acceptance. Independent local implementation and bounded composition are verified in isolated branches; publication and acceptance gates remain open. [Execution ledger](P0_B_EXECUTION.md) records agent ownership and actual evidence. |
+| P0-B Personal Decision Intelligence | Kanuj | End-to-end optional profile, routine/history context, multi-finding policy, decision packet, renderer and physical acceptance. All seven focused source PRs and bounded customer composition are merged; automated local/CI gates passed. Physical/customer acceptance and hosted activation remain open. Sami stewardship remains advisory under the rule below. [Execution ledger](P0_B_EXECUTION.md) records agent ownership and actual evidence. |
 | P0-C Hosted Beta Operations | DRI assigned explicitly before activation | Hosted guest abuse/lifecycle, linking, cleanup, retention and activation review. Hosted guest activation remains gated. |
 | P0-D Cross-product physical/release acceptance | Composition/release DRI named explicitly before activation | Cross-feature physical and release composition. Do not infer an owner from a permanent client/server lane. |
 
