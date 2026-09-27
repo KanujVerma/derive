@@ -3,7 +3,7 @@ import type { PersonalContextSnapshot, PersonalContextRevision, PersonalExperien
 import type { DecisionKnowledge, DecisionBinding } from '../../contracts/PersonalDecision.ts';
 import { projectTrustedSnapshot } from './truthAdapter.ts';
 import type { TrustedSnapshotEnvelope } from './truthAdapter.ts';
-export interface TrustedRoutineFact { itemId:string; productId:string; variantId:string|null; formulaVersionId:string|null; category:DecisionKnowledge<string>; ingredients:DecisionKnowledge<string[]>; sources:Array<{id:string;revision:string}> }
+export interface TrustedRoutineFact { itemId:string; productId:string; variantId:string|null; formulaVersionId:string|null; category:DecisionKnowledge<string>; ingredients:DecisionKnowledge<string[]>; sources:Array<{id:string;revision:string}>; provenance?:Array<{scope:'category'|'formula';productId:string;formulaVersionId?:string;source_reference:string;observed_at:string;provenance_type?:string}> }
 const answer=(value:string):'yes'|'no'|'unknown'|'withheld'=>value==='yes'||value==='no'||value==='withheld'?value:'unknown';
 export function evaluationFrequency(f:ReportedFrequency):'daily'|'few_times_weekly'|'weekly'|'occasional'|'unknown' {
  if(f.kind!=='qualitative')return 'unknown';

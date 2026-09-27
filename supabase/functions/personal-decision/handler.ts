@@ -34,6 +34,7 @@ export async function evaluateDecisionRequest(ownerId:string,request:PersonalDec
  const envelope=await deps.readSnapshot(ownerId,request);
  if(!envelope)throw new DecisionServiceError('TRUTH_SNAPSHOT_UNAVAILABLE',503);
  if(envelope.snapshot.resolutionCaseId!==request.caseId||envelope.snapshot.snapshotId!==request.snapshotId)throw new DecisionServiceError('TRUTH_SNAPSHOT_UNAVAILABLE',503);
+ const runtime=envelope.runtime??deps.runtime;
  const context=await deps.readContext(ownerId);
  if(context.ownerId!==ownerId)throw new DecisionServiceError('CONTEXT_OWNER_MISMATCH',403);
  const evaluatedContextRevision=context.revision;
@@ -45,8 +46,8 @@ export async function evaluateDecisionRequest(ownerId:string,request:PersonalDec
  const evaluation=evaluationInput(ownerId,envelope,context,[...events.values()],routineFacts,deps.now(),request.requestId);
  const packet=evaluatePersonalDecision(evaluation);
  if(!personalDecisionPacketSchema.safeParse(packet).success)throw new DecisionServiceError('ASSESSMENT_UNAVAILABLE',503);
- const persistedInput:SavedAssessment['input']={request,expectedContextRevision:evaluatedContextRevision,expectedBinding:evaluation.binding,truthRef:{caseId:envelope.snapshot.resolutionCaseId,snapshotId:envelope.snapshot.snapshotId,caseRevision:envelope.snapshot.caseRevision,resolverVersion:envelope.snapshot.resolverVersion,sourceBoundaryRevision:evaluation.binding.sourceBoundaryRevision,categoryBoundaryRevision:envelope.categoryBoundaryRevision??null},evaluatedFacts:{product:evaluation.product,routine:routineFacts.map(({ingredients,...fact})=>({...fact,formulaEvidence:ingredients.state==='known'?{state:'known',sourceIds:ingredients.sourceIds}:{state:ingredients.state}}))},runtime:deps.runtime};
+ const persistedInput:SavedAssessment['input']={request,expectedContextRevision:evaluatedContextRevision,expectedBinding:evaluation.binding,truthRef:{caseId:envelope.snapshot.resolutionCaseId,snapshotId:envelope.snapshot.snapshotId,caseRevision:envelope.snapshot.caseRevision,resolverVersion:envelope.snapshot.resolverVersion,sourceBoundaryRevision:evaluation.binding.sourceBoundaryRevision,categoryBoundaryRevision:envelope.categoryBoundaryRevision??null},evaluatedFacts:{product:evaluation.product,categoryProvenance:envelope.categoryProvenance??null,routine:routineFacts.map(({ingredients,...fact})=>({...fact,formulaEvidence:ingredients.state==='known'?{state:'known',sourceIds:ingredients.sourceIds}:{state:ingredients.state}}))},runtime};
  const stored=await deps.persist(ownerId,request.requestId,persistedInput,packet);
  if(validatePersonalDecisionPacket(stored.packet,evaluation.binding).length)throw new DecisionServiceError('ASSESSMENT_UNAVAILABLE',503);
- return {kind:'ready',ownerId,contextRevision:evaluatedContextRevision,expectedBinding:evaluation.binding,truthRef:persistedInput.truthRef,packet:stored.packet,assessmentId:stored.assessmentId,replayed:stored.replayed,runtime:deps.runtime,snapshotRef:{caseId:request.caseId,snapshotId:request.snapshotId}};
+ return {kind:'ready',ownerId,contextRevision:evaluatedContextRevision,expectedBinding:evaluation.binding,truthRef:persistedInput.truthRef,packet:stored.packet,assessmentId:stored.assessmentId,replayed:stored.replayed,runtime,snapshotRef:{caseId:request.caseId,snapshotId:request.snapshotId}};
 }

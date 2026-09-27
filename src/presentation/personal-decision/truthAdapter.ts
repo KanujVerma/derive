@@ -2,7 +2,7 @@ import { hasVerifiedPackageFormula } from '../../contracts/ProductTruthSnapshot.
 import type { ProductTruthSnapshotV1 } from '../../contracts/ProductTruthSnapshot.ts';
 import type { DecisionKnowledge, P0BProductEvaluationProjectionV1 } from '../../contracts/PersonalDecision.ts';
 /** Category is separate accepted server evidence; snapshots currently omit this fact. */
-export interface TrustedSnapshotEnvelope { snapshot:ProductTruthSnapshotV1; category?:DecisionKnowledge<string>; categorySources?:Array<{id:string;revision:string}>; categoryBoundaryRevision?:string }
+export interface TrustedSnapshotEnvelope { snapshot:ProductTruthSnapshotV1; runtime?:'authoritative'|'local_fixture'; categoryProvenance?:{productId:string;category:string;source_reference:string;catalog_verified_at:string}; category?:DecisionKnowledge<string>; categorySources?:Array<{id:string;revision:string}>; categoryBoundaryRevision?:string }
 export function projectTrustedSnapshot({snapshot:s,category,categorySources=[],categoryBoundaryRevision}:TrustedSnapshotEnvelope):P0BProductEvaluationProjectionV1 {
  const revision=String(s.caseRevision), sourceId=s.snapshotId;
  const identityConflict=s.conflicts.some(c=>c.status==='unresolved'&&c.code!=='ingredient_mismatch');
