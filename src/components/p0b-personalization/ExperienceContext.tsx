@@ -1,3 +1,4 @@
+import { referenceDisplayLabel } from '@/src/presentation/p0b-personalization/referenceDisplay';
 import React, { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { Screen } from '@/src/components/ui/Screen';
@@ -28,7 +29,7 @@ export function ExperienceContext({ createRecordId, existing, availableProducts 
     <GroupedSection header="Product"><View style={styles.group}>
       {availableProducts.length > 0 && <View style={styles.chips}>{availableProducts.map(product => <ChoiceChip key={product.productId + ':' + product.variantId + ':' + product.formulaVersionId} label={product.label} disabled={loading} selected={draft.reference.kind === 'catalog' && draft.reference.productId === product.productId && draft.reference.variantId === product.variantId && draft.reference.formulaVersionId === product.formulaVersionId} onSelect={() => update({ reference: { ...product } })} />)}</View>}
       <ChoiceChip label="Enter a product name" selected={draft.reference.kind === 'manual'} disabled={loading} onSelect={() => update({ reference: { kind: 'manual', label: '', verification: 'unverified' } })} />
-      {draft.reference.kind === 'manual' ? <><TextInput accessibilityLabel="Experience product name" style={styles.input} editable={!loading} maxLength={180} value={draft.reference.label} placeholder="Product name" onChangeText={label => { if (draft.reference.kind === 'manual') update({ reference: { ...draft.reference, label } }); }} /><Text style={styles.copy}>Manual name. Formula and ingredients remain unverified.</Text></> : <Text style={styles.copy}>{draft.reference.label}. A missing formula reference stays unknown.</Text>}
+      {draft.reference.kind === 'manual' ? <><TextInput accessibilityLabel="Experience product name" style={styles.input} editable={!loading} maxLength={180} value={draft.reference.label} placeholder="Product name" onChangeText={label => { if (draft.reference.kind === 'manual') update({ reference: { ...draft.reference, label } }); }} /><Text style={styles.copy}>Manual name. Formula and ingredients remain unverified.</Text></> : <Text style={styles.copy}>{referenceDisplayLabel(draft.reference, availableProducts)}. A missing formula reference stays unknown.</Text>}
     </View></GroupedSection>
     <GroupedSection header="What did you notice?"><View style={[styles.group, styles.chips]}>{kinds.map(([kind, label]) => <ChoiceChip key={kind} label={label} selected={draft.kind === kind} disabled={loading} onSelect={() => update({ kind })} />)}</View></GroupedSection>
     <Text style={styles.copy}>No reaction to report does not mean you confirmed tolerance.</Text>
