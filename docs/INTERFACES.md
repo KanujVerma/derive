@@ -6,23 +6,30 @@
 
 The code-linked contracts below are real runtime interfaces. IDeriveService, ProductIdentityResolver, FreeAccess, FreePersonalFit, FreeContext, and FreeProductEvidence describe implemented boundaries, subject to their environment and release gates. Local scanner-first mobile integration is present in Development Mock and exact-local-Supabase Development Remote; hosted guest activation remains gated.
 
-Mobile Check currently calls Expo Camera directly. K4/S4 connects camera evidence to private S6 product-evidence resolution locally. This does not mean OCR, photo recognition, or provider-neutral capture adapters exist. The current free Personal Fit contract returns a narrow first-match result. The free context contract stores bounded saved-product, check, and experience events; it is not the canonical routine/exposure model.
+Mobile Check currently calls Expo Camera directly. K4/S4 connects camera evidence to private S6 product-evidence resolution locally. This does not mean OCR, photo recognition, or provider-neutral capture adapters exist. The retained S-FREE-2 Personal Fit contract returns a narrow first-match result. Legacy free context stores bounded saved-product/check/experience events; P0-B's separate reported-context revisions do not infer missing schedule, formula, primary goals or distinct reproductive answers from those legacy events.
 
 ### APPROVED TARGET, NOT YET IMPLEMENTED
 
-These names describe semantic concepts only. They are not current TypeScript interfaces, database tables, or approved method signatures.
+These remaining names describe target semantics, not provider implementations or approved new method signatures. Implemented P0-A and P0-B contracts are documented below.
 
 - **CaptureObservation:** immutable record of what a capture attempt observed and when, with permission/cancel/error state. It does not establish product identity.
 - **BarcodeCapturePort:** returns raw barcode observations and supported format/device errors; it does not assert exact product or formula.
 - **PhotoCapturePort:** returns a private image observation or permission, cancellation, unsupported-input, or capture failure state.
 - **ProductEvidenceExtractor:** proposes label text or attributes with source and uncertainty, or abstains. It cannot verify truth.
 - **ProductCandidateRetriever:** returns ranked candidate identities, no match, or ambiguity; ranking is retrieval evidence, not authority.
-- **Finding:** a bounded applicable, conflicting, or unknown conclusion with its supporting evidence, context, rule/source, and uncertainty.
-- **PersonalDecisionPacketV1:** versioned set of findings and the deterministic selected action, bound to one truth snapshot, minimum-necessary customer context, and policy version.
 - **SoftJudgmentProvider:** optional provider that contributes a constrained finding or abstains. It cannot write truth or override deterministic safety and decision policy. Jev is an evaluation candidate, not a production dependency.
-- **ExplanationRenderer:** renders only supported packet claims, action, rationale, uncertainty, and next step; it cannot add product or scientific claims.
 
 All target seams preserve explicit states for unsupported capture, denied permission, cancellation, no result, ambiguity, insufficient evidence, conflicting formula versions, stale truth revision, provider unavailability, and abstention. None is silently converted to a negative answer or a product match.
+
+### P0-B Personal Decision and Canonical Reported Context (merged local, not hosted)
+
+- [PersonalContext](../src/contracts/PersonalContext.ts) separates profile, reported routine/use and corrected experiences. Revisions are immutable self-reports, with owner-derived access, aggregate revision guards, stable retry IDs, effective history pagination and deletion cascades. Unknown/withheld, manual references and qualitative frequency remain explicit; no legacy backfill establishes formula, schedule, tolerance or reproductive truth.
+- [PersonalDecision](../src/contracts/PersonalDecision.ts) defines Finding, RoutineImpact, EvidenceNeed and PersonalDecisionPacketV1. The host independently loads ownership and truth/context revisions. Consequence, support, uncertainty and rule/source versions remain separate. Policy chooses one action while retaining material findings; the renderer cannot invent science or a different action.
+- [PersonalDecisionService](../src/contracts/PersonalDecisionService.ts) accepts only operation, requestId, caseId and snapshotId. It authenticates the owner, verifies the scan case, consumes the stored P0-A snapshot and freezes private evaluation provenance. New assessments reject stale context; exact retries return the immutable assessment. Clients/providers cannot supply owner, truth, profile or a decision packet.
+- Independently verified routine formula evidence survives withdrawn category verification; category stays unknown and no role relation is invented. Category source digests change on source-only edits. Public packets exclude private source URLs and reported notes.
+- Check uses the same immutable snapshot as the assessment and fences stale product/context/owner results. My Stuff canonical readback stays distinct from legacy saved reports. Root cleanup and captured-owner transport cover canonical and retained S2 profile/fit paths, including late A-B-A completion.
+- Transport is bounded to512 findings,200 impacts and1MiB UTF-8 JSON. PostgreSQL separately bounds evaluated input to512KiB and packet text to1MiB. Disclosure mounts at most10 reason groups and10 records per opened group; critical warnings and raw finding/source links remain retained.
+- [Execution packet](P0_B_EXECUTION.md) records exact source/CI and acceptance limits. No hosted deployment, working image extractor, physical acceptance, numerical score or new scientific validation follows from these source merges.
 
 ### P0-A authoritative product truth (local implementation, not hosted)
 
