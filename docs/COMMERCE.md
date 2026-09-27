@@ -45,10 +45,30 @@ Long-term product loop mental model:
 | **Retailer offer presentation** | C1.5B PARKED | Kanuj | Customer Shop states and purchase-option UX after Sami's interface. |
 | **Physical product commerce backend** | C1.5C PARKED | Sami | Shopify mapping, inventory, checkout, orders, fulfillment, returns; stable interface before mobile consumption. |
 | **Physical checkout and order UX** | C1.5C PARKED | Kanuj | Customer mobile flow after Sami's interface. |
+| **Product comparison** | APPROVED TARGET / NEAR-TERM POST-MVP | Kanuj for customer experience, consuming trusted product/context contracts | Compare two products or a candidate with what the customer uses, bound to product truth and the same personal-context revision. Not implemented; no universal score or commercial influence. |
 | **Multi-item cart** | DEFERRED | Kanuj | Separate customer UX milestone only if purchase behavior warrants it. |
 | **ADR-32** | APPROVED / C1.5A LANDED | Kanuj | Acquisition separation and future Derive merchant direction; implementation split above. |
 
 ---
+
+## Product comparison target
+
+**Status:** Approved near-term post-MVP capability. This is contextual skincare decision support, not price or retailer-offer comparison, and is not implemented.
+
+**Entry points:**
+- Check result → Compare.
+- Shop product → Compare.
+- Compare with what I am using.
+
+**Comparison truth:** resolve each product independently, then compare the same customer context revision:
+
+ProductTruthSnapshot A + ProductTruthSnapshot B + same PersonalContext revision → evidence-bound comparison.
+
+**Customer dimensions:** goal relevance, routine role, redundancy, supported formula/active differences, routine overlap or conflicts, prior customer experience, formula certainty, and what changes if switching.
+
+**Commerce dimensions:** verified price, size, merchant, and availability may appear separately only when the source and freshness are known. They never affect the skincare comparison or outcome.
+
+**Hard invariants:** no universal score; no commission, margin, sponsorship, deal, retailer relationship, or availability influence on skincare reasoning; no invented winner; insufficient evidence stays explicit; a retailer listing does not establish formula truth. This target does not unpark C1.5B feeds, C1.5C Shopify, cart, or physical checkout.
 
 ## 3. Access Model & Three Audience States
 
