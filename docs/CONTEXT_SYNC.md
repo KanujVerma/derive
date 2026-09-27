@@ -7,6 +7,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
 
+## 2026-09-27: Physical capture control overlap recovery
+
+- **Predecessor:** readiness branch reconciled with `origin/main@86c9e03985c299a407e3f041fcad83afd0fee90a` in `a391de97b69f4d5f392ca9944bbf2ee24fdae47e`. Kanuj's merged P0-B work is preserved. This is a separate capture-UX review branch stacked on readiness #95, not a competing canonical Check/root composition.
+- **Observed defect:** founder iPhone screenshots showed the floating tab bar covering the package-photo shutter and barcode controls. Capture was rendered inside the tab scene.
+- **Fix:** the capture host presents a full-screen native modal with its own safe-area provider. Camera controls use a compact, bounded scroll area above a separate action footer; all four roles wrap visibly, the shutter exposes busy state, and barcode mode has a non-interactive alignment guide. Existing capture operations, private evidence bridge and candidate/unknown semantics are preserved. No `app/**`, canonical Check, database, catalog, Auth or provider change.
+- **Evidence:** 50 unit files / 590 tests, both TypeScript checks, web and iOS JavaScript exports passed. Browser inspection confirmed the permission screen visually covers the tabs and Close returns to Check; no Mac camera permission was granted. The founder reloaded Expo Go and explicitly confirmed on the physical iPhone that tabs are hidden and the shutter is fully visible. This does not close retake, interruption, deny/retry, small-device/accessibility or complete release acceptance.
+- **Review:** React best-practices review checked stable hooks, preserved operation gates, wrapping labels and touch/selected/busy accessibility. Exact-head CI is a separate merge gate. No hosted changes or product population occurred. See [SCANNER_INTEGRATION_READINESS.md](SCANNER_INTEGRATION_READINESS.md).
+
 ## 2026-09-27: Scanner extraction boundary and local physical QA readiness
 
 - **Predecessor:** initial `main@105b3a3c41132287e7b4df1331eefe72111e58d4`; reconciled newly merged P0-B1 #91 at `origin/main@7ed5a9f1c7d2038cb6818e3901af5a377a52a703` before fresh validation. #90/#92 are active counterpart work; unpublished work remains with its writers. #80 is assessment/service provenance; #88 is canonical customer composition.
