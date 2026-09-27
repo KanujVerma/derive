@@ -29,7 +29,7 @@ Only after the portfolio root grants the shared local-service lease, with the ex
 node --experimental-strip-types scripts/test-p0d-customer-flow-local.mjs --run --output /private/tmp/p0d-local-receipt.json
 ```
 
-The script refuses every endpoint except `http://127.0.0.1:54321`. It never starts, resets or serves Supabase. It creates disposable guests and uniquely named/random-ID fixture catalog rows, then deletes only those rows. Actual customer deletion is through the customer Edge API. Cleanup failures fail the run. A receipt is created only after all assertions/cleanup pass and Git identity remains unchanged. The output path must be new; preserve the receipt and its printed hash outside the checkout. Function traces contain response hashes/statuses, not credentials or raw disclosures.
+The script refuses every endpoint except `http://127.0.0.1:54321`. It never starts, resets or serves Supabase. It creates disposable guests and uniquely named/random-ID fixture catalog rows, then deletes only those rows. Actual customer deletion is through the customer Edge API. Every recorded guest/catalog deletion and absence check is attempted independently; safe errors are collected before failing the run without a receipt. A network/admin error cannot count as verified Auth absence. A receipt is created only after all assertions/cleanup pass and Git identity remains unchanged. The output path must be new; preserve the receipt and its printed hash outside the checkout. Function traces contain response hashes/statuses, not credentials or raw disclosures.
 
 ## Evidence format and review
 

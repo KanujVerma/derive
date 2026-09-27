@@ -60,3 +60,8 @@ after(() => rmSync(dir, { recursive: true, force: true }));
   const receipt = artifact('hosted', { environment: local });
   assert.throws(() => inspectCustomerRelease({ version: 1, target: { ...target, environment: local }, evidence: [receipt] }, { sha, dirty: false }), /hosted/i);
  });
+
+ test('source evidence cannot be complete without the required iOS export observation', () => {
+  const receipt = artifact('source', { checks: REQUIRED_CHECKS.source.filter(id => id !== 'ios_export').map(id => ({ id, outcome: 'passed', observation: `Observed ${id}.` })) });
+  assert.throws(() => inspectCustomerRelease({ version: 1, target, evidence: [receipt] }, { sha, dirty: false }), /source\/ios_export/);
+ });

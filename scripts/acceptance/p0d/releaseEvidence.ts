@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 export const LOCAL_CHECKS = ['guest_free_entry', 'catalog_search', 'useful_unknown', 'immutable_facts', 'optional_context', 'personal_decision', 'routine_history', 'explicit_my_stuff', 'repeat_check', 'owner_isolation', 'customer_deletion', 'fixture_cleanup'] as const;
 const customer = ['fresh_install', 'guest_free_entry', 'single_camera_search', 'supported_facts_unknown', 'optional_personalization', 'personal_decision', 'routine_history', 'my_stuff_repeat_check', 'account_privacy_support'] as const;
 export const REQUIRED_CHECKS: Record<string, readonly string[]> = {
- source: ['full_tests', 'app_types', 'test_types', 'web_export', 'scope_secret_review', 'exact_head_ci'],
+ source: ['full_tests', 'app_types', 'test_types', 'web_export', 'ios_export', 'scope_secret_review', 'exact_head_ci'],
  local_api: LOCAL_CHECKS,
  binary: ['build_identity', 'embedded_environment', 'no_dev_fixtures', 'adult_scope_offer'],
  simulator: customer,

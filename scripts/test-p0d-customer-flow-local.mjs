@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { sourceMetadata } from './acceptance/p0d/sourceMetadata.mjs';
 import { assertLocalRun, LOCAL_CHECKS } from './acceptance/p0d/releaseEvidence.ts';
+import { cleanupP0dFixtures } from './acceptance/p0d/cleanup.ts';
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
  console.log('Usage: node --experimental-strip-types scripts/test-p0d-customer-flow-local.mjs --dry-run | --run --output /private/tmp/p0d-local.json\n--dry-run touches no database/services. --run requires the root shared-service lease, existing exact-local Supabase and served Edge functions. Never starts or resets the stack. Creates and cleans synthetic catalog/guest rows. Proves local API/controller/persistence only, never UI/camera/hosted/binary/customer acceptance.');
@@ -86,14 +87,13 @@ try {
  assert.deepEqual((await lists(other)).flatMap(list => list.items), []); assert.equal((await call(other, 'free-context', { operation: 'record_check', requestId: randomUUID(), caseId: resolved.caseId })).status, 404);
  controller.setOwner(users[1]); assert.equal(controller.getState().context, null); assert.equal(selectVisibleCustomerDecision(controller.getState(), users[1], repeated.truthSnapshot), null);
  passed('owner_isolation', 'Second guest cannot read/save first guest history; existing customer controller clears the prior owner immediately.');
- await good(guest, 'delete-customer-account', { confirmation: 'DELETE_MY_DERIVE_ACCOUNT' }); assert((await admin.auth.admin.getUserById(owner)).error);
+ await good(guest, 'delete-customer-account', { confirmation: 'DELETE_MY_DERIVE_ACCOUNT' }); assert.equal((await admin.auth.admin.getUserById(owner)).error?.status, 404);
  for (const table of ['personal_context_revisions', 'personal_decision_assessments', 'free_saved_products', 'free_check_history', 'free_product_experiences', 'product_resolution_cases']) { const result = await admin.from(table).select('id').eq('user_id', owner); assert.ifError(result.error); assert.deepEqual(result.data, []); }
  users[0] = null;
  passed('customer_deletion', 'Actual customer deletion Edge removes synthetic guest Auth and canonical/free/Check records; no billing entitlement used.');
 } finally {
  controller?.setOwner(null);
- for (const id of users.filter(Boolean)) assert.ifError((await admin.auth.admin.deleteUser(id)).error);
- for (const [key, table] of [['identifier', 'product_identifiers'], ['formula', 'product_formula_versions'], ['variant', 'product_variants'], ['product', 'products']]) if (fixtures[key]) { assert.ifError((await admin.from(table).delete().eq('id', fixtures[key])).error); const remaining = await admin.from(table).select('id').eq('id', fixtures[key]); assert.ifError(remaining.error); assert.deepEqual(remaining.data, []); }
+ await cleanupP0dFixtures(admin, users, fixtures);
 }
 passed('fixture_cleanup', 'Only generated guests and random-ID fixture catalog rows were removed; checked absence. Shared stack unchanged.');
 assert.deepEqual(checks.map(check => check.id), [...LOCAL_CHECKS]); assert.deepEqual(sourceMetadata(), source, 'Source changed during the run');
