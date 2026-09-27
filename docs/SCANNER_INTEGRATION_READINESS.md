@@ -17,6 +17,8 @@ The founder connected a USB iPhone and opened Expo Go while the Mac used the pho
 
 The first physical attempt returned: “You need to be signed in to Expo Go and Expo CLI.” The local CLI reported not logged in. Stop physical verification at that boundary: the founder must sign into the same Expo account in the phone app and local CLI, then restart the development server. Never send passwords or Expo credentials through chat. [Expo's current account requirement](https://docs.expo.dev/troubleshooting/expo-go-sign-in-required/) is development tooling, not a customer requirement to log into Expo when Derive ships as its own app.
 
+The founder subsequently completed local CLI login; `expo whoami` verified an account, and the agent restarted the same local server. Phone-side matching login and successful app load still require observation. The original account error is not a Derive Auth failure and does not justify changing Supabase, customer credentials or security policy.
+
 After loading the current development bundle, the founder operates the real camera and permission prompts. Observe cold launch/guest access, allow/deny/retry, barcode capture, three package roles, retake/cancel, double tap, connection interruption, unknown/candidate recovery and owner switch. Use [the existing physical checklist](../src/components/check/capture/K4_COMPOSE_DEVICE_CHECKLIST.md). Record exact source/runtime/environment and each result; do not record private images, owner identifiers or token-bearing URLs. Do not call a browser render, JavaScript export or developer inventory a camera pass.
 
 ## Acceptance that remains open
@@ -29,3 +31,5 @@ After loading the current development bundle, the founder operates the real came
 ## Verification record
 
 Before P0-B1 reconciliation: all **43 unit files / 533 tests**, both TypeScript checks, web and iOS JavaScript exports; a fresh isolated reset followed by **19 pgTAP files / 486 assertions** and **all 17 current CI integration harnesses** passed. This checkpoint is not sufficient evidence for the later reconciled tree. Final exact-head results and CI belong in the PR/return packet, not a predicted self-referencing SHA in this ledger.
+
+After reconciling `main@7ed5a9f`: all **44 unit files / 551 tests**, both independent TypeScript checks, web and iOS JavaScript exports passed. Release exports deliberately disabled dotenv loading so the ignored physical-QA LAN configuration was not compiled into them. A second fresh isolated reset, **19 pgTAP files / 486 assertions**, and **all 17 integration harnesses** passed. No test failure was waived. The temporary project ID was restored; no Supabase configuration change is included in the PR. Exact-head CI and physical acceptance remain separate gates.
