@@ -99,3 +99,8 @@ GitHub interpreted a negated closing keyword in PR102 as an automatic issue74 cl
 ## P0-D final source registration
 
 After PR102 landed, K2 reconciled onto8ac8ed3 and added exactly three CI lines after the P0-B client harness. Clean head7cc6fda3489d0900c13d8e8601fc6fe7abf505c3 passed full73unit files/612registeredTAP plus assertion scripts, app/test types, web/iOS exports and scope/secret/diff checks. Its actual local12checks/32Edgecalls and robust owned cleanup passed again; receipt `/private/tmp/p0d-local-receipt-7cc6fda.json`, SHA256cef026b1e65fadb35b7fdf08a826f8fffdb44bfca00e3d90ec3b617afa03298c. Source registration and local proof are complete; fresh exact-head CI and normal root merge remain the landing gate. This is local service/controller proof, not physical, hosted, TestFlight or human proof.
+
+
+## Final runtime restoration
+
+After all local service leases returned, K1 verified only12Derive containers and no foreign containers. It stopped only task-owned Metro8135, stopped Supabase with default backups enabled, cancelled exactly the temporary127.0.0.1:54321/54322 SSH forwards, and stopped Colima after verifying zero containers and all three saved volumes retained (`supabase_db_derive`, `supabase_edge_runtime_derive`, `supabase_storage_derive`). Ports8135/54321/54322 are closed. Port8097 already had no listener and was not killed; Simulator boot state is preserved. The private pre-reset backup remains unprinted/uncommitted. No global Docker/SSH/build configuration changed. The earlier prepared phone URL is now historical and requires a new bounded operator run; the phone unlock question was unanswered, not permission. Physical interactions and unassisted study remain unrun.
