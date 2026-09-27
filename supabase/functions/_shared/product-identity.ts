@@ -44,6 +44,7 @@ export interface ResolverDecision {
   candidates: ProductResolutionCandidate[];
   nextAction: ProductResolutionNextAction;
   requiresFounderReview: boolean;
+  conflicts?: Array<"identity_mismatch" | "region_mismatch" | "ingredient_mismatch" | "identifier_conflict">;
 }
 
 const AUTHORITATIVE_IDENTIFIER_SOURCES = new Set<IdentifierAuthority>(["manufacturer", "gs1", "founder"]);
@@ -96,8 +97,11 @@ function candidateFrom(record: CatalogResolutionRecord, basis: ProductCandidateB
 }
 
 function uniqueRecords(records: CatalogResolutionRecord[]): CatalogResolutionRecord[] {
+  // Preserve a completed explicit linkage when duplicate projections describe
+  // the same formula; array order must not decide identifier authority.
+  const ordered = [...records].sort((a, b) => Number(verifiedFormulaForIdentifier(b)) - Number(verifiedFormulaForIdentifier(a)));
   const seen = new Set<string>();
-  return records.filter((record) => {
+  return ordered.filter((record) => {
     const key = [record.productId ?? "", record.variantId ?? "", record.formulaVersionId ?? ""].join(":");
     if (seen.has(key)) return false;
     seen.add(key);
@@ -107,7 +111,11 @@ function uniqueRecords(records: CatalogResolutionRecord[]): CatalogResolutionRec
 
 function verifiedFormulaForIdentifier(record: CatalogResolutionRecord): boolean {
   return Boolean(
-    record.identifierVerifiedAt
+    record.productId && record.variantId
+      && normalizeIdentityText(record.brand) && normalizeIdentityText(record.name)
+      && normalizeIdentityText(record.variantName)
+      && record.identifierAuthority && AUTHORITATIVE_IDENTIFIER_SOURCES.has(record.identifierAuthority)
+      && record.identifierVerifiedAt
       && record.formulaVersionId
       && record.identifierFormulaVersionId === record.formulaVersionId
       && record.formulaVerificationStatus === "verified"
@@ -145,14 +153,45 @@ export function resolveProductIdentity(
   catalog: CatalogResolutionRecord[],
 ): ResolverDecision {
   const barcode = normalizeBarcode(evidence.barcode);
-  if (barcode) {
-    const matches = uniqueRecords(catalog.filter((record) =>
-      normalizeBarcode(record.identifierValue) === barcode
+  if (barcode && isValidGtin(barcode)) {
+    const assertions = catalog.filter((record) =>
+      record.identifierValue === barcode
+      && record.identifierType === `gtin_${barcode.length}`
       && record.identifierAuthority
       && record.identifierVerifiedAt
       && AUTHORITATIVE_IDENTIFIER_SOURCES.has(record.identifierAuthority)
-    ));
-    if (matches.length === 1) return identifiedDecision(matches[0], "authoritative_identifier", ["exact authoritative identifier"]);
+    );
+    const matches = uniqueRecords(assertions);
+    // Typed observations do not override an identifier. A contradiction must
+    // remain visible rather than being discarded by barcode-first precedence.
+    const identityFields: [string | undefined, keyof CatalogResolutionRecord][] = [
+      [evidence.brand, "brand"], [evidence.productName, "name"],
+      [evidence.variantName, "variantName"], [evidence.regionCode, "regionCode"],
+    ];
+    const conflictingFields = identityFields.filter(([submitted, field]) => {
+      const normalized = normalizeIdentityText(submitted);
+      return normalized && assertions.some((record) => normalizeIdentityText(record[field] as string | undefined) !== normalized);
+    });
+    const conflicts = conflictingFields.map(([, field]) => `submitted ${field} conflicts with or is unsupported by authoritative identifier`);
+    if (matches.length && conflicts.length) return {
+      ...ambiguousDecision(matches, "authoritative_identifier", conflicts),
+      conflicts: [...new Set(conflictingFields.map(([, field]) => field === "regionCode" ? "region_mismatch" as const : "identity_mismatch" as const))],
+    };
+    if (matches.length === 1) {
+      const fingerprint = normalizeIngredientFingerprint(evidence.ingredientList);
+      if (fingerprint && assertions.some((record) => record.ingredientFingerprint !== fingerprint)) {
+        const match = matches[0];
+        return {
+          state: "identified_formula_unverified",
+          selected: { ...match, formulaVersionId: undefined, identifierFormulaVersionId: undefined },
+          candidates: [candidateFrom(match, "authoritative_identifier", ["submitted ingredient list conflicts with or is unsupported by identifier-linked formula"])],
+          nextAction: "photograph_ingredients",
+          requiresFounderReview: true,
+          conflicts: ["ingredient_mismatch"],
+        };
+      }
+      return identifiedDecision(matches[0], "authoritative_identifier", ["exact authoritative identifier"]);
+    }
     if (matches.length > 1) {
       const identityKeys = new Set(matches.map((record) => `${record.productId ?? ""}:${record.variantId ?? ""}`));
       if (identityKeys.size === 1 && matches[0].productId) {
@@ -168,7 +207,10 @@ export function resolveProductIdentity(
           requiresFounderReview: false,
         };
       }
-      return ambiguousDecision(matches, "authoritative_identifier", ["identifier maps to multiple product variants"]);
+      return {
+        ...ambiguousDecision(matches, "authoritative_identifier", ["identifier maps to multiple product variants"]),
+        conflicts: ["identifier_conflict"],
+      };
     }
   }
 
