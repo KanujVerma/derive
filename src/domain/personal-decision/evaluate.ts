@@ -63,8 +63,8 @@ export const RULE_SOURCES = {
     reproductive: { url: 'https://www.aad.org/public/everyday-care/skin-care-secrets/routine/pregnancy-skin-care', applicability: 'Retinoid pregnancy/nursing caution only; trying-to-conceive requires review.' },
     practical: { basis: 'Owner-reported current routine role and explicit decision intent', limitation: 'No efficacy or tolerance comparison.' },
 } as const;
-export const ENGINE_VERSION = 'p0b-findings/4';
-export const POLICY_VERSION = 'p0b-policy/2';
+export const ENGINE_VERSION = 'p0b-findings/5';
+export const POLICY_VERSION = 'p0b-policy/3';
 /** Consequence precedence, not a numerical compatibility score. */
 export const CAUTION_PRECEDENCE: Finding['kind'][] = ['reproductive_context_caution', 'prior_product_reaction', 'routine_experience_caution', 'active_overlap', 'reported_ingredient_sensitivity', 'reactive_active'];
 const SUPPORTED_ROLES = new Set(['moisturizer','cleanser','sunscreen','serum','treatment']);
@@ -148,14 +148,15 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
                 gap('ingredient_alias_review', true);
         }
         if (retinoid) {
+            const reproductiveGap=(code:'reproductive_context'|'reviewed_claim',state:'unknown'|'withheld')=>{const f=add('reproductive','missing_evidence',profileEvidence);f.applicability='uncertain';f.confidence='unknown';for(const evidence of f.evidence)if(evidence.kind==='reviewed_claim')evidence.applicability='uncertain';gap(code,true,f,state);f.display={kind:'evidence_gap',code,evidenceIndexes:f.evidence.map((_,index)=>index)};};
             for (const key of ['pregnancy', 'nursing'] as const) {
                 if (profile[key] === 'yes')
                     gap('clinician_review', true, add('reproductive', 'reproductive_context_caution', profileEvidence, 'caution', ingredientDisplay(retinoid, key)));
                 else if (profile[key] !== 'no')
-                    gap('reproductive_context', true, undefined, profile[key] === 'withheld' ? 'withheld' : 'unknown');
+                    reproductiveGap('reproductive_context',profile[key]==='withheld'?'withheld':'unknown');
             }
             if (profile.tryingToConceive !== 'no')
-                gap('reviewed_claim', true,undefined,profile.tryingToConceive==='withheld'?'withheld':'unknown');
+                reproductiveGap('reviewed_claim',profile.tryingToConceive==='withheld'?'withheld':'unknown');
         }
         if (active) {
             if (profile.treatments.state === 'unknown' || profile.treatments.state === 'withheld')
@@ -273,7 +274,7 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
     const role = packet.findings.find(f => f.kind === 'goal_role_match');
     const selected = caution ?? (critical ? packet.findings.find(f => critical.findingIds.includes(f.id)) : undefined) ?? redundant ?? role ?? packet.findings[0];
     const kind = caution ? 'USE_WITH_CAUTION' : critical ? 'NOT_ENOUGH_INFORMATION' : redundant ? 'KEEP_CURRENT' : role ? 'COULD_WORK' : 'NOT_ENOUGH_INFORMATION';
-    const nextStep = kind === 'COULD_WORK' ? 'consider_use' : kind === 'KEEP_CURRENT' ? 'keep_current' : packet.evidenceNeeds.some(n => n.code === 'clinician_review') ? 'ask_clinician' : caution?.kind === 'routine_experience_caution' ? 'review_routine' : packet.evidenceNeeds.some(n => n.code === 'verified_formula' || n.code === 'formula_conflict' || n.code === 'exact_identity') ? 'confirm_formula' : !caution && packet.evidenceNeeds.some(n=>n.critical&&n.code==='supported_rule') ? 'view_product_facts' : caution?.kind === 'active_overlap' ? 'review_routine' : 'add_context';
+    const nextStep = kind === 'COULD_WORK' ? 'consider_use' : kind === 'KEEP_CURRENT' ? 'keep_current' : packet.evidenceNeeds.some(n => n.code === 'clinician_review') || (!!caution&&!!retinoid&&profile?.tryingToConceive==='yes') ? 'ask_clinician' : caution?.kind === 'routine_experience_caution' ? 'review_routine' : packet.evidenceNeeds.some(n => n.code === 'verified_formula' || n.code === 'formula_conflict' || n.code === 'exact_identity') ? 'confirm_formula' : !caution && (packet.evidenceNeeds.some(n=>n.critical&&n.code==='supported_rule') || (!!retinoid&&profile?.tryingToConceive==='yes')) ? 'view_product_facts' : caution?.kind === 'active_overlap' ? 'review_routine' : 'add_context';
     packet.action = { kind, findingIds: packet.findings.map(f => f.id), primaryFindingId: selected.id, nextStep };
     const issues = validatePersonalDecisionPacket(packet, b);
     if (issues.length)
