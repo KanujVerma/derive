@@ -18,3 +18,9 @@ for (const source of [context, routine]) {
   assert.ok(!/saved successfully|profile saved/i.test(source));
 }
 console.log('P0-B optional module boundaries passed');
+const experience = readFileSync(new URL('../src/components/p0b-personalization/ExperienceContext.tsx', import.meta.url), 'utf8');
+assert.ok(experience.includes('prepareExperienceEdit(existing.draft, existing.revisionId)'));
+assert.ok(experience.includes('No reaction to report does not mean you confirmed tolerance.'));
+assert.ok(experience.includes('Skip experience'));
+assert.ok(experience.includes('supersedesRevisionId: edit.supersedesRevisionId'));
+assert.ok(context.includes("['Not sure', 'unsure']"));
