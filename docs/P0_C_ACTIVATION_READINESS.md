@@ -92,6 +92,9 @@ assertion or screenshot of a dashboard switch alone does not prove the control.
 
 - **Retention duration and notice:** no default is chosen. Set product expectations
   and a defensible inactivity duration before introducing destructive cleanup.
+  A no-automatic-cleanup closed beta is the recommendation pending founder
+  approval, not an adopted retention policy or authorization to retain data
+  indefinitely. Customer-initiated Storage-first deletion remains required.
 - **Cleanup/upgrade/delete concurrency:** use a reviewed identity/lifecycle fence,
   not a bulk `delete auth.users` sweep. Auth deletion before Storage verification
   would orphan private evidence and is prohibited.
@@ -125,3 +128,18 @@ Application/tests TypeScript and web/iOS JavaScript exports pass. No environment
 files were loaded into the export. This is offline tooling/source evidence, not
 new RLS, hosted security, cleanup execution or physical acceptance evidence.
 Exact-head CI remains the portfolio orchestrator's pre-merge gate.
+
+### Current-main reconciliation
+
+Reconciled onto canonical `24529aeb8125d82085f5e3ccad8cb0513c145bb5` without
+conflicts. The eight inspected source files are unchanged at this checkpoint;
+the preflight still reports all 12 hosted gates `UNKNOWN` and activation `BLOCKED`.
+Kanuj's P0-D account changes add reachable legal links, not anonymous linking or
+an existing-account conflict warning. His separate
+[P0-D acceptance](P0_D_ACCEPTANCE.md) owns integrated customer/release evidence;
+this source inventory does not replace it.
+
+Fresh validation passes all 75 current test files (57 TAP-reporting files,
+627 registered TAP tests, zero failures; assertion-style files also run), both
+TypeScript checks, web/iOS exports and scope/diff checks. No hosted setting,
+runtime, schema, rate limit, cleanup job or privacy invariant was changed.
