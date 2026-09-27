@@ -83,6 +83,8 @@ export type ProductResolutionNextAction =
   | 'manual_review';
 
 export interface ProductResolutionResult {
+  /** Additive P0-A output. Older deployments may omit it; never synthesize authority client-side. */
+  truthSnapshot?: import('./ProductTruthSnapshot.ts').ProductTruthSnapshotV1;
   caseId: string;
   state: ProductResolutionState;
   product?: ResolvedProductIdentity;
