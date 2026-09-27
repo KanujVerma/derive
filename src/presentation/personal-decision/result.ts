@@ -1,3 +1,5 @@
+import { groupDecisionDetails } from './disclosure.ts';
+import type { DecisionDetailGroup } from './disclosure.ts';
 import type { Goal } from '../../types/schema.ts';
 import { validatePersonalDecisionPacket } from '../../contracts/PersonalDecision.ts';
 import type {
@@ -8,10 +10,12 @@ import { decisionBindingSchema, personalDecisionPacketSchema } from './parse.ts'
 
 export type PersonalDecisionView = { kind: 'unavailable'; title: string; message: string } | {
   kind: 'ready'; action: PersonalDecisionActionKind; title: string; primaryReason: string;
-  secondaryCautions: string[]; routineImpacts: string[];
+  secondaryCautions: string[]; criticalCautions: string[]; routineImpacts: string[];
   unknowns: Array<{ text: string; critical: boolean }>;
   nextStep: DecisionNextStep; nextStepLabel: string;
   details: Array<{ reason: string; evidence: string[] }>;
+  detailGroups: DecisionDetailGroup[];
+  presentationKey: string;
   versions: { engine: string; policy: string };
 };
 const titles: Record<PersonalDecisionActionKind, string> = {
@@ -155,7 +159,9 @@ export function describePersonalDecision(value: unknown, expectedBinding: Decisi
   return {
     kind: 'ready', action: packet.action.kind, title: titles[packet.action.kind], primaryReason,
     secondaryCautions: [...new Set(active.filter((finding) => finding.id !== packet.action.primaryFindingId
-      && finding.severity !== 'informational' && finding.confidence !== 'unknown').map((finding) => reasons.get(finding.id)!))],
+      && finding.severity === 'caution' && finding.confidence !== 'unknown' && reasons.get(finding.id) !== primaryReason).map((finding) => reasons.get(finding.id)!))],
+    criticalCautions: [...new Set(active.filter((finding) => finding.severity === 'blocker' && finding.confidence !== 'unknown'
+      && reasons.get(finding.id) !== primaryReason).map((finding) => reasons.get(finding.id)!))],
     routineImpacts: [...new Set(packet.routineImpacts.map((impact) => impactCopy[impact.kind]))],
     unknowns: deduplicateUnknowns([
       ...[...critical, ...other].map((need) => ({ text: needText(need), critical: need.critical })),
@@ -169,6 +175,8 @@ export function describePersonalDecision(value: unknown, expectedBinding: Decisi
     ]),
     nextStep: packet.action.nextStep, nextStepLabel: nextSteps[packet.action.nextStep],
     details: active.map((finding) => ({ reason: reasons.get(finding.id)!, evidence: evidenceCopy(finding) })),
+    detailGroups: groupDecisionDetails(active, reasons),
+    presentationKey: JSON.stringify([packet.binding.ownerId, packet.id]),
     versions: { engine: safeVersion(packet.versions.engine), policy: safeVersion(packet.versions.policy) },
   };
 }
