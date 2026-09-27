@@ -6,7 +6,7 @@ import { Button } from '@/src/components/ui/Button';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import type { RoutineReference } from '@/src/presentation/p0b-personalization/draft';
-import { createExperienceDraft, prepareExperienceEdit, unknownUseContext, validateExperienceDraft, type ExperienceDraft, type ExperienceEdit, type ExperienceKind } from '@/src/presentation/p0b-personalization/experience';
+import { createExperienceDraft, selectExperienceCatalogProduct, confirmExperiencePackage, unambiguousExperiencePackage, prepareExperienceEdit, unknownUseContext, validateExperienceDraft, type ExperienceDraft, type ExperienceEdit, type ExperienceKind } from '@/src/presentation/p0b-personalization/experience';
 import { ReportedUseFields } from './ReportedUseFields';
 import { styles } from './ContextFlow';
 export interface ExperienceContextProps {
@@ -22,14 +22,18 @@ export function ExperienceContext({ createRecordId, existing, availableProducts 
   const [symptomsText, setSymptomsText] = useState(() => existing?.draft.symptoms.join('\n') ?? '');
   const [validation, setValidation] = useState<string | null>(null);
   const draft = edit.draft;
+  const productChoices = [...new Map(availableProducts.map(product => [product.productId, product])).values()];
+  const exactPackage = draft.reference.kind === 'catalog' ? unambiguousExperiencePackage(draft.reference.productId, availableProducts) : null;
   const update = (patch: Partial<ExperienceDraft>) => { setValidation(null); setEdit(current => ({ ...current, draft: { ...current.draft, ...patch } })); };
   return <Screen scrollable><Text style={styles.title}>{existing ? 'Correct your product experience' : 'Your product experience'}</Text>
     <Text style={styles.copy}>Optional. This records what you noticed. It does not establish which ingredient caused a reaction.</Text>
     {existing && <Text style={styles.copy}>This correction updates your earlier report and preserves its history.</Text>}
     <GroupedSection header="Product"><View style={styles.group}>
-      {availableProducts.length > 0 && <View style={styles.chips}>{availableProducts.map(product => <ChoiceChip key={product.productId + ':' + product.variantId + ':' + product.formulaVersionId} label={product.label} disabled={loading} selected={draft.reference.kind === 'catalog' && draft.reference.productId === product.productId && draft.reference.variantId === product.variantId && draft.reference.formulaVersionId === product.formulaVersionId} onSelect={() => update({ reference: { ...product } })} />)}</View>}
+      {availableProducts.length > 0 && <View style={styles.chips}>{productChoices.map(product => <ChoiceChip key={product.productId + ':' + product.variantId + ':' + product.formulaVersionId} label={product.label} disabled={loading} selected={draft.reference.kind === 'catalog' && draft.reference.productId === product.productId} onSelect={() => { if (draft.reference.kind !== 'catalog' || draft.reference.productId !== product.productId) update({ reference: selectExperienceCatalogProduct(product) }); }} />)}</View>}
       <ChoiceChip label="Enter a product name" selected={draft.reference.kind === 'manual'} disabled={loading} onSelect={() => update({ reference: { kind: 'manual', label: '', verification: 'unverified' } })} />
-      {draft.reference.kind === 'manual' ? <><TextInput accessibilityLabel="Experience product name" style={styles.input} editable={!loading} maxLength={180} value={draft.reference.label} placeholder="Product name" onChangeText={label => { if (draft.reference.kind === 'manual') update({ reference: { ...draft.reference, label } }); }} /><Text style={styles.copy}>Manual name. Formula and ingredients remain unverified.</Text></> : <Text style={styles.copy}>{referenceDisplayLabel(draft.reference, availableProducts)}. A missing formula reference stays unknown.</Text>}
+      {draft.reference.kind === 'manual' ? <><TextInput accessibilityLabel="Experience product name" style={styles.input} editable={!loading} maxLength={180} value={draft.reference.label} placeholder="Product name" onChangeText={label => { if (draft.reference.kind === 'manual') update({ reference: { ...draft.reference, label } }); }} /><Text style={styles.copy}>Manual name. Formula and ingredients remain unverified.</Text></> : <Text style={styles.copy}>{referenceDisplayLabel(draft.reference, availableProducts)}. {draft.reference.variantId && draft.reference.formulaVersionId ? 'You marked this as the same package and formula.' : 'Formula at the time of use is unconfirmed.'}</Text>}
+      {draft.reference.kind === 'catalog' && exactPackage && <ChoiceChip label="Same package and formula" disabled={loading} selected={draft.reference.variantId === exactPackage.variantId && draft.reference.formulaVersionId === exactPackage.formulaVersionId} onSelect={() => { if (draft.reference.kind === 'catalog') update({ reference: draft.reference.variantId === exactPackage.variantId && draft.reference.formulaVersionId === exactPackage.formulaVersionId ? selectExperienceCatalogProduct(draft.reference) : confirmExperiencePackage(draft.reference, availableProducts) }); }} />}
+      {draft.reference.kind === 'catalog' && !exactPackage && !draft.reference.formulaVersionId && <Text style={styles.copy}>Keep the formula unconfirmed when the saved package references are missing or ambiguous.</Text>}
     </View></GroupedSection>
     <GroupedSection header="What did you notice?"><View style={[styles.group, styles.chips]}>{kinds.map(([kind, label]) => <ChoiceChip key={kind} label={label} selected={draft.kind === kind} disabled={loading} onSelect={() => update({ kind })} />)}</View></GroupedSection>
     <Text style={styles.copy}>No reaction to report does not mean you confirmed tolerance.</Text>

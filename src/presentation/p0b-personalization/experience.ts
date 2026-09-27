@@ -42,3 +42,16 @@ export function validateExperienceDraft(draft: ExperienceDraft): string | null {
   if (draft.note !== null && (!draft.note.trim() || draft.note.length > 500 || /[\x00-\x1f\x7f]/.test(draft.note))) return 'Use a note of up to 500 characters.';
   return draft.useContext ? validateReportedUse(draft.useContext) : null;
 }
+/** A name identifies a product family, not the formula used in a historical report. */
+export function selectExperienceCatalogProduct(reference: Extract<RoutineReference, { kind: 'catalog' }>): Extract<RoutineReference, { kind: 'catalog' }> {
+  return { kind: 'catalog', label: reference.label, productId: reference.productId, variantId: null, formulaVersionId: null };
+}
+export function unambiguousExperiencePackage(productId: string, available: readonly Extract<RoutineReference, { kind: 'catalog' }>[]): Extract<RoutineReference, { kind: 'catalog' }> | null {
+  const exact = new Map(available.filter(reference => reference.productId === productId && reference.variantId && reference.formulaVersionId).map(reference => [reference.variantId + ':' + reference.formulaVersionId, reference]));
+  return exact.size === 1 ? [...exact.values()][0] : null;
+}
+/** This function is invoked only by the customer's separate package/formula confirmation. */
+export function confirmExperiencePackage(reference: Extract<RoutineReference, { kind: 'catalog' }>, available: readonly Extract<RoutineReference, { kind: 'catalog' }>[]): Extract<RoutineReference, { kind: 'catalog' }> {
+  const exact = unambiguousExperiencePackage(reference.productId, available);
+  return exact ? { ...reference, variantId: exact.variantId, formulaVersionId: exact.formulaVersionId } : reference;
+}
