@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-27: Sami camera/perception/catalog/operations handoff
+
+- **Immutable predecessor:** `origin/main@4d7e75188c426bf6d8e47ad0f2bb1927964ccd25` after #113 merged; both exact-head #113 CI jobs in run `36358334883` succeeded. Kanuj's #116–#119 remain preserved on main.
+- **Current source:** Sami #108 Auto camera, #110 iOS UPC-A normalization, #109 offline perception benchmark, #111 pure contribution validator/demand boundary, #112 read-only hosted readiness inventory, and #113 bounded-image-read hardening are merged. Kanuj #117 adds an inactive customer contribution module, and #118 renders the current-source Check camera entry in Simulator. Neither is live service or real-phone proof.
+- **Private input:** the founder-provided 12 product images are third-party Amazon-review photos. They were hash-checked and inspected locally with Mac Apple Vision only; no external provider upload, repository image asset, rights-cleared frozen corpus, recognition accuracy, formula approval or canonical catalog import is claimed. Missing retail barcodes remain missing, not invented.
+- **Gates:** working on-device photo recognition, external provider comparison, reviewed contribution persistence/service, hosted P0-C activation, physical capture, unassisted customer acceptance and release remain open. See [Sami portfolio checkpoint](SAMI_PORTFOLIO.md) for exact PRs, checks, ownership and next decisions. Kanuj remains owner of active Check/P0-B/P0-D composition; do not overwrite his surfaces.
+
 
 ## 2026-09-27: Kanuj portfolio continuation from merged Auto/catalog/readiness foundations
 
