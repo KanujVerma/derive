@@ -9,7 +9,7 @@ Every active milestone/feature has exactly one founder DRI accountable for its c
 | Feature | DRI | Scope and status |
 | --- | --- | --- |
 | P0-A Capture + Product Resolution | Sami | End-to-end Check capture, barcode/photo evidence, extraction/evaluation adapters if selected, S6 truth resolution, catalog/review and device acceptance. Current Check uses Expo Camera directly; no photo OCR provider or Scandit adapter is implemented. |
-| P0-B Personal Decision Intelligence | Kanuj | End-to-end optional profile, routine/history context, multi-finding policy, decision packet, renderer and physical acceptance. Local first-match Personal Fit exists; the multi-finding target does not. |
+| P0-B Personal Decision Intelligence | Kanuj | End-to-end optional profile, routine/history context, multi-finding policy, decision packet, renderer and physical acceptance. All seven focused source PRs and bounded customer composition are merged; automated local/CI gates passed. Physical/customer acceptance and hosted activation remain open. Sami stewardship remains advisory under the rule below. [Execution ledger](P0_B_EXECUTION.md) records agent ownership and actual evidence. |
 | P0-C Hosted Beta Operations | DRI assigned explicitly before activation | Hosted guest abuse/lifecycle, linking, cleanup, retention and activation review. Hosted guest activation remains gated. |
 | P0-D Cross-product physical/release acceptance | Composition/release DRI named explicitly before activation | Cross-feature physical and release composition. Do not infer an owner from a permanent client/server lane. |
 
@@ -17,7 +17,7 @@ These are the approved initial split, not a prediction that every P0 feature is 
 
 ## Horizontal stewardship
 
-Feature ownership does not remove review of cross-cutting invariants. Default platform/truth steward: **Sami**, covering Auth, RLS, Storage, ownership/linking/deletion, billing, service-role boundaries, canonical product/formula semantics, scientific-evidence model and migration discipline. Default customer-experience steward: **Kanuj**, covering root navigation, shared design system, global Check, result hierarchy, app shell, cross-feature behavior and physical-device acceptance. A steward reviews invariant changes; the feature DRI remains accountable for shipping.
+Feature ownership does not remove review of cross-cutting invariants. Default platform/truth steward: **Sami**, covering Auth, RLS, Storage, ownership/linking/deletion, billing, service-role boundaries, canonical product/formula semantics, scientific-evidence model and migration discipline. Default customer-experience steward: **Kanuj**, covering root navigation, shared design system, global Check, result hierarchy, app shell, cross-feature behavior and physical-device acceptance. A steward reviews invariant changes; the feature DRI remains accountable for shipping. Stewardship review is advisory and valuable, not a required merge approval or blocking gate unless GitHub branch protection or a concrete unresolved invariant finding requires it. The feature DRI owns the end-to-end merge decision and must independently verify focused diffs, required validation and exact-head CI. Keep the steward requested/notified; after each merge reconcile every remaining feature PR onto the new main and rerun its required exact-head validation.
 
 ## Maximum independent parallelism
 
