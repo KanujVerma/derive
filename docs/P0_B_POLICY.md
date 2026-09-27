@@ -32,3 +32,7 @@ The product projection source IDs must resolve in its accepted source registry. 
 Runtime, hosted persistence, actual source verification and physical/customer acceptance are outside this independent module and remain composition/release gates.
 
 Integration review correction (engine/policy v2): the authenticated host supplies a bounded UUID packet ID; full provenance stays in binding. Sensitivity/treatment and reproductive withheld states remain explicit. Existing-item experience matters only through supported role duplication, actual active overlap, or an explicit current-target relationship. Occasional active routine use remains overlap-relevant without asserting full role coverage. Routine overlap uses a routine-bound display, never claims a reported treatment.
+
+Engine v3 and later share semantically identical evidence needs by code, privacy state and criticality, retaining every blocked finding and both reference directions. Repeated same-product reactions share needs and equivalent conclusions; material formula classes remain distinct. Scientific/policy meanings remain unchanged.
+
+Engine v4 consolidates repeated target reaction/change and routine-item experience conclusions by outcome and current/old/unknown formula class. It chooses the same representative at a fixed revision regardless of arrival order, retains material classes separately, and leaves all source reports untouched in immutable owner history. Exact paged retrieval is retained; very large history remains a latency/scaling consideration rather than a silently truncated input.

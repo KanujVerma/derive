@@ -63,7 +63,7 @@ export const RULE_SOURCES = {
     reproductive: { url: 'https://www.aad.org/public/everyday-care/skin-care-secrets/routine/pregnancy-skin-care', applicability: 'Retinoid pregnancy/nursing caution only; trying-to-conceive requires review.' },
     practical: { basis: 'Owner-reported current routine role and explicit decision intent', limitation: 'No efficacy or tolerance comparison.' },
 } as const;
-export const ENGINE_VERSION = 'p0b-findings/2';
+export const ENGINE_VERSION = 'p0b-findings/4';
 export const POLICY_VERSION = 'p0b-policy/2';
 /** Consequence precedence, not a numerical compatibility score. */
 export const CAUTION_PRECEDENCE: Finding['kind'][] = ['reproductive_context_caution', 'prior_product_reaction', 'routine_experience_caution', 'active_overlap', 'reported_ingredient_sensitivity', 'reactive_active'];
@@ -106,9 +106,11 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
     };
     const gap = (code: EvidenceNeedCode, critical: boolean, related?: Finding, state: 'missing' | 'unknown' | 'withheld' | 'conflict' = 'unknown') => {
         const f = related ?? add('unsupported', 'missing_evidence', []);
-        const id = `need:${packet.evidenceNeeds.length}`;
-        packet.evidenceNeeds.push({ id, code, state, critical, findingIds: [f.id] });
-        f.evidenceNeedIds.push(id);
+        const existing=packet.evidenceNeeds.find(need=>need.code===code&&need.state===state&&need.critical===critical);
+        const id=existing?.id??`need:${packet.evidenceNeeds.length}`;
+        if(existing){if(!existing.findingIds.includes(f.id))existing.findingIds.push(f.id);}
+        else packet.evidenceNeeds.push({id,code,state,critical,findingIds:[f.id]});
+        if(!f.evidenceNeedIds.includes(id))f.evidenceNeedIds.push(id);
         if (!related) {
             f.confidence = 'unknown';
             f.applicability = 'uncertain';
@@ -183,18 +185,24 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
             else if(profile.primaryGoal!=='dryness')gap('supported_rule',true);
         }
     }
-    for (const event of input.history?.events ?? []) {
+    const historyEvents=[...(input.history?.events??[])].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+    const historicalClass=(event:NonNullable<EvaluationInput['history']>['events'][number],variantId:string|null,formulaVersionId:string|null)=>!event.variantId||!event.formulaVersionId?'unknown':event.variantId===variantId&&event.formulaVersionId===formulaVersionId?'current':'old';
+    const historyConclusions=new Map<string,Finding>();
+    for (const event of historyEvents) {
         if (event.productId !== b.productId)
             continue;
         const evidence = [context('history', event.id)];
         if (event.outcome === 'reaction') {
-            const f = add('reaction', 'prior_product_reaction', evidence, 'caution', { kind: 'prior_reaction', historyEventId: event.id, historicalFormulaVersionId: event.formulaVersionId, evidenceIndexes: [0] });
+            const key=`target:reaction:${historicalClass(event,b.variantId,b.formulaVersionId)}`;
+            let f=historyConclusions.get(key);
+            if(!f){f=add('reaction','prior_product_reaction',evidence,'caution',{kind:'prior_reaction',historyEventId:event.id,historicalFormulaVersionId:event.formulaVersionId,evidenceIndexes:[0]});f.uncertainty.push(`history_formula_class:${historicalClass(event,b.variantId,b.formulaVersionId)}`);historyConclusions.set(key,f);}
             gap('individual_tolerance', false, f);
             if (!event.formulaVersionId || !event.variantId)
                 gap('exact_prior_formula', false, f);
         }
-        if (event.formulaVersionId && b.formulaVersionId && (event.formulaVersionId !== b.formulaVersionId || event.variantId !== b.variantId))
-            gap('current_formula_experience', false, add('history', 'formula_changed', evidence));
+        if(event.formulaVersionId&&b.formulaVersionId&&(event.formulaVersionId!==b.formulaVersionId||(event.variantId!==null&&event.variantId!==b.variantId))){
+            const key=`target:change:${historicalClass(event,b.variantId,b.formulaVersionId)}`;let f=historyConclusions.get(key);if(!f){f=add('history','formula_changed',[...formulaFacts,...evidence]);historyConclusions.set(key,f);}gap('current_formula_experience',false,f);
+        }
     }
     const routine = input.routine;
     if (!routine || routine.completeness !== 'complete')
@@ -247,11 +255,12 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
             }
             const material=item.productId===b.productId&&input.intent==='check_current'||packet.routineImpacts.some(impact=>impact.routineItemIds.includes(item.id));
             if(!material)continue;
-            for (const event of input.history?.events ?? []) {
+            for (const event of historyEvents) {
                 if (!item.productId || event.productId !== item.productId || (event.outcome !== 'reaction' && event.outcome !== 'ineffective'))
                     continue;
                 const related = [...evidence, context('history', event.id)];
-                const f = add('history', 'routine_experience_caution', related, 'caution', { kind: 'routine_experience', routineItemIds: [item.id], historyEventId: event.id, outcome: event.outcome, evidenceIndexes: [0, 1] });
+                const key=`routine:${item.id}:${event.outcome}:${historicalClass(event,item.variantId,item.formulaVersionId)}`;let f=historyConclusions.get(key);
+                if(!f){f=add('history','routine_experience_caution',related,'caution',{kind:'routine_experience',routineItemIds:[item.id],historyEventId:event.id,outcome:event.outcome,evidenceIndexes:[0,1]});f.uncertainty.push(`history_formula_class:${historicalClass(event,item.variantId,item.formulaVersionId)}`);historyConclusions.set(key,f);}
                 gap('current_formula_experience', true, f);
             }
         }
