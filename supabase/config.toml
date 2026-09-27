@@ -170,3 +170,6 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/personal-context/deno.json"
 entrypoint = "./functions/personal-context/index.ts"
+
+[functions.personal-decision]
+verify_jwt = false
