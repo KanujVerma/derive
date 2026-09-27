@@ -1,7 +1,27 @@
 /// <reference types="node" />
-import { readFileSync, realpathSync, lstatSync } from 'node:fs';
+import { readFileSync, realpathSync, lstatSync, openSync, closeSync, fstatSync, readSync, constants } from 'node:fs';
 import { resolve, dirname, extname } from 'node:path';
 import { evaluatePerceptionBenchmark, parseFrozenPerceptionManifest, sha256, unpreparedPerceptionReport } from './perception-benchmark.ts';
+
+/** Bind the size/type check to the opened file and never read more than limit + 1 bytes. */
+function readBoundedJsonFile(path: string, limit: number): string {
+  const metadata = lstatSync(path);
+  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > limit) throw new Error();
+  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = fstatSync(descriptor);
+    if (!opened.isFile() || opened.size > limit || opened.dev !== metadata.dev || opened.ino !== metadata.ino) throw new Error();
+    const buffer = Buffer.alloc(limit + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const read = readSync(descriptor, buffer, length, buffer.length - length, null);
+      if (!read) break;
+      length += read;
+    }
+    if (length > limit) throw new Error();
+    return buffer.subarray(0, length).toString('utf8');
+  } finally { closeSync(descriptor); }
+}
 
 // No network, provider SDK, upload, credential or catalog import is permitted here.
 try {
@@ -10,8 +30,7 @@ try {
   else {
     if (args.length < 3 || args.length > 4) throw new Error();
     const [manifestPath, imageDirectory, digest, outputsPath] = args;
-    if (lstatSync(manifestPath).size > 2_000_000 || (outputsPath && lstatSync(outputsPath).size > 16_000_000)) throw new Error();
-    const json = readFileSync(manifestPath, 'utf8');
+    const json = readBoundedJsonFile(manifestPath, 2_000_000);
     const manifest = parseFrozenPerceptionManifest(json, digest);
     const imageRoot = realpathSync(imageDirectory);
     const imageDigests = new Map<string, string>();
@@ -27,7 +46,7 @@ try {
       if (!matchesType) throw new Error();
       imageDigests.set(row.imageFile, sha256(bytes));
     }
-    const outputs: unknown = outputsPath ? JSON.parse(readFileSync(outputsPath, 'utf8')) : [];
+    const outputs: unknown = outputsPath ? JSON.parse(readBoundedJsonFile(outputsPath, 16_000_000)) : [];
     const report = evaluatePerceptionBenchmark(json, digest, imageDigests, outputs);
     console.log(JSON.stringify(report, null, 2));
     if (report.providers.some(provider => provider.failed)) process.exitCode = 1;

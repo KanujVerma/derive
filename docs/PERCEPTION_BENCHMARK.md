@@ -21,6 +21,8 @@ node --experimental-strip-types scripts/perception-benchmark-cli.ts /private/man
 
 Omit the output file to obtain `NOT_RUN` rows for every registered provider. The independently recorded SHA-256 is over exact UTF-8 manifest bytes. Any edit to rights, gold, roster or image hash requires a new recorded benchmark freeze. Every image is read locally, SHA-256 checked, limited to 10 MiB and magic-byte checked as `.jpg`, `.png` or `.webp`. Image filenames must be simple opaque names, not paths; symlinks and corpus-directory escapes are rejected. These checks establish file identity/type boundaries, **not successful decoding or image quality**. No image or output files should be committed.
 
+Manifest and output JSON must be regular files, not symlinks or directories. The opened file's identity/type and byte bounds are rechecked, and reads are capped at the declared limit plus one detection byte (2 MB manifest / 16 MB outputs). Diagnostics remain sanitized.
+
 ## Private manifest schema (version 1)
 
 - `schemaVersion: 1`, opaque `benchmarkId`, nonempty `cases` (maximum 1,000), nonempty `providers` (maximum 20). Unknown fields are rejected.
@@ -48,8 +50,10 @@ Exact brand/name/variant/barcode/region/label strings, ordered ingredient occurr
 3. Freeze corpus and run current barcode, practical on-device OCR, Gemini candidate and GPT/Luna candidate on the same images. Adapters must remain server-side or local benchmark tooling, not Expo client secrets.
 4. Compare literal extraction, abstention, difficult-scene coverage, latency/cost and time-to-useful-resolution. Document operational/privacy tradeoffs before selecting any extractor.
 
-This increment changes no app, shared contract, database, hosted state, catalog promotion, environment setting or billing. Actual perception delivery remains blocked by real images, independent gold, approved terms and real adapters; this tool removes a reproducibility gap rather than pretending those gates are complete.
+This increment changes no app, shared contract, database, hosted state, catalog promotion, environment setting or billing. Actual perception delivery remains blocked by **rights-cleared images with independent gold**, approved terms and real adapters; the twelve preliminary third-party review images do not clear those gates. This tool removes a reproducibility gap rather than pretending those gates are complete.
 
 ## Local implementation checks
 
 Against base `465173e`, focused tests passed 8/8. The complete `npm test` loop passed all 67 test files: 51 files emitted TAP with 598 registered tests and zero failures; the remaining assertion-style files also completed. Both application and tests TypeScript checks passed. Web and iOS JavaScript exports passed with environment loading disabled. Default CLI output was independently inspected as zero-image `CORPUS_NOT_READY` with null metrics. These are tooling/replay checks, not real-image acceptance. Independent review and exact-head CI are still publication/merge gates owned by the portfolio orchestrator.
+
+After independent portfolio review, the JSON reader was hardened to reject manifest/output symlinks and non-files, bind checks to the opened descriptor, and bound actual reads. The isolated branch reconciled cleanly with main `aa12e08`, then the newer documentation checkpoint `411bb87`. Fresh focused tests passed 8/8, including the new JSON-input rejection paths. The entire current suite passed **74 test files**, including **56 TAP-reporting files / 620 TAP tests / zero failures**; both TypeScript checks and web/iOS exports passed. A first export attempt was blocked by sandbox write permission for its local log; after granting that worktree write scope, both exports completed. No failure was waived. Independent review did not clear image rights or provider selection; exact-head CI remains the merge gate.

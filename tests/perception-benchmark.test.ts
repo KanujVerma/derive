@@ -122,10 +122,23 @@ test('CLI verifies bounded image bytes and fails with sanitized diagnostics on t
     f.json = JSON.stringify(f.manifest);
     const manifestPath = join(directory, 'manifest.json');
     writeFileSync(manifestPath, f.json);
-    const command = () => spawnSync(process.execPath, ['--experimental-strip-types', 'scripts/perception-benchmark-cli.ts', manifestPath, directory, sha256(f.json)], { encoding: 'utf8' });
+    const command = (manifestInput = manifestPath, outputInput?: string) => spawnSync(process.execPath,
+      ['--experimental-strip-types', 'scripts/perception-benchmark-cli.ts', manifestInput, directory, sha256(f.json), ...(outputInput ? [outputInput] : [])], { encoding: 'utf8' });
     const valid = command();
     assert.equal(valid.status, 0);
     assert.equal(JSON.parse(valid.stdout).providers[0].status, 'NOT_RUN');
+    const manifestLink = join(directory, 'manifest-link.json');
+    symlinkSync(manifestPath, manifestLink);
+    const outputPath = join(directory, 'outputs.json');
+    writeFileSync(outputPath, '[]');
+    const outputLink = join(directory, 'output-link.json');
+    symlinkSync(outputPath, outputLink);
+    for (const rejected of [command(manifestLink), command(manifestPath, outputLink), command(directory), command(manifestPath, directory)]) {
+      assert.equal(rejected.status, 1);
+      assert.equal(rejected.stdout, '');
+      assert.equal(rejected.stderr.includes(directory), false);
+      assert.ok(rejected.stderr.includes('INVALID_PERCEPTION_BENCHMARK_INPUT'));
+    }
     writeFileSync(join(directory, 'front.jpg'), Buffer.from('wrong bytes'));
     assert.equal(command().status, 1);
     rmSync(join(directory, 'front.jpg'));
