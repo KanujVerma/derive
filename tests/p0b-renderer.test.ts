@@ -149,3 +149,26 @@ test('P0-B renderer expresses evidence limitations without developer claim or ru
   assert.doesNotMatch(JSON.stringify(view.unknowns), /applicable claim|supported.*rule/i);
   assert.ok(view.unknowns.some((unknown) => /reviewed evidence.*situation/i.test(unknown.text)));
 });
+
+test('P0-B renderer retains verified routine formula overlap without an invented category', () => {
+  const { packet, binding } = fixture('routine-formula-overlap');
+  const view = describePersonalDecision(packet, binding);
+  assert.equal(view.kind, 'ready');
+  if (view.kind !== 'ready') return;
+  assert.equal(view.action, 'USE_WITH_CAUTION');
+  assert.match(view.primaryReason, /overlaps with a product already in your routine/i);
+  assert.doesNotMatch(view.primaryReason, /moisturizer|cleanser|serum|sunscreen/i);
+  assert.equal(view.nextStep, 'review_routine');
+});
+
+test('P0-B unknown routine role cannot promote redundancy or replacement copy', () => {
+  const { packet, binding } = fixture('redundancy');
+  const finding = packet.findings.find((entry) => entry.kind === 'role_redundancy')!;
+  if (finding.display?.kind === 'routine_relation') finding.display.role = 'unknown';
+  assert.equal(describePersonalDecision(packet, binding).kind, 'unavailable');
+  finding.kind = 'replacement_candidate';
+  packet.routineImpacts = [];
+  packet.action.kind = 'NOT_ENOUGH_INFORMATION';
+  packet.action.nextStep = 'review_routine';
+  assert.equal(describePersonalDecision(packet, binding).kind, 'unavailable');
+});

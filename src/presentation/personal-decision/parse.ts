@@ -32,7 +32,7 @@ const evidence = z.discriminatedUnion('kind', [
 const evidenceIndexes = z.array(z.number().int().nonnegative()).max(100);
 const display = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('role_match'), goal: GoalSchema, category, evidenceIndexes }),
-  z.strictObject({ kind: z.literal('routine_relation'), routineItemIds: refs, role: category,
+  z.strictObject({ kind: z.literal('routine_relation'), routineItemIds: refs, role: z.union([category, z.literal('unknown')]),
     timing: z.enum(['am', 'pm', 'both', 'unknown']),
     frequency: z.enum(['daily', 'few_times_weekly', 'weekly', 'occasional', 'unknown']), evidenceIndexes }),
   z.strictObject({ kind: z.literal('prior_reaction'), historyEventId: ref, historicalFormulaVersionId: ref.nullable(), evidenceIndexes }),
