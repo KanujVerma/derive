@@ -131,3 +131,6 @@ jobs:
 
       - name: Run P0-B stored truth decision and provenance harness
         run: node scripts/test-p0b-decision-local.mjs
+
+      - name: Run P0-B actual customer client acceptance
+        run: node --experimental-strip-types scripts/test-p0b-customer-acceptance-local.mjs
