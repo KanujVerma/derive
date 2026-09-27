@@ -7,9 +7,10 @@ import { colors, layout, radii, spacing, typography } from '../../../constants/t
 import { Icon } from '../../ui/Icon';
 import { captureRecovery } from '../../../presentation/capture/captureRecovery';
 import { createCaptureOperationGate } from '../../../presentation/capture/captureOperationGate';
+import { canObserveLiveBarcode, isObservedRetailBarcode, stillPhotoRole, type CaptureIntent } from '../../../presentation/capture/autoCapture';
 import {
   captureRoles, createCaptureSession, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
-  type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
+  type CaptureAction, type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
 } from '../../../presentation/capture/productEvidence';
 
 const roleLabels: Record<CaptureRole, string> = {
@@ -35,23 +36,46 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const [permission, requestPermission] = useCameraPermissions();
   const [session, setSession] = useState(createCaptureSession);
   const [role, setRole] = useState<CaptureRole>(initialRole);
+  const [intent, setIntent] = useState<CaptureIntent>('auto');
+  const [showCorrection, setShowCorrection] = useState(false);
+  const [previewRole, setPreviewRole] = useState<PhotoRole | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [torch, setTorch] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canRetry, setCanRetry] = useState(false);
   const [canCollectMore, setCanCollectMore] = useState(true);
   const camera = useRef<CameraView>(null);
+  const mounted = useRef(true);
+  const currentSession = useRef(session);
+  const previewActive = useRef(false);
+  const latestIntent = useRef(intent);
+  latestIntent.current = intent;
   const scanLocked = useRef(false);
   const requestSequence = useRef(0);
   const operations = useRef(createCaptureOperationGate()).current;
-  const currentEvidence = session.evidence.find((item) => item.role === role);
+  const currentEvidence = intent === 'auto' ? undefined : session.evidence.find((item) => item.role === role);
 
-  useEffect(() => () => {
-    requestSequence.current += 1;
-    operations.cancel();
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      requestSequence.current += 1;
+      operations.cancel();
+    };
   }, [operations]);
 
+  const dispatchCapture = (action: CaptureAction) => {
+    currentSession.current = reduceCapture(currentSession.current, action);
+    setSession(currentSession.current);
+  };
+  const setPreview = (uri: string | null) => {
+    previewActive.current = uri !== null;
+    setPreviewUri(uri);
+  };
+
   const close = () => {
+    mounted.current = false;
     requestSequence.current += 1;
     operations.cancel();
     onClose();
@@ -59,9 +83,13 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
 
   const selectRole = (nextRole: CaptureRole) => {
     operations.whenIdle(() => {
-      scanLocked.current = !!session.evidence.find((item) => item.role === nextRole);
+      scanLocked.current = currentSession.current.evidence.some((item) => item.role === nextRole);
       setRole(nextRole);
-      setPreviewUri(null);
+      setIntent(nextRole);
+      latestIntent.current = nextRole;
+      setShowCorrection(false);
+      setPreview(null);
+      setPreviewRole(null);
       setError(null);
       setCanRetry(false);
       void Haptics.selectionAsync().catch(() => {});
@@ -69,7 +97,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const capturePhoto = async () => {
-    if (role === 'barcode' || busy) return;
+    if (intent === 'barcode' || busy) return;
     await operations.run(async (isCurrent) => {
       setBusy(true);
       setError(null);
@@ -77,7 +105,8 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         const photo = await camera.current?.takePictureAsync({ quality: 0.85 });
         if (!isCurrent()) return;
         if (!photo?.uri) throw new Error('No photo returned');
-        setPreviewUri(photo.uri);
+        setPreviewRole(stillPhotoRole(intent));
+        setPreview(photo.uri);
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       } catch {
         if (isCurrent()) setError('Could not take the photo. Please try again.');
@@ -88,27 +117,32 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const usePhoto = () => {
-    if (!previewUri || role === 'barcode') return;
-    setSession((previous) => reduceCapture(previous, { type: 'photo', role, uri: previewUri }));
-    setPreviewUri(null);
+    if (!previewUri || !previewRole) return;
+    dispatchCapture({ type: 'photo', role: previewRole, uri: previewUri });
+    setPreview(null);
+    setPreviewRole(null);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
 
-  const onBarcode = ({ data }: BarcodeScanningResult) => {
-    if (role !== 'barcode' || scanLocked.current || !/^\d{8,14}$/.test(data)) return;
-    scanLocked.current = true;
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    if (autoFinishBarcode && !session.evidence.some((item) => item.kind === 'local_photo')) {
-      onEvidenceReady(toCaptureHandoff(reduceCapture(session, { type: 'barcode', value: data })));
-      return;
-    }
-    setSession((previous) => reduceCapture(previous, { type: 'barcode', value: data }));
+  const onBarcode = ({ data, type }: BarcodeScanningResult) => {
+    if (!mounted.current || currentSession.current.phase !== 'collecting'
+      || !canObserveLiveBarcode(latestIntent.current, { busy: operations.isBusy(), hasPreview: previewActive.current, locked: scanLocked.current }) || !isObservedRetailBarcode(data, type)) return;
+    operations.whenIdle(() => {
+      scanLocked.current = true;
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (autoFinishBarcode && !currentSession.current.evidence.some((item) => item.kind === 'local_photo')) {
+        mounted.current = false;
+        onEvidenceReady(toCaptureHandoff(reduceCapture(currentSession.current, { type: 'barcode', value: data })));
+        return;
+      }
+      dispatchCapture({ type: 'barcode', value: data });
+    });
   };
 
   const retake = () => {
     requestSequence.current += 1;
-    setSession((previous) => reduceCapture(previous, { type: 'retake', role }));
-    setPreviewUri(null);
+    dispatchCapture({ type: 'retake', role });
+    setPreview(null);
     scanLocked.current = false;
     setError(null);
     setCanRetry(false);
@@ -116,20 +150,21 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const processEvidence = async () => {
-    if (!session.evidence.length || session.phase === 'processing') return;
+    if (!mounted.current || !currentSession.current.evidence.length || currentSession.current.phase === 'processing') return;
     await operations.run(async (isCurrent) => {
       const sequence = ++requestSequence.current;
-      const evidence = session.evidence;
-      setSession((previous) => reduceCapture(previous, { type: 'process' }));
+      // Native barcode callbacks may precede the next React render.
+      const evidence = currentSession.current.evidence;
+      dispatchCapture({ type: 'process' });
       setError(null);
       setCanRetry(false);
       try {
         const result = await processor.process(evidence);
         if (!isCurrent() || sequence !== requestSequence.current) return;
-        setSession((previous) => reduceCapture(previous, { type: 'resolved', result }));
+        dispatchCapture({ type: 'resolved', result });
       } catch (cause) {
         if (!isCurrent() || sequence !== requestSequence.current) return;
-        setSession((previous) => reduceCapture(previous, { type: 'resolved', result: { state: 'insufficient_evidence', candidates: [] } }));
+        dispatchCapture({ type: 'resolved', result: { state: 'insufficient_evidence', candidates: [] } });
         const recovery = captureRecovery(cause);
         setCanRetry(recovery.canRetry);
         setCanCollectMore(recovery.canCollectMore);
@@ -140,11 +175,15 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
 
   const collectMore = () => {
     requestSequence.current += 1;
-    setSession((previous) => reduceCapture(previous, { type: 'collect_more' }));
-    selectRole(captureRoles.find((candidate) => !session.evidence.some((item) => item.role === candidate)) ?? 'front_label');
+    dispatchCapture({ type: 'collect_more' });
+    selectRole(captureRoles.find((candidate) => !currentSession.current.evidence.some((item) => item.role === candidate)) ?? 'front_label');
   };
 
-  const finish = () => onEvidenceReady(toCaptureHandoff(session));
+  const finish = () => {
+    if (!mounted.current) return;
+    mounted.current = false;
+    onEvidenceReady(toCaptureHandoff(currentSession.current));
+  };
 
   return (
     <View style={styles.root}>
@@ -153,8 +192,9 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           ref={camera}
           style={StyleSheet.absoluteFill}
           facing="back"
-          barcodeScannerSettings={{ barcodeTypes: ['upc_a', 'upc_e', 'ean13', 'ean8'] }}
-          onBarcodeScanned={role === 'barcode' ? onBarcode : undefined}
+          enableTorch={torch}
+          barcodeScannerSettings={{ barcodeTypes: ['upc_a', 'ean13', 'ean8'] }}
+          onBarcodeScanned={intent === 'auto' || intent === 'barcode' ? onBarcode : undefined}
         />
       ) : previewUri ? (
         <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -166,7 +206,9 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           <Icon name="close" size={20} color={colors.inkInverse} />
         </Pressable>
         <Text style={styles.topTitle}>Capture product</Text>
-        <View style={styles.iconButton} />
+        <Pressable accessibilityRole="button" accessibilityLabel={torch ? 'Turn flashlight off' : 'Turn flashlight on'} accessibilityState={{ selected: torch, disabled: busy || !permission?.granted || session.phase !== 'collecting' || previewUri !== null }} disabled={busy || !permission?.granted || session.phase !== 'collecting' || previewUri !== null} onPress={() => operations.whenIdle(() => setTorch((value) => !value))} style={styles.iconButton}>
+          <Icon name="flashlight" size={20} color={colors.inkInverse} />
+        </Pressable>
       </View>
 
       {session.phase === 'collecting' && !permission?.granted ? (
@@ -181,7 +223,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
       ) : session.phase === 'collecting' ? (
         <View style={styles.collecting}>
           <View pointerEvents="none" style={styles.guideArea}>
-            {role === 'barcode' && !currentEvidence && !previewUri ? (
+            {(intent === 'auto' || intent === 'barcode') && !currentEvidence && !previewUri ? (
               // Alignment aid only: Expo still detects barcodes across the whole preview.
               <View testID="barcode-alignment-guide" style={styles.barcodeGuide} />
             ) : null}
@@ -189,30 +231,33 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
             <View style={styles.panel}>
               <ScrollView style={styles.controlScroll} contentContainerStyle={styles.controlContent}>
-                <Text style={styles.prompt}>{previewUri ? `Review ${roleLabels[role].toLowerCase()}` : currentEvidence ? `${roleLabels[role]} saved` : prompts[role]}</Text>
-                <Text style={styles.hint}>{role === 'barcode' ? 'Hold steady. The barcode scans automatically.' : 'Capture package details. Photos do not verify the formula.'}</Text>
-                <View style={styles.roleRow}>
+                <Text style={styles.prompt}>{previewUri ? (previewRole ? `Review ${roleLabels[previewRole].toLowerCase()}` : 'Which part is in this photo?') : currentEvidence ? `${roleLabels[role]} saved` : intent === 'auto' ? 'Point at your skincare product' : prompts[role]}</Text>
+                <Text style={styles.hint}>{previewUri && !previewRole ? 'Choose the package detail you captured. We have not identified it automatically.' : intent === 'auto' ? 'Barcodes scan automatically. Or take a photo of the package.' : role === 'barcode' ? 'Hold steady. The barcode scans automatically.' : 'Capture package details. Photos do not verify the formula.'}</Text>
+                {!previewUri && <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy, expanded: showCorrection }} disabled={busy} onPress={() => operations.whenIdle(() => setShowCorrection((value) => !value))} style={styles.correction}><Text style={styles.roleText}>Choose what to capture</Text></Pressable>}
+                {(showCorrection || previewUri) && <View style={styles.roleRow}>
+                  {showCorrection && !previewUri && <Pressable accessibilityRole="button" onPress={() => operations.whenIdle(() => { setIntent('auto'); latestIntent.current = 'auto'; setShowCorrection(false); scanLocked.current = currentSession.current.evidence.some((item) => item.kind === 'barcode'); })} style={styles.roleChip}><Text style={styles.roleText}>Auto</Text></Pressable>}
                   {captureRoles.map((item) => {
+                    if (previewUri && item === 'barcode') return null;
                     const saved = session.evidence.some((entry) => entry.role === item);
                     return (
-                      <Pressable key={item} accessibilityRole="button" accessibilityLabel={`${roleLabels[item]}${saved ? ', captured' : ''}`} accessibilityState={{ selected: role === item, disabled: busy }} disabled={busy} onPress={() => selectRole(item)} style={[styles.roleChip, role === item && styles.roleChipActive]}>
-                        <Text style={[styles.roleText, role === item && styles.roleTextActive]}>{saved ? '✓ ' : ''}{roleLabels[item]}</Text>
+                      <Pressable key={item} accessibilityRole="button" accessibilityLabel={`${roleLabels[item]}${saved ? ', captured' : ''}`} accessibilityState={{ selected: previewUri ? previewRole === item : intent === item, disabled: busy }} disabled={busy} onPress={() => { if (previewUri && item !== 'barcode') operations.whenIdle(() => setPreviewRole(item)); else selectRole(item); }} style={[styles.roleChip, (previewUri ? previewRole === item : intent === item) && styles.roleChipActive]}>
+                        <Text style={[styles.roleText, (previewUri ? previewRole === item : intent === item) && styles.roleTextActive]}>{saved ? '✓ ' : ''}{roleLabels[item]}</Text>
                       </Pressable>
                     );
                   })}
-                </View>
+                </View>}
                 {error && <Text style={styles.error}>{error}</Text>}
               </ScrollView>
               <View style={styles.captureActions}>
                 {previewUri ? (
-                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => setPreviewUri(null)} /><Action label="Use photo" onPress={usePhoto} /></View>
+                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => { setPreview(null); setPreviewRole(null); }} />{previewRole && <Action label="Use photo" onPress={usePhoto} />}</View>
                 ) : currentEvidence ? (
                   <View style={styles.actionRow}><Action label="Retake" secondary onPress={retake} /><Action label="Review evidence" onPress={() => void processEvidence()} /></View>
-                ) : role === 'barcode' ? (
+                ) : intent === 'barcode' ? (
                   <View style={styles.actionRow}><Text style={styles.scanHint}>Scanning barcode…</Text>{session.evidence.length > 0 && <Action label="Review evidence" onPress={() => void processEvidence()} />}</View>
                 ) : (
                   <View style={styles.actionRow}>
-                    <Pressable accessibilityRole="button" accessibilityLabel={`Take ${roleLabels[role]} photo`} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void capturePhoto()} style={[styles.shutter, busy && styles.shutterBusy]}>
+                    <Pressable accessibilityRole="button" accessibilityLabel={intent === 'auto' ? 'Take package photo' : `Take ${roleLabels[role]} photo`} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void capturePhoto()} style={[styles.shutter, busy && styles.shutterBusy]}>
                       {busy ? <ActivityIndicator color={colors.inkInverse} /> : <View style={styles.shutterInner} />}
                     </Pressable>
                     {session.evidence.length > 0 && <Action label="Review evidence" onPress={() => void processEvidence()} />}
@@ -229,7 +274,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
             <Text style={styles.outcomeBody}>{session.phase === 'processing' ? 'Checking the details you captured.' : session.phase === 'candidate_selected' ? 'Your selection is recorded as a possible match. It does not add verification.' : session.phase === 'unknown' ? 'We could not identify this product from the available evidence.' : session.phase === 'insufficient_evidence' ? 'We could not confirm this product. Try its barcode or search by name. Automatic photo identification is not available yet.' : 'Choose a possible match if you recognize it. Your choice does not verify the product or formula.'}</Text>
             {session.phase === 'processing' && <ActivityIndicator color={colors.brand} size="large" />}
             {(session.phase === 'candidates' || session.phase === 'ambiguous') && session.candidates.map((candidate) => (
-              <Pressable key={candidate.id} accessibilityRole="button" onPress={() => { setSession((previous) => reduceCapture(previous, { type: 'confirm_candidate', candidateId: candidate.id })); void Haptics.selectionAsync().catch(() => {}); }} style={styles.candidate}>
+              <Pressable key={candidate.id} accessibilityRole="button" onPress={() => { dispatchCapture({ type: 'confirm_candidate', candidateId: candidate.id }); void Haptics.selectionAsync().catch(() => {}); }} style={styles.candidate}>
                 <Text style={styles.candidateLabel}>{candidate.label}</Text>
                 <Text style={styles.candidateDetail}>{candidate.detail ?? 'Possible match. Formula unverified.'}</Text>
               </Pressable>
@@ -269,6 +314,7 @@ const styles = StyleSheet.create({
   prompt: { color: colors.inkInverse, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold, lineHeight: typography.lineHeights.bodyLarge },
   hint: { color: '#E6E9E5', fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, marginTop: spacing.xs },
   roleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingTop: spacing.sm },
+  correction: { minHeight: layout.minTouchTarget, justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xs },
   roleChip: { flexBasis: '45%', flexGrow: 1, minHeight: layout.minTouchTarget, borderRadius: radii.full, borderWidth: 1, borderColor: '#A9B5AC', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   roleChipActive: { backgroundColor: colors.surface },
   roleText: { color: colors.inkInverse, textAlign: 'center', fontSize: typography.sizes.caption, fontWeight: typography.weights.medium },
