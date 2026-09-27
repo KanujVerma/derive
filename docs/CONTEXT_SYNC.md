@@ -7,6 +7,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
 
+## 2026-09-27: Scanner extraction boundary and local physical QA readiness
+
+- **Predecessor:** initial `main@105b3a3c41132287e7b4df1331eefe72111e58d4`; reconciled newly merged P0-B1 #91 at `origin/main@7ed5a9f1c7d2038cb6818e3901af5a377a52a703` before fresh validation. #90/#92 are active counterpart work; unpublished work remains with its writers. #80 is assessment/service provenance; #88 is canonical customer composition.
+- **Implemented:** one import-free server-neutral extraction candidate DTO/parser/projection reused by the evaluator; independent evidence binding, literal/bounded observations and no authoritative identity promotion. Explicit development-runtime-only private LAN backend opt-in supports phone QA; staging/production/release and hosted guest access are unchanged. Added a privacy-safe read-only device-preflight script. `app/**` and P0-B write-sets are unchanged.
+- **Evidence:** reconciled 44 unit files / 551 tests; both TypeScript checks, web/iOS JS exports, fresh isolated database reset, 19 pgTAP files / 486 assertions, all 17 integration harnesses passed. Independent scope/boundary review found no blocker. Exact-head CI belongs in the PR/return packet, not a predicted resulting SHA.
+- **Phone boundary:** local Check rendered in a browser; local server/Auth health responded. Founder opened Expo Go on a USB-connected phone using the hotspot. The first blocker was Expo's matching-account login requirement, not Derive Auth. Local CLI sign-in subsequently verified and the server restarted; phone app load/camera acceptance still await observation. Original dirty auth work, hosted settings and local volumes are preserved.
+- **Gates:** no provider/image processing, real-photo benchmark, hosted activation, billing/referral/link/#35/#71 changes or P0-B takeover. #81/#86 remain partial. See [SCANNER_INTEGRATION_READINESS.md](SCANNER_INTEGRATION_READINESS.md) for exact scope, environment precautions, physical checklist and open gates.
+
 ## 2026-09-27: P0-B focused source landing and advisory stewardship
 
 - **Immutable source predecessor:** `7775a426ee4adb7741291d475798a9d162d9d392`; publication began at `105b3a3c41132287e7b4df1331eefe72111e58d4`. B1#91, B4#90, B2#92, B5#93, B3#94, B6#96 and B7#97 merged normally in that order. Each remaining feature PR was reconciled and fully revalidated after every main advancement. Exact heads, merge SHAs and CI: [P0_B_EXECUTION.md](P0_B_EXECUTION.md).

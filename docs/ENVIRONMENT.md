@@ -22,6 +22,7 @@ another.
 | `EXPO_PUBLIC_BUILD_FLAVOR` | Expo mobile/web build | Public | `development`, `remote-staging`, or `production`; empty local value defaults to development |
 | `EXPO_PUBLIC_SUPABASE_URL` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo mobile/web build | Public | Local or hosted Supabase client access |
+| `EXPO_PUBLIC_DEV_SUPABASE_LAN_URL` | Development JS runtime only | Public local test target | Optional exact Mac private IPv4 base URL on port 54321 for physical scanner QA; never staging/production/release |
 | `EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL` | Expo mobile/web build | Public | Optional customer contact; configure only after send-and-receive mailbox verification |
 | `SUPABASE_PROJECT_ID` | CLI / CI | Public identifier | Linking and deploying to a hosted project |
 | `SUPABASE_ACCESS_TOKEN` | CLI / CI | Secret | Headless Supabase management; interactive local login should use the CLI credential store instead |
@@ -70,6 +71,36 @@ The environment resolver accepts the legacy
 does not break. New environments must use
 `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. The legacy name is deliberately absent
 from `.env.example`.
+
+## Development-only physical scanner testing
+
+The user approved a bounded LAN testing seam on 2026-09-27. In an actual
+development JS runtime only, set `EXPO_PUBLIC_BUILD_FLAVOR=development`,
+`EXPO_PUBLIC_USE_REMOTE_SERVICE=true`, and point **both**
+`EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_DEV_SUPABASE_LAN_URL` to the exact
+Mac local Supabase API base URL: `http://<Mac-private-IPv4>:54321`.
+Use only the disposable local stack's public client key, not hosted project
+credentials. The helper accepts canonical RFC1918 IPv4 addresses only; paths,
+queries, credentials, alternate ports, public hosts and URL-number aliases are
+rejected. No wildcard or tunnel activation is provided.
+
+This lets existing local scanner-first routes work without changing customer
+root files or granting managed membership. The server still authenticates the
+owner and enforces RLS/Storage/entitlements. Staging and production reject the
+opt-in; a release JS runtime also rejects it, even if its flavor says
+development. Leave the variable blank for exports/releases and ordinary UI work.
+
+The phone and Mac must share a trusted private network. Plain HTTP exposes local
+test traffic to that network, so use disposable test identities and product
+fixtures, never real sensitive customer data. Do not forward port 54321 to the
+internet. Clear Metro's cache after changing the target; do not reuse a session
+or public key from a hosted backend. The optional `DERIVE_PUBLIC_SUPABASE_URL`
+server override only affects signed photo URLs; it does not enable the app shell.
+
+This is connection preparation, not physical acceptance. A reachable phone,
+compatible Expo Go or signed development build, camera/local-network permissions,
+and observed customer-path results remain separate gates. No hosted deployment,
+guest activation, native ATS relaxation or production configuration changed.
 
 ## L0 Remote staging build boundary
 

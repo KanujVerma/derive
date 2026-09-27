@@ -2,40 +2,23 @@ import type { ProductEvidenceExtractionCandidate } from '../../contracts/Product
 import { resolveProductIdentity } from '../../../supabase/functions/_shared/product-identity.ts';
 import type { ResolverEvidence } from '../../../supabase/functions/_shared/product-identity.ts';
 import { extractionCorpus, realImageScenarios, resolutionCorpus, syntheticCatalog } from './corpus.ts';
+import { ProductEvidenceExtractionError, parseProductEvidenceExtraction, projectProductEvidenceExtraction } from '../../../supabase/functions/_shared/product-evidence-extraction.ts';
+import type { ExtractionEvidenceRole } from '../../contracts/ProductEvidenceExtraction.ts';
 
 const fields = ['schemaVersion', 'evidenceId', 'role', 'outcome', 'abstentionReason', 'barcodeText', 'brandText', 'productNameText', 'variantText', 'regionText', 'labelText', 'orderedIngredients', 'numbers'];
-const textFields = ['barcodeText', 'brandText', 'productNameText', 'variantText', 'regionText', 'labelText'] as const;
-const isText = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 4096;
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 /** Experimental boundary validator. It does not certify extraction correctness. */
-export function parseExtractionCandidate(value: unknown, evidenceId: string): ProductEvidenceExtractionCandidate {
-  if (!object(value) || Object.keys(value).some(key => !fields.includes(key))
-    || value.schemaVersion !== 1 || value.evidenceId !== evidenceId || !/^[a-zA-Z0-9_-]{1,100}$/.test(evidenceId)
-    || !['front_label', 'ingredients', 'packaging'].includes(String(value.role))
-    || !['candidate', 'abstained'].includes(String(value.outcome))) throw new Error('Invalid extraction envelope');
-  for (const field of textFields) if (value[field] !== undefined && !isText(value[field])) throw new Error(`Invalid ${field}`);
-  if (value.orderedIngredients !== undefined && (!Array.isArray(value.orderedIngredients)
-    || value.orderedIngredients.length === 0 || value.orderedIngredients.length > 300 || !value.orderedIngredients.every(isText))) throw new Error('Invalid ingredient occurrences');
-  if (value.numbers !== undefined && (!Array.isArray(value.numbers) || value.numbers.length === 0 || value.numbers.length > 100
-    || !value.numbers.every(number => object(number) && Object.keys(number).length === 3
-      && isText(number.text) && isText(number.unitText) && isText(number.contextText)))) throw new Error('Invalid literal numbers');
-  if (value.outcome === 'abstained') {
-    if (!['unreadable', 'unsupported', 'conflicting_evidence', 'no_product_evidence'].includes(String(value.abstentionReason))
-      || [...textFields, 'orderedIngredients', 'numbers'].some(field => value[field] !== undefined)) throw new Error('Abstention must contain no guesses');
-  } else if (value.abstentionReason !== undefined || ![...textFields, 'orderedIngredients', 'numbers'].some(field => value[field] !== undefined)) {
-    throw new Error('Candidate must contain observed proposals');
-  }
-  return value as unknown as ProductEvidenceExtractionCandidate;
+export function parseExtractionCandidate(value: unknown, evidenceId: string, expectedRole?: ExtractionEvidenceRole): ProductEvidenceExtractionCandidate {
+  // Preserve the two-argument fixture API using corpus-owned roles, never output-owned roles.
+  const role = expectedRole ?? extractionCorpus.find(fixture => fixture.id === evidenceId)?.gold.role ?? 'front_label';
+  return parseProductEvidenceExtraction(value, { evidenceId, role });
 }
 
 /** Extracted barcode is NOT trusted scanner input; resemblance remains candidate-only. */
 export function candidateToResolverEvidence(candidate: ProductEvidenceExtractionCandidate): ResolverEvidence {
-  if (candidate.outcome === 'abstained') return {};
-  return {
-    labelText: [candidate.labelText, candidate.brandText, candidate.productNameText, candidate.variantText, candidate.regionText, candidate.barcodeText].filter(Boolean).join(' ') || undefined,
-    ingredientList: candidate.orderedIngredients ? [...candidate.orderedIngredients] : undefined,
-  };
+  const parsed = parseExtractionCandidate(candidate, candidate.evidenceId);
+  return projectProductEvidenceExtraction(parsed, { evidenceId: parsed.evidenceId, role: parsed.role });
 }
 
 const canonical = (value: unknown): string => {
@@ -55,11 +38,11 @@ export function evaluateExtraction(outputs: Record<string, unknown>) {
   const rows: ExtractionEvaluationRow[] = extractionCorpus.map(fixture => {
     if (!Object.hasOwn(outputs, fixture.id)) return { id: fixture.id, status: 'NOT_RUN', errors: ['No extraction output supplied'] };
     try {
-      const candidate = parseExtractionCandidate(outputs[fixture.id], fixture.id);
+      const candidate = parseExtractionCandidate(outputs[fixture.id], fixture.id, fixture.gold.role);
       const errors = fields.filter(field => canonical(candidate[field as keyof typeof candidate]) !== canonical(fixture.gold[field as keyof typeof fixture.gold]));
       return { id: fixture.id, status: errors.length ? 'FAIL' : 'PASS', errors };
-    } catch (error) {
-      return { id: fixture.id, status: 'FAIL', errors: [error instanceof Error ? error.message : 'Invalid output'] };
+    } catch {
+      return { id: fixture.id, status: 'FAIL', errors: [new ProductEvidenceExtractionError().message] };
     }
   });
   const executed = rows.filter(row => row.status !== 'NOT_RUN').length;

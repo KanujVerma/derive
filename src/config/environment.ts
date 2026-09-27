@@ -1,9 +1,14 @@
+import { isApprovedDevelopmentLanBackend, normalizeDevelopmentLanUrl } from './localDevelopmentBackend.ts';
+
 export interface PublicEnvironmentInput {
   buildFlavor?: string;
   supabaseUrl?: string;
   supabasePublishableKey?: string;
   legacySupabaseAnonKey?: string;
   useRemoteService?: string;
+  developmentSupabaseLanUrl?: string;
+  /** The actual JS runtime marker, not another client environment flag. */
+  developmentRuntime?: boolean;
 }
 
 export type BuildFlavor = 'development' | 'remote-staging' | 'production';
@@ -14,6 +19,7 @@ export interface PublicEnvironment {
   supabasePublishableKey: string;
   supabaseKeySource: 'publishable' | 'legacy_anon' | 'missing';
   useRemoteService: boolean;
+  developmentSupabaseLanUrl?: string;
 }
 
 export interface StagingBuildDiagnostics {
@@ -55,7 +61,7 @@ function parseBooleanFlag(name: string, value: string | undefined): boolean {
   throw new Error(`${name} must be either "true" or "false".`);
 }
 
-function validateSupabaseUrl(value: string): void {
+function validateSupabaseUrl(value: string, approvedDevelopmentLanUrl?: string): void {
   if (!value) return;
 
   let url: URL;
@@ -66,7 +72,8 @@ function validateSupabaseUrl(value: string): void {
   }
 
   const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalHost)) {
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalHost)
+    && !(approvedDevelopmentLanUrl && value && normalizeDevelopmentLanUrl(value) === approvedDevelopmentLanUrl)) {
     throw new Error(
       'EXPO_PUBLIC_SUPABASE_URL must use HTTPS, except for a local Supabase URL.',
     );
@@ -114,7 +121,18 @@ export function resolvePublicEnvironment(
     input.useRemoteService,
   );
 
-  validateSupabaseUrl(supabaseUrl);
+  const requestedLanUrl = clean(input.developmentSupabaseLanUrl);
+  let approvedDevelopmentLanUrl: string | undefined;
+  if (requestedLanUrl) {
+    if (!useRemoteService || !isApprovedDevelopmentLanBackend({
+      supabaseUrl, developmentLanUrl: requestedLanUrl, buildFlavor,
+      developmentRuntime: input.developmentRuntime === true,
+    })) {
+      throw new Error('Development LAN testing requires a development JS runtime, Remote mode, and matching local test URLs.');
+    }
+    approvedDevelopmentLanUrl = normalizeDevelopmentLanUrl(requestedLanUrl);
+  }
+  validateSupabaseUrl(supabaseUrl, approvedDevelopmentLanUrl);
   validateSupabaseKeys(publishableKey, legacyAnonKey);
 
   if (buildFlavor === 'remote-staging') {
@@ -156,6 +174,7 @@ export function resolvePublicEnvironment(
     supabasePublishableKey,
     supabaseKeySource,
     useRemoteService,
+    ...(approvedDevelopmentLanUrl ? { developmentSupabaseLanUrl: approvedDevelopmentLanUrl } : {}),
   });
 }
 
@@ -165,6 +184,8 @@ export const publicEnvironment = resolvePublicEnvironment({
   supabasePublishableKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   legacySupabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   useRemoteService: process.env.EXPO_PUBLIC_USE_REMOTE_SERVICE,
+  developmentSupabaseLanUrl: process.env.EXPO_PUBLIC_DEV_SUPABASE_LAN_URL,
+  developmentRuntime: typeof __DEV__ !== 'undefined' && __DEV__,
 });
 
 export interface PublicLegalLinks {

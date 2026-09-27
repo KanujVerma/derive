@@ -28,6 +28,7 @@ Founder workstreams and subagents may run concurrently when their write-sets and
 
 ## Non-negotiables
 
+- Challenge assumptions using inspected source, tests and explicit evidence, not ticket prose alone. Surface major architectural decisions to the founders before implementing them; continue autonomously on bounded, reversible implementation decisions. Preserve active unpublished counterpart work instead of reconstructing it.
 - Keep service-role, Stripe and model-provider secrets out of client code; `app/**` must not import server AI workflows.
 - Never silently implement another feature DRI's work. Record cross-feature defects with evidence and owner.
 - Never weaken Auth, RLS, private Storage or deletion for convenience.
