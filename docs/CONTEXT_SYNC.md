@@ -7,6 +7,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
 
+## 2026-09-27: Acceptance cleanup review corrections
+
+- **Predecessor:** mainbe853d237d6b7bc1e5f3252ebeb88cf7f3f46c0f; source candidates K1 PR102 head9bcffb6f98977ef92163152601aaf289a35d4b00 and P0-D PR107 head6499f90943d5c046cb5bd02bed69c9d4e7b8926c.
+- **Corrected finding:** independently reproduced early-abort cleanup in both newly owned runners. Both helpers attempt every owned deletion and absence query, aggregate safe labels, and emit no success receipt when any check fails. K1 explicitly verifies context, assessments, cases, snapshots and catalog zero. P0-D requires actual Auth404 and iOS-export source evidence; injected regressions and final local service reruns passed.
+- **Proof:** K1 final source full68files/590registeredTAP, app/test types, web/iOS exports; fullpgTAP21/524 and actual controller/Edge/persistence with generated snapshot1 then cleanup0. P0-D corrected6499 final71files/612TAP, app/test types, web/iOS and actual12checks/32calls, receipt SHA256e10d4774856daa56441e4274cb47cacecb746a0c7c114d0510e4a112f7bff6b8; exactCI36336423403 both SUCCESS. Later reconciled heads require refreshed validation before merging.
+- **Limits:** native observations remain pinned8ec9fe5, not later candidates. Physical launch is still blocked by phone lock; human tester later. Hosted, intended binary, TestFlight and release-copy reconciliation remain open. Source review correction does not close #74/#88/#100.
+
 ## 2026-09-27: Kanuj beta-critical portfolio activation
 
 - **Immutable predecessor:** main22a210a7a720c9621d45e789b8690dcc73ab059a, both main CI36328042910 jobs SUCCESS. Original dirty/unpushed work and all old worktrees remain preserved; no rebuild of landed P0-B.
