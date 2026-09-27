@@ -39,10 +39,11 @@ export const extractionCorpus: SyntheticExtractionCase[] = [
 const record = (variant: string, formula: string, barcode: string, ingredients: string[], region = 'US'): CatalogResolutionRecord => ({
   productId: 'synthetic-aster', variantId: `synthetic-${variant}`, formulaVersionId: `synthetic-${formula}`,
   brand: 'Synthetic Aster', name: 'Clear Serum', variantName: variant, regionCode: region,
-  identifierType: 'UPC-A', identifierValue: barcode, identifierAuthority: 'manufacturer',
+  identifierType: 'gtin_12', identifierValue: barcode, identifierAuthority: 'manufacturer',
   identifierVerifiedAt: '2026-01-01T00:00:00Z', identifierFormulaVersionId: `synthetic-${formula}`,
   formulaVerificationStatus: 'verified', formulaSourceReference: 'synthetic-only:no-source',
   formulaObservedAt: '2026-01-01T00:00:00Z', ingredientFingerprint: ingredients.map(v => v.toLowerCase()).join('|'),
+  formulaIngredients: ingredients, formulaRegionCode: region,
 });
 export const syntheticCatalog: CatalogResolutionRecord[] = [
   record('30 mL 0.1%', 'us-old', '000000000017', ['Water', 'Glycerin', 'Panthenol']),

@@ -27,7 +27,8 @@ export function mapCaptureForCheck(handoff: CaptureHandoff, outcome?: CaptureRes
 
   return {
     authority: 'customer_evidence',
-    barcodeLookup: barcode && /^\d{8,14}$/.test(barcode) ? { barcode } : null,
+    // Mixed evidence must use the reviewed case, not Check's barcode-only fast path.
+    barcodeLookup: !localPhotos.length && barcode && /^\d{8,14}$/.test(barcode) ? { barcode } : null,
     localPhotos,
     review: { state: outcome?.state ?? 'pending', selectedCandidateId },
   };

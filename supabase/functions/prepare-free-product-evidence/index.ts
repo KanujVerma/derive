@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
     });
     if (error || !data || typeof data.storage_path !== "string") {
       if (error?.message?.includes("FREE_EVIDENCE_DAILY_LIMIT")) {
-        throw new ServiceError("DAILY_LIMIT", "Try adding more product photos tomorrow", 429);
+        throw new ServiceError("DAILY_LIMIT", "Try adding more product photos later", 429);
       }
       if (error?.message?.includes("FREE_EVIDENCE_REQUEST_CONFLICT")) {
         throw new ServiceError("REQUEST_CONFLICT", "This request ID was used for a different photo", 409);

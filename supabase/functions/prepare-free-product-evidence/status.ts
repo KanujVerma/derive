@@ -1,4 +1,13 @@
-import type { FreeProductEvidenceUpload, PrepareFreeProductEvidenceInput } from "../../../src/contracts/FreeProductEvidence.ts";
+// Edge bundles cannot import files outside supabase/functions, even type-only.
+// This local wire projection is checked against the client contract by tests.
+type PrepareFreeProductEvidenceInput = {
+  requestId: string;
+  role: "front_label" | "ingredients" | "packaging";
+  mimeType: "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif";
+};
+type FreeProductEvidenceUpload = Omit<PrepareFreeProductEvidenceInput, "requestId"> & {
+  bucket: "customer-product-evidence"; storagePath: string; maxBytes: number;
+};
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const EXTENSIONS: Record<FreeProductEvidenceUpload["mimeType"], string> = {

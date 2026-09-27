@@ -99,8 +99,8 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
     if (role !== 'barcode' || scanLocked.current || !/^\d{8,14}$/.test(data)) return;
     scanLocked.current = true;
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    if (autoFinishBarcode) {
-      onEvidenceReady(toCaptureHandoff(reduceCapture(createCaptureSession(), { type: 'barcode', value: data })));
+    if (autoFinishBarcode && !session.evidence.some((item) => item.kind === 'local_photo')) {
+      onEvidenceReady(toCaptureHandoff(reduceCapture(session, { type: 'barcode', value: data })));
       return;
     }
     setSession((previous) => reduceCapture(previous, { type: 'barcode', value: data }));
@@ -210,7 +210,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         <View style={[styles.outcomeWrap, { paddingTop: Math.max(insets.top, spacing.md) + 72, paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
           <ScrollView contentContainerStyle={styles.outcomeScroll}>
             <Text style={styles.outcomeTitle}>{session.phase === 'processing' ? 'Reviewing evidence' : session.phase === 'candidates' ? 'Possible product' : session.phase === 'ambiguous' ? 'Several possible products' : session.phase === 'candidate_selected' ? 'Candidate noted' : session.phase === 'unknown' ? 'Product unknown' : 'More evidence needed'}</Text>
-            <Text style={styles.outcomeBody}>{session.phase === 'processing' ? 'Checking the details you captured.' : session.phase === 'candidate_selected' ? 'Your selection is recorded as a possible match. Product and formula details still need verification.' : session.phase === 'unknown' ? 'We could not identify this product from the available evidence.' : session.phase === 'insufficient_evidence' ? 'A clearer label or ingredient list may help identify this product.' : 'Choose a possible match if you recognize it. This does not verify the product or formula.'}</Text>
+            <Text style={styles.outcomeBody}>{session.phase === 'processing' ? 'Checking the details you captured.' : session.phase === 'candidate_selected' ? 'Your selection is recorded as a possible match. It does not add verification.' : session.phase === 'unknown' ? 'We could not identify this product from the available evidence.' : session.phase === 'insufficient_evidence' ? 'We could not confirm this product. Try its barcode or search by name. Automatic photo identification is not available yet.' : 'Choose a possible match if you recognize it. Your choice does not verify the product or formula.'}</Text>
             {session.phase === 'processing' && <ActivityIndicator color={colors.brand} size="large" />}
             {(session.phase === 'candidates' || session.phase === 'ambiguous') && session.candidates.map((candidate) => (
               <Pressable key={candidate.id} accessibilityRole="button" onPress={() => { setSession((previous) => reduceCapture(previous, { type: 'confirm_candidate', candidateId: candidate.id })); void Haptics.selectionAsync().catch(() => {}); }} style={styles.candidate}>
