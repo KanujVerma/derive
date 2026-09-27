@@ -164,3 +164,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/free-context/deno.json"
 entrypoint = "./functions/free-context/index.ts"
+
+[functions.personal-context]
+enabled = true
+verify_jwt = true
+import_map = "./functions/personal-context/deno.json"
+entrypoint = "./functions/personal-context/index.ts"
