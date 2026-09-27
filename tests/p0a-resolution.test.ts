@@ -138,3 +138,25 @@ test('inconsistent duplicate formula metadata abstains regardless of array order
     }
   }
 });
+
+test('formula-only matching refuses a known contradictory formula market', () => {
+  const result = resolveProductIdentity({ ingredientList: ['Water', 'Glycerin'], regionCode: 'GB' }, [{ ...record, formulaIngredients: ['Water', 'Glycerin'], formulaRegionCode: 'US' }]);
+  assert.equal(result.state, 'insufficient_evidence');
+  assert.equal(result.selected, undefined);
+  assert.deepEqual(result.conflicts, ['region_mismatch']);
+  assert.equal(resolveProductIdentity({ ingredientList: ['Water', 'Glycerin'], regionCode: 'US' }, [{ ...record, formulaRegionCode: 'US' }]).state, 'formula_only');
+  assert.equal(resolveProductIdentity({ ingredientList: ['Water', 'Glycerin'], regionCode: 'GB' }, [{ ...record, regionCode: undefined, formulaRegionCode: undefined }]).state, 'formula_only');
+});
+
+test('barcode and literal label resembling another known product preserve conflict candidates', () => {
+  const other = { ...record, productId: 'product-2', variantId: 'variant-2', formulaVersionId: 'formula-2', brand: 'Other Lab', name: 'Other Wash', identifierValue: undefined };
+  const result = resolveProductIdentity({ barcode: record.identifierValue, labelText: 'Other Lab Other Wash' }, [record, other]);
+  assert.equal(result.state, 'ambiguous_candidates');
+  assert.equal(result.selected, undefined);
+  assert.deepEqual(result.conflicts, ['identity_mismatch']);
+  assert.deepEqual(new Set(result.candidates.map((candidate) => candidate.productId)), new Set(['product', 'product-2']));
+  for (const labelText of ['Evidence Lab Barrier Wash', 'unreadable package', 'Other Lab Other Washer']) {
+    assert.equal(resolveProductIdentity({ barcode: record.identifierValue, labelText }, [record, other]).state, 'verified_product_formula');
+  }
+  assert.equal(resolveProductIdentity({ labelText: 'Other Lab Other Wash' }, [record, other]).state, 'ambiguous_candidates');
+});

@@ -200,6 +200,20 @@ export function resolveProductIdentity(
       && AUTHORITATIVE_IDENTIFIER_SOURCES.has(record.identifierAuthority)
     );
     const matches = uniqueRecords(assertions);
+    // Literal resemblance can contradict a barcode, but can never verify a
+    // different product. Use only complete known brand/name phrases.
+    const label = ` ${identityEvidenceText(evidence.labelText)} `;
+    const otherLabelMatches = catalog.filter((record) => {
+      const brand = identityEvidenceText(record.brand);
+      const name = identityEvidenceText(record.name);
+      return Boolean(record.productId && brand && name
+        && label.includes(` ${brand} `) && label.includes(` ${name} `)
+        && !matches.some((match) => match.productId === record.productId));
+    });
+    if (matches.length && otherLabelMatches.length) return {
+      ...ambiguousDecision([...matches, ...otherLabelMatches], "combined_candidate_evidence", ["submitted label resembles another catalog product and conflicts with authoritative identifier"]),
+      conflicts: ["identity_mismatch"],
+    };
     // Typed observations do not override an identifier. A contradiction must
     // remain visible rather than being discarded by barcode-first precedence.
     const identityFields: [string | undefined, keyof CatalogResolutionRecord][] = [
@@ -300,10 +314,18 @@ export function resolveProductIdentity(
   }
 
   if (evidence.ingredientList?.length) {
-    const formulaMatches = uniqueRecords(catalog.filter((record) =>
+    const ingredientMatches = catalog.filter((record) =>
       record.formulaVerificationStatus === "verified"
       && matchesIngredientEvidence(evidence.ingredientList!, record)
-    ));
+    );
+    const compatible = ingredientMatches.filter((record) => !record.formulaRegionCode
+      || ![evidence.regionCode, record.regionCode].some((region) => Boolean(region)
+        && conservativeText(region) !== conservativeText(record.formulaRegionCode)));
+    const formulaMatches = uniqueRecords(compatible);
+    if (ingredientMatches.length && !formulaMatches.length) return {
+      state: "insufficient_evidence", candidates: [], nextAction: "manual_review",
+      requiresFounderReview: true, conflicts: ["region_mismatch"],
+    };
     if (formulaMatches.length === 1) {
       const match = formulaMatches[0];
       return {

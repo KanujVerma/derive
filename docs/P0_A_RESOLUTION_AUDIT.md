@@ -48,3 +48,13 @@ The approved follow-up separates evidence equality from the persisted fingerprin
 Root integration must project raw `product_formula_versions.ingredients` and `region_code` into these optional pure-record fields. These columns already exist; the leaf adds no migration or Edge edits. The pure module can now detect the market mismatch flagged above once Edge supplies it. Typed family selection remains conservative and never gains formula authority.
 
 Follow-up validation: focused `tests/p0a-resolution.test.ts` 19/19 and full `npm test` 479/479 pass; `git diff --check` passes. `npx --no-install tsc --noEmit` and `npm run typecheck:tests` both pass with zero errors against the root's complete dependency environment. The temporary dependency symlink was removed. Database, Edge, exports and CI remain root gates.
+
+## Final integrated-tree review
+
+Read-only review of the root integration found ingredient-only matches still ignored known submitted/formula market contradictions. Although the snapshot correctly marked formula-only as not applicable to a selected package, returning that formula association without conflict was misleading. Formula-only matching now excludes known incompatible formula markets; if all otherwise matching formula records are excluded, it returns insufficient evidence with `region_mismatch`. Unknown formula markets remain unknown and do not invent compatibility.
+
+A barcode plus a label naming another complete known catalog brand/product previously returned verified barcode truth. The pure resolver now preserves both candidates as ambiguous with `identity_mismatch`. Matching uses complete literal brand/name phrases with word boundaries, retains Unicode and decimal/slash notation, and never promotes a label to authority. Generic unreadable text and incomplete/sub-string product names are not treated as recognized contradictions.
+
+The capture processor, automatic barcode handoff and Check composition separately discard simultaneous photos. Root owns the serial fix: preserve existing photos when adding barcode, upload all supplied photo roles, resolve once with the combined evidence, bind retries to all evidence and prefer an existing exact mixed-evidence result. This leaf does not edit those surfaces or claim photo extraction exists.
+
+Final validation: focused regression cases 21/21, full `npm test` 481/481, both TypeScript checks and `git diff --check` pass. This review does not expand typed-family authority or introduce a broad label parser.
