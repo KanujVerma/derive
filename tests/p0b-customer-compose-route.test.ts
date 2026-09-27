@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const source = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const route = source('app/personalize/index.tsx'), check = source('src/components/check/CheckProductScreen.tsx'), fixture = source('app/personalize/fixture.tsx'), layout = source('app/_layout.tsx');
+for (const component of ['ContextFlow', 'RoutineContext', 'ExperienceContext']) assert.ok(route.includes(component));
+assert.ok(route.includes("operation: 'append_experience'"));
+assert.ok(route.includes('supersedesRevisionId: edit.supersedesRevisionId'));
+assert.ok(route.includes('currentCustomerOwner() === ownerId'));
+assert.ok(check.includes('resolution?.truthSnapshot ?? null'));
+assert.ok(check.includes('expectedBinding={visibleDecision.expectedBinding}'));
+assert.ok(check.includes("step === 'view_product_facts'"));
+assert.ok(!check.includes('expectedBinding={customerState.decision.packet.binding}'));
+assert.ok(fixture.includes("!__DEV__ || publicEnvironment.buildFlavor !== 'development' || shell === 'legacy'"));
+assert.ok(fixture.includes('DEVELOPMENT FIXTURE'));
+assert.ok(!fixture.includes('writePersonalContext'));
+assert.ok(layout.includes("__DEV__ && publicEnvironment.buildFlavor === 'development' && shell !== 'legacy'"));
+console.log('P0-B customer route and fixture boundaries passed');

@@ -6,11 +6,13 @@ This document separates current runtime evidence from the approved target. The t
 
 ### CURRENT IMPLEMENTATION
 
-At main d793639, Development Mock and exact-local-Supabase Development Remote contain the scanner-first free path. Remote Staging and production retain legacy managed routing; hosted anonymous guest activation remains gated. The public anon database role has no application-table privileges. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the local platform access matrix.
+At the P0-B source checkpoint `7775a42`, Development Mock and exact-local-Supabase Development Remote contain the scanner-first free path. Remote Staging and production retain legacy managed routing; hosted anonymous guest activation remains gated. The public anon database role has no application-table privileges. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the local platform access matrix.
 
 The mobile Check path uses Expo Camera directly. S6 has product, variant, identifier, append-only formula-version, provenance, evidence, and resolution-case concepts. Private product evidence and K4/S4 camera-to-evidence integration exist locally, but photo-only input has no working OCR/image-recognition extraction. Candidate or user-supplied text cannot establish verified formula truth.
 
-The local free profile, first-match Personal Fit, saved-product/check/experience history, and evidence upload are bounded implementations. Personal Fit returns a narrow sequential result, not every applicable finding or a versioned personal decision packet. Free event history is not a canonical routine/exposure timeline. ProductTruthSnapshot, concentration assertions, regulatory-constraint records, the full scientific-claim model, and multi-finding decision packet are not implemented. Physical scanner acceptance is unverified.
+The merged free profile, first-match Personal Fit, saved-product/check/experience history, and evidence upload are bounded implementations. P0-A now produces and stores immutable owner-bound ProductTruthSnapshotV1 records. The existing first-match fit and free event history do not become a multi-finding decision or canonical routine timeline merely because a snapshot exists. Concentration assertions, regulatory-constraint records and the full scientific-claim model remain unimplemented. Physical scanner acceptance is unverified.
+
+P0-B's seven focused source PRs are merged. Development Remote with exact local Supabase consumes actual immutable P0-A snapshots, canonical reported context revisions and corrected history to produce a deterministic multi-finding PersonalDecisionPacketV1. Check, shared editors and My Stuff consume the owner-bound result/readback; the legacy S2 path remains distinct and its client transport is also owner-pinned. Category assertions and routine formula evidence are independently sourced and frozen with each evaluation; neither becomes new P0-A truth. This is merged source plus automated local proof, not hosted activation or physical/customer acceptance. See [P0_B_EXECUTION.md](P0_B_EXECUTION.md) for exact PR, CI and acceptance evidence.
 
 ### APPROVED TARGET, NOT YET IMPLEMENTED
 
