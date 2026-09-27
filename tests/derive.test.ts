@@ -1243,6 +1243,7 @@ test('Environment template: Lists only approved names and contains zero credenti
 
   assert.deepEqual(names, [
     'EXPO_PUBLIC_BUILD_FLAVOR',
+    'EXPO_PUBLIC_DEV_SUPABASE_LAN_URL',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'EXPO_PUBLIC_SUPABASE_URL',
@@ -1251,6 +1252,7 @@ test('Environment template: Lists only approved names and contains zero credenti
 
   const approvedPublicNames = new Set([
     'EXPO_PUBLIC_BUILD_FLAVOR',
+    'EXPO_PUBLIC_DEV_SUPABASE_LAN_URL',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'EXPO_PUBLIC_SUPABASE_URL',
@@ -1272,6 +1274,7 @@ test('Environment template: Lists only approved names and contains zero credenti
 test('Environment guard: Mobile source references only approved public variables', () => {
   const approved = new Set([
     'EXPO_PUBLIC_BUILD_FLAVOR',
+    'EXPO_PUBLIC_DEV_SUPABASE_LAN_URL',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
     'EXPO_PUBLIC_SUPABASE_ANON_KEY', // Temporary compatibility fallback only.
     'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',

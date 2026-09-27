@@ -1,4 +1,6 @@
 import type { BuildFlavor } from '../config/environment.ts';
+import { publicEnvironment } from '../config/environment.ts';
+import { isApprovedDevelopmentLanBackend } from '../config/localDevelopmentBackend.ts';
 import type { ShopAudience } from '../commerce/types.ts';
 
 /** Client presentation only. This is not an access or membership decision. */
@@ -12,9 +14,17 @@ export function resolveShellPresentation(input: {
   buildFlavor: BuildFlavor;
   remoteEnabled: boolean;
   supabaseUrl?: string;
+  developmentLanUrl?: string;
+  developmentRuntime?: boolean;
 }): ShellPresentation {
   if (input.buildFlavor !== 'development') return 'legacy';
   if (!input.remoteEnabled) return 'scanner_first_preview';
+  if (isApprovedDevelopmentLanBackend({
+    supabaseUrl: input.supabaseUrl ?? '',
+    developmentLanUrl: input.developmentLanUrl ?? publicEnvironment.developmentSupabaseLanUrl,
+    buildFlavor: input.buildFlavor,
+    developmentRuntime: input.developmentRuntime ?? (typeof __DEV__ !== 'undefined' && __DEV__),
+  })) return 'local_free_integration';
   try {
     const url = new URL(input.supabaseUrl ?? '');
     if (['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
