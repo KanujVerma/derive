@@ -1,8 +1,10 @@
+import { GOALS } from '../p0b-personalization/draft.ts';
+import type { SafetyField } from '../p0b-personalization/draft.ts';
 import { hasVerifiedPackageFormula } from '../../contracts/ProductTruthSnapshot.ts';
 import type { DecisionTruthRef } from '../../contracts/PersonalDecisionService.ts';
 import { projectTrustedSnapshot } from './truthAdapter.ts';
 import { describePersonalDecision } from './result.ts';
-import type { PersonalContextRequest, PersonalContextSnapshot, PersonalContextWriteResult, PersonalExperiencePage } from '../../contracts/PersonalContext.ts';
+import type { PersonalContextRequest, PersonalContextSnapshot, PersonalContextWriteResult, PersonalExperiencePage, ContextProductReference, PersonalProfileInput } from '../../contracts/PersonalContext.ts';
 import type { DecisionBinding, PersonalDecisionPacketV1 } from '../../contracts/PersonalDecision.ts';
 import type { ProductTruthSnapshotV1 } from '../../contracts/ProductTruthSnapshot.ts';
 export type CustomerWrite = { operation: 'save_profile'; profile: Extract<PersonalContextRequest, { operation: 'save_profile' }>['profile'] }
@@ -10,17 +12,19 @@ export type CustomerWrite = { operation: 'save_profile'; profile: Extract<Person
   | { operation: 'append_experience'; experience: Extract<PersonalContextRequest, { operation: 'append_experience' }>['experience']; supersedesRevisionId: string | null };
 export type CustomerDecision = { kind: 'idle' | 'loading' } | { kind: 'unavailable'; reason: string } | { kind: 'ready'; packet: PersonalDecisionPacketV1; expectedBinding: DecisionBinding; truthRef: DecisionTruthRef; contextRevision: number };
 export interface CustomerGateway {
+  labels?(ownerId: string, references: Array<Extract<ContextProductReference, { kind: 'catalog' }>>): Promise<Record<string, string>>;
   load(ownerId: string): Promise<PersonalContextSnapshot>;
   write(ownerId: string, request: Exclude<PersonalContextRequest, { operation: 'get_context' | 'get_revision' | 'get_experiences' }>): Promise<PersonalContextWriteResult>;
   history?(ownerId: string, request: { operation: 'get_experiences'; atRevision: number; limit: number; cursor?: string }): Promise<PersonalExperiencePage>;
   evaluate(ownerId: string, request: { operation: 'evaluate'; requestId: string; caseId: string; snapshotId: string }): Promise<{ kind: 'unavailable'; reason: string } | { kind: 'ready'; assessmentId: string; ownerId: string; contextRevision: number; snapshotRef: { caseId: string; snapshotId: string }; packet: PersonalDecisionPacketV1; expectedBinding: DecisionBinding; runtime: 'authoritative' | 'local_fixture'; truthRef: { caseId: string; snapshotId: string; caseRevision: number; resolverVersion: string; sourceBoundaryRevision: string; categoryBoundaryRevision: string | null } }>;
 }
-export interface CustomerState { originReference: { kind: 'catalog'; label: string; productId: string; variantId: string | null; formulaVersionId: string | null } | null; ownerId: string | null; context: PersonalContextSnapshot | null; status: 'idle' | 'loading' | 'ready' | 'saving' | 'error'; error: string | null; decision: CustomerDecision }
+export interface CustomerState { displayLabels: Record<string, string>; originReference: { kind: 'catalog'; label: string; productId: string; variantId: string | null; formulaVersionId: string | null } | null; ownerId: string | null; context: PersonalContextSnapshot | null; status: 'idle' | 'loading' | 'ready' | 'saving' | 'error'; error: string | null; decision: CustomerDecision }
 /** Host-owned authenticated controller. No persistent client context or snapshot promotion. */
 export class CustomerController {
-  private state: CustomerState = { originReference: null, ownerId: null, context: null, status: 'idle', error: null, decision: { kind: 'idle' } };
+  private state: CustomerState = { displayLabels: {}, originReference: null, ownerId: null, context: null, status: 'idle', error: null, decision: { kind: 'idle' } };
   private generation = 0; private loadSequence = 0; private evaluationSequence = 0;
   private listeners = new Set<() => void>();
+  private labelSequence = 0;
   private historyCursor: string | null | undefined = undefined;
   private pendingAssessment: { key: string; request: Parameters<CustomerGateway['evaluate']>[1] } | null = null;
   private writingGeneration: number | null = null;
@@ -30,17 +34,28 @@ export class CustomerController {
   getState = (): CustomerState => this.state;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private publish(patch: Partial<CustomerState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); }
-  setOwner(ownerId: string | null) { if (ownerId === this.state.ownerId) return; this.generation++; this.pending = null; this.pendingAssessment = null; this.historyCursor = undefined; this.publish({ originReference: null, ownerId, context: null, status: 'idle', error: null, decision: { kind: 'idle' } }); }
+  setOwner(ownerId: string | null) { if (ownerId === this.state.ownerId) return; this.generation++; this.pending = null; this.pendingAssessment = null; this.historyCursor = undefined; this.publish({ displayLabels: {}, originReference: null, ownerId, context: null, status: 'idle', error: null, decision: { kind: 'idle' } }); }
   setOriginSnapshot(ownerId: string | null, snapshot: ProductTruthSnapshotV1 | null) {
-    const refs = snapshot?.catalogReferences;
-    this.publish({ originReference: ownerId && this.state.ownerId === ownerId && refs?.productId && snapshot?.product ? { kind: 'catalog', label: [snapshot.product.brand, snapshot.product.name].filter(Boolean).join(' '), productId: refs.productId, variantId: refs.variantId, formulaVersionId: refs.formulaVersionId } : null });
+    const projected = snapshot ? projectTrustedSnapshot({ snapshot }) : null;
+    const identity = projected?.identity.state === 'known' ? projected.identity.value : null;
+    const formula = projected?.formula.state === 'known' ? projected.formula.value : null;
+    this.publish({ originReference: ownerId && this.state.ownerId === ownerId && identity && snapshot?.product ? { kind: 'catalog', label: [snapshot.product.brand, snapshot.product.name].filter(Boolean).join(' '), productId: identity.productId, variantId: identity.variantId, formulaVersionId: formula?.formulaVersionId ?? null } : null });
   }
   async load(): Promise<boolean> {
     const owner = this.state.ownerId, generation = this.generation, sequence = ++this.loadSequence;
     if (!owner) return false;
     this.publish({ status: 'loading', error: null, decision: { kind: 'idle' } });
-    try { const context = await this.gateway.load(owner); if (generation !== this.generation || sequence !== this.loadSequence) return false; if (context.ownerId !== owner || context.profile && context.profile.ownerId !== owner || context.routine && context.routine.ownerId !== owner || context.experiences.some(item => item.ownerId !== owner)) throw new Error('OWNER_MISMATCH'); this.historyCursor = context.historyTruncated ? undefined : null; this.publish({ context, status: 'ready' }); return true; }
+    try { const context = await this.gateway.load(owner); if (generation !== this.generation || sequence !== this.loadSequence) return false; if (context.ownerId !== owner || context.profile && context.profile.ownerId !== owner || context.routine && context.routine.ownerId !== owner || context.experiences.some(item => item.ownerId !== owner)) throw new Error('OWNER_MISMATCH'); this.historyCursor = context.historyTruncated ? undefined : null; this.publish({ context, status: 'ready' }); void this.loadDisplayLabels(); return true; }
     catch { if (generation === this.generation && sequence === this.loadSequence) this.publish({ context: null, status: 'error', error: 'Your context could not be loaded. Please try again.' }); return false; }
+  }
+  async loadDisplayLabels(): Promise<void> {
+    const owner = this.state.ownerId, context = this.state.context, generation = this.generation, sequence = ++this.labelSequence;
+    if (!owner || !context || !this.gateway.labels) return;
+    const references = [...(context.routine?.data.items.map(item => item.reference) ?? []), ...context.experiences.map(item => item.data.reference)]
+      .filter((reference): reference is Extract<ContextProductReference, { kind: 'catalog' }> => reference.kind === 'catalog');
+    try { const labels = await this.gateway.labels(owner, references);
+      if (generation === this.generation && sequence === this.labelSequence && this.state.context?.revision === context.revision) this.publish({ displayLabels: { ...labels } });
+    } catch { /* Display names remain explicitly unavailable; identity/formula authority is unchanged. */ }
   }
   async loadMoreHistory(): Promise<boolean> {
     const owner = this.state.ownerId, context = this.state.context, generation = this.generation;
@@ -50,7 +65,7 @@ export class CustomerController {
       if (generation !== this.generation || this.state.context?.revision !== context.revision) return false;
       if (page.atRevision !== context.revision || page.items.some(item => item.ownerId !== owner)) throw new Error('STALE_HISTORY');
       const records = new Map(context.experiences.map(item => [item.data.id, item])); page.items.forEach(item => records.set(item.data.id, item)); this.historyCursor = page.nextCursor;
-      this.publish({ context: { ...context, experiences: [...records.values()], historyTruncated: Boolean(page.nextCursor) }, status: 'ready' }); return true;
+      this.publish({ context: { ...context, experiences: [...records.values()], historyTruncated: Boolean(page.nextCursor) }, status: 'ready' }); void this.loadDisplayLabels(); return true;
     } catch { if (generation === this.generation) this.publish({ status: 'error', error: 'More history could not be loaded. Please try again.' }); return false; }
   }
   async save(input: CustomerWrite): Promise<boolean> {
@@ -70,7 +85,7 @@ export class CustomerController {
   }
   async assess(snapshot: ProductTruthSnapshotV1 | null): Promise<void> {
     const owner = this.state.ownerId, context = this.state.context, generation = this.generation, sequence = ++this.evaluationSequence;
-    if (!owner || !context || context.ownerId !== owner || context.profile && context.profile.ownerId !== owner || context.routine && context.routine.ownerId !== owner || context.experiences.some(item => item.ownerId !== owner) || !snapshot) { this.publish({ decision: { kind: 'unavailable', reason: 'Authoritative product evidence is not available. Product facts remain useful.' } }); return; }
+    if (!owner || !context || context.ownerId !== owner || context.profile && context.profile.ownerId !== owner || context.routine && context.routine.ownerId !== owner || context.experiences.some(item => item.ownerId !== owner) || !snapshot) { this.publish({ decision: { kind: 'unavailable', reason: "We don't have enough product evidence for a personal decision. Product facts are still available." } }); return; }
     const key = JSON.stringify([owner, context.revision, snapshot.resolutionCaseId, snapshot.snapshotId]);
     if (!this.pendingAssessment || this.pendingAssessment.key !== key) this.pendingAssessment = { key, request: { operation: 'evaluate', requestId: this.createId(), caseId: snapshot.resolutionCaseId, snapshotId: snapshot.snapshotId } };
     const request = this.pendingAssessment.request;
@@ -116,5 +131,66 @@ export interface CustomerCheckFacts { brand: string; name: string; categoryLabel
 export function selectCustomerCheckFacts(snapshot: ProductTruthSnapshotV1 | null, catalog: CustomerCheckFacts): CustomerCheckFacts {
   if (!snapshot) return catalog;
   const formula = hasVerifiedPackageFormula(snapshot) ? snapshot.formula : null;
-  return { brand: snapshot.product?.brand ?? 'Unconfirmed identity', name: snapshot.product?.name ?? 'Product identity needs confirmation', categoryLabel: 'Product formula evidence', formula: formula ? { ingredients: [...formula.ingredients], provenanceType: formula.provenanceType, observedAt: formula.observedAt } : null, source: formula?.publicSourceUrl ?? null };
+  const identityKnown = projectTrustedSnapshot({ snapshot }).identity.state === 'known';
+  return { brand: identityKnown ? snapshot.product?.brand ?? 'Unconfirmed identity' : 'Unconfirmed identity', name: identityKnown ? snapshot.product?.name ?? 'Product identity needs confirmation' : 'Product identity needs confirmation', categoryLabel: 'Product formula evidence', formula: formula ? { ingredients: [...formula.ingredients], provenanceType: formula.provenanceType, observedAt: formula.observedAt } : null, source: formula?.publicSourceUrl ?? null };
+}
+/** A current catalog outage cannot erase an already resolved immutable snapshot. */
+export async function loadOptionalCustomerCatalog<T>(snapshot: ProductTruthSnapshotV1 | null, load: () => Promise<T>): Promise<T | null> {
+  try { return await load(); } catch (error) { if (snapshot) return null; throw error; }
+}
+/** Unknown canonical context must not reveal an older S2 fit while current context is loading. */
+export function canShowLegacyPersonalFit(state: CustomerState, ownerId: string | null): boolean {
+  const context = state.context;
+  return Boolean(ownerId && state.ownerId === ownerId && state.status === 'ready' && context?.ownerId === ownerId && !context.profile && !context.routine && context.experiences.length === 0 && !context.historyTruncated && context.historyRevision === null);
+}
+
+/** Question relevance comes from a bound reviewed rule, never client ingredient matching. */
+export function deriveJitReproductiveQuestions(packet: PersonalDecisionPacketV1 | null, binding: DecisionBinding | null, context: PersonalContextSnapshot | null): SafetyField[] {
+  if (!packet || !binding || !context?.profile || binding.ownerId !== context.ownerId || binding.profileRevision !== context.profile.id || binding.routineRevision !== (context.routine?.id ?? null) || binding.historyRevision !== context.historyRevision || !binding.formulaVersionId || !binding.variantId || describePersonalDecision(packet, binding).kind !== 'ready') return [];
+  const relevant = packet.findings.filter(finding => finding.ruleId === 's2_retinoid_reproductive' && finding.evidence.some(evidence => evidence.kind === 'product_fact' && evidence.scope === 'formula' && evidence.snapshotRevision === binding.productSnapshotRevision && evidence.productId === binding.productId && evidence.variantId === binding.variantId && evidence.formulaVersionId === binding.formulaVersionId));
+  const relatedNeed = (code: 'reproductive_context' | 'reviewed_claim') => packet.evidenceNeeds.some(need => need.code === code && need.critical && relevant.some(finding => need.findingIds.includes(finding.id) && finding.evidenceNeedIds.includes(need.id)));
+  const answers = context.profile.data.reproductive;
+  const questions = new Set<SafetyField>();
+  if (relatedNeed('reproductive_context')) {
+    if (!['yes', 'no'].includes(answers.pregnancy)) questions.add('pregnancy');
+    if (!['yes', 'no'].includes(answers.nursing)) questions.add('nursing');
+  }
+  if (relatedNeed('reviewed_claim') && answers.tryingToConceive !== 'no') questions.add('trying');
+  return (['pregnancy', 'trying', 'nursing'] as const).filter(field => questions.has(field));
+}
+/** Explicit editing of already shared answers adds no new sensitive intake. */
+export function deriveProfileEditQuestions(profile: PersonalProfileInput | null, jitReproductive: readonly SafetyField[], jitContext: readonly ('treatments' | 'sensitivities')[]): { reproductive: SafetyField[]; context: Array<'treatments' | 'sensitivities'> } {
+  const fields = [['pregnancy', 'pregnancy'], ['trying', 'tryingToConceive'], ['nursing', 'nursing']] as const;
+  return { reproductive: fields.filter(([field, stored]) => jitReproductive.includes(field) || Boolean(profile && profile.reproductive[stored] !== 'unanswered')).map(([field]) => field), context: (['treatments', 'sensitivities'] as const).filter(field => jitContext.includes(field) || Boolean(profile && profile[field].status !== 'unanswered')) };
+}
+export interface CustomerFunctionClient { functions: { invoke: (name: string, options: { body: object; headers?: Record<string, string> }) => Promise<{ data: unknown; error: unknown }> } }
+export interface CustomerSessionSource extends CustomerFunctionClient { auth: { getSession: () => Promise<{ data: { session: { access_token: string; user: { id: string } } | null }; error?: unknown }> } }
+/** Per-request session capture prevents SDK token rotation from changing the body owner. */
+export async function captureCustomerFunctionClient(ownerId: string, source: CustomerSessionSource | null, getOwner: () => string | null, onMismatch: (owner: string | null) => void): Promise<CustomerFunctionClient> {
+  const fail = (owner: string | null): never => { onMismatch(owner); throw Object.assign(new Error('The session changed.'), { code: 'OWNER_CHANGED' }); };
+  const guard = () => { const owner = getOwner(); if (owner !== ownerId) fail(owner); };
+  guard(); if (!source) return fail(null);
+  const sessionResult = await source.auth.getSession().catch(() => fail(null)); guard();
+  const session = sessionResult.data.session;
+  if (sessionResult.error || typeof session?.access_token !== 'string' || !session.access_token.trim() || session.user?.id !== ownerId) return fail(null);
+  const token = session.access_token;
+  return { functions: { async invoke(name, options) { guard(); const result = await source.functions.invoke(name, { ...options, headers: { ...options.headers, Authorization: `Bearer ${token}` } }); guard(); return result; } } };
+}
+/** Root lifetime ownership cleanup stays active when individual feature screens are unmounted. */
+export function bindCustomerOwnerLifecycle(controller: CustomerController, getOwner: () => string | null, subscribeAuth: (listener: () => void) => () => void, subscribeAccess: (listener: () => void) => () => void): () => void {
+  const sync = () => controller.setOwner(getOwner()); sync();
+  const stopAuth = subscribeAuth(sync), stopAccess = subscribeAccess(sync);
+  return () => { stopAuth(); stopAccess(); controller.setOwner(null); };
+}
+export type CanonicalMyStuffSummary = { kind: 'loading' | 'unavailable' } | { kind: 'ready'; hasProfile: boolean; primaryGoal: string | null; secondaryGoals: string[]; experienceSummary: string };
+/** Canonical summaries never infer a primary goal or report kind from legacy S2/S3 data. */
+export function describeCanonicalMyStuff(state: CustomerState, ownerId: string | null): CanonicalMyStuffSummary {
+  if (!ownerId || state.ownerId !== ownerId) return { kind: 'loading' };
+  if (state.status === 'error') return { kind: 'unavailable' };
+  const context = state.context;
+  if (state.status !== 'ready' || !context || context.ownerId !== ownerId || !Number.isSafeInteger(context.revision) || context.revision < 0 || (context.profile && (context.profile.ownerId !== ownerId || !context.profile.id))) return { kind: 'loading' };
+  const profile = context.profile?.data;
+  const label = (goal: string) => GOALS.find(([value]) => value === goal)?.[1] ?? 'Unknown goal';
+  const count = context.experiences.length, noun = count === 1 ? 'product experience' : 'product experiences';
+  return { kind: 'ready', hasProfile: Boolean(profile), primaryGoal: profile?.primaryGoal ? label(profile.primaryGoal) : null, secondaryGoals: profile?.secondaryGoals.map(label) ?? [], experienceSummary: context.historyTruncated ? `${count} recent ${noun}; more are available.` : `${count} saved ${noun}.` };
 }

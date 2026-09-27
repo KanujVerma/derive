@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { profileFromStorage, profileToStorage, routineFromStorage, routineToStorage, experienceFromStorage, experienceToStorage } from '../src/presentation/p0b-personalization/storageAdapter.ts';
+import { profileFromStorage, profileToStorage, routineFromStorage, routineToStorage, experienceFromStorage, experienceToStorage, catalogReferenceKey, contextProductLabel } from '../src/presentation/p0b-personalization/storageAdapter.ts';
 import { createContextDraft, manualRoutineItem } from '../src/presentation/p0b-personalization/draft.ts';
 const draft = createContextDraft(); draft.treatments = { state: 'unsure' }; draft.sensitivities = { state: 'withheld' };
 assert.equal(profileToStorage(draft).treatments.status, 'unsure');
@@ -32,3 +32,8 @@ for (const unit of ['day', 'week', 'month'] as const) {
   const exact = { ...routine, items: [{ ...routine.items[0], frequency: { kind: 'exact' as const, count: 2, unit }, startedOn: '2026-01-01', stoppedOn: '2026-02-01', duration: { count: 4, unit: 'weeks' as const } }] };
   assert.deepEqual(routineToStorage(routineFromStorage(routineToStorage(exact))), routineToStorage(exact));
 }
+const catalogReferences = [{ kind: 'catalog' as const, productId: 'product-a', variantId: null, formulaVersionId: null }, { kind: 'catalog' as const, productId: 'product-b', variantId: null, formulaVersionId: null }];
+const labels = { [catalogReferenceKey(catalogReferences[0])]: 'Current name: Brand A Cream', [catalogReferenceKey(catalogReferences[1])]: 'Current name: Brand B Cleanser' };
+assert.notEqual(contextProductLabel(catalogReferences[0], labels), contextProductLabel(catalogReferences[1], labels));
+assert.equal(contextProductLabel(catalogReferences[0], {}), 'Saved product 1 (name unavailable)');
+assert.equal(contextProductLabel(catalogReferences[1], {}, 2), 'Saved product 2 (name unavailable)');

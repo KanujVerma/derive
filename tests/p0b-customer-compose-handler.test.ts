@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { CustomerController, selectVisibleCustomerDecision, selectCustomerCheckFacts } from '../src/presentation/personal-decision/customerController.ts';
+import { CustomerController, selectVisibleCustomerDecision, selectCustomerCheckFacts, loadOptionalCustomerCatalog } from '../src/presentation/personal-decision/customerController.ts';
 import { evaluateDecisionRequest } from '../supabase/functions/personal-decision/handler.ts';
 import type { DecisionDependencies, SavedAssessment } from '../supabase/functions/personal-decision/handler.ts';
 import { fixtureSnapshot } from '../supabase/functions/personal-decision/fixtures.ts';
@@ -47,3 +47,5 @@ assert.equal(frozenFacts.brand, snapshot.product?.brand);
 assert.deepEqual(frozenFacts.formula?.ingredients, ['Water', 'Glycerin']);
 assert.equal(frozenFacts.source, null);
 assert.equal(selectCustomerCheckFacts({ ...snapshot, state: 'identified_formula_unverified', formula: null }, mutableCatalog).formula, null);
+assert.equal(await loadOptionalCustomerCatalog(snapshot, async () => { throw new Error('Catalog 404'); }), null);
+await assert.rejects(() => loadOptionalCustomerCatalog(null, async () => { throw new Error('Catalog 404'); }));

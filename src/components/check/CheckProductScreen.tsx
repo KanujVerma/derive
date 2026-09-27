@@ -55,7 +55,7 @@ import { canPublishCheckResult, createCheckMemorySaver, selectFreeCheckOwner,
   selectSavableCheckCaseId, shouldHideCheckForOwner, validateCheckResolution } from '@/src/presentation/check/checkMemory';
 import { PersonalDecisionPanel } from '@/src/components/personal-decision/PersonalDecisionPanel';
 import { customerController, currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
-import { selectVisibleCustomerDecision, selectCustomerCheckFacts } from '@/src/presentation/personal-decision/customerController';
+import { selectVisibleCustomerDecision, selectCustomerCheckFacts, loadOptionalCustomerCatalog, canShowLegacyPersonalFit } from '@/src/presentation/personal-decision/customerController';
 import type { DecisionNextStep } from '@/src/contracts/PersonalDecision';
 import { recordFreeCheck } from '@/src/services/remote/freeContext';
 
@@ -85,7 +85,7 @@ export default function CheckProductScreen() {
   const gateway = integrated ? remotePersonalizationGateway : personalizationGateway;
   const [legacyPersonalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
   const customerState = useSyncExternalStore(customerController.subscribe, customerController.getState);
-  const personalFitState: PersonalFitRefreshInput = customerState.ownerId === liveCheckOwner && customerState.context && (customerState.context.profile || customerState.context.routine || customerState.context.experiences.length) ? { kind: 'factual_only' } : legacyPersonalFitState;
+  const personalFitState: PersonalFitRefreshInput = integrated && liveCheckOwner && !canShowLegacyPersonalFit(customerState, liveCheckOwner) ? { kind: 'factual_only' } : legacyPersonalFitState;
   const resultScroll = useRef<ScrollView>(null);
   const [nextStepMessage, setNextStepMessage] = useState<{ snapshotId: string; contextRevision: number; text: string } | null>(null);
   const openPersonalization = () => router.push('/personalize');
@@ -113,7 +113,7 @@ export default function CheckProductScreen() {
     return () => { active = false; };
   }, [liveCheckOwner, personalTarget]));
   useEffect(() => { customerController.setOwner(currentCustomerOwner()); }, [sessionUserId, authStatus, accessStatus, accessUserId, accessOwnerId]);
-  const openDecisionEditor = (mode: 'profile' | 'routine' | 'history') => router.push({ pathname: '/personalize', params: { p0b: '1', mode } });
+  const openDecisionEditor = (mode: 'profile' | 'routine' | 'history') => router.push({ pathname: '/personalize', params: { p0b: '1', mode, source: 'check', snapshotId: personalTarget?.snapshotId } });
   const handleDecisionStep = (step: DecisionNextStep) => {
     if (!visibleDecision) return;
     if (step === 'add_context') { openDecisionEditor('profile'); return; }
@@ -321,7 +321,7 @@ export default function CheckProductScreen() {
     try {
       const result = validateCheckResolution(await loadResult(), knownProductId);
       const selectedId = resolvedCatalogDetailId(result, knownProductId);
-      const detail = selectedId ? await getCatalogProductDetail(selectedId) : null;
+      const detail = selectedId ? await loadOptionalCustomerCatalog(integrated ? result.truthSnapshot ?? null : null, () => getCatalogProductDetail(selectedId)) : null;
       if (requestSequence !== resolutionSequenceRef.current
         || !canPublishCheckResult(integrated, requestOwner, currentLiveCheckOwner())) return;
       resolutionOwnerRef.current = requestOwner;
@@ -538,7 +538,17 @@ export default function CheckProductScreen() {
   const invalidResult = Boolean(scanResult && confirmedProduct && resultPresentation.kind === 'invalid');
   const currentFormula = getVerifiedFormulaForResolution(catalogDetail, resolution);
 
-  if (shouldHideCheckForOwner({
+  const renderDecisionPanel = () => {
+    if (!personalTarget || customerState.ownerId !== liveCheckOwner) return null;
+    return <>
+                {visibleDecision ? <PersonalDecisionPanel packet={visibleDecision.packet} expectedBinding={visibleDecision.expectedBinding} onNextStep={handleDecisionStep} /> : <View style={styles.previewFactRow}><Text style={styles.previewFactText}>{customerState.decision.kind === 'loading' ? 'Updating this personal decision...' : customerState.decision.kind === 'unavailable' ? customerState.decision.reason : 'Product facts are ready. Optional context can improve a supported personal decision.'}</Text></View>}
+                {nextStepMessage?.snapshotId === personalTarget.snapshotId && nextStepMessage.contextRevision === customerState.context?.revision && <Text accessibilityLiveRegion="polite" style={styles.previewFactText}>{nextStepMessage.text}</Text>}
+                <Button label="Skin and goals" variant="ghost" onPress={() => openDecisionEditor('profile')} />
+
+    </>;
+  };
+
+  if ((integrated && liveCheckOwner && (catalogDetail || resolution) && customerState.ownerId !== liveCheckOwner) || shouldHideCheckForOwner({
     integrated, previousOwner: previousCheckOwnerRef.current, sessionUserId,
     liveOwner: liveCheckOwner, resultOwner: resolutionOwnerRef.current,
     hasResult: Boolean(catalogDetail || resolution),
@@ -785,11 +795,7 @@ export default function CheckProductScreen() {
                   )}
                 </View>
               </GroupedSection>
-              {personalTarget && customerState.ownerId === liveCheckOwner ? <>
-                {visibleDecision ? <PersonalDecisionPanel packet={visibleDecision.packet} expectedBinding={visibleDecision.expectedBinding} onNextStep={handleDecisionStep} /> : <View style={styles.previewFactRow}><Text style={styles.previewFactText}>{customerState.decision.kind === 'loading' ? 'Updating this personal decision...' : customerState.decision.kind === 'unavailable' ? customerState.decision.reason : 'Product facts are ready. Optional context can improve a supported personal decision.'}</Text></View>}
-                {nextStepMessage?.snapshotId === personalTarget.snapshotId && nextStepMessage.contextRevision === customerState.context?.revision && <Text accessibilityLiveRegion="polite" style={styles.previewFactText}>{nextStepMessage.text}</Text>}
-                <Button label="Edit decision context" variant="ghost" onPress={() => openDecisionEditor('profile')} />
-              </> : <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />}
+              {personalTarget ? renderDecisionPanel() : <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />}
 
             </>
           ) : (
@@ -850,6 +856,18 @@ export default function CheckProductScreen() {
         </ScrollView>
       </View>
     );
+  }
+
+  if (personalTarget && !catalogDetail) {
+    const facts = selectCustomerCheckFacts(personalTarget, { brand: '', name: '', categoryLabel: '', formula: null, source: null });
+    return <View style={[styles.container, { paddingTop: insets.top }]}><RootShellHeader title="Check" /><ScrollView ref={resultScroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}>
+      <View style={styles.previewProductHeading}><Text style={styles.productBrandText}>{facts.brand.toUpperCase()}</Text><Text style={styles.productNameText}>{facts.name}</Text></View>
+      <GroupedSection header="Formula Details"><View style={styles.previewFactRow}><Text style={styles.previewFactType}>{facts.categoryLabel}</Text>
+        {facts.formula ? <><Text style={styles.previewFactText}>Verified ingredients for this exact package: {facts.formula.ingredients.join(', ')}</Text><Text style={styles.previewFactText}>Provenance: {facts.formula.provenanceType.replace('_', ' ')}</Text></> : <Text style={styles.previewFactText}>Exact package formula not verified.</Text>}
+        {facts.source && <TouchableOpacity style={styles.sourceLink} accessibilityRole="link" accessibilityLabel="View product source" onPress={() => void Linking.openURL(facts.source!).catch(() => {})}><Text style={styles.sourceLinkText}>Product source</Text></TouchableOpacity>}
+      </View></GroupedSection>
+      {renderDecisionPanel()}{renderSaveCheckAction(resolution?.caseId)}<Button label="Check another product" variant="outline" onPress={handleResetScan} />
+    </ScrollView></View>;
   }
 
   if (resolution && !catalogDetail) {

@@ -1,3 +1,5 @@
+import { customerController, currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
+import { bindCustomerOwnerLifecycle } from '@/src/presentation/personal-decision/customerController';
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +23,7 @@ import { refreshCustomerBootstrap, resolveCustomerBootstrap } from '@/src/servic
 import { resolveAuthRoute, getAuthRedirectRoute } from '@/src/utils/authRouting';
 
 export default function RootLayout() {
+  useEffect(() => bindCustomerOwnerLifecycle(customerController, currentCustomerOwner, listener => useAuthStore.subscribe(listener), listener => useFreeAccessStore.subscribe(listener)), []);
   const router = useRouter();
   const segments = useSegments();
   const authStatus = useAuthStore((s) => s.status);
