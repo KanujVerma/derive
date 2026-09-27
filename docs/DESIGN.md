@@ -4,6 +4,22 @@ Derive's visual language is modeled on Apple-grade minimalism and quiet luxury. 
 
 ---
 
+## Obvious-by-default consumer UX
+
+> **Complexity belongs behind the interface.** Derive may use sophisticated evidence, personalization, catalog, and decision systems internally, but a customer should not have to understand them to use the product.
+
+- Design for first-time use without explanation or technical/skincare expertise.
+- Support a broad consumer age range, including older adults, without gender stereotypes.
+- Use plain consumer language, keep backend terminology out of primary flows, and present one clear primary action whenever possible.
+- Keep visible choices to a minimum.
+- Prefer progressive disclosure and minimal reading/setup before first value.
+- Do not make technical camera modes the default.
+- Use automatic behavior only when it stays truthful; when uncertain, ask one simple clarification.
+- Keep manual correction as recovery or optional depth, with clear Back, Close, and Retry paths.
+- Keep touch targets at least 44pt and layouts readable across supported text sizes and smaller screens.
+- Avoid unnecessary cards, chips, settings, explanations, and choices.
+- Yuka is a simplicity and first-value reference, not a visual clone or source of Derive's truth model.
+
 ## 1. Color Palette Tokens (`src/constants/theme.ts`)
 
 | Token | Hex | Role | Contrast Ratio |

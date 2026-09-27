@@ -1776,3 +1776,15 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
   - Established 3-part economic concept: retail unit price, inventory lifespan (e.g. 60–90 days), and 30-day normalized consumption.
   - Arthur fixture verified at $96/month ($39 management + $52 products + $5 provisional operations).
   - Price stability contract: routine edits do not change billing unless product consumption changes; price increases require member confirmation; price drops apply automatically.
+
+
+## 2026-09-27: universal product input, simple-by-default UX, and comparison target
+
+- **Predecessor:** clean origin/main@39c0fed999194a7eacc33f2b50818d2defa6690d. PR #108 merged at c7e1d53fb0b2fd3ca4c5a236646a45229672c95d; PR #109 merged at fc6f923db82f491fc1d6e14a902bb8007587213d; PR #110 merged at 24529aeb8125d82085f5e3ccad8cb0513c145bb5; PR #111 merged at 4b71bdd39b06dd396ebecda6bfa2ba7f61dab3a0; PR #112 merged at this main.
+- **Scope:** documentation and product-direction clarification only. No runtime feature, extraction, camera-roll input, URL/share path, comparison behavior, catalog change, or hosted activation is added by this pass. PR #112's offline preflight does not verify hosted controls; activation remains gated.
+- **Product input:** the customer intent is “Check this product.” Auto camera, barcode, search, package evidence, library photos, and manual recovery are input surfaces that converge on candidate evidence, S6 truth resolution, ProductTruthSnapshotV1, then personal decision. They are not separate truth engines.
+- **Current camera boundary:** PR #108 makes Auto the default, keeps supported barcode observation active, and permits package-photo capture. PR #110 handles Expo's checksum-valid iOS UPC-A normalization; actual physical barcode acceptance remains open. An unclassified still uses manual role clarification. Automatic photo-role classification, OCR/VLM extraction, and cloud video remain unimplemented. The canonical Check has no camera-roll picker; URL paste and OS Share remain later.
+- **Benchmark boundary:** PR #109 merged offline manifest/replay tooling only. No provider was called, no cloud image upload occurred, no extraction performance was measured, and no winner was selected. The preliminary image intake is not a rights-cleared independent-gold corpus.
+- **Priority:** Auto camera and product-name search are core; photo/screenshot library input is the next target; manual recovery remains core; URL/share and pasted ingredient text are later; Product Compare is approved near-term post-MVP and not implemented.
+- **Simplicity and comparison:** complexity belongs behind the interface. Product Compare uses two product truth snapshots and the same personal-context revision, without a universal score or commercial influence. Price/merchant/availability remain separately sourced commerce facts.
+- **Unchanged authority:** S6/ProductTruthSnapshotV1 product and formula authority, P0-B decision binding, commerce independence, and founder ownership/stewardship are unchanged.

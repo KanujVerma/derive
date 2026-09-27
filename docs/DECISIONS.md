@@ -4,7 +4,17 @@ Key technical and product decisions for Derive. Approved target decisions do not
 
 **Current approved direction:** scanner-first personalized skincare product intelligence. Free Check answers “Should I use this product?” with supported facts, contextual guidance, and honest unknowns; there is no universal numerical compatibility or health score. The $25/month Managed Skincare offer remains a hypothesis whose pricing, retention, and hosted billing activation are not validated.
 
-**Implementation status at d793639:** the scanner-first free path and bounded profile, fit, history, and private product-evidence integrations exist locally in Development Mock and exact-local-Supabase Development Remote. Personal Fit is a narrow first-match result, not the target multi-finding decision system. Remote Staging/production retain legacy managed routing; hosted guest activation, physical scanner acceptance, OCR/image recognition, and the complete target decision architecture remain open. ADR-33 records approved product intent; later ADRs below distinguish implementation, target, and evaluation.
+### Current product-input and simplicity clarification
+
+These are approved product decisions, not claims that every input is implemented.
+
+1. **One customer intent, multiple evidence inputs:** “Check this product” may use Auto camera, barcode, search, product/package photos, camera-roll photos, or manual recovery. Later inputs may include URL, OS Share, or pasted ingredient text. These produce observations or candidate evidence, not separate truth engines; all converge on S6 and ProductTruthSnapshotV1 before personal decision.
+2. **Auto and simple by default:** The camera opens in Auto. Do not require technical barcode/front/ingredients/packaging mode selection before capture. Manual role choice is a recovery when an unclassified still needs clarification; customer confirmation does not establish formula truth. Current Auto does not automatically classify photo roles, extract OCR, or perform VLM recognition.
+3. **Contextual Product Compare:** Product Compare is an approved near-term post-MVP target. It compares two supported products or a candidate with a product the customer uses, bound to ProductTruthSnapshot and the same PersonalContext revision. It has no universal score, and commerce never changes the skincare result.
+
+Photo-library product input is a near-term target; URL/Share and pasted ingredient-text inputs are later. None of these future customer input paths, nor Product Compare, should be described as shipped without current code evidence.
+
+**Implementation status at main 39c0fed:** the bounded scanner-first free path remains local to Development modes; Remote Staging/production retain legacy managed routing and hosted guest activation is gated. P0-A ProductTruthSnapshotV1 and capture recovery are implemented locally. PR #108 makes camera entry Auto with active supported barcode observation and package-photo capture; PR #110 handles checksum-valid iOS UPC-A observations normalized by Expo Camera. Manual role clarification is used for an unclassified still; automatic role classification, OCR/VLM extraction, a Check camera-roll picker, URL/Share input, and Product Compare are not implemented. PR #109 merged offline benchmark/replay tooling, but no provider was called, no cloud image upload occurred, and no image performance was measured. PR #112 adds only a read-only offline hosted-free readiness preflight; hosted activation remains gated. P0-B multi-finding decision packets and same-snapshot composition are locally/CI-proven; physical/customer acceptance and hosted activation remain open. ADR-33 records approved product intent; later entries below distinguish implementation, target, and evaluation.
 
 ---
 
