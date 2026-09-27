@@ -91,3 +91,47 @@ test('P0-B display facts cannot cite absent evidence or unbound personal context
   packet.findings[0].display.evidenceIndexes = [0];
   assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_scope'));
 });
+
+test('P0-B supported product family can retain prior reaction with unknown variant', () => {
+  const { packet, binding } = clone(personalDecisionFixtures.find((f) => f.id === 'prior-reaction')!);
+  packet.binding.variantId = null;
+  binding.variantId = null;
+  assert.deepEqual(validatePersonalDecisionPacket(packet, binding), []);
+});
+
+test('P0-B routine evidence binds its owner, revision and separate item identity', () => {
+  const { packet, binding } = clone(personalDecisionFixtures[0]);
+  packet.findings[0].evidence.push({ kind: 'routine_product_fact', ownerId: binding.ownerId,
+    routineRevision: binding.routineRevision!, routineItemId: 'routine-item:1', productId: 'other-product:1',
+    variantId: null, formulaVersionId: null, scope: 'category', sourceId: 'other-category', sourceRevision: 'source:1' });
+  assert.deepEqual(validatePersonalDecisionPacket(packet, binding), []);
+  const evidence = packet.findings[0].evidence.at(-1)!;
+  if (evidence.kind === 'routine_product_fact') evidence.ownerId = 'other-owner';
+  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('evidence_binding_mismatch'));
+});
+
+test('P0-B routine relation needs product authority beyond an owner context assertion', () => {
+  const { packet, binding } = clone(personalDecisionFixtures[0]);
+  packet.findings[0].display = { kind: 'routine_relation', routineItemIds: ['routine-item:1'], role: 'moisturizer', timing: 'unknown', frequency: 'unknown', evidenceIndexes: [2] };
+  packet.findings[0].evidence.push({ kind: 'context_fact', section: 'routine', ownerId: binding.ownerId, revision: binding.routineRevision!, recordId: 'routine-item:1' });
+  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_scope'));
+  packet.findings[0].evidence.push({ kind: 'routine_product_fact', ownerId: binding.ownerId, routineRevision: binding.routineRevision!,
+    routineItemId: 'routine-item:1', productId: 'other-product:1', variantId: null, formulaVersionId: null,
+    scope: 'category', sourceId: 'other-category', sourceRevision: 'source:1' });
+  packet.findings[0].display.evidenceIndexes.push(3);
+  assert.deepEqual(validatePersonalDecisionPacket(packet, binding), []);
+});
+
+test('P0-B routine experience caution cites the exact existing item and history event', () => {
+  const { packet, binding } = clone(personalDecisionFixtures[0]);
+  packet.findings = [{ id: 'routine-experience', kind: 'routine_experience_caution', applicability: 'applicable', severity: 'caution', confidence: 'supported',
+    ruleId: 'fixture:experience', ruleVersion: '1', evidenceNeedIds: [], uncertainty: [], evidence: [
+      { kind: 'context_fact', section: 'routine', ownerId: binding.ownerId, revision: binding.routineRevision!, recordId: 'routine-item:1' },
+      { kind: 'context_fact', section: 'history', ownerId: binding.ownerId, revision: binding.historyRevision!, recordId: 'history-event:1' }],
+    display: { kind: 'routine_experience', routineItemIds: ['routine-item:1'], historyEventId: 'history-event:1', outcome: 'reaction', evidenceIndexes: [0, 1] } }];
+  packet.evidenceNeeds = [];
+  packet.action = { kind: 'USE_WITH_CAUTION', findingIds: ['routine-experience'], primaryFindingId: 'routine-experience', nextStep: 'review_routine' };
+  assert.deepEqual(validatePersonalDecisionPacket(packet, binding), []);
+  packet.findings[0].display!.evidenceIndexes = [0];
+  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_scope'));
+});

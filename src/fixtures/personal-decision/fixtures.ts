@@ -82,8 +82,34 @@ const formulaChanged: Finding = {
   uncertainty: ['Earlier tolerance belongs to fixture-formula:0; it does not prove current-formula tolerance.'],
   evidenceNeedIds: ['current-experience'],
 };
+const routineContext: DecisionEvidence = {
+  kind: 'context_fact', section: 'routine', ownerId: binding.ownerId, revision: 'routine:1', recordId: 'routine-item:1',
+};
+const routineCategory: DecisionEvidence = {
+  kind: 'routine_product_fact', ownerId: binding.ownerId, routineRevision: 'routine:1', routineItemId: 'routine-item:1',
+  productId: 'fixture-existing-product:1', variantId: null, formulaVersionId: null,
+  scope: 'category', sourceId: 'fixture-existing-category', sourceRevision: 'category:1',
+};
+const redundancy: Finding = {
+  id: 'redundant-role', kind: 'role_redundancy', applicability: 'applicable', severity: 'informational', confidence: 'supported',
+  ruleId: 'fixture:redundancy', ruleVersion: '1', evidence: [categoryEvidence, routineContext, routineCategory],
+  uncertainty: [], evidenceNeedIds: [],
+  display: { kind: 'routine_relation', routineItemIds: ['routine-item:1'], role: 'moisturizer', timing: 'pm', frequency: 'few_times_weekly', evidenceIndexes: [0, 1, 2] },
+};
+const routineExperience: Finding = {
+  id: 'routine-experience', kind: 'routine_experience_caution', applicability: 'applicable', severity: 'caution', confidence: 'supported',
+  ruleId: 'fixture:routine-experience', ruleVersion: '1', evidence: [routineContext,
+    { kind: 'context_fact', section: 'history', ownerId: binding.ownerId, revision: 'history:1', recordId: 'existing-experience:1' }],
+  uncertainty: [], evidenceNeedIds: [],
+  display: { kind: 'routine_experience', routineItemIds: ['routine-item:1'], historyEventId: 'existing-experience:1', outcome: 'reaction', evidenceIndexes: [0, 1] },
+};
 export const personalDecisionFixtures: PersonalDecisionFixture[] = [
   fixture('positive-role-match'),
+  fixture('redundancy', { findings: [role, redundancy],
+    routineImpacts: [{ id: 'duplicate-impact', kind: 'duplicates_role', candidate: { productId: binding.productId, variantId: binding.variantId, formulaVersionId: binding.formulaVersionId }, routineItemIds: ['routine-item:1'], findingIds: ['redundant-role'], uncertainty: [] }],
+    action: { kind: 'KEEP_CURRENT', findingIds: ['redundant-role'], primaryFindingId: 'redundant-role', nextStep: 'keep_current' } }),
+  fixture('routine-experience', { findings: [role, redundancy, routineExperience],
+    action: { kind: 'USE_WITH_CAUTION', findingIds: ['routine-experience', 'redundant-role'], primaryFindingId: 'routine-experience', nextStep: 'review_routine' } }),
   fixture('caution', { findings: [role, caution],
     action: { kind: 'USE_WITH_CAUTION', findingIds: ['prior-reaction', 'goal-role'], primaryFindingId: 'prior-reaction', nextStep: 'ask_clinician' } }),
   fixture('missing-formula', {
