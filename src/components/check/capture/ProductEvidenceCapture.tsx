@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -7,6 +7,7 @@ import { colors, layout, radii, spacing, typography } from '../../../constants/t
 import { Icon } from '../../ui/Icon';
 import { GlassContainer } from '../../ui/GlassContainer';
 import { captureRecovery } from '../../../presentation/capture/captureRecovery';
+import { createCaptureOperationGate } from '../../../presentation/capture/captureOperationGate';
 import {
   captureRoles, createCaptureSession, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
   type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
@@ -43,31 +44,48 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const camera = useRef<CameraView>(null);
   const scanLocked = useRef(false);
   const requestSequence = useRef(0);
+  const operations = useRef(createCaptureOperationGate()).current;
   const currentEvidence = session.evidence.find((item) => item.role === role);
 
+  useEffect(() => () => {
+    requestSequence.current += 1;
+    operations.cancel();
+  }, [operations]);
+
+  const close = () => {
+    requestSequence.current += 1;
+    operations.cancel();
+    onClose();
+  };
+
   const selectRole = (nextRole: CaptureRole) => {
-    scanLocked.current = !!session.evidence.find((item) => item.role === nextRole);
-    setRole(nextRole);
-    setPreviewUri(null);
-    setError(null);
-    setCanRetry(false);
-    void Haptics.selectionAsync().catch(() => {});
+    operations.whenIdle(() => {
+      scanLocked.current = !!session.evidence.find((item) => item.role === nextRole);
+      setRole(nextRole);
+      setPreviewUri(null);
+      setError(null);
+      setCanRetry(false);
+      void Haptics.selectionAsync().catch(() => {});
+    });
   };
 
   const capturePhoto = async () => {
     if (role === 'barcode' || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const photo = await camera.current?.takePictureAsync({ quality: 0.85 });
-      if (!photo?.uri) throw new Error('No photo returned');
-      setPreviewUri(photo.uri);
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    } catch {
-      setError('Could not take the photo. Please try again.');
-    } finally {
-      setBusy(false);
-    }
+    await operations.run(async (isCurrent) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const photo = await camera.current?.takePictureAsync({ quality: 0.85 });
+        if (!isCurrent()) return;
+        if (!photo?.uri) throw new Error('No photo returned');
+        setPreviewUri(photo.uri);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      } catch {
+        if (isCurrent()) setError('Could not take the photo. Please try again.');
+      } finally {
+        if (isCurrent()) setBusy(false);
+      }
+    });
   };
 
   const usePhoto = () => {
@@ -100,23 +118,25 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
 
   const processEvidence = async () => {
     if (!session.evidence.length || session.phase === 'processing') return;
-    const sequence = ++requestSequence.current;
-    const evidence = session.evidence;
-    setSession((previous) => reduceCapture(previous, { type: 'process' }));
-    setError(null);
-    setCanRetry(false);
-    try {
-      const result = await processor.process(evidence);
-      if (sequence !== requestSequence.current) return;
-      setSession((previous) => reduceCapture(previous, { type: 'resolved', result }));
-    } catch (cause) {
-      if (sequence !== requestSequence.current) return;
-      setSession((previous) => reduceCapture(previous, { type: 'resolved', result: { state: 'insufficient_evidence', candidates: [] } }));
-      const recovery = captureRecovery(cause);
-      setCanRetry(recovery.canRetry);
-      setCanCollectMore(recovery.canCollectMore);
-      setError(recovery.message);
-    }
+    await operations.run(async (isCurrent) => {
+      const sequence = ++requestSequence.current;
+      const evidence = session.evidence;
+      setSession((previous) => reduceCapture(previous, { type: 'process' }));
+      setError(null);
+      setCanRetry(false);
+      try {
+        const result = await processor.process(evidence);
+        if (!isCurrent() || sequence !== requestSequence.current) return;
+        setSession((previous) => reduceCapture(previous, { type: 'resolved', result }));
+      } catch (cause) {
+        if (!isCurrent() || sequence !== requestSequence.current) return;
+        setSession((previous) => reduceCapture(previous, { type: 'resolved', result: { state: 'insufficient_evidence', candidates: [] } }));
+        const recovery = captureRecovery(cause);
+        setCanRetry(recovery.canRetry);
+        setCanCollectMore(recovery.canCollectMore);
+        setError(recovery.message);
+      }
+    });
   };
 
   const collectMore = () => {
@@ -143,7 +163,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         <Image source={{ uri: currentEvidence.value }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : null}
       <View style={[styles.top, { paddingTop: Math.max(insets.top, spacing.md) }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close product capture" onPress={onClose} style={styles.iconButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close product capture" onPress={close} style={styles.iconButton}>
           <Icon name="close" size={20} color={colors.inkInverse} />
         </Pressable>
         <Text style={styles.topTitle}>Product evidence</Text>
@@ -168,7 +188,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
               {captureRoles.map((item) => {
                 const saved = session.evidence.some((entry) => entry.role === item);
                 return (
-                  <Pressable key={item} accessibilityRole="button" accessibilityLabel={`${roleLabels[item]}${saved ? ', captured' : ''}`} onPress={() => selectRole(item)} style={[styles.roleChip, role === item && styles.roleChipActive]}>
+                  <Pressable key={item} accessibilityRole="button" accessibilityLabel={`${roleLabels[item]}${saved ? ', captured' : ''}`} disabled={busy} onPress={() => selectRole(item)} style={[styles.roleChip, role === item && styles.roleChipActive]}>
                     <Text style={[styles.roleText, role === item && styles.roleTextActive]}>{saved ? '✓ ' : ''}{roleLabels[item]}</Text>
                   </Pressable>
                 );
@@ -203,7 +223,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
               {error && canRetry && <Action label="Try review again" onPress={() => void processEvidence()} />}
               {session.phase !== 'processing' && (canCollectMore
                 ? <Action label="Add or retake evidence" secondary onPress={collectMore} />
-                : <Action label="Close capture" secondary onPress={onClose} />)}
+                : <Action label="Close capture" secondary onPress={close} />)}
               {session.phase !== 'processing' && !error && <Action label="Continue with evidence" onPress={finish} />}
             </View>
           </ScrollView>
