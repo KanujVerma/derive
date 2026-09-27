@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { editSensitivityInput } from '../src/presentation/p0b-personalization/sensitivityInput.ts';
+const firstLine = editSensitivityInput('Fragrance\n');
+assert.equal(firstLine.text, 'Fragrance\n');
+assert.deepEqual(firstLine.answer, { state: 'answered', value: ['Fragrance'] });
+const secondLine = editSensitivityInput(firstLine.text + 'Niacinamide');
+assert.equal(secondLine.text, 'Fragrance\nNiacinamide');
+assert.deepEqual(secondLine.answer, { state: 'answered', value: ['Fragrance', 'Niacinamide'] });
+assert.deepEqual(editSensitivityInput('').answer, { state: 'unanswered' });
+assert.equal(editSensitivityInput('  ').text, '  ');
+console.log('P0-B sensitivity multiline editing passed');

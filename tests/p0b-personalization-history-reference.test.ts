@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { selectExperienceCatalogProduct, confirmExperiencePackage, unambiguousExperiencePackage, createExperienceDraft } from '../src/presentation/p0b-personalization/experience.ts';
+const exact = { kind: 'catalog' as const, label: 'Current name: Cream', productId: 'product', variantId: 'variant', formulaVersionId: 'formula' };
+const selected = selectExperienceCatalogProduct(exact);
+assert.equal(selected.productId, exact.productId); assert.equal(selected.variantId, null); assert.equal(selected.formulaVersionId, null);
+assert.equal(confirmExperiencePackage(selected, [exact]).formulaVersionId, exact.formulaVersionId);
+assert.equal(unambiguousExperiencePackage('product', [exact, { ...exact, formulaVersionId: 'other-formula' }]), null);
+assert.equal(confirmExperiencePackage(selected, [exact, { ...exact, formulaVersionId: 'other-formula' }]).formulaVersionId, null);
+const existing = { ...createExperienceDraft('id'), reference: exact, kind: 'reacted' as const };
+assert.deepEqual(createExperienceDraft('unused', existing).reference, exact);
+assert.equal(selected.productId, existing.reference.productId);
+console.log('Historical name selection preserves product identity without inventing formula history');
