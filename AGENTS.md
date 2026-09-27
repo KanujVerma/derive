@@ -4,7 +4,7 @@
 
 Derive's approved direction is **scanner-first personalized skincare product intelligence**. Free Check asks “Should I use this product?” and returns only supported facts and context-sensitive actions. `$25/month Managed Skincare` is a paid hypothesis, not validated pricing or activated hosted billing. No universal numerical compatibility, health, or product-quality score.
 
-The target architecture is not proof of runtime behavior. Development Mock and exact-local-Supabase modes contain a scanner-first free path; Remote Staging and production retain legacy managed access. S-FREE-2/3/4 and K2/S2, K3/S3, K4/S4 are integrated locally, not hosted. Photo-only input has no working OCR/image recognition; hosted guest activation and physical acceptance remain gated. See [ROADMAP.md](docs/ROADMAP.md) and [CONTEXT_SYNC.md](docs/CONTEXT_SYNC.md) for current status.
+The target architecture is not proof of runtime behavior. Development Mock and exact-local-Supabase modes contain a scanner-first free path; Remote Staging and production retain legacy managed access. S-FREE-2/3/4 and K2/S2, K3/S3, K4/S4 are integrated locally, not hosted. P0-A adds immutable product-truth snapshots and tested capture recovery, not photo recognition. Photo-only input has no working OCR/image recognition; hosted guest activation and physical acceptance remain gated. See [ROADMAP.md](docs/ROADMAP.md), [P0_A_EXECUTION.md](docs/P0_A_EXECUTION.md), and [CONTEXT_SYNC.md](docs/CONTEXT_SYNC.md) for current status.
 
 ## Truth and references
 

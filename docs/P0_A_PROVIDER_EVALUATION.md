@@ -36,6 +36,10 @@ The two baseline failures are `mismatched-barcode-region` (gold `ambiguous_candi
 
 ## Validation and next evidence
 
+### Integrated resolver rerun (2026-09-26)
+
+Root ran `node --experimental-strip-types scripts/evaluate-product-evidence.ts` against the integrated fixes: **15/15 deterministic synthetic gold cases pass**, including both baseline barcode conflicts. The fixture now declares the canonical `gtin_12` metadata and supplies exact ordered ingredients/market facts; this corrects its wire projection rather than pretending the former `UPC-A` value was supported. Extraction still has **0/15 executed**, and real-image scenarios **0/4 executed**. Real-image accuracy, latency and cost remain null. No provider was contacted, selected or shipped. DB/Edge snapshot evidence is independent of these synthetic metrics.
+
 Focused harness tests: 5/5 pass. Isolated strict TypeScript check of all added source/script/test files: zero errors. `git diff --check`: clean. The application-wide unit/type/export gates belong to the root composition pass; this leaf worktree has no installed dependencies and reuses the root worktree's TypeScript executable only for the isolated check. Snapshot-aware metrics remain deferred until the root authoritative snapshot implementation is composed; the synthetic resolver checks do not establish durable snapshot persistence or runtime truth correctness.
 
 Before any real-image benchmark, obtain a representative rights-cleared corpus with exact variant, package size, region, formula version, transcription and number/unit gold; approve provider terms, training use, retention/deletion, processing region, access controls and server-side credentials. Review customer consent for every intended image purpose. Run actual adapters and measure hallucination/abstention, exact variant/formula behavior, critical-number and ingredient-order errors, difficult captures, device/offline behavior, latency, cost and review burden separately. Until then all real-image and provider-selection claims remain untested.
