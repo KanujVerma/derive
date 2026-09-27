@@ -7,6 +7,7 @@ interface Revision {
     revision: string;
 }
 export interface EvaluationInput {
+    packetId: string;
     binding: DecisionBinding;
     product: P0BProductEvaluationProjectionV1;
     evaluatedAt: string;
@@ -16,8 +17,8 @@ export interface EvaluationInput {
         secondaryGoals: Goal[];
         skinBehavior: string;
         reactivity: string;
-        sensitivities: string[] | null;
-        treatments: string[] | null;
+        sensitivities: {state:'reported'|'none_known'|'unknown'|'withheld';values:string[]};
+        treatments: {state:'reported'|'none'|'unknown'|'withheld';values:string[]};
         pregnancy: Answer;
         nursing: Answer;
         tryingToConceive: Answer;
@@ -62,15 +63,17 @@ export const RULE_SOURCES = {
     reproductive: { url: 'https://www.aad.org/public/everyday-care/skin-care-secrets/routine/pregnancy-skin-care', applicability: 'Retinoid pregnancy/nursing caution only; trying-to-conceive requires review.' },
     practical: { basis: 'Owner-reported current routine role and explicit decision intent', limitation: 'No efficacy or tolerance comparison.' },
 } as const;
-export const ENGINE_VERSION = 'p0b-findings/1';
-export const POLICY_VERSION = 'p0b-policy/1';
+export const ENGINE_VERSION = 'p0b-findings/2';
+export const POLICY_VERSION = 'p0b-policy/2';
 /** Consequence precedence, not a numerical compatibility score. */
 export const CAUTION_PRECEDENCE: Finding['kind'][] = ['reproductive_context_caution', 'prior_product_reaction', 'routine_experience_caution', 'active_overlap', 'reported_ingredient_sensitivity', 'reactive_active'];
+const SUPPORTED_ROLES = new Set(['moisturizer','cleanser','sunscreen','serum','treatment']);
 const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 const contains = (ingredients: string[], token: string) => ingredients.some(i => new RegExp(`(^|[^a-z])${token}(?=$|[^a-z])`).test(i));
 /** Trusted typed boundary. Host establishes ownership, truth provenance and expected revisions. */
 export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisionPacketV1 {
     const { binding: b, product: p } = input;
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.packetId))throw new Error('Invalid packet identifier');
     if (p.snapshotId !== b.productSnapshotId || p.snapshotRevision !== b.productSnapshotRevision || p.sourceBoundaryRevision !== b.sourceBoundaryRevision)
         throw new Error('Product binding mismatch');
     for (const section of ['profile', 'routine', 'history'] as const) {
@@ -82,7 +85,7 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
     const formula = p.formula.state === 'known' ? p.formula.value : null;
     if ((identity?.productId ?? null) !== b.productId || (identity?.variantId ?? null) !== b.variantId || (formula?.formulaVersionId ?? null) !== b.formulaVersionId)
         throw new Error('Identity/formula binding mismatch');
-    const packet: PersonalDecisionPacketV1 = { schemaVersion: 'personal-decision/v1', id: `p0b:${Object.values(b).map(v => encodeURIComponent(v ?? 'null')).join(':')}`, evaluatedAt: input.evaluatedAt, binding: { ...b }, versions: { engine: ENGINE_VERSION, policy: POLICY_VERSION, projection: p.schemaVersion }, findings: [], routineImpacts: [], evidenceNeeds: [], action: { kind: 'NOT_ENOUGH_INFORMATION', findingIds: [], primaryFindingId: '', nextStep: 'add_context' } };
+    const packet: PersonalDecisionPacketV1 = { schemaVersion: 'personal-decision/v1', id:input.packetId, evaluatedAt: input.evaluatedAt, binding: { ...b }, versions: { engine: ENGINE_VERSION, policy: POLICY_VERSION, projection: p.schemaVersion }, findings: [], routineImpacts: [], evidenceNeeds: [], action: { kind: 'NOT_ENOUGH_INFORMATION', findingIds: [], primaryFindingId: '', nextStep: 'add_context' } };
     const context = (section: 'profile' | 'routine' | 'history', id: string): DecisionEvidence => ({ kind: 'context_fact', section, ownerId: b.ownerId, revision: b[`${section}Revision`]!, recordId: id });
     const facts = (scope: 'identity' | 'formula' | 'category'): DecisionEvidence[] => {
         const knowledge = p[scope];
@@ -133,13 +136,13 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
     if (profile && !['reacts_easily', 'generally_tolerates'].includes(profile.reactivity))
         gap('profile_context', true, undefined, profile.reactivity === 'withheld' ? 'withheld' : 'unknown');
     if (profile && usable) {
-        if (profile.sensitivities === null)
-            gap('sensitivity_context', true);
-        else if (profile.sensitivities.length) {
-            const exact = profile.sensitivities.filter(s => ingredients.includes(normalize(s)));
+        if (profile.sensitivities.state === 'unknown' || profile.sensitivities.state === 'withheld')
+            gap('sensitivity_context', true,undefined,profile.sensitivities.state==='withheld'?'withheld':'unknown');
+        else if (profile.sensitivities.values.length) {
+            const exact = profile.sensitivities.values.filter(s => ingredients.includes(normalize(s)));
             for (const sensitivity of exact)
                 gap('individual_tolerance', false, add('sensitivity', 'reported_ingredient_sensitivity', profileEvidence, 'caution', ingredientDisplay(normalize(sensitivity), 'reported_sensitivity')));
-            if (exact.length < profile.sensitivities.length)
+            if (exact.length < profile.sensitivities.values.length)
                 gap('ingredient_alias_review', true);
         }
         if (retinoid) {
@@ -150,16 +153,16 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
                     gap('reproductive_context', true, undefined, profile[key] === 'withheld' ? 'withheld' : 'unknown');
             }
             if (profile.tryingToConceive !== 'no')
-                gap('reviewed_claim', true);
+                gap('reviewed_claim', true,undefined,profile.tryingToConceive==='withheld'?'withheld':'unknown');
         }
         if (active) {
-            if (profile.treatments === null)
-                gap('current_treatments', true);
+            if (profile.treatments.state === 'unknown' || profile.treatments.state === 'withheld')
+                gap('current_treatments', true,undefined,profile.treatments.state==='withheld'?'withheld':'unknown');
             else {
                 const overlaps = [
-                    retinoid && profile.treatments.includes('topical_retinoid') ? retinoid : null,
-                    profile.treatments.includes('exfoliating_acid') ? retinoid ?? exfoliant : null,
-                    bp && profile.treatments.includes('benzoyl_peroxide') ? 'benzoyl peroxide' : null,
+                    retinoid && profile.treatments.values.includes('topical_retinoid') ? retinoid : null,
+                    profile.treatments.values.includes('exfoliating_acid') ? retinoid ?? exfoliant : null,
+                    bp && profile.treatments.values.includes('benzoyl_peroxide') ? 'benzoyl peroxide' : null,
                 ].filter((term): term is string => !!term);
                 for (const term of new Set(overlaps)) {
                     const f = add('overlap', 'active_overlap', profileEvidence, 'caution', ingredientDisplay(term, 'treatment_overlap'));
@@ -170,12 +173,14 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
             if (profile.reactivity === 'reacts_easily')
                 gap('individual_tolerance', false, add('reactive', 'reactive_active', profileEvidence, 'caution', ingredientDisplay(active, 'reactivity')));
         }
-        if (profile.treatments?.includes('other_prescription'))
-            gap('current_treatments', true);
+        if (profile.treatments.values.includes('other_prescription'))
+            gap('current_treatments', true,undefined,profile.treatments.state==='withheld'?'withheld':'unknown');
         if ([profile.primaryGoal, ...profile.secondaryGoals].includes('dryness') && profile.skinBehavior === 'dry_tight' && p.category.state === 'known' && p.category.value === 'moisturizer' && facts('category').length && !active) {
             const evidence = [...formulaFacts, ...facts('category'), context('profile', 'profile')];
             const f = add('role', 'goal_role_match', evidence, 'informational', { kind: 'role_match', goal: 'dryness', category: 'moisturizer', evidenceIndexes: evidence.map((_, i) => i) });
             gap('individual_tolerance', false, f);
+            if(profile.primaryGoal===null)gap('profile_context',true);
+            else if(profile.primaryGoal!=='dryness')gap('supported_rule',true);
         }
     }
     for (const event of input.history?.events ?? []) {
@@ -206,7 +211,7 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
     };
     if (routine && input.intent !== 'check_current' && routine.items.some(item => item.state === 'current' && !routineFacts(item, 'category').length))
         gap('routine_completeness', true);
-    if (routine && p.category.state === 'known' && identity && facts('category').length) {
+    if (routine && p.category.state === 'known' && SUPPORTED_ROLES.has(p.category.value) && identity && facts('category').length) {
         const category = p.category.value;
         const matches = routine.items.filter(i => i.state === 'current' && i.category.state === 'known' && i.category.value === category && routineFacts(i, 'category').length);
         for (const item of matches) {
@@ -217,7 +222,7 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
         }
     }
     if (routine) {
-        for (const item of routine.items.filter(i => i.state === 'current')) {
+        for (const item of routine.items.filter(i => i.state === 'current'||i.state==='occasional')) {
             const evidence = [context('routine', item.id)];
             const currentFormulaFacts = routineFacts(item, 'formula');
             const knownIngredients = !!currentFormulaFacts.length;
@@ -233,13 +238,15 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
                     bp && currentBP ? 'benzoyl peroxide' : null,
                 ].filter((term): term is string => !!term);
                 for (const term of new Set(overlaps)) {
-                    const overlapEvidence = [...formulaFacts, ...evidence, ...currentFormulaFacts];
-                    const f = add('overlap', 'active_overlap', overlapEvidence, 'caution', { kind: 'ingredient_context', ingredient: term, context: 'treatment_overlap', evidenceIndexes: overlapEvidence.map((_, i) => i) });
+                    const overlapEvidence = [...formulaFacts, ...evidence, ...currentFormulaFacts,...routineFacts(item,'category')];
+                    const f = add('overlap', 'active_overlap', overlapEvidence, 'caution', {kind:'routine_relation',routineItemIds:[item.id],role:item.category.state==='known'&&SUPPORTED_ROLES.has(item.category.value)&&routineFacts(item,'category').length?item.category.value:'unknown',timing:item.timing,frequency:item.frequency,evidenceIndexes:overlapEvidence.map((_,i)=>i)});
                     gap('application_schedule', false, f);
                     gap('individual_tolerance', false, f);
                     packet.routineImpacts.push({ id: `overlap:${item.id}:${term}`, kind: 'active_overlap', candidate: { productId: b.productId, variantId: b.variantId, formulaVersionId: b.formulaVersionId }, routineItemIds: [item.id], findingIds: [f.id], uncertainty: [] });
                 }
             }
+            const material=item.productId===b.productId&&input.intent==='check_current'||packet.routineImpacts.some(impact=>impact.routineItemIds.includes(item.id));
+            if(!material)continue;
             for (const event of input.history?.events ?? []) {
                 if (!item.productId || event.productId !== item.productId || (event.outcome !== 'reaction' && event.outcome !== 'ineffective'))
                     continue;
@@ -257,7 +264,7 @@ export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisi
     const role = packet.findings.find(f => f.kind === 'goal_role_match');
     const selected = caution ?? (critical ? packet.findings.find(f => critical.findingIds.includes(f.id)) : undefined) ?? redundant ?? role ?? packet.findings[0];
     const kind = caution ? 'USE_WITH_CAUTION' : critical ? 'NOT_ENOUGH_INFORMATION' : redundant ? 'KEEP_CURRENT' : role ? 'COULD_WORK' : 'NOT_ENOUGH_INFORMATION';
-    const nextStep = kind === 'COULD_WORK' ? 'consider_use' : kind === 'KEEP_CURRENT' ? 'keep_current' : packet.evidenceNeeds.some(n => n.code === 'clinician_review') ? 'ask_clinician' : caution?.kind === 'routine_experience_caution' ? 'review_routine' : packet.evidenceNeeds.some(n => n.code === 'verified_formula' || n.code === 'formula_conflict' || n.code === 'exact_identity') ? 'confirm_formula' : caution?.kind === 'active_overlap' ? 'review_routine' : 'add_context';
+    const nextStep = kind === 'COULD_WORK' ? 'consider_use' : kind === 'KEEP_CURRENT' ? 'keep_current' : packet.evidenceNeeds.some(n => n.code === 'clinician_review') ? 'ask_clinician' : caution?.kind === 'routine_experience_caution' ? 'review_routine' : packet.evidenceNeeds.some(n => n.code === 'verified_formula' || n.code === 'formula_conflict' || n.code === 'exact_identity') ? 'confirm_formula' : !caution && packet.evidenceNeeds.some(n=>n.critical&&n.code==='supported_rule') ? 'view_product_facts' : caution?.kind === 'active_overlap' ? 'review_routine' : 'add_context';
     packet.action = { kind, findingIds: packet.findings.map(f => f.id), primaryFindingId: selected.id, nextStep };
     const issues = validatePersonalDecisionPacket(packet, b);
     if (issues.length)
