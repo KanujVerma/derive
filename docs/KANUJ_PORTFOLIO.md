@@ -87,3 +87,15 @@ Sami95 and99 are merged at8ec9fe57 andbe853d23 respectively. K1 acceptance PR102
 ## Independent review correction
 
 Root/independent review reproduced a P2 failure-path defect in both new acceptance runners: one cleanup deletion exception skipped remaining owned cleanup/absence checks. Both owners added all-attempt cleanup, safe aggregated failure and injected regressions. K1 final head9bcffb6 checks each owned product-truth snapshot is absent after cleanup; its actual controller/local-service rerun passed. P0-D corrected head6499f90 passed its12-check/32-call journey with verified Auth404 and all cleanup, receipt `/private/tmp/p0d-local-receipt-6499f90.json`, SHA256e10d4774856daa56441e4274cb47cacecb746a0c7c114d0510e4a112f7bff6b8. It also requires the missing iOS-export evidence gate. No real customer data or actual cleanup failure was observed. The concrete source finding is corrected; exact-head validation and dependency-safe landing remain required. This was not a human-steward approval dependency.
+
+
+## P0-B acceptance source landing
+
+PR102 exact9bcffb6f98977ef92163152601aaf289a35d4b00 passed bothCI36336776094 jobs, including the new actual customer-controller harness. Independent review injected surviving snapshots for either owner and observed safe rejection only after all24cleanup operations. Root merged normally as8ac8ed3d6299a85ef6e617b5dc940c1e4c5d5f20. K2 now receives the sole three-line CI registration lock and reconciles PR107 onto that main before its fresh gates. #74/#88 remain open because this source landing does not complete physical or human acceptance.
+
+GitHub interpreted a negated closing keyword in PR102 as an automatic issue74 closure on merge. Root corrected the PR wording, verified closingIssuesReferences empty, reopened74 and left an evidence comment. Physical/human acceptance remains open; the automatic event was not completion proof.
+
+
+## P0-D final source registration
+
+After PR102 landed, K2 reconciled onto8ac8ed3 and added exactly three CI lines after the P0-B client harness. Clean head7cc6fda3489d0900c13d8e8601fc6fe7abf505c3 passed full73unit files/612registeredTAP plus assertion scripts, app/test types, web/iOS exports and scope/secret/diff checks. Its actual local12checks/32Edgecalls and robust owned cleanup passed again; receipt `/private/tmp/p0d-local-receipt-7cc6fda.json`, SHA256cef026b1e65fadb35b7fdf08a826f8fffdb44bfca00e3d90ec3b617afa03298c. Source registration and local proof are complete; fresh exact-head CI and normal root merge remain the landing gate. This is local service/controller proof, not physical, hosted, TestFlight or human proof.
