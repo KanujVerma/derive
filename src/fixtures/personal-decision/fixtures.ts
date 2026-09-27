@@ -54,10 +54,14 @@ const basePacket: PersonalDecisionPacketV1 = {
   findings: [role], routineImpacts: [], evidenceNeeds: [tolerance],
   action: { kind: 'COULD_WORK', findingIds: ['goal-role'], primaryFindingId: 'goal-role', nextStep: 'consider_use' },
 };
+/** Fixture data is plain JSON; avoid runtime APIs that may be absent in Hermes. */
+function copyFixtureJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 function fixture(id: string, changes: Partial<PersonalDecisionPacketV1> = {},
   projectedProduct: P0BProductEvaluationProjectionV1 = product): PersonalDecisionFixture {
   const packet = { ...basePacket, ...changes, id: `fixture-packet:${id}` };
-  return structuredClone({ id, product: projectedProduct, binding: packet.binding, packet });
+  return copyFixtureJson({ id, product: projectedProduct, binding: packet.binding, packet });
 }
 const missingFormula: Finding = {
   id: 'missing-formula', kind: 'missing_evidence', applicability: 'applicable', severity: 'blocker', confidence: 'unknown',

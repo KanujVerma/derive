@@ -169,3 +169,21 @@ test('P0-B unsupported goal can route to facts without promising more intake sup
   packet.action.kind = 'USE_WITH_CAUTION';
   assert.ok(validatePersonalDecisionPacket(packet, binding).includes('action_next_step_mismatch'));
 });
+
+test('P0-B fixtures load without structuredClone and keep independent plain-JSON copies', async () => {
+  const original = JSON.stringify(personalDecisionFixtures);
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'structuredClone');
+  assert.ok(descriptor);
+  try {
+    Object.defineProperty(globalThis, 'structuredClone', { value: undefined, configurable: true, writable: true });
+    const modulePath = '../src/fixtures/personal-decision/fixtures.ts?native-clone-regression';
+    const loaded = await import(modulePath);
+    const fixtures = loaded.personalDecisionFixtures as typeof personalDecisionFixtures;
+    assert.equal(fixtures.length, personalDecisionFixtures.length);
+    fixtures[0].packet.findings[0].uncertainty.push('native-test-mutation');
+    assert.ok(!fixtures[1].packet.findings[0].uncertainty.includes('native-test-mutation'));
+    assert.equal(JSON.stringify(personalDecisionFixtures), original);
+  } finally {
+    Object.defineProperty(globalThis, 'structuredClone', descriptor);
+  }
+});
