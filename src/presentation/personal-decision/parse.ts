@@ -3,7 +3,8 @@ import { GoalSchema } from '../../types/schema.ts';
 import type { DecisionBinding, PersonalDecisionPacketV1 } from '../../contracts/PersonalDecision.ts';
 
 const ref = z.string().min(1).max(200).refine((value) => value.trim().length > 0);
-const refs = z.array(ref).max(100);
+// 50 items × role + 2 overlap terms + 6 outcome/formula-relation classes, plus bounded profile/target findings.
+const refs = z.array(ref).max(512);
 const text = z.string().max(600);
 const texts = z.array(text).max(30);
 const section = z.enum(['profile', 'routine', 'history']);
@@ -52,20 +53,41 @@ const finding = z.strictObject({
 });
 
 /** Strict renderer-local transport boundary; authentication and source approval stay with the host. */
-export const personalDecisionPacketSchema: z.ZodType<PersonalDecisionPacketV1> = z.strictObject({
+const packetShape: z.ZodType<PersonalDecisionPacketV1> = z.strictObject({
   schemaVersion: z.literal('personal-decision/v1'), id: ref, evaluatedAt: z.iso.datetime(), binding: decisionBindingSchema,
   versions: z.strictObject({ engine: ref, policy: ref, projection: z.literal('p0b-product-evaluation/v1') }),
-  findings: z.array(finding).min(1).max(100),
+  findings: z.array(finding).min(1).max(512),
   routineImpacts: z.array(z.strictObject({ id: ref,
     kind: z.enum(['adds_role', 'duplicates_role', 'replacement_candidate', 'active_overlap', 'keep_current', 'none', 'unknown']),
     candidate: z.strictObject({ productId: ref.nullable(), variantId: ref.nullable(), formulaVersionId: ref.nullable() }),
     routineItemIds: refs, findingIds: refs, uncertainty: texts,
-  })).max(100),
+  })).max(200),
   evidenceNeeds: z.array(z.strictObject({ id: ref, code: evidenceNeedCode,
     state: z.enum(['missing', 'unknown', 'withheld', 'conflict']), critical: z.boolean(), findingIds: refs,
-  })).max(100),
+  })).max(256),
   action: z.strictObject({ kind: z.enum(['COULD_WORK', 'USE_WITH_CAUTION', 'KEEP_CURRENT', 'SKIP', 'NOT_ENOUGH_INFORMATION']),
     findingIds: refs, primaryFindingId: ref,
     nextStep: z.enum(['consider_use', 'keep_current', 'skip_product', 'confirm_formula', 'add_context', 'review_routine', 'ask_clinician', 'view_product_facts']),
   }),
 });
+
+/** Compact transport JSON bytes are independent of PostgreSQL jsonb::text bytes.
+ * The storage boundary separately checks its actual serialized bytes. No TextEncoder
+ * dependency: this runs in Hermes as well as web, and counts serialized UTF-8 bytes.
+ */
+export const personalDecisionPacketSchema: z.ZodType<PersonalDecisionPacketV1> = z.unknown().superRefine((value, context) => {
+  let serialized: string | undefined;
+  try { serialized = JSON.stringify(value); } catch { context.addIssue({ code: 'custom', message: 'Packet must be JSON serializable' }); return; }
+  if (serialized === undefined || utf8Bytes(serialized) > 1_048_576) {
+    context.addIssue({ code: 'custom', message: 'Packet exceeds the 1 MiB UTF-8 transport budget' });
+  }
+}).pipe(packetShape);
+
+function utf8Bytes(value: string): number {
+  let bytes = 0;
+  for (const character of value) {
+    const point = character.codePointAt(0)!;
+    bytes += point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
+  }
+  return bytes;
+}
