@@ -1,6 +1,6 @@
 # Shared Product Catalog and Check a Product
 
-## Current status at main d793639
+## Current implementation
 
 Check is the scanner-first free acquisition path in Development Mock and exact-local-Supabase Development Remote. Local integration includes sourced catalog search, S6 product/formula resolution, retained S2 fit, private evidence and P0-B canonical reported context/multi-finding decisions. P0-B source is merged; physical/customer acceptance and hosted activation remain separate. Remote Staging and production retain legacy managed routing; hosted guest activation remains gated.
 

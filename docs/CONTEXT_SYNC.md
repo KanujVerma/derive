@@ -7,6 +7,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
 
+## 2026-09-27: Kanuj acceptance and P0-D source landed
+
+- **Immutable predecessor:** mainaa12e08677657b5a955fef766d81c97b9432a968. K1 PR102 exact9bcffb6 bothCI36336776094 succeeded, normal merge8ac8ed3; K2 PR107 reconciled onto8ac8ed3, exact7cc6fda bothCI36337440783 succeeded, normal mergeaa12e08. Both new actual integration harnesses are registered in CI. Sami95/99 were reviewed, not edited/rebased/merged by Kanuj.
+- **Validation:** final73unitfiles/612registeredTAP plus assertion scripts, app/test types, web/iOS exports, scope/secret/diff gates. Fresh CI reset/full21pgTAPfiles/524assertions plus actual Auth/Edge/persistence/controller/owner/deletion/cleanup passed. K2 local receipt SHA256cef026b1e65fadb35b7fdf08a826f8fffdb44bfca00e3d90ec3b617afa03298c. Focused independent cleanup, receiver preservation, iOS-source evidence and final workflow review found no remaining scoped invariant defect.
+- **Issues/ownership:** Kanuj P0-D active100; Sami P0-C preparation explicitly assigned by user mandate, activation not authorized.77 source-only closed. GitHub auto-closed74 from a negated PR keyword; root corrected wording, verified no closing reference and reopened74.74/88/100 remain open for actual acceptance. Docs-only101 reconciles after source landings and records final public metadata separately.
+- **Restoration:** task Metro8135, Supabase and Colima stopped after leases returned; exact temporary loopback54321/54322 forwards cancelled; three saved volumes and private pre-reset backup retained. No foreign containers, unrelated8097 kill, global config edit or Simulator boot change.
+- **Limits/next:** native observations at8ec9fe5 are not physical interaction or later-binary proof. Phone unlock unanswered; tester later. Sami camera/extraction/catalog/hosted dependencies and actual beta/TestFlight/privacy/support/copy remain open. **KANUJ MVP PORTFOLIO PARTIAL**. Full DAG and bounded next work: [KANUJ_PORTFOLIO.md](KANUJ_PORTFOLIO.md).
+
 ## 2026-09-27: Acceptance cleanup review corrections
 
 - **Predecessor:** mainbe853d237d6b7bc1e5f3252ebeb88cf7f3f46c0f; source candidates K1 PR102 head9bcffb6f98977ef92163152601aaf289a35d4b00 and P0-D PR107 head6499f90943d5c046cb5bd02bed69c9d4e7b8926c.
