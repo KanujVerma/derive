@@ -2,6 +2,7 @@ import type { CatalogProductDetail, CatalogProductSummary } from '../contracts/P
 import type { ProductResolutionResult, ResolveProductIdentityInput } from '../contracts/ProductIdentityResolver.ts';
 import { ProductCategorySchema } from '../types/schema.ts';
 import { supabase } from './supabase.ts';
+import { parseProductTruthSnapshot } from '../contracts/productTruthValidation.ts';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FORMULA_STATES = new Set(['unverified','verified_variant_available','multiple_versions']);
@@ -74,6 +75,16 @@ export async function resolveCatalogIdentity(
     || typeof data.caseId !== 'string' || !Array.isArray(data.candidates)
     || (data.product && !UUID.test(data.product.productId))) {
     throw new Error('Product identity could not be confirmed');
+  }
+  if (data.truthSnapshot !== undefined) {
+    const snapshot = parseProductTruthSnapshot(data.truthSnapshot);
+    if (snapshot.resolutionCaseId !== data.caseId || snapshot.state !== data.state
+      || (snapshot.product?.productId ?? null) !== (data.product?.productId ?? null)
+      || (snapshot.product?.variantId ?? null) !== (data.product?.variantId ?? null)
+      || (data.formula && data.formula.formulaVersionId !== snapshot.formula?.formulaVersionId)) {
+      throw new Error('Product identity could not be confirmed');
+    }
+    data.truthSnapshot = snapshot;
   }
   return data as ProductResolutionResult;
 }
