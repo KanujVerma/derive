@@ -25,3 +25,7 @@ Previously the founder confirmed only the full-screen shutter/tab overlap fix. A
 ## Local validation checkpoint
 
 On the reconciled main above plus this increment, all 74 current unit-test files completed successfully: 56 emitted TAP with 619 registered cases and zero failures; assertion-style scripts also passed. Both application and test TypeScript checks, web and iOS exports, and diff/scope checks passed. Independent review found and corrected a same-tick barcode → process stale-render race; the seven focused Auto tests pass. No local database reset, hosted state change or physical-device run was performed for this leaf. Both exact-head CI jobs remain publication/merge gates; these local results do not claim their success.
+
+## Expo iPhone normalization follow-up
+
+An installed-SDK source audit after #108 found that Expo Camera's iOS `Current/BarcodeScannerUtils.swift` strips the leading zero from UPC-A encoded as EAN-13 but retains the `ean13` event type. A strict 13-digit type check therefore rejected that valid normalized event. The follow-up accepts checksum-valid 12-digit values with that type while continuing to reject malformed values and unsupported compressed UPC-E. It does not rewrite the observed value or infer an identifier from image text. A focused regression covers both normalized and padded forms plus corrupt/wrong-length/unsupported-type events. This is SDK/source proof, not an observed native camera pass; fresh iPhone UPC-A and EAN-13 checks remain required.
