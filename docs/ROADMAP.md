@@ -25,13 +25,34 @@ CAPTURE / SEARCH
 
 Probabilistic systems may contribute bounded candidate evidence or findings. They cannot create canonical product truth or unrestricted recommendations. See [ARCHITECTURE.md](ARCHITECTURE.md), [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md), and [INTERFACES.md](INTERFACES.md) for the target concepts and current implementation boundary.
 
+## Product input strategy
+
+**Customer intent:** “Check this product.” Customers should be able to show Derive a product in the natural form they already have it, without understanding which recognition method is used. Inputs create candidate evidence and observations; they do not become separate truth engines.
+
+All supported inputs converge on the same authority path: product input → candidate evidence/observations → S6 product and formula resolution → ProductTruthSnapshotV1 → personal decision. Barcode, photo, model output, retailer listing, URL, or customer selection is evidence, not canonical product/formula truth by itself.
+
+Auto is the camera default. PR #108 adds Auto inside the existing camera, supported barcode observation and package-photo capture. PR #118 composes one visible Open camera action in canonical Check with a name-search fallback; the previous barcode-only entry was observed in Simulator and corrected without editing Sami capture internals. PR #110 handles checksum-valid iOS UPC-A observations normalized by Expo Camera; real iPhone barcode and in-camera interaction acceptance remain unverified. When a still is not classified, the customer is asked which package detail it contains. Automatic photo-role classification, OCR, and VLM extraction are not implemented. PR #109 merged offline benchmark/replay tooling, but no provider was called, no cloud image upload occurred, and no image-extraction performance was measured.
+
+| Input or capability | Priority | Current status |
+| --- | --- | --- |
+| Auto camera | Core | Auto entry, supported barcode observation, package photo, and manual clarification are implemented. PR #110 handles Expo's checksum-valid iOS UPC-A normalization; physical acceptance and automatic photo-role classification remain open. |
+| Product-name search | Core | Existing Check/catalog path. |
+| Photo or screenshot from the customer's library | Near-term MVP target | The canonical product Check has no camera-roll picker. Package-photo camera capture is different from library upload. |
+| Manual recovery | Core | Search and customer clarification recover from uncertain evidence; the clarification is not formula authority. |
+| Pasted product URL | Post-MVP convenience | Not implemented. |
+| iOS/OS Share to Derive | Post-MVP convenience | Not implemented. |
+| Pasted ingredient text | Later convenience | Not implemented as a customer input flow; it would still be evidence for the same S6 pipeline. |
+| Product Compare | Near-term post-MVP | Approved target; not implemented. |
+
+This is an ordering of product importance, not a deadline. Do not describe library upload, URL/share/text input, automatic photo-role inference, or Product Compare as shipped. Keep the customer interface simple: automatic behavior when truthful, search and manual recovery when needed, and no mandatory technical-mode choice before capture.
+
 ## Current implementation versus target
 
 **Implemented locally at `d793639`:** the scanner-first shell and free Auth/catalog/profile/context/evidence integrations work in Development Mock or Development Remote with an exact local Supabase host. S-FREE-2 has a narrow first-match deterministic `PersonalFitResult`; S-FREE-3 stores explicit saved-product/check/experience events; S-FREE-4 grants private product-evidence uploads; K4/S4 connects Check capture to S6 locally. S-PAID-1 routine draft fallback and founder-console drafting are also local implementation. These pieces do not imply hosted deployment or a public beta.
 
 **P0-A local increment:** `ProductTruthSnapshotV1` and fixtures landed in #87. The producer increment adds immutable owner-bound case/review snapshots, strict client validation, conflict-preserving resolution, typed quota/owner recovery, single-flight capture, mixed barcode/photo retention and read-only lost-upload-ACK confirmation. See [P0_A_EXECUTION.md](P0_A_EXECUTION.md) and [P0_A_CAPTURE_ACCEPTANCE.md](P0_A_CAPTURE_ACCEPTANCE.md) for exact gates and limitations. No hosted deployment is implied.
 
-**Still not implemented or not selected:** photo OCR/image recognition, provider-neutral device SDK ports, Scandit adoption, real-image extraction benchmark/provider selection, concentration assertions, hosted guest activation, and physical scanner acceptance. P0-B's multi-finding baseline, packet, canonical reported context and customer composition are merged with automated local/CI proof; physical/customer acceptance remains open. See [P0_B_EXECUTION.md](P0_B_EXECUTION.md). The Check camera still uses Expo Camera directly. The extraction contract/evaluator is not a working image extractor.
+**Still not implemented or not selected:** photo OCR/image recognition, provider-neutral device SDK ports, Scandit adoption, measured real-image extraction results/provider selection, concentration assertions, hosted guest activation, and physical scanner acceptance. Offline benchmark/replay preparation exists through merged PR #109; it does not supply an image-extraction result. P0-B's multi-finding baseline, packet, canonical reported context and customer composition are merged with automated local/CI proof; physical/customer acceptance remains open. See [P0_B_EXECUTION.md](P0_B_EXECUTION.md). The Check camera still uses Expo Camera directly. The extraction contract/evaluator is not a working image extractor.
 
 Remote Staging and production retain legacy managed-first routing. Hosted anonymous signup is gated pending lifecycle and abuse controls. The scanner-first public external beta is not ready.
 
@@ -42,7 +63,7 @@ Remote Staging and production retain legacy managed-first routing. Hosted anonym
 | P0-A Capture + Product Resolution | Sami | Capture/search resolves supported product and formula truth or asks for the missing evidence; candidate/photo/barcode flow, S6 resolution, catalog/review and device acceptance. | Snapshot contract landed; immutable production/recovery increment has local automated evidence. Real-photo extraction and physical acceptance remain unverified; not complete or hosted. |
 | P0-B Personal Decision Intelligence | Kanuj | Use verified product truth plus profile, routine and history to return a supported action, reason and next step. | Seven focused source PRs are merged at `7775a42`: contracts, context/history, findings/policy, editors, bounded renderer, stored-snapshot service and Check/editor/My Stuff composition. Required automated local and exact-head CI gates passed. Physical/customer acceptance and hosted activation remain open. Advisory stewardship does not block the DRI merge decision. See [P0_B_EXECUTION.md](P0_B_EXECUTION.md). |
 | P0-C Hosted Beta Operations | Sami | Safely prepare and operate hosted guest lifecycle, abuse/rate/CAPTCHA, linking/conflict, cleanup, retention and recovery. | Preparation ownership is assigned by the portfolio mandate. Hosted guest signup remains gated; activation is not authorized by this pass. |
-| P0-D Integrated customer / physical / release acceptance | Kanuj | Own the complete scanner-first customer outcome, current binary/environment, recovery, account/privacy/support and separate release evidence. | ACTIVE under [#100](https://github.com/KanujVerma/derive/issues/100); account recovery, integrated journey and release truth prepare independently while Sami owns camera/P0-A/catalog/P0-C. Physical/current-binary/hosted/TestFlight/unassisted-customer gates remain separate. |
+| P0-D Integrated customer / physical / release acceptance | Kanuj | Own the complete scanner-first customer outcome, current binary/environment, recovery, account/privacy/support and separate release evidence. | ACTIVE under [#100](https://github.com/KanujVerma/derive/issues/100). Account recovery/local journey (#107), optional contribution UX module (#117), source-only release copy (#116), and current Check Auto entry (#118) are merged. Contribution submission/runtime, live site deployment, physical/current-binary/hosted/TestFlight/unassisted-customer proof remain open. Sami owns camera/P0-A/catalog/P0-C. |
 
 ## Beta gates
 
@@ -53,7 +74,7 @@ Delay broad scanner-first outreach until Derive has honest identity/unknown reco
 | Area | Current implementation | Evaluation, not selection |
 | --- | --- | --- |
 | Barcode capture | Expo Camera / Expo barcode. | Scandit is the commercial challenger; the Yuka/Scandit story is vendor/customer evidence, not an independent Derive benchmark. Decide only from real skincare-package/device tests and useful-resolved-product outcomes. |
-| Image evidence extraction | Private photo capture/upload and S6 evidence path exist locally; no working OCR/VLM extraction is claimed. | Gemini fast multimodal is an initial candidate; GPT/Luna is a challenger. Compare on a frozen real image benchmark, including exact variant, ingredient transcription, critical number/unit error, hallucination, abstention, multilingual text, latency, cost and review burden. No winner yet. |
+| Image evidence extraction | Private package-photo capture/upload and S6 evidence path exist locally; no working OCR/VLM extraction is claimed. PR #109 adds offline manifest/replay tooling only; no provider run or measured image result exists. | Gemini fast multimodal is an initial candidate; GPT/Luna is a challenger. A rights-cleared frozen real-image benchmark must compare exact variant, ingredient transcription, critical number/unit error, hallucination, abstention, multilingual text, latency, cost and review burden. No winner yet. |
 | Soft judgment | Narrow deterministic personal-fit rules. | Jev is an optional experiment, not an authority or production dependency. Compare it with the deterministic baseline and structured model candidates on labeled Derive cases. Do not invent confidence thresholds. |
 | On-device perception | Barcode and Expo Camera are current. | On-device OCR may be useful later; ML Kit, Apple Vision and other native tools are candidates only. MobileCLIP/image retrieval depends on a rights-cleared package corpus and is not active. |
 

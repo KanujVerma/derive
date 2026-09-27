@@ -1,18 +1,20 @@
 # Project Context: Derive
 
-## Current approved strategy (2026-09-26)
+## Current approved strategy (2026-09-27)
 
-Derive is **scanner-first personalized skincare product intelligence**. Free Check asks **“Should I use this product?”** and first returns supported facts about what Derive actually knows. When supported personal context exists, it explains what that person should do and why. There is no universal numerical product, compatibility, or health score. “Personalized Yuka for skincare” is internal shorthand only.
+Derive is scanner-first personalized skincare product intelligence. The customer has one intent: **“Check this product.”** Auto camera, search, barcode, package evidence, and recovery are ways to provide evidence, not separate truth systems. Complexity belongs behind the interface; customers should not need to know the recognition method or backend vocabulary.
 
-The paid hypothesis is **$25/month Managed Skincare** for ongoing routine management, adaptation, check-ins, progress, and product decisions. Pricing, retention, and hosted billing activation are not validated by the display price or local flows. See [ROADMAP.md](ROADMAP.md), [OWNERSHIP.md](OWNERSHIP.md), and [AGENTS.md](../AGENTS.md) for active plans and agent routing.
+All supported inputs converge on S6 product/formula truth and ProductTruthSnapshotV1 before a personal decision. Auto camera is the current default, with supported barcode observation and package-photo capture; an unclassified still requires manual role clarification. Photo-library product upload is the next high-value target. URL paste and Share to Derive are later conveniences. Product Compare is approved near-term post-MVP, not a current feature. See [ROADMAP.md](ROADMAP.md), [PRODUCT.md](PRODUCT.md), [COMMERCE.md](COMMERCE.md), [DESIGN.md](DESIGN.md), and [OWNERSHIP.md](OWNERSHIP.md).
 
-## Current implementation status at main 35a015c
+The $25/month Managed Skincare offer remains a paid hypothesis. Pricing, retention, and hosted billing activation are not validated by a display price or local flow. No universal product/compatibility/health score is used.
 
-A bounded scanner-first free path exists locally in Development Mock and exact-local-Supabase Development Remote. S-FREE-2/3/4 and K2/S2, K3/S3, and K4/S4 are integrated locally. The current Check camera/barcode path uses Expo Camera directly, and private product evidence is captured and handled locally. Photo-only OCR/image recognition is not implemented; Scandit is not selected; Gemini/Luna image extraction has not been benchmarked.
+## Current implementation status at main 39c0fed
 
-Optional free profile persistence, saved products, Check history, reported experiences, and private product evidence exist in bounded local forms. The current free profile stores a goals array, skin behavior, reactivity, treatment and sensitivity context, and one pregnancy/nursing status field. It does not implement a separate decision-intent field, an explicit primary-goal field, or distinct just-in-time pregnancy, trying-to-conceive, and breastfeeding states. Free product memory currently stores using/considering/stopped, checks, and reported experiences; it is not a canonical routine/exposure timeline. Personal Fit is a narrow sequential first-match result, not the approved multi-finding decision system. PersonalDecisionPacketV1 is target architecture only.
+PR #108 and #110 are merged. The current camera starts in Auto, keeps supported barcode observation active, and allows package-photo capture. PR #110 handles checksum-valid iOS UPC-A observations normalized by Expo Camera; actual iPhone barcode acceptance remains unverified. If a still is unclassified, the customer selects which package detail it contains before using it. Automatic photo-role classification, OCR, VLM extraction, and cloud video are not implemented.
 
-Remote Staging and production retain legacy managed routing. Hosted guest activation remains gated, and scanner-first external beta is not ready. Physical scanner acceptance remains unverified. Do not describe local integration as hosted release or target behavior as shipped behavior.
+The canonical product Check has no camera-roll/photo-library picker, product URL paste, OS Share input, or Product Compare. Search and manual recovery remain core paths. S6 and local ProductTruthSnapshotV1 preserve product/formula authority. P0-B currently provides locally/CI-proven findings, versioned decision policy, packet, and same-snapshot composition; this does not establish physical/customer acceptance or hosted release.
+
+PR #109 is merged offline benchmark/replay tooling. It has not called a provider, uploaded images to a provider, or measured image-extraction performance. No image provider is selected, and the preliminary image intake does not meet rights-cleared independent-gold requirements. PR #112 adds a read-only offline hosted-free readiness preflight; all hosted gates remain UNKNOWN and activation remains BLOCKED. Remote Staging/production retain legacy managed routing, and scanner-first external beta is not ready.
 
 ## Historical managed-first project context (superseded as product strategy)
 

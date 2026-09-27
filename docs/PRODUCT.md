@@ -8,6 +8,18 @@ There is no universal numerical compatibility, health, safety, or product-qualit
 
 The intended differentiator is that the same product may lead to a different decision for a different person, routine, or history. The decision must remain bound to the exact supported product and formula revision.
 
+### Obvious by default
+
+Derive should feel simpler than the intelligence behind it. Complexity belongs behind the interface. A first-time customer should understand what to do without founder explanation or knowledge of Derive's internal evidence, model, catalog, or truth systems.
+
+Use one obvious primary action, plain consumer language, minimal setup before first value, and progressive disclosure. Prefer automatic behavior when it remains truthful. Do not make technical mode selection the default; ask one simple clarification when evidence is uncertain. Manual correction is recovery, and deeper formula/provenance detail is optional depth. Provide clear Back, Close, and Retry paths.
+
+### Show Derive a product
+
+The customer has one intent: **“Check this product.”** Auto camera, barcode, product-name search, product/package and ingredient photos, library photos, manual recovery, and future URL/share/text input are ways to provide candidate evidence, not separate customer truth systems. Supported inputs converge on S6 and the same ProductTruthSnapshotV1/personal-decision boundary.
+
+PR #108 makes Auto the camera default, keeps supported barcode observation active, and permits package-photo capture. PR #110 handles checksum-valid iOS UPC-A observations normalized by Expo Camera; real iPhone acceptance remains unverified. An unclassified still asks the customer to choose its role. Automatic photo-role classification, OCR/VLM extraction, camera-roll upload to canonical product Check, product URL/share input, and Product Compare are not implemented. PR #109 adds offline benchmark/replay tooling only; no provider was called or image-extraction performance measured. The near-term priorities and later inputs are in [ROADMAP.md](ROADMAP.md).
+
 ### Current implementation
 
 Development Mock and exact-local-Supabase Development Remote contain a scanner-first free path. Remote Staging and production retain legacy managed routing, and hosted guest activation is gated. S6 has sourced product identity and versioned formula evidence; K4/S4 connects the mobile camera to private product-evidence handling locally. Check uses Expo Camera directly. Photo-only evidence has no working OCR or image-recognition extraction.
