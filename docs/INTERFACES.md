@@ -10,7 +10,7 @@ Mobile Check currently calls Expo Camera directly. K4/S4 connects camera evidenc
 
 ### APPROVED TARGET, NOT YET IMPLEMENTED
 
-These names describe semantic concepts only. They are not current TypeScript interfaces, database tables, or approved method signatures.
+These names describe target semantics. P0-A's implemented snapshot is documented below; P0-B's local Finding, PersonalDecisionPacketV1 and renderer branches are recorded in [P0_B_EXECUTION.md](P0_B_EXECUTION.md) and remain unpublished. The remaining target names do not imply implemented interfaces, database tables or approved method signatures.
 
 - **CaptureObservation:** immutable record of what a capture attempt observed and when, with permission/cancel/error state. It does not establish product identity.
 - **BarcodeCapturePort:** returns raw barcode observations and supported format/device errors; it does not assert exact product or formula.

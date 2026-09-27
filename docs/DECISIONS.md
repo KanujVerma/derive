@@ -336,7 +336,7 @@ These findings are review evidence, not accepted contract changes. S1A does not 
 - **Decision:** Preserve Product, ProductAlias, ProductVariant, ProductIdentifierAssertion, ObservedPackaging, FormulaVersion, ordered IngredientOccurrence, IngredientEntity, ConcentrationAssertion, RegulatoryConstraint, ScientificEvidenceClaim, SourceProvenance, ReformulationLineage, ResolutionCase, and ProductTruthSnapshot as separate concepts. Do not model timeless Product.ingredients.
 - **Semantics:** A GTIN is an identifier assertion, not a product primary key, exact formula key, or authenticity proof. Visual resemblance, model output, user confirmation, and retailer data are evidence or candidates, not canonical formula authority. Unknown stays unknown.
 - **Concentration:** Keep evidence basis, quantity shape, review state, and substance/unit/formula/market/time/source scope separate from regulatory limits. A derived constraint is not an observed concentration. A regulatory maximum is not a measured formulation quantity.
-- **Snapshot invariant:** A personal decision must bind to the same identity, variant, formula evidence, conflict state, and provenance revision shown to the customer. The target ProductTruthSnapshot is not a current source type.
+- **Snapshot invariant:** A personal decision must bind to the same identity, variant, formula evidence, conflict state, and provenance revision shown to the customer. P0-A implements ProductTruthSnapshotV1 and immutable storage locally; this does not imply hosted deployment or complete personal-decision integration.
 
 ### ADR-36: Contextual Scientific Claims and Scoped Evidence Assessment
 
@@ -347,10 +347,10 @@ These findings are review evidence, not accepted contract changes. S1A does not 
 
 ### ADR-37: Multi-Finding Personal Decision and Evidence-Bound Explanation
 
-- **Status:** ACCEPTED TARGET; current free Personal Fit is only a narrow sequential first-match implementation.
+- **Status:** ACCEPTED TARGET; merged free Personal Fit is a narrow first-match implementation. P0-B's local multi-finding branches and bounded composition are under validation, with publication and acceptance gates open.
 - **Decision:** Gather all applicable supported findings, preserve their evidence and uncertainty, and apply a deterministic final policy to select the customer action. The versioned PersonalDecisionPacket binds that action to the ProductTruthSnapshot and minimum-necessary user context, findings, conflicts, unknowns, and policy revision.
 - **Soft judgment:** A probabilistic provider may contribute bounded, typed findings or abstain. It cannot establish canonical product truth, bypass deterministic safety/policy, or invent a conclusion from missing evidence. Jev is an optional bounded experiment, not a selected provider or production dependency.
-- **Explanation:** An evidence-bound renderer explains only claims present in the packet. It cannot add new scientific or product claims. No PersonalDecisionPacket or multi-finding decision service is currently implemented.
+- **Explanation:** An evidence-bound renderer explains only claims present in the packet. It cannot add new scientific or product claims. P0-B implements the packet, deterministic baseline and renderer on isolated local branches; these are not merged or hosted. See [P0_B_EXECUTION.md](P0_B_EXECUTION.md).
 
 ### ADR-38: Provider-Neutral Capture and Perception; Scanner Selection by Evaluation
 

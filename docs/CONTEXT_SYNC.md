@@ -7,6 +7,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
 
+## 2026-09-27: P0-B local integration and acceptance checkpoint
+
+- **Predecessor:** recovered `45f1773e4983c3c28848839c65640b7681b89d8e`; current verified origin/main `105b3a3c41132287e7b4df1331eefe72111e58d4`. P0-A's stored snapshot runtime is now available. P0-B remains unpublished; no PR, exact-head CI or merge is claimed.
+- **Local work:** all seven isolated workstreams are frozen and locally verified; final customer bundle `585208495becb6d66afc7f67380a3c6daf65d3d4`, service `cdf0b3e795906213fcb97ed1896931240502ae45`. Source remains unpublished. Check/editor/My Stuff have one owner; no P0-A implementation changes. Historical product-name selection leaves formula unknown; scoped JIT questions and saved answers remain editable; pinned SDK authorization/global memory purge protect ownership. Original shared-checkout web work is preserved.
+- **Proof:** final frozen customer bundle passed all 59 unit files: 559 TAP cases plus 51 policy/22 service scenarios and assertion scripts; root reran unit/app/test TypeScript. Web/iOS JS exports passed. Fresh reset/full pgTAP21/524 passed. Actual final service Edge proof persisted257 findings/150 impacts/454,176-byte packet and lossless326,527-byte Unicode input; actual JIT cases and source-digest replay passed. Cleanup counts0. Independent engine/renderer and SDK ownership reviews passed; detailed provenance and limits are in [P0_B_EXECUTION.md](P0_B_EXECUTION.md).
+- **Gates:** public source pushes were rejected by automatic approval review; direct confirmation is pending. Required stewardship, final exact-head CI, publication/merges and physical/customer acceptance remain open. No hosted deployment, EAS/TestFlight, provider adoption or P0-A implementation.
+
 ## 2026-09-26: P0-A truth producer and capture recovery integration
 
 - **Predecessor:** `origin/main@773a4b839f37712f345a20118b908c4d4eba0bae`; contract PR #87 exact-head CI [36282262084](https://github.com/KanujVerma/derive/actions/runs/36282262084) green. Starting feature recovery base was `45f1773e4983c3c28848839c65640b7681b89d8e`.
