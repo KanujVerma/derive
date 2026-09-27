@@ -172,3 +172,17 @@ test('P0-B unknown routine role cannot promote redundancy or replacement copy', 
   packet.action.nextStep = 'review_routine';
   assert.equal(describePersonalDecision(packet, binding).kind, 'unavailable');
 });
+
+test('P0-B unsupported goal offers product details without changing the action or promising more intake', () => {
+  const { packet, binding } = fixture('unsupported-goal');
+  const view = describePersonalDecision(packet, binding);
+  assert.equal(view.kind, 'ready');
+  if (view.kind !== 'ready') return;
+  assert.equal(view.action, 'NOT_ENOUGH_INFORMATION');
+  assert.equal(view.nextStep, 'view_product_facts');
+  assert.equal(view.nextStepLabel, 'View product details');
+  assert.doesNotMatch(view.nextStepLabel, /context|answer|intake/i);
+  assert.ok(view.details.some((detail) => /dryness/i.test(detail.reason)));
+  assert.ok(view.unknowns.some((unknown) => unknown.critical));
+  assert.doesNotMatch(JSON.stringify(view.unknowns), /evidence for this advice is unresolved/i);
+});

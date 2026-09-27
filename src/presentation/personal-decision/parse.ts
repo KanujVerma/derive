@@ -66,6 +66,6 @@ export const personalDecisionPacketSchema: z.ZodType<PersonalDecisionPacketV1> =
   })).max(100),
   action: z.strictObject({ kind: z.enum(['COULD_WORK', 'USE_WITH_CAUTION', 'KEEP_CURRENT', 'SKIP', 'NOT_ENOUGH_INFORMATION']),
     findingIds: refs, primaryFindingId: ref,
-    nextStep: z.enum(['consider_use', 'keep_current', 'skip_product', 'confirm_formula', 'add_context', 'review_routine', 'ask_clinician']),
+    nextStep: z.enum(['consider_use', 'keep_current', 'skip_product', 'confirm_formula', 'add_context', 'review_routine', 'ask_clinician', 'view_product_facts']),
   }),
 });

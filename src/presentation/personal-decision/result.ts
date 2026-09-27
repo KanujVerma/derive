@@ -21,7 +21,7 @@ const titles: Record<PersonalDecisionActionKind, string> = {
 const nextSteps: Record<DecisionNextStep, string> = {
   consider_use: 'Consider this product', keep_current: 'Keep my current product', skip_product: 'Skip this product',
   confirm_formula: 'Confirm the exact formula', add_context: 'Add relevant context',
-  review_routine: 'Review my routine', ask_clinician: 'Ask a qualified professional',
+  review_routine: 'Review my routine', ask_clinician: 'Ask a qualified professional', view_product_facts: 'View product details',
 };
 const goals: Record<Goal, string> = {
   breakouts: 'breakouts', dark_spots: 'dark spots', dryness: 'dryness', oiliness: 'oiliness', texture: 'skin texture',
@@ -160,7 +160,7 @@ export function describePersonalDecision(value: unknown, expectedBinding: Decisi
     unknowns: deduplicateUnknowns([
       ...[...critical, ...other].map((need) => ({ text: needText(need), critical: need.critical })),
       ...active.filter((finding) => (finding.confidence !== 'supported' || finding.applicability === 'uncertain')
-        && !(finding.kind === 'missing_evidence'
+        && !((finding.kind === 'missing_evidence' || finding.kind === 'no_supported_rule')
           && finding.evidenceNeedIds.some((id) => packet.evidenceNeeds.some((need) => need.id === id)))).map((finding) => ({
         text: finding.confidence === 'limited' ? 'Some evidence for this advice is limited.'
           : finding.confidence === 'unknown' ? 'Some evidence for this advice is unresolved.' : 'This advice may not apply to your situation.',
