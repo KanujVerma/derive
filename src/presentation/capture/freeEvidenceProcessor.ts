@@ -3,8 +3,11 @@ import type { ProductResolutionResult, ResolveProductIdentityInput } from '../..
 import type { CaptureCandidate, CaptureEvidence, CaptureProcessor, CaptureResult, PhotoRole } from './productEvidence.ts';
 import { ProductPhotoReadError } from './readProductEvidencePhoto.ts';
 import type { ProductPhoto } from './readProductEvidencePhoto.ts';
+import { FreeProductEvidenceDailyLimitError } from '../../services/remote/freeProductEvidence.ts';
 
 type Dependencies = {
+  /** Live processors are bound to the signed-in owner at creation. */
+  getOwnerId?(): string | null;
   readPhoto(uri: string): Promise<ProductPhoto>;
   createRequestId(): string;
   prepare(input: PrepareFreeProductEvidenceInput): Promise<FreeProductEvidenceUpload>;
@@ -12,7 +15,7 @@ type Dependencies = {
   resolve(input: ResolveProductIdentityInput): Promise<ProductResolutionResult>;
 };
 
-export type CaptureProcessingErrorCode = 'PHOTO_FAILED' | 'PHOTO_TOO_LARGE' | 'PHOTO_MIME_UNSUPPORTED' | 'PREPARE_FAILED' | 'UPLOAD_FAILED' | 'RESOLVE_FAILED';
+export type CaptureProcessingErrorCode = 'PHOTO_FAILED' | 'PHOTO_TOO_LARGE' | 'PHOTO_MIME_UNSUPPORTED' | 'DAILY_LIMIT' | 'ACCOUNT_CHANGED' | 'PREPARE_FAILED' | 'UPLOAD_FAILED' | 'RESOLVE_FAILED';
 export class CaptureProcessingError extends Error {
   readonly code: CaptureProcessingErrorCode;
 
@@ -49,6 +52,12 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
   const photoAttempts = new Map<string, { requestId: string; target?: FreeProductEvidenceUpload; uploaded: boolean }>();
   const resolutions = new WeakMap<CaptureResult, ProductResolutionResult>();
   let caseAttempt: { key: string; requestId: string } | null = null;
+  const ownerId = deps.getOwnerId?.();
+  const assertOwner = () => {
+    if (deps.getOwnerId && (!ownerId || deps.getOwnerId() !== ownerId)) {
+      throw new CaptureProcessingError('ACCOUNT_CHANGED');
+    }
+  };
 
   const present = (result: ProductResolutionResult): CaptureResult => {
     const review = mapFreeResolutionToCapture(result);
@@ -58,14 +67,17 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
 
   return {
     async process(evidence: readonly CaptureEvidence[]): Promise<CaptureResult> {
+      assertOwner();
       const barcode = evidence.find((item) => item.kind === 'barcode' && item.role === 'barcode');
       if (barcode) {
         if (!/^\d{8,14}$/.test(barcode.value)) return { state: 'insufficient_evidence', candidates: [] };
         const key = `barcode:${barcode.value}`;
         if (caseAttempt?.key !== key) caseAttempt = { key, requestId: deps.createRequestId() };
         try {
-          return present(await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', barcode: barcode.value }));
-        } catch { throw new CaptureProcessingError('RESOLVE_FAILED'); }
+          const result = await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', barcode: barcode.value });
+          assertOwner();
+          return present(result);
+        } catch { assertOwner(); throw new CaptureProcessingError('RESOLVE_FAILED'); }
       }
 
       const photos = evidence.filter((item): item is CaptureEvidence & { role: PhotoRole; kind: 'local_photo' } =>
@@ -80,10 +92,12 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
         let image: ProductPhoto;
         try { image = await deps.readPhoto(item.value); }
         catch (error) {
+          assertOwner();
           if (error instanceof ProductPhotoReadError && error.code === 'PHOTO_TOO_LARGE') throw new CaptureProcessingError('PHOTO_TOO_LARGE');
           if (error instanceof ProductPhotoReadError && error.code === 'PHOTO_MIME_UNSUPPORTED') throw new CaptureProcessingError('PHOTO_MIME_UNSUPPORTED');
           throw new CaptureProcessingError('PHOTO_FAILED');
         }
+        assertOwner();
         let attempt = photoAttempts.get(key);
         if (!attempt) {
           attempt = { requestId: deps.createRequestId(), uploaded: false };
@@ -91,8 +105,12 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
         }
         if (!attempt.target) {
           try { attempt.target = await deps.prepare({ requestId: attempt.requestId, role: item.role, mimeType: image.mimeType }); }
-          catch { throw new CaptureProcessingError('PREPARE_FAILED'); }
+          catch (error) {
+            assertOwner();
+            throw new CaptureProcessingError(error instanceof FreeProductEvidenceDailyLimitError ? 'DAILY_LIMIT' : 'PREPARE_FAILED');
+          }
         }
+        assertOwner();
         if (attempt.target.role !== item.role || attempt.target.mimeType !== image.mimeType
           || attempt.target.bucket !== 'customer-product-evidence' || !attempt.target.storagePath
           || !Number.isFinite(attempt.target.maxBytes) || attempt.target.maxBytes > 10 * 1024 * 1024
@@ -101,17 +119,21 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
         }
         if (!attempt.uploaded) {
           try { await deps.upload(attempt.target, image.bytes); attempt.uploaded = true; }
-          catch { throw new CaptureProcessingError('UPLOAD_FAILED'); }
+          catch { assertOwner(); throw new CaptureProcessingError('UPLOAD_FAILED'); }
         }
+        assertOwner();
         evidencePhotos.push({ storagePath: attempt.target.storagePath, role: item.role });
       }
       const key = photos.map((item) => `${item.role}\u0000${item.value}`).join('\u0001');
       if (caseAttempt?.key !== key) caseAttempt = { key, requestId: deps.createRequestId() };
       try {
-        return present(await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', evidencePhotos }));
-      } catch { throw new CaptureProcessingError('RESOLVE_FAILED'); }
+        const result = await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', evidencePhotos });
+        assertOwner();
+        return present(result);
+      } catch { assertOwner(); throw new CaptureProcessingError('RESOLVE_FAILED'); }
     },
     resolutionFor(review: CaptureResult): ProductResolutionResult | null {
+      if (deps.getOwnerId && (!ownerId || deps.getOwnerId() !== ownerId)) return null;
       return resolutions.get(review) ?? null;
     },
   };
