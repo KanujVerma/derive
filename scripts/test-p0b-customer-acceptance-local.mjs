@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
 import { assertDisposableLocalTarget } from './acceptance/p0b/target.ts';
+import { attemptOwnedCleanup } from './acceptance/p0b/cleanup.ts';
 import { CustomerController, captureCustomerFunctionClient, selectVisibleCustomerDecision, describeCanonicalMyStuff } from '../src/presentation/personal-decision/customerController.ts';
 import { getPersonalContext, writePersonalContext, requestPersonalContext } from '../src/services/remote/personalContext.ts';
 import { requestPersonalDecision } from '../src/services/remote/personalDecision.ts';
@@ -80,6 +81,7 @@ try {
   const identifier = await admin.from('product_identifiers').insert({ variant_id: variantId, formula_version_id: formulaId, identifier_type: 'gtin_12', identifier_value: '012345678905', source_authority: 'founder', source_reference: 'https://fixture.invalid/p0b-customer', observed_at: now, verified_at: now }).select('id').single(); assert.ifError(identifier.error); owned.identifier = identifier.data.id;
   const resolved = await a.functions.invoke('resolve-product-identity', { body: { requestId: randomUUID(), consumer: 'scan', barcode: '012345678905' } }); assert.ifError(resolved.error);
   const snapshot = resolved.data.truthSnapshot; assert(snapshot); assert.equal(snapshot.formula.formulaVersionId, formulaId);
+  assert.equal(await count('product_truth_snapshots', 'user_id', aid), 1, 'Resolution actually created an owned immutable snapshot before cleanup');
   await assess(snapshot, 'NOT_ENOUGH_INFORMATION');
 
   const draft = createContextDraft();
@@ -136,15 +138,19 @@ try {
   for (const client of [a, b]) for (const table of ['personal_context_heads', 'personal_context_revisions', 'personal_decision_assessments']) {
     assert.equal((await client.from(table).select('*')).error?.code, '42501');
   }
-  console.log('PASS: actual mobile controller/remote adapters, SDK, local authoritative Edge and persistence; positive/redundancy/reaction/partial context, exact text, server goal cap, correction, response-loss idempotency, unavailable/retry, A-B-signout-A and private-table boundaries. Synthetic catalog inputs only. Native/physical/hosted/human acceptance remains separate.');
 } finally {
   changeOwner(null, a);
-  for (const client of [a, b]) await client.auth.signOut().catch(() => {});
-  for (const id of ownedUsers) { const result = await admin.auth.admin.deleteUser(id); assert.ifError(result.error); }
-  for (const [table, id] of [['product_identifiers', owned.identifier], ['product_formula_versions', owned.formula], ['product_variants', owned.variant], ['products', owned.product]]) {
-    if (id) assert.ifError((await admin.from(table).delete().eq('id', id)).error);
-  }
-  for (const id of ownedUsers) for (const table of ['personal_context_heads', 'personal_context_revisions', 'personal_decision_assessments', 'product_resolution_cases']) assert.equal(await count(table, 'user_id', id), 0);
-  if (owned.product) assert.equal(await count('products', 'id', owned.product), 0);
-  console.log('PASS: disposable identity/context/assessment/case/catalog cleanup independently read back as zero.');
+  const catalog = [['product_identifiers', owned.identifier], ['product_formula_versions', owned.formula], ['product_variants', owned.variant], ['products', owned.product]].filter(([, id]) => id);
+  const deletions = [a, b].map((client, index) => ({ label: `session ${index + 1} sign-out`, run: async () => { assert.ifError((await client.auth.signOut()).error); } }));
+  ownedUsers.forEach((id, index) => deletions.push({ label: `owned user ${index + 1} deletion`, run: async () => { assert.ifError((await admin.auth.admin.deleteUser(id)).error); } }));
+  catalog.forEach(([table, id]) => deletions.push({ label: `${table} deletion`, run: async () => { assert.ifError((await admin.from(table).delete().eq('id', id)).error); } }));
+  const checks = ownedUsers.map((id, index) => ({ label: `owned user ${index + 1} absence`, run: async () => {
+    const result = await admin.auth.admin.getUserById(id);
+    assert.equal(result.error?.code, 'user_not_found'); assert.equal(result.data.user, null);
+  } }));
+  for (const [index, id] of ownedUsers.entries()) for (const table of ['personal_context_heads', 'personal_context_revisions', 'personal_decision_assessments', 'product_resolution_cases', 'product_truth_snapshots']) checks.push({ label: `owned user ${index + 1} ${table} absence`, run: async () => { assert.equal(await count(table, 'user_id', id), 0); } });
+  catalog.forEach(([table, id]) => checks.push({ label: `${table} absence`, run: async () => { assert.equal(await count(table, 'id', id), 0); } }));
+  await attemptOwnedCleanup(deletions, checks);
 }
+console.log('PASS: actual mobile controller/remote adapters, SDK, local authoritative Edge and persistence; positive/redundancy/reaction/partial context, exact text, server goal cap, correction, response-loss idempotency, unavailable/retry, A-B-signout-A and private-table boundaries. Synthetic catalog inputs only. Native/physical/hosted/human acceptance remains separate.');
+console.log('PASS: disposable identity/context/assessment/case/snapshot/catalog cleanup independently read back as zero.');

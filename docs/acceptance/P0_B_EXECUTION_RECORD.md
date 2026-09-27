@@ -6,7 +6,7 @@
 
 - Starting main: `22a210a7a720c9621d45e789b8690dcc73ab059a`.
 - Reconciled production source: first `8ec9fe57ee2a341cf058da6818cab1227984aaea` after Sami's #95, then `be853d237d6b7bc1e5f3252ebeb88cf7f3f46c0f` after #99 actually merged. P0-B architecture was reused. The latter advancement changed no P0-B server functions, shared contracts or decision/personalization modules; expensive valid local service evidence was retained.
-- Acceptance checkpoint: `0f8653d3c94cb19ece4d316e538d0a657919bf57`. Later runner additions check invalid fourth/duplicate goals; its tested SHA-256 is `dcfa4aa73a9837106e199afb0beada20a713f079cc5e896979f2bea712d834cc`. Final PR head and exact-head CI are reported by GitHub metadata, not predicted here.
+- Acceptance checkpoint: `0f8653d3c94cb19ece4d316e538d0a657919bf57`. Later runner additions check invalid fourth/duplicate goals and exhaustive owned cleanup; its tested SHA-256 is `e3232e2e3b954815e4f147bcf46e5bf95364da65cd8c545d54505a3e3db7ac9e`. Final PR head and exact-head CI are reported by GitHub metadata, not predicted here.
 - Node 22.23.0; cached Supabase CLI 2.117.0; Colima Docker; PostgreSQL 15.8; native Expo Go; no new dependency, EAS build, TestFlight build or provider call.
 - Simulator: iPhone 17 Pro, iOS 26.5. Physical iPhone: iOS 27.0, available/connected. Physical all-app inventory confirms Expo Go 57.0.9 build 1017880. Historical Derive 1.0.0 build 10 is not this source.
 - No production/hosted writes. Disposable local anonymous identities and explicitly synthetic catalog records only. These records exercise evaluation/persistence; they do not validate real product efficacy, provider performance or catalog coverage.
@@ -26,14 +26,16 @@
 | Lost write confirmation | PASS | First request actually committed; controlled response loss caused the client error; retry retained request ID and server replay produced one revision |
 | Client unavailable/retry | PASS | Controlled transport failure hid context/current decision; restored service calls produced a current bound result |
 | Owner/session isolation | PASS | Real anonymous A/B SDK sessions, B blocked from A's resolver snapshot, sign-out purge and A return; authenticated raw private-table access rejected |
-| Owned harness cleanup | PASS | Anonymous users, owned context/assessment/case and synthetic catalog records deleted; independent exact-count readback zero |
-| Full unit suite | PASS | On final reconciled source: 67 unit files; 50 TAP programs, 590 registered cases, zero failures, plus assertion-style suites |
+| Owned harness cleanup | PASS | Every recorded owned deletion and independent Auth/context/assessment/case/snapshot/catalog absence check attempted; exact-count readback zero. The run first proved its immutable snapshot was actually created. First/later deletion, absence-query and combined failures tested locally without live failure injection |
+| Full unit suite | PASS | On final reconciled source: 68 unit files; 50 TAP programs, 590 registered cases, zero failures, plus assertion-style suites |
 | App/test TypeScript | PASS | Both checks zero errors |
 | Web/iOS JavaScript exports | PASS | Both exports completed; no native binary claim |
 
 Capacity regression reused the existing harness: actual persisted 257 findings/150 impacts, 454176-byte packet; 326527-byte Unicode input retained all 300 ordered ingredients.
 
 The new local runner is executed with `node --experimental-strip-types scripts/test-p0b-customer-acceptance-local.mjs`. It requires the already running disposable local stack, captures CLI status privately, and rejects any API URL other than exact `http://127.0.0.1:54321` before constructing clients or authenticating. It never starts, resets or stops the shared stack. The new safeguard test was observed failing for the missing rejection, then passing for hosted/LAN/lookalike/credential/port drift. Root granted a narrow single-writer CI extension: one registration after the existing P0-B decision harness, with no permissions, secrets or other job changes.
+
+Narrow review found that an early deletion failure previously aborted later cleanup. The owned cleanup helper now attempts every recorded sign-out/deletion and every reachable independent absence check, collects only safe operation labels, and rejects after the full pass. Both success messages occur after the completed cleanup barrier, so a primary or cleanup failure emits no PASS. The regression was observed failing for a missing rejection, then passing for first/later deletion failure, query failure, combined failures and success. No live failure/destruction was injected; a normal actual client/service run confirmed the repaired cleanup against the disposable local stack.
 
 ## Native observation and limits
 
