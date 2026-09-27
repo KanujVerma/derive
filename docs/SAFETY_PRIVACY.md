@@ -9,6 +9,8 @@ Derive operates under uncompromising safety and privacy standards appropriate fo
 
 Local free profile, history, and private product-evidence paths are owner-bound and remain local integrations; hosted guest activation is gated. The camera-to-private-evidence path does not imply OCR or image recognition. Existing pregnancy/nursing and sensitivity fields must preserve unanswered, no, yes, and prefer-not-to-say semantics where the underlying contract provides them. Reported product reactions are not diagnosed allergies or proof of ingredient causation.
 
+P0-B source now preserves intent/primary and secondary goals, distinct reproductive answers, reported routine/use and corrected history behind owner-bound immutable revisions. It consumes P0-A truth with deterministic policy and bounded explanation; it does not establish a general scientific/clinical system. Physical/customer acceptance stays open. P0-D is explicitly Kanuj-owned and verifies release scope/environment/current binary before external beta. User-facing evidence scopes and operational prerequisites remain separate.
+
 ### APPROVED TARGET, NOT YET IMPLEMENTED
 
 The initial external-beta population is U.S. adults age 18 and older. This target does not claim that runtime age-gating is implemented.
