@@ -158,3 +158,14 @@ test('P0-B exact routine formula overlap survives unknown routine category witho
   overlap.kind = 'replacement_candidate';
   assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_scope'));
 });
+
+test('P0-B unsupported goal can route to facts without promising more intake supplies evidence', () => {
+  const { packet, binding } = clone(personalDecisionFixtures[0]);
+  packet.findings.push({ id: 'unsupported-goal', kind: 'no_supported_rule', applicability: 'applicable', severity: 'informational', confidence: 'unknown',
+    ruleId: 'fixture:unsupported-goal', ruleVersion: '1', evidence: [], uncertainty: [], evidenceNeedIds: ['unsupported-goal-evidence'] });
+  packet.evidenceNeeds.push({ id: 'unsupported-goal-evidence', code: 'supported_rule', state: 'missing', critical: true, findingIds: ['unsupported-goal'] });
+  packet.action = { kind: 'NOT_ENOUGH_INFORMATION', findingIds: ['unsupported-goal', 'goal-role'], primaryFindingId: 'unsupported-goal', nextStep: 'view_product_facts' };
+  assert.deepEqual(validatePersonalDecisionPacket(packet, binding), []);
+  packet.action.kind = 'USE_WITH_CAUTION';
+  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('action_next_step_mismatch'));
+});

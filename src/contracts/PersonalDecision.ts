@@ -114,7 +114,7 @@ export type PersonalDecisionActionKind =
   | 'COULD_WORK' | 'USE_WITH_CAUTION' | 'KEEP_CURRENT' | 'SKIP' | 'NOT_ENOUGH_INFORMATION';
 export type DecisionNextStep =
   | 'consider_use' | 'keep_current' | 'skip_product' | 'confirm_formula'
-  | 'add_context' | 'review_routine' | 'ask_clinician';
+  | 'add_context' | 'review_routine' | 'ask_clinician' | 'view_product_facts';
 
 export interface PersonalDecisionAction {
   kind: PersonalDecisionActionKind;
@@ -260,7 +260,7 @@ export function validatePersonalDecisionPacket(
     USE_WITH_CAUTION: ['confirm_formula', 'add_context', 'review_routine', 'ask_clinician'],
     KEEP_CURRENT: ['keep_current'],
     SKIP: ['skip_product'],
-    NOT_ENOUGH_INFORMATION: ['confirm_formula', 'add_context', 'review_routine', 'ask_clinician'],
+    NOT_ENOUGH_INFORMATION: ['confirm_formula', 'add_context', 'review_routine', 'ask_clinician', 'view_product_facts'],
   };
   if (!allowedSteps[packet.action.kind].includes(packet.action.nextStep)) issues.add('action_next_step_mismatch');
   return [...issues];

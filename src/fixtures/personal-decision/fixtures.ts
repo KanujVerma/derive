@@ -114,6 +114,10 @@ const routineExperience: Finding = {
 };
 export const personalDecisionFixtures: PersonalDecisionFixture[] = [
   fixture('positive-role-match'),
+  fixture('unsupported-goal', { findings: [role, { id: 'unsupported-goal', kind: 'no_supported_rule', applicability: 'applicable', severity: 'informational', confidence: 'unknown',
+    ruleId: 'fixture:unsupported-goal', ruleVersion: '1', evidence: [profileEvidence], uncertainty: [], evidenceNeedIds: ['unsupported-goal-evidence'] }],
+    evidenceNeeds: [tolerance, { id: 'unsupported-goal-evidence', code: 'supported_rule', state: 'missing', critical: true, findingIds: ['unsupported-goal'] }],
+    action: { kind: 'NOT_ENOUGH_INFORMATION', findingIds: ['unsupported-goal', 'goal-role'], primaryFindingId: 'unsupported-goal', nextStep: 'view_product_facts' } }),
   fixture('redundancy', { findings: [role, redundancy],
     routineImpacts: [{ id: 'duplicate-impact', kind: 'duplicates_role', candidate: { productId: binding.productId, variantId: binding.variantId, formulaVersionId: binding.formulaVersionId }, routineItemIds: ['routine-item:1'], findingIds: ['redundant-role'], uncertainty: [] }],
     action: { kind: 'KEEP_CURRENT', findingIds: ['redundant-role'], primaryFindingId: 'redundant-role', nextStep: 'keep_current' } }),
