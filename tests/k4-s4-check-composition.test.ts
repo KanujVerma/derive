@@ -16,7 +16,7 @@ test('canonical Check opens one host for barcode or a compact package photo path
 
 test('barcode-only finishes capture while existing photos require reviewed mixed evidence', () => {
   assert.match(host, /autoFinishBarcode/);
-  assert.match(capture, /if \(autoFinishBarcode && !session\.evidence\.some\(\(item\) => item\.kind === 'local_photo'\)\) \{[\s\S]*?onEvidenceReady\(toCaptureHandoff\(reduceCapture\(session, \{ type: 'barcode', value: data \}\)\)\)/);
+  assert.match(capture, /if \(autoFinishBarcode && !currentSession\.current\.evidence\.some\(\(item\) => item\.kind === 'local_photo'\)\) \{[\s\S]*?onEvidenceReady\(toCaptureHandoff\(reduceCapture\(currentSession\.current, \{ type: 'barcode', value: data \}\)\)\)/);
   assert.match(check, /if \(handoff\.barcodeLookup\) \{[\s\S]*?openResolution\(\{ consumer: 'scan', barcode: handoff\.barcodeLookup\.barcode \}\);[\s\S]*?return;/);
 });
 
