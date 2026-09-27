@@ -4,7 +4,9 @@
 
 **P0-B PARTIAL, BLOCKERS REMAIN**
 
-All implementation workstreams are frozen and locally verified. P0-B source is unpublished: no P0-B PR, merge or exact-head GitHub CI exists. Automatic approval review rejected public code pushes because it recognized an earlier docs-only authorization; the requested direct destination authorization remains pending. Required stewardship and physical/customer acceptance are also unperformed.
+The publication continuation explicitly authorized reviewed public source pushes. B1, B2 and B4 are now published as focused PRs #91, #92 and #90 respectively; all three exact heads passed Verify & Build and Database & Integration. Required Sami stewardship requests are confirmed, but no reviews have been submitted. No P0-B PR has merged. Later public waves are held by the requested current-main dependency order, not by an implementation wait.
+
+The new compactness gate exposed excessive expanded rows. Original B5 was corrected locally at `31712a2d49bdec92dbef05634ca5f13e8196f43a`; independent component SSR confirms bounded semantic/evidence pages, one immediate secondary cue, explicit further-caution review and visible critical warnings. All raw findings and provenance remain retained. The updated combined LOCAL validation bundle is `651cf3a0d8b3ff1d66f4366ce3a98b31cd0079fc`; it is not a public feature PR.
 
 ## Repository baseline
 
@@ -32,15 +34,15 @@ B1, B2 and B4 began concurrently. B3 and B5 consumed the frozen local contract w
 
 ## Agent execution and frozen heads
 
-All rows below are **local, unmerged, with PR and merge SHA absent**.
+All rows remain unmerged. B1/B2/B4 publication and exact-head CI are recorded below; later waves remain private until their prerequisites merge.
 
 | Issue / workstream | Agent / branch | Frozen head | Own write-set |
 | --- | --- | --- | --- |
-| [#75](https://github.com/KanujVerma/derive/issues/75) B1 contracts | Sol contracts agent; `kanuj/p0b-contracts` | `5ba9abec2861ba55ce0ac8aeafccd93a2a0cf953` | PersonalDecision contract; personal-decision fixtures; contracts test; P0_B_DECISION doc |
+| [#75](https://github.com/KanujVerma/derive/issues/75) B1 contracts | Sol contracts agent; `kanuj/p0b-contracts` | `65f0e7ae57798c98abd8eccbaf11d94897eef575` | PersonalDecision contract; personal-decision fixtures; contracts test; P0_B_DECISION doc |
 | [#76](https://github.com/KanujVerma/derive/issues/76) B2 context | Sol context agent, then root budget amendment; `kanuj/p0b-context-history` | `36084f0c7c12f13455da56bfc58a0af46e5e54f8` | PersonalContext contract/remote client; personal-context Edge/parser; three additive migrations; context/budget pgTAP; context smoke/test/doc; only its JWT-enabled config stanza |
 | [#78](https://github.com/KanujVerma/derive/issues/78) B3 policy/gold | Sol engine agent; `kanuj/p0b-findings-policy` | `511aa72a891023a0e59c0f652191403bcdae71be` | domain personal-decision evaluator; policy fixtures/test/doc |
-| [#77](https://github.com/KanujVerma/derive/issues/77) B4 editors | Sol personalization agent; `kanuj/p0b-personalization` | `98a34b54e2bc5e1210be06564d0c546efdb6fdb2` | p0b-personalization components/models/fixtures; six focused test scripts |
-| [#79](https://github.com/KanujVerma/derive/issues/79) B5 renderer | Sol contracts agent after B1; `kanuj/p0b-result-experience` | `e6259a897f093684e5ed29c4e057b04855ba069f` | PersonalDecisionPanel; strict parser/templates; renderer/capacity tests |
+| [#77](https://github.com/KanujVerma/derive/issues/77) B4 editors | Sol personalization agent; `kanuj/p0b-personalization` | `c5fa9d7a5236220125e8c99c1836995c98b827a8` | p0b-personalization components/models/fixtures; six focused test scripts |
+| [#79](https://github.com/KanujVerma/derive/issues/79) B5 renderer | Sol contracts agent after B1; `kanuj/p0b-result-experience` | `31712a2d49bdec92dbef05634ca5f13e8196f43a` | PersonalDecisionPanel; strict parser/templates; renderer/capacity tests |
 | [#80](https://github.com/KanujVerma/derive/issues/80) B6 service | Sol engine agent after B3; `kanuj/p0b-compose` | `cdf0b3e795906213fcb97ed1896931240502ae45` | PersonalDecisionService DTO/remote client; pure truth/context adapters; personal-decision Edge; decision config stanza; service smoke/test; root's two CI registrations |
 | [#88](https://github.com/KanujVerma/derive/issues/88) B7 customer | Sol personalization agent after B4; `kanuj/p0b-customer-compose` | `585208495becb6d66afc7f67380a3c6daf65d3d4` | CheckProductScreen; existing personalize route/dev fixture; My Stuff/root layout; controller/gateway/storage adapter; seven customer test scripts; narrow MyStuffContent props |
 
@@ -76,7 +78,7 @@ The request contains only operation/request ID/case ID/snapshot ID. Case ownersh
 
 Packet ID is the request UUID; assessment ID is a different database-generated UUID. Customer code verifies them independently and matches the original immutable product envelope. Check facts use that snapshot even if current catalog detail changes or fails.
 
-Requests pin the captured owner session's Authorization. Actual SDK testing reproduced the old A-body/B-token race and verified the corrected request remains A or aborts. Root auth/access subscriptions clear P0-B memory without feature screens mounted and fence late load/save/label callbacks.
+Requests pin the captured owner session's Authorization. Actual SDK testing reproduced the old A-body/B-token race and verified the corrected request remains A or aborts. Root auth/access subscriptions clear P0-B memory without feature screens mounted and fence late load/save/label callbacks. The new compact disclosure pages replace prior rows; they do not accumulate hundreds of mounted findings.
 
 ## Concrete customer behavior verified locally
 
@@ -110,7 +112,7 @@ Requests pin the captured owner session's Authorization. Actual SDK testing repr
 - Independent engine/renderer recheck: 12 checks pass; repeated-history cap regression repaired without dropping raw reports.
 - Independent SDK ownership/JIT review: no material findings; focused tests and separate actual-SDK harness pass. No physical/React-mount proof implied.
 - Final combined diff: 70 scoped files, no existing P0-A implementation edits; source/config/root exceptions assigned explicitly. Diff checks pass; concrete credential-pattern audit found zero matches. No sensitive analytics/replay additions; controls use 44-point minimum/shared primitives.
-- P0-B exact-head GitHub CI: **NOT RUN**, no published P0-B PR. Local gates are not remote CI.
+- P0-B exact-head GitHub CI: B1/B2/B4 **SUCCESS, both jobs** at the exact heads below; later waves NOT RUN because publication awaits prerequisite reviews/merges.
 
 ## Physical/customer acceptance
 
@@ -126,9 +128,28 @@ Root's isolated `kanuj/p0b-docs` prepares updates to ARCHITECTURE, INTERFACES, D
 
 ## Remaining blockers and next authorized steps
 
-1. Direct authorization for reviewed source pushes to PUBLIC github.com/KanujVerma/derive, after automatic approval-review rejection.
-2. Focused independent PR publication/reconciliation, exact-head CI and normal merges.
+1. Required stewardship review on the published foundation/editor/context PRs; requests are pending with no submitted review.
+2. Merge prerequisites after review, then reconcile/publish B3/B5/B6/B7 own commits on actual merged main and require exact-head CI. B6 imports B5’s strict parser, so B5 is an additional actual source prerequisite.
 3. Sami stewardship review for material context/migration/RLS/service-role/source/scientific boundaries, including ownership transport. This review has not been obtained.
 4. Physical/customer acceptance with a usable device/runtime and interaction tools.
 
 Independent P0-B implementation did not wait for Sami. No hosted rollout, free guest operations, OCR/provider choice, billing or release build is authorized by this packet.
+
+
+## Publication continuation: exact current PR gates
+
+Starting and ending shared main for this continuation: `105b3a3c41132287e7b4df1331eefe72111e58d4`. No merge performed while required reviews are absent.
+
+| Workstream | PR / exact head | Files / validation | Exact-head CI | Stewardship / merge |
+| --- | --- | --- | --- | --- |
+| B4 / #77 | [#90](https://github.com/KanujVerma/derive/pull/90), `c5fa9d7a5236220125e8c99c1836995c98b827a8` | 15 own files; six focused assertion scripts; full unit, both TS, web/iOS, scope/secret/diff pass | [36315658000](https://github.com/KanujVerma/derive/actions/runs/36315658000), both success | Sami requested, no review; unmerged |
+| B1 / #75 | [#91](https://github.com/KanujVerma/derive/pull/91), `65f0e7ae57798c98abd8eccbaf11d94897eef575` | 4 own files; 18 focused/530 full registered tests; both TS/web/iOS/scope/secret/diff pass | [36315663590](https://github.com/KanujVerma/derive/actions/runs/36315663590), both success | Sami requested, no review; unmerged |
+| B2 / #76 | [#92](https://github.com/KanujVerma/derive/pull/92), `36084f0c7c12f13455da56bfc58a0af46e5e54f8` | 14 own files; 521 registered tests, both TS/web/iOS; fresh local reset, pgTAP21/524, authenticated context/RLS/correction/deletion smoke pass | [36316218680](https://github.com/KanujVerma/derive/actions/runs/36316218680), both success | Sami requested, no review; unmerged |
+| B3 / #78 | Frozen `511aa72`; no PR until B1 merges | Existing own four commits, no redesign | Not published | Source prerequisite / scientific stewardship |
+| B5 / #79 | Corrective `31712a2`; no PR until B1 merges | 505 registered tests; four compactness tests, both TS/web/iOS/diff/secret; independent SSR pass | Not published | Source prerequisite / relevant review |
+| B6 / #80 | Frozen `cdf0b3e`; no PR until B1/B2/B3/B5 merge | Own commits90decd9/7b5bc32/cdf0b3e; actual P0-A snapshot remains consumed | Not published | Required platform/truth stewardship |
+| B7 / #88 | Own commits35f8824/5852084; no PR until B4/B5/B6 merge | Updated local bundle651cf3a:60 unit files/563 registered cases; TS/web/iOS, owner/JIT/MyStuff/Check regressions pass | Not published | Final review / physical gate open |
+
+Local Docker initially failed because a forced registry caused new image pulls through a missing Desktop credential helper. Using the installed CLI’s default cached image tags restored startup without editing global credential configuration. Fresh B2 tests passed. Local advisors report zero security issues and one existing duplicate-index performance warning on public.routines, outside B2 scope; no unrelated schema fix made.
+
+All raw471 finding/source objects remain byte-identical through compactness presentation. Actual SSR defaults15 text nodes; explanation pages10/10/9 structured groups with lazy evidence, no append growth. Default1secondary cue plus explicit7-caution review in3/3/1 pages; all4critical unknowns and a synthetic known blocker remain immediate. No analytics/raw packet data added. This is component/SSR evidence, not physical rendering.
