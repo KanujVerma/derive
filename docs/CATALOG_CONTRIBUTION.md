@@ -65,6 +65,11 @@ This pure validator does not prove any of those runtime conditions.
 
 ## Privacy and founder decision gate
 
+**Founder-approved scope (2026-09-27):** contribution is explicit opt-in, photos remain
+private, and only independently reviewed structured facts may be considered for catalog
+inclusion. No public/catalog image reuse and no automatic formula approval are authorized.
+This is the approved product boundary, not a claim that a consent screen/API is implemented.
+
 Private photos remain owner-bound, evidence-only and purpose-limited. A contribution does
 not make an image reusable, public, trainable or transferable to third-party models. No
 public URL, Storage path, local URI, image bytes or reuse-consent flag is accepted here.
@@ -72,14 +77,16 @@ Independently corroborated structured facts may enter reviewed catalog ingestion
 reusing the private photo. User evidence alone cannot verify formula, concentration or
 authenticity. Existing account deletion guarantees must survive any later persistence.
 
-Before an API/migration/runtime activation, founders must choose the scope of explicit
-submission consent, private-evidence access and retention, withdrawal/deletion behavior,
-and any separate image rights/reuse permission. That decision is intentionally not encoded
-as a new database retention policy or a blanket consent claim in this increment.
+Before an API/migration/runtime activation, founders must still choose concrete consent
+record/wording, authorized private-evidence review access, retention and withdrawal/deletion
+behavior. Those unresolved choices are intentionally not encoded as a database retention
+policy or a blanket consent claim in this increment. Public image reuse is out of scope;
+it is not enabled by the private structured-facts contribution decision.
 
 ## Remaining integration and release gates
 
-1. Resolve the above purpose/retention/consent architecture with founders.
+1. Finalize concrete consent/retention/review-access/withdrawal architecture within the
+   approved private, explicit-opt-in, reviewed-facts-only scope.
 2. Add an owner-derived API and additive persistence with atomic replay/dedupe, least-privilege
    RLS, deletion/withdrawal and private evidence checks; fresh reset, pgTAP and integration QA.
 3. Compose an explicit Help add it action under the single-writer Check lease. Reuse the existing
