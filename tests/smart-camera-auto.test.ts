@@ -31,6 +31,13 @@ test('observed retail barcode binds the declared symbology and rejects unsupport
     assert.equal(isObservedRetailBarcode(value, type), false);
   }
 });
+test('Expo iOS UPC-A normalization retains EAN-13 type with twelve validated digits', () => {
+  assert.equal(isObservedRetailBarcode('036000291452', 'ean13'), true);
+  assert.equal(isObservedRetailBarcode('0036000291452', 'ean13'), true);
+  assert.equal(isObservedRetailBarcode('036000291453', 'ean13'), false);
+  assert.equal(isObservedRetailBarcode('03600029145', 'ean13'), false);
+  assert.equal(isObservedRetailBarcode('036000291452', 'upc_e'), false);
+});
 test('a barcode callback cannot finish while the synchronous camera gate is busy', async () => {
   const gate = createCaptureOperationGate();
   let release!: () => void;

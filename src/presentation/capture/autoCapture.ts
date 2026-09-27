@@ -25,6 +25,9 @@ export function isObservedGtin(value: string): boolean {
 
 /** UPC-E requires explicit expansion; its eight digits must not masquerade as EAN-8. */
 export function isObservedRetailBarcode(value: string, type: string): boolean {
+  // Expo's iOS AVMetadata adapter strips a leading 0 from UPC-A encoded as
+  // EAN-13, while retaining type="ean13". Accept its validated 12-digit form.
+  if (type === 'ean13' && value.length === 12) return isObservedGtin(value);
   const expectedLength = type === 'ean8' ? 8 : type === 'upc_a' ? 12 : type === 'ean13' ? 13 : 0;
   return expectedLength !== 0 && value.length === expectedLength && isObservedGtin(value);
 }
