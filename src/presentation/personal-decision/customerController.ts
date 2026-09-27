@@ -177,10 +177,11 @@ export async function captureCustomerFunctionClient(ownerId: string, source: Cus
   return { functions: { async invoke(name, options) { guard(); const result = await source.functions.invoke(name, { ...options, headers: { ...options.headers, Authorization: `Bearer ${token}` } }); guard(); return result; } } };
 }
 /** Root lifetime ownership cleanup stays active when individual feature screens are unmounted. */
-export function bindCustomerOwnerLifecycle(controller: CustomerController, getOwner: () => string | null, subscribeAuth: (listener: () => void) => () => void, subscribeAccess: (listener: () => void) => () => void): () => void {
-  const sync = () => controller.setOwner(getOwner()); sync();
+export function bindCustomerOwnerLifecycle(controller: CustomerController, getOwner: () => string | null, subscribeAuth: (listener: () => void) => () => void, subscribeAccess: (listener: () => void) => () => void, purgeLegacyStatus?: () => void): () => void {
+  let previousOwner: string | null | undefined;
+  const sync = () => { const owner = getOwner(); if (owner !== previousOwner) { previousOwner = owner; purgeLegacyStatus?.(); } controller.setOwner(owner); }; sync();
   const stopAuth = subscribeAuth(sync), stopAccess = subscribeAccess(sync);
-  return () => { stopAuth(); stopAccess(); controller.setOwner(null); };
+  return () => { stopAuth(); stopAccess(); purgeLegacyStatus?.(); controller.setOwner(null); };
 }
 export type CanonicalMyStuffSummary = { kind: 'loading' | 'unavailable' } | { kind: 'ready'; hasProfile: boolean; primaryGoal: string | null; secondaryGoals: string[]; experienceSummary: string };
 /** Canonical summaries never infer a primary goal or report kind from legacy S2/S3 data. */

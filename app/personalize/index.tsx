@@ -16,7 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PersonalizationFlow } from '@/src/components/personalization/PersonalizationFlow';
 import { colors } from '@/src/constants/theme';
 import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/presentation/personalization/gateway';
-import { remotePersonalizationGateway } from '@/src/presentation/personalization/remoteGateway';
+import { ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
 import type { PersonalizationGateway } from '@/src/presentation/personalization/gateway';
 import { Button } from '@/src/components/ui/Button';
 import type { PersonalizationDraft } from '@/src/presentation/personalization/draft';
@@ -36,7 +36,7 @@ function LegacyPersonalizeScreen() {
   const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
   const live = shell === 'local_free_integration';
   return <PersonalizeEditor key={ownerId ?? 'signed-out'} ownerId={ownerId}
-    gateway={live ? remotePersonalizationGateway : personalizationGateway} live={live} />;
+    gateway={live ? ownerPinnedLegacyGateway : personalizationGateway} live={live} />;
 }
 
 function PersonalizeEditor({ ownerId, gateway, live }: {

@@ -48,7 +48,7 @@ import type { CheckCaptureHandoff } from '@/src/presentation/capture/checkCaptur
 import type { CaptureRole } from '@/src/presentation/capture/productEvidence';
 import { PersonalFitSection } from '@/src/components/personalization/PersonalFitSection';
 import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/presentation/personalization/gateway';
-import { remotePersonalizationGateway } from '@/src/presentation/personalization/remoteGateway';
+import { ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
 import { selectFreeFitTarget } from '@/src/presentation/personalization/fitTarget';
 import type { PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
 import { canPublishCheckResult, createCheckMemorySaver, selectFreeCheckOwner,
@@ -82,7 +82,7 @@ export default function CheckProductScreen() {
     shell, authStatus, sessionUserId, accessStatus, accessUserId, accessOwnerId,
   });
   const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
-  const gateway = integrated ? remotePersonalizationGateway : personalizationGateway;
+  const gateway = integrated ? ownerPinnedLegacyGateway : personalizationGateway;
   const [legacyPersonalFitState, setPersonalFitState] = useState<PersonalFitRefreshInput>({ kind: 'factual_only' });
   const customerState = useSyncExternalStore(customerController.subscribe, customerController.getState);
   const personalFitState: PersonalFitRefreshInput = integrated && liveCheckOwner && !canShowLegacyPersonalFit(customerState, liveCheckOwner) ? { kind: 'factual_only' } : legacyPersonalFitState;

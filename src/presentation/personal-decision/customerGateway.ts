@@ -1,3 +1,5 @@
+import { createOwnerPinnedLegacyGateway } from './legacyCustomerGateway';
+import { getFreeSkinProfile, saveFreeSkinProfile, getPersonalFit } from '../../services/remote/freePersonalFit';
 import { catalogReferenceKey } from '../p0b-personalization/storageAdapter';
 import { supabase } from '../../services/supabase';
 import { captureCustomerFunctionClient } from './customerController';
@@ -34,3 +36,5 @@ export const customerGateway: CustomerGateway = {
   async evaluate(owner, request) { assertOwner(owner); const result = await requestPersonalDecision(request, await captureClient(owner)); assertOwner(owner); return result; },
 };
 export const customerController = new CustomerController(customerGateway, createCatalogRequestId);
+
+export const ownerPinnedLegacyGateway = createOwnerPinnedLegacyGateway({ getFreeSkinProfile, saveFreeSkinProfile, getPersonalFit }, captureClient, currentCustomerOwner);
