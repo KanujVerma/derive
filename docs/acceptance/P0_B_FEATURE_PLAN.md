@@ -26,4 +26,4 @@ This lead holds the physical iPhone, Simulator and local Colima/Supabase lease. 
 | Eligible adult, unassisted current app | Comprehension evidence for that exact environment and binary/source; a fixture session remains exploratory |
 | Export or CI | Source/build checks only |
 
-Sami's #95 development LAN changes landed at `8ec9fe57ee2a341cf058da6818cab1227984aaea`; this branch was reconciled onto that main. Physical local Remote testing consumes those merged flags. The installed physical Derive 1.0.0 build 10 is historical and cannot establish current P0-B acceptance. See [the execution record](P0_B_EXECUTION_RECORD.md) for observed results and remaining gates.
+Sami's #95 development LAN changes landed at `8ec9fe57ee2a341cf058da6818cab1227984aaea`; #99 capture changes then landed at `be853d237d6b7bc1e5f3252ebeb88cf7f3f46c0f`. This branch was reconciled onto both actual main advancements. Physical local Remote testing consumes the merged flags. The installed physical Derive 1.0.0 build 10 is historical and cannot establish current P0-B acceptance. See [the execution record](P0_B_EXECUTION_RECORD.md) for observed results and remaining gates.

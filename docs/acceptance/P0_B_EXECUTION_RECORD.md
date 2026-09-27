@@ -5,7 +5,7 @@
 ## Source and run identity
 
 - Starting main: `22a210a7a720c9621d45e789b8690dcc73ab059a`.
-- Reconciled production source: `8ec9fe57ee2a341cf058da6818cab1227984aaea`, after Sami's #95 actually merged. P0-B architecture was reused.
+- Reconciled production source: first `8ec9fe57ee2a341cf058da6818cab1227984aaea` after Sami's #95, then `be853d237d6b7bc1e5f3252ebeb88cf7f3f46c0f` after #99 actually merged. P0-B architecture was reused. The latter advancement changed no P0-B server functions, shared contracts or decision/personalization modules; expensive valid local service evidence was retained.
 - Acceptance checkpoint: `0f8653d3c94cb19ece4d316e538d0a657919bf57`. Later runner additions check invalid fourth/duplicate goals; its tested SHA-256 is `dcfa4aa73a9837106e199afb0beada20a713f079cc5e896979f2bea712d834cc`. Final PR head and exact-head CI are reported by GitHub metadata, not predicted here.
 - Node 22.23.0; cached Supabase CLI 2.117.0; Colima Docker; PostgreSQL 15.8; native Expo Go; no new dependency, EAS build, TestFlight build or provider call.
 - Simulator: iPhone 17 Pro, iOS 26.5. Physical iPhone: iOS 27.0, available/connected. Physical all-app inventory confirms Expo Go 57.0.9 build 1017880. Historical Derive 1.0.0 build 10 is not this source.
@@ -19,7 +19,7 @@
 | Database/Auth/RLS suite | PASS | 21 pgTAP files, 524 assertions |
 | Existing canonical context harness | PASS | Owner/deletion, replay/races/stale writes, effective corrections, exact historical formula, unknown legacy context and assessment provenance |
 | Existing authoritative decision harness | PASS | Stored P0-A truth reader with fixture opt-in disabled; supported positive, redundancy, active/caution overlap, missing/unavailable truth, reformulation/history, prior reaction, partial routine and relevant withheld/unknown context |
-| Actual mobile client acceptance | PASS | Current `CustomerController`, principal capture, storage adapters, remote Context/Decision adapters, actual SDK, Edge and persisted assessment; no fabricated decision response |
+| Actual mobile client acceptance | PASS | Re-run on final reconciled source: current `CustomerController`, principal capture, storage adapters, remote Context/Decision adapters, actual SDK, Edge and persisted assessment; no fabricated decision response |
 | Server goal boundary | PASS | One primary + two secondary persisted; fourth total goal and duplicate primary rejected without a context revision write. Native goal-chip interaction remains unverified |
 | Exact text persistence | PASS | `Synthetic QA Cedar 123, café` round-tripped through actual client/service/persistence; this is not native keyboard evidence |
 | Routine/report changes | PASS | Actual persisted add/remove, complete/partial state, redundancy, effective no-reaction-to-reaction correction and updated bound decision |
@@ -27,7 +27,7 @@
 | Client unavailable/retry | PASS | Controlled transport failure hid context/current decision; restored service calls produced a current bound result |
 | Owner/session isolation | PASS | Real anonymous A/B SDK sessions, B blocked from A's resolver snapshot, sign-out purge and A return; authenticated raw private-table access rejected |
 | Owned harness cleanup | PASS | Anonymous users, owned context/assessment/case and synthetic catalog records deleted; independent exact-count readback zero |
-| Full unit suite | PASS | 66 unit files; 49 TAP programs, 587 registered cases, zero failures, plus assertion-style suites |
+| Full unit suite | PASS | On final reconciled source: 67 unit files; 50 TAP programs, 590 registered cases, zero failures, plus assertion-style suites |
 | App/test TypeScript | PASS | Both checks zero errors |
 | Web/iOS JavaScript exports | PASS | Both exports completed; no native binary claim |
 
@@ -37,7 +37,7 @@ The new local runner is executed with `node --experimental-strip-types scripts/t
 
 ## Native observation and limits
 
-The current app loaded in Expo Go on Simulator through normal local Remote guest bootstrap and landed on CHECK. Local counts showed one anonymous identity, zero memberships and no canonical context head. No DEVELOPMENT FIXTURE screen, client Auth bypass or synthetic entitlement was used on this route.
+The app at production source `8ec9fe57ee2a341cf058da6818cab1227984aaea` loaded in Expo Go on Simulator through normal local Remote guest bootstrap and landed on CHECK. Local counts showed one anonymous identity, zero memberships and no canonical context head. No DEVELOPMENT FIXTURE screen, client Auth bypass or synthetic entitlement was used on this route. These observations are pinned to that source, not promoted into a native #99 or release acceptance claim.
 
 Normal app deep links loaded canonical Skin and Goals, Routine and Experiences screens from the actual owner-bound context service. This proves native screen loading through those routes. It does not prove navigation by user taps, edits, keyboard entry or Save.
 
