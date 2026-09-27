@@ -6,9 +6,9 @@ import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { Icon } from '@/src/components/ui/Icon';
 import { colors, spacing, typography } from '@/src/constants/theme';
-import { createContextDraft, relevantQuestions, toggleSecondaryGoal, validateContextDraft, type Answer, type ContextDraft, type Goal, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
+import { createContextDraft, relevantQuestions, toggleSecondaryGoal, validateContextDraft, GOALS, type Treatment, type Answer, type ContextDraft, type Goal, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
 
-const goals: readonly [Goal, string][] = [['hydration', 'Hydration'], ['blemishes', 'Blemishes'], ['texture', 'Texture'], ['tone', 'Uneven tone'], ['comfort', 'Comfort']];
+const goals = GOALS;
 export interface ContextFlowProps {
   initialDraft?: ContextDraft; relevance?: SafetyRelevance;
   /** Context questions are shown only when the caller establishes relevance. */
@@ -16,7 +16,7 @@ export interface ContextFlowProps {
   onApply: (draft: ContextDraft) => void; onSkip: () => void;
   loading?: boolean; error?: string | null;
 }
-function AnswerChoices<T extends string>({ label, answer, choices, onChange, disabled }: { label: string; answer: Answer<T>; choices: readonly [T, string][]; onChange: (answer: Answer<T>) => void; disabled: boolean }) {
+function AnswerChoices<T extends string>({ label, answer, choices, onChange, disabled }: { label: string; answer: Answer<T>; choices: readonly (readonly [T, string])[]; onChange: (answer: Answer<T>) => void; disabled: boolean }) {
   return <GroupedSection header={label}><View style={styles.group}><View style={styles.chips}>
     {choices.map(([value, text]) => <ChoiceChip key={value} label={text} selected={answer.state === 'answered' && answer.value === value} onSelect={() => onChange({ state: 'answered', value })} disabled={disabled} />)}
     <ChoiceChip label="Leave unanswered" selected={answer.state === 'unanswered'} onSelect={() => onChange({ state: 'unanswered' })} disabled={disabled} />
@@ -45,8 +45,9 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], on
       <AnswerChoices label="Response to products" answer={draft.reactivity} disabled={loading} choices={[['reacts_easily', 'Reacts easily'], ['generally_tolerates', 'Generally tolerates products'], ['unsure', 'Not sure']]} onChange={value => update('reactivity', value)} />
     </>}
     {step === 2 && <>
-      {contextQuestions.map(field => <GroupedSection key={field} header={field === 'treatments' ? 'Relevant treatments' : 'Known sensitivities'} footer="Use names you know. A reaction does not establish ingredient causation."><View style={styles.group}>
-        <TextInput style={styles.input} accessibilityLabel={field === 'treatments' ? 'Treatment names, one per line' : 'Sensitivity names, one per line'} editable={!loading} multiline placeholder="One name per line" value={draft[field].state === 'answered' ? draft[field].value.join('\n') : ''} onChangeText={text => update(field, text.trim() ? { state: 'answered', value: text.split('\n').map(value => value.trim()).filter(Boolean) } : { state: 'unanswered' })} />
+      {contextQuestions.includes('treatments') && <GroupedSection header="Relevant treatments"><View style={[styles.group, styles.chips]}>{([['topical_retinoid', 'Topical retinoid'], ['benzoyl_peroxide', 'Benzoyl peroxide'], ['exfoliating_acid', 'Exfoliating acid'], ['other_prescription', 'Other prescription treatment']] as const).map(([value, label]) => <ChoiceChip key={value} label={label} disabled={loading} selected={draft.treatments.state === 'answered' && draft.treatments.value.includes(value)} onSelect={() => { const selected: Treatment[] = draft.treatments.state === 'answered' ? draft.treatments.value : []; const next = selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]; update('treatments', next.length ? { state: 'answered', value: next } : { state: 'unanswered' }); }} />)}{([['None', 'answered'], ['Leave unanswered', 'unanswered'], ['Prefer not to say', 'withheld']] as const).map(([label, state]) => <ChoiceChip key={state} label={label} disabled={loading} selected={draft.treatments.state === state && (state !== 'answered' || (draft.treatments.state === 'answered' && draft.treatments.value.length === 0))} onSelect={() => update('treatments', state === 'answered' ? { state, value: [] } : { state })} />)}</View></GroupedSection>}
+      {contextQuestions.filter((field): field is 'sensitivities' => field === 'sensitivities').map(field => <GroupedSection key={field} header="Known sensitivities" footer="Use names you know. A reaction does not establish ingredient causation."><View style={styles.group}>
+        <TextInput style={styles.input} accessibilityLabel="Sensitivity names, one per line" editable={!loading} multiline placeholder="One name per line" value={draft[field].state === 'answered' ? draft[field].value.join('\n') : ''} onChangeText={text => update(field, text.trim() ? { state: 'answered', value: text.split('\n').map(value => value.trim()).filter(Boolean) } : { state: 'unanswered' })} />
         <View style={styles.chips}>{([['None known', 'answered'], ['Leave unanswered', 'unanswered'], ['Prefer not to say', 'withheld']] as const).map(([label, state]) => <ChoiceChip key={state} label={label} disabled={loading} selected={draft[field].state === state && (state !== 'answered' || (draft[field].state === 'answered' && draft[field].value.length === 0))} onSelect={() => update(field, state === 'answered' ? { state, value: [] } : { state })} />)}</View>
       </View></GroupedSection>)}
       {fields.length > 0 && <Text style={styles.copy}>{relevance?.evidenceReason}</Text>}

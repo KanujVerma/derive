@@ -1,6 +1,8 @@
 /** Local collection seam. The composition owner supplies ownership and persistence. */
 export type Answer<T> = { state: 'unanswered' } | { state: 'withheld' } | { state: 'answered'; value: T };
-export type Goal = 'hydration' | 'blemishes' | 'texture' | 'tone' | 'comfort';
+export const GOALS = [['breakouts', 'Breakouts'], ['dark_spots', 'Dark marks'], ['dryness', 'Dryness & barrier'], ['redness', 'Redness & sensitivity'], ['texture', 'Texture'], ['oiliness', 'Oiliness'], ['fine_lines', 'Fine lines'], ['simplify', 'Simplify my routine'], ['maintain', 'Maintain my skin']] as const;
+export type Goal = (typeof GOALS)[number][0];
+export type Treatment = 'topical_retinoid' | 'benzoyl_peroxide' | 'exfoliating_acid' | 'other_prescription';
 export type Intent = 'add' | 'replace' | 'check_current';
 export type SafetyField = 'pregnancy' | 'trying' | 'nursing';
 export interface SafetyRelevance { fields: readonly SafetyField[]; evidenceReason: string }
@@ -8,7 +10,7 @@ export interface ContextDraft {
   intent: Answer<Intent>; primaryGoal: Answer<Goal>; secondaryGoals: Goal[];
   behavior: Answer<'dry_tight' | 'balanced' | 'combination' | 'oily' | 'unsure'>;
   reactivity: Answer<'reacts_easily' | 'generally_tolerates' | 'unsure'>;
-  treatments: Answer<string[]>; sensitivities: Answer<string[]>;
+  treatments: Answer<Treatment[]>; sensitivities: Answer<string[]>;
   pregnancy: Answer<'yes' | 'no' | 'unsure'>; trying: Answer<'yes' | 'no' | 'unsure'>; nursing: Answer<'yes' | 'no' | 'unsure'>;
 }
 export function createContextDraft(initial?: ContextDraft): ContextDraft {
@@ -29,13 +31,25 @@ export function validateContextDraft(draft: ContextDraft): string | null {
   if (new Set(draft.secondaryGoals).size !== draft.secondaryGoals.length || (draft.primaryGoal.state === 'answered' && draft.secondaryGoals.includes(draft.primaryGoal.value))) return 'Choose each goal once.';
   return null;
 }
-export type RoutineFrequency = { kind: 'unknown' } | { kind: 'qualitative'; value: 'daily' | 'few_times_weekly' | 'occasionally' } | { kind: 'exact'; timesPerWeek: number };
+export type RoutineFrequency = { kind: 'unknown' } | { kind: 'qualitative'; value: 'daily' | 'most_days' | 'few_times_week' | 'weekly' | 'less_often' | 'as_needed' } | { kind: 'exact'; count: number; unit: 'day' | 'week' | 'month' };
+export type RoutineReference = { kind: 'manual'; label: string; verification: 'unverified' } | { kind: 'catalog'; label: string; productId: string; variantId: string | null; formulaVersionId: string | null };
 export interface RoutineItemDraft {
-  id: string; reference: { kind: 'manual'; label: string; verification: 'unverified' };
+  id: string; reference: RoutineReference;
   status: 'current' | 'paused' | 'stopped' | 'occasional'; timing: 'am' | 'pm' | 'both' | 'unknown'; frequency: RoutineFrequency;
 }
 export interface RoutineDraft { completeness: 'partial' | 'complete' | 'unknown'; items: RoutineItemDraft[] }
 export function createRoutineDraft(initial?: RoutineDraft): RoutineDraft { return initial ? { completeness: initial.completeness, items: initial.items.map(item => ({ ...item, reference: { ...item.reference }, frequency: { ...item.frequency } })) } : { completeness: 'unknown', items: [] }; }
 export function manualRoutineItem(id: string, label: string): RoutineItemDraft {
   return { id, reference: { kind: 'manual', label: label.trim(), verification: 'unverified' }, status: 'current', timing: 'unknown', frequency: { kind: 'unknown' } };
+}
+export function validateRoutineDraft(draft: RoutineDraft): string | null {
+  if (draft.items.length > 50) return 'Add up to 50 routine products.';
+  if (new Set(draft.items.map(item => item.id)).size !== draft.items.length) return 'Each routine item needs a distinct ID.';
+  for (const item of draft.items) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id)) return 'Each routine item needs a valid UUID.';
+    if (!item.reference.label.trim()) return 'Enter a product name.';
+    if (item.reference.kind === 'catalog' && item.reference.formulaVersionId && !item.reference.variantId) return 'A formula reference needs its variant reference.';
+    if (item.frequency.kind === 'exact' && (!Number.isInteger(item.frequency.count) || item.frequency.count < 1 || item.frequency.count > 100)) return 'Use an exact count from 1 to 100.';
+  }
+  return null;
 }
