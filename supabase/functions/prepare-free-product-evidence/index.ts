@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { authenticate, corsHeaders, errorResponse, jsonResponse, readJsonObject, ServiceError } from "../_shared/runtime.ts";
+import { FreeEvidenceStatusError, readFreeEvidenceStatus } from "./status.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ROLES = new Set(["front_label", "ingredients", "packaging"]);
@@ -11,18 +12,25 @@ Deno.serve(async (req: Request) => {
   try {
     const { userId, admin } = await authenticate(req);
     const body = await readJsonObject(req);
-    if (Object.keys(body).some((key) => !["requestId", "role", "mimeType"].includes(key))
+    if (Object.keys(body).some((key) => !["requestId", "role", "mimeType", "operation"].includes(key))
+      || (body.operation !== undefined && body.operation !== "status")
       || typeof body.requestId !== "string" || !UUID.test(body.requestId)
       || typeof body.role !== "string" || !ROLES.has(body.role)
       || typeof body.mimeType !== "string" || !MIMES.has(body.mimeType)) {
       throw new ServiceError("INVALID_PAYLOAD", "A request UUID, photo role, and supported image type are required", 400);
+    }
+    if (body.operation === "status") {
+      return jsonResponse(await readFreeEvidenceStatus(admin, userId, {
+        requestId: body.requestId, role: body.role as "front_label" | "ingredients" | "packaging",
+        mimeType: body.mimeType as "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif",
+      }));
     }
     const { data, error } = await admin.rpc("issue_free_product_evidence_grant", {
       p_user_id: userId, p_request_id: body.requestId, p_role: body.role, p_mime_type: body.mimeType,
     });
     if (error || !data || typeof data.storage_path !== "string") {
       if (error?.message?.includes("FREE_EVIDENCE_DAILY_LIMIT")) {
-        throw new ServiceError("DAILY_LIMIT", "Try adding more product photos tomorrow", 429);
+        throw new ServiceError("DAILY_LIMIT", "Try adding more product photos later", 429);
       }
       if (error?.message?.includes("FREE_EVIDENCE_REQUEST_CONFLICT")) {
         throw new ServiceError("REQUEST_CONFLICT", "This request ID was used for a different photo", 409);
@@ -32,5 +40,8 @@ Deno.serve(async (req: Request) => {
     }
     return jsonResponse({ bucket: "customer-product-evidence", storagePath: data.storage_path,
       role: data.role, mimeType: data.mime_type, maxBytes: 10 * 1024 * 1024 });
-  } catch (error) { return errorResponse(error); }
+  } catch (error) {
+    if (error instanceof FreeEvidenceStatusError) return jsonResponse({ code: error.code, error: error.message }, error.status);
+    return errorResponse(error);
+  }
 });

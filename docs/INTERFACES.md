@@ -17,13 +17,20 @@ These names describe semantic concepts only. They are not current TypeScript int
 - **PhotoCapturePort:** returns a private image observation or permission, cancellation, unsupported-input, or capture failure state.
 - **ProductEvidenceExtractor:** proposes label text or attributes with source and uncertainty, or abstains. It cannot verify truth.
 - **ProductCandidateRetriever:** returns ranked candidate identities, no match, or ambiguity; ranking is retrieval evidence, not authority.
-- **ProductTruthSnapshot:** binds product/variant/formula revision, provenance, conflicts, and unresolved evidence to one assessment.
 - **Finding:** a bounded applicable, conflicting, or unknown conclusion with its supporting evidence, context, rule/source, and uncertainty.
 - **PersonalDecisionPacketV1:** versioned set of findings and the deterministic selected action, bound to one truth snapshot, minimum-necessary customer context, and policy version.
 - **SoftJudgmentProvider:** optional provider that contributes a constrained finding or abstains. It cannot write truth or override deterministic safety and decision policy. Jev is an evaluation candidate, not a production dependency.
 - **ExplanationRenderer:** renders only supported packet claims, action, rationale, uncertainty, and next step; it cannot add product or scientific claims.
 
 All target seams preserve explicit states for unsupported capture, denied permission, cancellation, no result, ambiguity, insufficient evidence, conflicting formula versions, stale truth revision, provider unavailability, and abstention. None is silently converted to a negative answer or a product match.
+
+### P0-A authoritative product truth (local implementation, not hosted)
+
+`src/contracts/ProductTruthSnapshot.ts` defines `ProductTruthSnapshotV1`; fixtures live in `src/fixtures/product-truth/snapshots.ts`. S6's additive optional `truthSnapshot` is absent on older deployments. Do not synthesize one from legacy labels. `src/contracts/productTruthValidation.ts` rejects malformed supplied truth. The service-only `seal_product_truth_snapshot` locks the owner case and stores one immutable JSON record per case revision in `product_truth_snapshots`; a founder conclusion appends a new revision. Responses bind product/formula and recovery action to the sealed revision, not mutable catalog labels or a stale pre-review row.
+
+Product identity is separate from exact package formula authority. `hasVerifiedPackageFormula` requires exact product/variant/formula references, ordered authoritative ingredients and no unresolved conflicts. Formula-only has no package identity. Public provenance URLs are approved or null; internal sources, raw OCR, private paths and image bytes are excluded. P0-B must import/adapt this contract without creating competing truth or treating extraction candidates as authority. The neutral extraction/evaluation contract is a candidate seam, not a provider implementation.
+
+`prepare-free-product-evidence` also accepts `{operation:'status',requestId,role,mimeType}` for an existing JWT-owner-bound grant. It never issues a grant or consumes quota. It returns only the exact target and existence/MIME/size metadata. One status query can recover a lost upload acknowledgement; uploads remain immutable. This is not content-digest or package-authenticity verification. Capture retains bytes/attempt IDs only while the host is open; no restart recovery is promised.
 
 ### S-FREE-4 Free Product Evidence (merged local contract, not hosted)
 

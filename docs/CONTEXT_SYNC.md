@@ -7,6 +7,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
 
+## 2026-09-26: P0-A truth producer and capture recovery integration
+
+- **Predecessor:** `origin/main@773a4b839f37712f345a20118b908c4d4eba0bae`; contract PR #87 exact-head CI [36282262084](https://github.com/KanujVerma/derive/actions/runs/36282262084) green. Starting feature recovery base was `45f1773e4983c3c28848839c65640b7681b89d8e`.
+- **Implemented locally:** immutable owner-bound ProductTruthSnapshotV1 production/storage, case/review revisions, strict client validation, safe public provenance, ordered authoritative ingredients, barcode/variant/market/label/ingredient conflict preservation. Existing founder review is reused; no free unresolved review queue is added. Capture preserves typed quota/owner errors, serializes operations, retains mixed photos/barcode and uses one read-only existing-grant status query for lost upload ACK; immutable uploads and original bytes remain bound to the attempt.
+- **Evidence:** 40 unit files / 512 tests, both TypeScript checks, web/iOS JS exports and diff check; fresh reset and 19 pgTAP files / 486 assertions; all 17 current CI integration scripts passed. Synthetic resolver gold 15/15; extraction 0/15 and real-image scenarios 0/4 NOT_RUN, cost/latency/accuracy null. Exact-head CI evidence is recorded in the implementation PR/return packet, not a predicted resulting SHA.
+- **Handoff:** P0-B imports `src/contracts/ProductTruthSnapshot.ts` and fixtures. New `productTruthPresentation.ts` provides factual customer states, no personalized policy. Kanuj remains single writer for global Check/root composition; P0-A changed only capture leaves, not CheckProductScreen or app routes.
+- **Gates:** P0-A is partial, not complete. No working photo extractor, physical device acceptance, hosted activation or provider winner. Parent #81 and acceptance #86 retain those blockers. #35/#71 remain untouched; original auth work preserved. Read [P0_A_EXECUTION.md](P0_A_EXECUTION.md), [P0_A_CAPTURE_ACCEPTANCE.md](P0_A_CAPTURE_ACCEPTANCE.md), [P0_A_PROVIDER_EVALUATION.md](P0_A_PROVIDER_EVALUATION.md).
+
 ## 2026-09-26: Canonical architecture and ownership documentation reconciliation
 
 - **Predecessor:** clean `origin/main@d793639b6ee95c1eabdc91956c16aaa413fb056c`. PR #68 merged as `51a0e527b464c74495fa5ff1c0e90cfa21bea4fa`; PR #69 as `4b9fdaa558cb060efff37126db67ccfd407257f4`; PR #70 as `d793639b6ee95c1eabdc91956c16aaa413fb056c`. This checkpoint is documentation-only and makes no runtime, schema, hosted, CI or release changes.

@@ -11,7 +11,7 @@ test('barcode is a factual lookup input while photos remain local evidence', () 
 
   assert.deepEqual(mapCaptureForCheck(toCaptureHandoff(session)), {
     authority: 'customer_evidence',
-    barcodeLookup: { barcode: '012345678905' },
+    barcodeLookup: null,
     localPhotos: [
       { role: 'front_label', uri: 'file://front.jpg' },
       { role: 'ingredients', uri: 'file://ingredients.jpg' },

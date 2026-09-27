@@ -76,8 +76,25 @@ test('barcode bypasses photo grants and uploads', async () => {
       return { caseId: 'case-1', state: 'insufficient_evidence', candidates: [], nextAction: 'manual_review', requiresFounderReview: false };
     },
   });
-  await processor.process([{ role: 'barcode', kind: 'barcode', value: '012345678905' }, photo]);
+  await processor.process([{ role: 'barcode', kind: 'barcode', value: '012345678905' }]);
   assert.equal(grants, 0);
+});
+
+test('mixed barcode and photos resolve together once and retain uploaded evidence on retry', async () => {
+  let uploads = 0;
+  const requests: unknown[] = [];
+  const processor = createFreeEvidenceProcessor({
+    readPhoto: async () => ({ bytes: JPEG.slice().buffer, mimeType: 'image/jpeg' }),
+    createRequestId: () => 'same-id',
+    prepare: async (input) => ({ bucket: 'customer-product-evidence', storagePath: 'issued/path', role: input.role, mimeType: input.mimeType, maxBytes: 10 * 1024 * 1024 }),
+    upload: async () => { uploads++; },
+    resolve: async (input) => { requests.push(input); return { caseId: 'case', state: 'insufficient_evidence', candidates: [], nextAction: 'manual_review', requiresFounderReview: false }; },
+  });
+  const evidence: CaptureEvidence[] = [{ role: 'barcode', kind: 'barcode', value: '012345678905' }, photo];
+  await processor.process(evidence);
+  await processor.process(evidence);
+  assert.equal(uploads, 1);
+  assert.deepEqual(requests, Array(2).fill({ requestId: 'same-id', consumer: 'scan', barcode: '012345678905', evidencePhotos: [{ storagePath: 'issued/path', role: 'front_label' }] }));
 });
 
 test('manual retry reuses photo grant and resolver request ID after upload or response failure', async () => {
@@ -97,6 +114,22 @@ test('manual retry reuses photo grant and resolver request ID after upload or re
   assert.deepEqual(prepared, ['id-1']);
   assert.deepEqual(resolved, ['id-2', 'id-2']);
   assert.equal(uploads, 2);
+});
+
+test('lost upload acknowledgement resumes through read-only status and never changes retained bytes', async () => {
+  let reads = 0, uploads = 0, grants = 0, statuses = 0;
+  const target = { bucket: 'customer-product-evidence' as const, storagePath: 'issued/immutable', role: 'front_label' as const, mimeType: 'image/jpeg' as const, maxBytes: 10 * 1024 * 1024 };
+  const processor = createFreeEvidenceProcessor({
+    readPhoto: async () => { reads++; return { bytes: JPEG.slice().buffer, mimeType: 'image/jpeg' }; },
+    createRequestId: () => 'original-id',
+    prepare: async () => { grants++; return target; },
+    upload: async () => { uploads++; throw new Error('lost ACK after storage success'); },
+    status: async input => { statuses++; assert.equal(input.requestId, 'original-id'); return { uploaded: true, target, objectBytes: JPEG.byteLength }; },
+    resolve: async () => ({ caseId: 'case', state: 'insufficient_evidence', candidates: [], nextAction: 'manual_review', requiresFounderReview: false }),
+  });
+  await processor.process([photo]);
+  await processor.process([photo]);
+  assert.deepEqual([reads, uploads, grants, statuses], [1, 1, 1, 1]);
 });
 
 test('candidate and unknown states stay unresolved without fabricating product identity', async () => {

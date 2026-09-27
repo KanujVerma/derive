@@ -122,3 +122,6 @@ jobs:
 
       - name: Run S-FREE-4 private product evidence E2E harness
         run: node scripts/test-s-free-4-local.mjs
+
+      - name: Run P0-A immutable truth and ownership harness
+        run: node scripts/test-p0a-truth-local.mjs

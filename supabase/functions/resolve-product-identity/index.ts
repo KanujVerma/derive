@@ -55,6 +55,7 @@ interface ResolutionCaseRow {
   formula_version_id: string | null;
   next_action: ProductResolutionResult["nextAction"];
   requires_founder_review: boolean;
+  evidence_snapshot?: { requestFingerprint?: string };
 }
 
 interface ProductRow {
@@ -82,6 +83,8 @@ interface FormulaRow {
   catalog_public_source_url: string | null;
   observed_at: string;
   packaging_markers: string[] | null;
+  ingredients: string[];
+  region_code: string | null;
 }
 
 interface IdentifierRow {
@@ -274,7 +277,7 @@ async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<Ca
     }),
     loadPagedCatalogRows<FormulaRow>("formulas", (from, to) => {
       const query = admin.from("product_formula_versions")
-        .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers");
+        .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers, ingredients, region_code");
       if (freeOnly) query.eq("verification_status", "verified").not("catalog_public_source_url", "is", null);
       return query.order("id", { ascending: true }).range(from, to);
     }),
@@ -318,6 +321,8 @@ async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<Ca
         formulaSourceReference: freeOnly ? formula.catalog_public_source_url ?? undefined : formula.source_reference,
         formulaObservedAt: formula.observed_at,
         ingredientFingerprint: formula.normalized_ingredient_fingerprint,
+        formulaIngredients: formula.ingredients,
+        formulaRegionCode: formula.region_code ?? undefined,
         packagingMarkers: [...(variant.packaging_markers ?? []), ...(formula.packaging_markers ?? [])],
       });
     }
@@ -340,6 +345,8 @@ async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<Ca
       formulaSourceReference: freeOnly ? formula?.catalog_public_source_url ?? undefined : formula?.source_reference,
       formulaObservedAt: formula?.observed_at,
       ingredientFingerprint: formula?.normalized_ingredient_fingerprint,
+      formulaIngredients: formula?.ingredients,
+      formulaRegionCode: formula?.region_code ?? undefined,
       packagingMarkers: [...(variant.packaging_markers ?? []), ...(formula?.packaging_markers ?? [])],
     });
   }
@@ -351,6 +358,8 @@ async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<Ca
         formulaSourceReference: freeOnly ? formula.catalog_public_source_url ?? undefined : formula.source_reference,
         formulaObservedAt: formula.observed_at,
         ingredientFingerprint: formula.normalized_ingredient_fingerprint,
+        formulaIngredients: formula.ingredients,
+        formulaRegionCode: formula.region_code ?? undefined,
         packagingMarkers: formula.packaging_markers ?? [],
       });
     }
@@ -387,11 +396,19 @@ function recordForIds(catalog: CatalogResolutionRecord[], productId: string | nu
 
 async function responseForCase(
   admin: SupabaseClient,
+  userId: string,
   row: ResolutionCaseRow,
   catalog: CatalogResolutionRecord[],
   fallbackCandidates: ProductResolutionCandidate[] = [],
 ): Promise<ProductResolutionResult> {
-  const selected = recordForIds(catalog, row.product_id, row.variant_id, row.formula_version_id);
+  // Snapshot creation is serialized per case; retries return the immutable stored revision.
+  const { data: truthSnapshot, error: snapshotError } = await admin.rpc('seal_product_truth_snapshot', {
+    p_user_id: userId,
+    p_case_id: row.id,
+  });
+  if (snapshotError || !truthSnapshot) {
+    throw new ServiceError('PRODUCT_TRUTH_UNAVAILABLE', 'Product evidence could not be confirmed', 503);
+  }
   const { data: storedCandidates, error } = await admin.from("product_resolution_candidates")
     .select("product_id, variant_id, formula_version_id, candidate_basis, match_reasons, rank_order")
     .eq("case_id", row.id).order("rank_order", { ascending: true });
@@ -412,29 +429,24 @@ async function responseForCase(
       matchReasons: candidate.match_reasons ?? [],
     } as ProductResolutionCandidate;
   });
-  const includeProduct = row.resolution_state === "verified_product_formula" || row.resolution_state === "identified_formula_unverified";
-  const includeFormula = row.resolution_state === "verified_product_formula" || row.resolution_state === "formula_only";
   return {
+    truthSnapshot,
     caseId: row.id,
-    state: row.resolution_state,
-    product: includeProduct && selected?.productId && selected.brand && selected.name ? {
-      productId: selected.productId,
-      brand: selected.brand,
-      name: selected.name,
-      variantId: selected.variantId,
-      variantName: selected.variantName,
-      regionCode: selected.regionCode,
-    } : undefined,
-    formula: includeFormula && selected?.formulaVersionId && selected.formulaVerificationStatus === "verified"
-      && selected.formulaSourceReference && selected.formulaObservedAt ? {
-        formulaVersionId: selected.formulaVersionId,
+    state: truthSnapshot.state,
+    product: truthSnapshot.product ?? undefined,
+    formula: truthSnapshot.formula?.publicSourceUrl ? {
+        formulaVersionId: truthSnapshot.formula.formulaVersionId,
         verificationStatus: "verified",
-        sourceReference: selected.formulaSourceReference,
-        observedAt: selected.formulaObservedAt,
+        sourceReference: truthSnapshot.formula.publicSourceUrl,
+        observedAt: truthSnapshot.formula.observedAt,
       } : undefined,
     candidates: candidates.length > 0 ? candidates : fallbackCandidates,
-    nextAction: row.next_action,
-    requiresFounderReview: row.requires_founder_review,
+    nextAction: truthSnapshot.nextRequiredEvidence === 'none' ? 'evaluate_product_fit'
+      : truthSnapshot.nextRequiredEvidence === 'ingredients' ? 'photograph_ingredients'
+      : truthSnapshot.nextRequiredEvidence === 'variant_selection'
+        ? (truthSnapshot.state === 'ambiguous_candidates' ? 'choose_candidate' : 'confirm_variant')
+        : 'manual_review',
+    requiresFounderReview: truthSnapshot.founderReview !== 'not_needed',
   };
 }
 
@@ -448,6 +460,8 @@ Deno.serve(async (req: Request) => {
     try { identityKind = identityKindFromVerifiedUser(user); }
     catch { throw new ServiceError("IDENTITY_UNAVAILABLE", "Account identity could not be verified", 503); }
     const request = parseRequest(await readJsonObject(req), userId);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(request)));
+    const requestFingerprint = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
     // Free Check can use server-granted private photos. Managed Shelf remains
     // separate, and legacy managed photo paths never become guest-accessible.
     let managedAccess = false;
@@ -466,7 +480,7 @@ Deno.serve(async (req: Request) => {
     const catalog = await loadCatalog(admin, !managedAccess);
 
     const { data: replay, error: replayError } = await admin.from("product_resolution_cases")
-      .select("id, consumer, resolution_state, product_id, variant_id, formula_version_id, next_action, requires_founder_review")
+      .select("id, consumer, resolution_state, product_id, variant_id, formula_version_id, next_action, requires_founder_review, evidence_snapshot")
       .eq("user_id", userId).eq("request_id", request.requestId).maybeSingle();
     if (replayError) {
       console.error("product resolution replay lookup failed:", replayError.code);
@@ -476,7 +490,10 @@ Deno.serve(async (req: Request) => {
       if (replay.consumer !== request.consumer) {
         throw new ServiceError("REQUEST_CONFLICT", "This request ID belongs to a different product workflow", 409);
       }
-      return jsonResponse(await responseForCase(admin, replay as ResolutionCaseRow, catalog));
+      if (replay.evidence_snapshot?.requestFingerprint && replay.evidence_snapshot.requestFingerprint !== requestFingerprint) {
+        throw new ServiceError('REQUEST_CONFLICT', 'This request ID belongs to different evidence', 409);
+      }
+      return jsonResponse(await responseForCase(admin, userId, replay as ResolutionCaseRow, catalog));
     }
 
     const photoText = request.evidencePhotos.filter((photo) => photo.extractedText);
@@ -509,6 +526,8 @@ Deno.serve(async (req: Request) => {
       p_variant_id: selectedVariantId,
       p_formula_version_id: selectedFormulaId,
       p_evidence_snapshot: {
+        requestFingerprint,
+        conflicts: decision.conflicts ?? [],
         hasBarcode: Boolean(request.barcode),
         hasTypedIdentity: Boolean(request.brand || request.productName || request.variantName),
         hasIngredientList: Boolean(request.ingredientList),
@@ -527,7 +546,10 @@ Deno.serve(async (req: Request) => {
       console.error("record_product_resolution failed:", saveError?.code ?? "empty");
       throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be saved", 500);
     }
-    return jsonResponse(await responseForCase(admin, saved as ResolutionCaseRow, catalog, decision.candidates));
+    if (saved.evidence_snapshot?.requestFingerprint && saved.evidence_snapshot.requestFingerprint !== requestFingerprint) {
+      throw new ServiceError('REQUEST_CONFLICT', 'This request ID belongs to different evidence', 409);
+    }
+    return jsonResponse(await responseForCase(admin, userId, saved as ResolutionCaseRow, catalog, decision.candidates));
   } catch (error) {
     return errorResponse(error);
   }

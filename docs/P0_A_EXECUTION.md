@@ -1,6 +1,6 @@
 # P0-A execution and evidence ledger
 
-Status: IN PROGRESS. DRI Sami; product/formula-truth steward Sami, customer-experience steward Kanuj. No hosted activation or provider selection is authorized by this increment.
+Status: AUTOMATED IMPLEMENTATION INTEGRATED; PHYSICAL/REAL-IMAGE ACCEPTANCE BLOCKED. DRI Sami; product/formula-truth steward Sami, customer-experience steward Kanuj. No hosted activation or provider selection is authorized by this increment.
 
 ## Recovered checkpoint
 
@@ -42,3 +42,15 @@ High-contention contracts, migrations, resolver Edge, runtime composition, CI an
 ## Validation and completion gates
 
 Repository-native full unit suite; app and test TypeScript; web and iOS JS export; diff/secret/boundary review; backend full reset, pgTAP, existing Edge integration plus new snapshot/ownership/replay smoke; exact-head Verify & Build and Database & Integration. Unit tests do not prove physical camera/permissions/haptics. Record all 26 customer scenarios with evidence or an explicit unverified/blocker status. Synthetic provider tests do not prove real-image quality. Hosted anonymous operations/release remain P0-C/P0-D, not this task.
+
+## Landings and integrated evidence
+
+Parent #81; contract/producer #82; capture #83; resolver/review #84; evaluation #85; acceptance #86. Contract #87 merged as `773a4b839f37712f345a20118b908c4d4eba0bae`, exact-head CI run [36282262084](https://github.com/KanujVerma/derive/actions/runs/36282262084) passed both jobs. #82 was reopened because its runtime producer was not complete at the contract landing. Original dirty auth checkout remains untouched. Unrelated #35/#71 and historical #6–9 remain unchanged.
+
+The second increment serially composes leaf commits and root production: additive `20260927010000_p0a_product_truth_snapshots.sql`; immutable owner snapshots per case/review; fail-closed client parsing; exact ingredients/market/Unicode/punctuation/identifier conflicts; typed quota/session recovery; capture operation gate; mixed evidence retention; readonly existing-grant upload-status recovery; neutral extraction contract/corpus/evaluator. No server function imports a client filesystem path. Actual live Edge testing caught and corrected that bundle error before publication. Existing founder queue/promotion is reused, not recreated; free unresolved cases remain outside the managed queue.
+
+Observed local gates: **40 unit files / 512 tests**, both TypeScript checks, web and iOS JS exports, diff check; 19 pgTAP files / 486 assertions and all 17 CI integration scripts passed on a fresh disposable reset. Synthetic gold 15/15; no real extraction supplied, no provider selected. Exact-head CI results belong to the PR/completion packet, not predicted SHAs in this ledger. A pgTAP rerun after legacy founder smokes initially hit fixture-pollution assertions; a fresh reset restored the required reproducible clean baseline. No test failure was waived.
+
+Remaining P0-A critical acceptance: rights-cleared representative real-image corpus and approved provider evaluation inputs; connected/current test binary and physical camera/permission/network/retake acceptance. Root may merge the safe automated increment after exact-head CI, but must return `P0-A PARTIAL — BLOCKED`, not complete. P0-B may immediately import the contract/fixtures and presentation seam; global Check is reserved for Kanuj's single-writer composition. Catalog pagination fails closed above 10k/table; indexed demand retrieval is a scaling follow-up, not a reason to remove the safety bound. No restart-persistent capture retry, invented formula concentrations, public-check monetization, S7 expansion, hosted deployment or data deletion is authorized.
+
+Final independent review found no new authority/ownership blocker, but confirmed composition limits: unchanged `CheckProductScreen` fetches current catalog detail after receiving immutable truth; matching formula IDs remain checked, while mutable product/variant labels can drift or an older detail can become unavailable. Existing Personal Fit and saved-check history do not pin snapshot ID/revision. Kanuj's #80 composition must bind display/assessment/history to the shown snapshot before same-revision end-to-end claims. Resolver replay still requires current photo/catalog lookup, and candidate labels are reconstructed; immutable authoritative snapshot facts are preserved once returned, not a promise of replay during catalog/storage outage. These limits are explicit acceptance blockers/handoffs, not silently fixed in P0-B-owned files.

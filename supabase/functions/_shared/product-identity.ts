@@ -24,6 +24,8 @@ export interface CatalogResolutionRecord {
   formulaSourceReference?: string;
   formulaObservedAt?: string;
   ingredientFingerprint?: string;
+  formulaIngredients?: string[];
+  formulaRegionCode?: string;
   packagingMarkers?: string[];
 }
 
@@ -44,9 +46,46 @@ export interface ResolverDecision {
   candidates: ProductResolutionCandidate[];
   nextAction: ProductResolutionNextAction;
   requiresFounderReview: boolean;
+  conflicts?: Array<"identity_mismatch" | "region_mismatch" | "ingredient_mismatch" | "identifier_conflict">;
 }
 
 const AUTHORITATIVE_IDENTIFIER_SOURCES = new Set<IdentifierAuthority>(["manufacturer", "gs1", "founder"]);
+
+// Unlike the persisted legacy fingerprint, evidence equality must retain
+// Unicode, decimal separators and slash notation. Hyphens in identity labels
+// are ordinary word separators; ingredient strings retain all punctuation.
+function conservativeText(value: string | undefined): string {
+  return (value ?? "").normalize("NFKC").toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function identityEvidenceText(value: string | undefined): string {
+  return conservativeText(value).replace(/[-‐‑]/g, " ").replace(/\s+/g, " ");
+}
+
+function matchesIngredientEvidence(ingredients: string[], record: CatalogResolutionRecord): boolean {
+  if (record.formulaIngredients) {
+    return ingredients.length === record.formulaIngredients.length
+      && ingredients.every((ingredient, index) => Boolean(conservativeText(ingredient))
+        && conservativeText(ingredient) === conservativeText(record.formulaIngredients?.[index]));
+  }
+  // Old projections expose only a lossy ASCII fingerprint. Abstain when that
+  // representation cannot preserve every submitted occurrence and notation.
+  if (ingredients.some((ingredient) => !/^[a-z0-9\s-]+$/i.test(ingredient) || !normalizeIdentityText(ingredient))) return false;
+  return normalizeIngredientFingerprint(ingredients) === record.ingredientFingerprint;
+}
+
+function inconsistentFormulaAssertions(records: CatalogResolutionRecord[]): boolean {
+  const seen = new Map<string, string>();
+  return records.some((record) => {
+    if (!record.formulaVersionId) return false;
+    const key = [record.productId, record.variantId, record.formulaVersionId].join(":");
+    const facts = JSON.stringify([record.formulaVerificationStatus, record.formulaSourceReference,
+      record.formulaObservedAt, record.ingredientFingerprint, record.formulaIngredients, record.formulaRegionCode]);
+    const prior = seen.get(key);
+    seen.set(key, facts);
+    return prior !== undefined && prior !== facts;
+  });
+}
 
 export function normalizeIdentityText(value: string | undefined): string {
   return (value ?? "")
@@ -96,8 +135,11 @@ function candidateFrom(record: CatalogResolutionRecord, basis: ProductCandidateB
 }
 
 function uniqueRecords(records: CatalogResolutionRecord[]): CatalogResolutionRecord[] {
+  // Preserve a completed explicit linkage when duplicate projections describe
+  // the same formula; array order must not decide identifier authority.
+  const ordered = [...records].sort((a, b) => Number(verifiedFormulaForIdentifier(b)) - Number(verifiedFormulaForIdentifier(a)));
   const seen = new Set<string>();
-  return records.filter((record) => {
+  return ordered.filter((record) => {
     const key = [record.productId ?? "", record.variantId ?? "", record.formulaVersionId ?? ""].join(":");
     if (seen.has(key)) return false;
     seen.add(key);
@@ -107,7 +149,11 @@ function uniqueRecords(records: CatalogResolutionRecord[]): CatalogResolutionRec
 
 function verifiedFormulaForIdentifier(record: CatalogResolutionRecord): boolean {
   return Boolean(
-    record.identifierVerifiedAt
+    record.productId && record.variantId
+      && normalizeIdentityText(record.brand) && normalizeIdentityText(record.name)
+      && normalizeIdentityText(record.variantName)
+      && record.identifierAuthority && AUTHORITATIVE_IDENTIFIER_SOURCES.has(record.identifierAuthority)
+      && record.identifierVerifiedAt
       && record.formulaVersionId
       && record.identifierFormulaVersionId === record.formulaVersionId
       && record.formulaVerificationStatus === "verified"
@@ -145,14 +191,75 @@ export function resolveProductIdentity(
   catalog: CatalogResolutionRecord[],
 ): ResolverDecision {
   const barcode = normalizeBarcode(evidence.barcode);
-  if (barcode) {
-    const matches = uniqueRecords(catalog.filter((record) =>
-      normalizeBarcode(record.identifierValue) === barcode
+  if (barcode && isValidGtin(barcode)) {
+    const assertions = catalog.filter((record) =>
+      record.identifierValue === barcode
+      && record.identifierType === `gtin_${barcode.length}`
       && record.identifierAuthority
       && record.identifierVerifiedAt
       && AUTHORITATIVE_IDENTIFIER_SOURCES.has(record.identifierAuthority)
-    ));
-    if (matches.length === 1) return identifiedDecision(matches[0], "authoritative_identifier", ["exact authoritative identifier"]);
+    );
+    const matches = uniqueRecords(assertions);
+    // Literal resemblance can contradict a barcode, but can never verify a
+    // different product. Use only complete known brand/name phrases.
+    const label = ` ${identityEvidenceText(evidence.labelText)} `;
+    const otherLabelMatches = catalog.filter((record) => {
+      const brand = identityEvidenceText(record.brand);
+      const name = identityEvidenceText(record.name);
+      return Boolean(record.productId && brand && name
+        && label.includes(` ${brand} `) && label.includes(` ${name} `)
+        && !matches.some((match) => match.productId === record.productId));
+    });
+    if (matches.length && otherLabelMatches.length) return {
+      ...ambiguousDecision([...matches, ...otherLabelMatches], "combined_candidate_evidence", ["submitted label resembles another catalog product and conflicts with authoritative identifier"]),
+      conflicts: ["identity_mismatch"],
+    };
+    // Typed observations do not override an identifier. A contradiction must
+    // remain visible rather than being discarded by barcode-first precedence.
+    const identityFields: [string | undefined, keyof CatalogResolutionRecord][] = [
+      [evidence.brand, "brand"], [evidence.productName, "name"],
+      [evidence.variantName, "variantName"], [evidence.regionCode, "regionCode"],
+    ];
+    const conflictingFields = identityFields.filter(([submitted, field]) => {
+      const normalized = identityEvidenceText(submitted);
+      return normalized && assertions.some((record) => identityEvidenceText(record[field] as string | undefined) !== normalized);
+    });
+    const conflicts = conflictingFields.map(([, field]) => `submitted ${field} conflicts with or is unsupported by authoritative identifier`);
+    if (matches.length && conflicts.length) return {
+      ...ambiguousDecision(matches, "authoritative_identifier", conflicts),
+      conflicts: [...new Set(conflictingFields.map(([, field]) => field === "regionCode" ? "region_mismatch" as const : "identity_mismatch" as const))],
+    };
+    if (matches.length && inconsistentFormulaAssertions(assertions)) {
+      const identityKeys = new Set(matches.map((record) => `${record.productId ?? ""}:${record.variantId ?? ""}`));
+      if (identityKeys.size === 1 && matches[0].productId) return {
+        state: "identified_formula_unverified",
+        selected: { ...matches[0], formulaVersionId: undefined, identifierFormulaVersionId: undefined },
+        candidates: matches.map((record) => candidateFrom(record, "authoritative_identifier", ["conflicting formula facts for one identifier assertion"])),
+        nextAction: "manual_review", requiresFounderReview: true, conflicts: ["identifier_conflict"],
+      };
+      return { ...ambiguousDecision(matches, "authoritative_identifier", ["conflicting formula facts for one identifier assertion"]), conflicts: ["identifier_conflict"] };
+    }
+    if (matches.length === 1) {
+      const formulaRegionConflict = assertions.some((record) => Boolean(record.formulaRegionCode)
+        && [evidence.regionCode, record.regionCode].some((region) => Boolean(region)
+          && conservativeText(region) !== conservativeText(record.formulaRegionCode)));
+      const ingredientConflict = Boolean(evidence.ingredientList?.length)
+        && assertions.some((record) => !matchesIngredientEvidence(evidence.ingredientList!, record));
+      if (ingredientConflict || formulaRegionConflict) {
+        const match = matches[0];
+        return {
+          state: "identified_formula_unverified",
+          selected: { ...match, formulaVersionId: undefined, identifierFormulaVersionId: undefined },
+          candidates: [candidateFrom(match, "authoritative_identifier", [formulaRegionConflict
+            ? "formula market conflicts with submitted or identifier-supported variant market"
+            : "submitted ingredient list conflicts with or is unsupported by identifier-linked formula"])],
+          nextAction: "photograph_ingredients",
+          requiresFounderReview: true,
+          conflicts: [...(ingredientConflict ? ["ingredient_mismatch" as const] : []), ...(formulaRegionConflict ? ["region_mismatch" as const] : [])],
+        };
+      }
+      return identifiedDecision(matches[0], "authoritative_identifier", ["exact authoritative identifier"]);
+    }
     if (matches.length > 1) {
       const identityKeys = new Set(matches.map((record) => `${record.productId ?? ""}:${record.variantId ?? ""}`));
       if (identityKeys.size === 1 && matches[0].productId) {
@@ -168,20 +275,23 @@ export function resolveProductIdentity(
           requiresFounderReview: false,
         };
       }
-      return ambiguousDecision(matches, "authoritative_identifier", ["identifier maps to multiple product variants"]);
+      return {
+        ...ambiguousDecision(matches, "authoritative_identifier", ["identifier maps to multiple product variants"]),
+        conflicts: ["identifier_conflict"],
+      };
     }
   }
 
-  const brand = normalizeIdentityText(evidence.brand);
-  const productName = normalizeIdentityText(evidence.productName);
+  const brand = identityEvidenceText(evidence.brand);
+  const productName = identityEvidenceText(evidence.productName);
   if (brand && productName) {
-    const variant = normalizeIdentityText(evidence.variantName);
-    const region = normalizeIdentityText(evidence.regionCode);
+    const variant = identityEvidenceText(evidence.variantName);
+    const region = identityEvidenceText(evidence.regionCode);
     const matches = uniqueRecords(catalog.filter((record) =>
-      normalizeIdentityText(record.brand) === brand
-      && normalizeIdentityText(record.name) === productName
-      && (!variant || normalizeIdentityText(record.variantName) === variant)
-      && (!region || normalizeIdentityText(record.regionCode) === region)
+      identityEvidenceText(record.brand) === brand
+      && identityEvidenceText(record.name) === productName
+      && (!variant || identityEvidenceText(record.variantName) === variant)
+      && (!region || identityEvidenceText(record.regionCode) === region)
     ));
     if (matches.length === 1) return identifiedDecision(matches[0], "exact_typed_identity", ["exact brand and product name"]);
     if (matches.length > 1) {
@@ -203,12 +313,19 @@ export function resolveProductIdentity(
     }
   }
 
-  const ingredientFingerprint = normalizeIngredientFingerprint(evidence.ingredientList);
-  if (ingredientFingerprint) {
-    const formulaMatches = uniqueRecords(catalog.filter((record) =>
+  if (evidence.ingredientList?.length) {
+    const ingredientMatches = catalog.filter((record) =>
       record.formulaVerificationStatus === "verified"
-      && record.ingredientFingerprint === ingredientFingerprint
-    ));
+      && matchesIngredientEvidence(evidence.ingredientList!, record)
+    );
+    const compatible = ingredientMatches.filter((record) => !record.formulaRegionCode
+      || ![evidence.regionCode, record.regionCode].some((region) => Boolean(region)
+        && conservativeText(region) !== conservativeText(record.formulaRegionCode)));
+    const formulaMatches = uniqueRecords(compatible);
+    if (ingredientMatches.length && !formulaMatches.length) return {
+      state: "insufficient_evidence", candidates: [], nextAction: "manual_review",
+      requiresFounderReview: true, conflicts: ["region_mismatch"],
+    };
     if (formulaMatches.length === 1) {
       const match = formulaMatches[0];
       return {
