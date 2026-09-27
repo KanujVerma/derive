@@ -83,3 +83,7 @@ Candidate82dd0c5ae49b7f83eaaa52227c66446756a8c71f completed12 checks and32 actua
 ## Main-advance reconciliation checkpoint
 
 Sami95 and99 are merged at8ec9fe57 andbe853d23 respectively. K1 acceptance PR102 is reconciling onto be853d23 and rerunning its required source/CI gates. The final P0-D candidate04c25338512971219ed7100cc5587d8e8e0099f0 passed its12-check/32-call local service/controller journey again on that clean rebased head. Receipt `/private/tmp/p0d-local-receipt-04c2533.json`, SHA256fdde442f7637877516c28419f33a8508e9cb94d98da823c042744d9944c86359; generated data cleanup checked, no native/hosted/binary proof. The portfolio docs branch preserved Sami's two ledger entries during reconciliation. Smart automatic routing/extraction/torch and hosted/current-release/user gates are still separate from the landed full-screen fix.
+
+## Independent review hold
+
+The successful-run local proofs remain valid, but root/independent review found a P2 failure-path defect in both newly introduced acceptance runners: asserting immediately on one cleanup deletion failure can skip remaining owned cleanup/absence checks. Source PRs102/107 are held for all-attempt cleanup with aggregated failure and safe injected regression tests. P0-D also adds the missing iOS-export source-evidence gate. No real customer data or actual cleanup failure was observed; this is a concrete reproduced correctness defect, not a human-steward approval dependency. Other portfolio work continues.
