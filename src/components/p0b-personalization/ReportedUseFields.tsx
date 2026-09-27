@@ -1,0 +1,17 @@
+import React from 'react';
+import { Text, TextInput, View } from 'react-native';
+import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
+import type { ReportedUseDraft } from '@/src/presentation/p0b-personalization/experience';
+import { styles } from './ContextFlow';
+export function ReportedUseFields({ value, onChange, disabled = false }: { value: ReportedUseDraft; onChange: (value: ReportedUseDraft) => void; disabled?: boolean }) {
+  return <View style={styles.group}>
+    <Text style={styles.copy}>Use details, if known</Text>
+    <View style={styles.chips}>{([['am', 'Morning'], ['pm', 'Evening'], ['both', 'Both'], ['unknown', 'Not sure']] as const).map(([timing, label]) => <ChoiceChip key={timing} label={label} selected={value.timing === timing} disabled={disabled} onSelect={() => onChange({ ...value, timing })} />)}</View>
+    <View style={styles.chips}>{([['daily', 'Daily'], ['most_days', 'Most days'], ['few_times_week', 'A few times a week'], ['weekly', 'Weekly'], ['less_often', 'Less often'], ['as_needed', 'As needed']] as const).map(([frequency, label]) => <ChoiceChip key={frequency} label={label} selected={value.frequency.kind === 'qualitative' && value.frequency.value === frequency} disabled={disabled} onSelect={() => onChange({ ...value, frequency: { kind: 'qualitative', value: frequency } })} />)}<ChoiceChip label="Frequency unknown" selected={value.frequency.kind === 'unknown'} disabled={disabled} onSelect={() => onChange({ ...value, frequency: { kind: 'unknown' } })} /></View>
+    <TextInput accessibilityLabel="Reported exact use count" style={styles.input} editable={!disabled} keyboardType="numeric" placeholder="Exact use count, if known" value={value.frequency.kind === 'exact' ? String(value.frequency.count) : ''} onChangeText={text => onChange({ ...value, frequency: text.trim() ? { kind: 'exact', count: Number(text), unit: value.frequency.kind === 'exact' ? value.frequency.unit : 'week' } : { kind: 'unknown' } })} />
+    {value.frequency.kind === 'exact' && <View style={styles.chips}>{(['day', 'week', 'month'] as const).map(unit => <ChoiceChip key={unit} label={`Per ${unit}`} selected={value.frequency.kind === 'exact' && value.frequency.unit === unit} disabled={disabled} onSelect={() => { if (value.frequency.kind === 'exact') onChange({ ...value, frequency: { ...value.frequency, unit } }); }} />)}</View>}
+    {(['startedOn', 'stoppedOn'] as const).map(field => <TextInput key={field} accessibilityLabel={field === 'startedOn' ? 'Use started date' : 'Use stopped date'} style={styles.input} editable={!disabled} placeholder={field === 'startedOn' ? 'Started YYYY-MM-DD, if known' : 'Stopped YYYY-MM-DD, if known'} value={value[field] ?? ''} onChangeText={text => onChange({ ...value, [field]: text.trim() || null })} />)}
+    <TextInput accessibilityLabel="Reported duration count" style={styles.input} editable={!disabled} keyboardType="numeric" placeholder="Duration count, if known" value={value.duration ? String(value.duration.count) : ''} onChangeText={text => onChange({ ...value, duration: text.trim() ? { count: Number(text), unit: value.duration?.unit ?? 'weeks' } : null })} />
+    {value.duration && <View style={styles.chips}>{(['days', 'weeks', 'months', 'years'] as const).map(unit => <ChoiceChip key={unit} label={unit} selected={value.duration?.unit === unit} disabled={disabled} onSelect={() => { if (value.duration) onChange({ ...value, duration: { ...value.duration, unit } }); }} />)}</View>}
+  </View>;
+}

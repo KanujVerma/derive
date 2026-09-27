@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { referenceDisplayLabel } from '../src/presentation/p0b-personalization/referenceDisplay.ts';
+import { manualRoutineItem } from '../src/presentation/p0b-personalization/draft.ts';
+const reference = { kind: 'catalog' as const, label: 'Saved product 1 (name unavailable)', productId: 'product', variantId: 'variant', formulaVersionId: 'formula' };
+const draft = { ...manualRoutineItem('id', ''), reference, timing: 'pm' as const, frequency: { kind: 'qualitative' as const, value: 'few_times_week' as const }, startedOn: '2026-01-01', duration: { count: 2, unit: 'months' as const } };
+const unchanged = JSON.stringify(draft);
+assert.equal(referenceDisplayLabel(draft.reference, []), reference.label);
+assert.equal(referenceDisplayLabel(draft.reference, [{ ...reference, label: 'Current catalog name: Brand Cream' }]), 'Current catalog name: Brand Cream');
+assert.equal(JSON.stringify(draft), unchanged);
+assert.equal(referenceDisplayLabel(draft.reference, [{ ...reference, formulaVersionId: 'other-formula', label: 'Other context' }]), reference.label);
+assert.equal(referenceDisplayLabel({ kind: 'manual', label: 'My cream', verification: 'unverified' }, [{ ...reference, label: 'Catalog cream' }]), 'My cream');
+console.log('P0-B late label arrival preserves routine draft state');
