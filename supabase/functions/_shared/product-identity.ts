@@ -24,6 +24,8 @@ export interface CatalogResolutionRecord {
   formulaSourceReference?: string;
   formulaObservedAt?: string;
   ingredientFingerprint?: string;
+  formulaIngredients?: string[];
+  formulaRegionCode?: string;
   packagingMarkers?: string[];
 }
 
@@ -48,6 +50,42 @@ export interface ResolverDecision {
 }
 
 const AUTHORITATIVE_IDENTIFIER_SOURCES = new Set<IdentifierAuthority>(["manufacturer", "gs1", "founder"]);
+
+// Unlike the persisted legacy fingerprint, evidence equality must retain
+// Unicode, decimal separators and slash notation. Hyphens in identity labels
+// are ordinary word separators; ingredient strings retain all punctuation.
+function conservativeText(value: string | undefined): string {
+  return (value ?? "").normalize("NFKC").toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function identityEvidenceText(value: string | undefined): string {
+  return conservativeText(value).replace(/[-‐‑]/g, " ").replace(/\s+/g, " ");
+}
+
+function matchesIngredientEvidence(ingredients: string[], record: CatalogResolutionRecord): boolean {
+  if (record.formulaIngredients) {
+    return ingredients.length === record.formulaIngredients.length
+      && ingredients.every((ingredient, index) => Boolean(conservativeText(ingredient))
+        && conservativeText(ingredient) === conservativeText(record.formulaIngredients?.[index]));
+  }
+  // Old projections expose only a lossy ASCII fingerprint. Abstain when that
+  // representation cannot preserve every submitted occurrence and notation.
+  if (ingredients.some((ingredient) => !/^[a-z0-9\s-]+$/i.test(ingredient) || !normalizeIdentityText(ingredient))) return false;
+  return normalizeIngredientFingerprint(ingredients) === record.ingredientFingerprint;
+}
+
+function inconsistentFormulaAssertions(records: CatalogResolutionRecord[]): boolean {
+  const seen = new Map<string, string>();
+  return records.some((record) => {
+    if (!record.formulaVersionId) return false;
+    const key = [record.productId, record.variantId, record.formulaVersionId].join(":");
+    const facts = JSON.stringify([record.formulaVerificationStatus, record.formulaSourceReference,
+      record.formulaObservedAt, record.ingredientFingerprint, record.formulaIngredients, record.formulaRegionCode]);
+    const prior = seen.get(key);
+    seen.set(key, facts);
+    return prior !== undefined && prior !== facts;
+  });
+}
 
 export function normalizeIdentityText(value: string | undefined): string {
   return (value ?? "")
@@ -169,25 +207,41 @@ export function resolveProductIdentity(
       [evidence.variantName, "variantName"], [evidence.regionCode, "regionCode"],
     ];
     const conflictingFields = identityFields.filter(([submitted, field]) => {
-      const normalized = normalizeIdentityText(submitted);
-      return normalized && assertions.some((record) => normalizeIdentityText(record[field] as string | undefined) !== normalized);
+      const normalized = identityEvidenceText(submitted);
+      return normalized && assertions.some((record) => identityEvidenceText(record[field] as string | undefined) !== normalized);
     });
     const conflicts = conflictingFields.map(([, field]) => `submitted ${field} conflicts with or is unsupported by authoritative identifier`);
     if (matches.length && conflicts.length) return {
       ...ambiguousDecision(matches, "authoritative_identifier", conflicts),
       conflicts: [...new Set(conflictingFields.map(([, field]) => field === "regionCode" ? "region_mismatch" as const : "identity_mismatch" as const))],
     };
+    if (matches.length && inconsistentFormulaAssertions(assertions)) {
+      const identityKeys = new Set(matches.map((record) => `${record.productId ?? ""}:${record.variantId ?? ""}`));
+      if (identityKeys.size === 1 && matches[0].productId) return {
+        state: "identified_formula_unverified",
+        selected: { ...matches[0], formulaVersionId: undefined, identifierFormulaVersionId: undefined },
+        candidates: matches.map((record) => candidateFrom(record, "authoritative_identifier", ["conflicting formula facts for one identifier assertion"])),
+        nextAction: "manual_review", requiresFounderReview: true, conflicts: ["identifier_conflict"],
+      };
+      return { ...ambiguousDecision(matches, "authoritative_identifier", ["conflicting formula facts for one identifier assertion"]), conflicts: ["identifier_conflict"] };
+    }
     if (matches.length === 1) {
-      const fingerprint = normalizeIngredientFingerprint(evidence.ingredientList);
-      if (fingerprint && assertions.some((record) => record.ingredientFingerprint !== fingerprint)) {
+      const formulaRegionConflict = assertions.some((record) => Boolean(record.formulaRegionCode)
+        && [evidence.regionCode, record.regionCode].some((region) => Boolean(region)
+          && conservativeText(region) !== conservativeText(record.formulaRegionCode)));
+      const ingredientConflict = Boolean(evidence.ingredientList?.length)
+        && assertions.some((record) => !matchesIngredientEvidence(evidence.ingredientList!, record));
+      if (ingredientConflict || formulaRegionConflict) {
         const match = matches[0];
         return {
           state: "identified_formula_unverified",
           selected: { ...match, formulaVersionId: undefined, identifierFormulaVersionId: undefined },
-          candidates: [candidateFrom(match, "authoritative_identifier", ["submitted ingredient list conflicts with or is unsupported by identifier-linked formula"])],
+          candidates: [candidateFrom(match, "authoritative_identifier", [formulaRegionConflict
+            ? "formula market conflicts with submitted or identifier-supported variant market"
+            : "submitted ingredient list conflicts with or is unsupported by identifier-linked formula"])],
           nextAction: "photograph_ingredients",
           requiresFounderReview: true,
-          conflicts: ["ingredient_mismatch"],
+          conflicts: [...(ingredientConflict ? ["ingredient_mismatch" as const] : []), ...(formulaRegionConflict ? ["region_mismatch" as const] : [])],
         };
       }
       return identifiedDecision(matches[0], "authoritative_identifier", ["exact authoritative identifier"]);
@@ -214,16 +268,16 @@ export function resolveProductIdentity(
     }
   }
 
-  const brand = normalizeIdentityText(evidence.brand);
-  const productName = normalizeIdentityText(evidence.productName);
+  const brand = identityEvidenceText(evidence.brand);
+  const productName = identityEvidenceText(evidence.productName);
   if (brand && productName) {
-    const variant = normalizeIdentityText(evidence.variantName);
-    const region = normalizeIdentityText(evidence.regionCode);
+    const variant = identityEvidenceText(evidence.variantName);
+    const region = identityEvidenceText(evidence.regionCode);
     const matches = uniqueRecords(catalog.filter((record) =>
-      normalizeIdentityText(record.brand) === brand
-      && normalizeIdentityText(record.name) === productName
-      && (!variant || normalizeIdentityText(record.variantName) === variant)
-      && (!region || normalizeIdentityText(record.regionCode) === region)
+      identityEvidenceText(record.brand) === brand
+      && identityEvidenceText(record.name) === productName
+      && (!variant || identityEvidenceText(record.variantName) === variant)
+      && (!region || identityEvidenceText(record.regionCode) === region)
     ));
     if (matches.length === 1) return identifiedDecision(matches[0], "exact_typed_identity", ["exact brand and product name"]);
     if (matches.length > 1) {
@@ -245,11 +299,10 @@ export function resolveProductIdentity(
     }
   }
 
-  const ingredientFingerprint = normalizeIngredientFingerprint(evidence.ingredientList);
-  if (ingredientFingerprint) {
+  if (evidence.ingredientList?.length) {
     const formulaMatches = uniqueRecords(catalog.filter((record) =>
       record.formulaVerificationStatus === "verified"
-      && record.ingredientFingerprint === ingredientFingerprint
+      && matchesIngredientEvidence(evidence.ingredientList!, record)
     ));
     if (formulaMatches.length === 1) {
       const match = formulaMatches[0];

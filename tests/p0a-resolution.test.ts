@@ -82,3 +82,59 @@ test('identifier reused across variants preserves an explicit identifier conflic
   assert.equal(result.state, 'ambiguous_candidates');
   assert.deepEqual(result.conflicts, ['identifier_conflict']);
 });
+
+test('Unicode identity and decimal/slash variant contradictions cannot disappear', () => {
+  for (const evidence of [{ brand: '東京' }, { variantName: 'Retinol 0/5%' }]) {
+    const catalog = { ...record, variantName: 'Retinol 0.5%' };
+    assert.equal(resolveProductIdentity({ barcode: record.identifierValue, ...evidence }, [catalog]).state, 'ambiguous_candidates');
+  }
+  assert.equal(resolveProductIdentity({ brand: '東京', productName: 'Wash', variantName: '標準' }, [{ ...record, brand: '東京', name: 'Wash', variantName: '標準' }]).state, 'identified_formula_unverified');
+});
+
+test('legacy fingerprints abstain for Unicode or punctuation-sensitive ingredient evidence', () => {
+  for (const ingredientList of [['Water', 'β-Arbutin'], ['水', 'Water'], ['Retinol 0/5%']]) {
+    const catalog = { ...record, ingredientFingerprint: normalizeIngredientFingerprint(ingredientList) };
+    const result = resolveProductIdentity({ barcode: record.identifierValue, ingredientList }, [catalog]);
+    assert.equal(result.state, 'identified_formula_unverified');
+    assert.deepEqual(result.conflicts, ['ingredient_mismatch']);
+    assert.equal(resolveProductIdentity({ ingredientList }, [catalog]).state, 'insufficient_evidence');
+  }
+});
+
+test('raw ordered ingredients preserve Greek symbols, occurrence count, punctuation and order', () => {
+  const catalog = { ...record, formulaIngredients: ['Water', 'α-Arbutin', 'Retinol 0.5%'], ingredientFingerprint: normalizeIngredientFingerprint(['Water', 'α-Arbutin', 'Retinol 0.5%']) };
+  const same = [' WATER ', 'α-Arbutin', 'Retinol 0.5%'];
+  assert.equal(resolveProductIdentity({ barcode: record.identifierValue, ingredientList: same }, [catalog]).state, 'verified_product_formula');
+  assert.equal(resolveProductIdentity({ ingredientList: same }, [catalog]).state, 'formula_only');
+  for (const ingredientList of [['Water', 'β-Arbutin', 'Retinol 0.5%'], ['水', ...same], ['Water', 'α-Arbutin', 'Retinol 0/5%'], ['α-Arbutin', 'Water', 'Retinol 0.5%']]) {
+    assert.equal(resolveProductIdentity({ barcode: record.identifierValue, ingredientList }, [catalog]).state, 'identified_formula_unverified');
+    assert.equal(resolveProductIdentity({ ingredientList }, [catalog]).state, 'insufficient_evidence');
+  }
+});
+
+test('exact Unicode ingredients can match raw formula evidence without an ASCII fingerprint', () => {
+  assert.equal(resolveProductIdentity({ ingredientList: ['水'] }, [{ formulaVersionId: 'f', formulaVerificationStatus: 'verified', formulaIngredients: ['水'] }]).state, 'formula_only');
+});
+
+test('known formula market cannot inherit an incompatible variant or submitted market', () => {
+  for (const evidence of [{ barcode: record.identifierValue }, { barcode: record.identifierValue, regionCode: 'US' }]) {
+    const result = resolveProductIdentity(evidence, [{ ...record, formulaRegionCode: 'GB' }]);
+    assert.equal(result.state, 'identified_formula_unverified');
+    assert.equal(result.selected?.formulaVersionId, undefined);
+    assert.deepEqual(result.conflicts, ['region_mismatch']);
+  }
+  assert.equal(resolveProductIdentity({ barcode: record.identifierValue, regionCode: 'US' }, [{ ...record, formulaRegionCode: 'US' }]).state, 'verified_product_formula');
+});
+
+test('inconsistent duplicate formula metadata abstains regardless of array order', () => {
+  for (const changed of [{ formulaSourceReference: 'other-source' }, { formulaObservedAt: '2026-09-21' }, { formulaVerificationStatus: 'rejected' as const }, { ingredientFingerprint: 'different' }, { formulaIngredients: ['Water'] }, { formulaRegionCode: 'GB' }]) {
+    const inconsistent = { ...record, ...changed };
+    for (const catalog of [[record, inconsistent], [inconsistent, record]]) {
+      const result = resolveProductIdentity({ barcode: record.identifierValue }, catalog);
+      assert.equal(result.state, 'identified_formula_unverified');
+      assert.equal(result.selected?.formulaVersionId, undefined);
+      assert.deepEqual(result.conflicts, ['identifier_conflict']);
+      assert.equal(result.nextAction, 'manual_review');
+    }
+  }
+});

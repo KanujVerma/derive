@@ -36,3 +36,15 @@ Implementation references: `supabase/functions/_shared/product-identity.ts`, `un
 - `npx --no-install tsc --noEmit` and `npm run typecheck:tests`: attempted with a temporary symlink to the existing app dependencies; blocked by missing baseline `expo-application` / `expo-file-system` packages. No resolver TypeScript diagnostic was emitted. Root must rerun with the lockfile dependency environment before integration. The temporary dependency symlink was removed after validation.
 - `git diff --check`: passes.
 - Database reset, pgTAP, Edge integration, web/iOS exports and exact-head CI are root integration gates; this leaf does not claim they ran or passed.
+
+## Adversarial follow-up
+
+The first fix still inherited the legacy normalizer's ASCII/punctuation loss. Read-only reproductions showed submitted brand `東京` disappearing, `Retinol 0/5%` comparing equal to `Retinol 0.5%`, `α-Arbutin` and `β-Arbutin` sharing a fingerprint, and `['水', 'Water']` collapsing to `['Water']`. Same-formula duplicate source references also selected whichever equally verified assertion appeared first.
+
+The approved follow-up separates evidence equality from the persisted fingerprint format. Identity comparisons retain Unicode and decimal/slash notation. When `formulaIngredients` exists, ingredient comparison uses exact ordered strings after NFKC, case, surrounding-space and repeated-whitespace normalization; punctuation and occurrence count remain meaningful. Legacy projections lacking raw ingredients abstain for non-ASCII or punctuation-sensitive ingredient evidence. The stored fingerprint generator and catalog-ingestion format remain unchanged. Fingerprints do not establish concentration assertions.
+
+`formulaRegionCode`, when supplied, must agree with known submitted/variant region before a formula can verify. Inconsistent duplicate formula source, observation time, verification status, fingerprint, raw ingredients or formula region preserve exact identity only and record `identifier_conflict`, with manual review. Duplicate linkage presence alone is not a contradictory formula fact and still preserves a completed explicit linkage.
+
+Root integration must project raw `product_formula_versions.ingredients` and `region_code` into these optional pure-record fields. These columns already exist; the leaf adds no migration or Edge edits. The pure module can now detect the market mismatch flagged above once Edge supplies it. Typed family selection remains conservative and never gains formula authority.
+
+Follow-up validation: focused `tests/p0a-resolution.test.ts` 19/19 and full `npm test` 479/479 pass; `git diff --check` passes. `npx --no-install tsc --noEmit` and `npm run typecheck:tests` both pass with zero errors against the root's complete dependency environment. The temporary dependency symlink was removed. Database, Edge, exports and CI remain root gates.
