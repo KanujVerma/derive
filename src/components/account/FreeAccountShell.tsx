@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { publicLegalLinks } from '../../config/environment';
@@ -9,13 +9,21 @@ import { signOutSession } from '../../services/authClient';
 import type { FreeAccessState } from '../../contracts/FreeAccess';
 import { getFreeAccountPresentation } from './freeAccountPresentation';
 import { Icon } from '../ui/Icon';
+import { openCustomerAccountLink } from '../../presentation/customer-journey/accountLinks';
 
 /** Truthful settings for a locally integrated anonymous identity. */
 export function FreeAccountShell({ identityKind }: { identityKind: FreeAccessState['identityKind'] }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [deleting, setDeleting] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const presentation = getFreeAccountPresentation(identityKind);
+
+  const openLink = async (label: 'Privacy' | 'Support', url: string) => {
+    setLinkError(null);
+    const result = await openCustomerAccountLink(label, url, Linking);
+    setLinkError(result.error);
+  };
 
   const signOut = async () => {
     const result = await signOutSession();
@@ -61,21 +69,22 @@ export function FreeAccountShell({ identityKind }: { identityKind: FreeAccessSta
       </Pressable>
       <Text style={styles.title}>Account & Settings</Text>
     </View>
-    <View style={styles.content}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.lg }]}>
       <Text style={styles.body}>{presentation.intro}</Text>
-      <Pressable style={styles.row} accessibilityRole="link" onPress={() => void Linking.openURL(publicLegalLinks.privacyUrl)}>
+      <Pressable style={styles.row} accessibilityRole="link" onPress={() => void openLink('Privacy', publicLegalLinks.privacyUrl)}>
         <Text style={styles.link}>Privacy</Text>
       </Pressable>
-      <Pressable style={styles.row} accessibilityRole="link" onPress={() => void Linking.openURL(publicLegalLinks.supportUrl)}>
+      <Pressable style={styles.row} accessibilityRole="link" onPress={() => void openLink('Support', publicLegalLinks.supportUrl)}>
         <Text style={styles.link}>Support</Text>
       </Pressable>
+      {linkError ? <Text accessibilityRole="alert" style={styles.error}>{linkError}</Text> : null}
       <Pressable style={styles.row} accessibilityRole="button" accessibilityState={{ disabled: deleting }} disabled={deleting} onPress={confirmDeletion}>
         <Text style={styles.delete}>{deleting ? 'Deleting…' : 'Delete Derive data'}</Text>
       </Pressable>
       {presentation.showSignOut && <Pressable style={styles.row} accessibilityRole="button" onPress={() => void signOut()}>
         <Text style={styles.link}>Sign Out</Text>
       </Pressable>}
-    </View>
+    </ScrollView>
   </View>;
 }
 
@@ -88,5 +97,6 @@ const styles = StyleSheet.create({
   body: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: 23, marginBottom: spacing.lg },
   row: { minHeight: 52, justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
   link: { color: colors.ink, fontSize: typography.sizes.bodyRegular },
+  error: { color: colors.actionStop.text, fontSize: typography.sizes.bodyRegular, marginVertical: spacing.sm },
   delete: { color: colors.actionStop.text, fontSize: typography.sizes.bodyRegular },
 });

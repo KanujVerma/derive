@@ -10,10 +10,14 @@ Every active milestone/feature has exactly one founder DRI accountable for its c
 | --- | --- | --- |
 | P0-A Capture + Product Resolution | Sami | End-to-end Check capture, barcode/photo evidence, extraction/evaluation adapters if selected, S6 truth resolution, catalog/review and device acceptance. Current Check uses Expo Camera directly; no photo OCR provider or Scandit adapter is implemented. |
 | P0-B Personal Decision Intelligence | Kanuj | End-to-end optional profile, routine/history context, multi-finding policy, decision packet, renderer and physical acceptance. All seven focused source PRs and bounded customer composition are merged; automated local/CI gates passed. Physical/customer acceptance and hosted activation remain open. Sami stewardship remains advisory under the rule below. [Execution ledger](P0_B_EXECUTION.md) records agent ownership and actual evidence. |
-| P0-C Hosted Beta Operations | DRI assigned explicitly before activation | Hosted guest abuse/lifecycle, linking, cleanup, retention and activation review. Hosted guest activation remains gated. |
-| P0-D Cross-product physical/release acceptance | Composition/release DRI named explicitly before activation | Cross-feature physical and release composition. Do not infer an owner from a permanent client/server lane. |
+| P0-C Hosted Beta Operations | Sami | Hosted guest abuse/lifecycle, linking, cleanup, retention and activation review. Preparation ownership is assigned by the portfolio mandate; hosted guest activation remains gated and is not authorized by this pass. |
+| P0-D Integrated customer / physical / release acceptance | Kanuj | ACTIVE preparation and consumer integration under [#100](https://github.com/KanujVerma/derive/issues/100). Owns the integrated scanner-first customer outcome and separate binary/device/hosted/TestFlight/real-user evidence. Sami owns active camera/capture, P0-A and P0-C; no competing scanner or catalog implementation. |
 
 These are the approved initial split, not a prediction that every P0 feature is currently active or complete. Current implementation and gate status are in [ROADMAP.md](ROADMAP.md).
+
+## Kanuj beta-critical portfolio
+
+Kanuj owns P0-B physical/live/customer acceptance (#74/#88), P0-D integrated customer/release experience (#100), and focused customer-experience stewardship of Sami's customer-facing work. Sami actively owns smart camera/capture implementation: one simple camera with automatic useful evidence routing and a manual fallback when uncertain. Kanuj consumes stable truth/capture contracts and defines downstream acceptance; he does not edit Sami's active camera/controller/extraction/catalog/P0-C surfaces in parallel. See [KANUJ_PORTFOLIO.md](KANUJ_PORTFOLIO.md) for the complete DAG, strict write-sets, resource leases and current gates.
 
 ## Horizontal stewardship
 

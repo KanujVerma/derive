@@ -12,7 +12,7 @@ The intended differentiator is that the same product may lead to a different dec
 
 Development Mock and exact-local-Supabase Development Remote contain a scanner-first free path. Remote Staging and production retain legacy managed routing, and hosted guest activation is gated. S6 has sourced product identity and versioned formula evidence; K4/S4 connects the mobile camera to private product-evidence handling locally. Check uses Expo Camera directly. Photo-only evidence has no working OCR or image-recognition extraction.
 
-The local free profile, saved-product/check/experience history, and Personal Fit exist in bounded forms. Current Personal Fit is a narrow sequential first-match result, not a multi-finding engine. Local history is not the target canonical routine/exposure timeline. Physical scanner acceptance is not established. Consult [ROADMAP.md](ROADMAP.md) and [CONTEXT_SYNC.md](CONTEXT_SYNC.md) for point-in-time gates.
+P0-B source now implements canonical reported profile/routine/use and corrected experience revisions, a deterministic multi-finding decision packet and same-snapshot Check/editor/My Stuff integration. Retained S2 first-match fit and S3 saved-event memory remain separate; legacy data is not silently promoted into canonical context or exposure truth. The baseline is locally/CI-proven, not a general scientific exposure system or physical/customer acceptance. Kanuj owns the active P0-D integrated customer/release feature while Sami owns smart camera/capture. Consult [KANUJ_PORTFOLIO.md](KANUJ_PORTFOLIO.md), [ROADMAP.md](ROADMAP.md) and [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
 
 ### Customer value progression
 
