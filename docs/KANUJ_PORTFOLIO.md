@@ -1,5 +1,38 @@
 # Kanuj beta-critical portfolio
 
+## Current continuation: Auto camera, contribution UX, and release truth
+
+**Verified starting main:** `aefbd46085698d49be9789b7742acbf2a1288471`, resulting-main CI `36352925277` both jobs successful. Original shared checkout remains dirty at `773a4b8`; no reset, stash, checkout or cleanup of that work. Previous portfolio landings #102, #107 and #101 are merged and are historical records below, not new work.
+
+Sami's #108 Auto camera, #110 Expo iOS UPC-A normalization, #109 offline perception benchmark, #111 pure catalog-contribution contract and #112 hosted-free readiness preflight are merged. None proves physical barcode acceptance, image recognition, customer contribution submission, or hosted guest activation. Sami's image-read-hardening #113 remains open and Sami-owned. Never edit, rebase or merge that branch for him.
+
+```text
+Kanuj portfolio root: current-main tracking, source-of-truth, issue and merge order
++-- K1 / current Auto camera and P0-D acceptance: physical/Simulator owner
++-- K2 / Help add this product customer module: #115, consumes #111 pure contract
++-- K3 / release/privacy/support truth: tracked apple-site and app copy audit
+```
+
+| Track | Isolated branch / worktree | Strict write-set and boundary |
+| --- | --- | --- |
+| Root | `kanuj/portfolio-wave-2` / `derive-kanuj-portfolio` | Canonical portfolio, roadmap/ledger, issue/merge coordination only. |
+| K1 | `kanuj/p0d-current-camera-acceptance` / `derive-p0d-current-camera` | `docs/acceptance/P0_D_CURRENT_CAMERA.md`, focused tests, and a root-granted narrow `CheckProductScreen.tsx` Auto-entry composition fix. Sole device/Simulator operator; no Sami camera internals. |
+| K2 | `kanuj/missing-product-contribution-ux` / `derive-missing-product-ux` | New `src/presentation/catalog-contribution/**`, `src/components/check/contribution/**`, `tests/catalog-contribution-ux*`, own acceptance doc. No Check root/backend/contract edits; #115 tracks the customer increment. |
+| K3 | `kanuj/p0d-release-truth` / `derive-p0d-release-truth` | Own release audit, bounded `apple-site/{index,privacy,support,privacy-choices}.html` copy, optional Account leaf and tests. No external deployment or legal-commitment invention. |
+
+The four branches initially started at the same verified main; each remaining Kanuj PR was reconciled and revalidated after main advanced. Existing old branches/worktrees remain intact. Root reserves root navigation/Auth/contracts, migration order, build/environment config and final composition. K1 alone holds a narrow canonical Check entry lease after a current-source Simulator observation showed the barcode-only entry hiding package photos despite #108 Auto inside capture; it may not edit Sami capture internals. K1 holds device/Simulator; local Supabase/Colima are stopped until a root-granted need is established. K2 consumed #111's validator in merged PR #117 (normal merge `7a3e82c41b8ba46c0d32a0ae3217f74b22b12d48`, exact-head CI `36355063029` both green) without creating a submission API, review queue, catalog truth or fake success. #115 stays open for final Check composition after Sami #105 runtime handoff. K3 prepared PR #116 (`63371dece5f738c67e2e51126eab412b874c5f45`) for four tracked `apple-site` pages plus an audit; both exact-head CI `36354571785` jobs passed. The user explicitly authorized a read-only Vercel settings check after an earlier automatic rejection. The live `derive-beta-site` project has no connected Git repository or production branch in its project API; its sole READY production deployment is from historical `kanuj/apple-build8-external-review` source. Vercel documents automatic merge deployments for connected Git projects, so a source merge is not expected to publish this site. PR #116 reconciled after #117, passed both exact-head CI `36355613278` jobs, and merged normally as `137facf71e19111c7dbdaa743a37510af1cd8a5b`. Post-merge Vercel readback still showed the single older production deployment, so public deployment and candidate-specific privacy/legal review remain separate gates. No Vercel setting or deployment was changed. The eligible unassisted adult tester is later. The wired physical iPhone is paired but passcode-locked; an asynchronous operator unlock request is pending. Source, Simulator, physical, local service, hosted, binary/TestFlight and human observations remain separate.
+
+After any main advancement, fetch and reconcile remaining Kanuj branches, rerun applicable gates and require exact-head CI. Source PRs run full unit, app/test TypeScript, web/iOS exports, diff/scope/secret checks; database/Auth/RLS gates apply only to legitimate backend changes, which this wave does not plan. All final PR merges remain root-owned. No EAS/TestFlight build, provider/billing/hosted activation, public release, photo-library path, Product Compare or Sami-owned implementation is authorized in this wave.
+
+## Current wave source landing checkpoint
+
+- **K2 merged:** PR #117 head `85ee9369e33a94fe5fd7b9a3b68d1548c3db45e0`, exact-head CI `36355063029` both successful, normal merge `7a3e82c41b8ba46c0d32a0ae3217f74b22b12d48`. The leaf has honest unavailable recovery today, optional draft review against #111, owner-scoped component state, private evidence opt-in and stable request IDs for unchanged details. It has no customer submission API or canonical truth write. #115 stays open for bounded Check composition after Sami #105 runtime.
+- **K1 source landed:** PR #118 head `6a0c6660cf5f12be27488e9ee22a1a6a89469795`, exact-head CI `36356139508` both green, normal merge `c8284ee305ccbe65c5a36f0cec8e7955edc7f104`. Current-source Simulator had shown a barcode-only Check entry despite #108's Auto camera; one Kanuj-owned Check entry fix now renders a plain **Open camera** action and visible name-search fallback. It changed no Sami capture files. The updated entry rendered on iPhone 17 Pro Simulator, but automation taps did not change the screen; no in-camera interaction or physical proof is claimed. Local focused 21/21, full 62 files/665 registered cases, both TypeScript checks, web/iOS exports, diff/scope/secret checks passed.
+- **K3 source landed:** PR #116 head `d12cfbdf75a742059376634d6020e1df5b6dce95`, exact-head CI `36355613278` both green, normal merge `137facf71e19111c7dbdaa743a37510af1cd8a5b`. Four tracked public-page source files and a release audit are committed. The live Vercel project has no connected Git repository; post-merge readback still showed only the old production deployment. Public site deployment, live page readback, candidate privacy/legal and hosted/binary validation remain open. Public deployment, binary-specific privacy/legal review and hosted behavior remain gates.
+- **Still open:** #74/#88/#100/#115; Sami #113 is open/independent. Physical phone is passcode-locked, smaller Simulator prompt and native input-control behavior are unverified, eligible unassisted tester is later. Public site still served its old headline after #116 merged; source copy is not deployed. Hosted guest activation, contribution runtime, perception extraction, actual beta binary/TestFlight and candidate-specific privacy review remain open. The portfolio status is **KANUJ MVP PORTFOLIO PARTIAL**.
+
+## Earlier portfolio wave: landed source and historical checkpoints
+
 ## Mandate and checkpoint
 
 Kanuj is DRI for P0-B acceptance and P0-D integrated customer/release experience. Sami owns active smart camera/capture, P0-A extraction/truth, catalog contribution/coverage and P0-C hosted operations. Kanuj remains CX steward of those customer-facing changes. A counterpart dependency gates integration, not independent preparation.
