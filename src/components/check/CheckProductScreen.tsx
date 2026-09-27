@@ -42,7 +42,6 @@ import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
-import { CaptureEntry } from '@/src/components/check/capture/CaptureEntry';
 import { CheckCaptureHost } from '@/src/components/check/capture/CheckCaptureHost';
 import type { CheckCaptureHandoff } from '@/src/presentation/capture/checkCaptureAdapter';
 import type { CaptureRole } from '@/src/presentation/capture/productEvidence';
@@ -958,7 +957,7 @@ export default function CheckProductScreen() {
           {integrated && searchQuery.trim().length >= 2 && (
             <Button label="Check name as entered" variant="ghost" size="medium" onPress={handleManualNameCheck} style={{ marginTop: spacing.md }} />
           )}
-          <Button label={targetShell ? 'Scan barcode' : 'Use barcode camera'} variant="outline" size="medium" onPress={() => { if (targetShell) openCapture('barcode'); else { setIsSearching(false); handleRetryScan(); } }} style={{ marginTop: spacing.lg }} />
+          <Button label={targetShell ? 'Open camera' : 'Use barcode camera'} variant="outline" size="medium" onPress={() => { if (targetShell) openCapture('barcode'); else { setIsSearching(false); handleRetryScan(); } }} style={{ marginTop: spacing.lg }} />
         </ScrollView>
       </View>
     );
@@ -968,8 +967,11 @@ export default function CheckProductScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
-        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
-          <CaptureEntry onOpenCapture={openCapture} onSearchName={handleSearchNamePress} />
+        <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
+          <Text style={styles.entryTitle}>Check a product</Text>
+          <Text style={styles.entryBody}>Scan a barcode or take a photo of the package.</Text>
+          <Button label="Open camera" variant="brand" onPress={() => openCapture('barcode')} style={styles.entryAction} />
+          <Button label="Search by name" variant="ghost" onPress={handleSearchNamePress} style={{ marginTop: spacing.sm }} />
         </ScrollView>
       </View>
     );
