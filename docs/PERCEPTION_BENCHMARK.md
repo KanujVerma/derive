@@ -1,6 +1,12 @@
 # Real-image perception benchmark readiness
 
-This is an **offline manifest validation and supplied-output replay tool**, not an image extractor. No real-image corpus has been supplied; no Gemini, GPT/Luna, OCR or barcode adapter has been run by this increment. No provider has won. Default output is `CORPUS_NOT_READY`, zero images, `NOT_RUN` scenarios and null accuracy/latency/cost. Fabricated test gold is a harness self-check, never benchmark performance or catalog evidence.
+This is an **offline manifest validation and supplied-output replay tool**, not an image extractor. At the initial implementation checkpoint no images had been supplied. A later private intake now contains **12 preliminary supplied PNGs**, but **zero frozen rights-cleared images with independent gold**. No Gemini, GPT/Luna, OCR or barcode adapter has been run by this increment. No provider has won. Default output remains `CORPUS_NOT_READY`, zero accepted benchmark images, `NOT_RUN` scenarios and null accuracy/latency/cost. Fabricated test gold is a harness self-check, never benchmark performance or catalog evidence.
+
+## Preliminary image intake, not benchmark acceptance
+
+The twelve original images were inspected locally without modification or copying. A private, outside-repository inventory records exact filename, byte count, SHA-256 and PNG dimensions. The user clarified that **all twelve are photographs by Amazon reviewers**, publicly available and supplied for this test—not user-owned photographs. Public availability does not establish permission. Source URLs and reviewer permissions are unavailable; rights remain **unverified**, with zero eligible frozen corpus images. Only preliminary private local inspection is in scope: no cloud upload, image copying, publication or rights-cleared provider benchmark. No private paths or images enter this document or commit.
+
+Independent literal gold is not yet created. Apparent front/back pairs do not establish the same exact package generation, region or formula; visible old/new packaging differences require review, and a back image without visible product identity remains unbound. Missing or partial barcodes stay unreadable. The set is useful preliminary intake, not representative coverage or a provider accuracy result. Rights/consent evidence, independent gold, exact evidence binding and approved provider handling still gate the frozen corpus.
 
 ## What was missing and what is now reproducible
 
