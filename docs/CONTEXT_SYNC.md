@@ -7,6 +7,16 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
 
+## 2026-09-27: Kanuj beta-critical portfolio activation
+
+- **Immutable predecessor:** main22a210a7a720c9621d45e789b8690dcc73ab059a, both main CI36328042910 jobs SUCCESS. Original dirty/unpushed work and all old worktrees remain preserved; no rebuild of landed P0-B.
+- **Ownership:** Kanuj now explicitly owns P0-D integrated customer/release experience under #100, P0-B physical/live/customer acceptance under #74/#88, and CX stewardship. Source-only #77 is closed because no unique source work remains; real acceptance stays open. Sami owns active smart camera/capture, extraction, catalog and P0-C; reserved surfaces are recorded in [KANUJ_PORTFOLIO.md](KANUJ_PORTFOLIO.md).
+- **Parallel work:** three isolated feature/review leads run P0-B acceptance, P0-D stable account/journey/release preparation, and read-only scanner stewardship. Root alone owns portfolio DAG/locks/issue/merge/canonical-docs state. Device/local DB lease belongs only to the P0-B lead. An external dependency gates final integration, not independent preparation.
+- **Availability/evidence:** user made the iPhone available and will arrange the eligible unassisted adult tester later. Fresh complete-app inventory verifies connected phone and installed ExpoGo57; earlier developer-only inventory omitted store apps. Installed Derive build10 is older than current P0-B. Physical automation/current-source LAN/live-service and human results stay unproven until observed.
+- **Concrete work:** P0-D is implementing rejected Privacy/Support link recovery and scrollability on stable FreeAccountShell, preserving configured links and no contact-verification claim. Actual local service acceptance recovered a preserved-backup host-forwarding failure with temporary loopback forwards, without deleting volumes or changing global config; controller/service proof is running and other tracks continue.
+- **CX review:** exact95head403427a merged8ec9fe57 after green CI587TAP/524pgTAP and focused review; stale551/486/P0-B1 metadata received nonblocking advice.99reconciled exacte0591ea onto8ec9fe57 and passed fresh CI590TAP/524pgTAP; final six-file CX review found no introduced source blocker. One-camera automatic routing/torch remain broader Sami follow-ups, not regressions introduced by99. Public comments leave implementation ownership intact.
+- **Limits:** no production activation, billing/vendor commitment, public release or architecture redesign. Local/fixture/Simulator/device/hosted/TestFlight/human proof remains separate. This activates preparation and ownership, not external beta readiness.
+
 ## 2026-09-27: Physical capture control overlap recovery
 
 - **Predecessor:** readiness branch reconciled with `origin/main@86c9e03985c299a407e3f041fcad83afd0fee90a` in `a391de97b69f4d5f392ca9944bbf2ee24fdae47e`. Kanuj's merged P0-B work is preserved. This is a separate capture-UX review branch stacked on readiness #95, not a competing canonical Check/root composition.

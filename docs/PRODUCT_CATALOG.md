@@ -2,7 +2,7 @@
 
 ## Current status at main d793639
 
-Check is the scanner-first free acquisition path in Development Mock and exact-local-Supabase Development Remote. Local integration includes sourced catalog search, S6 product/formula resolution, a narrow first-match Personal Fit path, free profile/history, and private product evidence. Remote Staging and production retain legacy managed routing; hosted guest activation remains gated.
+Check is the scanner-first free acquisition path in Development Mock and exact-local-Supabase Development Remote. Local integration includes sourced catalog search, S6 product/formula resolution, retained S2 fit, private evidence and P0-B canonical reported context/multi-finding decisions. P0-B source is merged; physical/customer acceptance and hosted activation remain separate. Remote Staging and production retain legacy managed routing; hosted guest activation remains gated.
 
 Catalog identity and formula truth are separate. A product name, alias, variant, identifier assertion, packaging observation, and formula version are not interchangeable. A GTIN is evidence of an identifier, not an exact formula or authenticity proof. Full formula facts are shown only when supported by the applicable verified identity/formula evidence. Unknown and conflicting cases remain unresolved and enter review; candidate resemblance, manual text, or a retailer offer does not establish canonical truth.
 
