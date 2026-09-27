@@ -89,6 +89,10 @@ try {
   draft.pregnancy = draft.trying = draft.nursing = { state: 'answered', value: 'no' };
   draft.treatments = draft.sensitivities = { state: 'answered', value: [] };
   const profile = profileToStorage(draft);
+  assert.equal(await controller.save({ operation: 'save_profile', profile: { ...profile, secondaryGoals: ['texture', 'redness', 'oiliness'] } }), false);
+  assert.equal(await count('personal_context_revisions', 'user_id', aid), 0, 'A fourth total goal must not persist');
+  assert.equal(await controller.save({ operation: 'save_profile', profile: { ...profile, secondaryGoals: ['dryness'] } }), false);
+  assert.equal(await count('personal_context_revisions', 'user_id', aid), 0, 'The primary goal cannot also persist as secondary');
   dropWriteConfirmation = true;
   assert.equal(await controller.save({ operation: 'save_profile', profile }), false);
   assert.equal(state().status, 'error'); assert.equal(state().context.revision, 0);
@@ -132,7 +136,7 @@ try {
   for (const client of [a, b]) for (const table of ['personal_context_heads', 'personal_context_revisions', 'personal_decision_assessments']) {
     assert.equal((await client.from(table).select('*')).error?.code, '42501');
   }
-  console.log('PASS: actual mobile controller/remote adapters, SDK, local authoritative Edge and persistence; positive/redundancy/reaction/partial context, exact text, correction, response-loss idempotency, unavailable/retry, A-B-signout-A and private-table boundaries. Synthetic catalog inputs only. Native/physical/hosted/human acceptance remains separate.');
+  console.log('PASS: actual mobile controller/remote adapters, SDK, local authoritative Edge and persistence; positive/redundancy/reaction/partial context, exact text, server goal cap, correction, response-loss idempotency, unavailable/retry, A-B-signout-A and private-table boundaries. Synthetic catalog inputs only. Native/physical/hosted/human acceptance remains separate.');
 } finally {
   changeOwner(null, a);
   for (const client of [a, b]) await client.auth.signOut().catch(() => {});

@@ -8,7 +8,9 @@ Record current source revision, iPhone/OS, Expo Go version or actual Derive bina
 
 For a Mock source run, use a task-local Metro server with dotenv disabled, development flavor and Remote service false. In the current session its own port is 8131, and the intended URL is `exp://172.20.10.4:8131/--/personalize/fixture?mode=profile`. This temporary IP/URL must be checked again for a later session. Physical launch initially returned **Locked**, so no source load was observed. Unlocking the phone and reaching the current DEVELOPMENT FIXTURE screen is a prerequisite, not a completed interaction gate.
 
-The DEVELOPMENT FIXTURE banner must remain visible. Its synthetic actions are local and unsaved; they cannot establish service acceptance. The physical local Remote run needs Sami's merged, verified development LAN contract. Do not use a client Auth bypass, fabricate an entitlement, or point a development test at hosted production.
+The DEVELOPMENT FIXTURE banner must remain visible in a fixture run. Its synthetic actions are local and unsaved; they cannot establish service acceptance.
+
+The actual local Remote app is separately prepared from merged source `8ec9fe57ee2a341cf058da6818cab1227984aaea`, on `exp://172.20.10.4:8135`, with development flavor, Remote service true, dotenv disabled, and both `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_DEV_SUPABASE_LAN_URL` set to `http://172.20.10.4:54321`. Its public local key is captured privately, never copied into the record. The local LAN API health check returned 200. This is an intended normal app URL, not a fixture route. It must still be loaded and observed on the unlocked phone. Do not use a client Auth bypass, fabricate an entitlement, or point a development test at hosted production.
 
 ## Execute and record
 
