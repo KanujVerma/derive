@@ -96,6 +96,15 @@ const redundancy: Finding = {
   uncertainty: [], evidenceNeedIds: [],
   display: { kind: 'routine_relation', routineItemIds: ['routine-item:1'], role: 'moisturizer', timing: 'pm', frequency: 'few_times_weekly', evidenceIndexes: [0, 1, 2] },
 };
+const routineFormulaOverlap: Finding = {
+  id: 'routine-formula-overlap', kind: 'active_overlap', applicability: 'applicable', severity: 'caution', confidence: 'supported',
+  ruleId: 'fixture:formula-overlap', ruleVersion: '1',
+  evidence: [{ ...categoryEvidence, scope: 'formula', formulaVersionId: binding.formulaVersionId }, routineContext,
+    { ...routineCategory, scope: 'formula', variantId: 'fixture-existing-variant:1', formulaVersionId: 'fixture-existing-formula:1',
+      sourceId: 'fixture-existing-formula', sourceRevision: 'formula-evidence:1' }],
+  uncertainty: ['Routine product category is unknown.'], evidenceNeedIds: [],
+  display: { kind: 'routine_relation', routineItemIds: ['routine-item:1'], role: 'unknown', timing: 'unknown', frequency: 'unknown', evidenceIndexes: [0, 1, 2] },
+};
 const routineExperience: Finding = {
   id: 'routine-experience', kind: 'routine_experience_caution', applicability: 'applicable', severity: 'caution', confidence: 'supported',
   ruleId: 'fixture:routine-experience', ruleVersion: '1', evidence: [routineContext,
@@ -108,6 +117,9 @@ export const personalDecisionFixtures: PersonalDecisionFixture[] = [
   fixture('redundancy', { findings: [role, redundancy],
     routineImpacts: [{ id: 'duplicate-impact', kind: 'duplicates_role', candidate: { productId: binding.productId, variantId: binding.variantId, formulaVersionId: binding.formulaVersionId }, routineItemIds: ['routine-item:1'], findingIds: ['redundant-role'], uncertainty: [] }],
     action: { kind: 'KEEP_CURRENT', findingIds: ['redundant-role'], primaryFindingId: 'redundant-role', nextStep: 'keep_current' } }),
+  fixture('routine-formula-overlap', { findings: [role, routineFormulaOverlap],
+    routineImpacts: [{ id: 'overlap-impact', kind: 'active_overlap', candidate: { productId: binding.productId, variantId: binding.variantId, formulaVersionId: binding.formulaVersionId }, routineItemIds: ['routine-item:1'], findingIds: ['routine-formula-overlap'], uncertainty: ['Routine category is unknown.'] }],
+    action: { kind: 'USE_WITH_CAUTION', findingIds: ['routine-formula-overlap'], primaryFindingId: 'routine-formula-overlap', nextStep: 'review_routine' } }),
   fixture('routine-experience', { findings: [role, redundancy, routineExperience],
     action: { kind: 'USE_WITH_CAUTION', findingIds: ['routine-experience', 'redundant-role'], primaryFindingId: 'routine-experience', nextStep: 'review_routine' } }),
   fixture('caution', { findings: [role, caution],

@@ -214,7 +214,7 @@ export function validatePersonalDecisionPacket(
         && e.recordId === display.historyEventId)) issues.add('display_evidence_scope');
       if (display.kind === 'routine_relation' && (!hasContext('routine') || !display.routineItemIds.length
         || display.routineItemIds.some((id) => !cited.some((e) => e.kind === 'context_fact' && e.section === 'routine' && e.recordId === id)
-          || !cited.some((e) => e.kind === 'routine_product_fact' && e.scope === 'category' && e.routineItemId === id)))) {
+          || !cited.some((e) => e.kind === 'routine_product_fact' && e.scope === (finding.kind === 'active_overlap' ? 'formula' : 'category') && e.routineItemId === id)))) {
         issues.add('display_evidence_scope');
       }
       if (display.kind === 'routine_experience' && (!display.routineItemIds.length

@@ -135,3 +135,26 @@ test('P0-B routine experience caution cites the exact existing item and history 
   packet.findings[0].display!.evidenceIndexes = [0];
   assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_scope'));
 });
+
+test('P0-B exact routine formula overlap survives unknown routine category without category promotion', () => {
+  const { packet, binding } = clone(personalDecisionFixtures.find((f) => f.id === 'redundancy')!);
+  const overlap = packet.findings.find((finding) => finding.kind === 'role_redundancy')!;
+  overlap.kind = 'active_overlap';
+  overlap.severity = 'caution';
+  overlap.display = { kind: 'routine_relation', routineItemIds: ['routine-item:1'], role: 'unknown', timing: 'unknown', frequency: 'unknown', evidenceIndexes: [0, 1, 2] };
+  const candidateEvidence = overlap.evidence[0];
+  if (candidateEvidence.kind === 'product_fact') {
+    candidateEvidence.scope = 'formula'; candidateEvidence.formulaVersionId = binding.formulaVersionId;
+  }
+  const routineEvidence = overlap.evidence[2];
+  if (routineEvidence.kind === 'routine_product_fact') {
+    routineEvidence.scope = 'formula'; routineEvidence.variantId = 'existing-variant:1'; routineEvidence.formulaVersionId = 'existing-formula:1';
+  }
+  packet.routineImpacts = [];
+  packet.action = { kind: 'USE_WITH_CAUTION', findingIds: [overlap.id], primaryFindingId: overlap.id, nextStep: 'review_routine' };
+  assert.deepEqual(validatePersonalDecisionPacket(packet, binding), []);
+  overlap.kind = 'role_redundancy';
+  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_scope'));
+  overlap.kind = 'replacement_candidate';
+  assert.ok(validatePersonalDecisionPacket(packet, binding).includes('display_evidence_scope'));
+});
