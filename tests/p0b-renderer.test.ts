@@ -118,3 +118,34 @@ test('P0-B renderer uses sourced routine role and preserves qualitative frequenc
   assert.doesNotMatch(view.primaryReason, /three|3|better/i);
   assert.ok(view.routineImpacts.some((text) => /duplicate/i.test(text)));
 });
+
+test('P0-B renderer does not assert an unknown routine is incomplete', () => {
+  const { packet, binding } = fixture('partial-routine');
+  const view = describePersonalDecision(packet, binding);
+  assert.equal(view.kind, 'ready');
+  if (view.kind !== 'ready') return;
+  assert.match(view.primaryReason, /do not have your complete routine/i);
+  assert.doesNotMatch(JSON.stringify(view), /your routine is incomplete/i);
+});
+
+test('P0-B renderer deduplicates specific unknowns and omits unresolved-support filler', () => {
+  const { packet, binding } = fixture('missing-formula');
+  packet.evidenceNeeds.push({ ...packet.evidenceNeeds.find((need) => need.code === 'verified_formula')!, id: 'formula-duplicate', critical: false });
+  const view = describePersonalDecision(packet, binding);
+  assert.equal(view.kind, 'ready');
+  if (view.kind !== 'ready') return;
+  assert.equal(view.unknowns.filter((unknown) => /exact formula has not been verified/i.test(unknown.text)).length, 1);
+  assert.ok(view.unknowns.find((unknown) => /exact formula has not been verified/i.test(unknown.text))!.critical);
+  assert.doesNotMatch(JSON.stringify(view.unknowns), /retained finding|unresolved support/i);
+});
+
+test('P0-B renderer expresses evidence limitations without developer claim or rule terms', () => {
+  const { packet, binding } = fixture('missing-formula');
+  packet.evidenceNeeds.find((need) => need.code === 'verified_formula')!.code = 'reviewed_claim';
+  packet.evidenceNeeds.push({ id: 'rule-gap', code: 'supported_rule', state: 'missing', critical: true, findingIds: ['missing-formula'] });
+  const view = describePersonalDecision(packet, binding);
+  assert.equal(view.kind, 'ready');
+  if (view.kind !== 'ready') return;
+  assert.doesNotMatch(JSON.stringify(view.unknowns), /applicable claim|supported.*rule/i);
+  assert.ok(view.unknowns.some((unknown) => /reviewed evidence.*situation/i.test(unknown.text)));
+});

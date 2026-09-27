@@ -33,13 +33,13 @@ const roles: Record<string, string> = {
 const needs: Record<EvidenceNeedCode, string> = {
   exact_identity: 'The exact product and variant need confirmation.',
   verified_formula: 'The exact formula has not been verified.', formula_conflict: 'Formula evidence conflicts.',
-  profile_context: 'Relevant personal context is missing.', routine_completeness: 'Your routine is incomplete; an absent product does not mean you do not use it.',
+  profile_context: 'Relevant personal context is missing.', routine_completeness: 'We do not have your complete routine; an absent product does not mean you do not use it.',
   application_schedule: 'Your application schedule is unknown.', current_treatments: 'Relevant current-treatment context is missing.',
   sensitivity_context: 'Relevant sensitivity context is unknown.', ingredient_alias_review: 'The reported ingredient name needs review.',
   reproductive_context: 'Relevant reproductive context has not been provided.', individual_tolerance: 'Individual tolerance is unknown.',
   exact_prior_formula: 'The formula used in your earlier experience is unconfirmed.',
   current_formula_experience: 'Earlier experience does not establish tolerance of the current formula.',
-  reviewed_claim: 'A reviewed applicable claim is missing.', supported_rule: 'No supported personal decision rule applies.',
+  reviewed_claim: 'There is not enough reviewed evidence for your situation.', supported_rule: 'The available evidence does not support personal advice for your situation.',
   clinician_review: 'Individual advice from a qualified professional is needed.',
 };
 const timing: Record<Extract<FindingDisplayFacts, { kind: 'routine_relation' }>['timing'], string> = {
@@ -157,14 +157,16 @@ export function describePersonalDecision(value: unknown, expectedBinding: Decisi
     secondaryCautions: [...new Set(active.filter((finding) => finding.id !== packet.action.primaryFindingId
       && finding.severity !== 'informational' && finding.confidence !== 'unknown').map((finding) => reasons.get(finding.id)!))],
     routineImpacts: [...new Set(packet.routineImpacts.map((impact) => impactCopy[impact.kind]))],
-    unknowns: [
+    unknowns: deduplicateUnknowns([
       ...[...critical, ...other].map((need) => ({ text: needText(need), critical: need.critical })),
-      ...active.filter((finding) => finding.confidence !== 'supported' || finding.applicability === 'uncertain').map((finding) => ({
-        text: finding.confidence === 'limited' ? 'Support for a retained finding is limited.'
-          : finding.confidence === 'unknown' ? 'A retained finding has unresolved support.' : 'A retained finding may not apply to this decision.',
+      ...active.filter((finding) => (finding.confidence !== 'supported' || finding.applicability === 'uncertain')
+        && !(finding.kind === 'missing_evidence'
+          && finding.evidenceNeedIds.some((id) => packet.evidenceNeeds.some((need) => need.id === id)))).map((finding) => ({
+        text: finding.confidence === 'limited' ? 'Some evidence for this advice is limited.'
+          : finding.confidence === 'unknown' ? 'Some evidence for this advice is unresolved.' : 'This advice may not apply to your situation.',
         critical: finding.severity === 'blocker',
       })),
-    ],
+    ]),
     nextStep: packet.action.nextStep, nextStepLabel: nextSteps[packet.action.nextStep],
     details: active.map((finding) => ({ reason: reasons.get(finding.id)!, evidence: evidenceCopy(finding) })),
     versions: { engine: safeVersion(packet.versions.engine), policy: safeVersion(packet.versions.policy) },
@@ -172,4 +174,13 @@ export function describePersonalDecision(value: unknown, expectedBinding: Decisi
 }
 function safeVersion(value: string): string {
   return /^[a-zA-Z0-9._/-]{1,80}$/.test(value) ? value : 'Recorded';
+}
+
+function deduplicateUnknowns(items: Array<{ text: string; critical: boolean }>): Array<{ text: string; critical: boolean }> {
+  const unique = new Map<string, { text: string; critical: boolean }>();
+  for (const item of items) {
+    const existing = unique.get(item.text);
+    unique.set(item.text, { text: item.text, critical: item.critical || existing?.critical === true });
+  }
+  return [...unique.values()];
 }

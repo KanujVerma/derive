@@ -23,8 +23,10 @@ export function PersonalDecisionPanel({ packet, expectedBinding, onNextStep }: P
       <Text style={styles.body}>{view.message}</Text>
     </View>;
   }
-  const criticalUnknowns = view.unknowns.filter((unknown) => unknown.critical);
-  const otherUnknowns = view.unknowns.filter((unknown) => !unknown.critical);
+  // A specific unknown stated as the primary reason is already visible, including blockers.
+  const additionalUnknowns = view.unknowns.filter((unknown) => unknown.text !== view.primaryReason);
+  const criticalUnknowns = additionalUnknowns.filter((unknown) => unknown.critical);
+  const otherUnknowns = additionalUnknowns.filter((unknown) => !unknown.critical);
   // Every blocker remains expanded. Additional non-critical detail uses the disclosure.
   const visibleUnknowns = [...criticalUnknowns, ...otherUnknowns.slice(0, 1)];
   return <View style={styles.panel} accessibilityLiveRegion="polite">
