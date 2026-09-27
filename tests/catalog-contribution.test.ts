@@ -112,9 +112,16 @@ test('dedupe unifies padded representations of the same GTIN without making it t
 
 test('region, variant and size remain separate, and missing context is not a wildcard', () => {
   const variants = [{}, { region: 'US' }, { region: 'CA' }, { variant: 'SPF 30' }, { variant: 'SPF 50' },
-    { packageSize: '50 mL' }, { packageSize: '50 g' }, { packageSize: '1.7 fl oz' }];
+    { packageSize: '50 mL' }, { packageSize: '50 ML' }, { packageSize: '50 g' }, { packageSize: '1.7 fl oz' }];
   const keys = variants.map((fields) => contributionCandidateKey(parseCatalogContribution(proposal({ gtin: '036000291452', ...fields }))));
   assert.equal(new Set(keys).size, keys.length);
+});
+
+test('evidence input ordering does not make unchanged owner/request replay conflict', () => {
+  const evidence = [{ evidenceId: EVIDENCE, role: 'front_label' }, { evidenceId: REQUEST, role: 'ingredients' }];
+  const results = prioritizeContributionDemand([{ authenticatedOwnerId: OWNER_A, request: proposal({}, { evidence }) },
+    { authenticatedOwnerId: OWNER_A, request: proposal({}, { evidence: [...evidence].reverse() }) }]);
+  assert.equal(results[0]!.uniqueContributors, 1);
 });
 
 test('label-only dedupe preserves multilingual labels, punctuation and decimal/strength distinctions', () => {

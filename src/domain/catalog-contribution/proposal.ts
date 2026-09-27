@@ -98,7 +98,7 @@ export function parseCatalogContribution(raw: unknown): CatalogContributionReque
       if (typeof entry.role !== 'string' || !ROLES.has(entry.role) || ids.has(evidenceId) || roles.has(entry.role)) return fail();
       ids.add(evidenceId); roles.add(entry.role);
       return Object.freeze({ evidenceId, role: entry.role as 'front_label' | 'ingredients' | 'packaging' });
-    });
+    }).sort((left, right) => left.role < right.role ? -1 : left.role > right.role ? 1 : 0);
   }
   return Object.freeze({ version: 1, intent: 'help_add_product', requestId: uuid(row.requestId),
     product: Object.freeze(product), ...(evidence === undefined ? {} : { evidence: Object.freeze(evidence) }) });
@@ -112,7 +112,7 @@ export function contributionCandidateKey(request: CatalogContributionRequest): s
   const item = checked.product;
   return JSON.stringify(['catalog-proposal-v1', item.gtin ? ['gtin', item.gtin.padStart(14, '0')]
     : ['label', normalized(item.brand), normalized(item.name)], normalized(item.region),
-  normalized(item.variant), normalized(item.packageSize)]);
+  normalized(item.variant), item.packageSize ?? null]);
 }
 
 export interface CatalogContributionDemand {

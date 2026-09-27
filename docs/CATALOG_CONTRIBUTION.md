@@ -47,7 +47,8 @@ This pure validator does not prove any of those runtime conditions.
   under that key becomes a review conflict, never a vote for the most popular name.
 - Region, variant and package size remain separate key dimensions. Unanswered context is
   not a wildcard. Text-only keys preserve Unicode, decimals, punctuation and units; only
-  case, compatibility Unicode and repeated whitespace normalize. Do not guess size
+  label case, compatibility Unicode and repeated whitespace normalize; package-size unit
+  case remains intact. Do not guess size
   equivalence or transliterations. The resulting conservative under-merges are safer than
   silently combining distinct variants; authoritative review may connect candidates later.
 - A candidate group is not an exact package/formula identity. GTINs may survive reformulation.
@@ -56,6 +57,8 @@ This pure validator does not prove any of those runtime conditions.
   Anonymous identities are not verified distinct people. Account farming remains a P0-C abuse
   concern; do not market the count as distinct-human validation.
 - Same owner/retry UUID with changed normalized payload fails with `IDEMPOTENCY_CONFLICT`.
+  Evidence ordering is canonicalized by role, so merely reordering identical references
+  does not conflict.
   The reducer is a bounded batch (maximum 5,000 records), not a scalable storage/query engine.
   Future persistence needs atomic uniqueness and indexed aggregation, not loading the entire
   submission history into memory. Over-limit input fails rather than silently truncating.
