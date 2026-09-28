@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 const status = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], {
   encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
 }));
-assert.equal(status.API_URL, 'http://127.0.0.1:54321', 'Refuse non-local Supabase');
+assert.equal(new URL(status.API_URL).hostname, '127.0.0.1', 'Refuse non-local Supabase');
 const makeClient = (key) => createClient(status.API_URL, key, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
@@ -22,6 +22,8 @@ const invoke = async (client, name, body) => {
 };
 let firstId, secondId, productId;
 const uploaded = [];
+let unusedGrantedPath;
+let otherUploadedPath;
 
 try {
   const a = await first.auth.signInAnonymously();
@@ -106,13 +108,28 @@ try {
   })).status, 409, 'free Scan must not replay an earlier Shelf case');
 
   for (let i = 0; i < 5; i++) {
-    assert.ifError((await invoke(first, 'prepare-free-product-evidence', {
+    const granted = await invoke(first, 'prepare-free-product-evidence', {
       requestId: randomUUID(), role: 'ingredients', mimeType: 'image/png',
-    })).error);
+    });
+    assert.ifError(granted.error);
+    if (i === 0) unusedGrantedPath = granted.data.storagePath;
   }
   assert.equal((await invoke(first, 'prepare-free-product-evidence', {
     requestId: randomUUID(), role: 'packaging', mimeType: 'image/png',
   })).status, 429);
+  const deletionFence = await admin.rpc('begin_customer_account_deletion', { p_user_id: firstId });
+  assert.ifError(deletionFence.error);
+  assert.equal(deletionFence.data, true);
+  assert.ok((await first.storage.from(bucket).upload(unusedGrantedPath, png,
+    { contentType: 'image/png', upsert: false })).error,
+  'a previously issued grant cannot upload after deletion begins');
+  const otherGrant = await invoke(second, 'prepare-free-product-evidence', {
+    requestId: randomUUID(), role: 'front_label', mimeType: 'image/png',
+  });
+  assert.ifError(otherGrant.error);
+  assert.ifError((await second.storage.from(bucket).upload(otherGrant.data.storagePath, png,
+    { contentType: 'image/png', upsert: false })).error);
+  otherUploadedPath = otherGrant.data.storagePath;
   const deleteResult = await invoke(first, 'delete-customer-account', { confirmation: 'DELETE_MY_DERIVE_ACCOUNT' });
   assert.ifError(deleteResult.error);
   assert.deepEqual((await admin.from('free_product_evidence_grants').select('id').eq('user_id', firstId)).data, []);
@@ -126,6 +143,7 @@ try {
     if (uploaded.length) await admin.storage.from(bucket).remove(uploaded);
     await admin.auth.admin.deleteUser(firstId);
   }
+  if (otherUploadedPath) await admin.storage.from(bucket).remove([otherUploadedPath]);
   if (secondId) await admin.auth.admin.deleteUser(secondId);
   if (productId) await admin.from('products').delete().eq('id', productId);
 }
