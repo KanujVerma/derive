@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { CatalogProductSummary } from '../../contracts/ProductCatalog';
 import { searchCatalogProducts } from '../../services/productCatalog';
 import { colors, radii, spacing, typography } from '../../constants/theme';
+import { catalogImagePresentation } from '../../presentation/check/result-sheet/model';
+import { Icon } from '../ui/Icon';
 
 interface Props {
   onSelect: (product: CatalogProductSummary) => void;
@@ -83,6 +85,7 @@ export function CatalogProductSearch({
       )}
       {!loading && !error && results.query === query.trim() && results.items.map((item) => {
         const alreadyAdded = selectedIds.includes(item.productId);
+        const image = catalogImagePresentation(item.imageUrl);
         return (
           <TouchableOpacity
             key={item.productId}
@@ -93,6 +96,11 @@ export function CatalogProductSearch({
             accessibilityLabel={`${actionLabel} ${item.brand} ${item.name}`}
             accessibilityState={{ disabled: alreadyAdded }}
           >
+            <View style={styles.thumbnail} accessible accessibilityLabel={image.kind === 'catalog' ? image.label : 'No product image available'}>
+              {image.kind === 'catalog'
+                ? <Image source={{ uri: image.uri }} style={styles.thumbnailImage} resizeMode="contain" />
+                : <Icon name="bottle" size={24} color={colors.brand} />}
+            </View>
             <View style={styles.resultCopy}>
               <Text style={styles.brand}>{item.brand}</Text>
               <Text style={styles.name}>{item.name}</Text>
@@ -112,7 +120,9 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, color: colors.ink, backgroundColor: colors.canvas },
   helper: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: 19 },
   status: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  result: { minHeight: 62, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.borderSubtle, paddingVertical: spacing.sm, gap: spacing.sm },
+  result: { minHeight: 72, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.borderSubtle, paddingVertical: spacing.sm, gap: spacing.sm },
+  thumbnail: { width: 56, height: 56, borderRadius: radii.md, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  thumbnailImage: { width: 56, height: 56 },
   resultCopy: { flex: 1 },
   brand: { color: colors.inkMuted, fontSize: typography.sizes.caption },
   name: { color: colors.ink, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold },
