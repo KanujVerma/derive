@@ -42,7 +42,7 @@ export function buildTierLadderView(input: TierLadderInput): TierLadderView {
       {
         id: 'managed', name: 'Managed Skincare', summary: 'A routine managed for you',
         detail: 'A routine built and adjusted over time using check-ins.',
-        status: 'Early Access',
+        status: input.managedInterestEnabled ? 'Early Access' : 'Coming later',
       },
     ],
     managedInterestAction: input.managedInterestEnabled

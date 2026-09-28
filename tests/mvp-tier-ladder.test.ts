@@ -14,7 +14,7 @@ test('tier ladder explains Free, Plus, and Managed without reducing Free Check q
   assert.equal(view.tiers[0].status, 'Free');
   assert.equal(view.tiers[1].status, 'In development');
   assert.match(view.tiers[1].detail, /compare products/i);
-  assert.equal(view.tiers[2].status, 'Early Access');
+  assert.equal(view.tiers[2].status, 'Coming later');
   assert.match(view.tiers[2].detail, /routine.*over time/i);
   assert.equal(view.managedInterestAction, null);
 });
@@ -23,6 +23,8 @@ test('Managed interest is offered only with an enabled, host-owned intent path',
   const preview = buildTierLadderView(tierLadderFixtures.preview);
   const open = buildTierLadderView(tierLadderFixtures.managedInterestOpen);
   assert.equal(preview.managedInterestAction, null);
+  assert.equal(preview.tiers[2].status, 'Coming later');
+  assert.equal(open.tiers[2].status, 'Early Access');
   assert.deepEqual(open.managedInterestAction, {
     event: 'managed_interest', properties: { source: 'plan' }, label: "I'm interested",
   });
