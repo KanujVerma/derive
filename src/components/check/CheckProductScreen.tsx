@@ -44,6 +44,8 @@ import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { CheckCaptureHost } from '@/src/components/check/capture/CheckCaptureHost';
+import { ScanResultSheet } from '@/src/components/check/result-sheet/ScanResultSheet';
+import { cameraCompanionSheet, cameraResultNeedsExistingPage } from '@/src/presentation/check/result-sheet/cameraCompanion';
 import type { CheckCaptureHandoff } from '@/src/presentation/capture/checkCaptureAdapter';
 import type { CaptureRole } from '@/src/presentation/capture/productEvidence';
 import { PersonalFitSection } from '@/src/components/personalization/PersonalFitSection';
@@ -110,6 +112,10 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(!targetShell);
   const [captureRole, setCaptureRole] = useState<CaptureRole | null>(null);
+  const [cameraAwaitingResult, setCameraAwaitingResult] = useState(false);
+  const [cameraScanId, setCameraScanId] = useState('');
+  const [cameraSessionKey, setCameraSessionKey] = useState(0);
+  const [detectionPaused, setDetectionPaused] = useState(false);
   const [captureEvidence, setCaptureEvidence] = useState<CheckCaptureHandoff | null>(null);
   const [catalogDetail, setCatalogDetail] = useState<CatalogProductDetail | null>(null);
   const [resolution, setResolution] = useState<ProductResolutionResult | null>(null);
@@ -268,6 +274,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const openCapture = (role: CaptureRole) => {
     pendingResolutionRef.current = null;
     lastTypedNameRef.current = null;
+    setCameraAwaitingResult(false);
+    setDetectionPaused(false);
     setCaptureRole(role);
     setCaptureEvidence(null);
     setUnknownBarcode(null);
@@ -408,7 +416,14 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
 
   const handleCaptureReady = (handoff: CheckCaptureHandoff) => {
     lastTypedNameRef.current = null;
-    setCaptureRole(null);
+    const keepCamera = targetShell && (Boolean(handoff.barcodeLookup) || Boolean(handoff.resolvedCase?.truthSnapshot));
+    if (keepCamera) {
+      setCameraAwaitingResult(true);
+      setCameraScanId(createCatalogRequestId());
+    } else {
+      setCameraAwaitingResult(false);
+      setCaptureRole(null);
+    }
     if (handoff.barcodeLookup) {
       if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('barcode');
       setCaptureEvidence(null);
@@ -429,6 +444,16 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       setEvaluationError(null);
     }
   };
+
+  useEffect(() => {
+    if (!cameraResultNeedsExistingPage({
+      awaiting: cameraAwaitingResult, checking: isCheckingProduct, ownerId: liveCheckOwner,
+      scanId: cameraScanId, error: evaluationError, resolution, catalogProduct: catalogDetail,
+    })) return;
+    setCameraAwaitingResult(false);
+    setDetectionPaused(false);
+    setCaptureRole(null);
+  }, [cameraAwaitingResult, isCheckingProduct, liveCheckOwner, cameraScanId, evaluationError, resolution, catalogDetail]);
 
   const handleBarcodeScanned = (scanningResult: BarcodeScanningResult) => {
     if (isScanningLockedRef.current) return;
@@ -663,14 +688,46 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   }
 
   if (targetShell && captureRole) {
+    const companion = cameraCompanionSheet({
+      awaiting: cameraAwaitingResult, checking: isCheckingProduct, ownerId: liveCheckOwner,
+      scanId: cameraScanId, error: evaluationError, resolution, catalogProduct: catalogDetail,
+    });
     return (
       <View style={styles.container}>
         <CheckCaptureHost
-          key={captureRole}
+          key={`${captureRole}:${cameraSessionKey}`}
           initialRole={captureRole}
           live={integrated}
-          onClose={() => setCaptureRole(null)}
+          detectionPaused={detectionPaused}
           onCaptureReady={handleCaptureReady}
+          onClose={() => { setCameraAwaitingResult(false); setDetectionPaused(false); setCaptureRole(null); }}
+          companion={companion && (
+            <ScanResultSheet
+              model={companion}
+              currentOwnerId={liveCheckOwner}
+              currentSnapshot={resolution?.truthSnapshot ?? null}
+              currentResolverResult={resolution}
+              currentScanId={cameraScanId}
+              onDetectionPausedChange={setDetectionPaused}
+              onDismiss={() => {
+                setCameraAwaitingResult(false);
+                setDetectionPaused(false);
+                setResolution(null);
+                setEvaluationError(null);
+                setCatalogDetail(null);
+                setUnknownBarcode(null);
+                setCaptureEvidence(null);
+                setCandidates([]);
+                setConfirmedProduct(null);
+                setCameraSessionKey((value) => value + 1);
+              }}
+              onOpenDetails={() => {
+                setCameraAwaitingResult(false);
+                setDetectionPaused(false);
+                setCaptureRole(null);
+              }}
+            />
+          )}
         />
       </View>
     );
