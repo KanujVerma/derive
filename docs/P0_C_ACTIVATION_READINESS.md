@@ -56,6 +56,26 @@ anonymous setting never implies the hosted setting. Every hosted gate stays
 intentionally exits **2** and reports activation **BLOCKED**, even if every local
 shape is present. It is an inventory aid, not a release authority or enable switch.
 
+### Exact-project function-name readback (2026-09-27)
+
+Run `node scripts/readback-hosted-function-inventory.mjs` from the repository root
+with an authenticated Supabase CLI. This second, read-only check compares the
+committed `HEAD` function entrypoints with the names returned by `supabase
+functions list --project-ref snojlbqovlawewwqbviz --output json`. The project
+reference is fixed in the script. It prints only the source revision, counts and
+function names; raw CLI output/errors, credentials and customer data are not
+printed. Missing, malformed or duplicate inventories fail closed with exit 2.
+Name parity exits 0 for this **one inventory only**, but activation still reports
+`BLOCKED`: names cannot prove deployed code revisions, configuration, JWT
+enforcement, migrations, Auth settings, RLS or physical acceptance.
+
+At source `3e641c550058e13fe1fe64adc31dbe67a64d0e10`, the exact hosted project
+reported **15** functions versus **21** committed entrypoints. Six were missing
+hosted: `access-state`, `free-context`, `free-personal-fit`, `personal-context`,
+`personal-decision` and `prepare-free-product-evidence`; there were no unexpected
+hosted names. This is a point-in-time name inventory, not a deployment request
+or a full hosted migration/function revision readback. No hosted change was made.
+
 ## Required reviewed evidence before activation
 
 Record revision, project, date, reviewer, sanitized artifact reference and actual
