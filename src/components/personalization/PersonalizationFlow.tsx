@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, borderRadius: 8, color: colors.ink,
     backgroundColor: colors.surface, textAlignVertical: 'top' },
   error: { color: colors.actionStop.text, marginTop: spacing.md, fontSize: typography.sizes.bodyRegular },
-  footer: { paddingHorizontal: layout.gutter, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.hairline },
+  footer: { paddingHorizontal: layout.gutter, paddingTop: spacing.sm },
   skipStep: { minHeight: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs },
   skipText: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular },
 });
