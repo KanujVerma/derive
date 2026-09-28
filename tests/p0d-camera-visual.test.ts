@@ -37,20 +37,21 @@ test('capture and recovery controls stay accessible and scroll clear of the foot
   assert.match(capture, /minWidth: layout\.minTouchTarget, minHeight: layout\.minTouchTarget/);
   assert.match(capture, /<ScrollView style=\{styles\.controlScroll\}/);
   assert.match(capture, /paddingBottom: Math\.max\(insets\.bottom, spacing\.md\)/);
-  for (const label of ['Capture options', 'Retake', 'Use photo', 'Review evidence']) {
+  for (const label of ['Capture options', 'Retake', 'Use photo', 'Check product']) {
     assert.ok(capture.includes(label), `missing ${label}`);
   }
 });
 
 test('default Auto keeps one visible shutter while the five modes open in a compact vertical popover', () => {
-  assert.match(capture, /\(showCorrection \|\| previewUri\) && <CameraGlass style=\{styles\.modeMenu\}>/);
+  assert.match(capture, /\(showCorrection \|\| \(previewUri && !previewRole\)\) && <CameraGlass style=\{styles\.modeMenu\}>/);
+  assert.match(capture, /accessibilityLabel="Change part"/);
   assert.match(capture, /roleRow: \{[^\n]*flexDirection: 'column'/);
   assert.match(capture, /roleChip: \{[^\n]*minHeight: layout\.minTouchTarget/);
   assert.match(capture, /selected && <Icon name="check"/);
   assert.match(capture, /!previewUri && !currentEvidence && <View style=\{\[styles\.selectorSlot/);
   assert.match(capture, /LayoutAnimation\.configureNext\(\{ duration: 180/);
   assert.match(capture, /intent !== 'auto' && <CameraGlass style=\{styles\.guidancePill\}>/);
-  assert.match(capture, /session\.evidence\.length > 0 && <Action label="Review evidence"/);
+  assert.match(capture, /session\.evidence\.length > 0 && <Action label="Check product"/);
   assert.doesNotMatch(capture, /<View style=\{styles\.panel\}>/);
 });
 

@@ -42,6 +42,11 @@ export function createCaptureSession(): CaptureSession {
   return { phase: 'collecting', evidence: [], candidates: [] };
 }
 
+export function nextPhotoRole(session: CaptureSession): PhotoRole | null {
+  return (captureRoles.filter((role): role is PhotoRole => role !== 'barcode')
+    .find((role) => !session.evidence.some((item) => item.role === role))) ?? null;
+}
+
 function replaceEvidence(session: CaptureSession, evidence: CaptureEvidence): CaptureSession {
   const next = session.evidence.filter((item) => item.role !== evidence.role).concat(evidence);
   return { ...createCaptureSession(), evidence: captureRoles.flatMap((role) => next.filter((item) => item.role === role)) };
