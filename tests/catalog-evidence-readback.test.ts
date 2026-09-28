@@ -7,13 +7,11 @@ import {
 const revision = 'a'.repeat(40);
 const observedAt = '2026-09-28T12:00:00.000Z';
 const counts = {
-  total_products: 4,
   sourced_products: 1,
-  not_sourced_products: 3,
   sourced_aliases: 1,
   active_sourced_variants: 0,
   verified_sourced_variants: 0,
-  verified_authoritative_gtins: 0,
+  verified_authoritative_gtin_assertions: 0,
   verified_formula_versions: 0,
   uniquely_linked_formula_variants: 0,
   conflicting_formula_variants: 0,
@@ -31,7 +29,7 @@ test('catalog evidence readback fails closed on truncated, inconsistent or coerc
   const input = { target: 'local', sourceRevision: revision, observedAt };
   assert.throws(() => catalogEvidenceReceipt({ ...input, row: { ...counts, sourced_aliases: undefined } }));
   assert.throws(() => catalogEvidenceReceipt({ ...input, row: { ...counts, sourced_products: '1' } }));
-  assert.throws(() => catalogEvidenceReceipt({ ...input, row: { ...counts, sourced_products: 2 } }));
+  assert.throws(() => catalogEvidenceReceipt({ ...input, row: { ...counts, sourced_products: -1 } }));
   assert.throws(() => catalogEvidenceReceipt({ ...input, row: { ...counts, uniquely_linked_formula_variants: 2, active_sourced_variants: 1 } }));
   assert.throws(() => catalogEvidenceReceipt({ ...input, row: counts, sourceRevision: 'working-tree' }));
 });

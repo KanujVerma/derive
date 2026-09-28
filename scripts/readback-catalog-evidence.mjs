@@ -10,8 +10,8 @@ import { pathToFileURL } from 'node:url';
 const exec = promisify(execFile);
 export const PROJECT_REF = 'snojlbqovlawewwqbviz';
 const COUNT_FIELDS = [
-  'total_products', 'sourced_products', 'not_sourced_products', 'sourced_aliases',
-  'active_sourced_variants', 'verified_sourced_variants', 'verified_authoritative_gtins',
+  'sourced_products', 'sourced_aliases',
+  'active_sourced_variants', 'verified_sourced_variants', 'verified_authoritative_gtin_assertions',
   'verified_formula_versions', 'uniquely_linked_formula_variants', 'conflicting_formula_variants',
 ];
 
@@ -39,15 +39,13 @@ with sourced as (
   group by i.variant_id
 )
 select
-  (select count(*) from public.products)::integer as total_products,
   (select count(*) from sourced)::integer as sourced_products,
-  (select count(*) from public.products where not (is_catalog_standard is true and catalog_verified_at is not null))::integer as not_sourced_products,
   (select count(*) from public.product_search_aliases a join sourced p on p.id = a.product_id)::integer as sourced_aliases,
   (select count(*) from active_variants)::integer as active_sourced_variants,
   (select count(*) from active_variants where catalog_verification_status = 'verified')::integer as verified_sourced_variants,
   (select count(*) from public.product_identifiers i join active_variants v on v.id = i.variant_id
     where i.verified_at is not null and i.source_authority in ('manufacturer', 'gs1', 'founder')
-      and i.identifier_type in ('gtin_8', 'gtin_12', 'gtin_13', 'gtin_14'))::integer as verified_authoritative_gtins,
+      and i.identifier_type in ('gtin_8', 'gtin_12', 'gtin_13', 'gtin_14'))::integer as verified_authoritative_gtin_assertions,
   (select count(*) from public.product_formula_versions f join active_variants v on v.id = f.variant_id
     where f.verification_status = 'verified'
       and f.provenance_type in ('manufacturer', 'package_label', 'regulator', 'founder_review'))::integer as verified_formula_versions,
@@ -68,8 +66,7 @@ export function catalogEvidenceReceipt({ row, target, sourceRevision, observedAt
     || COUNT_FIELDS.some((field) => !nonnegativeInteger(row[field]))) {
     throw new Error('INVALID_CATALOG_EVIDENCE_READBACK');
   }
-  if (row.sourced_products + row.not_sourced_products !== row.total_products
-    || row.verified_sourced_variants > row.active_sourced_variants
+  if (row.verified_sourced_variants > row.active_sourced_variants
     || row.uniquely_linked_formula_variants + row.conflicting_formula_variants > row.active_sourced_variants) {
     throw new Error('INCONSISTENT_CATALOG_EVIDENCE_READBACK');
   }
