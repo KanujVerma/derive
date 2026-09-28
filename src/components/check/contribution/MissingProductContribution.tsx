@@ -24,6 +24,8 @@ export interface MissingProductContributionProps {
   contextKey: string;
   availability: ContributionAvailability;
   initial?: Partial<ContributionDraft>;
+  /** The Check screen already supplies its horizontal content inset. */
+  embedded?: boolean;
   onTryAnotherWay: () => void;
 }
 
@@ -32,7 +34,7 @@ export function MissingProductContribution({ contextKey, ...props }: MissingProd
   return <ContributionBody key={contextKey} {...props} />;
 }
 
-function ContributionBody({ availability, initial, onTryAnotherWay }:
+function ContributionBody({ availability, initial, embedded, onTryAnotherWay }:
   Omit<MissingProductContributionProps, 'contextKey'>) {
   const [draft, setDraft] = useState(() => createContributionDraft(initial));
   const [editing, setEditing] = useState(false);
@@ -60,7 +62,7 @@ function ContributionBody({ availability, initial, onTryAnotherWay }:
   };
 
   if (!editing || !view.canPrepareRequest) return (
-    <View style={styles.container}>
+    <View style={[styles.container, embedded && styles.embedded]}>
       <Text style={styles.heading}>We couldn’t find this product.</Text>
       <Text style={styles.body}>{view.explanation}</Text>
       {view.primaryAction === 'help_add_product' ? (
@@ -72,7 +74,7 @@ function ContributionBody({ availability, initial, onTryAnotherWay }:
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, embedded && styles.embedded]}>
       <Text style={styles.heading}>Help add this product</Text>
       <Text style={styles.body}>{view.explanation}</Text>
       <TextField label="Brand" value={draft.brand} onChangeText={(value) => update('brand', value)} error={errors.brand} />
@@ -106,6 +108,7 @@ function ContributionBody({ availability, initial, onTryAnotherWay }:
 
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, backgroundColor: colors.canvas },
+  embedded: { paddingHorizontal: 0 },
   heading: { color: colors.ink, fontSize: typography.sizes.sectionTitle,
     lineHeight: typography.lineHeights.sectionTitle, fontWeight: typography.weights.semibold,
     marginBottom: spacing.sm },
