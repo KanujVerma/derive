@@ -877,7 +877,9 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
                   )}
                 </View>
               </GroupedSection>
-              {personalTarget ? renderDecisionPanel() : <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />}
+              <View style={styles.resultSectionSpacing}>
+                {personalTarget ? renderDecisionPanel() : <PersonalFitSection state={personalFitState} onPersonalize={openPersonalization} />}
+              </View>
 
             </>
           ) : (
@@ -1331,6 +1333,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
   },
+  resultSectionSpacing: { marginBottom: spacing.lg },
   entryContent: {
     paddingHorizontal: layout.gutter,
     paddingTop: spacing.xxl,
