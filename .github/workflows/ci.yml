@@ -96,6 +96,9 @@ jobs:
       - name: Run S-PAID-1 manual routine fallback integration harness
         run: node scripts/test-s-paid-1-local.mjs
 
+      - name: Run explicit catalog contribution integration harness
+        run: node scripts/test-catalog-contribution-local.mjs
+
       - name: Run S5 membership commerce integration harness
         run: node scripts/test-s5-local.mjs
 
