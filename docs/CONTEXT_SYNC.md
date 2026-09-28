@@ -13,6 +13,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 - **Founder decisions:** first scanner-first beta is free-only, without $4.99 checkout or Managed purchase activation. During this temporary closed beta, guest data remains until the customer deletes it; no automatic inactivity cleanup. Customer-requested Storage-first deletion remains mandatory. Neither decision authorizes indefinite retention or hosted guest activation.
 - **Next gate:** review migration ordering/content and function revisions, account lifecycle, signup abuse, deletion fencing, hosted least-privilege and actual device/customer flows with the relevant single writers before activation. No hosted write, EAS build or TestFlight submission is in this increment.
 
+## 2026-09-27: P0-C guest account-replacement guard
+
+- **Immutable predecessor:** merged `origin/main@a123d0ee88f8894a34816712e7acf7f2f43b8e19` (#126 migration readback and closed-beta policy). This isolated source increment guards ordinary password/signup and legacy code Auth paths before they can replace an anonymous session.
+- **Behavior:** `is_anonymous === true` blocks normal signin/code verification and directs signup to a separate same-identity upgrade path; unknown current identity/provider failure also blocks. No provider mutation occurs and existing guest client state stays in place. No session or confirmed permanent-user signin keeps existing behavior.
+- **Limits:** This is not verified account linking, an existing-account abandonment confirmation UI, guest sign-out prevention, concurrency acceptance, hosted enablement or physical proof. Coordinate any later account UI with Kanuj's CX ownership. The founder's guest-only versus recoverable-first beta choice remains pending; do not infer it from this guard.
+
 ## 2026-09-27: Sami camera/perception/catalog/operations handoff
 
 - **Immutable predecessor:** `origin/main@4d7e75188c426bf6d8e47ad0f2bb1927964ccd25` after #113 merged; both exact-head #113 CI jobs in run `36358334883` succeeded. Kanuj's #116–#119 remain preserved on main.
