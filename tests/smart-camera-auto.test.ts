@@ -53,8 +53,8 @@ test('Auto camera remains a local leaf with explicit uncertain-photo fallback', 
   const source = readFileSync(new URL('../src/components/check/capture/ProductEvidenceCapture.tsx', import.meta.url), 'utf8');
   assert.match(source, /useState<CaptureIntent>\('auto'\)/);
   assert.match(source, /Which part is in this photo\?/);
-  assert.match(source, /previewRole && <Action label="Use photo"/);
-  assert.match(source, /onBarcodeScanned=\{intent === 'auto' \|\| intent === 'barcode' \? onBarcode : undefined\}/);
+  assert.match(source, /previewRole && <Action label=\{session\.evidence\.some\([\s\S]*'Replace photo' : 'Use photo'\}/);
+  assert.match(source, /onBarcodeScanned=\{intent === 'barcode' \|\| \(intent === 'auto' && capturedPhotos\.length === 0\) \? onBarcode : undefined\}/);
   assert.doesNotMatch(source, /fetch\(|Gemini|stream.*frames|Ingredient list detected/);
 });
 

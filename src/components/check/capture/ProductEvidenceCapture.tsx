@@ -10,7 +10,7 @@ import { captureRecovery } from '../../../presentation/capture/captureRecovery';
 import { createCaptureOperationGate } from '../../../presentation/capture/captureOperationGate';
 import { canObserveLiveBarcode, isObservedRetailBarcode, stillPhotoRole, type CaptureIntent } from '../../../presentation/capture/autoCapture';
 import {
-  captureRoles, createCaptureSession, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
+  captureRoles, createCaptureSession, nextPhotoRole, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
   type CaptureAction, type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
 } from '../../../presentation/capture/productEvidence';
 
@@ -56,6 +56,8 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const requestSequence = useRef(0);
   const operations = useRef(createCaptureOperationGate()).current;
   const currentEvidence = intent === 'auto' ? undefined : session.evidence.find((item) => item.role === role);
+  const capturedPhotos = session.evidence.filter((item) => item.kind === 'local_photo');
+  const nextMissingPhoto = nextPhotoRole(session);
 
   useEffect(() => {
     mounted.current = true;
@@ -107,7 +109,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const capturePhoto = async () => {
-    if (intent === 'barcode' || busy) return;
+    if (intent === 'barcode' || (intent === 'auto' && !nextPhotoRole(currentSession.current)) || busy) return;
     await operations.run(async (isCurrent) => {
       setBusy(true);
       setError(null);
@@ -127,8 +129,14 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const usePhoto = () => {
-    if (!previewUri || !previewRole) return;
+    if (!previewActive.current || !previewUri || !previewRole) return;
     dispatchCapture({ type: 'photo', role: previewRole, uri: previewUri });
+    const nextRole = nextPhotoRole(currentSession.current);
+    setRole(nextRole ?? 'barcode');
+    setIntent(nextRole ?? 'auto');
+    latestIntent.current = nextRole ?? 'auto';
+    scanLocked.current = currentSession.current.evidence.some((item) => item.role === 'barcode');
+    setShowCorrection(false);
     setPreview(null);
     setPreviewRole(null);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -149,11 +157,16 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
     });
   };
 
-  const retake = () => {
+  const retakeRole = (targetRole: CaptureRole) => {
+    if (operations.isBusy()) return;
     requestSequence.current += 1;
-    dispatchCapture({ type: 'retake', role });
+    dispatchCapture({ type: 'retake', role: targetRole });
+    setRole(targetRole);
+    setIntent(targetRole);
+    latestIntent.current = targetRole;
     setPreview(null);
     scanLocked.current = false;
+    setShowCorrection(false);
     setError(null);
     setCanRetry(false);
     void Haptics.selectionAsync().catch(() => {});
@@ -186,7 +199,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const collectMore = () => {
     requestSequence.current += 1;
     dispatchCapture({ type: 'collect_more' });
-    selectRole(captureRoles.find((candidate) => !currentSession.current.evidence.some((item) => item.role === candidate)) ?? 'front_label');
+    selectRole(nextPhotoRole(currentSession.current) ?? 'front_label');
   };
 
   const finish = () => {
@@ -204,7 +217,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           facing="back"
           enableTorch={torch}
           barcodeScannerSettings={{ barcodeTypes: ['upc_a', 'ean13', 'ean8'] }}
-          onBarcodeScanned={intent === 'auto' || intent === 'barcode' ? onBarcode : undefined}
+          onBarcodeScanned={intent === 'barcode' || (intent === 'auto' && capturedPhotos.length === 0) ? onBarcode : undefined}
         />
       ) : previewUri ? (
         <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -236,7 +249,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
       ) : session.phase === 'collecting' ? (
         <View style={styles.collecting}>
           <View pointerEvents="none" style={styles.guideArea}>
-            {(intent === 'auto' || intent === 'barcode') && !currentEvidence && !previewUri ? (
+            {(intent === 'barcode' || (intent === 'auto' && capturedPhotos.length === 0)) && !currentEvidence && !previewUri ? (
               // Alignment aid only: Expo still detects barcodes across the whole preview.
               <View testID="barcode-alignment-guide" style={styles.barcodeGuide}>
                 <View style={[styles.guideCorner, styles.guideTopLeft]} />
@@ -269,23 +282,29 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
             </ScrollView>
           </CameraGlass>}
           <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+            {!previewUri && capturedPhotos.length > 0 && <View accessibilityLabel="Captured product photos" style={styles.evidenceTray}>
+              {capturedPhotos.map((item) => <Pressable key={item.role} accessibilityRole="button" accessibilityLabel={`${roleLabels[item.role]} photo captured. Tap to retake`} onPress={() => retakeRole(item.role)} style={styles.evidenceThumbButton}>
+                <Image source={{ uri: item.value }} style={styles.evidenceThumb} resizeMode="cover" />
+                <Text style={styles.evidenceThumbLabel} numberOfLines={1}>{roleLabels[item.role]}</Text>
+              </Pressable>)}
+            </View>}
             {!previewUri && currentEvidence && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{roleLabels[role]} saved</Text></CameraGlass>}
             {!previewUri && !currentEvidence && intent !== 'auto' && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{prompts[role]}</Text></CameraGlass>}
             {previewUri && <CameraGlass style={styles.guidancePill}><Text style={styles.hint}>Photos do not verify the formula.</Text></CameraGlass>}
             {error && <Text style={styles.error}>{error}</Text>}
             <View style={styles.captureActions}>
                 {previewUri ? (
-                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => { setPreview(null); setPreviewRole(null); }} />{previewRole && <Action label="Use photo" onPress={usePhoto} />}</View>
+                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => { setPreview(null); setPreviewRole(null); }} />{previewRole && <Action label={session.evidence.some((item) => item.role === previewRole) ? 'Replace photo' : 'Use photo'} onPress={usePhoto} />}</View>
                 ) : currentEvidence ? (
-                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={retake} /><Action label="Review evidence" onPress={() => void processEvidence()} /></View>
+                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => retakeRole(role)} /><Action label="Check product" onPress={() => void processEvidence()} /></View>
                 ) : intent === 'barcode' ? (
-                  <View style={styles.actionRow}>{session.evidence.length > 0 && <Action label="Review evidence" onPress={() => void processEvidence()} />}</View>
+                  <View style={styles.actionRow}>{session.evidence.length > 0 && <Action label="Check product" onPress={() => void processEvidence()} />}</View>
                 ) : (
-                  <View style={styles.actionRow}>
-                    <Pressable accessibilityRole="button" accessibilityLabel={intent === 'auto' ? 'Take package photo' : `Take ${roleLabels[role]} photo`} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void capturePhoto()} style={[styles.shutter, busy && styles.shutterBusy]}>
+                  <View style={styles.photoActionStack}>
+                    {session.evidence.length > 0 && <Action label="Check product" onPress={() => void processEvidence()} />}
+                    {(intent !== 'auto' || nextMissingPhoto) && <Pressable accessibilityRole="button" accessibilityLabel={intent === 'auto' ? 'Take front label photo' : `Take ${roleLabels[role]} photo`} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void capturePhoto()} style={[styles.shutter, busy && styles.shutterBusy]}>
                       {busy ? <ActivityIndicator color={colors.inkInverse} /> : <View style={styles.shutterInner} />}
-                    </Pressable>
-                    {session.evidence.length > 0 && <Action label="Review evidence" onPress={() => void processEvidence()} />}
+                    </Pressable>}
                   </View>
                 )}
             </View>
@@ -358,6 +377,10 @@ const styles = StyleSheet.create({
   guideBottomLeft: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: radii.xs },
   guideBottomRight: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: radii.xs },
   bottom: { flexShrink: 1, position: 'relative', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md },
+  evidenceTray: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, maxWidth: '100%' },
+  evidenceThumbButton: { minWidth: layout.minTouchTarget, minHeight: layout.minTouchTarget + spacing.md, alignItems: 'center', gap: spacing.xxs },
+  evidenceThumb: { width: layout.minTouchTarget, height: layout.minTouchTarget, borderRadius: radii.sm },
+  evidenceThumbLabel: { color: colors.inkInverse, fontSize: typography.sizes.caption, fontWeight: typography.weights.medium, maxWidth: 72 },
   guidancePill: { maxWidth: '100%', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radii.full },
   selectorSlot: { position: 'absolute', right: spacing.xs, width: 112 },
   selectorPill: { width: 112, height: 52, borderRadius: radii.full },
@@ -374,6 +397,7 @@ const styles = StyleSheet.create({
   roleText: { color: colors.inkInverse, textAlign: 'center', fontSize: typography.sizes.caption, fontWeight: typography.weights.medium },
   roleTextActive: { color: colors.brandDark },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  photoActionStack: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   action: { minHeight: layout.ctaHeight, minWidth: 116, maxWidth: '100%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.full, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   secondaryAction: { backgroundColor: 'rgba(30,54,44,0.72)', borderWidth: 1, borderColor: colors.inkInverse },
   actionText: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold, textAlign: 'center' },
