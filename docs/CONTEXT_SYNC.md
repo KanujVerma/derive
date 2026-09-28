@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-27: P0-C deletion/upload fence for scanner-first App Store target
+
+- **Immutable predecessor:** `origin/main@38d7a97650e9123cb96cbceca9917c1b997a0986` (#127 guest account-replacement guard). The founder corrected the target from a temporary closed beta to a scanner-first App Store release; the first release remains free-only.
+- **Sami-owned change:** a server-only deletion marker and restrictive private Storage INSERT fence serialize customer uploads with account deletion before the function inventories both buckets. Failed cleanup retains the marker for safe retry; successful Auth deletion retains Storage-first/Auth-last order. No Kanuj `app/**`, release binary, hosted settings, or customer data changed.
+- **Local evidence:** isolated fresh reset applies all 29 source migrations. Full pgTAP passes 22 files/536 assertions. S-FREE-4 live local Storage/auth/deletion harness and a separate two-transaction ordering test pass. All 85 application test files, both TypeScript checks, and web/iOS JavaScript exports pass. Source proof does not establish hosted or physical App Store acceptance.
+- **Remaining decisions/gates:** the temporary closed-beta no-auto-cleanup policy is not a public-release retention decision. Hosted still lags the source migrations/functions from the read-only inventory; guest abuse/upgrade/recovery, hosted failure/race drill, provider terms, useful scanner coverage, and Kanuj-owned binary/privacy/customer acceptance remain. No hosted activation or submission is authorized by this increment.
+
 ## 2026-09-27: P0-C hosted migration inventory and closed-beta policy
 
 - **Immutable predecessor:** merged `origin/main@98d2ba379b7cf36607b1bce349c03db293500947` (#125 hosted function-name readback). This isolated increment adds a read-only exact-project migration-version comparison; it does not apply migrations or enable hosted Auth.

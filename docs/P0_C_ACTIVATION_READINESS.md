@@ -1,5 +1,40 @@
 # P0-C hosted free operations — readiness inventory
 
+## App Store scanner release target (2026-09-27 update)
+
+The founder has now specified a **scanner-first App Store release**, not merely
+the temporary closed beta described in historical sections below. The approved
+first release remains free-only; no $4.99 checkout or Managed purchase activation
+is implied. The closed-beta decision to retain guest data until user deletion
+was explicitly temporary, so it does **not** settle public-release retention,
+privacy notice, or lost-device recovery. Kanuj owns the release binary/customer
+acceptance; Sami owns this hosted lifecycle boundary. Neither lane can call the
+App Store release ready from source tests alone.
+
+This increment adds `20260928000000_p0c_account_deletion_upload_fence.sql` and
+updates `delete-customer-account`: a server-only, durable deletion marker is set
+before either private bucket is inventoried. Customer INSERT checks for both
+private buckets are restrictive and share a transaction-scoped lock with that
+transition. A failed cleanup leaves the marker set, allowing a retry without
+reopening uploads; successful Auth deletion cascades the marker away. Existing
+Storage-first removal, empty-namespace verification, and Auth-last order remain.
+The local proof includes a fresh all-migration reset, full pgTAP, real free
+Storage upload/rejection/deletion, a deterministic two-transaction ordering
+test, all 85 application test files, both TypeScript checks, and web/iOS
+JavaScript exports. This does not prove a provider-side upload already in
+flight before its database INSERT, hosted deployment, or failure/retry behavior
+under network faults. Review the hosted Storage implementation and run a
+disposable hosted race/failure drill before claiming that broader guarantee.
+
+Before the App Store build can point at hosted scanner-first runtime, the
+remaining gates include: reconcile all unapplied hosted migrations and missing
+functions in reviewed order; verify Auth abuse/rate controls; finish guest
+identity upgrade/existing-account warning and retention/recovery policy; verify
+private-photo deletion and owner isolation on hosted; provide a useful, honest
+scanner result/fallback on physical devices; and complete Kanuj-owned binary,
+privacy/support, and App Store acceptance. Do not enable hosted anonymous Auth
+or submit a release based on this isolated migration alone.
+
 ## Scope and actual state
 
 Sami owns P0-C under the explicit portfolio brief. This increment audits existing
@@ -22,7 +57,7 @@ remains `snojlbqovlawewwqbviz`.
 | Identity/access | Verified Auth `is_anonymous` controls identity kind; `access-state` grants managed access only to permanent active members. | Exact hosted deployed revision/config and least-privilege readback. |
 | Owner isolation | Auth UUID switches purge client caches; P0-B composition separately fences owner/revision responses. | Physical session-loss, refresh, account-switch and A→B→A acceptance against hosted deployment. |
 | Photo resource control | Service-only grant RPC serializes owner quota/replay; six issued upload grants per rolling 24 hours; private immutable owner paths. | This is **not** a semantic Check allowance or signup-wide/IP/device abuse defense. Search/barcode do not share that upload quota. |
-| Account deletion | Caller-token identity; exact confirmation; both private buckets inventoried, removed, verified empty, then Auth deletion. | Concurrent upload fencing and hosted deletion failure/retry acceptance. Existing implementation order must not be weakened. |
+| Account deletion | Caller-token identity; exact confirmation; server-only deletion marker and restrictive private-upload fence; both private buckets inventoried, removed, verified empty, then Auth deletion. | Hosted deletion failure/retry and provider-side in-flight-upload acceptance. Existing implementation order must not be weakened. |
 | Anonymous upgrade/conflict | Password signup/signin adapters and a fail-closed ordinary Auth replacement guard exist. | No verified same-UUID anonymous linking or customer warning/confirmation flow. Creating another account is not proof of guest preservation. |
 | Retention/cleanup | Owner deletion exists. | No production guest inactivity retention policy, resumable Storage-first cleanup job, deletion lease or cleanup operational readback was found. Do not infer automatic expiry from Auth anonymity. |
 | Operations | Existing tests cover local ownership/deletion boundaries. | Hosted rate/abuse alerts, retention execution, rollback drill and physical/customer acceptance. |
@@ -178,9 +213,9 @@ assertion or screenshot of a dashboard switch alone does not prove the control.
 
 ## Safe next implementation sequence
 
-Define the lifecycle/conflict contract and temporary beta notice → lease shared
+Define the lifecycle/conflict contract and public-release notice → lease shared
 Auth/migration surfaces → isolated signup/endpoint abuse controls and
-deletion-write fencing with failure/concurrency tests → bounded client lifecycle
+hosted deletion-fence failure/race drill → bounded client lifecycle
 integration with Kanuj → disposable local reset/
 pgTAP/integration → exact-head CI → reviewed hosted dry-run/readback → actual
 physical/customer acceptance → explicit coordinated activation.

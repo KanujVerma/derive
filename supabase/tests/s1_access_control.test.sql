@@ -92,11 +92,12 @@ select results_eq(
     order by policyname
   $$,
   array[
+    'customer_private_upload_deletion_fence:INSERT:authenticated',
     'customer_product_evidence_free_insert_granted:INSERT:authenticated',
     'customer_product_evidence_insert_own:INSERT:authenticated',
     'customer_skin_photos_insert_own:INSERT:authenticated'
   ],
-  'Storage has only the audited managed and grant-bound free upload policies'
+  'Storage has only the audited managed, free, and restrictive deletion-fence policies'
 );
 
 select results_eq(

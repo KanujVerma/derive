@@ -139,6 +139,17 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
+    // Commit the write fence before listing either private bucket. The RPC
+    // serializes with customer INSERT policy checks, so an admitted upload
+    // cannot commit behind the first inventory pass. Leave the fence in place
+    // after any cleanup failure; a later call can safely retry deletion.
+    const { data: deletionStarted, error: deletionStartError } = await adminClient
+      .rpc("begin_customer_account_deletion", { p_user_id: user.id });
+    if (deletionStartError || deletionStarted !== true) {
+      console.error("delete-customer-account deletion fence failed:", deletionStartError?.code ?? "missing_profile");
+      return jsonResponse({ code: "DELETION_FAILED", error: "Account deletion could not be completed" }, 500);
+    }
+
     const [photoRows, submissionRows, productEvidenceRows, skinNamespace, productNamespace] = await Promise.all([
       adminClient.from("user_photos").select("storage_path").eq("user_id", user.id),
       adminClient
