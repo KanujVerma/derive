@@ -6,6 +6,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-28: Kanuj 24–48 hour MVP portfolio from current main
+
+- **Immutable start:** `origin/main@f9fa0b720fb8fc8bc8154c073709c0b8dee8581a`; both main CI `36377337899` jobs successful. Original dirty shared checkout and all existing branches/worktrees are preserved. Sami #125–#128 are merged source/readback/guard increments, not hosted scanner-first activation.
+- **Exact-project read-only inventory:** 15 hosted/21 source Edge Function names and 19 hosted/29 source migration versions. Six free/decision/evidence functions and ten versions including the deletion/upload fence are missing hosted. Name/version drift does not establish code, schema, RLS, Auth, physical behavior or readiness. No hosted change or customer data read occurred.
+- **Parallel Kanuj lanes:** T1 monetization/evidence, T2 privacy-safe measurement, T4 offline soft-judgment benchmark started in isolated branches from this main with disjoint writes. Root owns canonical docs, merge order and release. T3 entitlement-policy branch is prepared for the first available execution slot; T6 presentation follows stable tier semantics. Sami P0-C, image perception and catalog contribution remain separate single-writer lanes.
+- **Strategy status:** Free single-product quality is an approved target; Plus cross-product value and Founding Plus cohort/pricing are evaluation/experiment; Managed delegated care is an approved target. Sami's recent free-only first-release checkpoint and the new proposal for public Plus/Founding Plus access are an OPEN FOUNDER DECISION. Age scope, quotas and billing are also open; none has been activated. Jev/Gemini are challengers, not final truth or action authorities.
+- **Next:** finish independent source/docs and exact-head CI, hand trusted hosted/identity/entitlement work to Sami, consume stable contracts in bounded composition, and maintain App Store/physical/privacy gates. A 24–48 hour objective is a priority filter, not a release-readiness claim. [Current Kanuj DAG](KANUJ_PORTFOLIO.md).
+
 ## 2026-09-27: P0-C deletion/upload fence for scanner-first App Store target
 
 - **Immutable predecessor:** `origin/main@38d7a97650e9123cb96cbceca9917c1b997a0986` (#127 guest account-replacement guard). The founder corrected the target from a temporary closed beta to a scanner-first App Store release; the first release remains free-only.
