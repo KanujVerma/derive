@@ -6,12 +6,12 @@ import type { Provider, Result } from './harness.ts';
 export interface RecordedAttempt {
   caseId: string;
   output?: unknown;
-  failure?: 'unavailable' | 'timeout' | 'provider_error';
+  failure?: 'unavailable' | 'timeout' | 'provider_error' | 'schema_invalid' | 'model_mismatch';
   /** Actual invocation measurements only. Never estimated from a price page. */
   latencyMs: number;
-  costUsd: number;
-  inputTokens: number;
-  outputTokens: number;
+  costUsd: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
   /** Optional probabilities for the four contribution labels, in the same invocation. */
   probabilities?: Record<Contribution, number>;
 }
@@ -26,6 +26,8 @@ export interface RecordedRun {
 }
 const digest = /^[a-f0-9]{64}$/;
 const finite = (v: number) => Number.isFinite(v) && v >= 0;
+const measured = (v: number | null) => v === null || finite(v);
+const tokens = (v: number | null) => v === null || (Number.isSafeInteger(v) && v >= 0);
 const average = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
 const percentile = (values: number[], p: number) => [...values].sort((a, b) => a - b)[Math.ceil(p * values.length) - 1];
 
@@ -39,7 +41,8 @@ export function replayRecordedRuns(runs: RecordedRun[]): Result[] {
     if (!['jev', 'gemini_structured'].includes(run.provider) || !run.modelVersion.trim() || !digest.test(run.adapterSha256) || !digest.test(run.promptSha256) ||
         run.attempts.length !== ids.length || new Set(run.attempts.map(a => a.caseId)).size !== ids.length || run.attempts.some(a => !ids.includes(a.caseId))) throw new Error('RUN_INVALID');
     for (const a of run.attempts) {
-      if (!finite(a.latencyMs) || !finite(a.costUsd) || !Number.isSafeInteger(a.inputTokens) || a.inputTokens < 0 || !Number.isSafeInteger(a.outputTokens) || a.outputTokens < 0 ||
+      if (!finite(a.latencyMs) || !measured(a.costUsd) || !tokens(a.inputTokens) || !tokens(a.outputTokens) ||
+          (a.failure !== undefined && !['unavailable', 'timeout', 'provider_error', 'schema_invalid', 'model_mismatch'].includes(a.failure)) ||
           (a.output === undefined) === (a.failure === undefined)) throw new Error('ATTEMPT_INVALID');
       if (a.probabilities) {
         const keys = Object.keys(a.probabilities).sort();
@@ -54,15 +57,29 @@ export function replayRecordedRuns(runs: RecordedRun[]): Result[] {
     if (providerRuns.some(run => run.modelVersion !== first.modelVersion || run.adapterSha256 !== first.adapterSha256 || run.promptSha256 !== first.promptSha256)) throw new Error('RUN_CONFIG_MISMATCH');
     const attempts = providerRuns.flatMap(run => run.attempts);
     const valid: Array<{ id: string; expected: SoftJudgmentV0; actual: SoftJudgmentV0; critical: boolean; probabilities?: Record<Contribution, number> }> = [];
-    for (const a of attempts) {
-      if (a.output === undefined) continue;
+    const caseAnalysis: Result['caseAnalysis'] = [];
+    for (const [attemptIndex, a] of attempts.entries()) {
+      const c = CORPUS.find(row => row.id === a.caseId)!;
+      const expected = c.expected;
+      if (a.output === undefined) {
+        caseAnalysis.push({ caseId: a.caseId, runIndex: Math.floor(attemptIndex / ids.length), expected, actual: null,
+          mismatchedFields: [], outcome: a.failure! });
+        continue;
+      }
       try {
         const actual = parseSoftJudgment(a.output);
-        const c = CORPUS.find(row => row.id === a.caseId)!;
         const packet = evaluatePersonalDecision(c.makeInput());
         valid.push({ id: a.caseId, expected: c.expected, actual,
           critical: packet.evidenceNeeds.some(n => n.critical) || packet.findings.some(f => f.severity === 'caution'), probabilities: a.probabilities });
-      } catch (error) { if (!(error instanceof Error) || error.message !== 'SCHEMA_INVALID') throw error; }
+        const mismatchedFields = (['routineContribution', 'overlap', 'needsMoreContext', 'abstain'] as const)
+          .filter(field => expected[field] !== actual[field]);
+        caseAnalysis.push({ caseId: a.caseId, runIndex: Math.floor(attemptIndex / ids.length), expected, actual,
+          mismatchedFields, outcome: mismatchedFields.length ? 'disagreement' : 'match' });
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== 'SCHEMA_INVALID') throw error;
+        caseAnalysis.push({ caseId: a.caseId, runIndex: Math.floor(attemptIndex / ids.length), expected, actual: null,
+          mismatchedFields: [], outcome: 'schema_invalid' });
+      }
     }
     const pairs = valid.map(r => [r.expected.routineContribution, r.actual.routineContribution] as const);
     const labels = [...new Set(pairs.flat())];
@@ -78,13 +95,16 @@ export function replayRecordedRuns(runs: RecordedRun[]): Result[] {
     return { provider, status: 'RUN', modelVersion: first.modelVersion, runCount: providerRuns.length, evaluatedCases: valid.length,
       exactLabelAccuracy: valid.length ? valid.filter(r => r.expected.routineContribution === r.actual.routineContribution).length / valid.length : null,
       macroF1, abstentionAccuracy: valid.length ? valid.filter(r => r.expected.abstain === r.actual.abstain).length / valid.length : null,
-      schemaValidity: attempts.filter(a => a.output !== undefined).length ? valid.length / attempts.filter(a => a.output !== undefined).length : null,
+      schemaValidity: caseAnalysis.some(row => row.outcome === 'match' || row.outcome === 'disagreement' || row.outcome === 'schema_invalid') ?
+        valid.length / caseAnalysis.filter(row => row.outcome === 'match' || row.outcome === 'disagreement' || row.outcome === 'schema_invalid').length : null,
       criticalFalsePositiveCount: valid.filter(r => r.critical && ['incremental', 'replacement_candidate'].includes(r.actual.routineContribution)).length,
-      disagreementCaseIds: [...new Set(valid.filter(r => r.expected.routineContribution !== r.actual.routineContribution).map(r => r.id))].sort(),
+      disagreementCaseIds: [...new Set(caseAnalysis.filter(row => row.outcome === 'disagreement').map(row => row.caseId))].sort(),
       providerFailures: attempts.filter(a => a.failure !== undefined).length, repeatedRunStability: stabilityPairs.length ? average(stabilityPairs) : null,
       brierScore: brierRows.length ? average(brierRows.map(r => average(CONTRIBUTIONS.map(label => (r.probabilities![label] - Number(r.expected.routineContribution === label)) ** 2)))) : null,
       p50LatencyMs: percentile(attempts.map(a => a.latencyMs), 0.5), p95LatencyMs: percentile(attempts.map(a => a.latencyMs), 0.95),
-      costUsdPerCase: average(attempts.map(a => a.costUsd)), inputTokens: attempts.reduce((sum, a) => sum + a.inputTokens, 0),
-      outputTokens: attempts.reduce((sum, a) => sum + a.outputTokens, 0) } satisfies Result;
+      costUsdPerCase: attempts.every(a => a.costUsd !== null) ? average(attempts.map(a => a.costUsd!)) : null,
+      inputTokens: attempts.every(a => a.inputTokens !== null) ? attempts.reduce((sum, a) => sum + a.inputTokens!, 0) : null,
+      outputTokens: attempts.every(a => a.outputTokens !== null) ? attempts.reduce((sum, a) => sum + a.outputTokens!, 0) : null,
+      caseAnalysis } satisfies Result;
   });
 }

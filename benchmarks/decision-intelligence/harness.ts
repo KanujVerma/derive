@@ -25,6 +25,9 @@ export interface Result {
   costUsdPerCase: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  caseAnalysis: Array<{ caseId: string; runIndex: number; expected: SoftJudgmentV0; actual: SoftJudgmentV0 | null;
+    mismatchedFields: Array<keyof SoftJudgmentV0>;
+    outcome: 'match' | 'disagreement' | 'unavailable' | 'timeout' | 'provider_error' | 'schema_invalid' | 'model_mismatch' }>;
 }
 export interface Report { corpusVersion: string; corpusSha256: string; provenance: string; cases: number; results: Result[]; }
 
@@ -61,16 +64,23 @@ export function runBaseline(): Report {
   const falsePositive = rows.filter(r => r.critical && ['incremental', 'replacement_candidate'].includes(r.actual.routineContribution)).length;
   const currentCorpusSha256 = corpusSha256();
   const common: Omit<Result, 'provider' | 'status' | 'modelVersion' | 'runCount' | 'evaluatedCases' | 'exactLabelAccuracy' | 'macroF1' | 'abstentionAccuracy' | 'schemaValidity' | 'criticalFalsePositiveCount' | 'disagreementCaseIds' | 'providerFailures' | 'repeatedRunStability'> =
-    { brierScore: null, p50LatencyMs: null, p95LatencyMs: null, costUsdPerCase: null, inputTokens: null, outputTokens: null };
+    { brierScore: null, p50LatencyMs: null, p95LatencyMs: null, costUsdPerCase: null, inputTokens: null, outputTokens: null,
+      caseAnalysis: rows.map(row => {
+        const mismatchedFields = (['routineContribution', 'overlap', 'needsMoreContext', 'abstain'] as const)
+          .filter(field => row.expected[field] !== row.actual[field]);
+        return { caseId: row.id, runIndex: 0, expected: row.expected, actual: row.actual, mismatchedFields,
+          outcome: mismatchedFields.length ? 'disagreement' as const : 'match' as const };
+      }) };
   const results: Result[] = [
     { provider: 'p0b_deterministic', status: 'RUN', modelVersion: `${ENGINE_VERSION};${POLICY_VERSION}`, runCount: 1,
       evaluatedCases: rows.length, exactLabelAccuracy: correct / rows.length, macroF1: macroF1(pairs),
       abstentionAccuracy: abstainCorrect / rows.length, schemaValidity: 1, criticalFalsePositiveCount: falsePositive,
-      disagreementCaseIds: rows.filter(r => r.expected.routineContribution !== r.actual.routineContribution).map(r => r.id),
+      disagreementCaseIds: rows.filter(r => (['routineContribution', 'overlap', 'needsMoreContext', 'abstain'] as const)
+        .some(field => r.expected[field] !== r.actual[field])).map(r => r.id),
       providerFailures: 0, repeatedRunStability: null, ...common },
     ...(['jev', 'gemini_structured'] as const).map(provider => ({ provider, status: 'NOT_RUN' as const, modelVersion: null, runCount: 0,
       evaluatedCases: 0, exactLabelAccuracy: null, macroF1: null, abstentionAccuracy: null, schemaValidity: null,
-      criticalFalsePositiveCount: null, disagreementCaseIds: [], providerFailures: 0, repeatedRunStability: null, ...common })),
+      criticalFalsePositiveCount: null, disagreementCaseIds: [], providerFailures: 0, repeatedRunStability: null, ...common, caseAnalysis: [] })),
   ];
   return { corpusVersion: CORPUS_VERSION, corpusSha256: currentCorpusSha256, provenance: 'Reviewed P0-B policy assertions; not independent founder-reviewed gold', cases: rows.length, results };
 }
