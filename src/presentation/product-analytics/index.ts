@@ -41,33 +41,46 @@ export type ProductEventSink = (event: ProductEventEnvelope) => void;
 export type CheckInputMethod = ProductEventProperties<'check_started'>['inputMethod'];
 export type CheckOutcome = ProductEventProperties<'check_completed'>['outcome'];
 
-function validProperties(event: ProductEventName, properties: unknown): boolean {
-  if (properties === null || typeof properties !== 'object' || Array.isArray(properties) ||
-      Object.getPrototypeOf(properties) !== Object.prototype) return false;
-  if (event === 'check_completed') {
-    const result = properties as { outcome?: unknown; personalized?: unknown };
-    if (result.outcome !== 'useful' && result.personalized !== false) return false;
+function snapshotProperties<E extends ProductEventName>(
+  event: E,
+  properties: unknown
+): ProductEventProperties<E> | null {
+  try {
+    if (properties === null || typeof properties !== 'object' || Array.isArray(properties) ||
+        Object.getPrototypeOf(properties) !== Object.prototype) return null;
+    const rules: Record<string, readonly string[] | 'boolean'> = EVENT_SCHEMA[event];
+    const descriptors = Object.getOwnPropertyDescriptors(properties);
+    const fields = Reflect.ownKeys(descriptors);
+    if (fields.length !== Object.keys(rules).length) return null;
+    const snapshot: Record<string, string | boolean> = {};
+    for (const field of fields) {
+      if (typeof field !== 'string' || !Object.prototype.hasOwnProperty.call(rules, field)) return null;
+      const descriptor = descriptors[field];
+      if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+      const value: unknown = descriptor.value;
+      const rule = rules[field];
+      if (rule === 'boolean' ? typeof value !== 'boolean' : !rule.includes(value as string)) return null;
+      snapshot[field] = value as string | boolean;
+    }
+    if (event === 'check_completed' && snapshot.outcome !== 'useful' && snapshot.personalized !== false) {
+      return null;
+    }
+    return snapshot as ProductEventProperties<E>;
+  } catch {
+    // A Proxy may throw while exposing its prototype, keys, or descriptors.
+    return null;
   }
-  const rules: Record<string, readonly string[] | 'boolean'> = EVENT_SCHEMA[event];
-  const fields = Object.keys(properties);
-  if (fields.length !== Object.keys(rules).length) return false;
-  return fields.every((field) => {
-    if (!Object.prototype.hasOwnProperty.call(rules, field)) return false;
-    const value = (properties as Record<string, unknown>)[field];
-    const rule = rules[field];
-    return rule === 'boolean' ? typeof value === 'boolean' : rule.includes(value as string);
-  });
 }
 
 /** A caller-owned sink can be installed only after transport and privacy review. */
 export function createProductAnalytics(sink?: ProductEventSink) {
   function emit<E extends ProductEventName>(event: E, properties: ProductEventProperties<E>): boolean {
-    if (typeof event !== 'string' || !Object.prototype.hasOwnProperty.call(EVENT_SCHEMA, event) ||
-        !validProperties(event, properties)) return false;
+    if (typeof event !== 'string' || !Object.prototype.hasOwnProperty.call(EVENT_SCHEMA, event)) return false;
+    const snapshot = snapshotProperties(event, properties);
+    if (snapshot === null) return false;
     if (!sink) return false;
     try {
-      // Copy only schema-validated primitives. No caller object reaches a transport.
-      sink({ schemaVersion: 1, event, properties: { ...properties } });
+      sink({ schemaVersion: 1, event, properties: snapshot });
       return true;
     } catch {
       // Measurement must never interrupt a customer action.
@@ -81,7 +94,7 @@ export function createProductAnalytics(sink?: ProductEventSink) {
   }
 
   function beginCheck(inputMethod: CheckInputMethod) {
-    const validInput = validProperties('check_started', { inputMethod });
+    const validInput = snapshotProperties('check_started', { inputMethod }) !== null;
     if (validInput) emit('check_started', { inputMethod });
     let completed = false;
     return {

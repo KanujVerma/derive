@@ -23,6 +23,37 @@ test('runtime validation rejects extra, identifying, free-text, and invalid valu
   assert.deepEqual(events, []);
 });
 
+test('an accessor cannot change an allowed value into private text during emission', () => {
+  const events: unknown[] = [];
+  const analytics = createProductAnalytics((event) => { events.push(event); });
+  const unsafe = analytics.track as (event: unknown, properties: unknown) => boolean;
+  let reads = 0;
+  const properties = Object.defineProperty({}, 'channel', {
+    enumerable: true,
+    get() { reads += 1; return reads === 1 ? 'direct' : 'private skin note'; },
+  });
+
+  assert.equal(unsafe('acquisition_touch', properties), false);
+  assert.equal(reads, 0);
+  assert.deepEqual(events, []);
+});
+
+test('symbol and hidden fields and throwing proxy traps fail closed', () => {
+  const events: unknown[] = [];
+  const unsafe = createProductAnalytics((event) => { events.push(event); }).track as
+    (event: unknown, properties: unknown) => boolean;
+  const withSymbol = { channel: 'direct', [Symbol('private')]: 'skin note' };
+  const withHidden = Object.defineProperty({ channel: 'direct' }, 'privateNote', { value: 'skin note' });
+  const hostile = new Proxy({ channel: 'direct' }, {
+    getOwnPropertyDescriptor() { throw new Error('hostile trap'); },
+  });
+
+  assert.equal(unsafe('acquisition_touch', withSymbol), false);
+  assert.equal(unsafe('acquisition_touch', withHidden), false);
+  assert.equal(unsafe('acquisition_touch', hostile), false);
+  assert.deepEqual(events, []);
+});
+
 test('one visible Check session counts once despite retries or provider calls', () => {
   const events: unknown[] = [];
   const analytics = createProductAnalytics((event) => { events.push(event); });
