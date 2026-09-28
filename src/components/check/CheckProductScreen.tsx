@@ -62,6 +62,8 @@ import { createCustomerCheckFlow, selectIdentityNextAction, selectVisibleCheckVi
 import type { ProductEventSink } from '@/src/presentation/product-analytics';
 import type { DecisionNextStep } from '@/src/contracts/PersonalDecision';
 import { recordFreeCheck } from '@/src/services/remote/freeContext';
+import { MissingProductContribution } from '@/src/components/check/contribution/MissingProductContribution';
+import { selectCheckContributionRecovery } from '@/src/presentation/catalog-contribution/checkRecovery';
 
 export default function CheckProductScreen({ productEventSink }: { productEventSink?: ProductEventSink } = {}) {
   const router = useRouter();
@@ -174,6 +176,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [isLocked, setIsLocked] = useState(false);
   const isScanningLockedRef = useRef(false);
   const pendingResolutionRef = useRef<{ key: string; requestId: string } | null>(null);
+  const lastTypedNameRef = useRef<string | null>(null);
   const resolutionOwnerRef = useRef<string | null>(null);
   const previousCheckOwnerRef = useRef(sessionUserId);
   const resolutionSequenceRef = useRef(0);
@@ -197,6 +200,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     resolutionSequenceRef.current += 1;
     resolutionOwnerRef.current = null;
     pendingResolutionRef.current = null;
+    lastTypedNameRef.current = null;
     checkMemorySaverRef.current = createCheckMemorySaver(recordFreeCheck, createCatalogRequestId);
     setCatalogDetail(null);
     setResolution(null);
@@ -248,6 +252,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
 
   const handleSearchNamePress = () => {
     void Haptics.selectionAsync().catch(() => {});
+    lastTypedNameRef.current = null;
     setCaptureRole(null);
     setCaptureEvidence(null);
     setUnknownBarcode(null);
@@ -262,6 +267,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
 
   const openCapture = (role: CaptureRole) => {
     pendingResolutionRef.current = null;
+    lastTypedNameRef.current = null;
     setCaptureRole(role);
     setCaptureEvidence(null);
     setUnknownBarcode(null);
@@ -375,6 +381,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     evidence: Omit<ResolveProductIdentityInput, 'requestId'>,
     knownProductId?: string,
   ) => {
+    lastTypedNameRef.current = evidence.productName && !evidence.brand ? evidence.productName : null;
     if (preview) {
       resolutionOwnerRef.current = null;
       setIsSearching(false);
@@ -400,6 +407,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   const handleCaptureReady = (handoff: CheckCaptureHandoff) => {
+    lastTypedNameRef.current = null;
     setCaptureRole(null);
     if (handoff.barcodeLookup) {
       if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('barcode');
@@ -497,6 +505,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     setCandidates([]);
     setIsCheckingProduct(false);
     pendingResolutionRef.current = null;
+    lastTypedNameRef.current = null;
     setScanResult(null);
     setUnknownBarcode(null);
     setCaptureRole(null);
@@ -705,15 +714,19 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   }
 
   if (targetShell && unknownBarcode) {
+    const recovery = selectCheckContributionRecovery({ targetShell, ownerId: liveCheckOwner,
+      caseId: resolution?.caseId ?? null, reason: 'unknown_barcode', observedBarcode: unknownBarcode,
+      observedName: null });
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
-        <View style={styles.entryContent}>
-          <Text style={styles.entryTitle}>Product unknown</Text>
-          <Text style={styles.entryBody}>No verified barcode match. Search by name or try another scan.</Text>
-          <Button label="Search by name" variant="brand" onPress={handleSearchNamePress} style={styles.entryAction} />
+        <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
+          <Text style={styles.entryBody}>No verified barcode match.</Text>
+          {recovery && <MissingProductContribution contextKey={recovery.contextKey}
+            availability={recovery.availability} initial={recovery.initial} embedded
+            onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
           <Button label="Scan another barcode" variant="outline" onPress={() => openCapture('barcode')} style={styles.entryAction} />
-        </View>
+        </ScrollView>
       </View>
     );
   }
@@ -941,14 +954,21 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
 
   if (resolution && !catalogDetail) {
     const fit = describeCheckProductFit(resolution.state);
+    const recovery = selectCheckContributionRecovery({ targetShell, ownerId: liveCheckOwner,
+      caseId: resolution.caseId,
+      reason: resolution.state === 'insufficient_evidence' || resolution.state === 'formula_only'
+        ? 'unresolved_check' : null,
+      observedBarcode: unknownBarcode, observedName: lastTypedNameRef.current });
     const identityMessage = resolution.state === 'insufficient_evidence' && captureEvidence?.localPhotos.length
       ? 'We could not identify this product from the photos yet.'
       : 'Product identity is not confirmed.';
     const selectedCandidate = resolution.candidates.find((_, index) =>
       `${resolution.caseId}:${index}` === captureEvidence?.review.selectedCandidateId);
     return (
-      <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
-        <Text style={styles.screenTitle}>Check a Product</Text>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        {targetShell && <RootShellHeader title="Check" />}
+        <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
+        {!targetShell && <Text style={styles.screenTitle}>Check a Product</Text>}
         <Text style={{ color: colors.inkMuted, marginVertical: spacing.md }}>{integrated
           ? `${identityMessage} Personal Fit cannot be assessed from this evidence.`
           : fit.message}</Text>
@@ -966,8 +986,12 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           </TouchableOpacity>
         ))}
         {renderSaveCheckAction(resolution.caseId)}
-        {targetShell && <Button label="Search by name" variant="brand" size="medium" onPress={handleSearchNamePress} style={{ marginBottom: spacing.md }} />}
+        {recovery && <MissingProductContribution contextKey={recovery.contextKey}
+          availability={recovery.availability} initial={recovery.initial} embedded
+          onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
+        {targetShell && !recovery && <Button label="Search by name" variant="brand" size="medium" onPress={handleSearchNamePress} style={{ marginBottom: spacing.md }} />}
         <Button label="Check another product" variant="secondary" size="medium" onPress={handleResetScan} />
+        </ScrollView>
       </View>
     );
   }
@@ -990,15 +1014,18 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
 
 
   if (targetShell && captureEvidence && captureEvidence.localPhotos.length > 0 && !captureEvidence.resolvedCase) {
+    const recovery = selectCheckContributionRecovery({ targetShell, ownerId: liveCheckOwner,
+      caseId: null, reason: 'unresolved_photo', observedBarcode: null, observedName: null });
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
-        <View style={styles.entryContent}>
-          <Text style={styles.entryTitle}>Package photos captured</Text>
+        <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
           <Text style={styles.entryBody}>Product identity is still unknown. Search by name or take another photo.</Text>
-          <Button label="Search by name" variant="brand" onPress={handleSearchNamePress} style={styles.entryAction} />
+          {recovery && <MissingProductContribution contextKey={recovery.contextKey}
+            availability={recovery.availability} initial={recovery.initial} embedded
+            onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
           <Button label="Take another photo" variant="outline" onPress={() => openCapture(captureEvidence.localPhotos[0].role)} style={styles.entryAction} />
-        </View>
+        </ScrollView>
       </View>
     );
   }
