@@ -39,7 +39,7 @@ Apple says categories must accurately reflect the app's core experience. Lifesty
 
 ## Payment scope, two conditional release paths
 
-**Founder decision required.** The current `production` flavor exposes a Managed membership screen with a `$25/month` price and Stripe-hosted Checkout/Portal actions, while `remote-staging` hides Checkout and price through `usesConciergeMembershipAccess`. Neither flavor makes the hosted free Check public. `src/utils/shellPresentation.ts`, `src/utils/membershipPresentation.ts`, `app/membership/index.tsx`, and `eas.json` are the source evidence. This packet does not change payment architecture or select a path.
+**Founder decision required.** The `app/membership/index.tsx` component contains a `$25/month` Managed price and Stripe-hosted Checkout/Portal actions. Its flavor predicate would allow those actions in `production`, but that profile currently selects the Mock service, and normal-route reachability of the payment screen in a public candidate has not been established. `remote-staging` hides Checkout and price through `usesConciergeMembershipAccess`. Neither flavor makes the hosted free Check public. `src/utils/shellPresentation.ts`, `src/utils/membershipPresentation.ts`, `app/membership/index.tsx`, and `eas.json` are the source evidence. This packet does not change payment architecture or select a path.
 
 | Path | Product-page and Review Notes treatment | Gate |
 | --- | --- | --- |
