@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-28: Check measurement call sites composed locally
+
+- **Immutable predecessor:** main `9bdb8f0eaa41ff48810719a5887552140459b9fa` after the canonical MVP tier/release ledger. Kanuj #137 merged as `97ea901` after exact-head CI `36393159893` passed both required jobs.
+- **Implemented source:** the integrated customer Check begins one coarse customer-visible attempt at evidence handoff or search, completes when a current-owner terminal result is shown, and emits a separate empty-payload personal-decision view once a bound ready panel becomes visible. Snapshot identity conflict cannot borrow a catalog match to become useful. Candidate-only and stale/hidden states cannot complete a useful Check. The leaf has no default sink, network transport, persistence or customer measurement receipt.
+- **Remaining gate:** Sami/Kanuj must approve privacy choice, owner projection, deletion, synthetic payload inspection and a trusted production ingress before first-customer analytics. The App Store and hosted/physical gates remain blocked; no customer telemetry was activated by #137. [Analytics contract](PRODUCT_ANALYTICS.md) and [release scorecard](APP_STORE_RELEASE_READINESS.md) hold the exact boundary.
+
 ## 2026-09-28: Kanuj MVP source increments merged; release remains gated
 
 - **Immutable predecessor:** `origin/main@f9fa0b720fb8fc8bc8154c073709c0b8dee8581a` at the start of this wave. Sami #132 read-only hosted Auth-config tooling merged as `320d201`; its attempted Auth setting readback is UNKNOWN without a Management API read token, not evidence of safe guest activation.
