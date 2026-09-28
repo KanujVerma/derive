@@ -26,6 +26,9 @@ export type CustomerFacingOperation =
   | 'auth_signup'
   | 'auth_signup_unconfirmed'
   | 'auth_password_signin'
+  | 'auth_guest_switch_blocked'
+  | 'auth_guest_upgrade_required'
+  | 'auth_session_unknown'
   | 'auth_delete_account'
   | 'beta_access'
   | 'bootstrap'
@@ -49,6 +52,9 @@ export const CUSTOMER_ERROR_MESSAGES: Record<CustomerFacingOperation, string> = 
   auth_signup: "We couldn't create your account right now. Please try again.",
   auth_signup_unconfirmed: "We couldn't finish creating your account. Please try again.",
   auth_password_signin: "Email or password didn't work. Check your details and try again.",
+  auth_guest_switch_blocked: 'Signing in to another account would leave this guest session behind. Your guest data will not move automatically.',
+  auth_guest_upgrade_required: 'This guest session cannot be turned into an account with the regular sign-up form. Your data is still here.',
+  auth_session_unknown: "We couldn't confirm your current session. Please try again before changing accounts.",
   auth_delete_account: "We couldn't delete your account right now. Please try again.",
   beta_access: "We couldn't finish opening your beta access automatically. Please try again.",
   bootstrap: "We couldn't finish loading your account. Please try again.",

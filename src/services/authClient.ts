@@ -23,13 +23,20 @@ export interface VerifyOtpResult {
   success: boolean;
   userId?: string;
   error?: string;
+  code?: AuthTransitionBlockCode;
 }
 
 export interface PasswordAuthResult {
   success: boolean;
   userId?: string;
   error?: string;
+  code?: AuthTransitionBlockCode;
 }
+
+export type AuthTransitionBlockCode =
+  | 'GUEST_SESSION_ACTIVE'
+  | 'GUEST_UPGRADE_REQUIRED'
+  | 'CURRENT_SESSION_UNKNOWN';
 
 export interface PasswordSignUpInput {
   firstName: string;
@@ -185,6 +192,38 @@ export function resetAuthAdapter(): void {
   activeAdapter = defaultSupabaseAdapter;
 }
 
+/**
+ * A normal sign-in/sign-up can replace the current Supabase session. Never use it
+ * to silently convert an anonymous owner: that requires a separate verified
+ * same-UUID linking flow, or an explicit existing-account abandonment warning.
+ */
+async function preflightAccountReplacement(): Promise<'CLEAR' | 'GUEST' | 'UNKNOWN'> {
+  try {
+    const { data, error } = await activeAdapter.getSession();
+    if (error || !data || !('session' in data)) return 'UNKNOWN';
+    const user = data.session?.user;
+    if (!user) return 'CLEAR';
+    if (user.is_anonymous === true) return 'GUEST';
+    if (user.is_anonymous === false) return 'CLEAR';
+    return 'UNKNOWN';
+  } catch {
+    return 'UNKNOWN';
+  }
+}
+
+function accountTransitionBlock(kind: 'GUEST' | 'UNKNOWN', signup = false): {
+  success: false;
+  code: AuthTransitionBlockCode;
+  error: string;
+} {
+  if (kind === 'UNKNOWN') {
+    return { success: false, code: 'CURRENT_SESSION_UNKNOWN', error: getCustomerErrorMessage('auth_session_unknown') };
+  }
+  return signup
+    ? { success: false, code: 'GUEST_UPGRADE_REQUIRED', error: getCustomerErrorMessage('auth_guest_upgrade_required') }
+    : { success: false, code: 'GUEST_SESSION_ACTIVE', error: getCustomerErrorMessage('auth_guest_switch_blocked') };
+}
+
 function projectAuthenticatedSession(user: { id: string; email?: string | null }): string {
   const userId = user.id;
   const sessionEmail = user.email || null;
@@ -223,7 +262,7 @@ export function ensureLocalAnonymousSession(): Promise<string> {
  */
 export async function sendEmailOtp(
   email: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; code?: AuthTransitionBlockCode }> {
   const normalizedEmail = (email || '').trim().toLowerCase();
   if (!isValidEmail(normalizedEmail)) {
     return {
@@ -233,6 +272,8 @@ export async function sendEmailOtp(
   }
 
   try {
+    const transition = await preflightAccountReplacement();
+    if (transition !== 'CLEAR') return accountTransitionBlock(transition);
     const { error } = await activeAdapter.signInWithOtp(normalizedEmail);
     if (error) {
       console.warn('sendEmailOtp backend error:', error.name || 'send_failed');
@@ -271,6 +312,8 @@ export async function verifyEmailOtp(
   }
 
   try {
+    const transition = await preflightAccountReplacement();
+    if (transition !== 'CLEAR') return accountTransitionBlock(transition);
     const { data, error } = await activeAdapter.verifyOtp(normalizedEmail, normalizedToken);
     if (error || !data?.user) {
       console.warn('verifyEmailOtp backend error:', error?.name || 'verification_failed');
@@ -330,6 +373,8 @@ export async function createPasswordAccount(
   const fullName = composeFullName(firstName, lastName);
 
   try {
+    const transition = await preflightAccountReplacement();
+    if (transition !== 'CLEAR') return accountTransitionBlock(transition, true);
     if (!activeAdapter.signUp) {
       console.warn('createPasswordAccount backend error: signup_unavailable');
       return {
@@ -398,6 +443,8 @@ export async function signInWithPassword(
   }
 
   try {
+    const transition = await preflightAccountReplacement();
+    if (transition !== 'CLEAR') return accountTransitionBlock(transition);
     if (!activeAdapter.signInWithPassword) {
       console.warn('signInWithPassword backend error: password_signin_unavailable');
       return {
