@@ -1,0 +1,17 @@
+{
+  "product": {
+    "brand": "Vaseline",
+    "name": "Healing Jelly Original",
+    "category": "moisturizer",
+    "sourceReference": "https://www.vaseline.com/us/en/p/vaseline-healing-jelly-original.html/00305212352009",
+    "publicSourceUrl": "https://www.vaseline.com/us/en/p/vaseline-healing-jelly-original.html/00305212352009",
+    "observedAt": "2026-09-28T00:00:00Z"
+  },
+  "aliases": [
+    {
+      "name": "Vaseline Original Healing Jelly",
+      "sourceReference": "https://www.vaseline.com/us/en/p/vaseline-healing-jelly-original.html/00305212352009",
+      "observedAt": "2026-09-28T00:00:00Z"
+    }
+  ]
+}

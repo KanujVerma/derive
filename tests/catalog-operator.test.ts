@@ -15,6 +15,23 @@ test('Catalog operator: sourced product-only entry stays product-only', () => {
   assert.equal(result.identifier, undefined);
 });
 
+test('Catalog operator: launch search seeds carry product identity only', () => {
+  for (const [file, brand, name] of [
+    ['vaseline-healing-jelly-original.json', 'Vaseline', 'Healing Jelly Original'],
+    ['cerave-moisturizing-cream.json', 'CeraVe', 'Moisturizing Cream'],
+    ['cetaphil-moisturizing-lotion.json', 'Cetaphil', 'Moisturizing Lotion'],
+  ]) {
+    const input = JSON.parse(readFileSync(new URL(`../docs/catalog-seeds/${file}`, import.meta.url), 'utf8'));
+    const entry = validateCatalogEntry(input);
+    assert.equal(entry.product.brand, brand);
+    assert.equal(entry.product.name, name);
+    assert.equal(new URL(entry.product.publicSourceUrl).hostname.endsWith(brand.toLowerCase() + '.com'), true);
+    assert.equal(entry.variant, undefined);
+    assert.equal(entry.formula, undefined);
+    assert.equal(entry.identifier, undefined);
+  }
+});
+
 test('Catalog operator: refuses missing provenance and guessed formula claims', () => {
   const noSource = structuredClone(seed);
   delete noSource.product.sourceReference;
