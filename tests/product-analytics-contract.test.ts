@@ -10,6 +10,15 @@ test('a safe event is emitted with only its declared coarse properties', () => {
   assert.deepEqual(events, [{ schemaVersion: 1, event: 'plus_trigger_reached', properties: { trigger: 'compare' } }]);
 });
 
+test('personal decision exposure carries no product, owner, or context payload', () => {
+  const events: unknown[] = [];
+  const analytics = createProductAnalytics((event) => { events.push(event); });
+  const unsafe = analytics.track as (event: unknown, properties: unknown) => boolean;
+  assert.equal(unsafe('personal_decision_viewed', { productName: 'Private cream' }), false);
+  assert.equal(unsafe('personal_decision_viewed', {}), true);
+  assert.deepEqual(events, [{ schemaVersion: 1, event: 'personal_decision_viewed', properties: {} }]);
+});
+
 test('runtime validation rejects extra, identifying, free-text, and invalid values', () => {
   const events: unknown[] = [];
   const analytics = createProductAnalytics((event) => { events.push(event); });

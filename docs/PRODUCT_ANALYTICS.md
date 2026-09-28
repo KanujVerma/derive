@@ -1,6 +1,6 @@
 # Product analytics and experiments
 
-**Status: IMPLEMENTED leaf contract; EVALUATION for transport; no shipped customer measurement.** This document owns the customer measurement definitions. The existing `src/services/analytics.ts` logs in development and still has older event types that accept product names and IDs. The new `src/presentation/product-analytics/index.ts` has a typed, runtime checked event envelope and an optional sink. It has no default sink, network call, persistence, identity, or production screen call site. These events are therefore a contract, not current funnel data. No onboarding or other existing analytics log is evidence of customer measurement.
+**Status: IMPLEMENTED leaf contract and local Check composition; EVALUATION for transport; no shipped customer measurement.** This document owns the customer measurement definitions. The existing `src/services/analytics.ts` logs in development and still has older event types that accept product names and IDs. `src/presentation/product-analytics/index.ts` has a typed, runtime checked event envelope and an optional sink. The integrated customer Check now calls it through a bounded local flow, but the default screen has no sink, network call, persistence, or identity export. These events are therefore a prepared contract, not current funnel data. No onboarding or other existing analytics log is evidence of customer measurement.
 
 ## Measurement rules
 
@@ -17,13 +17,19 @@ Version 1 is `{ schemaVersion: 1, event, properties }`. The allowlist is impleme
 | Event group | V1 events | Only accepted dimensions |
 | --- | --- | --- |
 | First touch | `app_opened`, `acquisition_touch`, `referral_opened`, `referral_shared` | Platform or coarse channel enum. Codes and creator identities stay in a private canonical attribution store. |
-| Check | `check_started`, `check_completed` | Input method; terminal outcome; personalization boolean. |
+| Check | `check_started`, `check_completed`, `personal_decision_viewed` | Input method; terminal outcome; personalization boolean. The later decision exposure has no properties. |
 | Retention | `my_stuff_viewed`, `check_saved` | None. |
 | Plus intent | `plus_trigger_reached`, `paywall_viewed`, `plus_plan_selected`, `plus_purchase_started` | Coarse trigger/source or monthly/annual choice. Completion, renewal, cancellation, and collected revenue come from verified payment/backend facts. |
 | Managed intent | `managed_viewed`, `managed_learn_more`, `managed_interest` | Coarse entry surface. Intake and paid conversion are separate canonical facts. |
 | Experiments | `experiment_exposed` | Fixed experiment and variant enums only. No assignment authority in the client. This event is emitted only when the assigned treatment is actually shown. |
 
-No current screen calls this contract. A composition pass should add only the events required for the first release, with testable trigger points. A reviewed production ingress is required to meet the brief's pre-distribution measurement gate.
+## Check composition acceptance
+
+**IMPLEMENTED locally, inactive transport:** `CheckProductScreen` begins an integrated owner-bound attempt when barcode or photo evidence returns from capture, a searched product is selected, or a valid name is submitted. Candidate selection continues an unfinished attempt. It completes only after the focused screen renders a terminal result; internal resolver/provider calls and duplicate triggers cannot start extra attempts. An owner change or explicit reset abandons the unfinished attempt. The local preview and legacy member Scan are outside this V1 composition.
+
+The visible verified package formula or a bound ready personal decision can make a supported result useful. A supported product identity with an explicit plain next action to photograph ingredients or confirm the exact variant can also be useful without claiming that its formula or personal fit is verified. Candidate lists stay unfinished; unknown barcode, insufficient evidence, and visible failures remain separate non-useful outcomes. A pure visibility selector blocks completion while the screen is blurred, showing capture/loading, or bound to the wrong owner, and requires any personal decision to match the current resolution. Factual `check_completed` is immediate; if the bound ready panel appears later, `personal_decision_viewed` is emitted once for that useful Check. The screen passes only input method, outcome, and personalization boolean into the Check envelope and an empty decision exposure. It never passes product identity, formula, photo, or context.
+
+An optional `productEventSink` is injectable for an approved host and local tests; the normal route supplies none. Transport, customer privacy choice and opt-out, backend owner projection, deletion, synthetic staging payload review, final App Privacy answers, and physical acceptance remain separate gates. A reviewed production ingress is still required to meet the brief's pre-distribution measurement gate.
 
 ## Funnel definitions and query contract
 
@@ -31,7 +37,7 @@ Use a server-derived owner projection for distinct counts. Denominators should r
 
 | Question | Numerator and denominator |
 | --- | --- |
-| Acquisition to activation | Canonical first touch or coarse source -> first app open -> first Check start -> first useful Check -> first personalized useful Check, each over the same eligible owner cohort. Referral/creator credit requires server-verified private attribution. |
+| Acquisition to activation | Canonical first touch or coarse source -> first app open -> first Check start -> first useful Check -> first `personal_decision_viewed` following a useful Check, each over the same eligible owner cohort. A factual Check stays useful even when the ready personal panel arrives later. Referral/creator credit requires server-verified private attribution. |
 | Useful resolution | Customer-visible `useful` completions / all terminal Check completions, split by input method. Show unknown, insufficient evidence, and failure separately. |
 | Repeat value | Owners with at least a second useful Check / activated owners. Checks per activated owner and calendar week. D1/D7/D30 returns require activity on the named day after first useful Check, with timezone and observation window fixed before analysis. |
 | Plus | Trigger -> paywall -> plan choice -> start -> verified purchase, renewal or cancellation. Verify final steps from StoreKit/payment backend and entitlement projection; never count a client purchase tap as a sale. |
