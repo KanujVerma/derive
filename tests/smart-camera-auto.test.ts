@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { stillPhotoRole, canObserveLiveBarcode, isObservedGtin, isObservedRetailBarcode } from '../src/presentation/capture/autoCapture.ts';
+import { shutterPhotoRole, stillPhotoRole, canObserveLiveBarcode, isObservedGtin, isObservedRetailBarcode } from '../src/presentation/capture/autoCapture.ts';
 import { createCaptureOperationGate } from '../src/presentation/capture/captureOperationGate.ts';
 import { createCaptureSession, reduceCapture } from '../src/presentation/capture/productEvidence.ts';
 
@@ -9,6 +9,11 @@ test('Auto does not guess a photo role; explicit correction supplies only routin
   assert.equal(stillPhotoRole('auto'), null);
   assert.equal(stillPhotoRole('barcode'), null);
   for (const role of ['front_label', 'ingredients', 'packaging'] as const) assert.equal(stillPhotoRole(role), role);
+});
+test('the Auto shutter explicitly starts a front-label photo without an extra role tap', () => {
+  assert.equal(shutterPhotoRole('auto'), 'front_label');
+  assert.equal(shutterPhotoRole('ingredients'), 'ingredients');
+  assert.equal(shutterPhotoRole('barcode'), null);
 });
 test('continuous barcode signal stops during a photo, preview, or locked result', () => {
   const idle = { busy: false, hasPreview: false, locked: false };

@@ -8,6 +8,11 @@ export function stillPhotoRole(intent: CaptureIntent): PhotoRole | null {
   return intent === 'auto' || intent === 'barcode' ? null : intent;
 }
 
+/** Auto's labeled shutter is a front-label action, not image classification. */
+export function shutterPhotoRole(intent: CaptureIntent): PhotoRole | null {
+  return intent === 'auto' ? 'front_label' : stillPhotoRole(intent);
+}
+
 export function canObserveLiveBarcode(intent: CaptureIntent, state: {
   busy: boolean; hasPreview: boolean; locked: boolean;
 }): boolean {

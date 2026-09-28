@@ -8,7 +8,7 @@ import { colors, layout, radii, spacing, typography } from '../../../constants/t
 import { Icon } from '../../ui/Icon';
 import { captureRecovery } from '../../../presentation/capture/captureRecovery';
 import { createCaptureOperationGate } from '../../../presentation/capture/captureOperationGate';
-import { canObserveLiveBarcode, isObservedRetailBarcode, stillPhotoRole, type CaptureIntent } from '../../../presentation/capture/autoCapture';
+import { canObserveLiveBarcode, isObservedRetailBarcode, shutterPhotoRole, type CaptureIntent } from '../../../presentation/capture/autoCapture';
 import {
   captureRoles, createCaptureSession, nextPhotoRole, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
   type CaptureAction, type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
@@ -117,7 +117,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         const photo = await camera.current?.takePictureAsync({ quality: 0.85 });
         if (!isCurrent()) return;
         if (!photo?.uri) throw new Error('No photo returned');
-        setPreviewRole(stillPhotoRole(intent));
+        setPreviewRole(shutterPhotoRole(intent));
         setPreview(photo.uri);
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       } catch {
