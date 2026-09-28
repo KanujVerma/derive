@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-28: Exact-barcode catalog candidate loading
+
+- **Immutable predecessor:** `origin/main@459566a` after Kanuj #150. This Sami-owned resolver change does not touch Kanuj's camera or decision surfaces.
+- **Source behavior:** a new barcode-only resolution loads exact GTIN assertions through the existing identifier index, then only their linked variants, products, and formula versions. Mixed evidence and existing-case replay keep the prior broad catalog read, preserving cross-product contradictions and immutable snapshot presentation. The same deterministic resolver and provenance requirements decide whether a formula is verified; an unknown barcode stays unknown.
+- **Local proof:** 770 application tests, both TypeScript checks, iOS/web exports, fresh isolated database reset, 24 pgTAP files/575 assertions, and a real local Edge smoke covering exact verified barcode, unknown barcode, typed contradiction, replay, ownership and deletion passed. The isolated test stack used ports `57321`/`57322`; no hosted data or settings changed.
+- **Remaining gap:** broad name/mixed-evidence resolution and replay still have a 10,000-row fail-closed bound. This change does not add GTIN/formula catalog coverage, image recognition, Gemini, hosted deployment or App Store readiness. The three name-only catalog seeds remain in separate PR #159 pending review.
+
 ## 2026-09-28: Camera result sheet stays with the live preview
 
 - **Immutable predecessor:** origin/main `fe477af52a1eb93d1c38d82d9ab8a5b729bfccc3` after #156. Exact-head CI `36478510888` passed both jobs on `d955fbe0e51715e88557066b655de7b78eeed490` before that merge.
