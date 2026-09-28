@@ -26,6 +26,7 @@ export interface MissingProductContributionProps {
   initial?: Partial<ContributionDraft>;
   /** The Check screen already supplies its horizontal content inset. */
   embedded?: boolean;
+  onTryAnotherWayLabel?: string;
   onTryAnotherWay: () => void;
 }
 
@@ -34,7 +35,7 @@ export function MissingProductContribution({ contextKey, ...props }: MissingProd
   return <ContributionBody key={contextKey} {...props} />;
 }
 
-function ContributionBody({ availability, initial, embedded, onTryAnotherWay }:
+function ContributionBody({ availability, initial, embedded, onTryAnotherWayLabel = 'Try another way', onTryAnotherWay }:
   Omit<MissingProductContributionProps, 'contextKey'>) {
   const [draft, setDraft] = useState(() => createContributionDraft(initial));
   const [editing, setEditing] = useState(false);
@@ -68,7 +69,7 @@ function ContributionBody({ availability, initial, embedded, onTryAnotherWay }:
       {view.primaryAction === 'help_add_product' ? (
         <Button label="Help add product" variant="brand" onPress={() => setEditing(true)} style={styles.action} />
       ) : null}
-      <Button label="Try another way" variant={view.primaryAction === 'help_add_product' ? 'outline' : 'brand'}
+      <Button label={onTryAnotherWayLabel} variant={view.primaryAction === 'help_add_product' ? 'outline' : 'brand'}
         onPress={onTryAnotherWay} style={styles.action} />
     </View>
   );

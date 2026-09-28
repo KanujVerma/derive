@@ -2,7 +2,7 @@
 
 ## Implemented boundary
 
-`MissingProductContribution` is composed into the scanner-first Check for an unknown barcode, an unresolved identity result after a typed name, and a package-photo handoff without a resolved case. Its current `unavailable` state says that asking Derive to add a product is not available and offers **Try another way**. Search and camera retries remain available. An unresolved Check does not send a request, create a review task, or add catalog truth.
+`MissingProductContribution` is composed into the scanner-first Check for an unknown barcode, an unresolved identity result after a typed name, and a package-photo handoff without a resolved case. Its current `unavailable` state says that asking Derive to add a product is not available and offers **Search by name** in Check. The reusable component retains **Try another way** as its default elsewhere. Camera retries remain available. An unresolved Check does not send a request, create a review task, or add catalog truth.
 
 The future `available` state opens a short draft with required brand and product name. Barcode, variant, package size, and country code are optional. The action is **Review product details**; its callback receives the parsed `CatalogContributionRequest` for a separate consent and submission step. This component never sends, persists, or displays success for a shared contribution.
 

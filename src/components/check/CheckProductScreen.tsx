@@ -723,7 +723,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
         <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
           <Text style={styles.entryBody}>No verified barcode match.</Text>
           {recovery && <MissingProductContribution contextKey={recovery.contextKey}
-            availability={recovery.availability} initial={recovery.initial} embedded onTryAnotherWay={handleSearchNamePress} />}
+            availability={recovery.availability} initial={recovery.initial} embedded
+            onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
           <Button label="Scan another barcode" variant="outline" onPress={() => openCapture('barcode')} style={styles.entryAction} />
         </ScrollView>
       </View>
@@ -986,7 +987,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
         ))}
         {renderSaveCheckAction(resolution.caseId)}
         {recovery && <MissingProductContribution contextKey={recovery.contextKey}
-          availability={recovery.availability} initial={recovery.initial} embedded onTryAnotherWay={handleSearchNamePress} />}
+          availability={recovery.availability} initial={recovery.initial} embedded
+          onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
         {targetShell && !recovery && <Button label="Search by name" variant="brand" size="medium" onPress={handleSearchNamePress} style={{ marginBottom: spacing.md }} />}
         <Button label="Check another product" variant="secondary" size="medium" onPress={handleResetScan} />
         </ScrollView>
@@ -1020,7 +1022,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
         <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
           <Text style={styles.entryBody}>Product identity is still unknown. Search by name or take another photo.</Text>
           {recovery && <MissingProductContribution contextKey={recovery.contextKey}
-            availability={recovery.availability} initial={recovery.initial} embedded onTryAnotherWay={handleSearchNamePress} />}
+            availability={recovery.availability} initial={recovery.initial} embedded
+            onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
           <Button label="Take another photo" variant="outline" onPress={() => openCapture(captureEvidence.localPhotos[0].role)} style={styles.entryAction} />
         </ScrollView>
       </View>

@@ -4,6 +4,7 @@ import test from 'node:test';
 import { selectCheckContributionRecovery } from '../src/presentation/catalog-contribution/checkRecovery.ts';
 
 const check = readFileSync(new URL('../src/components/check/CheckProductScreen.tsx', import.meta.url), 'utf8');
+const recovery = readFileSync(new URL('../src/components/check/contribution/MissingProductContribution.tsx', import.meta.url), 'utf8');
 
 test('recovery appears only for unresolved scanner-first product identity', () => {
   const base = { targetShell: true, ownerId: 'owner-a', caseId: 'case-a', observedBarcode: null,
@@ -45,4 +46,10 @@ test('Check composes recovery for unknown barcode, unresolved case, and unresolv
   assert.match(check, /reason: 'unresolved_photo'/);
   assert.equal((check.match(/<MissingProductContribution/g) ?? []).length, 3);
   assert.doesNotMatch(check, /catalog-contribution['"]|submitCatalogContribution/);
+});
+
+test('embedded Check recovery retains an explicit Search by name action and other callers keep the generic default', () => {
+  assert.equal((check.match(/onTryAnotherWayLabel="Search by name"/g) ?? []).length, 3);
+  assert.match(recovery, /onTryAnotherWayLabel = 'Try another way'/);
+  assert.match(recovery, /label=\{onTryAnotherWayLabel\}/);
 });
