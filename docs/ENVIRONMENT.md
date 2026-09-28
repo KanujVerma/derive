@@ -36,6 +36,7 @@ another.
 | `DERIVE_CHECKOUT_SUCCESS_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS success destination (localhost HTTP allowed only for local development) |
 | `DERIVE_CHECKOUT_CANCEL_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS cancellation destination (localhost HTTP allowed only for local development) |
 | `DERIVE_PORTAL_RETURN_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS return destination from Stripe Billing Portal |
+| `MEASUREMENT_INGRESS_ENABLED` | Supabase Edge Functions / trusted server | Non-secret activation gate | Defaults off; set exactly `true` only after first-party measurement privacy, opt-out, retention and App Privacy review |
 
 The root `.env.example` lists only public mobile variables, including an empty optional build flavor and support address.
 CLI/CI and trusted-server names are documented here instead of being mixed into
@@ -47,6 +48,10 @@ When the support address is unset or malformed, onboarding does not offer a huma
 S5 trusted-server names are listed with empty values in `supabase/.env.example`.
 They are deliberately absent from the root Expo template. PostHog remains
 excluded until its SDK and privacy-safe event transport are implemented.
+The first-party product measurement ingress has a separate server-only,
+default-off switch in that same template. It does not enable PostHog or a
+customer event call site. Do not set it to `true` in hosted settings based on
+this source preparation alone.
 
 ## Local mobile development
 
