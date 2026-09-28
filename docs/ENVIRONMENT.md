@@ -197,10 +197,11 @@ a routine. The deterministic emergency circuit breaker and server-owned signal
 inference do not require the provider key. See [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md).
 
 At the 2026-09-28 read-only hosted secret-name check for project
-`snojlbqovlawewwqbviz`, `GEMINI_API_KEY` was still absent. The developer's
-ignored `app/supabase/.env.local` has blank `GEMINI_API_KEY`, `GEMINI_MODEL`,
-and `ROUTINE_MODEL_PROVIDER` placeholders; saving a value there does not
-automatically inject it into a running local function or hosted project. Local
+`snojlbqovlawewwqbviz`, `GEMINI_API_KEY` was still absent. The local trusted
+function file is the ignored `supabase/.env.local`; a repository-root `.env`
+is not automatically loaded by Supabase Edge Functions and must never become
+a mobile `EXPO_PUBLIC_*` secret. Saving a value to the trusted file does not
+inject it into an already-running function or the hosted project. Local
 functions must be started with that env file, while hosted use requires a
 separately authorized secret update and deployed function. Free barcode/name
 Check does not call Gemini. The current Gemini paths are the Managed-gated
