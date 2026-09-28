@@ -1,9 +1,57 @@
-# Sami beta-critical portfolio — 2026-09-27 checkpoint
+# Sami beta-critical portfolio — 2026-09-28 checkpoint
 
 **SAMI MVP PORTFOLIO PARTIAL.** Source foundations and automated gates are not a
 working photo recognizer, a hosted scanner-first beta, or physical acceptance.
 This ledger complements canonical ownership and Kanuj's P0-D acceptance; it does
 not replace them or assign his composition work to Sami.
+
+## Current 2026-09-28 integration checkpoint
+
+**SOURCE:** Main advanced from `7d804bf0ac174b8816a5a83f465647c1d9387732`
+to `b7c1e15d0ba8e0c8fae52c45c06c171b43eba96c` through focused Sami PRs
+[#139](https://github.com/KanujVerma/derive/pull/139),
+[#140](https://github.com/KanujVerma/derive/pull/140),
+[#141](https://github.com/KanujVerma/derive/pull/141),
+[#142](https://github.com/KanujVerma/derive/pull/142),
+[#143](https://github.com/KanujVerma/derive/pull/143) and
+[#145](https://github.com/KanujVerma/derive/pull/145) and
+[#146](https://github.com/KanujVerma/derive/pull/146). Each PR passed both
+exact-head CI jobs before merge. Post-merge main CI for `924371b` passed
+both jobs in [run 36461201362](https://github.com/KanujVerma/derive/actions/runs/36461201362).
+Post-merge main CI for `b7c1e15` also passed both jobs in
+[run 36464124278](https://github.com/KanujVerma/derive/actions/runs/36464124278). The
+original dirty auth checkout was not changed. No Kanuj-owned `app/**` file was
+changed in these PRs.
+
+| Lane | Increment landed | Still needed for customer release |
+| --- | --- | --- |
+| S1 hosted free / P0-C | Exact-project dry-run and migration/function dependency review in [P0-C rollout review](P0_C_HOSTED_ROLLOUT_REVIEW.md). At `666fe1d`, the read-only inventory found 19/30 migration versions and 15/22 function names hosted, with no hosted-only versions/names. #145 proved a separate local guest deletion retry across >100 objects and both private buckets without touching the retained scanner stack. | That dated inventory had eleven missing migrations and seven missing function names. Source now contains 31 migrations and 23 functions after #146, with no S4 hosted deployment. A fresh exact-project readback returned UNKNOWN; do not infer current hosted parity or deployed revision identity. Auth flags, safe rollout, hosted deletion/failure drill and real-product/signed physical acceptance remain unproven. Public guest activation is not authorized. |
+| S2 image perception | Offline replay now reports per-provider scenario coverage and honest `NOT_RUN`; no provider winner is fabricated. | Eligible rights-cleared independent-gold corpus remains zero; no cloud provider was run; first release is barcode/name-first, without automatic photo identification. |
+| S3 contribution | Owner-derived private submit/status/withdraw Edge API, additive owner-RLS table, explicit versioned consent record, private evidence existence check, idempotent replay, daily abuse bound, withdrawal scrub and deletion cascade. Fresh local reset, pgTAP and Auth/Storage/Edge tests passed. Kanuj #148 composed honest missing-product recovery in Check in an unavailable state. | Neither the API nor a send action is hosted/activated. Founder-approved consent copy, private-image reviewer access and public retention policy precede activation. Structured facts need separate review before canonical promotion. |
+| S4 measurement / quota | Strict coarse-event parser plus a first-party authenticated event ingress and owner-bound table landed in #146. The Edge function is default-OFF; local Auth, RLS, shape, operational rate-cap and deletion-cascade tests passed. No PostHog SDK, export, client transport, hosted deployment or customer tracking was activated. | Founder privacy choice/opt-out, retention and disclosure, staging payload audit and app composition remain before activation. Provider-cost ledger, referral authority and atomic customer-visible Check quota are not implemented. Do not confuse six photo upload grants/day with a Check limit. |
+| S5 catalog | Read-only exact-project sourced-catalog evidence inventory landed. **HOSTED dated readback:** one sourced product, one alias, zero active sourced variants, authoritative verified GTIN assertions or verified formula versions. | This is not demand coverage. Collect intended beta products, corroborate exact package/variant/GTIN/formula with rights-cleared sources, ingest reviewed facts, and physically test barcode/name resolution. |
+
+After these Sami landings, Kanuj's [#144](https://github.com/KanujVerma/derive/pull/144)
+records a physical iPhone Development Mock checkpoint: live camera preview,
+visible shutter/modes, torch toggle and a mock name-search result. It did not
+test a real product or barcode, hosted service, account/privacy flows, a signed
+candidate or unassisted customer use. It is useful physical evidence, not
+end-to-end App Store acceptance. His subsequent
+[#148](https://github.com/KanujVerma/derive/pull/148) composed missing-product
+recovery in Check, but kept submission unavailable pending consent and hosted
+review. Current main after that merge is `ecb82ad4e85e1efa0690980637a06b295f70eca1`.
+
+The critical path is hosted P0-C parity and guest safety **plus** enough truthful
+barcode/name catalog coverage, then Kanuj's production routing, real-product
+physical iPhone journey and App Store acceptance. Contribution, analytics, quota and photo
+extraction can progress independently but must not be marketed or activated from
+source-only evidence. The founder previously chose Free-only first; newer
+Free/Plus product docs warrant final binary-scope confirmation. The public
+release audience and guest retention/recovery policy are also unresolved.
+Temporary closed-beta retain-until-delete is not a public retention policy.
+
+The sections below preserve the 2026-09-27 checkpoint and are historical where
+the current table supersedes their implementation state.
 
 ## Recovered and preserved
 
