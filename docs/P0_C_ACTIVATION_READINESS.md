@@ -1,5 +1,9 @@
 # P0-C hosted free operations — readiness inventory
 
+The current exact-project migration/function drift and ordered SQL review are
+recorded in [the hosted rollout review](P0_C_HOSTED_ROLLOUT_REVIEW.md). It is a
+read-only checkpoint and does not approve deployment or guest activation.
+
 ## App Store scanner release target (2026-09-27 update)
 
 The founder has now specified a **scanner-first App Store release**, not merely
