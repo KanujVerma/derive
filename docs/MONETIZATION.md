@@ -10,7 +10,7 @@
 | **Derive Plus** | “Help me make better skincare decisions across my products.” | **EVALUATION:** self-directed comparison, Considering workspace, analytical My Stuff, longitudinal patterns, and eventually useful research or reformulation alerts. Higher usage may help, but alone is a weak reason to pay. These are not public paid entitlements. |
 | **Managed Skincare** | “I don't want to think about skincare. Manage it for me.” | **APPROVED TARGET:** Plus-level tools plus delegated AM/PM routine management, check-ins, proposed changes, customer approval for meaningful changes, and proactive follow-up. **IMPLEMENTED:** legacy Founding Beta membership and Stripe source exist; this is not evidence of a hosted public Managed offer. **EXPERIMENT:** $25/month, products separate, subject to service cost and retention evidence. |
 
-**APPROVED TARGET / FIRST RELEASE SCOPE:** The current P0-C plan for the first App Store scanner candidate is free-only barcode and name search. Native product-photo OCR, Plus checkout, and Managed purchase activation are outside that candidate; hosted and physical acceptance remain open. The founder's newer proposal to show Plus or Founding Plus publicly remains unresolved against that free-only scope; this document does not add it to the candidate. See [P0-C activation readiness](P0_C_ACTIVATION_READINESS.md).
+**OPEN FIRST-RELEASE SCOPE:** The latest founder direction targets public Derive plus a real Plus or Founding Plus benefit, with Managed shown as Early Access. Sami's earlier P0-C first-release checkpoint was Free-only barcode/name Check, and the latest brief explicitly preserves that path if Plus billing slips. Final candidate scope has not been reconciled. No Plus checkout, Founding grant or Managed purchase activation is implemented or authorized by this document; hosted and physical acceptance remain open. Native product-photo OCR is outside the current source capability. See [P0-C activation readiness](P0_C_ACTIVATION_READINESS.md) and [release scorecard](APP_STORE_RELEASE_READINESS.md).
 
 **APPROVED TARGET:** The scanner earns trust and may distribute the service; whether deeper scanner use increases Managed conversion is an unproven funnel hypothesis. Plus is for people who still direct their own routine. Managed takes responsibility for ongoing routine decisions. A Plus tool must not quietly imply the Managed promise of proactive care or human review.
 
@@ -54,11 +54,11 @@
 
 ## 24–48 hour call and unresolved decisions
 
-**APPROVED TARGET:** Release a useful scanner-first Free candidate once its actual hosted, physical, privacy, and App Store gates pass. Managed can be honestly presented as Early Access if the candidate supports the promised interest path. Plus architecture and learning instrumentation can proceed in parallel; neither a Plus price nor billing must block first scanner value.
+**APPROVED DIRECTION / CONDITIONAL FALLBACK:** Aim for public Derive with a real Plus or Founding Plus benefit and an honest Managed Early Access path. If Plus billing or entitlement is not ready, preserve a useful Free scanner-first candidate rather than delaying first customer value. Either path requires its actual hosted, physical, privacy, measurement and App Store gates. No production Plus or Managed claim can be inferred from source preparation.
 
 **OPEN FOUNDER DECISIONS, in order:**
 
-1. Whether the first external candidate is Free plus Managed information, or also exposes a real Plus benefit. Name the exact benefit before a paid offer.
+1. Whether the first external candidate can meet the preferred Derive plus Plus/Founding direction, or must use the Free-only fallback. Name and implement the exact Plus benefit before a paid offer.
 2. Whether to run Founding Plus at launch; if yes, approve eligibility, term, expiration/renewal terms, and the primary learning metric. Do not assume `250/60` is optimal.
 3. Whether to test `$4.99/month` and `$30–40/year` after value and cost evidence, and which price variants are allowed in a later experiment. No storefront product is approved by this note.
 4. What Managed Early Access commits Derive to do with expressed interest, and who can fulfill that response.
