@@ -1803,3 +1803,11 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 - **Priority:** Auto camera and product-name search are core; photo/screenshot library input is the next target; manual recovery remains core; URL/share and pasted ingredient text are later; Product Compare is approved near-term post-MVP and not implemented.
 - **Simplicity and comparison:** complexity belongs behind the interface. Product Compare uses two product truth snapshots and the same personal-context revision, without a universal score or commercial influence. Price/merchant/availability remain separately sourced commerce facts.
 - **Unchanged authority:** S6/ProductTruthSnapshotV1 product and formula authority, P0-B decision binding, commerce independence, and founder ownership/stewardship are unchanged.
+
+## 2026-09-27: P0-C hosted function-name drift readback
+
+- **Owner / scope:** Sami, read-only hosted readiness; no migration, Auth/RLS, deployment, deletion, customer-data access or activation.
+- **Source / hosted target:** committed main `3e641c550058e13fe1fe64adc31dbe67a64d0e10`; exact Supabase project `snojlbqovlawewwqbviz`.
+- **Observed:** 21 committed function entrypoints, 15 hosted names. Hosted lacks `access-state`, `free-context`, `free-personal-fit`, `personal-context`, `personal-decision` and `prepare-free-product-evidence`; no unexpected hosted names. Deployed revisions and all other hosted controls remain unverified.
+- **Tool:** `scripts/readback-hosted-function-inventory.mjs` repeats the sanitized name comparison and fails closed on drift/error. Even exact name parity leaves activation blocked; `docs/P0_C_ACTIVATION_READINESS.md` is the gate packet.
+- **Next gate:** finish lifecycle/abuse/retention decisions and local least-privilege acceptance, then coordinate a reviewed exact-project migration/function/config readback, rollout and physical acceptance with Kanuj. Do not treat this inventory as authorization to deploy.
