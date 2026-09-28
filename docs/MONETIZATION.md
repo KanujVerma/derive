@@ -1,6 +1,6 @@
 # Derive monetization: product boundary and learning plan
 
-**Owner:** Kanuj, with Sami advisory on hosted entitlement, billing, privacy, and operations. **As of:** 2026-09-28. **Scope:** product and commercial direction, not a billing activation plan. Status labels below distinguish source behavior from targets and experiments. Current competitor and subscription evidence is in [the dated research note](research/COMPETITOR_ECONOMICS_2026_09_28.md). [PRODUCT.md](PRODUCT.md), [COMMERCE.md](COMMERCE.md), and [APP_STORE_RELEASE_READINESS.md](APP_STORE_RELEASE_READINESS.md) remain authoritative for their respective product, Shop, and release boundaries.
+**Owner:** Kanuj, with Sami advisory on hosted entitlement, billing, privacy, and operations. **As of:** 2026-09-28. **Scope:** product and commercial direction, not a billing activation plan. Status labels below distinguish source behavior from targets and experiments. Current competitor and subscription evidence is in [the dated research note](research/COMPETITOR_ECONOMICS_2026_09_28.md). [PRODUCT.md](PRODUCT.md), [COMMERCE.md](COMMERCE.md), [PRODUCT_ANALYTICS.md](PRODUCT_ANALYTICS.md), and [APP_STORE_RELEASE_READINESS.md](APP_STORE_RELEASE_READINESS.md) remain authoritative for their respective product, Shop, measurement, and release boundaries; the new analytics contract has no production event sink or screen call site yet.
 
 ## The three customer jobs
 
