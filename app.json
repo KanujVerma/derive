@@ -14,8 +14,8 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "Derive uses your camera to capture private skin progress photos and scan your current skincare shelf.",
-        "NSPhotoLibraryUsageDescription": "Derive needs photo library access to upload photos of your skincare products."
+        "NSCameraUsageDescription": "Derive uses your camera to scan skincare product barcodes and capture product or skin photos you choose.",
+        "NSPhotoLibraryUsageDescription": "Derive uses photos you choose from your library to add products to your shelf or attach an image to a message."
       }
     },
     "android": {
