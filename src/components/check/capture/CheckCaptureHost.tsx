@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Modal } from 'react-native';
+import { Modal, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProductEvidenceCapture } from './ProductEvidenceCapture';
 import { createCheckCaptureBridge, type CheckCaptureHandoff } from '../../../presentation/capture/checkCaptureAdapter';
@@ -12,9 +12,11 @@ interface Props {
   processor?: CaptureProcessor;
   initialRole?: CaptureRole;
   live?: boolean;
+  detectionPaused?: boolean;
+  companion?: React.ReactNode;
 }
 
-export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', live = false }: Props) {
+export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', live = false, detectionPaused = false, companion = null }: Props) {
   const selectedProcessor = useMemo(() => processor ?? (live ? createLiveFreeEvidenceProcessor() : pendingCaptureProcessor), [processor, live]);
   const bridge = useMemo(() => createCheckCaptureBridge(selectedProcessor), [selectedProcessor]);
 
@@ -23,13 +25,17 @@ export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRo
     // Native modal roots need their own provider for correct device safe areas.
     <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaProvider>
-        <ProductEvidenceCapture
-          onClose={onClose}
-          initialRole={initialRole}
-          autoFinishBarcode
-          processor={bridge.processor}
-          onEvidenceReady={(handoff) => onCaptureReady(bridge.handoff(handoff))}
-        />
+        <View style={{ flex: 1 }}>
+          <ProductEvidenceCapture
+            onClose={onClose}
+            initialRole={initialRole}
+            autoFinishBarcode
+            detectionPaused={detectionPaused}
+            processor={bridge.processor}
+            onEvidenceReady={(handoff) => onCaptureReady(bridge.handoff(handoff))}
+          />
+          {companion}
+        </View>
       </SafeAreaProvider>
     </Modal>
   );

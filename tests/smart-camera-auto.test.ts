@@ -73,7 +73,7 @@ test('Auto camera remains a local leaf and asks for a part only when the photo r
   assert.match(source, /Which part is in this photo\?/);
   assert.match(source, /accessibilityLabel="Change part"/);
   assert.match(source, /previewRole && <Action label=\{session\.evidence\.some\([\s\S]*'Replace photo' : 'Use photo'\}/);
-  assert.match(source, /onBarcodeScanned=\{intent === 'barcode' \|\| \(intent === 'auto' && capturedPhotos\.length === 0\) \? onBarcode : undefined\}/);
+  assert.match(source, /onBarcodeScanned=\{liveBarcode \? onBarcode : undefined\}/);
   assert.doesNotMatch(source, /fetch\(|Gemini|stream.*frames|Ingredient list detected/);
 });
 

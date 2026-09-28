@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-28: Camera result sheet stays with the live preview
+
+- **Immutable predecessor:** origin/main `fe477af52a1eb93d1c38d82d9ab8a5b729bfccc3` after #156. Exact-head CI `36478510888` passed both jobs on `d955fbe0e51715e88557066b655de7b78eeed490` before that merge.
+- **Customer behavior:** a barcode or photo result that includes an immutable product-truth snapshot keeps the camera mounted and shows the bound result sheet. Barcode observation pauses while the sheet is open. Closing the sheet starts a fresh capture session. A finished result without a snapshot still uses the existing result page.
+- **Same-case gap:** `resolve-product-identity` can retry one `requestId` but cannot append evidence to an existing case or revision. The sheet's add-ingredient action is intentionally unwired. Sami owns that continuation contract. Kanuj must not present a new resolve as the same case.
+- **Not claimed:** physical camera acceptance, hosted scanner parity, signed candidate, TestFlight, or an unassisted customer study.
+
 ## 2026-09-28: Sami source portfolio lands, provider and release gates remain
 
 - **Immutable predecessor:** main `924371b5808c02b1e0b450b9734abe366c379c0f` after Sami #145; both post-merge CI jobs passed in run `36461201362`. The next focused S4 first-party ingress PR #146 merged as `b7c1e15d0ba8e0c8fae52c45c06c171b43eba96c` after both exact-head jobs passed.
