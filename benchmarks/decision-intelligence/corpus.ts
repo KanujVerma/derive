@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { input as reviewedInput } from '../../tests/fixtures/p0b/policy.ts';
 import type { EvaluationInput } from '../../src/domain/personal-decision/evaluate.ts';
 import type { SoftJudgmentV0 } from './schema.ts';
@@ -46,3 +47,9 @@ export const CORPUS: readonly Case[] = [
     'A self report is retained as a caution, while contribution remains unknown; no ingredient diagnosis follows.',
     { routineContribution: 'unclear', overlap: 'unknown', needsMoreContext: true, abstain: true }, value => { value.profile = null; value.binding.profileRevision = null; value.product.formula = { state: 'unknown', reason: 'fixture missing' }; value.binding.formulaVersionId = null; value.history!.events = [{ id: 'reaction-1', productId: 'product', variantId: null, formulaVersionId: null, outcome: 'reaction' }]; }),
 ];
+
+export function corpusSha256(): string {
+  return createHash('sha256').update(JSON.stringify(CORPUS.map(c => ({
+    id: c.id, scenario: c.scenario, provenance: c.provenance, expected: c.expected, input: c.makeInput(),
+  })))).digest('hex');
+}

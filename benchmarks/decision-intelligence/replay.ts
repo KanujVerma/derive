@@ -1,4 +1,4 @@
-import { CORPUS } from './corpus.ts';
+import { CORPUS, CORPUS_VERSION, corpusSha256 } from './corpus.ts';
 import { CONTRIBUTIONS, parseSoftJudgment, type Contribution, type SoftJudgmentV0 } from './schema.ts';
 import { evaluatePersonalDecision } from '../../src/domain/personal-decision/evaluate.ts';
 import type { Provider, Result } from './harness.ts';
@@ -17,6 +17,8 @@ export interface RecordedAttempt {
 }
 export interface RecordedRun {
   provider: Exclude<Provider, 'p0b_deterministic'>;
+  corpusVersion: string;
+  corpusSha256: string;
   modelVersion: string;
   adapterSha256: string;
   promptSha256: string;
@@ -30,8 +32,10 @@ const percentile = (values: number[], p: number) => [...values].sort((a, b) => a
 /** Offline comparison of supplied records. It does not authenticate provider origin or call a network. */
 export function replayRecordedRuns(runs: RecordedRun[]): Result[] {
   const ids = CORPUS.map(c => c.id);
+  const currentCorpusSha256 = corpusSha256();
   const byProvider = new Map<RecordedRun['provider'], RecordedRun[]>();
   for (const run of runs) {
+    if (run.corpusVersion !== CORPUS_VERSION || run.corpusSha256 !== currentCorpusSha256) throw new Error('RUN_CORPUS_MISMATCH');
     if (!['jev', 'gemini_structured'].includes(run.provider) || !run.modelVersion.trim() || !digest.test(run.adapterSha256) || !digest.test(run.promptSha256) ||
         run.attempts.length !== ids.length || new Set(run.attempts.map(a => a.caseId)).size !== ids.length || run.attempts.some(a => !ids.includes(a.caseId))) throw new Error('RUN_INVALID');
     for (const a of run.attempts) {

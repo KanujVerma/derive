@@ -1,5 +1,4 @@
-import { createHash } from 'node:crypto';
-import { CORPUS, CORPUS_VERSION } from './corpus.ts';
+import { CORPUS, CORPUS_VERSION, corpusSha256 } from './corpus.ts';
 import { evaluatePersonalDecision, ENGINE_VERSION, POLICY_VERSION } from '../../src/domain/personal-decision/evaluate.ts';
 import { parseSoftJudgment, CONTRIBUTIONS, type Contribution, type SoftJudgmentV0 } from './schema.ts';
 import type { PersonalDecisionPacketV1 } from '../../src/contracts/PersonalDecision.ts';
@@ -60,7 +59,7 @@ export function runBaseline(): Report {
   const correct = rows.filter(r => r.expected.routineContribution === r.actual.routineContribution).length;
   const abstainCorrect = rows.filter(r => r.expected.abstain === r.actual.abstain).length;
   const falsePositive = rows.filter(r => r.critical && ['incremental', 'replacement_candidate'].includes(r.actual.routineContribution)).length;
-  const corpusSha256 = createHash('sha256').update(JSON.stringify(CORPUS.map(c => ({ id: c.id, scenario: c.scenario, provenance: c.provenance, expected: c.expected, input: c.makeInput() })))).digest('hex');
+  const currentCorpusSha256 = corpusSha256();
   const common: Omit<Result, 'provider' | 'status' | 'modelVersion' | 'runCount' | 'evaluatedCases' | 'exactLabelAccuracy' | 'macroF1' | 'abstentionAccuracy' | 'schemaValidity' | 'criticalFalsePositiveCount' | 'disagreementCaseIds' | 'providerFailures' | 'repeatedRunStability'> =
     { brierScore: null, p50LatencyMs: null, p95LatencyMs: null, costUsdPerCase: null, inputTokens: null, outputTokens: null };
   const results: Result[] = [
@@ -73,5 +72,5 @@ export function runBaseline(): Report {
       evaluatedCases: 0, exactLabelAccuracy: null, macroF1: null, abstentionAccuracy: null, schemaValidity: null,
       criticalFalsePositiveCount: null, disagreementCaseIds: [], providerFailures: 0, repeatedRunStability: null, ...common })),
   ];
-  return { corpusVersion: CORPUS_VERSION, corpusSha256, provenance: 'Reviewed P0-B policy assertions; not independent founder-reviewed gold', cases: rows.length, results };
+  return { corpusVersion: CORPUS_VERSION, corpusSha256: currentCorpusSha256, provenance: 'Reviewed P0-B policy assertions; not independent founder-reviewed gold', cases: rows.length, results };
 }

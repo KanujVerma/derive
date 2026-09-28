@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { CORPUS } from '../benchmarks/decision-intelligence/corpus.ts';
+import { CORPUS, CORPUS_VERSION } from '../benchmarks/decision-intelligence/corpus.ts';
 import { baseline, runBaseline } from '../benchmarks/decision-intelligence/harness.ts';
 import { parseSoftJudgment } from '../benchmarks/decision-intelligence/schema.ts';
 import { replayRecordedRuns, type RecordedRun } from '../benchmarks/decision-intelligence/replay.ts';
@@ -15,13 +15,24 @@ for (const c of CORPUS) {
 assert.throws(() => parseSoftJudgment({ routineContribution: 'incremental', overlap: 'none', abstain: true, needsMoreContext: false }), /SCHEMA_INVALID/);
 assert.throws(() => parseSoftJudgment({ routineContribution: 'incremental', overlap: 'none', abstain: false, needsMoreContext: false, action: 'SKIP' }), /SCHEMA_INVALID/);
 assert.throws(() => parseSoftJudgment({ routineContribution: 'unclear', overlap: 'unknown', abstain: true, needsMoreContext: false }), /SCHEMA_INVALID/);
+const plain = { routineContribution: 'incremental', overlap: 'none', needsMoreContext: false, abstain: false };
+const parsed = parseSoftJudgment(plain);
+assert.notStrictEqual(parsed, plain);
+plain.routineContribution = 'redundant';
+assert.equal(parsed.routineContribution, 'incremental');
+assert.throws(() => parseSoftJudgment({ ...plain, get routineContribution() { return 'incremental'; } }), /SCHEMA_INVALID/);
+assert.throws(() => parseSoftJudgment(Object.defineProperty({ ...plain }, 'hidden', { value: 'extra' })), /SCHEMA_INVALID/);
+assert.throws(() => parseSoftJudgment({ ...plain, [Symbol('extra')]: true }), /SCHEMA_INVALID/);
+assert.throws(() => parseSoftJudgment(Object.assign(Object.create(null), plain)), /SCHEMA_INVALID/);
+assert.throws(() => parseSoftJudgment(new Proxy(plain, { ownKeys() { throw new Error('trap leaked'); } })), /SCHEMA_INVALID/);
 const report = runBaseline();
 assert.deepEqual(report, runBaseline());
 assert.equal(report.cases, CORPUS.length);
 assert.equal(report.results[0].evaluatedCases, CORPUS.length);
 assert(report.results.slice(1).every(r => r.status === 'NOT_RUN' && r.evaluatedCases === 0 && r.exactLabelAccuracy === null && r.costUsdPerCase === null));
 // These artificial records test offline replay arithmetic only. They are never reported as provider results.
-const mock: RecordedRun = { provider: 'jev', modelVersion: 'test-only', adapterSha256: 'a'.repeat(64), promptSha256: 'b'.repeat(64),
+const mock: RecordedRun = { provider: 'jev', corpusVersion: CORPUS_VERSION, corpusSha256: report.corpusSha256,
+  modelVersion: 'test-only', adapterSha256: 'a'.repeat(64), promptSha256: 'b'.repeat(64),
   attempts: CORPUS.map(c => ({ caseId: c.id, output: c.expected, latencyMs: 5, costUsd: 0.01, inputTokens: 10, outputTokens: 1 })) };
 const replay = replayRecordedRuns([mock, mock])[0];
 assert.equal(replay.evaluatedCases, CORPUS.length * 2);
@@ -29,5 +40,7 @@ assert.equal(replay.repeatedRunStability, 1);
 assert.equal(replay.p95LatencyMs, 5);
 assert(Math.abs(replay.costUsdPerCase! - 0.01) < 1e-12);
 assert.equal(replay.brierScore, null);
+assert.throws(() => replayRecordedRuns([{ ...mock, corpusVersion: 'old-corpus' }]), /RUN_CORPUS_MISMATCH/);
+assert.throws(() => replayRecordedRuns([{ ...mock, corpusSha256: '0'.repeat(64) }]), /RUN_CORPUS_MISMATCH/);
 assert.throws(() => replayRecordedRuns([{ ...mock, attempts: [{ ...mock.attempts[0], output: undefined, failure: 'timeout' }, ...mock.attempts.slice(1), mock.attempts[0]] }]), /RUN_INVALID/);
 console.log('Decision intelligence benchmark schema, provenance, baseline and repeatability passed');
