@@ -1839,3 +1839,10 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 - **Observed:** 21 committed function entrypoints, 15 hosted names. Hosted lacks `access-state`, `free-context`, `free-personal-fit`, `personal-context`, `personal-decision` and `prepare-free-product-evidence`; no unexpected hosted names. Deployed revisions and all other hosted controls remain unverified.
 - **Tool:** `scripts/readback-hosted-function-inventory.mjs` repeats the sanitized name comparison and fails closed on drift/error. Even exact name parity leaves activation blocked; `docs/P0_C_ACTIVATION_READINESS.md` is the gate packet.
 - **Next gate:** finish lifecycle/abuse/retention decisions and local least-privilege acceptance, then coordinate a reviewed exact-project migration/function/config readback, rollout and physical acceptance with Kanuj. Do not treat this inventory as authorization to deploy.
+
+## 2026-09-28: P0-C safe Auth setting inventory
+
+- **Founder scope:** first App Store scanner release uses barcode and name search; no native product-photo OCR, $4.99 checkout, or managed purchase activation is implied.
+- **Owner / scope:** Sami adds a fixed-project, read-only Management API Auth setting inventory. It emits only anonymous/global signup flags, anonymous IP rate limit and sanitized CAPTCHA status. It never emits returned provider/SMTP secrets or a Management API token. No hosted setting is changed.
+- **Actual hosted result:** `UNKNOWN` because no read token was available for this checkpoint. A source or default rate-limit assumption is not hosted proof. The separate 10-migration/six-function drift remains; activation is `BLOCKED` even after a successful Auth-setting readback.
+- **Open founder/release gates:** public guest retention/recovery policy, customer-facing account transition, abuse/challenge test, reviewed exact-project rollout, actual scanner coverage and Kanuj-owned physical/App Store acceptance.
