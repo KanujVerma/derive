@@ -1,0 +1,144 @@
+# App Store release readiness: scanner-first Derive
+
+**Owner:** Kanuj, P0-D. **Starting source:** `2f6671d25d762bca32396be220a3fb070749c5e1` (2026-09-27). This is a preparation ledger for a future U.S. App Store candidate. The prior [external TestFlight packet](APPLE_EXTERNAL_TESTFLIGHT_SUBMISSION.md) describes a managed-first Build 8/9 and is historical evidence only. No current scanner-first archive, App Store submission or public release is claimed.
+
+## Status meanings
+
+- **PASS:** the named, narrow source or observed gate was actually verified; it does not pass a different environment.
+- **READY TO VERIFY:** preparation exists, but the exact candidate/archive/private account/device evidence is pending.
+- **BLOCKED:** current source or an absent dependency contradicts the intended release outcome.
+- **UNKNOWN:** the required private or final-candidate fact has not been observed safely.
+
+[Apple's current minimum](https://developer.apple.com/news/?id=ueeok6yw) requires iOS uploads made from April 28, 2026 onward to use the iOS 26 SDK or later. [App Store Connect's upload guidance](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds) lists Xcode 26 or later for building an iOS app. The **local** Mac reports Xcode 27.0 / iOS SDK 27.0. The remote EAS build image and a final archive remain separate evidence.
+
+## Prepared metadata checkpoint
+
+The conditional scanner-first [App Store submission draft](APP_STORE_SUBMISSION_V1.md) landed as PR #121 (reviewed head `1da04d0f51f22cb9016edea4665dca2278ae8388`, both exact-head CI `36361217292` jobs successful, normal merge `19b95246870b1cd551e8b85ed4bf2c09759341c4`). It prepares a name, subtitle, description, keywords, categories, screenshot shot list, reviewer-access plan and two payment-scope notes. Every field still requires exact-binary and private ASC readback before submission. No ASC data was written.
+
+## Fail-closed source preflight checkpoint
+
+The bounded [binary preflight audit](acceptance/APP_STORE_BINARY_PREFLIGHT.md) landed in PR #123 (reviewed head `8c066f0dbad3bef2ddefb940d40da6c2aeb7f36a`, both exact-head CI `36361757231` jobs successful, normal merge `a06fd8d2cb4f7362392c16d7560d0588c32cf34c`). Run `node scripts/preflight-app-store-release.mjs` from the repository root. On current source it intentionally exits 2, with `PRODUCTION_MOCK_SERVICE` and `PRODUCTION_LEGACY_SHELL`; it never turns source checks into an archive/ASC PASS. Root independently reproduced that output before merge. The same PR corrected only the two iOS permission-purpose strings in `app.json`: camera now names product barcode and product/skin photo capture; library names customer-selected shelf images and message attachments. Generated `Info.plist` and the exact candidate prompts still require verification.
+
+## Payment, privacy and account audit checkpoint
+
+The focused [App Store policy audit](acceptance/APP_STORE_POLICY_AUDIT.md) landed as PR #122 (reviewed head `ef8510e6468c409cf1259dccbd9a18923553acd6`, both exact-head CI `36362150411` jobs successful, normal merge `3e641c550058e13fe1fe64adc31dbe67a64d0e10`). It traces actual Checkout CTA reachability by build flavor: Remote staging is legacy managed but hides its price/Stripe controls under concierge access; current production is legacy Mock, and its membership component's Stripe buttons are not a proven normal public route. The free scanner-first flow works only in development/local integration today. Option B therefore needs an exact candidate-specific payment and App Review assessment; code that can open Stripe is not proof of an active public purchase path.
+
+The audit also records source-only deletion, no production analytics transport/ATT/IDFA found, the audience age gap, and a more granular provisional App Privacy worksheet. It is evidence for the scorecard below, not submitted Apple data.
+
+## Candidate-critical source finding
+
+`app.json` declares `com.derive.skincare`, marketing version `1.0.0`, iPhone only, icon `assets/icon.png` and `usesNonExemptEncryption=false`. The icon file exists at 1024 × 1024 with no alpha; this proves only the source asset. `eas.json` selects remote app-version management and a store-distributed `production` profile with `EXPO_PUBLIC_USE_REMOTE_SERVICE=false`; the `remote-staging` profile sets Remote true and uses the preview EAS environment. `src/utils/shellPresentation.ts` returns `legacy` for every non-development flavor before checking Remote mode. Consequently, the existing production profile would use Mock/legacy, and simply turning Remote on would still select the legacy shell. **No current EAS profile is an accepted scanner-first public candidate.** A later reviewed Kanuj/Sami hosted composition and exact-binary preflight must resolve both conditions; this preparation pass does not activate production.
+
+## App Store readiness scorecard
+
+| Gate | Status | Current evidence and exact closure |
+| --- | --- | --- |
+| Apple Developer membership and agreements | UNKNOWN | No current private account readback. Confirm active membership, agreements and tax/banking applicability through authorized App Store Connect access. |
+| App Store Connect app record / ASC app ID | UNKNOWN | `eas.json` contains `ascAppId: 6813524447`; that source identifier is not a current ASC record readback. Confirm the record and bundle binding. |
+| App content rights declarations | UNKNOWN | Rights to all final listed content, product imagery and any provider-sourced material have not been reviewed in ASC. Inspect the exact candidate assets and answer the actual questions before submission. |
+| Bundle, version, EAS identity | PASS | `com.derive.skincare`, `1.0.0`, EAS project `4100d696-3e03-4b2c-bdb3-1986d5f1a624` are declared in source. Read actual archive identity separately. |
+| Remote native build number | UNKNOWN | `eas.json` uses `appVersionSource: remote` and auto-increment. Inspect the final EAS/ASC candidate, not `app.json`, for `CFBundleVersion`. |
+| Icon and supported family | PASS | 1024-square opaque icon exists; `supportsTablet=false`. Inspect generated archive and ASC rendering before submission. |
+| Minimum iOS deployment target | UNKNOWN | No target is declared in `app.json` and no generated iOS archive was inspected. Read `IPHONEOS_DEPLOYMENT_TARGET` from the candidate. |
+| EAS Xcode/SDK builder | READY TO VERIFY | Local Xcode 27/SDK 27 meets Apple’s current minimum; EAS does not pin an image in source. Read the final EAS builder image, Xcode and iOS SDK from the candidate build log. |
+| Store-distributed scanner-first service mode | BLOCKED | Existing `production` has Remote=false; all non-development shell flavors resolve legacy. Candidate preflight must reject Mock and legacy routes. |
+| Hosted anonymous/free lifecycle | BLOCKED | P0-C readiness tooling is offline inventory only. Hosted signup, abuse, linking/conflicts, cleanup, deletion and operational rollback are not accepted. |
+| Name/barcode and truthful unknown recovery | READY TO VERIFY | Local source paths exist; actual hosted catalog coverage, barcode camera and useful unknown/result flow require final-binary and physical proof. |
+| Photo-to-product recognition, if claimed | BLOCKED | There is no production image extractor or measured real-image performance. Omit recognition claims or wait for Sami’s reviewed implementation and candidate evidence; captured photos alone cannot verify identity/formula. |
+| No Mock/fixture leakage | BLOCKED | Existing production profile is Mock. Confirm a final archive's embedded public configuration and screens, not just an Expo JS export. |
+| Production public Supabase URL/key | UNKNOWN | Production EAS values and archive embedding were not read. The preflight’s optional `--public-config-env` checks only supplied public value shapes, not the actual EAS environment, service reachability or RLS. |
+| Production diagnostics and secrets | READY TO VERIFY | Audit candidate environment, service-role/Stripe/model secrets, development LAN flags, analytics and release logging in final artifact. No secret values enter this ledger. |
+| Camera/photo permissions | READY TO VERIFY | PR #123 corrected source purposes for actual camera barcode/product/skin capture and shelf/message library selection. Verify generated `Info.plist`, runtime prompts and no unused native permission in the final archive. |
+| Native privacy manifests / required-reason APIs | READY TO VERIFY | No committed app-level `PrivacyInfo.xcprivacy` is assumed necessary from absence alone. The installed dependency-source audit found manifests, but not the final bundle. Inspect generated native dependencies, final archive and Xcode aggregate privacy report; add only proven missing approved reasons. [Apple's required-reason guidance](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api) governs this check. |
+| App Privacy questionnaire | READY TO VERIFY | Provisional mapping below; [Apple requires](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy) a privacy policy URL and accurate app-level data answers. No submission is claimed. |
+| Tracking / ATT / IDFA / replay | READY TO VERIFY | Current `src/services/analytics.ts` logs only in development; no production PostHog sender, ATT request, IDFA use or session replay transport was found in the scoped source audit. Verify linked SDKs and network behavior in the final candidate. |
+| Live Privacy, Support, choices and home | BLOCKED | All four public URLs returned HTTP 200 on 2026-09-27, but the live home still displayed the old `Your skincare, handled.` headline while checked-in `apple-site` source had newer scanner-first-boundary copy. Public deployment and live readback require separate approval. |
+| Support contact delivery | UNKNOWN | The live Support page and app source contain a mailto contact, but send-and-receive delivery and actual support operation have not been verified for the candidate. Do not treat a syntactically valid address as a working contact path. |
+| Account deletion | READY TO VERIFY | `deleteCurrentAccount` invokes `delete-customer-account` and clears the local session only after confirmed success; prior local journey tested deletion. Repeat on the exact hosted candidate for discoverability, Storage/rows/Auth removal and truthful retry. If any billable Managed account can use the candidate, verify separately whether deletion cancels or preserves external Stripe billing and explain it accurately. [Apple's deletion guidance](https://developer.apple.com/support/offering-account-deletion-in-your-app) applies. |
+| Cosmetic/non-diagnostic claims | READY TO VERIFY | Current policy intends cosmetic guidance and honest uncertainty. Audit final binary, store description, screenshots, support and decision paths for unsupported medical claims. |
+| Adult runtime audience | BLOCKED | U.S. adults 18+ is the approved target; runtime age affirmation has not been proven. Founder chooses a minimal affirmation or revises the audience claim after review. Complete Apple's age-rating questionnaire from actual content; no rating is inferred. |
+| Payment and Managed scope | BLOCKED | Existing Stripe-hosted membership code and $25 display are not a chosen public v1.0 payment plan. Current staging hides Checkout; current production is Mock and does not prove normal-route reachability. Choose the release scope below before candidate build. |
+| Actual storefront availability | UNKNOWN | U.S.-only is the recommended first storefront, pending founder decision; no private ASC availability readback or setting change occurred. |
+| App categories | READY TO VERIFY | The conditional [submission draft](APP_STORE_SUBMISSION_V1.md) recommends Lifestyle primary and Reference secondary, subject to the actual candidate purpose and ASC confirmation; category choice cannot bypass a medical declaration. |
+| Age-rating questionnaire | UNKNOWN | Final ASC answers and assigned rating were not read. Prepare responses from actual medical/treatment content, external links and capabilities; a stated 18+ audience is not an Apple rating or runtime gate. |
+| App Store metadata and screenshots | READY TO VERIFY | The conditional [submission draft](APP_STORE_SUBMISSION_V1.md) is merged source only. Final screenshots must come from the accepted candidate at Apple's required device sizes, not legacy/fixture UI. |
+| App Review access and notes | READY TO VERIFY | The conditional [submission draft](APP_STORE_SUBMISSION_V1.md) has a permanent reviewer-account plan. Provision and verify it against the exact hosted candidate if login or gated features require one. Reviewer must not need founder OTP intervention, payment or support contact; credentials live only in ASC. [Apple's review checklist](https://developer.apple.com/app-store/review/guidelines/) requires full access and live backend services. |
+| Export compliance | READY TO VERIFY | Source declares `usesNonExemptEncryption=false`; verify actual final dependencies and archive before confirming Apple's answer. |
+| Signed archive, TestFlight and physical customer run | BLOCKED | No intended scanner-first candidate archive exists. Physical barcode/camera/result and unassisted adult comprehension remain unverified. JS export and old Build 8/9/10 cannot substitute. |
+
+## Payment scope: founder decision required
+
+**Option A: Free-first v1.0.** publish scanner-first Free Check without public Managed checkout. Managed may be informational or invite-only if the actual candidate and backend support that distinction. This avoids making a payment path a prerequisite for a first useful Check; it still needs an explicit decision and code/binary verification.
+
+**Option B: Managed payment included.** specify the exact in-app CTA, external Stripe destination, U.S. storefront behavior, account/entitlement and review access. Apple's [current App Review Guidelines §3.1](https://developer.apple.com/app-store/review/guidelines/) and actual storefront rules require a focused legal/App Review review. A U.S. external-link allowance is not blanket clearance for this particular digital subscription, UI, or other storefronts. The current `delete-customer-account` function deletes Storage and Auth but contains no Stripe cancellation step. Before any billable member uses this candidate, determine whether deletion cancels, transfers to a self-service billing path or leaves a subscription active; implement and verify the approved behavior, disclose it accurately to customers and reviewers, and avoid orphaned ongoing charges. This is a Sami billing/operations handoff, not a Kanuj source change in this wave. Do not turn on production Stripe or alter billing until the founder chooses and approves the reviewed scope.
+
+## Provisional App Privacy mapping
+
+This is a **draft to verify on the final candidate**, not submitted ASC answers. “No observed tracking” is a scoped source observation, not an archive/SDK or partner attestation. Apple's [App Privacy guidance](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy) requires app-level answers covering the app and integrated partners. For the exact Apple data-type choices, see the [policy audit](acceptance/APP_STORE_POLICY_AUDIT.md); photos and pregnancy/treatment context can require more than one category.
+
+| Data type / candidate Apple category | Collected in current source path? | Linked to identity? | Used for tracking? | Proposed purpose | Actual system/source | Final-candidate dependency |
+| --- | --- | --- | --- | --- | --- | --- |
+| Name / Contact Info | Yes for permanent/invited account; not required for anonymous free Auth. | Yes when given. | No observed; verify. | Account and support. | Auth/profile and managed onboarding. | Final guest/permanent path and hosted fields. |
+| Email / Contact Info | Yes for permanent account; not required for anonymous free Auth. | Yes when given. | No observed; verify. | Sign-in and account support. | Supabase Auth and profile. | Final reviewer, linking and customer sign-in behavior. |
+| User ID / Identifiers | Yes for anonymous and permanent Auth owners. | Yes to private account records. | No observed; verify. | Owner isolation and service access. | Supabase Auth, RLS, private Storage paths. | Hosted session, deletion, partner SDKs. |
+| Product/package photos / Photos or Videos | Yes when private product evidence is captured/uploaded. | Yes, Auth-owner bound. | No observed; verify. | Product evidence and resolution. | `customer-product-evidence`, S6 case. | Actual camera/upload, provider review and retention. |
+| Skin/baseline/check-in photos / Photos or Videos | Managed onboarding source requires front/left/right baseline photos; later check-in photos are optional. | Yes, Auth-owner bound. | No observed; verify. | Managed context and progress. | `customer-skin-photos`, onboarding/check-in. | Whether Managed ships, actual capture, hosted processing and retention. |
+| Skin goals/behavior / Health or User Content | Optional in free and managed profiles. | Yes when saved. | No observed; verify. | Personal decision and routine. | Personal context / `skin_profiles`. | Exact released intake and hosted API. |
+| Pregnancy/trying/nursing / Sensitive Info and possibly Health | Optional, separate answers in source. | Yes when saved. | No observed; verify. | Material safety context. | Owner-bound personal context. | Exact questions, privacy choice and Apple category mapping. |
+| Prescription/strong treatment context / Health | Optional in source. | Yes when saved. | No observed; verify. | Safety and fit boundaries. | Personal context and managed intake. | Actual released use and any provider sharing. |
+| Reactions/sensitivities / Health or User Content | Optional self-reports in source. | Yes when saved. | No observed; verify. | Cautions and history. | Free experiences / `product_reactions`. | Final collection; never imply diagnosed allergy. |
+| Notes, routine and Check history / User Content or Product Interaction | Customer-saved notes and free Check history are explicit; managed routine/history can also be server-authored and persisted. An unresolved Check is not a contribution. | Yes when persisted. | No observed; verify. | Retain useful context and deliver managed routine. | `free-context`, personal context, managed routine persistence. | Exact free/Managed scope, save/read/deletion and retention. |
+| Membership/purchase history / Purchases | Conditional; managed source stores status and Stripe references, but production billing is not active. | Yes if present. | No observed; verify. | Entitlement and billing. | Membership records and Stripe webhook/portal. | Option A/B, existing billable accounts and actual activation. |
+| Payment details / Payment Info | Not established as directly collected by Derive; external Stripe Checkout may process card data. | UNKNOWN for app/partner declaration. | UNKNOWN. | Payment if Managed ships. | Stripe-hosted checkout; no card fields found in Derive client. | Exact processor data flow and Apple's partner disclosure definitions. |
+| Usage events / Product Interaction | Typed events exist; inspected production client has no PostHog sender and logs only in development. | If enabled later, UNKNOWN. | No observed; verify. | Reliability/feature use if later approved. | `src/services/analytics.ts`. | Archive SDK/network audit and any enabled transport. |
+| Diagnostics / Crash or Performance Data | App-owned production collection not established. | UNKNOWN. | UNKNOWN. | Reliability if collected. | Apple/Expo/native SDKs and hosted logs to inspect. | Final archive, SDK privacy report and ASC answers. |
+
+None of these rows authorizes third-party model transfer, ad tracking, public photo reuse or a new telemetry SDK. Consent, linked status, purposes and retention must match the actual candidate and hosted operations.
+
+## Public policy/support deployment packet: prepared, not authorized
+
+The four public URLs were HTTP 200 on the task host, but the live home still served `Your skincare, handled.` while tracked `apple-site/index.html` had `Make sense of your skincare.` The `derive-beta-site` Vercel project has no connected Git repository, so repository merges did not deploy its revised pages. **Do not deploy the current source unchanged for a public scanner-first candidate:** its Privacy page still describes hosted Free Check as disabled and the current external TestFlight as lacking AI-enabled Ask/Scan. Those statements need exact-candidate, hosted-processing and legal review before publication.
+
+Once the final candidate and policy text are approved, the following is a **command plan only**, from the checked-out `apple-site/` directory. It has not been executed in this wave:
+
+```sh
+vercel link --yes --team kanujverma12-8011s-projects --project derive-beta-site
+vercel deploy --prod --yes --scope kanujverma12-8011s-projects
+```
+
+The first command creates only a local ignored project link; the second is a **public production deployment** requiring separate founder authorization. Do not run it from a dirty or mismatched source checkout. Vercel's [deployment documentation](https://vercel.com/docs/deployments/overview) distinguishes Git-connected automatic deploys from CLI deployments.
+
+Post-deployment verify and record the deployment ID/URL, project/domain alias and source SHA. Read `/`, `/privacy`, `/support` and `/privacy-choices` over HTTPS for status 200 and exact approved copy. Check the in-app URLs, support contact route, deletion instructions, free/Managed/payment scope, adult/cosmetic statement, photo/AI/provider claims and App Privacy answers against the installed candidate. If any disagree, leave the release gate BLOCKED. A page returning 200 alone is insufficient.
+
+## Candidate accessibility acceptance matrix
+
+These are **READY TO VERIFY**, not App Store accessibility-support declarations. Run on the exact installed candidate, including a smaller supported iPhone. Apple recommends [at least 44 × 44-point touch targets](https://developer.apple.com/design/tips/) and [testing with Larger Text, VoiceOver and contrast settings](https://developer.apple.com/documentation/accessibility/performing-accessibility-testing-for-your-app).
+
+| Candidate path | Required observation | Current status |
+| --- | --- | --- |
+| Check entry and search | Largest relevant Dynamic Type sizes preserve the primary action, readable copy, name-search fallback and Back without clipping or horizontal scroll. | READY TO VERIFY |
+| Auto camera | Shutter, Close, torch, Retake, manual correction and permission/Settings recovery are reachable above device safe areas; active touch targets meet 44-point behavior. | READY TO VERIFY |
+| Result and uncertainty | VoiceOver reads product identity/evidence limits, action, reason, caution and next step in a useful order; contrast remains sufficient. | READY TO VERIFY |
+| Optional personalization and My Stuff | Controls, selected states, save/retry feedback and histories remain operable with Larger Text and VoiceOver; Skip remains obvious. | READY TO VERIFY |
+| Account and deletion | Privacy, Support and Delete controls have clear labels and focus order; irreversible confirmation and failed-deletion recovery are accessible. | READY TO VERIFY |
+| Camera-independent fallback | A customer can search by name and understand useful unknown recovery without relying only on a visual barcode frame or photo. | READY TO VERIFY |
+
+The previous Simulator observation showed only the corrected Check entry. Automated taps did not change that screen, and the physical phone was locked. No in-camera, touch-target, VoiceOver or Dynamic Type result is carried forward from it.
+
+## Release decisions and dependency ledger
+
+| Can finish now | Requires Sami/final source | Requires candidate archive/device | Requires founder/Apple authorization |
+| --- | --- | --- | --- |
+| Source/config preflight, honest metadata draft, provisional privacy mapping, public copy audit, reviewer test plan, screenshot shot list, official requirement check. | Hosted free lifecycle/abuse/account linking and actual scanner-first service, real image-extraction and catalog coverage, reviewed production routing/config, final payment contract if Managed ships. | Remote EAS Xcode/SDK, bundle/build ID, privacy report, required-reason manifests, screenshot dimensions, permissions, no Mock/fixtures/secrets, physical camera/deletion/accessibility and end-to-end hosted journey. | Free-first versus Managed payment; age-18 handling; U.S. storefront/category; public Vercel deployment; candidate build if it changes external state/cost; ASC metadata/privacy answers, App Review submission and release. |
+
+## Recommended final release sequence
+
+1. After Sami's last relevant merge, fetch/reconcile and rerun all required exact-head source gates. Decide payment scope, adult runtime treatment and first storefront before candidate configuration.
+2. Review the hosted scanner-first Auth/abuse/owner/deletion and product-evidence contract. Make the smallest explicitly owned client/profile integration; prove final production routing is Remote and scanner-first without Mock/fixture leakage.
+3. Run the bounded source preflight; obtain founder authorization for the EAS candidate build and any external state/cost. Record EAS image/Xcode/SDK, app version/build and public host identity.
+4. Inspect the signed archive's Info.plist, privacy manifests/aggregate report, linked SDKs, permissions, encryption and diagnostics. Fix only proven gaps, rebuild and reverify.
+5. On the exact candidate, complete hosted Auth/Check/unknown/personalization/My Stuff/account deletion, physical barcode/photo/permission/recovery/accessibility and the separate eligible unassisted adult study.
+6. Capture accepted-device screenshots and reconcile metadata, App Privacy answers, age questionnaire, reviewer access, support and policy copy to that binary. Obtain separate approval for the public Vercel deployment; verify all live pages after deployment.
+7. With approved U.S. availability, payment treatment, agreements and a working permanent reviewer path, obtain explicit authorization for App Store Connect writes and App Review submission. Monitor review; public release remains a separate authorization.
+
+**Current status:** `APP STORE PREP PARTIAL — RELEASE DECISIONS PENDING`. The source/bootstrap and payment/age decisions prevent an actual candidate. This ledger is preparation, not Apple approval readiness.
