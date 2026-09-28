@@ -15,7 +15,8 @@ not be activated in customer UI or hosted until it is. The server
 derives the owner from a verified JWT; the request cannot name an owner. The
 `requestId` is unique per owner, identical retries return the same row, and a
 changed retry fails. At most ten new proposals per owner are accepted in a
-rolling 24 hours; retries do not count again. The Edge parser bounds every
+rolling 24 hours; retries do not count again, but withdrawn rows still count
+as new submissions within that window. The Edge parser bounds every
 field and the database additionally rejects a payload over 4096 bytes.
 `status` and `withdraw` reveal
 only the calling owner's rows. No customer can write the table or call its
