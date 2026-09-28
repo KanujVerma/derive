@@ -11,7 +11,7 @@ const product: CatalogProductSummary = {
 };
 
 export const scanResultSheetFixtures = {
-  loading: buildScanResultSheet({ kind: 'loading' }),
+  loading: buildScanResultSheet({ kind: 'loading', ownerId: 'synthetic-owner', scanId: 'synthetic-scan' }),
   verified: buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, catalogProduct: product }),
   formulaUnverified: buildScanResultSheet({ kind: 'snapshot', snapshot: {
     ...verifiedProductTruth, state: 'identified_formula_unverified', formula: null,
@@ -23,5 +23,5 @@ export const scanResultSheetFixtures = {
   } }),
   formulaOnly: buildScanResultSheet({ kind: 'snapshot', snapshot: formulaOnlyProductTruth }),
   unknown: buildScanResultSheet({ kind: 'snapshot', snapshot: unresolvedProductTruth }),
-  error: buildScanResultSheet({ kind: 'error' }),
+  error: buildScanResultSheet({ kind: 'error', ownerId: 'synthetic-owner', scanId: 'synthetic-scan' }),
 } as const;

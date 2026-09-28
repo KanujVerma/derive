@@ -5,8 +5,15 @@ import { hasVerifiedPackageFormula } from '../../../contracts/ProductTruthSnapsh
 import { projectTrustedSnapshot } from '../../personal-decision/truthAdapter.ts';
 import { describeProductTruth } from '../../capture/productTruthPresentation.ts';
 
-export type SheetImage = { kind: 'placeholder' } | { kind: 'catalog'; uri: string }
+export type SheetImage = { kind: 'placeholder' } | { kind: 'catalog'; uri: string; label: 'Product image, package may differ' }
   | { kind: 'customer_unverified'; uri: string; label: 'Your photo, unverified' };
+export interface LocalCustomerPhoto {
+  uri: string;
+  ownerId: string;
+  caseId: string;
+  snapshotId: string;
+  evidenceId: string;
+}
 export interface SheetBinding {
   ownerId: string | null;
   caseId: string;
@@ -21,12 +28,14 @@ export interface RequestedEvidenceAction {
   role: 'ingredients';
   binding: SheetBinding;
 }
-export type SheetInput = { kind: 'loading' } | { kind: 'error' } | {
+export type SheetInput = { kind: 'loading'; ownerId: string | null; scanId: string }
+  | { kind: 'error'; ownerId: string | null; scanId: string } | {
   kind: 'snapshot'; snapshot: ProductTruthSnapshotV1; ownerId?: string | null;
-  catalogProduct?: CatalogProductSummary | null; localCustomerPhotoUri?: string | null;
+  catalogProduct?: CatalogProductSummary | null; localCustomerPhoto?: LocalCustomerPhoto | null;
   resolverResult?: ProductResolutionResult | null;
 };
-export type SheetModel = { kind: 'loading' | 'error'; title: string; detail: string } | {
+export type SheetModel = { kind: 'loading' | 'error'; title: string; detail: string;
+  ownerId: string | null; scanId: string } | {
   kind: 'result'; title: string; brand: string | null; status: string; detail: string;
   nextAction: string; image: SheetImage; binding: SheetBinding;
   personalFit: null | { title: string; reason: string };
@@ -41,14 +50,19 @@ export function catalogImagePresentation(value: string | null): SheetImage {
     if (url.protocol !== 'https:' || !url.hostname || url.username || url.password
       || url.search || url.hash || url.hostname === 'localhost'
       || /^(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(url.hostname)) return { kind: 'placeholder' };
-    return { kind: 'catalog', uri: value };
+    return { kind: 'catalog', uri: value, label: 'Product image, package may differ' };
   } catch { return { kind: 'placeholder' }; }
 }
 
-function localPhotoPresentation(value: string | null | undefined): SheetImage {
-  return value && /^file:\/\/\/[^\s]+$/i.test(value)
-    ? { kind: 'customer_unverified', uri: value, label: 'Your photo, unverified' }
-    : { kind: 'placeholder' };
+function localPhotoPresentation(photo: LocalCustomerPhoto | null | undefined,
+  ownerId: string | null, snapshot: ProductTruthSnapshotV1): SheetImage {
+  if (!photo || !ownerId || photo.ownerId !== ownerId
+    || photo.caseId !== snapshot.resolutionCaseId || photo.snapshotId !== snapshot.snapshotId
+    || !snapshot.evidence.some(item => item.evidenceId === photo.evidenceId
+      && item.source === 'member_input'
+      && (item.type === 'front_label' || item.type === 'ingredients' || item.type === 'packaging'))
+    || !/^file:\/\/\/[^\s]+$/i.test(photo.uri)) return { kind: 'placeholder' };
+  return { kind: 'customer_unverified', uri: photo.uri, label: 'Your photo, unverified' };
 }
 
 function bindingFor(ownerId: string | null, snapshot: ProductTruthSnapshotV1): SheetBinding {
@@ -74,8 +88,8 @@ function requestedEvidenceFor(snapshot: ProductTruthSnapshotV1, binding: SheetBi
 }
 
 export function buildScanResultSheet(input: SheetInput): SheetModel {
-  if (input.kind === 'loading') return { kind: 'loading', title: 'Checking product', detail: 'Checking available evidence.' };
-  if (input.kind === 'error') return { kind: 'error', title: 'Could not check', detail: 'Try again or search by name.' };
+  if (input.kind === 'loading') return { kind: 'loading', title: 'Checking product', detail: 'Checking available evidence.', ownerId: input.ownerId, scanId: input.scanId };
+  if (input.kind === 'error') return { kind: 'error', title: 'Could not check', detail: 'Try again or search by name.', ownerId: input.ownerId, scanId: input.scanId };
 
   const { snapshot } = input;
   const binding = bindingFor(input.ownerId ?? null, snapshot);
@@ -84,7 +98,8 @@ export function buildScanResultSheet(input: SheetInput): SheetModel {
   const catalogImage = identity && input.catalogProduct?.productId === binding.productId
     ? catalogImagePresentation(input.catalogProduct.imageUrl)
     : { kind: 'placeholder' } as const;
-  const image = catalogImage.kind === 'catalog' ? catalogImage : localPhotoPresentation(input.localCustomerPhotoUri);
+  const image = catalogImage.kind === 'catalog' ? catalogImage
+    : localPhotoPresentation(input.localCustomerPhoto, input.ownerId ?? null, snapshot);
   const title = identity?.name ?? (snapshot.state === 'ambiguous_candidates'
     ? 'Several possible products' : snapshot.state === 'formula_only'
       ? 'Formula clue found' : 'Product not confirmed');
@@ -116,7 +131,14 @@ export function isCurrentRequestedEvidenceAction(action: RequestedEvidenceAction
 
 /** Hide a stale card before render, not only when its detail button is pressed. */
 export function selectCurrentSheetModel(model: SheetModel | null, ownerId: string | null,
-  snapshot: ProductTruthSnapshotV1 | null): SheetModel | null {
-  if (!model || model.kind !== 'result') return model;
+  snapshot: ProductTruthSnapshotV1 | null, scanId: string): SheetModel | null {
+  if (!model) return null;
+  if (model.kind !== 'result') return model.ownerId === ownerId && model.scanId.length > 0
+    && model.scanId === scanId && !snapshot ? model : null;
   return snapshot && isCurrentSheetBinding(model.binding, ownerId, snapshot) ? model : null;
+}
+
+/** Expanded text scrolls within this cap instead of covering the camera. */
+export function resultSheetDetailMaxHeight(viewportHeight: number): number {
+  return Math.max(96, Math.min(320, Math.floor(viewportHeight * 0.42)));
 }

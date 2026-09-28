@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, LayoutAnimation, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, LayoutAnimation, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { ProductTruthSnapshotV1 } from '../../../contracts/ProductTruthSnapshot';
 import type { ProductResolutionResult } from '../../../contracts/ProductIdentityResolver';
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
 import { GlassContainer } from '../../ui/GlassContainer';
 import { Icon } from '../../ui/Icon';
 import type { RequestedEvidenceAction, SheetBinding, SheetImage, SheetModel } from '../../../presentation/check/result-sheet/model';
-import { isCurrentRequestedEvidenceAction, isCurrentSheetBinding, selectCurrentSheetModel } from '../../../presentation/check/result-sheet/model';
+import { isCurrentRequestedEvidenceAction, isCurrentSheetBinding, resultSheetDetailMaxHeight,
+  selectCurrentSheetModel } from '../../../presentation/check/result-sheet/model';
 
 export interface ScanResultSheetProps {
   /** Null removes the sheet. The camera host retains ownership of detection and navigation. */
@@ -14,6 +15,7 @@ export interface ScanResultSheetProps {
   currentOwnerId: string | null;
   currentSnapshot: ProductTruthSnapshotV1 | null;
   currentResolverResult: ProductResolutionResult | null;
+  currentScanId: string;
   bottomInset?: number;
   onDetectionPausedChange: (paused: boolean) => void;
   onDismiss: () => void;
@@ -23,7 +25,7 @@ export interface ScanResultSheetProps {
 
 function ProductThumbnail({ image }: { image: SheetImage }) {
   return (
-    <View style={styles.thumbnail} accessible accessibilityLabel={image.kind === 'catalog' ? 'Catalog product image'
+    <View style={styles.thumbnail} accessible accessibilityLabel={image.kind === 'catalog' ? image.label
       : image.kind === 'customer_unverified' ? image.label : 'No product image available'}>
       {image.kind === 'placeholder'
         ? <Icon name="bottle" size={25} color={colors.brand} />
@@ -33,12 +35,13 @@ function ProductThumbnail({ image }: { image: SheetImage }) {
 }
 
 /** Floating camera companion. The host must stop barcode detection while model is non-null. */
-export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, currentResolverResult, bottomInset = 0,
+export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, currentResolverResult, currentScanId, bottomInset = 0,
   onDetectionPausedChange, onDismiss, onOpenDetails, onAddRequestedEvidence }: ScanResultSheetProps) {
   const [expanded, setExpanded] = useState(false);
+  const { height } = useWindowDimensions();
   const onPauseRef = useRef(onDetectionPausedChange);
   onPauseRef.current = onDetectionPausedChange;
-  const visibleModel = selectCurrentSheetModel(model, currentOwnerId, currentSnapshot);
+  const visibleModel = selectCurrentSheetModel(model, currentOwnerId, currentSnapshot, currentScanId);
   const open = visibleModel !== null;
   const sheetKey = visibleModel?.kind === 'result'
     ? `${visibleModel.binding.caseId}:${visibleModel.binding.snapshotId}:${visibleModel.binding.caseRevision}` : visibleModel?.kind ?? 'closed';
@@ -107,10 +110,11 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
               <Icon name="close" size={19} color={colors.inkMuted} />
             </Pressable>
           </View>
-          {visibleModel.kind === 'result' && visibleModel.image.kind === 'customer_unverified'
+          {visibleModel.kind === 'result' && visibleModel.image.kind !== 'placeholder'
             && <Text style={styles.photoLabel}>{visibleModel.image.label}</Text>}
           {expanded && (
-            <View style={styles.details}>
+            <ScrollView style={[styles.details, { maxHeight: resultSheetDetailMaxHeight(height) }]}
+              contentContainerStyle={styles.detailsContent} accessibilityLabel="Result details">
               <Text style={styles.detail}>{visibleModel.detail}</Text>
               {visibleModel.kind === 'result' && !canAddRequestedEvidence
                 && <Text style={styles.nextAction}>{visibleModel.nextAction}</Text>}
@@ -128,7 +132,7 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
                   <Icon name="forward" size={17} color={colors.inkInverse} />
                 </Pressable>
               )}
-            </View>
+            </ScrollView>
           )}
         </View>
       </GlassContainer>
@@ -155,7 +159,8 @@ const styles = StyleSheet.create({
   close: { width: layout.minTouchTarget, height: layout.minTouchTarget, borderRadius: radii.full,
     alignItems: 'center', justifyContent: 'center' },
   photoLabel: { color: colors.inkMuted, fontSize: typography.sizes.micro, marginTop: spacing.xxs },
-  details: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.md, paddingTop: spacing.md, gap: spacing.sm },
+  details: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.md },
+  detailsContent: { paddingTop: spacing.md, gap: spacing.sm },
   detail: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
   nextAction: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption },
   evidenceAction: { minHeight: layout.minTouchTarget, alignSelf: 'flex-start', flexDirection: 'row',

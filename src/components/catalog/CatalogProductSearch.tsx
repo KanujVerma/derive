@@ -96,7 +96,7 @@ export function CatalogProductSearch({
             accessibilityLabel={`${actionLabel} ${item.brand} ${item.name}`}
             accessibilityState={{ disabled: alreadyAdded }}
           >
-            <View style={styles.thumbnail} accessible accessibilityLabel={image.kind === 'catalog' ? 'Catalog product image' : 'No product image available'}>
+            <View style={styles.thumbnail} accessible accessibilityLabel={image.kind === 'catalog' ? image.label : 'No product image available'}>
               {image.kind === 'catalog'
                 ? <Image source={{ uri: image.uri }} style={styles.thumbnailImage} resizeMode="contain" />
                 : <Icon name="bottle" size={24} color={colors.brand} />}

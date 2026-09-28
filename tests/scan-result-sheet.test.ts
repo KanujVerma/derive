@@ -5,7 +5,7 @@ import type { CatalogProductSummary } from '../src/contracts/ProductCatalog.ts';
 import type { ProductResolutionResult } from '../src/contracts/ProductIdentityResolver.ts';
 import {
   catalogImagePresentation, buildScanResultSheet, isCurrentSheetBinding, selectCurrentSheetModel,
-  isCurrentRequestedEvidenceAction,
+  isCurrentRequestedEvidenceAction, resultSheetDetailMaxHeight,
 } from '../src/presentation/check/result-sheet/model.ts';
 
 const product: CatalogProductSummary = {
@@ -25,7 +25,9 @@ const ingredientResolution: ProductResolutionResult = {
 };
 
 test('catalog images require an approved HTTPS-shaped URL and otherwise show a neutral placeholder', () => {
-  assert.deepEqual(catalogImagePresentation(product.imageUrl), { kind: 'catalog', uri: product.imageUrl });
+  assert.deepEqual(catalogImagePresentation(product.imageUrl), {
+    kind: 'catalog', uri: product.imageUrl, label: 'Product image, package may differ',
+  });
   for (const value of [null, 'http://example.org/bottle.jpg', 'file:///private/bottle.jpg',
     'data:image/png;base64,test', 'https://user:password@example.org/bottle.jpg',
     'https://example.org/bottle.jpg?token=private', 'https://localhost/bottle.jpg']) {
@@ -40,7 +42,9 @@ test('verified package result uses exact product identity without a score or inv
   assert.equal(result.title, 'Fixture Cleanser');
   assert.equal(result.brand, 'Synthetic');
   assert.equal(result.status, 'Exact formula verified');
-  assert.deepEqual(result.image, { kind: 'catalog', uri: product.imageUrl });
+  assert.deepEqual(result.image, {
+    kind: 'catalog', uri: product.imageUrl, label: 'Product image, package may differ',
+  });
   assert.equal(result.personalFit, null);
   assert.equal(result.binding.productId, product.productId);
   assert.equal(result.binding.formulaVersionId, verifiedProductTruth.formula!.formulaVersionId);
@@ -73,20 +77,38 @@ test('unknown, ambiguous, and formula-only snapshots preserve uncertainty', () =
 });
 
 test('customer capture stays visibly unverified and is never treated as a catalog photo', () => {
-  const local = buildScanResultSheet({ kind: 'snapshot', snapshot: unresolvedProductTruth,
-    localCustomerPhotoUri: 'file:///private/capture.jpg' });
+  const snapshot = { ...unresolvedProductTruth, evidence: [{
+    evidenceId: 'evidence-a', type: 'front_label' as const, source: 'member_input' as const,
+    authority: 'candidate' as const,
+  }] };
+  const photo = {
+    uri: 'file:///private/capture.jpg', ownerId: 'owner-a',
+    caseId: snapshot.resolutionCaseId, snapshotId: snapshot.snapshotId,
+    evidenceId: 'evidence-a',
+  };
+  const local = buildScanResultSheet({ kind: 'snapshot', snapshot, ownerId: 'owner-a',
+    localCustomerPhoto: photo });
   assert.equal(local.kind, 'result');
   if (local.kind === 'result') assert.deepEqual(local.image, {
     kind: 'customer_unverified', uri: 'file:///private/capture.jpg', label: 'Your photo, unverified',
   });
-  const remote = buildScanResultSheet({ kind: 'snapshot', snapshot: unresolvedProductTruth,
-    localCustomerPhotoUri: 'https://private.example/signed?token=secret' });
-  if (remote.kind === 'result') assert.deepEqual(remote.image, { kind: 'placeholder' });
+  for (const badPhoto of [
+    { ...photo, uri: 'https://private.example/signed?token=secret' },
+    { ...photo, ownerId: 'owner-b' },
+    { ...photo, caseId: 'other-case' },
+    { ...photo, snapshotId: 'other-snapshot' },
+    { ...photo, evidenceId: 'other-evidence' },
+  ]) {
+    const result = buildScanResultSheet({ kind: 'snapshot', snapshot, ownerId: 'owner-a', localCustomerPhoto: badPhoto });
+    if (result.kind === 'result') assert.deepEqual(result.image, { kind: 'placeholder' });
+  }
+  const missingOwner = buildScanResultSheet({ kind: 'snapshot', snapshot, localCustomerPhoto: photo });
+  if (missingOwner.kind === 'result') assert.deepEqual(missingOwner.image, { kind: 'placeholder' });
 });
 
 test('loading and error remain recoverable without inventing an identity', () => {
-  const loading = buildScanResultSheet({ kind: 'loading' });
-  const error = buildScanResultSheet({ kind: 'error' });
+  const loading = buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-a' });
+  const error = buildScanResultSheet({ kind: 'error', ownerId: 'owner-a', scanId: 'scan-a' });
   assert.equal(loading.kind, 'loading');
   assert.equal(error.kind, 'error');
   assert.doesNotMatch(JSON.stringify([loading, error]), /productId|formulaVersionId/);
@@ -107,11 +129,27 @@ test('detail action binding fails closed after case, snapshot, revision, owner, 
 
 test('the sheet itself disappears if its owner or immutable case no longer matches the camera', () => {
   const result = buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, ownerId: 'owner-a' });
-  assert.equal(selectCurrentSheetModel(result, 'owner-a', verifiedProductTruth), result);
-  assert.equal(selectCurrentSheetModel(result, 'owner-b', verifiedProductTruth), null);
-  assert.equal(selectCurrentSheetModel(result, 'owner-a', unresolvedProductTruth), null);
-  assert.equal(selectCurrentSheetModel(result, 'owner-a', null), null);
-  assert.equal(selectCurrentSheetModel(buildScanResultSheet({ kind: 'loading' }), null, null)?.kind, 'loading');
+  assert.equal(selectCurrentSheetModel(result, 'owner-a', verifiedProductTruth, 'scan-a'), result);
+  assert.equal(selectCurrentSheetModel(result, 'owner-b', verifiedProductTruth, 'scan-a'), null);
+  assert.equal(selectCurrentSheetModel(result, 'owner-a', unresolvedProductTruth, 'scan-a'), null);
+  assert.equal(selectCurrentSheetModel(result, 'owner-a', null, 'scan-a'), null);
+  const loading = buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-a' });
+  const error = buildScanResultSheet({ kind: 'error', ownerId: 'owner-a', scanId: 'scan-a' });
+  for (const pending of [loading, error]) {
+    assert.equal(selectCurrentSheetModel(pending, 'owner-a', null, 'scan-a'), pending);
+    assert.equal(selectCurrentSheetModel(pending, 'owner-b', null, 'scan-a'), null);
+    assert.equal(selectCurrentSheetModel(pending, 'owner-a', null, 'scan-b'), null);
+    assert.equal(selectCurrentSheetModel(pending, 'owner-a', verifiedProductTruth, 'scan-a'), null);
+  }
+});
+
+test('expanded detail height remains bounded on short and large screens', () => {
+  for (const viewportHeight of [320, 568, 1024, 1400]) {
+    const detailHeight = resultSheetDetailMaxHeight(viewportHeight);
+    assert.ok(detailHeight >= 96);
+    assert.ok(detailHeight <= viewportHeight * 0.45);
+    assert.ok(detailHeight <= 320);
+  }
 });
 
 test('an ambiguous snapshot cannot borrow a product identity even if stale fields are populated', () => {
