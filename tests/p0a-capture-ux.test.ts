@@ -14,12 +14,12 @@ test('capture is presented above the tab navigator with a fresh native safe-area
   assert.match(host, /onCaptureReady\(bridge\.handoff\(handoff\)\)/);
 });
 
-test('collecting controls scroll independently of the footer and expose all roles through correction', () => {
+test('capture options scroll independently of the shutter and expose all roles', () => {
   const collecting = capture.slice(capture.indexOf('<View style={styles.collecting}>'), capture.indexOf('<View style={[styles.outcomeWrap'));
   assert.match(collecting, /<ScrollView style=\{styles\.controlScroll\}/);
   assert.ok(collecting.indexOf('</ScrollView>') < collecting.indexOf('<View style={styles.captureActions}>'));
   assert.doesNotMatch(collecting, /<ScrollView horizontal/);
-  assert.match(capture, /roleRow: \{[^\n]*flexWrap: 'wrap'/);
+  assert.match(capture, /roleRow: \{[^\n]*flexDirection: 'column'/);
   assert.match(capture, /accessibilityState=\{\{ selected: previewUri \? previewRole === item : intent === item, disabled: busy \}\}/);
   assert.match(capture, /paddingBottom: Math\.max\(insets\.bottom, spacing\.md\)/);
 });
