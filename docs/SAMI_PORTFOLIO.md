@@ -1,9 +1,43 @@
-# Sami beta-critical portfolio — 2026-09-27 checkpoint
+# Sami beta-critical portfolio — 2026-09-28 checkpoint
 
 **SAMI MVP PORTFOLIO PARTIAL.** Source foundations and automated gates are not a
 working photo recognizer, a hosted scanner-first beta, or physical acceptance.
 This ledger complements canonical ownership and Kanuj's P0-D acceptance; it does
 not replace them or assign his composition work to Sami.
+
+## Current 2026-09-28 integration checkpoint
+
+**SOURCE:** Main advanced from `7d804bf0ac174b8816a5a83f465647c1d9387732`
+to `666fe1d180b2c4badc638f3ccdb608ca8508fd15` through focused Sami PRs
+[#139](https://github.com/KanujVerma/derive/pull/139),
+[#140](https://github.com/KanujVerma/derive/pull/140),
+[#141](https://github.com/KanujVerma/derive/pull/141),
+[#142](https://github.com/KanujVerma/derive/pull/142) and
+[#143](https://github.com/KanujVerma/derive/pull/143). Each PR passed both
+exact-head CI jobs before merge. Post-merge main CI through `666fe1d` passed
+both jobs in [run 36457528086](https://github.com/KanujVerma/derive/actions/runs/36457528086). The
+original dirty auth checkout was not changed. No Kanuj-owned `app/**` file was
+changed in these PRs.
+
+| Lane | Increment landed | Still needed for customer release |
+| --- | --- | --- |
+| S1 hosted free / P0-C | Exact-project dry-run and migration/function dependency review in [P0-C rollout review](P0_C_HOSTED_ROLLOUT_REVIEW.md). At `666fe1d`, the fresh read-only inventory found 19/30 migration versions and 15/22 function names hosted, with no hosted-only versions/names. | Eleven migrations and seven function names remain pending; source function names do not prove deployed revision parity. Auth flags, safe rollout, guest/deletion drill and Kanuj physical acceptance remain unproven. Public guest activation is not authorized. |
+| S2 image perception | Offline replay now reports per-provider scenario coverage and honest `NOT_RUN`; no provider winner is fabricated. | Eligible rights-cleared independent-gold corpus remains zero; no cloud provider was run; first release is barcode/name-first, without automatic photo identification. |
+| S3 contribution | Owner-derived private submit/status/withdraw Edge API, additive owner-RLS table, explicit versioned consent record, private evidence existence check, idempotent replay, daily abuse bound, withdrawal scrub and deletion cascade. Fresh local reset, pgTAP and Auth/Storage/Edge tests passed. | Not hosted or composed into Check. Founder-approved consent copy, private-image reviewer access and public retention policy precede activation. Structured facts need separate review before canonical promotion. |
+| S4 measurement / quota | Pure strict coarse-event ingress parser landed; no PostHog SDK, export, or client transport activated. | Authenticated first-party ingress and privacy lifecycle are being built separately. Provider-cost ledger, referral authority and atomic customer-visible Check quota are not implemented. Do not confuse six photo upload grants/day with a Check limit. |
+| S5 catalog | Read-only exact-project sourced-catalog evidence inventory landed. **HOSTED dated readback:** one sourced product, one alias, zero active sourced variants, authoritative verified GTIN assertions or verified formula versions. | This is not demand coverage. Collect intended beta products, corroborate exact package/variant/GTIN/formula with rights-cleared sources, ingest reviewed facts, and physically test barcode/name resolution. |
+
+The critical path is hosted P0-C parity and guest safety **plus** enough truthful
+barcode/name catalog coverage, then Kanuj's production routing, physical iPhone
+journey and App Store acceptance. Contribution, analytics, quota and photo
+extraction can progress independently but must not be marketed or activated from
+source-only evidence. The founder previously chose Free-only first; newer
+Free/Plus product docs warrant final binary-scope confirmation. The public
+release audience and guest retention/recovery policy are also unresolved.
+Temporary closed-beta retain-until-delete is not a public retention policy.
+
+The sections below preserve the 2026-09-27 checkpoint and are historical where
+the current table supersedes their implementation state.
 
 ## Recovered and preserved
 

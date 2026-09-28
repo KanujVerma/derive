@@ -196,6 +196,23 @@ hosted provider paths proven. Without a selected/configured provider,
 a routine. The deterministic emergency circuit breaker and server-owned signal
 inference do not require the provider key. See [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md).
 
+At the 2026-09-28 read-only hosted secret-name check for project
+`snojlbqovlawewwqbviz`, `GEMINI_API_KEY` was still absent. The developer's
+ignored `app/supabase/.env.local` has blank `GEMINI_API_KEY`, `GEMINI_MODEL`,
+and `ROUTINE_MODEL_PROVIDER` placeholders; saving a value there does not
+automatically inject it into a running local function or hosted project. Local
+functions must be started with that env file, while hosted use requires a
+separately authorized secret update and deployed function. Free barcode/name
+Check does not call Gemini. The current Gemini paths are the Managed-gated
+`ask-derive` and `scan-product` text-generation functions and the
+Managed-gated `propose-routine` function when its provider selector is
+explicitly `gemini`. These paths do not identify a product from a photo.
+
+`JEV_API_KEY` is **not** a recognized runtime variable in current source:
+there is no Jev adapter or live call path. Jev appears only in the offline
+decision-intelligence evaluation seam. Do not paste a Jev credential into
+Expo, Supabase secrets, or this local file expecting it to turn on a feature.
+
 S5 commerce reads every Stripe value only inside Supabase Edge Functions.
 `create-membership-checkout` and `create-membership-portal` require a valid
 member JWT. `stripe-membership-webhook` intentionally does not require a
