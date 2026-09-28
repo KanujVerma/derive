@@ -36,6 +36,7 @@ another.
 | `DERIVE_CHECKOUT_SUCCESS_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS success destination (localhost HTTP allowed only for local development) |
 | `DERIVE_CHECKOUT_CANCEL_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS cancellation destination (localhost HTTP allowed only for local development) |
 | `DERIVE_PORTAL_RETURN_URL` | Supabase Edge Functions / trusted server | Non-secret configuration | HTTPS return destination from Stripe Billing Portal |
+| `MEASUREMENT_INGRESS_ENABLED` | Supabase Edge Functions / trusted server | Non-secret activation gate | Defaults off; set exactly `true` only after first-party measurement privacy, opt-out, retention and App Privacy review |
 
 The root `.env.example` lists only public mobile variables, including an empty optional build flavor and support address.
 CLI/CI and trusted-server names are documented here instead of being mixed into
@@ -47,6 +48,10 @@ When the support address is unset or malformed, onboarding does not offer a huma
 S5 trusted-server names are listed with empty values in `supabase/.env.example`.
 They are deliberately absent from the root Expo template. PostHog remains
 excluded until its SDK and privacy-safe event transport are implemented.
+The first-party product measurement ingress has a separate server-only,
+default-off switch in that same template. It does not enable PostHog or a
+customer event call site. Do not set it to `true` in hosted settings based on
+this source preparation alone.
 
 ## Local mobile development
 
@@ -190,6 +195,24 @@ hosted provider paths proven. Without a selected/configured provider,
 `propose-routine` returns sanitized `MODEL_UNAVAILABLE` rather than fabricating
 a routine. The deterministic emergency circuit breaker and server-owned signal
 inference do not require the provider key. See [HOSTED_REMOTE_SMOKE.md](HOSTED_REMOTE_SMOKE.md).
+
+At the 2026-09-28 read-only hosted secret-name check for project
+`snojlbqovlawewwqbviz`, `GEMINI_API_KEY` was still absent. The local trusted
+function file is the ignored `supabase/.env.local`; a repository-root `.env`
+is not automatically loaded by Supabase Edge Functions and must never become
+a mobile `EXPO_PUBLIC_*` secret. Saving a value to the trusted file does not
+inject it into an already-running function or the hosted project. Local
+functions must be started with that env file, while hosted use requires a
+separately authorized secret update and deployed function. Free barcode/name
+Check does not call Gemini. The current Gemini paths are the Managed-gated
+`ask-derive` and `scan-product` text-generation functions and the
+Managed-gated `propose-routine` function when its provider selector is
+explicitly `gemini`. These paths do not identify a product from a photo.
+
+`JEV_API_KEY` is **not** a recognized runtime variable in current source:
+there is no Jev adapter or live call path. Jev appears only in the offline
+decision-intelligence evaluation seam. Do not paste a Jev credential into
+Expo, Supabase secrets, or this local file expecting it to turn on a feature.
 
 S5 commerce reads every Stripe value only inside Supabase Edge Functions.
 `create-membership-checkout` and `create-membership-portal` require a valid

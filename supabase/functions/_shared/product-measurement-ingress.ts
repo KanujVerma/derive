@@ -1,20 +1,16 @@
 /**
  * Untrusted product-event payload boundary. This module does not authenticate,
  * persist, count Checks, award referrals, enforce quotas, or export telemetry.
- * A future ingress must do its own Auth, consent, abuse, and deletion review.
+ * The Edge ingress handles Auth and abuse; customer activation still requires
+ * approved privacy choice, retention, and disclosure.
  */
-import type {
-  ProductEventEnvelope,
-  ProductEventName,
-} from "../../../src/presentation/product-analytics/index.ts";
-
 export const MAX_PRODUCT_MEASUREMENT_BYTES = 1024;
 
 type FieldRule = readonly string[] | "boolean";
 
 // Intentionally independent of the client runtime allowlist: an untrusted
-// client cannot widen what the server accepts. The type and parity tests catch
-// drift when either side changes its V1 contract.
+// client cannot widen what the server accepts. The parity tests catch drift
+// when either side changes its V1 contract. Keep this Edge module self-contained.
 const EVENT_FIELDS = {
   app_opened: { platform: ["ios", "android", "web", "unknown"] },
   acquisition_touch: { channel: ["direct", "organic", "friend", "creator", "club", "paid", "unknown"] },
@@ -40,7 +36,14 @@ const EVENT_FIELDS = {
     experiment: ["plus_offer_v1", "managed_early_access_v1"],
     variant: ["control", "treatment"],
   },
-} as const satisfies Record<ProductEventName, Record<string, FieldRule>>;
+} as const satisfies Record<string, Record<string, FieldRule>>;
+
+type ProductEventName = keyof typeof EVENT_FIELDS;
+type ProductEventEnvelope = {
+  schemaVersion: 1;
+  event: ProductEventName;
+  properties: Record<string, string | boolean>;
+};
 
 function plainRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value) &&
@@ -79,5 +82,5 @@ export function parseProductMeasurementJson(body: string): ProductEventEnvelope 
   }
   if (event === "check_completed" && properties.outcome !== "useful" &&
       properties.personalized !== false) return null;
-  return { schemaVersion: 1, event, properties } as ProductEventEnvelope;
+  return { schemaVersion: 1, event, properties };
 }

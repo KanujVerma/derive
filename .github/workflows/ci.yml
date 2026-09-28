@@ -129,6 +129,9 @@ jobs:
       - name: Verify P0-C private upload and account-deletion ordering
         run: node scripts/test-p0c-deletion-concurrency-local.mjs
 
+      - name: Verify P0-C guest deletion pagination, failure and retry
+        run: node scripts/test-p0c-guest-deletion-retry-local.mjs
+
       - name: Run P0-A immutable truth and ownership harness
         run: node scripts/test-p0a-truth-local.mjs
 
@@ -143,3 +146,6 @@ jobs:
 
       - name: Run P0-D customer journey integration harness
         run: node --experimental-strip-types scripts/test-p0d-customer-flow-local.mjs --run --output /tmp/p0d-local-receipt.json
+
+      - name: Verify first-party measurement default-off and enabled local boundaries
+        run: node scripts/test-product-measurement-gate-local.mjs
