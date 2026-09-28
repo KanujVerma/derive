@@ -146,3 +146,6 @@ jobs:
 
       - name: Run P0-D customer journey integration harness
         run: node --experimental-strip-types scripts/test-p0d-customer-flow-local.mjs --run --output /tmp/p0d-local-receipt.json
+
+      - name: Verify first-party measurement default-off and enabled local boundaries
+        run: node scripts/test-product-measurement-gate-local.mjs
