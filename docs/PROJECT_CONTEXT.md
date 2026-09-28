@@ -1,6 +1,6 @@
 # Project Context: Derive
 
-## Current approved strategy (2026-09-27)
+## Current approved strategy (2026-09-28)
 
 Derive is scanner-first personalized skincare product intelligence. The customer has one intent: **“Check this product.”** Auto camera, search, barcode, package evidence, and recovery are ways to provide evidence, not separate truth systems. Complexity belongs behind the interface; customers should not need to know the recognition method or backend vocabulary.
 
@@ -8,13 +8,17 @@ All supported inputs converge on S6 product/formula truth and ProductTruthSnapsh
 
 The $25/month Managed Skincare offer remains a paid hypothesis. Pricing, retention, and hosted billing activation are not validated by a display price or local flow. No universal product/compatibility/health score is used.
 
-## Current implementation status at main 39c0fed
+The latest founder direction targets public Derive plus real Plus or Founding Plus access, with Managed shown as Early Access. The older Sami P0-C Free-only barcode/name checkpoint is the explicit fallback if Plus billing delays release. Final candidate scope is open. Plus is an evaluated self-directed cross-product product, while Managed is delegated ongoing care; proposed Founding grants, quotas and Plus prices are experiments, not active customer access. [MONETIZATION.md](MONETIZATION.md), [FOUNDING_PLUS_ENTITLEMENT.md](FOUNDING_PLUS_ENTITLEMENT.md) and [APP_STORE_RELEASE_READINESS.md](APP_STORE_RELEASE_READINESS.md) keep offer, client preparation and release evidence separate. The former 18+ target has been reopened; first-release audience treatment is undecided.
+
+## Implementation checkpoint at main 39c0fed (historical source snapshot)
 
 PR #108 and #110 are merged. The current camera starts in Auto, keeps supported barcode observation active, and allows package-photo capture. PR #110 handles checksum-valid iOS UPC-A observations normalized by Expo Camera; actual iPhone barcode acceptance remains unverified. If a still is unclassified, the customer selects which package detail it contains before using it. Automatic photo-role classification, OCR, VLM extraction, and cloud video are not implemented.
 
 The canonical product Check has no camera-roll/photo-library picker, product URL paste, OS Share input, or Product Compare. Search and manual recovery remain core paths. S6 and local ProductTruthSnapshotV1 preserve product/formula authority. P0-B currently provides locally/CI-proven findings, versioned decision policy, packet, and same-snapshot composition; this does not establish physical/customer acceptance or hosted release.
 
 PR #109 is merged offline benchmark/replay tooling. It has not called a provider, uploaded images to a provider, or measured image-extraction performance. No image provider is selected, and the preliminary image intake does not meet rights-cleared independent-gold requirements. PR #112 adds a read-only offline hosted-free readiness preflight; all hosted gates remain UNKNOWN and activation remains BLOCKED. Remote Staging/production retain legacy managed routing, and scanner-first external beta is not ready.
+
+**Current 2026-09-28 source update:** Offline soft-judgment benchmark #130, coarse analytics contract #131, monetization evidence #129, provider-neutral client entitlement projection #133, source-only App Store scorecard #134 and fixture-only tier presentation #135 are merged. None adds a production analytics sink, Plus grant, customer Check quota enforcement, provider-backed judgment, hosted anonymous activation, exact binary or physical acceptance. A fresh exact-project read-only inventory at `666f6d3` found 15 of 21 source Edge Function names and 19 of 29 source migration versions hosted; Auth config remains UNKNOWN. See [KANUJ_PORTFOLIO.md](KANUJ_PORTFOLIO.md) and [CONTEXT_SYNC.md](CONTEXT_SYNC.md).
 
 ## Historical managed-first project context (superseded as product strategy)
 

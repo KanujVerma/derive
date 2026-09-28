@@ -2,6 +2,8 @@
 
 ## Current contracts and approved target seams
 
+**2026-09-28 entitlement and measurement seam:** [The client entitlement projection](../src/presentation/entitlements/projectEntitlement.ts) accepts current `FreeAccessState` and an optional future trusted, owner-bound, versioned policy/grant/usage snapshot. It does not fetch or issue a grant, persist a count, or enforce the server limit. A supplied invalid snapshot cannot authorize a metered Check. [The product analytics leaf](../src/presentation/product-analytics/index.ts) accepts only coarse allowlisted events and has no production sink or screen call site. These Kanuj-owned client contracts are preparation; Sami's eventual backend must own grant and usage authority, owner identity, privacy choice, and atomic customer-visible Check counting. See [FOUNDING_PLUS_ENTITLEMENT.md](FOUNDING_PLUS_ENTITLEMENT.md) and [PRODUCT_ANALYTICS.md](PRODUCT_ANALYTICS.md) for their current limits.
+
 ### CURRENT IMPLEMENTATION
 
 The code-linked contracts below are real runtime interfaces. IDeriveService, ProductIdentityResolver, FreeAccess, FreePersonalFit, FreeContext, and FreeProductEvidence describe implemented boundaries, subject to their environment and release gates. Local scanner-first mobile integration is present in Development Mock and exact-local-Supabase Development Remote; hosted guest activation remains gated.

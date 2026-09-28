@@ -2,6 +2,8 @@
 
 High-signal findings synthesized from founder research, customer discovery conversations, dermatological literature, and competitive teardowns.
 
+The dated [scanner competitor and subscription-economics review](research/COMPETITOR_ECONOMICS_2026_09_28.md) is the current evidence input for [monetization hypotheses](MONETIZATION.md). Vendor claims and broad RevenueCat subscription medians are not Derive performance, conversion forecasts, or a Plus pricing decision. [The decision-intelligence evaluation](INTELLIGENCE_EVALUATION.md) is a separate offline baseline; Gemini and Jev have no Derive provider run or selected production role.
+
 ## External research update: scanner, product truth, and evidence (2026-09-26)
 
 These links describe external products, vendor claims, standards, or data policies. They are research inputs, not Derive implementation, endorsements, or provider selections.
