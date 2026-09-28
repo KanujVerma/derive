@@ -1,6 +1,23 @@
 # P0-D current camera acceptance, 2026-09-27
 
-Scope: Kanuj's current Check entry and the merged Sami Auto camera at starting main `aefbd46085698d49be9789b7742acbf2a1288471`. This is a source and development Simulator checkpoint, not physical or release acceptance. Issue [#100](https://github.com/KanujVerma/derive/issues/100) remains open.
+## Physical current-source checkpoint, 2026-09-28
+
+**Environment:** iPhone 17 Pro Max, iOS 27.0, wired and trusted; Expo Go 57.0.9 opened a Metro LAN bundle from source `77768e209870f962aab12fe0a04086c492015d59` with dotenv disabled, `EXPO_PUBLIC_BUILD_FLAVOR=development`, and Remote service disabled. This is Development Mock. Main later advanced to `666fe1d` only through catalog documentation, a read-only script and its test, with no app-runtime file change. The separately installed Derive 1.0.0 (10) app was not used. Xcode CoreDevice screenshots of the phone supported observation; a founder performed the taps. Temporary screenshots were kept outside Git, and no customer photo or private account record was submitted.
+
+| Physical step | Observed result | Limit |
+| --- | --- | --- |
+| Launch and Check entry | Expo Go loaded the current source; Check showed one Open camera action, Search by name, Account, and four root tabs. The controls were visible without clipping on the 17 Pro Max. | Development Mock, not a signed candidate or hosted guest first launch. |
+| Auto camera | Open camera presented a live physical preview. Close, torch, guide, mode chooser and shutter were visible together; the bottom tabs did not cover the shutter. The founder confirmed the torch toggled. | Permission success was observed, but a fresh permission prompt, denial, Settings recovery, rapid taps and interruptions were not tested. |
+| Manual fallback | Choose what to capture revealed Auto, Barcode, Front label, Ingredients and Packaging while keeping the shutter visible. Close returned to Check. | No shutter photo, ambiguous-still review, Retake or package evidence handoff was observed. |
+| Name-search fallback | Search opened the native keyboard without hiding the field or result action. Entering `CeraVe` showed one Renewing SA Cleanser result; tapping Check opened its result. | This is a Development Mock result, not hosted catalog coverage or a real bottle/barcode match. |
+| Result and optional context | The result showed sourced product identity, explicitly said exact package formula was not verified, and showed Personal Fit as not personalized. Personalize opened step 1 of 3 with Back, Skip, goals and a visible Continue action; Skip returned to the same factual result without entered context. | No actual personal decision, profile save, supported formula or customer comprehension is proven. The preview gave no verified personal recommendation or package-verification action. |
+| My Stuff and Account | My Stuff showed honest empty profile, products, Check history and reactions; Account opened. In this no-account preview, Account showed only `No account set up.` | Privacy, Support and deletion entries were not visible in Development Mock. The separate hosted free-account UI has source paths for them, but no physical or hosted acceptance was run. |
+
+No real skincare product was at hand, so UPC-A, EAN-13, EAN-8, ingredient-panel capture, difficult visual cases, and actual product identification remain **UNVERIFIED**. Small-screen/Dynamic Type, VoiceOver, save/revisit, owner transition, network loss, current hosted runtime, signed binary, TestFlight and an unassisted participant also remain open. These directed founder interactions are not the K4 human-study pass. The source release preflight still fails on production Mock service and legacy shell.
+
+## Earlier source and Simulator checkpoint, 2026-09-27
+
+Scope: Kanuj's Check entry and the merged Sami Auto camera at starting main `aefbd46085698d49be9789b7742acbf2a1288471`. This earlier section records source and development Simulator evidence only. Issue [#100](https://github.com/KanujVerma/derive/issues/100) remains open.
 
 ## Environments and evidence
 
