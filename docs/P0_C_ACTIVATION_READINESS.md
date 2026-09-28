@@ -76,7 +76,36 @@ hosted: `access-state`, `free-context`, `free-personal-fit`, `personal-context`,
 hosted names. This is a point-in-time name inventory, not a deployment request
 or a full hosted migration/function revision readback. No hosted change was made.
 
+### Exact-project migration-version readback (2026-09-27)
+
+Run `node scripts/readback-hosted-migration-inventory.mjs` from the repository
+root with an authenticated Supabase CLI. This read-only check compares the
+committed `HEAD` SQL migration **versions** with `supabase migration list
+--project-ref snojlbqovlawewwqbviz --output-format json`. It also compares the
+CLI's local-version inventory with committed source, so an uncommitted migration
+cannot silently look like a clean match. It prints only the source revision,
+counts and version numbers. Raw CLI output, errors, credentials and customer
+data are not printed. Missing/malformed/duplicate inventories fail closed with
+exit 2. Version parity exits 0 for this **one inventory only**; it does not
+verify migration SQL contents, applied schema/RLS, function revisions, Auth
+configuration, physical acceptance or activation readiness.
+
+At source `98d2ba379b7cf36607b1bce349c03db293500947`, the exact hosted
+project reported **19 applied** versions versus **28 committed** migrations.
+The following nine committed migrations have not been applied hosted:
+`20260923180000`, `20260923235000`, `20260924010000`, `20260924020000`,
+`20260925140000`, `20260926233621`, `20260927003158`, `20260927010000`, and
+`20260927021000`. No hosted-only version appeared. This is a point-in-time
+readback, not a request or authorization to push those migrations. The free
+identity/profile/history/evidence migrations are among the missing versions,
+so enabling hosted guests now would create a mixed deployment.
+
 ## Required reviewed evidence before activation
+
+For the initial closed scanner-first beta, the founder chose **free-only**:
+do not enable the proposed $4.99 checkout or Managed purchase path as part of
+this activation. This pricing decision does not weaken the hosted identity,
+rate, privacy, deletion or physical acceptance gates below.
 
 Record revision, project, date, reviewer, sanitized artifact reference and actual
 observed result per gate. Store secrets/customer identifiers outside public docs;
@@ -98,10 +127,13 @@ assertion or screenshot of a dashboard switch alone does not prove the control.
    injected removal/list failure and retry. Fence new writes during deletion and
    prove Storage empty before Auth removal. Signed URL expiry is not immediate
    revocation; existing maximum 15-minute exposure must be explained accurately.
-7. Approved inactivity/retention policy and resumable cleanup dry-run. Exclude
-   permanent/linked identities, recheck identity/activity immediately before
-   deletion, serialize cleanup versus linking/new uploads, verify Storage first,
-   retain only privacy-minimized job status, and alert/retry on failure.
+7. For the closed beta, disclose the approved **no automatic inactivity
+   cleanup** policy and verify customer-requested Storage-first deletion. Before
+   introducing any later automatic cleanup, approve a retention duration and
+   notice, then require a resumable dry-run: exclude permanent/linked identities,
+   recheck identity/activity immediately before deletion, serialize cleanup
+   versus linking/new uploads, verify Storage first, minimize job status, and
+   alert/retry on failure.
 8. Private model-provider purpose/terms/retention review before sending images.
 9. Privacy-safe operational alerts plus rollback/recovery drill. No ingredient,
    profile, pregnancy, prescription, product-text, images, tokens or replay payloads.
@@ -110,11 +142,12 @@ assertion or screenshot of a dashboard switch alone does not prove the control.
 
 ## Architectural decisions requiring founder review
 
-- **Retention duration and notice:** no default is chosen. Set product expectations
-  and a defensible inactivity duration before introducing destructive cleanup.
-  A no-automatic-cleanup closed beta is the recommendation pending founder
-  approval, not an adopted retention policy or authorization to retain data
-  indefinitely. Customer-initiated Storage-first deletion remains required.
+- **Closed-beta retention:** founder approved keeping guest data until the user
+  deletes it during this temporary closed-beta phase. No inactivity-cleanup job
+  will run in this phase. This is not an indefinite retention commitment;
+  customer-facing notice must reflect actual behavior, and a new policy decision
+  is required before a broader launch or automated cleanup. Customer-initiated
+  Storage-first deletion remains required.
 - **Cleanup/upgrade/delete concurrency:** use a reviewed identity/lifecycle fence,
   not a bulk `delete auth.users` sweep. Auth deletion before Storage verification
   would orphan private evidence and is prohibited.
@@ -130,9 +163,10 @@ assertion or screenshot of a dashboard switch alone does not prove the control.
 
 ## Safe next implementation sequence
 
-Define the lifecycle/conflict contract and retention policy → lease shared Auth/
-migration surfaces → isolated abuse and cleanup modules with failure/concurrency
-tests → bounded client lifecycle integration with Kanuj → disposable local reset/
+Define the lifecycle/conflict contract and temporary beta notice → lease shared
+Auth/migration surfaces → isolated signup/endpoint abuse controls and
+deletion-write fencing with failure/concurrency tests → bounded client lifecycle
+integration with Kanuj → disposable local reset/
 pgTAP/integration → exact-head CI → reviewed hosted dry-run/readback → actual
 physical/customer acceptance → explicit coordinated activation.
 
