@@ -1,0 +1,71 @@
+# Product analytics and experiments
+
+**Status: IMPLEMENTED leaf contract; EVALUATION for transport; no shipped customer measurement.** This document owns the customer measurement definitions. The existing `src/services/analytics.ts` logs in development and still has older event types that accept product names and IDs. The new `src/presentation/product-analytics/index.ts` has a typed, runtime checked event envelope and an optional sink. It has no default sink, network call, persistence, identity, or production screen call site. These events are therefore a contract, not current funnel data. No onboarding or other existing analytics log is evidence of customer measurement.
+
+## Measurement rules
+
+- Count one **customer-visible Check** from a user's Check action through the terminal result shown. Barcode/search/photo lookup attempts, retries, cache hits, and provider calls within that action are not additional Checks. `beginCheck` and `complete` enforce one start and at most one completion inside one mounted flow. A new user action starts a new Check. A future integration must handle interrupted flows and remounts without inflating counts.
+- **First useful Check** is the first result actually shown with supported product identity, a trustworthy plain answer or next action, and sufficient evidence for that answer. It may be factual and unpersonalized. A request reaching a provider, a candidate list, an unknown product, a photo upload, or an unresolved result is not activation. `check_completed` is recorded after the terminal result is shown; its `useful` outcome drives activation. `personalized=true` is permitted only with `useful`.
+- Record coarse outcomes, never product or ingredient identities, skin context, photos, local paths, transcripts, free text, email, referral codes, or owner/device IDs in the client event envelope. Schema validation rejects undeclared fields and values at runtime, including injected fields from JavaScript call sites. No autocapture or session replay.
+- Measurement cannot be an authority for membership, referral rewards, quotas, purchases, ownership, or clinical/product decisions. The backend and payment provider own those states. Treat all client events as claims until server accepted; never use them to grant rewards or entitlements.
+- Do not gate a useful Free Check on analytics availability or consent. On transport failure, the client drops the event without blocking the customer action. This favors customer trust over a falsely precise count; report missingness.
+
+## Event contract
+
+Version 1 is `{ schemaVersion: 1, event, properties }`. The allowlist is implemented in the leaf module. It contains no timestamp or subject ID; the server must supply receipt time and derive the authenticated owner itself. `createProductAnalytics()` without a reviewed sink emits nothing. A caller may inject a sink for contract tests or, after approval, a bounded composition pass.
+
+| Event group | V1 events | Only accepted dimensions |
+| --- | --- | --- |
+| First touch | `app_opened`, `acquisition_touch`, `referral_opened`, `referral_shared` | Platform or coarse channel enum. Codes and creator identities stay in a private canonical attribution store. |
+| Check | `check_started`, `check_completed` | Input method; terminal outcome; personalization boolean. |
+| Retention | `my_stuff_viewed`, `check_saved` | None. |
+| Plus intent | `plus_trigger_reached`, `paywall_viewed`, `plus_plan_selected`, `plus_purchase_started` | Coarse trigger/source or monthly/annual choice. Completion, renewal, cancellation, and collected revenue come from verified payment/backend facts. |
+| Managed intent | `managed_viewed`, `managed_learn_more`, `managed_interest` | Coarse entry surface. Intake and paid conversion are separate canonical facts. |
+| Experiments | `experiment_exposed` | Fixed experiment and variant enums only. No assignment authority in the client. This event is emitted only when the assigned treatment is actually shown. |
+
+No current screen calls this contract. A composition pass should add only the events required for the first release, with testable trigger points. A reviewed production ingress is required to meet the brief's pre-distribution measurement gate.
+
+## Funnel definitions and query contract
+
+Use a server-derived owner projection for distinct counts. Denominators should report eligible, exposed, and measured owner counts with acquisition channel, assignment, platform, release/build, and calendar window. Publish drop/missing event rates. Do not infer install counts from app opens.
+
+| Question | Numerator and denominator |
+| --- | --- |
+| Acquisition to activation | Canonical first touch or coarse source -> first app open -> first Check start -> first useful Check -> first personalized useful Check, each over the same eligible owner cohort. Referral/creator credit requires server-verified private attribution. |
+| Useful resolution | Customer-visible `useful` completions / all terminal Check completions, split by input method. Show unknown, insufficient evidence, and failure separately. |
+| Repeat value | Owners with at least a second useful Check / activated owners. Checks per activated owner and calendar week. D1/D7/D30 returns require activity on the named day after first useful Check, with timezone and observation window fixed before analysis. |
+| Plus | Trigger -> paywall -> plan choice -> start -> verified purchase, renewal or cancellation. Verify final steps from StoreKit/payment backend and entitlement projection; never count a client purchase tap as a sale. |
+| Managed | View -> learn more -> Early Access intent -> verified intake -> verified paid conversion. Keep intent distinct from membership. |
+| Referral | Server-recorded share/open and verified referring relationship -> first useful Check -> repeat -> verified Plus/Managed payment. Count unique referred owners and prevent self/duplicate credit in the canonical backend. |
+
+`my_stuff_viewed` and `check_saved` measure adoption only if their actual customer flows call the contract. Considering, Compare, research monitoring, and other target features have no V1 use event until they exist. Add narrowly typed events when those features launch. Do not turn planned features into apparent usage.
+
+**EXPERIMENT: scanner-to-Managed wedge.** Group activated owners by customer-visible Check count: 1, 2–4, 5–10, 11+. Compare Managed view, learn more, Early Access intent, and verified conversion by cohort. Use a fixed entry cohort and observation window, adjust for acquisition channel and tenure, and report sample sizes and uncertainty. This is an observational association; it cannot establish that scanning causes Managed demand. A randomized Managed offer requires a separate approved assignment and an exposure event. Publish flat or negative results.
+
+## Attribution, identity, and privacy
+
+**APPROVED TARGET:** the private backend validates a referral/creator/club link or campaign token, binds first eligible touch to the current owner, and keeps the code, source identity, relationship, fraud checks, and payout facts in owner-bound canonical tables. Client analytics receives only a coarse channel. A referral is activated only at first useful Check. A reward or creator payout requires verified canonical qualification, with payment receipts for paid outcomes. Neither commercial source nor experiment variant can affect skincare truth or safety.
+
+An authenticated ingress should derive the owner from its session, map it to a purpose-specific pseudonym on the server, and keep that mapping private. Do not send Supabase user IDs, emails, device IDs, raw codes, or product IDs to a general analytics vendor. A persistent pseudonym remains linkable usage data, including when derived from a guest account; do not call it anonymous. Guest-to-permanent linking, sign-out, owner change, deletion, opt-out, and pseudonym rotation require Sami's platform privacy design before transport. If a third-party export is chosen, a separate export identity should be generated from a server secret, with a tested deletion path. No event schema field permits the client to assert its own owner.
+
+## Experiments and remote configuration
+
+**APPROVED TARGET, inactive:** Sami's canonical backend returns an authenticated, owner-scoped assignment with experiment key, variant, policy version, eligibility, assignment time, expiry, and safe fallback. Assignment is stable across devices and guest linking according to the approved identity policy. The client applies only recognized values, falls back to control on missing/stale/unrecognized config, and emits exposure once the treatment is rendered. Keep a server assignment ledger for intent-to-treat analysis; exposure is not assignment. Record concurrent experiment collisions and freeze relevant quota/offer rules for a cohort. Do not allow PostHog or client flags to set entitlements or quota authority. No experiment or remote config is active through this leaf module.
+
+No screen should compute a stable cohort from email, device IDs, or local random state. Remote quota and Founding Plus rules require separate entitlement authority. If opt-out suppresses behavioral events, keep the assignment for product consistency and report the measurement gap.
+
+## Model and provider cost authority
+
+**Sami server handoff, not client analytics:** record one server-side invocation row per actual provider operation with invocation ID, internal customer-visible Check correlation where applicable, provider, model/version, operation, start/end or latency, token and image usage, currency and price-table version, estimated cost, status, error class, cache/retry relation, and whether its output contributed to a **useful** result. No prompts, responses, product names, image paths, ingredients, sensitive context, or raw user identifiers in the analytics export. Keep invoice reconciliation separate from estimates. A cached hit has zero new provider spend; retries count each actual paid call. A useful Check may involve several calls; aggregate all contributing calls once against the one visible Check. Server-only cost per useful Check, activated owner, Free active owner, and paid subscriber must use verified cohort denominators and measured coverage.
+
+## Transport options and recommendation
+
+| Option | Benefit | Cost and privacy impact |
+| --- | --- | --- |
+| Client PostHog | Fast built-in funnels and experiments. | New native SDK, direct third-party usage transmission, default SDK behavior/automatic fields to audit, pseudonym and deletion complexity, revised App Privacy answers. Highest final-binary review burden. |
+| Authenticated server/proxy to PostHog | Client only sends the allowlisted envelope to Derive; server can reject, rate-limit, derive owner, and strip fields before optional export. PostHog still supports funnels. | Sami must own ingress, export, owner projection, retention/deletion and operational checks. PostHog remains a third-party recipient when export is enabled. |
+| First-party event ledger | Maximum data control and no analytics vendor for V1. Direct join to canonical attribution/payment facts under controlled access. | Sami must build storage, deletion, aggregation, dashboards, abuse protection, and experiment reporting. More platform work on the MVP path. |
+
+**EVALUATION recommendation:** use the authenticated server/proxy path if Sami's S7 transport survives review, with the canonical backend owning identity, referral, entitlement and purchases. It offers a narrow client payload and fast funnel analysis without a second analytics ledger. Keep first-party ledger as the fallback if the vendor privacy or disclosure review fails; do not silently enable client PostHog. Sami PR #35 provides an inactive S7 transport/diagnostics candidate with `EXPO_PUBLIC_ANALYTICS_ENABLED=false`; it sends no customer events yet. Kanuj must review the changed shared analytics facade, customer privacy choice and opt-out. Before activation: approve disclosure and deletion procedure, inspect a synthetic staging event's raw payload, verify replay/autocapture/automatic exceptions/feature flags remain off, then reconcile App Privacy and the physical release binary. The leaf contract does not perform any of these steps.
+
+Apple defines Product Interaction as usage data and asks whether collected data is linked to identity and used for tracking. Pseudonymous owner-level event histories should be assessed as **linked** unless the final design truly breaks re-linkage. A first-party analytics purpose does not automatically mean ATT tracking; any cross-company ad measurement, partner data combination, SDK behavior, or data broker sharing changes that answer. Reassess the final app and partners before App Store submission. Sources: [Apple App Privacy details](https://developer.apple.com/app-store/app-privacy-details/) and [Apple privacy and tracking guidance](https://developer.apple.com/app-store/user-privacy-and-data-use/). The current provisional release worksheet remains in [APP_STORE_RELEASE_READINESS.md](APP_STORE_RELEASE_READINESS.md).
