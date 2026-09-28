@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { shutterPhotoRole, stillPhotoRole, canObserveLiveBarcode, isObservedGtin, isObservedRetailBarcode } from '../src/presentation/capture/autoCapture.ts';
+import { initialCaptureIntent, shutterPhotoRole, stillPhotoRole, canObserveLiveBarcode, isObservedGtin, isObservedRetailBarcode } from '../src/presentation/capture/autoCapture.ts';
 import { createCaptureOperationGate } from '../src/presentation/capture/captureOperationGate.ts';
 import { createCaptureSession, reduceCapture } from '../src/presentation/capture/productEvidence.ts';
 
@@ -14,6 +14,18 @@ test('the Auto shutter explicitly starts a front-label photo without an extra ro
   assert.equal(shutterPhotoRole('auto'), 'front_label');
   assert.equal(shutterPhotoRole('ingredients'), 'ingredients');
   assert.equal(shutterPhotoRole('barcode'), null);
+});
+test('an ingredients request opens in ingredients mode and captures ingredients evidence', () => {
+  const requestedIntent = initialCaptureIntent('ingredients');
+  assert.equal(requestedIntent, 'ingredients');
+  assert.equal(shutterPhotoRole(requestedIntent), 'ingredients');
+  assert.equal(canObserveLiveBarcode(requestedIntent, { busy: false, hasPreview: false, locked: false }), false);
+  assert.equal(initialCaptureIntent('front_label'), 'front_label');
+  assert.equal(initialCaptureIntent('packaging'), 'packaging');
+  assert.equal(initialCaptureIntent('barcode'), 'auto');
+  const source = readFileSync(new URL('../src/components/check/capture/ProductEvidenceCapture.tsx', import.meta.url), 'utf8');
+  assert.match(source, /useState<CaptureIntent>\(\(\) => initialCaptureIntent\(initialRole\)\)/);
+  assert.match(source, /setPreviewRole\(shutterPhotoRole\(intent\)\)/);
 });
 test('continuous barcode signal stops during a photo, preview, or locked result', () => {
   const idle = { busy: false, hasPreview: false, locked: false };
@@ -54,10 +66,12 @@ test('a barcode callback cannot finish while the synchronous camera gate is busy
   gate.whenIdle(() => finishes++);
   assert.equal(finishes, 1);
 });
-test('Auto camera remains a local leaf with explicit uncertain-photo fallback', () => {
+test('Auto camera remains a local leaf and asks for a part only when the photo role is unknown', () => {
   const source = readFileSync(new URL('../src/components/check/capture/ProductEvidenceCapture.tsx', import.meta.url), 'utf8');
-  assert.match(source, /useState<CaptureIntent>\('auto'\)/);
+  assert.match(source, /useState<CaptureIntent>\(\(\) => initialCaptureIntent\(initialRole\)\)/);
+  assert.match(source, /showCorrection \|\| \(previewUri && !previewRole\)/);
   assert.match(source, /Which part is in this photo\?/);
+  assert.match(source, /accessibilityLabel="Change part"/);
   assert.match(source, /previewRole && <Action label=\{session\.evidence\.some\([\s\S]*'Replace photo' : 'Use photo'\}/);
   assert.match(source, /onBarcodeScanned=\{intent === 'barcode' \|\| \(intent === 'auto' && capturedPhotos\.length === 0\) \? onBarcode : undefined\}/);
   assert.doesNotMatch(source, /fetch\(|Gemini|stream.*frames|Ingredient list detected/);

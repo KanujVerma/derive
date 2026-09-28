@@ -43,7 +43,8 @@ test('capture and recovery controls stay accessible and scroll clear of the foot
 });
 
 test('default Auto keeps one visible shutter while the five modes open in a compact vertical popover', () => {
-  assert.match(capture, /\(showCorrection \|\| previewUri\) && <CameraGlass style=\{styles\.modeMenu\}>/);
+  assert.match(capture, /\(showCorrection \|\| \(previewUri && !previewRole\)\) && <CameraGlass style=\{styles\.modeMenu\}>/);
+  assert.match(capture, /accessibilityLabel="Change part"/);
   assert.match(capture, /roleRow: \{[^\n]*flexDirection: 'column'/);
   assert.match(capture, /roleChip: \{[^\n]*minHeight: layout\.minTouchTarget/);
   assert.match(capture, /selected && <Icon name="check"/);

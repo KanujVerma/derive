@@ -8,7 +8,7 @@ import { colors, layout, radii, spacing, typography } from '../../../constants/t
 import { Icon } from '../../ui/Icon';
 import { captureRecovery } from '../../../presentation/capture/captureRecovery';
 import { createCaptureOperationGate } from '../../../presentation/capture/captureOperationGate';
-import { canObserveLiveBarcode, isObservedRetailBarcode, shutterPhotoRole, type CaptureIntent } from '../../../presentation/capture/autoCapture';
+import { canObserveLiveBarcode, initialCaptureIntent, isObservedRetailBarcode, shutterPhotoRole, type CaptureIntent } from '../../../presentation/capture/autoCapture';
 import {
   captureRoles, createCaptureSession, nextPhotoRole, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
   type CaptureAction, type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
@@ -37,7 +37,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const [permission, requestPermission] = useCameraPermissions();
   const [session, setSession] = useState(createCaptureSession);
   const [role, setRole] = useState<CaptureRole>(initialRole);
-  const [intent, setIntent] = useState<CaptureIntent>('auto');
+  const [intent, setIntent] = useState<CaptureIntent>(() => initialCaptureIntent(initialRole));
   const [showCorrection, setShowCorrection] = useState(false);
   const [previewRole, setPreviewRole] = useState<PhotoRole | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
@@ -259,7 +259,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
               </View>
             ) : null}
           </View>
-          {(showCorrection || previewUri) && <CameraGlass style={styles.modeMenu}>
+          {(showCorrection || (previewUri && !previewRole)) && <CameraGlass style={styles.modeMenu}>
             <ScrollView style={styles.controlScroll} contentContainerStyle={styles.controlContent}>
               {previewUri && <Text style={styles.modeTitle}>Which part is in this photo?</Text>}
               <View style={styles.roleRow}>
@@ -272,7 +272,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
                   const saved = session.evidence.some((entry) => entry.role === item);
                   const selected = previewUri ? previewRole === item : intent === item;
                   return (
-                    <Pressable key={item} accessibilityRole="button" accessibilityLabel={`${roleLabels[item]}${saved ? ', captured' : ''}`} accessibilityState={{ selected: previewUri ? previewRole === item : intent === item, disabled: busy }} disabled={busy} onPress={() => { if (previewUri && item !== 'barcode') operations.whenIdle(() => setPreviewRole(item)); else selectRole(item); }} style={[styles.roleChip, selected && styles.roleChipActive]}>
+                    <Pressable key={item} accessibilityRole="button" accessibilityLabel={`${roleLabels[item]}${saved ? ', captured' : ''}`} accessibilityState={{ selected: previewUri ? previewRole === item : intent === item, disabled: busy }} disabled={busy} onPress={() => { if (previewUri && item !== 'barcode') operations.whenIdle(() => { setPreviewRole(item); setShowCorrection(false); }); else selectRole(item); }} style={[styles.roleChip, selected && styles.roleChipActive]}>
                       <Text style={[styles.roleText, selected && styles.roleTextActive]}>{roleLabels[item]}</Text>
                       {selected && <Icon name="check" size={18} color={colors.brandDark} />}
                     </Pressable>
@@ -294,7 +294,10 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
             {error && <Text style={styles.error}>{error}</Text>}
             <View style={styles.captureActions}>
                 {previewUri ? (
-                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => { setPreview(null); setPreviewRole(null); }} />{previewRole && <Action label={session.evidence.some((item) => item.role === previewRole) ? 'Replace photo' : 'Use photo'} onPress={usePhoto} />}</View>
+                  <View style={styles.photoActionStack}>
+                    {previewRole && !showCorrection && <Pressable accessibilityRole="button" accessibilityLabel="Change part" onPress={() => operations.whenIdle(() => { animateOptions(); setShowCorrection(true); })} style={styles.changePart}><Text style={styles.changePartText}>Change part</Text></Pressable>}
+                    <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => { setShowCorrection(false); setPreview(null); setPreviewRole(null); }} />{previewRole && <Action label={session.evidence.some((item) => item.role === previewRole) ? 'Replace photo' : 'Use photo'} accessibilityLabel={`${session.evidence.some((item) => item.role === previewRole) ? 'Replace' : 'Use'} ${roleLabels[previewRole]} photo`} onPress={usePhoto} />}</View>
+                  </View>
                 ) : currentEvidence ? (
                   <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => retakeRole(role)} /><Action label="Check product" onPress={() => void processEvidence()} /></View>
                 ) : intent === 'barcode' ? (
@@ -345,8 +348,8 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   );
 }
 
-function Action({ label, onPress, secondary = false }: { label: string; onPress: () => void; secondary?: boolean }) {
-  return <Pressable accessibilityRole="button" onPress={onPress} style={[styles.action, secondary && styles.secondaryAction]}><Text style={[styles.actionText, secondary && styles.secondaryText]}>{label}</Text></Pressable>;
+function Action({ label, onPress, secondary = false, accessibilityLabel }: { label: string; onPress: () => void; secondary?: boolean; accessibilityLabel?: string }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={[styles.action, secondary && styles.secondaryAction]}><Text style={[styles.actionText, secondary && styles.secondaryText]}>{label}</Text></Pressable>;
 }
 
 function CameraGlass({ children, style }: { children: React.ReactNode; style: StyleProp<ViewStyle> }) {
@@ -398,6 +401,8 @@ const styles = StyleSheet.create({
   roleTextActive: { color: colors.brandDark },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   photoActionStack: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  changePart: { minHeight: layout.minTouchTarget, justifyContent: 'center', paddingHorizontal: spacing.md },
+  changePartText: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.medium, textAlign: 'center', textDecorationLine: 'underline' },
   action: { minHeight: layout.ctaHeight, minWidth: 116, maxWidth: '100%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.full, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   secondaryAction: { backgroundColor: 'rgba(30,54,44,0.72)', borderWidth: 1, borderColor: colors.inkInverse },
   actionText: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold, textAlign: 'center' },
