@@ -30,6 +30,17 @@ flight before its database INSERT, hosted deployment, or failure/retry behavior
 under network faults. Review the hosted Storage implementation and run a
 disposable hosted race/failure drill before claiming that broader guarantee.
 
+A later, separate local regression now exercises a guest with 101 private skin
+photos in one paginated folder, a nested skin photo, and private product
+evidence. A deliberately inconsistent service-authored photo metadata path
+first makes deletion fail closed: Auth and files remain, the upload fence stays
+set, and a neighboring guest is untouched. After removing only that synthetic
+bad row, retry removes both private namespaces and the guest Auth user while
+preserving the neighbor. CI runs this disposable local drill after a fresh
+database reset; it is not a hosted failure-injection or provider-network race
+proof. If the drill itself fails, its cleanup attempts only its generated local
+identities and warns if a synthetic fixture must be retained for diagnosis.
+
 Before the App Store build can point at hosted scanner-first runtime, the
 remaining gates include: reconcile all unapplied hosted migrations and missing
 functions in reviewed order; verify Auth abuse/rate controls; finish guest
