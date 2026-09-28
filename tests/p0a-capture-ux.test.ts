@@ -26,9 +26,9 @@ test('capture options scroll independently of the shutter and expose all roles',
 
 test('barcode guide is visual-only and the camera/shutter retain existing safety controls', () => {
   assert.match(capture, /pointerEvents="none" style=\{styles\.guideArea\}/);
-  assert.match(capture, /\(intent === 'auto' \|\| intent === 'barcode'\) && !currentEvidence && !previewUri/);
+  assert.match(capture, /\(intent === 'barcode' \|\| \(intent === 'auto' && capturedPhotos\.length === 0\)\) && !currentEvidence && !previewUri/);
   assert.match(capture, /testID="barcode-alignment-guide"/);
-  assert.match(capture, /onBarcodeScanned=\{intent === 'auto' \|\| intent === 'barcode' \? onBarcode : undefined\}/);
+  assert.match(capture, /onBarcodeScanned=\{intent === 'barcode' \|\| \(intent === 'auto' && capturedPhotos\.length === 0\) \? onBarcode : undefined\}/);
   assert.match(capture, /accessibilityState=\{\{ disabled: busy, busy \}\}/);
   assert.match(capture, /disabled=\{busy\} onPress=\{\(\) => void capturePhoto\(\)\}/);
   assert.match(capture, /operations\.cancel\(\)/);
