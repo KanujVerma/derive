@@ -150,6 +150,27 @@ readback, not a request or authorization to push those migrations. The free
 identity/profile/history/evidence migrations are among the missing versions,
 so enabling hosted guests now would create a mixed deployment.
 
+### Exact-project Auth setting readback (2026-09-28)
+
+`node scripts/readback-hosted-auth-config.mjs` makes one read-only Management API
+GET for `snojlbqovlawewwqbviz`. It requires a Supabase Management API token
+with `auth_config_read` permission in the process environment as
+`SUPABASE_ACCESS_TOKEN`; do **not** put that token in `.env.local`, the app,
+commits, command arguments or screenshots. A project publishable key is not a
+Management API token. The API's response may contain SMTP/CAPTCHA/provider
+secrets, so the script only emits the anonymous-signup flag, global signup flag,
+anonymous hourly IP limit and CAPTCHA enabled/provider state. Unknown providers
+are printed as `UNKNOWN`, not raw text. Errors and malformed or oversized
+responses emit only a sanitized `UNKNOWN`/`BLOCKED` result and exit 2.
+
+This check does not change a dashboard setting, create a guest, verify a real
+challenge, test IP limits, prove endpoint abuse resistance, or authorize a
+release. Observed settings leave activation `BLOCKED` even if anonymous Auth is
+already enabled. At this checkpoint no read token was available, so the actual
+hosted Auth settings remain **unknown**. The founder selected barcode/name search
+for the first App Store release; do not treat the preliminary Mac OCR diagnostic
+or package-photo capture as product recognition in that build.
+
 ## Required reviewed evidence before activation
 
 For the initial closed scanner-first beta, the founder chose **free-only**:
