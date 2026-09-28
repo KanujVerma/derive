@@ -15,8 +15,8 @@ to `924371b5808c02b1e0b450b9734abe366c379c0f` through focused Sami PRs
 [#142](https://github.com/KanujVerma/derive/pull/142),
 [#143](https://github.com/KanujVerma/derive/pull/143) and
 [#145](https://github.com/KanujVerma/derive/pull/145). Each PR passed both
-exact-head CI jobs before merge. Post-merge main CI through `666fe1d` passed
-both jobs in [run 36457528086](https://github.com/KanujVerma/derive/actions/runs/36457528086); CI for `924371b` must be checked separately. The
+exact-head CI jobs before merge. Post-merge main CI for `924371b` passed
+both jobs in [run 36461201362](https://github.com/KanujVerma/derive/actions/runs/36461201362). The
 original dirty auth checkout was not changed. No Kanuj-owned `app/**` file was
 changed in these PRs.
 
