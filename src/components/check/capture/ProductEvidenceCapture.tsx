@@ -30,9 +30,10 @@ interface Props {
   processor?: CaptureProcessor;
   initialRole?: CaptureRole;
   autoFinishBarcode?: boolean;
+  detectionPaused?: boolean;
 }
 
-export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false }: Props) {
+export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false }: Props) {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [session, setSession] = useState(createCaptureSession);
@@ -58,6 +59,8 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const currentEvidence = intent === 'auto' ? undefined : session.evidence.find((item) => item.role === role);
   const capturedPhotos = session.evidence.filter((item) => item.kind === 'local_photo');
   const nextMissingPhoto = nextPhotoRole(session);
+  const liveBarcode = !detectionPaused && !currentEvidence && !previewUri
+    && (intent === 'barcode' || (intent === 'auto' && capturedPhotos.length === 0));
 
   useEffect(() => {
     mounted.current = true;
@@ -217,7 +220,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           facing="back"
           enableTorch={torch}
           barcodeScannerSettings={{ barcodeTypes: ['upc_a', 'ean13', 'ean8'] }}
-          onBarcodeScanned={intent === 'barcode' || (intent === 'auto' && capturedPhotos.length === 0) ? onBarcode : undefined}
+          onBarcodeScanned={liveBarcode ? onBarcode : undefined}
         />
       ) : previewUri ? (
         <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -249,7 +252,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
       ) : session.phase === 'collecting' ? (
         <View style={styles.collecting}>
           <View pointerEvents="none" style={styles.guideArea}>
-            {(intent === 'barcode' || (intent === 'auto' && capturedPhotos.length === 0)) && !currentEvidence && !previewUri ? (
+            {liveBarcode ? (
               // Alignment aid only: Expo still detects barcodes across the whole preview.
               <View testID="barcode-alignment-guide" style={styles.barcodeGuide}>
                 <View style={[styles.guideCorner, styles.guideTopLeft]} />
