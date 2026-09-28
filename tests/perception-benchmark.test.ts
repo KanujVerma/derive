@@ -81,6 +81,41 @@ test('independent supplied outputs compare literal fields, retain partial NOT_RU
   assert.equal(provider.rows[1].status, 'NOT_RUN');
 });
 
+test('scenario results expose per-provider coverage without treating NOT_RUN as accuracy', () => {
+  const f = fixture();
+  f.run.entries.pop();
+  const report = evaluate(f, [f.run]);
+  const partial = report.providers[1];
+  const front = partial.scenarios.find(row => row.scenario === 'clear_front')!;
+  assert.deepEqual({ images: front.images, executed: front.executed, passed: front.passed,
+    coverageRate: front.coverageRate, exactCandidateRate: front.exactCandidateRate },
+  { images: 1, executed: 1, passed: 1, coverageRate: 1, exactCandidateRate: 1 });
+  for (const scene of ['blur', 'low_light']) {
+    const skipped = partial.scenarios.find(row => row.scenario === scene)!;
+    assert.equal(skipped.images, 1);
+    assert.equal(skipped.executed, 0);
+    assert.equal(skipped.notRun, 1);
+    assert.equal(skipped.coverageRate, 0);
+    assert.equal(skipped.exactCandidateRate, null);
+  }
+  const unrepresented = partial.scenarios.find(row => row.scenario === 'curved')!;
+  assert.equal(unrepresented.images, 0);
+  assert.equal(unrepresented.coverageRate, null);
+  assert.equal(unrepresented.exactCandidateRate, null);
+  const neverRun = report.providers[0].scenarios.find(row => row.scenario === 'clear_front')!;
+  assert.equal(neverRun.coverageRate, 0);
+  assert.equal(neverRun.exactCandidateRate, null);
+  assert.equal(report.providerWinner, 'NONE_SELECTED');
+  f.run.entries = [f.run.entries[0], { caseId: f.manifest.cases[1].id,
+    imageSha256: f.manifest.cases[1].imageSha256,
+    output: { schemaVersion: 1, evidenceId: 'unknown', role: 'packaging', outcome: 'candidate', brandText: 'Unsupported' },
+    latencyMs: 10, costUsd: 0.001 }];
+  const failed = evaluate(f, [f.run]).providers[1].scenarios.find(row => row.scenario === 'blur')!;
+  assert.equal(failed.executed, 1);
+  assert.equal(failed.failed, 1);
+  assert.equal(failed.exactCandidateRate, 0);
+});
+
 test('invented variants, changed decimals, unsupported non-abstention and authority fields fail', () => {
   const f = fixture();
   f.run.entries[0].output = { ...f.manifest.cases[0].gold, variantText: 'Invented', numbers: [{ text: '1', unitText: '%', contextText: 'printed amount' }] };

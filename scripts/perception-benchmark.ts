@@ -127,12 +127,24 @@ export function evaluatePerceptionBenchmark(manifestJson: string, manifestSha256
     const executed = rows.filter(row => row.status !== 'NOT_RUN').length;
     const passed = rows.filter(row => row.status === 'PASS').length;
     for (const metric of Object.values(metrics)) metric.rate = metric.eligible ? metric.correct / metric.eligible : null;
+    // Corpus coverage alone is not provider coverage. A partial run must visibly
+    // leave difficult scenes NOT_RUN instead of looking like equivalent evidence.
+    const scenarios = PERCEPTION_SCENARIOS.map(scenario => {
+      const indices = manifest.cases.flatMap((fixture, index) => fixture.scenarios.includes(scenario) ? [index] : []);
+      const scenarioRows = indices.map(index => rows[index]);
+      const scenarioExecuted = scenarioRows.filter(row => row.status !== 'NOT_RUN').length;
+      const scenarioPassed = scenarioRows.filter(row => row.status === 'PASS').length;
+      return { scenario, images: indices.length, executed: scenarioExecuted, passed: scenarioPassed,
+        failed: scenarioExecuted - scenarioPassed, notRun: indices.length - scenarioExecuted,
+        coverageRate: indices.length ? scenarioExecuted / indices.length : null,
+        exactCandidateRate: scenarioExecuted ? scenarioPassed / scenarioExecuted : null };
+    });
     return { id: provider.id, status: executed ? 'EXECUTED' : 'NOT_RUN', executed, passed, failed: executed - passed,
       notRun: rows.length - executed, exactCandidateRate: executed ? passed / executed : null, metrics,
       unsupportedCandidateCount: executed ? unsupportedCandidateCount : null, abstentionRate: executed ? abstained / executed : null,
       meanLatencyMs: executed ? run!.entries.reduce((sum, row) => sum + row.latencyMs, 0) / executed : null,
       totalCostUsd: executed ? run!.entries.reduce((sum, row) => sum + row.costUsd, 0) : null,
-      runIdentity: run ? { modelVersion: run.modelVersion, adapterSha256: run.adapterSha256, promptSha256: run.promptSha256 } : null, rows };
+      runIdentity: run ? { modelVersion: run.modelVersion, adapterSha256: run.adapterSha256, promptSha256: run.promptSha256 } : null, scenarios, rows };
   });
   return { schemaVersion: 1, scope: 'offline_real_image_replay', benchmarkId: manifest.benchmarkId, manifestSha256,
     imageCount: manifest.cases.length, providerWinner: 'NONE_SELECTED',
