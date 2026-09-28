@@ -23,7 +23,7 @@ remains `snojlbqovlawewwqbviz`.
 | Owner isolation | Auth UUID switches purge client caches; P0-B composition separately fences owner/revision responses. | Physical session-loss, refresh, account-switch and A→B→A acceptance against hosted deployment. |
 | Photo resource control | Service-only grant RPC serializes owner quota/replay; six issued upload grants per rolling 24 hours; private immutable owner paths. | This is **not** a semantic Check allowance or signup-wide/IP/device abuse defense. Search/barcode do not share that upload quota. |
 | Account deletion | Caller-token identity; exact confirmation; both private buckets inventoried, removed, verified empty, then Auth deletion. | Concurrent upload fencing and hosted deletion failure/retry acceptance. Existing implementation order must not be weakened. |
-| Anonymous upgrade/conflict | Password signup/signin adapters exist. | No verified same-UUID anonymous linking workflow or explicit existing-account conflict flow was found in inspected Auth/account modules. Creating another account is not proof of guest preservation. |
+| Anonymous upgrade/conflict | Password signup/signin adapters and a fail-closed ordinary Auth replacement guard exist. | No verified same-UUID anonymous linking or customer warning/confirmation flow. Creating another account is not proof of guest preservation. |
 | Retention/cleanup | Owner deletion exists. | No production guest inactivity retention policy, resumable Storage-first cleanup job, deletion lease or cleanup operational readback was found. Do not infer automatic expiry from Auth anonymity. |
 | Operations | Existing tests cover local ownership/deletion boundaries. | Hosted rate/abuse alerts, retention execution, rollback drill and physical/customer acceptance. |
 
@@ -31,6 +31,21 @@ These findings supersede no canonical source and do not rebuild S-OPS-1 under a
 second name. Historical Founding Beta password Auth is a different release path
 from anonymous scanner-first activation; its disabled email-confirmation settings
 must not silently become an approved public guest-upgrade policy.
+
+### Guest transition guard after the inventory checkpoint
+
+The ordinary password signup/signin and legacy email-code paths now check the
+provider's current session before invoking an Auth call that could replace it.
+If `user.is_anonymous === true`, sign-in/code verification is blocked with
+`GUEST_SESSION_ACTIVE`; ordinary sign-up is blocked with
+`GUEST_UPGRADE_REQUIRED`. Unknown identity or failed session lookup blocks with
+`CURRENT_SESSION_UNKNOWN`. These typed, customer-safe failures leave the current
+guest session and client stores intact. A confirmed permanent identity or no
+current session keeps the previous behavior. This is a **fail-closed guard**, not
+an account-conversion feature: no warning/confirmation UI, same-UUID linking,
+email delivery, existing-account transition or concurrency acceptance is claimed.
+The initial hosted activation remains blocked until the chosen beta account
+policy and corresponding physical flow are verified.
 
 ## Read-only preflight
 
