@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-27: P0-C hosted migration inventory and closed-beta policy
+
+- **Immutable predecessor:** merged `origin/main@98d2ba379b7cf36607b1bce349c03db293500947` (#125 hosted function-name readback). This isolated increment adds a read-only exact-project migration-version comparison; it does not apply migrations or enable hosted Auth.
+- **Hosted observation:** `snojlbqovlawewwqbviz` reports 19 applied versus 28 committed migration versions. Nine versions from `20260923180000` through `20260927021000` are source-only; no hosted-only version was observed. The tool exits 2 on drift and prints no raw CLI output. Function-name inventory separately remains 15 hosted/21 source, six missing. Version/name parity would still not prove deployed code, schema or release acceptance.
+- **Founder decisions:** first scanner-first beta is free-only, without $4.99 checkout or Managed purchase activation. During this temporary closed beta, guest data remains until the customer deletes it; no automatic inactivity cleanup. Customer-requested Storage-first deletion remains mandatory. Neither decision authorizes indefinite retention or hosted guest activation.
+- **Next gate:** review migration ordering/content and function revisions, account lifecycle, signup abuse, deletion fencing, hosted least-privilege and actual device/customer flows with the relevant single writers before activation. No hosted write, EAS build or TestFlight submission is in this increment.
+
 ## 2026-09-27: Sami camera/perception/catalog/operations handoff
 
 - **Immutable predecessor:** `origin/main@4d7e75188c426bf6d8e47ad0f2bb1927964ccd25` after #113 merged; both exact-head #113 CI jobs in run `36358334883` succeeded. Kanuj's #116–#119 remain preserved on main.
