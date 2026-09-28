@@ -25,6 +25,7 @@ import { PROTOTYPE_CATALOG, ScannableProductInput } from '@/src/services/catalog
 import { CatalogProductSearch } from '@/src/components/catalog/CatalogProductSearch';
 import type { CatalogProductSummary, CatalogProductDetail } from '@/src/contracts/ProductCatalog';
 import type { ProductResolutionResult, ProductResolutionCandidate, ResolveProductIdentityInput } from '@/src/contracts/ProductIdentityResolver';
+import { hasVerifiedPackageFormula } from '@/src/contracts/ProductTruthSnapshot';
 import { createCatalogRequestId, getCatalogProductDetail, resolveCatalogIdentity } from '@/src/services/productCatalog';
 import { describeCheckProductFit, getVerifiedFormulaForResolution, resolvedCatalogDetailId } from '@/src/commerce/checkProductPresentation';
 import { publicEnvironment } from '@/src/config/environment';
@@ -53,12 +54,16 @@ import type { PersonalFitRefreshInput } from '@/src/presentation/personalization
 import { canPublishCheckResult, createCheckMemorySaver, selectFreeCheckOwner,
   selectSavableCheckCaseId, shouldHideCheckForOwner, validateCheckResolution } from '@/src/presentation/check/checkMemory';
 import { PersonalDecisionPanel } from '@/src/components/personal-decision/PersonalDecisionPanel';
+import { describePersonalDecision } from '@/src/presentation/personal-decision/result';
 import { customerController, currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
 import { selectVisibleCustomerDecision, selectCustomerCheckFacts, loadOptionalCustomerCatalog, canShowLegacyPersonalFit } from '@/src/presentation/personal-decision/customerController';
+import { projectTrustedSnapshot } from '@/src/presentation/personal-decision/truthAdapter';
+import { createCustomerCheckFlow, selectIdentityNextAction, selectVisibleCheckView } from '@/src/presentation/product-analytics/checkFlow';
+import type { ProductEventSink } from '@/src/presentation/product-analytics';
 import type { DecisionNextStep } from '@/src/contracts/PersonalDecision';
 import { recordFreeCheck } from '@/src/services/remote/freeContext';
 
-export default function CheckProductScreen() {
+export default function CheckProductScreen({ productEventSink }: { productEventSink?: ProductEventSink } = {}) {
   const router = useRouter();
   const params = useLocalSearchParams<{ sim?: string }>();
   const insets = useSafeAreaInsets();
@@ -86,6 +91,13 @@ export default function CheckProductScreen() {
   const customerState = useSyncExternalStore(customerController.subscribe, customerController.getState);
   const personalFitState: PersonalFitRefreshInput = integrated && liveCheckOwner && !canShowLegacyPersonalFit(customerState, liveCheckOwner) ? { kind: 'factual_only' } : legacyPersonalFitState;
   const resultScroll = useRef<ScrollView>(null);
+  const checkFlowRef = useRef<ReturnType<typeof createCustomerCheckFlow> | null>(null);
+  if (!checkFlowRef.current) checkFlowRef.current = createCustomerCheckFlow(productEventSink);
+  const [isCheckFocused, setCheckFocused] = useState(false);
+  useFocusEffect(React.useCallback(() => {
+    setCheckFocused(true);
+    return () => setCheckFocused(false);
+  }, []));
   const [nextStepMessage, setNextStepMessage] = useState<{ snapshotId: string; contextRevision: number; text: string } | null>(null);
   const openPersonalization = () => router.push('/personalize');
   const { routine, userProducts, checkIns } = useRoutineStore();
@@ -180,6 +192,7 @@ export default function CheckProductScreen() {
 
   useEffect(() => {
     if (!integrated || previousCheckOwnerRef.current === sessionUserId) return;
+    checkFlowRef.current?.abandon();
     previousCheckOwnerRef.current = sessionUserId;
     resolutionSequenceRef.current += 1;
     resolutionOwnerRef.current = null;
@@ -199,6 +212,9 @@ export default function CheckProductScreen() {
     setIsCheckingProduct(false);
     setIsSearching(false);
   }, [integrated, sessionUserId]);
+  useEffect(() => {
+    if (integrated && !liveCheckOwner) checkFlowRef.current?.abandon();
+  }, [integrated, liveCheckOwner]);
 
   const renderSaveCheckAction = (caseId?: string) => {
     const savableCaseId = selectSavableCheckCaseId({
@@ -235,6 +251,12 @@ export default function CheckProductScreen() {
     setCaptureRole(null);
     setCaptureEvidence(null);
     setUnknownBarcode(null);
+    setCatalogDetail(null);
+    setResolution(null);
+    setCandidates([]);
+    setConfirmedProduct(null);
+    setScanResult(null);
+    setEvaluationError(null);
     setIsSearching(true);
   };
 
@@ -380,14 +402,23 @@ export default function CheckProductScreen() {
   const handleCaptureReady = (handoff: CheckCaptureHandoff) => {
     setCaptureRole(null);
     if (handoff.barcodeLookup) {
+      if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('barcode');
       setCaptureEvidence(null);
       void openResolution({ consumer: 'scan', barcode: handoff.barcodeLookup.barcode });
       return;
     }
+    if (integrated && currentLiveCheckOwner() && handoff.localPhotos.length > 0) checkFlowRef.current?.begin('photo');
     setCaptureEvidence(handoff);
     if (integrated && handoff.resolvedCase) {
       const resolvedCase = handoff.resolvedCase;
       void showResolution(async () => resolvedCase);
+    } else if (handoff.localPhotos.length > 0) {
+      setCatalogDetail(null);
+      setResolution(null);
+      setCandidates([]);
+      setConfirmedProduct(null);
+      setScanResult(null);
+      setEvaluationError(null);
     }
   };
 
@@ -412,11 +443,13 @@ export default function CheckProductScreen() {
       setIsSearching(false);
       return;
     }
+    if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('search');
     void openResolution({ consumer: 'scan', brand: item.brand, productName: item.name }, item.productId);
   };
 
   const handleSelectCandidate = (candidate: ProductResolutionCandidate) => {
     if (!candidate.brand || !candidate.name) return;
+    if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('search');
     void openResolution({
       consumer: 'scan', brand: candidate.brand, productName: candidate.name,
       variantName: candidate.variantName,
@@ -426,6 +459,7 @@ export default function CheckProductScreen() {
   const handleManualNameCheck = () => {
     const name = searchQuery.trim();
     if (name.length < 2) return;
+    if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('search');
     void openResolution({ consumer: 'scan', productName: name });
   };
 
@@ -454,6 +488,7 @@ export default function CheckProductScreen() {
 
   const handleResetScan = () => {
     void Haptics.selectionAsync().catch(() => {});
+    checkFlowRef.current?.abandon();
     resolutionSequenceRef.current += 1;
     resolutionOwnerRef.current = null;
     setConfirmedProduct(null);
@@ -536,6 +571,44 @@ export default function CheckProductScreen() {
   const resultPresentation = resolveScanResultPresentation(scanResult);
   const invalidResult = Boolean(scanResult && confirmedProduct && resultPresentation.kind === 'invalid');
   const currentFormula = getVerifiedFormulaForResolution(catalogDetail, resolution);
+  const identityNextAction = resolution ? selectIdentityNextAction(resolution.state, resolution.nextAction) : null;
+  const trustedSnapshotIdentity = personalTarget
+    ? projectTrustedSnapshot({ snapshot: personalTarget }).identity.state === 'known' : false;
+  const personalDecisionShown = Boolean(personalTarget && visibleDecision
+    && customerState.ownerId === liveCheckOwner
+    && describePersonalDecision(visibleDecision.packet, visibleDecision.expectedBinding).kind === 'ready');
+  const ownerBlocked = (integrated && liveCheckOwner && (catalogDetail || resolution)
+    && customerState.ownerId !== liveCheckOwner) || shouldHideCheckForOwner({
+    integrated, previousOwner: previousCheckOwnerRef.current, sessionUserId,
+    liveOwner: liveCheckOwner, resultOwner: resolutionOwnerRef.current,
+    hasResult: Boolean(catalogDetail || resolution),
+  });
+  const snapshotMatchesResolution = Boolean(personalTarget && resolution?.truthSnapshot
+    && personalTarget.snapshotId === resolution.truthSnapshot.snapshotId
+    && personalTarget.resolutionCaseId === resolution.caseId);
+  const visibleCheckView = selectVisibleCheckView({
+    integrated, focused: isCheckFocused, ownerReady: Boolean(liveCheckOwner), ownerBlocked: Boolean(ownerBlocked),
+    captureOpen: Boolean(captureRole), checking: isCheckingProduct,
+    errorShown: invalidResult || Boolean(evaluationError && !scanResult),
+    unknownShown: Boolean(unknownBarcode),
+    catalogDetailVisible: Boolean(catalogDetail), snapshotVisible: Boolean(personalTarget),
+    resolutionState: resolution?.state ?? null,
+    catalogIdentityMatched: Boolean(catalogDetail && resolution?.product?.productId === catalogDetail.productId),
+    snapshotIdentityKnown: trustedSnapshotIdentity, snapshotMatchesResolution,
+    catalogFormulaFactsShown: Boolean(!personalTarget && currentFormula),
+    snapshotFormulaFactsShown: Boolean(personalTarget && hasVerifiedPackageFormula(personalTarget)),
+    identityNextActionCopyAvailable: Boolean(catalogDetail && identityNextAction),
+    readyDecisionPanelShown: personalDecisionShown,
+    decisionMatchesResolution: Boolean(visibleDecision && personalTarget && snapshotMatchesResolution
+      && visibleDecision.expectedBinding.ownerId === liveCheckOwner
+      && visibleDecision.expectedBinding.productSnapshotId === personalTarget.snapshotId),
+    unresolvedPhotoVisible: Boolean(captureEvidence?.localPhotos.length && !captureEvidence.resolvedCase),
+  });
+  useEffect(() => {
+    if (!visibleCheckView) return;
+    checkFlowRef.current?.completeVisible(visibleCheckView);
+    checkFlowRef.current?.observePersonalDecision(visibleCheckView);
+  }, [visibleCheckView]);
 
   const renderDecisionPanel = () => {
     if (!personalTarget || customerState.ownerId !== liveCheckOwner) return null;
@@ -547,11 +620,7 @@ export default function CheckProductScreen() {
     </>;
   };
 
-  if ((integrated && liveCheckOwner && (catalogDetail || resolution) && customerState.ownerId !== liveCheckOwner) || shouldHideCheckForOwner({
-    integrated, previousOwner: previousCheckOwnerRef.current, sessionUserId,
-    liveOwner: liveCheckOwner, resultOwner: resolutionOwnerRef.current,
-    hasResult: Boolean(catalogDetail || resolution),
-  })) {
+  if (ownerBlocked) {
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
         <RootShellHeader title="Check" />
@@ -782,6 +851,7 @@ export default function CheckProductScreen() {
                     <Text style={styles.previewFactText}>Verified ingredients for this exact package: {facts.formula.ingredients.join(', ')}</Text>
                     <Text style={styles.previewFactText}>Provenance: {facts.formula.provenanceType.replace('_', ' ')}</Text>
                   </> : <Text style={styles.previewFactText}>Exact package formula not verified.</Text>}
+                  {identityNextAction && <Text style={styles.previewFactText}>{identityNextAction}</Text>}
                   {facts.source && (
                     <TouchableOpacity
                       onPress={() => void Linking.openURL(facts.source!).catch(() => {})}

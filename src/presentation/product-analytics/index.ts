@@ -10,6 +10,7 @@ const EVENT_SCHEMA = {
     outcome: ['useful', 'unknown_product', 'insufficient_evidence', 'failed'],
     personalized: 'boolean',
   },
+  personal_decision_viewed: {},
   my_stuff_viewed: {},
   check_saved: {},
   plus_trigger_reached: { trigger: ['quota', 'compare', 'shelf_analysis', 'history', 'research', 'other'] },
