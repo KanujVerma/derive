@@ -4,6 +4,8 @@
 
 Every active milestone/feature has exactly one founder DRI accountable for its customer outcome end-to-end. The DRI may own client/UI, server, persistence, tests, integration and physical acceptance required by that feature. There is no permanent frontend/backend owner split.
 
+**Current 2026-09-28 MVP wave:** Kanuj is DRI for the Free/Plus/Managed product boundary, monetization research (#129), privacy-safe measurement contract (#131), offline decision benchmark (#130), client entitlement projection (#133), Plus/Managed presentation preparation, and P0-D customer/release acceptance. These source increments do not activate analytics, Plus, billing, hosted access, or a public release. Sami remains DRI for P0-C hosted Auth/deployment/abuse/retention, P0-A perception and product truth, and catalog contribution service/review. Kanuj's future UI adapters consume reviewed server contracts in bounded composition; Sami's hosted work does not wait on fixture UI. [Current portfolio](KANUJ_PORTFOLIO.md) tracks exact branches and gates.
+
 ## Recommended initial P0 features
 
 | Feature | DRI | Scope and status |

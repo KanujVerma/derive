@@ -54,11 +54,13 @@ Ask pregnancy, trying-to-conceive, and breastfeeding/nursing questions only when
 
 Routine and history should grow progressively when they improve a decision. A future canonical model records what product/formula was used, when, and what the customer reported, so history can inform later checks without turning context tags or reactions into causal proof. Do not manufacture a routine, paid status, or progress when the underlying records do not support it.
 
-### Free and Managed relationship
+### Free, Plus and Managed relationship
 
 The free scanner is the acquisition wedge for supported product facts and personal guidance. **$25/month Managed Skincare** is an ongoing routine-management hypothesis: routine construction, check-ins, adaptation, progress/history, and product decisions, with founder support during early beta where needed. Do not claim validated pricing, retention, or hosted billing activation from a display price, founder console, or local flow. Routine products remain separate from membership pricing.
 
-The initial external-beta target is U.S. adults 18 and older; this is a target scope, not a claim of an implemented runtime age gate. Makeup, layering, and tint/shade guidance may follow later and must preserve confirmation, provenance, and non-discrimination rules.
+Derive Plus is an evaluated self-directed layer for comparing supported products and learning from one's own shelf/history. Its first benefit, price, founding trial, quota and launch timing are open; no Plus purchase or cohort grant is active. An allowed Free Check keeps its supported facts, material safety cautions, reason and next action. Paid access never changes product/formula truth or the personal decision. Managed conceptually includes Plus and adds delegated ongoing care. [Monetization direction](MONETIZATION.md) distinguishes these jobs and [entitlement preparation](FOUNDING_PLUS_ENTITLEMENT.md) is a client projection, not a live backend.
+
+The prior initial external-beta target was U.S. adults 18 and older. The founder reopened whether teens may be included, so the first-release audience and runtime treatment are an open decision; no age gate or teen support is inferred. Makeup, layering, and tint/shade guidance may follow later and must preserve confirmation, provenance, and non-discrimination rules.
 
 Dermatologist review is future trust and operations work. Say an individual plan was reviewed by a named dermatologist only when that person reviewed that plan. Protocol/advisory review needs different wording and separate legal/operational review. No dermatologist-certified feature is claimed today.
 

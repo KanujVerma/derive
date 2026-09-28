@@ -8,6 +8,8 @@ Ship scanner-first personalized skincare product intelligence where a U.S. adult
 
 **Free Check** is the acquisition wedge for product/formula facts and contextual personal decision support. There is no universal numerical compatibility/health score. Internally, “personalized Yuka for skincare” is an analogy only, not customer-facing positioning. The paid hypothesis is **$25/month Managed Skincare** for ongoing routine management, check-ins, adaptation, progress and product decisions, with founder support during early beta where needed. Price, retention and billing activation are not validated by the existing display price or local flows.
 
+**2026-09-28 MVP scope:** The first scanner-first release decision is Free barcode and product-name Check. Derive Plus is an evaluated self-directed cross-product and history product; its price, billing, benefit and launch timing are open. A time-limited Founding Plus cohort and usage limits are experiments, not active policy. Managed is delegated ongoing care, not a stronger Check score; public Managed payment is not activated. The newer proposal to expose Plus or Founding Plus at launch has not superseded the free-only first-release checkpoint. [Monetization and evidence](MONETIZATION.md), [entitlement preparation](FOUNDING_PLUS_ENTITLEMENT.md), [measurement contract](PRODUCT_ANALYTICS.md), [release gates](APP_STORE_RELEASE_READINESS.md), and [current Kanuj portfolio](KANUJ_PORTFOLIO.md) separate source preparation from customer activation.
+
 ## Approved target architecture
 
 ```text

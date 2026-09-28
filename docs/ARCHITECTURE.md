@@ -4,6 +4,8 @@
 
 This document separates current runtime evidence from the approved target. The target is not evidence that a service, type, migration, model, or provider exists.
 
+**2026-09-28 entitlement boundary:** [Founding Plus preparation](FOUNDING_PLUS_ENTITLEMENT.md) is a pure client projection of a *future trusted* owner-bound policy/grant/usage snapshot. It issues no grant and enforces no server quota. The current Free and Managed authorities remain separate; Plus, promotional cohorts and metered customer-visible Check sessions require reviewed server authorization and atomic counting before composition. The [product analytics contract](PRODUCT_ANALYTICS.md) likewise defines no production transport. Neither leaf changes the P0-A product truth or deterministic P0-B decision authority described below.
+
 ### CURRENT IMPLEMENTATION
 
 At the P0-B source checkpoint `7775a42`, Development Mock and exact-local-Supabase Development Remote contain the scanner-first free path. Remote Staging and production retain legacy managed routing; hosted anonymous guest activation remains gated. The public anon database role has no application-table privileges. See [S_FREE_1_ACCESS.md](S_FREE_1_ACCESS.md) for the local platform access matrix.

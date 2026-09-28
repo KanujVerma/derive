@@ -4,6 +4,8 @@ Key technical and product decisions for Derive. Approved target decisions do not
 
 **Current approved direction:** scanner-first personalized skincare product intelligence. Free Check answers “Should I use this product?” with supported facts, contextual guidance, and honest unknowns; there is no universal numerical compatibility or health score. The $25/month Managed Skincare offer remains a hypothesis whose pricing, retention, and hosted billing activation are not validated.
 
+**Current 2026-09-28 decision boundary:** The first scanner-first release is scoped to Free barcode and product-name Check. Plus cross-product self-service is an evaluation; Founding Plus cohort/duration, quotas and $4.99 monthly/$30–40 annual prices are experiments, not an active entitlement or storefront offer. Managed delegated care remains the paid target, with no public purchase activation. Whether a later candidate exposes Plus/Founding, the first-release audience after reopening 18+, and any approved billing route are open decisions. [MONETIZATION.md](MONETIZATION.md) contains the evidence and learning plan; [APP_STORE_RELEASE_READINESS.md](APP_STORE_RELEASE_READINESS.md) owns candidate gates. This current decision boundary does not rewrite historical ADRs below.
+
 ### Current product-input and simplicity clarification
 
 These are approved product decisions, not claims that every input is implemented.

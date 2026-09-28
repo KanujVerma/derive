@@ -13,7 +13,9 @@ P0-B source now preserves intent/primary and secondary goals, distinct reproduct
 
 ### APPROVED TARGET, NOT YET IMPLEMENTED
 
-The initial external-beta population is U.S. adults age 18 and older. This target does not claim that runtime age-gating is implemented.
+The prior initial external-beta target was U.S. adults age 18 and older. The founder has reopened whether teens may be included; audience, runtime treatment, policy copy, support, and applicable legal review are unresolved. No age-gating or teen flow is implemented by this statement. See [release readiness](APP_STORE_RELEASE_READINESS.md).
+
+The merged [product analytics contract](PRODUCT_ANALYTICS.md) permits only coarse typed events and has no production event sink or screen call site. It does not establish privacy choice, deletion behavior, an App Privacy answer, or actual first-customer measurement. Sensitive skin context, product/ingredient text, photos, exact identity and session replay must stay out of product analytics; any later transport requires explicit privacy and payload review.
 
 Ask sensitive context only at the point a product or routine decision materially depends on it. Pregnancy, trying to conceive, and breastfeeding/nursing are separate contexts; do not collapse them into a single inferred state. “Prefer not to say,” unanswered, unsure, and no remain distinguishable. Do not infer reproductive status, allergy, race, ethnicity, ancestry, or Fitzpatrick from images or unrelated data.
 
