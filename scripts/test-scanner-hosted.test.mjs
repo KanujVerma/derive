@@ -82,7 +82,8 @@ function fakeHosted({ deletionFails = false, wrongCleanupEmail = false } = {}) {
       if (!token) return respond({}, 401);
       if (ownerId !== ownerIds[0]) return respond({}, 404);
       return respond({ runtime: 'authoritative', ownerId, contextRevision: 1, assessmentId: revisionId,
-        packet: { action: { kind: 'NOT_ENOUGH_INFORMATION' } }, replayed: true });
+        snapshotRef: { caseId, snapshotId: revisionId }, truthRef: { caseId, snapshotId: revisionId },
+        packet: { action: { kind: 'NOT_ENOUGH_INFORMATION' }, binding: { ownerId, productSnapshotId: revisionId } }, replayed: true });
     }
     if (path === '/rest/v1/product_resolution_cases') return respond([]);
     if (path === '/functions/v1/free-context') {
@@ -90,7 +91,7 @@ function fakeHosted({ deletionFails = false, wrongCleanupEmail = false } = {}) {
         if (ownerId !== ownerIds[0]) return respond({}, 404);
         history = true; return respond({ check: { id: revisionId } });
       }
-      return respond({ items: history && ownerId === ownerIds[0] ? [{}] : [] });
+      return respond({ items: history && ownerId === ownerIds[0] ? [{ id: revisionId }] : [] });
     }
     if (path === '/functions/v1/resolve-product-link') return respond({ status: 'needs_details', nextAction: 'search_or_photo' });
     if (path === '/functions/v1/delete-customer-account') {

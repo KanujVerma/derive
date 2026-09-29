@@ -118,6 +118,9 @@ export async function runScannerHostedSmoke(input, dependencies) {
     const decisionReplay = await good('personal-decision', decisionInput, first);
     requireFact(decision.runtime === 'authoritative' && decision.ownerId === first.id
       && decision.contextRevision === saved.revision.revision && UUID.test(decision.assessmentId ?? '')
+      && decision.snapshotRef?.caseId === resolution.caseId && decision.snapshotRef?.snapshotId === resolution.truthSnapshot.snapshotId
+      && decision.truthRef?.caseId === resolution.caseId && decision.truthRef?.snapshotId === resolution.truthSnapshot.snapshotId
+      && decision.packet?.binding?.ownerId === first.id && decision.packet.binding.productSnapshotId === resolution.truthSnapshot.snapshotId
       && decision.packet?.action?.kind === 'NOT_ENOUGH_INFORMATION'
       && decisionReplay.assessmentId === decision.assessmentId && decisionReplay.replayed === true, 'UNKNOWN_DECISION_MISMATCH');
     const foreignDecision = await call('/functions/v1/personal-decision', { ...decisionInput, requestId: randomUUID() }, second.token);
@@ -132,7 +135,8 @@ export async function runScannerHostedSmoke(input, dependencies) {
     requireFact(UUID.test(one.check?.id ?? '') && one.check.id === two.check?.id, 'CHECK_REPLAY_MISMATCH');
     const history = await good('free-context', { operation: 'list', section: 'checks' }, first);
     const otherHistory = await good('free-context', { operation: 'list', section: 'checks' }, second);
-    requireFact(history.items?.length === 1 && otherHistory.items?.length === 0, 'CHECK_HISTORY_MISMATCH');
+    requireFact(history.items?.length === 1 && history.items[0].id === one.check.id
+      && otherHistory.items?.length === 0, 'CHECK_HISTORY_MISMATCH');
     checks.push('unknown_abstention_explicit_history_owner_isolation');
     stage = 'link_recovery';
     const recovered = await good('resolve-product-link', { requestId: randomUUID(), url: 'https://www.amazon.com/dp/B00ABC1234' }, first);
