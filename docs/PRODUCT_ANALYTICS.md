@@ -26,7 +26,7 @@ Version 1 is `{ schemaVersion: 1, event, properties }`. The allowlist is impleme
 | Check | `check_started`, `check_completed`, `personal_decision_viewed` | Input method; terminal outcome; personalization boolean. The later decision exposure has no properties. |
 | Retention | `my_stuff_viewed`, `check_saved` | None. |
 | Plus intent | `plus_trigger_reached`, `paywall_viewed`, `plus_plan_selected`, `plus_purchase_started` | Coarse trigger/source or monthly/annual choice. Completion, renewal, cancellation, and collected revenue come from verified payment/backend facts. |
-| Managed intent | `managed_viewed`, `managed_learn_more`, `managed_interest` | Coarse entry surface. Intake and paid conversion are separate canonical facts. |
+| Managed intent | `managed_viewed`, `managed_learn_more`, `managed_interest` | Coarse entry surface. The free Plan offer emits `managed_viewed` when shown and `managed_interest` only after a canonical waitlist join succeeds. Intake, invitation, and paid conversion stay separate canonical facts. Analytics is not the waitlist record. |
 | Experiments | `experiment_exposed` | Fixed experiment and variant enums only. No assignment authority in the client. This event is emitted only when the assigned treatment is actually shown. |
 
 ## Check composition acceptance
