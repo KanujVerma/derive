@@ -15,7 +15,7 @@ export const managedOffer = {
     { title: 'Ongoing adjustments', body: 'Check-ins guide changes.\nYou approve meaningful updates.' },
   ],
   joinLabel: 'Join waitlist',
-  joinNote: 'No payment today. We\'ll let you know when early access opens.',
+  joinNote: 'No payment today.\nWe\'ll let you know when early access opens.',
   joinedTitle: 'You\'re on the waitlist',
   joinedNote: 'We\'ll let you know when Managed Skincare opens.',
   leaveLabel: 'Leave waitlist',
