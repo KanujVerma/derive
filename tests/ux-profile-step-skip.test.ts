@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createContextDraft, type ContextDraft } from '../src/presentation/p0b-personalization/draft.ts';
-import { componentHarness, control, press } from './ux-profile-render.ts';
+import * as draftModule from '../src/presentation/p0b-personalization/draft.ts';
+import { componentHarness, control, press, textContent } from './ux-profile-render.ts';
 const file = 'src/components/p0b-personalization/ContextFlow.tsx';
 
 test('basic questions use substantive choices and step Skip preserves the earlier goal', () => {
@@ -44,4 +45,30 @@ test('editing retains unsure and withheld values while Cancel still exits', () =
   assert.deepEqual(applied?.reactivity, { state: 'withheld' });
   press(control(flow.render(), 'Cancel profile edit'));
   assert.equal(exits, 1);
+});
+
+test('final Skip blocks invalid retained answers through the same real validator as Done', () => {
+  const invalid = createContextDraft(); invalid.secondaryGoals = ['dryness', 'redness', 'texture'];
+  let applies = 0;
+  // Inject a corrupt local draft to exercise validation beyond the chip limits.
+  const flow = componentHarness(file, 'ContextFlow', { collectIntent: false, onApply() { applies++; }, onSkip() {} }, {
+    modules: { '@/src/presentation/p0b-personalization/draft': { ...draftModule, createContextDraft: () => createContextDraft(invalid) } },
+  });
+  press(control(flow.render(), 'Skip'));
+  press(control(flow.render(), 'Skip'));
+  assert.equal(applies, 0);
+  assert.ok(textContent(flow.render()).includes('Choose up to two other goals.'));
+});
+
+test('final Skip retains entered sensitivity names and leaves untouched fields unanswered', () => {
+  let applied: ContextDraft | undefined;
+  const flow = componentHarness(file, 'ContextFlow', { collectIntent: false, contextQuestions: ['sensitivities'], onApply(value: ContextDraft) { applied = value; }, onSkip() {} });
+  press(control(flow.render(), 'Skip'));
+  press(control(flow.render(), 'Skip'));
+  const input = flow.render().find(node => node.type === 'TextInput');
+  assert.ok(input);
+  input.props.onChangeText('  fragrance  \n\n limonene ');
+  press(control(flow.render(), 'Skip'));
+  assert.deepEqual(applied?.sensitivities, { state: 'answered', value: ['fragrance', 'limonene'] });
+  assert.deepEqual(applied?.reactivity, { state: 'unanswered' });
 });

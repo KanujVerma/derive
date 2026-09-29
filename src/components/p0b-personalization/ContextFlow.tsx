@@ -43,6 +43,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   const editing = Boolean(initialDraft);
   const askSkinFeel = (draft.primaryGoal.state === 'answered' && draft.primaryGoal.value === 'dryness') || draft.secondaryGoals.includes('dryness') || draft.behavior.state !== 'unanswered';
   const update = <K extends keyof ContextDraft>(key: K, value: ContextDraft[K]) => { setValidation(null); setDraft(current => ({ ...current, [key]: value })); };
+  const continueOrApply = () => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (editing || step === last) onApply(createContextDraft(draft)); else setStep(step + 1); };
   return <Screen scrollable><View style={styles.flow}>
     <View style={styles.intro}>
       <Text style={styles.title}>Your skin profile</Text>
@@ -75,9 +76,9 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
     </View>}
     {(error || validation) && <Text accessibilityRole="alert" style={styles.error}>{error || validation}</Text>}
     <View style={styles.actions}>
-      <Button label={editing || step === last ? completionLabel : 'Continue'} loading={loading} onPress={() => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (editing || step === last) onApply(createContextDraft(draft)); else setStep(step + 1); }} />
+      <Button label={editing || step === last ? completionLabel : 'Continue'} loading={loading} onPress={continueOrApply} />
       {!editing && step > 0 && <Button label="Back" variant="ghost" disabled={loading} onPress={() => setStep(step - 1)} />}
-      <Button label={editing ? 'Cancel profile edit' : 'Skip'} variant="ghost" disabled={loading} onPress={() => { if (editing) onSkip(); else if (step === last) onApply(createContextDraft(draft)); else setStep(step + 1); }} />
+      <Button label={editing ? 'Cancel profile edit' : 'Skip'} variant="ghost" disabled={loading} onPress={() => { if (editing) onSkip(); else if (step === last) continueOrApply(); else setStep(step + 1); }} />
     </View>
   </View></Screen>;
 }
