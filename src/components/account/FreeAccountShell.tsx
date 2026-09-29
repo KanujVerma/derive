@@ -33,7 +33,7 @@ export function FreeAccountShell({ identityKind }: { identityKind: FreeAccessSta
   const signOut = async () => {
     const result = await signOutSession();
     if (result.success) {
-      router.replace('/(tabs)/check');
+      router.replace('/');
       return;
     }
     const message = result.error || 'Sign out is unavailable. Please try again.';
@@ -46,7 +46,7 @@ export function FreeAccountShell({ identityKind }: { identityKind: FreeAccessSta
     setDeleting(true);
     const result = await deleteCurrentAccount();
     if (result.success) {
-      router.replace('/(tabs)/check');
+      router.replace('/');
       return;
     }
     setDeleting(false);

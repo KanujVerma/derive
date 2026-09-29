@@ -1,10 +1,11 @@
 import { createPersonalizationDraft, type PersonalizationDraft } from './draft.ts';
 import type { PersonalFitRefreshInput } from './result.ts';
 import type { ShellPresentation } from '../../utils/shellPresentation.ts';
+import { isFreeIntegrationShell } from '../../utils/shellPresentation.ts';
 
 /** Route availability is presentation-only; local Remote also needs its ready access projection. */
 export function canOpenPersonalizationRoute(shell: ShellPresentation, localReady: boolean): boolean {
-  return shell === 'scanner_first_preview' || (shell === 'local_free_integration' && localReady);
+  return shell === 'scanner_first_preview' || (isFreeIntegrationShell(shell) && localReady);
 }
 
 /** Mock-only presentation key; it is never a backend identity or persisted profile. */
