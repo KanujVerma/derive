@@ -133,6 +133,37 @@ test("ambiguous/truncated search never performs DailyMed cross-check", async () 
   assert.equal(calls, 1);
 });
 
+test("two exact-name labels remain ambiguous candidates with no automatic selection", async () => {
+  let calls = 0;
+  const second = { ...label, id: "56425877-3cf0-6496-e063-6294a90acf37", set_id: "10280745-908b-468f-e063-6294a90aa12f" };
+  const result = await lookupOtcSunscreenLabelCandidates(
+    { kind: "exact_brand_name", value: "Olay Regenerist SPF 15" },
+    { enabled: true, apiKey: "test-key", fetcher: (async () => {
+      calls++;
+      return json({ meta: { results: { total: 2 } }, results: [label, second] });
+    }) as typeof fetch },
+  );
+  assert.equal(result.status, "candidates");
+  if (result.status !== "candidates") return;
+  assert.equal(result.candidates.length, 2);
+  assert.equal(result.truncated, false);
+  assert.equal("selected" in result, false);
+  assert.equal(calls, 1);
+});
+
+test("upstream 429 and timeout fail closed without leaking a candidate", async () => {
+  const query = { kind: "exact_brand_name" as const, value: "Olay Regenerist SPF 15" };
+  const rateLimited = await lookupOtcSunscreenLabelCandidates(query,
+    { enabled: true, apiKey: "test-key", fetcher: (async () => json({ error: "quota" }, 429)) as typeof fetch });
+  assert.deepEqual(rateLimited, { status: "provider_error", candidates: [] });
+  const timeoutFetcher = ((_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  })) as typeof fetch;
+  const timedOut = await lookupOtcSunscreenLabelCandidates(query,
+    { enabled: true, apiKey: "test-key", fetcher: timeoutFetcher, timeoutMs: 1 });
+  assert.deepEqual(timedOut, { status: "provider_error", candidates: [] });
+});
+
 test("404 is no-match; malformed, oversized, and failure responses fail closed", async () => {
   const query = { kind: "exact_brand_name" as const, value: "Olay Regenerist SPF 15" };
   const base = { enabled: true, apiKey: "test-key" };
