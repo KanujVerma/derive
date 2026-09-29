@@ -41,7 +41,9 @@ resolved:
    import into proprietary canonical tables is authorized.
 2. Validate the new durable, atomic request reservation on local and hosted
    disposable users. It caps a user at 10/minute and 100/day, and all users at
-   60/minute and 1,000/day. Each outbound attempt counts, even if OBF is down;
+   12/minute and 1,000/day. The global minute cap leaves headroom below the
+   [published product-read limit of 15/minute/IP](https://openfoodfacts.github.io/openfoodfacts-server/api/#rate-limits)
+   (checked 2026-09-29). Each outbound attempt counts, even if OBF is down;
    provider 429 is passed back without an automatic retry. Add provider-wide
    backoff/monitoring before scale. Existing photo-grant quotas and measurement
    caps remain separate. Do not enable hosted until the migration and endpoint

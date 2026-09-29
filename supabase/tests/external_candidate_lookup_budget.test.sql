@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(18);
 
 select has_table('private', 'external_candidate_lookup_reservations', 'lookup budget has a private ledger');
 select ok(not has_table_privilege('authenticated', 'private.external_candidate_lookup_reservations', 'select')
@@ -35,10 +35,14 @@ select is((select count(*)::int from private.external_candidate_lookup_reservati
 
 delete from private.external_candidate_lookup_reservations;
 insert into private.external_candidate_lookup_reservations (user_id)
-  select 'e5000000-0000-4000-8000-000000000002' from generate_series(1, 60);
+  select 'e5000000-0000-4000-8000-000000000002' from generate_series(1, 11);
+select lives_ok($$select public.reserve_external_candidate_lookup('e5000000-0000-4000-8000-000000000001')$$,
+  'twelfth global reservation remains available');
+select is((select count(*)::int from private.external_candidate_lookup_reservations), 12,
+  'twelfth global reservation is recorded');
 select throws_ok($$select public.reserve_external_candidate_lookup('e5000000-0000-4000-8000-000000000001')$$,
   'P0001', 'EXTERNAL_CANDIDATE_GLOBAL_LIMIT', 'global cap protects provider from many guest owners');
-select is((select count(*)::int from private.external_candidate_lookup_reservations), 60,
+select is((select count(*)::int from private.external_candidate_lookup_reservations), 12,
   'global rejection does not insert a row');
 
 delete from private.external_candidate_lookup_reservations;

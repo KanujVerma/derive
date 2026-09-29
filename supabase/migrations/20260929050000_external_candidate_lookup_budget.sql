@@ -34,8 +34,10 @@ begin
   v_now := clock_timestamp();
   delete from private.external_candidate_lookup_reservations
     where reserved_at <= v_now - interval '1 day';
+  -- Published product-read limit is 15/minute/IP. Reserve headroom for
+  -- non-Edge diagnostic reads sharing an outbound address.
   if (select count(*) from private.external_candidate_lookup_reservations
-      where reserved_at > v_now - interval '1 minute') >= 60
+      where reserved_at > v_now - interval '1 minute') >= 12
      or (select count(*) from private.external_candidate_lookup_reservations
       where reserved_at > v_now - interval '1 day') >= 1000 then
     raise exception 'EXTERNAL_CANDIDATE_GLOBAL_LIMIT';
