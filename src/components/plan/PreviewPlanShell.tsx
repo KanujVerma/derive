@@ -89,7 +89,6 @@ export function PreviewPlanShell() {
           <Text style={styles.price}>{managedOffer.price}</Text>
           <Text style={styles.commercial}>{managedOffer.commercialTerm}</Text>
         </View>
-        <Text style={styles.explanation}>{managedOffer.explanation}</Text>
         <Text style={styles.sectionLabel}>{managedOffer.sectionLabel}</Text>
         <GroupedSection style={styles.benefits}>
           {managedOffer.benefits.map((benefit) => (
@@ -161,12 +160,6 @@ const styles = StyleSheet.create({
   commercialBlock: { marginTop: spacing.lg },
   price: { color: colors.brand, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
   commercial: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, marginTop: spacing.xxs },
-  explanation: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.bodyRegular,
-    lineHeight: typography.lineHeights.bodyRegular,
-    marginTop: spacing.lg,
-  },
   sectionLabel: {
     color: colors.inkMuted,
     fontSize: typography.sizes.micro,
