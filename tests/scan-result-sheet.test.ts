@@ -6,6 +6,7 @@ import type { ProductResolutionResult } from '../src/contracts/ProductIdentityRe
 import {
   catalogImagePresentation, buildScanResultSheet, isCurrentSheetBinding, selectCurrentSheetModel,
   isCurrentRequestedEvidenceAction, resultSheetDetailMaxHeight,
+  resultSheetNextAction,
 } from '../src/presentation/check/result-sheet/model.ts';
 
 const product: CatalogProductSummary = {
@@ -195,4 +196,14 @@ test('case/state/product mismatch or non-requested capture never starts another 
   if (noSnapshotRequest.kind === 'result') assert.equal(noSnapshotRequest.requestedEvidence, null);
   const noResolver = buildScanResultSheet({ kind: 'snapshot', snapshot: ingredientSnapshot });
   if (noResolver.kind === 'result') assert.equal(noResolver.requestedEvidence, null);
+});
+
+test('a generic ingredient request is not actionable without the bound continuation callback', () => {
+  const model = buildScanResultSheet({ kind: 'snapshot', snapshot: ingredientSnapshot, resolverResult: ingredientResolution });
+  assert.equal(model.kind, 'result');
+  if (model.kind !== 'result') return;
+  assert.doesNotMatch(resultSheetNextAction(model, false) ?? '', /photograph|add ingredient/i);
+  assert.equal(resultSheetNextAction(model, true), null);
+  const noRequest = buildScanResultSheet({ kind: 'snapshot', snapshot: ingredientSnapshot });
+  if (noRequest.kind === 'result') assert.doesNotMatch(resultSheetNextAction(noRequest, false) ?? '', /photograph|add ingredient/i);
 });

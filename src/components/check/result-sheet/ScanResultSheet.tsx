@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, LayoutAnimation, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Image, LayoutAnimation, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { ProductTruthSnapshotV1 } from '../../../contracts/ProductTruthSnapshot';
 import type { ProductResolutionResult } from '../../../contracts/ProductIdentityResolver';
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
-import { GlassContainer } from '../../ui/GlassContainer';
 import { Icon } from '../../ui/Icon';
+import { CheckResultContent } from './CheckResultContent';
+import type { CheckResultContentInput } from '../../../presentation/check/result-sheet/content';
+import type { DecisionNextStep } from '../../../contracts/PersonalDecision';
 import type { RequestedEvidenceAction, SheetBinding, SheetImage, SheetModel } from '../../../presentation/check/result-sheet/model';
 import { isCurrentRequestedEvidenceAction, isCurrentSheetBinding, resultSheetDetailMaxHeight,
-  selectCurrentSheetModel } from '../../../presentation/check/result-sheet/model';
+  selectCurrentSheetModel, resultSheetNextAction } from '../../../presentation/check/result-sheet/model';
 
 export interface ScanResultSheetProps {
   /** Null removes the sheet. The camera host retains ownership of detection and navigation. */
@@ -17,10 +19,15 @@ export interface ScanResultSheetProps {
   currentResolverResult: ProductResolutionResult | null;
   currentScanId: string;
   bottomInset?: number;
-  onDetectionPausedChange: (paused: boolean) => void;
+  onDetectionPausedChange?: (paused: boolean) => void;
   onDismiss: () => void;
   onOpenDetails?: (binding: SheetBinding) => void;
   onAddRequestedEvidence?: (action: RequestedEvidenceAction) => void;
+  contentInput?: CheckResultContentInput;
+  onNextStep?: (step: DecisionNextStep) => void;
+  onPersonalize?: () => void;
+  onOpenSource?: (url: string) => void;
+  dismissLabel?: string;
 }
 
 function ProductThumbnail({ image }: { image: SheetImage }) {
@@ -36,24 +43,32 @@ function ProductThumbnail({ image }: { image: SheetImage }) {
 
 /** Floating camera companion. The host must stop barcode detection while model is non-null. */
 export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, currentResolverResult, currentScanId, bottomInset = 0,
-  onDetectionPausedChange, onDismiss, onOpenDetails, onAddRequestedEvidence }: ScanResultSheetProps) {
+  onDetectionPausedChange, onDismiss, onOpenDetails, onAddRequestedEvidence, contentInput, onNextStep,
+  onPersonalize, onOpenSource, dismissLabel = 'Close result and scan another product' }: ScanResultSheetProps) {
   const [expanded, setExpanded] = useState(false);
   const { height } = useWindowDimensions();
   const onPauseRef = useRef(onDetectionPausedChange);
   onPauseRef.current = onDetectionPausedChange;
+  const reduceMotion = useRef(true);
   const visibleModel = selectCurrentSheetModel(model, currentOwnerId, currentSnapshot, currentScanId);
   const open = visibleModel !== null;
   const sheetKey = visibleModel?.kind === 'result'
     ? `${visibleModel.binding.caseId}:${visibleModel.binding.snapshotId}:${visibleModel.binding.caseRevision}` : visibleModel?.kind ?? 'closed';
 
   useEffect(() => {
-    onPauseRef.current(open);
-    return () => { if (open) onPauseRef.current(false); };
+    onPauseRef.current?.(open);
+    return () => { if (open) onPauseRef.current?.(false); };
   }, [open]);
   useEffect(() => { setExpanded(false); }, [sheetKey]);
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active) reduceMotion.current = value; }).catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => { reduceMotion.current = value; });
+    return () => { active = false; subscription.remove(); };
+  }, []);
 
   const move = (next: boolean) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion.current) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(next);
   };
   const pan = useMemo(() => PanResponder.create({
@@ -79,10 +94,15 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
   const canAddRequestedEvidence = visibleModel.kind === 'result' && Boolean(visibleModel.requestedEvidence
     && currentSnapshot && onAddRequestedEvidence
     && isCurrentRequestedEvidenceAction(visibleModel.requestedEvidence, currentOwnerId, currentSnapshot, currentResolverResult));
+  const currentContent = visibleModel.kind === 'result' && contentInput?.snapshot
+    && contentInput.ownerId === currentOwnerId
+    && isCurrentSheetBinding(visibleModel.binding, currentOwnerId, contentInput.snapshot) ? contentInput : null;
+  const nextAction = visibleModel.kind === 'result' ? resultSheetNextAction(visibleModel, canAddRequestedEvidence) : null;
 
   return (
-    <View style={[styles.position, { bottom: Math.max(bottomInset, spacing.md) }]}>
-      <GlassContainer tintColor={colors.glass.tintLight} isFloating style={styles.sheet}>
+    <View style={[styles.position, { bottom: Math.max(bottomInset, spacing.md) }]}
+      accessibilityViewIsModal onAccessibilityEscape={onDismiss}>
+      <View style={styles.sheet}>
         <View {...pan.panHandlers} style={styles.dragRegion}>
           <Pressable
             style={styles.dragTarget}
@@ -94,30 +114,31 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
             <View style={styles.handle} />
           </Pressable>
         </View>
-        <View style={styles.content}>
+        <ScrollView style={{ maxHeight: Math.max(resultSheetDetailMaxHeight(height), Math.floor(height * 0.72) - layout.minTouchTarget) }}
+          contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
+          accessibilityLabel={expanded ? 'Result and supporting details' : 'Personal Fit and essential result'}>
           <View style={styles.summary}>
             {visibleModel.kind === 'result'
               ? <ProductThumbnail image={visibleModel.image} />
               : <View style={styles.thumbnail}><Icon name="scan" size={25} color={colors.brand} /></View>}
             <View style={styles.summaryCopy}>
               {visibleModel.kind === 'loading' && <ActivityIndicator size="small" color={colors.brand} style={styles.loading} />}
-              {visibleModel.kind === 'result' && visibleModel.brand && <Text style={styles.brand} numberOfLines={1}>{visibleModel.brand}</Text>}
-              <Text style={styles.title} numberOfLines={2}>{visibleModel.title}</Text>
-              {visibleModel.kind === 'result' && <Text style={styles.status} numberOfLines={1}>{visibleModel.status}</Text>}
+              {visibleModel.kind === 'result' && visibleModel.brand && <Text style={styles.brand}>{visibleModel.brand}</Text>}
+              <Text style={styles.title} accessibilityRole="header">{visibleModel.title}</Text>
+              {visibleModel.kind === 'result' && <Text style={styles.status}>{visibleModel.status}</Text>}
             </View>
             <Pressable onPress={onDismiss} style={styles.close} accessibilityRole="button"
-              accessibilityLabel="Close result and scan another product" hitSlop={8}>
+              accessibilityLabel={dismissLabel} hitSlop={8}>
               <Icon name="close" size={19} color={colors.inkMuted} />
             </Pressable>
           </View>
           {visibleModel.kind === 'result' && visibleModel.image.kind !== 'placeholder'
             && <Text style={styles.photoLabel}>{visibleModel.image.label}</Text>}
-          {expanded && (
-            <ScrollView style={[styles.details, { maxHeight: resultSheetDetailMaxHeight(height) }]}
-              contentContainerStyle={styles.detailsContent} accessibilityLabel="Result details">
-              <Text style={styles.detail}>{visibleModel.detail}</Text>
-              {visibleModel.kind === 'result' && !canAddRequestedEvidence
-                && <Text style={styles.nextAction}>{visibleModel.nextAction}</Text>}
+            <View style={[styles.details, styles.detailsContent]}>
+              {currentContent ? <CheckResultContent input={currentContent} expanded={expanded} showIdentity={false}
+                onNextStep={onNextStep} onPersonalize={onPersonalize} onOpenSource={onOpenSource} />
+                : <Text style={styles.detail}>{visibleModel.detail}</Text>}
+              {!currentContent && nextAction && <Text style={styles.nextAction}>{nextAction}</Text>}
               {canAddRequestedEvidence && (
                 <Pressable onPress={addRequestedEvidence} style={styles.evidenceAction} accessibilityRole="button"
                   accessibilityLabel="Add ingredient photo" accessibilityHint="Adds evidence to this product check">
@@ -132,17 +153,16 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
                   <Icon name="forward" size={17} color={colors.inkInverse} />
                 </Pressable>
               )}
-            </ScrollView>
-          )}
-        </View>
-      </GlassContainer>
+            </View>
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   position: { position: 'absolute', left: spacing.md, right: spacing.md, zIndex: 20 },
-  sheet: { borderRadius: radii.xl },
+  sheet: { borderRadius: radii.xl, backgroundColor: colors.surface, overflow: 'hidden' },
   dragRegion: { minHeight: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
   dragTarget: { minWidth: 80, minHeight: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
   handle: { width: 36, height: 5, borderRadius: radii.full, backgroundColor: colors.borderStrong },
@@ -154,9 +174,9 @@ const styles = StyleSheet.create({
   summaryCopy: { flex: 1, minWidth: 0 },
   brand: { color: colors.inkMuted, fontSize: typography.sizes.caption, fontWeight: typography.weights.medium },
   title: { color: colors.ink, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold, lineHeight: typography.lineHeights.bodyLarge },
-  status: { color: colors.brand, fontSize: typography.sizes.caption, fontWeight: typography.weights.semibold },
+  status: { color: colors.inkMuted, fontSize: typography.sizes.caption, fontWeight: typography.weights.medium },
   loading: { alignSelf: 'flex-start', marginBottom: spacing.xxs },
-  close: { width: layout.minTouchTarget, height: layout.minTouchTarget, borderRadius: radii.full,
+  close: { width: layout.minTouchTarget, height: layout.minTouchTarget, borderRadius: radii.full, alignSelf: 'flex-start',
     alignItems: 'center', justifyContent: 'center' },
   photoLabel: { color: colors.inkMuted, fontSize: typography.sizes.micro, marginTop: spacing.xxs },
   details: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.md },
