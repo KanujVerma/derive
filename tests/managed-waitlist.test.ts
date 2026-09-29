@@ -18,15 +18,15 @@ test('the free Plan offer explains delegation and the current price hypothesis',
   assert.equal(managedOffer.price, '$25/month');
   assert.equal(managedOffer.eyebrow, 'Early Access');
   assert.equal(managedOffer.commercialTerm, 'Products purchased separately');
-  assert.equal(managedOffer.explanation, 'Derive builds and manages your routine over time.');
   assert.equal(managedOffer.benefits.length, 3);
   assert.deepEqual(managedOffer.benefits, [
-    { title: 'Your routine', body: 'One clear morning and evening plan' },
-    { title: 'Your products', body: 'Know what to keep, add, pause, or replace' },
+    { title: 'Your routine', body: 'Morning and evening plan' },
+    { title: 'Your products', body: 'What to keep, add, pause, or replace' },
     { title: 'Ongoing adjustments', body: 'Check-ins guide changes.\nYou approve meaningful updates.' },
   ]);
   assert.equal(managedOffer.joinLabel, 'Join waitlist');
-  assert.equal(managedOffer.joinNote, 'No payment today. We\'ll let you know in Derive when early access opens.');
+  assert.equal(managedOffer.joinNote, 'No payment today.\nWe\'ll let you know when early access opens.');
+  assert.doesNotMatch(JSON.stringify(managedOffer), /builds and manages your routine|in Derive when/);
   assert.equal(managedOffer.error, 'Couldn\'t join right now. Try again.');
   assert.equal(managedOffer.joinedTitle, 'You\'re on the waitlist');
   const copy = JSON.stringify(managedOffer);
