@@ -17,10 +17,12 @@ export interface PersonalDecisionPanelProps {
   /** Shared result owns the surface and its supporting disclosure. Defaults preserve existing callers. */
   embedded?: boolean;
   expanded?: boolean;
+  /** Result sheets render every supporting record in one continuous scroll. */
+  continuous?: boolean;
 }
 
 /** Standalone evidence-bound surface; current Check integration remains separately owned. */
-export function PersonalDecisionPanel({ packet, expectedBinding, onNextStep, embedded = false, expanded = true }: PersonalDecisionPanelProps) {
+export function PersonalDecisionPanel({ packet, expectedBinding, onNextStep, embedded = false, expanded = true, continuous = false }: PersonalDecisionPanelProps) {
   const view = describePersonalDecision(packet, expectedBinding);
   if (view.kind === 'unavailable') {
     return <View style={embedded ? styles.embedded : styles.panel} accessibilityLiveRegion="polite">
@@ -29,28 +31,28 @@ export function PersonalDecisionPanel({ packet, expectedBinding, onNextStep, emb
       <Text style={styles.body}>{view.message}</Text>
     </View>;
   }
-  return <ReadyDecisionPanel key={view.presentationKey} view={view} onNextStep={onNextStep} embedded={embedded} expanded={expanded} />;
+  return <ReadyDecisionPanel key={view.presentationKey} view={view} onNextStep={onNextStep} embedded={embedded} expanded={expanded} continuous={continuous} />;
 }
-function ReadyDecisionPanel({ view, onNextStep, embedded, expanded }: { view: Extract<PersonalDecisionView, { kind: 'ready' }>; onNextStep?: (step: DecisionNextStep) => void; embedded: boolean; expanded: boolean }) {
+function ReadyDecisionPanel({ view, onNextStep, embedded, expanded, continuous }: { view: Extract<PersonalDecisionView, { kind: 'ready' }>; onNextStep?: (step: DecisionNextStep) => void; embedded: boolean; expanded: boolean; continuous: boolean }) {
   const [showWhy, setShowWhy] = useState(false);
   const [groupPage, setGroupPage] = useState(0);
   const [evidencePages, setEvidencePages] = useState<Record<number, number | undefined>>({});
   const [reviewCautions, setReviewCautions] = useState(false);
   const [cautionPage, setCautionPage] = useState(0);
-  const additionalCautions = embedded ? [] : view.secondaryCautions.slice(1);
+  const additionalCautions = embedded || continuous ? [] : view.secondaryCautions.slice(1);
   const cautions = decisionPage(additionalCautions, cautionPage, 3);
   // A specific unknown stated as the primary reason is already visible, including blockers.
   const additionalUnknowns = view.unknowns.filter((unknown) => unknown.text !== view.primaryReason);
   const criticalUnknowns = additionalUnknowns.filter((unknown) => unknown.critical);
   const otherUnknowns = additionalUnknowns.filter((unknown) => !unknown.critical);
   // Every blocker remains expanded. Additional non-critical detail uses the disclosure.
-  const visibleUnknowns = [...criticalUnknowns, ...otherUnknowns.slice(0, 1)];
+  const visibleUnknowns = continuous ? additionalUnknowns : [...criticalUnknowns, ...otherUnknowns.slice(0, 1)];
   return <View style={embedded ? styles.embedded : styles.panel} accessibilityLiveRegion="polite">
     {embedded ? <SectionHeader title="Personal Fit" /> : <Text style={styles.eyebrow}>PERSONAL DECISION</Text>}
     <Text style={styles.title} accessibilityRole="header">{view.title}</Text>
     <Text style={styles.reason}>{view.primaryReason}</Text>
     {view.criticalCautions.map((text, index) => <Text key={`critical-${index}`} style={styles.caution}>{text}</Text>)}
-    {(embedded ? view.secondaryCautions : view.secondaryCautions.slice(0, 1)).map((text, index) => <Text key={`secondary-${index}`} style={styles.caution}>{text}</Text>)}
+    {(embedded || continuous ? view.secondaryCautions : view.secondaryCautions.slice(0, 1)).map((text, index) => <Text key={`secondary-${index}`} style={styles.caution}>{text}</Text>)}
     {additionalCautions.length > 0 && <>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: reviewCautions }} style={styles.disclosure}
         onPress={() => setReviewCautions(!reviewCautions)}>
@@ -71,16 +73,23 @@ function ReadyDecisionPanel({ view, onNextStep, embedded, expanded }: { view: Ex
     </View>}
     {onNextStep && <Button label={view.nextStepLabel} variant="brand" size="large"
       onPress={() => onNextStep(view.nextStep)} style={styles.action} />}
-    {expanded && <Pressable onPress={() => setShowWhy(!showWhy)} accessibilityRole="button"
+    {expanded && !continuous && <Pressable onPress={() => setShowWhy(!showWhy)} accessibilityRole="button"
       accessibilityLabel={showWhy ? 'Hide why Derive thinks this' : 'Why Derive thinks this'}
       accessibilityState={{ expanded: showWhy }} style={styles.disclosure}>
       <Text style={styles.disclosureText}>{showWhy ? 'Hide details' : 'Why Derive thinks this'}</Text>
     </Pressable>}
-    {expanded && showWhy && <View style={styles.details}>
-      <DecisionDisclosure groups={view.detailGroups} page={groupPage} evidencePages={evidencePages}
+    {expanded && (continuous || showWhy) && <View style={styles.details}>
+      {continuous ? <View>
+        <Text style={styles.label}>Why Derive thinks this</Text>
+        {view.detailGroups.map((group, index) => <View key={index} style={styles.detail}>
+          <Text style={styles.detailText}>{group.reason}</Text>
+          <Text style={styles.evidence}>{group.findingIds.length} linked findings</Text>
+          {group.evidence.map((row, position) => <Text key={position} style={styles.evidence}>{row.label}</Text>)}
+        </View>)}
+      </View> : <DecisionDisclosure groups={view.detailGroups} page={groupPage} evidencePages={evidencePages}
         onPage={page => { setGroupPage(page); setEvidencePages({}); }}
-        onEvidencePage={(index, page) => setEvidencePages(current => ({ ...current, [index]: page }))} />
-      {otherUnknowns.slice(1).map((unknown, index) => <Text key={`more-unknown-${index}`} style={styles.detailText}>{unknown.text}</Text>)}
+        onEvidencePage={(index, page) => setEvidencePages(current => ({ ...current, [index]: page }))} />}
+      {!continuous && otherUnknowns.slice(1).map((unknown, index) => <Text key={`more-unknown-${index}`} style={styles.detailText}>{unknown.text}</Text>)}
       <Text style={styles.evidence}>Evaluation {view.versions.engine} · Policy {view.versions.policy}</Text>
     </View>}
   </View>;
