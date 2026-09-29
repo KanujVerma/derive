@@ -86,12 +86,14 @@ test('UPC-A and zero-prefixed EAN-13 are the only permitted provider aliases', a
 
 test('HTTP boundary keeps disabled, auth, validation, provider-429, and success behavior distinct', async () => {
   let authCalls = 0;
+  let reserveCalls = 0;
   let lookupCalls = 0;
   const request = (body: unknown) => new Request('https://example.test/external-product-candidates', {
     method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' },
   });
   const deps = (enabled: boolean, authenticate: () => Promise<unknown> = async () => { authCalls++; }) => ({
     enabled, authenticate, readJsonObject: async (req: Request) => await req.json(),
+    reserve: async () => { reserveCalls++; },
     lookup: async (_barcode: string) => { lookupCalls++; return { status: 'rate_limited' as const, candidate: null }; },
     failure: (code: string, message: string, status: number) => Object.assign(new Error(message), { code, status }),
     respond: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'cache-control': 'private, no-store' } }),
@@ -105,18 +107,27 @@ test('HTTP boundary keeps disabled, auth, validation, provider-429, and success 
   assert.equal(off.status, 503);
   assert.equal((await off.json()).code, 'FEATURE_DISABLED');
   assert.equal(authCalls, 0);
+  assert.equal(reserveCalls, 0);
   assert.equal(lookupCalls, 0);
   const unauthenticated = await handleExternalCandidateRequest(request({ barcode: BARCODE }),
     deps(true, async () => { throw Object.assign(new Error('auth required'), { code: 'UNAUTHORIZED', status: 401 }); }));
   assert.equal(unauthenticated.status, 401);
+  assert.equal(reserveCalls, 0);
   assert.equal(lookupCalls, 0);
   const invalid = await handleExternalCandidateRequest(request({ barcode: '12345678' }), deps(true));
   assert.equal(invalid.status, 400);
+  assert.equal(reserveCalls, 0);
   assert.equal(lookupCalls, 0);
+  const budgetLimited = await handleExternalCandidateRequest(request({ barcode: BARCODE }), {
+    ...deps(true), reserve: async () => { throw Object.assign(new Error('limit'), { code: 'RATE_LIMITED', status: 429 }); },
+  });
+  assert.equal(budgetLimited.status, 429);
+  assert.equal(lookupCalls, 0, 'budget rejection occurs before outbound lookup');
   const limited = await handleExternalCandidateRequest(request({ barcode: BARCODE }), deps(true));
   assert.equal(limited.status, 429);
   assert.equal((await limited.json()).status, 'rate_limited');
   assert.equal(lookupCalls, 1);
+  assert.equal(reserveCalls, 1);
   const success = await handleExternalCandidateRequest(request({ barcode: BARCODE }), {
     ...deps(true), lookup: (barcode) => lookupOpenBeautyFacts(barcode, {
       userAgent: agent, fetcher: async () => found(),
@@ -135,5 +146,7 @@ test('evaluation endpoint is disabled by default and never writes catalog/cases'
   assert.match(source, /DERIVE_OBF_CANDIDATES_ENABLED/);
   assert.match(source, /=== 'true'/);
   assert.match(source, /authenticate, readJsonObject/);
-  assert.doesNotMatch(source, /\.from\(|\.rpc\(|insert\(|upsert\(|update\(/);
+  assert.match(source, /reserve_external_candidate_lookup/);
+  assert.doesNotMatch(source, /\.from\(|insert\(|upsert\(|update\(/);
+  assert.equal((source.match(/\.rpc\(/g) ?? []).length, 1, 'only the budget reservation RPC is called');
 });

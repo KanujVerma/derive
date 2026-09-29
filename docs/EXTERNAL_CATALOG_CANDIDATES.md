@@ -39,12 +39,13 @@ resolved:
 1. Review ODbL attribution, database-rights, storage, reuse, share-alike, and
    commercial-use implications for the proposed response and any cache. No bulk
    import into proprietary canonical tables is authorized.
-2. Add a durable, atomic per-user and global lookup reservation before the
-   outbound call, plus provider-429 backoff. Existing photo-grant quotas and
-   measurement-event abuse caps serve different purposes and cannot safely be
-   reused. A database migration is required; an in-memory Edge counter is not a
-   distributed limit. The current endpoint is only suitable for bounded local
-   evaluation.
+2. Validate the new durable, atomic request reservation on local and hosted
+   disposable users. It caps a user at 10/minute and 100/day, and all users at
+   60/minute and 1,000/day. Each outbound attempt counts, even if OBF is down;
+   provider 429 is passed back without an automatic retry. Add provider-wide
+   backoff/monitoring before scale. Existing photo-grant quotas and measurement
+   caps remain separate. Do not enable hosted until the migration and endpoint
+   are deployed from the same reviewed revision and acceptance is complete.
 3. Benchmark representative U.S. skincare barcodes for exact hit, useful
    identity, variant ambiguity, stale/misclassified products, 429, and latency.
    Compare with the canonical-only baseline. Do not use row count as the launch
