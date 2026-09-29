@@ -20,7 +20,7 @@ interface MemoryRow {
   offerVersion: string;
 }
 
-/** Session-local stand-in used when no authenticated owner is available. */
+/** Explicit test fixture. The customer Plan screen must not use this as a live join. */
 export function createMemoryWaitlistStore(now: () => string = () => new Date().toISOString()): WaitlistStore {
   const rows = new Map<string, MemoryRow>();
   const present = (row: MemoryRow | undefined): WaitlistRecord => row
@@ -57,26 +57,40 @@ export function createManagedWaitlistController(deps: {
   track(event: 'managed_viewed' | 'managed_interest'): void;
 }) {
   let viewedFor: string | undefined;
-  const ownerKey = (ownerId: string | null) => ownerId ?? 'preview';
 
   return {
     async show(ownerId: string | null): Promise<WaitlistRecord> {
-      const key = ownerKey(ownerId);
-      if (viewedFor !== key) {
-        viewedFor = key;
+      const viewKey = ownerId ?? 'signed-out';
+      if (viewedFor !== viewKey) {
+        viewedFor = viewKey;
         try { deps.track('managed_viewed'); } catch { /* Measurement never blocks the offer. */ }
       }
-      return deps.store.read(key);
+      if (!ownerId) return { status: 'none' };
+      return deps.store.read(ownerId);
     },
     async join(ownerId: string | null): Promise<WaitlistRecord> {
-      const next = await deps.store.join(ownerKey(ownerId));
+      if (!ownerId) throw new Error('waitlist unavailable');
+      const next = await deps.store.join(ownerId);
       if (next.status === 'joined') {
         try { deps.track('managed_interest'); } catch { /* A failed measurement still leaves the join in place. */ }
       }
       return next;
     },
     async leave(ownerId: string | null): Promise<WaitlistRecord> {
-      return deps.store.withdraw(ownerKey(ownerId));
+      if (!ownerId) throw new Error('waitlist unavailable');
+      return deps.store.withdraw(ownerId);
     },
   };
+}
+
+/** Drop a late read or join when the customer owner or request ticket has moved. */
+export function acceptOwnerResult<T>(input: {
+  ticket: number;
+  currentTicket: number;
+  expectedOwner: string | null;
+  currentOwner: string | null;
+  value: T;
+}): T | null {
+  if (input.ticket !== input.currentTicket || input.expectedOwner !== input.currentOwner) return null;
+  return input.value;
 }

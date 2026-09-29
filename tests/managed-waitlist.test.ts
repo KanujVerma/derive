@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { createCanonicalWaitlistStore } from '../src/presentation/managed-waitlist/canonical.ts';
 import { managedOffer } from '../src/presentation/managed-waitlist/offer.ts';
+import { resolvePlanPresentation } from '../src/presentation/managed-plan/planComposition.ts';
 import {
+  acceptOwnerResult,
   createManagedWaitlistController,
   createMemoryWaitlistStore,
 } from '../src/presentation/managed-waitlist/store.ts';
@@ -70,6 +73,48 @@ test('managed interest is recorded only after a join succeeds', async () => {
   assert.deepEqual(events, ['managed_viewed', 'managed_interest']);
 });
 
+test('a missing or different session cannot become a canonical join', async () => {
+  let calls = 0;
+  const canonical = createCanonicalWaitlistStore({
+    getSession: async () => null,
+    async read() { calls += 1; return { status: 'joined', joinedAt: 't', offerVersion: 'managed_waitlist_v1' }; },
+    async join() { calls += 1; return { status: 'joined', joinedAt: 't', offerVersion: 'managed_waitlist_v1' }; },
+    async withdraw() { calls += 1; return { status: 'withdrawn', joinedAt: 't', offerVersion: 'managed_waitlist_v1' }; },
+  });
+  const controller = createManagedWaitlistController({ store: canonical, track() {} });
+  assert.equal((await controller.show(null)).status, 'none');
+  await assert.rejects(() => controller.join(null));
+  await assert.rejects(() => canonical.join('owner-a'));
+  assert.equal(calls, 0);
+
+  const mismatched = createCanonicalWaitlistStore({
+    getSession: async () => ({ userId: 'owner-b' }),
+    async read() { calls += 1; return { status: 'joined', joinedAt: 't', offerVersion: 'managed_waitlist_v1' }; },
+    async join() { calls += 1; return { status: 'joined', joinedAt: 't', offerVersion: 'managed_waitlist_v1' }; },
+    async withdraw() { calls += 1; return { status: 'none' }; },
+  });
+  await assert.rejects(() => mismatched.read('owner-a'));
+  await assert.rejects(() => mismatched.join('owner-a'));
+  assert.equal(calls, 0);
+});
+
+test('a late result for the previous owner is discarded', () => {
+  const joined = { status: 'joined' as const, joinedAt: 't', offerVersion: 'managed_waitlist_v1' };
+  assert.equal(acceptOwnerResult({
+    ticket: 1, currentTicket: 2, expectedOwner: 'owner-a', currentOwner: 'owner-b', value: joined,
+  }), null);
+  assert.deepEqual(acceptOwnerResult({
+    ticket: 2, currentTicket: 2, expectedOwner: 'owner-b', currentOwner: 'owner-b', value: joined,
+  }), joined);
+});
+
+test('free Plan presentation is the waitlist and managed access keeps the routine plan', () => {
+  assert.equal(resolvePlanPresentation({ shell: 'scanner_first_preview', managedAccess: false }).kind, 'free');
+  assert.equal(resolvePlanPresentation({ shell: 'local_free_integration', managedAccess: false }).kind, 'free');
+  assert.equal(resolvePlanPresentation({ shell: 'local_free_integration', managedAccess: true }).kind, 'managed');
+  assert.equal(resolvePlanPresentation({ shell: 'legacy', managedAccess: false }).kind, 'managed');
+});
+
 test('the free Plan screen owns the waitlist and the managed routine screen does not', () => {
   const plan = read('app/(tabs)/plan.tsx');
   const offer = read('src/components/plan/PreviewPlanShell.tsx');
@@ -78,6 +123,6 @@ test('the free Plan screen owns the waitlist and the managed routine screen does
   assert.match(plan, /LegacyManagedPlanScreen/);
   assert.match(offer, /managedOffer.joinLabel/);
   assert.match(offer, /managedOffer.leaveLabel/);
-  assert.doesNotMatch(offer, /Enrollment coming soon|Stripe|checkout/);
+  assert.doesNotMatch(offer, /Enrollment coming soon|Stripe|checkout|createMemoryWaitlistStore/);
   assert.doesNotMatch(managed, /Join waitlist|managed_waitlist/);
 });

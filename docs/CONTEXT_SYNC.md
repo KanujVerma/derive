@@ -10,7 +10,7 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 
 - **Predecessor:** `origin/main` `459566af732d234783d64aa372bae78361b603d4`.
 - **Scope:** Free Plan explains Managed Skincare as delegated routine care at the `$25/month` hypothesis and records an owner-bound waitlist join. No payment, checkout, intake, scarcity, or notification campaign. Active managed routines stay on the existing Plan screen.
-- **Persistence:** Additive `public.managed_waitlist` with session-derived owner, idempotent join/read/withdraw, and account-deletion cascade. Signed-out preview keeps a session-local store and is not canonical. `managed_viewed` fires when the offer is shown; `managed_interest` fires only after join succeeds. Analytics failure does not block the join.
+- **Persistence:** Additive `public.managed_waitlist` with session-derived owner, idempotent join/read/withdraw, and account-deletion cascade. A joined row has no withdrawal time; leaving sets one, and joining again clears it. A signed-out screen cannot become "on the waitlist." The Plan screen calls the measurement contract; without an installed sink that call transmits nothing. Analytics failure does not block the join.
 - **Ownership:** Kanuj customer outcome. Sami stewardship review for Auth, RLS, and deletion. No edits to open catalog or `config.toml` write-sets.
 
 ## 2026-09-28: Camera result sheet stays with the live preview

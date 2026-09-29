@@ -16,6 +16,10 @@ create table public.managed_waitlist (
   ),
   constraint managed_waitlist_surface_known check (
     entry_surface in ('plan', 'check', 'account', 'other')
+  ),
+  constraint managed_waitlist_withdrawal_matches_status check (
+    (status = 'joined' and withdrawn_at is null)
+    or (status = 'withdrawn' and withdrawn_at is not null)
   )
 );
 
@@ -99,6 +103,7 @@ begin
   on conflict (user_id) do update
     set status = 'joined',
         joined_at = pg_catalog.clock_timestamp(),
+        withdrawn_at = null,
         offer_version = excluded.offer_version,
         price_cents = excluded.price_cents,
         entry_surface = excluded.entry_surface,

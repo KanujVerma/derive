@@ -100,9 +100,10 @@ select is(
   'leaving can be reversed by joining again'
 );
 select ok(
-  (select joined_at >= withdrawn_at and status = 'joined' from public.managed_waitlist
+  (select status = 'joined' and withdrawn_at is null and joined_at is not null
+    from public.managed_waitlist
     where user_id = 'aa110000-0000-4000-8000-000000000001'),
-  'a renewed join stays joined and keeps the earlier withdrawal time'
+  'a renewed join is current and clears the withdrawal time'
 );
 
 reset role;

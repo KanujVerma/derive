@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { managedOffer } from '../../presentation/managed-waitlist/offer.ts';
 import {
+  acceptOwnerResult,
   createManagedWaitlistController,
   type WaitlistRecord,
 } from '../../presentation/managed-waitlist/store.ts';
@@ -27,27 +28,49 @@ export function PreviewPlanShell() {
   const [record, setRecord] = useState<WaitlistRecord>({ status: 'none' });
   const [working, setWorking] = useState<'join' | 'leave' | null>(null);
   const [failed, setFailed] = useState(false);
+  const ticket = useRef(0);
+  const ownerRef = useRef(ownerId);
+  ownerRef.current = ownerId;
 
   useEffect(() => {
-    let cancelled = false;
+    const currentTicket = ++ticket.current;
+    const expectedOwner = ownerId;
+    setRecord({ status: 'none' });
     setFailed(false);
     setWorking(null);
-    void controller.show(ownerId).then((next) => {
-      if (!cancelled) setRecord(next);
+    void controller.show(expectedOwner).then((next) => {
+      const accepted = acceptOwnerResult({
+        ticket: currentTicket,
+        currentTicket: ticket.current,
+        expectedOwner,
+        currentOwner: ownerRef.current,
+        value: next,
+      });
+      if (accepted) setRecord(accepted);
     }).catch(() => {
-      if (!cancelled) setFailed(true);
+      if (currentTicket === ticket.current) setFailed(true);
     });
-    return () => { cancelled = true; };
   }, [controller, ownerId]);
 
   const run = (action: 'join' | 'leave') => {
+    const currentTicket = ticket.current;
+    const expectedOwner = ownerId;
     setWorking(action);
     setFailed(false);
-    const request = action === 'join' ? controller.join(ownerId) : controller.leave(ownerId);
+    const request = action === 'join' ? controller.join(expectedOwner) : controller.leave(expectedOwner);
     void request.then((next) => {
-      setRecord(next);
+      const accepted = acceptOwnerResult({
+        ticket: currentTicket,
+        currentTicket: ticket.current,
+        expectedOwner,
+        currentOwner: ownerRef.current,
+        value: next,
+      });
+      if (!accepted) return;
+      setRecord(accepted);
       setWorking(null);
     }).catch(() => {
+      if (currentTicket !== ticket.current) return;
       setWorking(null);
       setFailed(true);
     });
