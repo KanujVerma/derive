@@ -9366,6 +9366,10 @@ test('S6 endpoint: authenticates before evidence parsing and keeps photo/queue p
   assert.match(resolverFunction, /PHOTO_EVIDENCE_MANAGED_ONLY/);
   assert.match(resolverFunction, /managedAccess && decision\.requiresFounderReview/);
   assert.match(resolverFunction, /loadCatalog\(admin, !managedAccess\)/);
+  assert.match(resolverFunction, /isBarcodeOnly\(request\)/);
+  assert.match(resolverFunction, /loadBarcodeCatalog\(admin, !managedAccess, request\.barcode!\)/);
+  assert.match(resolverFunction, /\.eq\("identifier_type", `gtin_\$\{barcode\.length\}`\)\.eq\("identifier_value", barcode\)/);
+  assert.match(resolverFunction, /MAX_BARCODE_IDENTIFIERS = 100/);
   assert.match(resolverFunction, /\^\(file\|ph\|content\|https\?\):\\\/\\\//i);
   assert.match(resolverFunction, /source_authority, observed_at, verified_at/);
   assert.match(resolverFunction, /loadPagedCatalogRows/);
