@@ -3,7 +3,7 @@ import { coverageSha256, evaluateCoverage, parseCoverageCorpus } from './catalog
 import { normalizeBarcode } from '../src/utils/barcode.ts';
 
 const SOURCE_ID = 'open-beauty-facts';
-const VERSION = 'obf-v3-eval-1';
+const VERSION = 'obf-v3-eval-2'; // Pins no-barcode retention and explicitly observed usefulness semantics.
 const MIN_START_SPACING_MS = 6_000; // At most 10 reads/minute from this process, below OBF's 15/IP limit.
 const TIMEOUT_MS = 2_500;
 const MAX_RESPONSE_BYTES = 32_768;
@@ -15,13 +15,14 @@ interface PendingCandidate {
   identity: { brand: string; name: string; variant: string; packageSize: string; region: string };
   recordRef: string; retrievedAt: string; datasetVersion: string;
 }
-interface PendingEntry { caseId: string; outcome: 'candidate' | 'miss' | 'error' | 'timeout'; latencyMs: number;
+interface PendingEntry { caseId: string; outcome: 'candidate' | 'miss' | 'error' | 'timeout' | 'no_barcode'; latencyMs: number;
   action: 'confirm_candidate' | 'capture_label' | 'search_name'; claim: 'candidate'; candidate?: PendingCandidate }
 export interface PendingObfRun { sourceId: typeof SOURCE_ID; adapterVersion: typeof VERSION; corpusSha256: string; entries: PendingEntry[] }
 interface Options { allowNetwork: true; evaluationPermissionRef: string; termsReviewRef: string; userAgent: string; maxUniqueReads: number }
 interface Dependencies { fetcher?: typeof fetch; clock?: () => number; now?: () => Date; sleep?: (milliseconds: number) => Promise<void> }
 interface HumanReview { caseId: string; identityMatch: 'exact' | 'possible' | 'wrong' | 'unknown'; reviewerRef: string; evidenceRef: string;
-  customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string } }
+  customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string };
+  customerUsefulness?: { usefulSkincareResult: boolean; evidenceRef: string } }
 
 const fail = (): never => { throw new Error('OBF_EVALUATION_NOT_AUTHORIZED'); };
 const clean = (value: unknown): string | null => {
@@ -110,8 +111,8 @@ export async function runOpenBeautyFactsEvaluation(json: string, digest: string,
   const corpus = parseCoverageCorpus(json, digest);
   const source = corpus.sources.find(row => row.id === SOURCE_ID && row.kind === 'external');
   if (!source || source.evaluationPermissionRef !== options.evaluationPermissionRef || source.termsReviewRef !== options.termsReviewRef
-    || corpus.cases.some(row => !row.rights.providerEvaluationAllowed)) return fail();
-  const uniqueGtins = [...new Set(corpus.cases.map(row => normalizeBarcode(row.gtin)))];
+    || corpus.cases.some(row => row.gtin !== null && !row.rights.providerEvaluationAllowed)) return fail();
+  const uniqueGtins = [...new Set(corpus.cases.flatMap(row => row.gtin === null ? [] : [normalizeBarcode(row.gtin)]))];
   if (uniqueGtins.length > options.maxUniqueReads) return fail(); // No silently partial launch benchmark.
   if (evaluationActive) return fail();
   evaluationActive = true;
@@ -126,7 +127,9 @@ export async function runOpenBeautyFactsEvaluation(json: string, digest: string,
       lookup.set(gtin, { result, latencyMs: Math.max(0, clock() - start) });
       if (result.stop) break; // 429, 503, or timeout: do not pressure the provider further.
     }
-    const entries: PendingEntry[] = corpus.cases.flatMap(row => {
+    const entries: PendingEntry[] = corpus.cases.flatMap<PendingEntry>(row => {
+      if (row.gtin === null) return [{ caseId: row.id, outcome: 'no_barcode' as const, latencyMs: 0,
+        claim: 'candidate' as const, action: 'capture_label' as const }];
       const hit = lookup.get(normalizeBarcode(row.gtin)); if (!hit) return [];
       const { result, latencyMs } = hit;
       return [{ caseId: row.id, outcome: result.status, latencyMs, claim: 'candidate' as const,
@@ -154,7 +157,8 @@ export function adjudicateOpenBeautyFactsRun(json: string, digest: string, pendi
         || typeof review.customerConfirmation.confirmedExactPackageVariant !== 'boolean'
         || !ref(review.customerConfirmation.evidenceRef)))) return fail();
     return { ...entry, review: { identityMatch: review.identityMatch, reviewerRef: review.reviewerRef,
-      evidenceRef: review.evidenceRef, ...(review.customerConfirmation ? { customerConfirmation: review.customerConfirmation } : {}) } };
+      evidenceRef: review.evidenceRef, ...(review.customerConfirmation ? { customerConfirmation: review.customerConfirmation } : {}),
+      ...(review.customerUsefulness !== undefined ? { customerUsefulness: review.customerUsefulness } : {}) } };
   });
   const run = { ...pending, entries: rows };
   evaluateCoverage(json, digest, [run]); // Reuse scorer's strict shape and provenance validation.

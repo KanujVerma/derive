@@ -10,7 +10,8 @@ const identity = { brand: 'Fiction', name: 'Synthetic Lotion', variant: 'Plain',
 interface TestCandidate { identity: typeof identity; recordRef: string; retrievedAt: string; datasetVersion: string; canonicalProductId?: string; formulaSnapshotId?: string }
 interface TestEntry { caseId: string; outcome: string; latencyMs: number; action: string; claim: string; candidate?: TestCandidate;
   review?: { identityMatch: string; reviewerRef: string; evidenceRef: string;
-    customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string } } }
+    customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string };
+    customerUsefulness?: { usefulSkincareResult: boolean; evidenceRef: string } } }
 const candidate: TestCandidate = { identity, recordRef: 'synthetic-record', retrievedAt: '2026-09-28T00:00:00Z', datasetVersion: 'synthetic-v1' };
 function fixture() {
   // Deliberately fabricated self-check, not a measured U.S. personal-care corpus.
@@ -18,7 +19,7 @@ function fixture() {
     { id: 'a', gtin: '000000000000', category: 'facial_moisturizer', channel: 'drugstore', scan: { decoded: true, deviceEvidenceRef: 'synthetic-device' },
       reference: { identity, evidenceRef: 'synthetic-reference', canonicalProductId: 'canonical-a', formulaSnapshotId: 'formula-a' },
       rights: { collectionEvidenceRef: 'synthetic-collection', permissionEvidenceRef: 'synthetic-permission', providerEvaluationAllowed: true } },
-    { id: 'b', gtin: '000000000017', category: 'sunscreen', channel: 'beauty_retail', scan: { decoded: false, deviceEvidenceRef: 'synthetic-device' },
+    { id: 'b', gtin: '000000000017' as string | null, category: 'sunscreen', channel: 'beauty_retail', scan: { decoded: false, deviceEvidenceRef: 'synthetic-device' },
       reference: { identity: { ...identity, name: 'Synthetic Sunscreen' }, evidenceRef: 'synthetic-reference-b' },
       rights: { collectionEvidenceRef: 'synthetic-collection', permissionEvidenceRef: 'synthetic-permission', providerEvaluationAllowed: true } },
   ], sources: [
@@ -28,7 +29,8 @@ function fixture() {
   const json = JSON.stringify(corpus);
   const digest = coverageSha256(json);
   const entry: TestEntry = { caseId: 'a', outcome: 'candidate', latencyMs: 20, action: 'confirm_candidate', claim: 'candidate', candidate,
-    review: { identityMatch: 'exact', reviewerRef: 'independent-reviewer', evidenceRef: 'synthetic-audit' } };
+    review: { identityMatch: 'exact', reviewerRef: 'independent-reviewer', evidenceRef: 'synthetic-audit',
+      customerUsefulness: { usefulSkincareResult: true, evidenceRef: 'synthetic-usefulness-observation' } } };
   const run = { sourceId: 'external', adapterVersion: 'synthetic-v1', corpusSha256: digest, entries: [entry] as TestEntry[] };
   return { corpus, json, digest, run };
 }
@@ -85,6 +87,48 @@ test('external records cannot become verified product or formula even if they cl
   assert.equal(source.counts.verifiedFormula, 0);
   assert.equal(source.counts.usefulHit, 0);
   assert.equal(source.counts.falseCertainty, 1);
+});
+
+test('identity recovery is separate from observed usefulness; absent or negative observations never inflate useful hits', () => {
+  const f = fixture(); delete f.run.entries[0].review!.customerUsefulness;
+  let source = evaluate(f).sources[0];
+  assert.equal(source.counts.identityRecovery, 1);
+  assert.equal(source.counts.usefulHit, 0);
+  assert.equal(source.counts.usefulnessUnmeasured, 2);
+  assert.equal(source.rates.userReportedUsefulness, null);
+  assert.equal(source.byCategory.facial_moisturizer.identityRecovery, 1);
+  assert.equal(source.byChannel.drugstore.usefulHit, 0);
+  f.run.entries[0].review!.customerUsefulness = { usefulSkincareResult: false, evidenceRef: 'synthetic-not-useful' };
+  source = evaluate(f).sources[0];
+  assert.equal(source.counts.usefulnessObserved, 1);
+  assert.equal(source.counts.usefulnessUnmeasured, 1);
+  assert.equal(source.counts.usefulHit, 0);
+  assert.equal(source.rates.userReportedUsefulness, 0);
+  f.run.entries[0].review!.customerUsefulness = { usefulSkincareResult: true, evidenceRef: 'synthetic-useful' };
+  f.run.entries[0].review!.identityMatch = 'wrong';
+  source = evaluate(f).sources[0];
+  assert.equal(source.counts.userReportedUseful, 1); // Satisfaction is not audited correctness.
+  assert.equal(source.counts.identityRecovery, 0);
+  assert.equal(source.counts.usefulHit, 0);
+  assert.equal(source.counts.falseCertainty, 1);
+  f.run.entries[0].review!.customerUsefulness.evidenceRef = '';
+  assert.throws(() => evaluate(f));
+});
+
+test('missing physical barcodes stay in the denominator without invented provider misses or zero-latency queries', () => {
+  const f = fixture(); f.corpus.cases[1].gtin = null;
+  f.corpus.cases[1].rights.providerEvaluationAllowed = false; // No query is made for this encounter.
+  f.json = JSON.stringify(f.corpus); f.digest = coverageSha256(f.json); f.run.corpusSha256 = f.digest;
+  f.run.entries.push({ caseId: 'b', outcome: 'no_barcode', latencyMs: 0, action: 'capture_label', claim: 'candidate' });
+  const source = evaluate(f).sources[0];
+  assert.equal(source.status, 'COMPLETE'); assert.equal(source.denominator, 2);
+  assert.equal(source.counts.noBarcode, 1); assert.equal(source.counts.miss, 0);
+  assert.equal(source.rates.usefulScanHit, .5);
+  assert.deepEqual(source.latencyMs, { median: 20, p95: 20 });
+  f.run.entries[1].outcome = 'miss'; assert.throws(() => evaluate(f));
+  f.run.entries[1].outcome = 'no_barcode'; f.run.entries[1].latencyMs = 1; assert.throws(() => evaluate(f));
+  f.run.entries[1].latencyMs = 0; f.corpus.cases[1].scan.decoded = true;
+  f.json = JSON.stringify(f.corpus); f.digest = coverageSha256(f.json); assert.throws(() => evaluate(f, []));
 });
 
 test('canonical exact and formula require linked corpus evidence and proper presentation', () => {
@@ -174,6 +218,6 @@ test('report and CLI never reveal raw barcodes, vendor identity, rights or sourc
     const failed = command(link);
     assert.equal(failed.status, 1);
     assert.ok(failed.stderr.startsWith('INVALID_CATALOG_COVERAGE_INPUT'));
-    assert.equal(failed.stderr.includes(f.corpus.cases[0].gtin), false);
+    assert.equal(failed.stderr.includes(f.corpus.cases[0].gtin!), false);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

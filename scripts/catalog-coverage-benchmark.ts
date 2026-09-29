@@ -7,7 +7,7 @@ const categories = [
   'deodorant', 'antiperspirant', 'shampoo', 'conditioner', 'body_wash', 'body_moisturizer', 'other',
 ] as const;
 const channels = ['drugstore', 'mass_retail', 'beauty_retail', 'warehouse_club', 'direct_brand', 'other'] as const;
-const outcomes = ['candidate', 'miss', 'error', 'timeout'] as const;
+const outcomes = ['candidate', 'miss', 'error', 'timeout', 'no_barcode'] as const;
 const matches = ['exact', 'possible', 'wrong', 'unknown'] as const;
 const actions = ['confirm_candidate', 'show_verified_product', 'show_verified_formula', 'capture_label', 'search_name', 'report_missing'] as const;
 const claims = ['candidate', 'canonical_product', 'canonical_formula'] as const;
@@ -20,7 +20,7 @@ type Claim = typeof claims[number];
 type SourceKind = 'external' | 'canonical';
 interface Identity { brand: string; name: string; variant: string; packageSize: string; region: string }
 interface CorpusCase {
-  id: string; gtin: string; category: Category; channel: Channel;
+  id: string; gtin: string | null; category: Category; channel: Channel;
   scan: { decoded: boolean; deviceEvidenceRef: string };
   reference: { identity: Identity; evidenceRef: string; canonicalProductId?: string; formulaSnapshotId?: string };
   rights: { collectionEvidenceRef: string; permissionEvidenceRef: string; providerEvaluationAllowed: boolean };
@@ -29,7 +29,8 @@ interface Source { id: string; kind: SourceKind; evaluationPermissionRef: string
 export interface CoverageCorpus { schemaVersion: 1; cohort: string; cases: CorpusCase[]; sources: Source[] }
 interface Candidate { identity: Identity; recordRef: string; retrievedAt: string; datasetVersion: string; canonicalProductId?: string; formulaSnapshotId?: string }
 interface Review { identityMatch: Match; reviewerRef: string; evidenceRef: string;
-  customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string } }
+  customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string };
+  customerUsefulness?: { usefulSkincareResult: boolean; evidenceRef: string } }
 interface Entry { caseId: string; outcome: Outcome; latencyMs: number; action: Action; claim: Claim; candidate?: Candidate; review?: Review }
 interface Run { sourceId: string; adapterVersion: string; corpusSha256: string; entries: Entry[] }
 
@@ -70,12 +71,12 @@ export function parseCoverageCorpus(json: string, expectedSha256: string): Cover
   if (root.schemaVersion !== 1 || !opaque(root.cohort)) return bad();
   const cases = rows(root.cases, 5000).map(v => {
     const r = obj(v, ['id', 'gtin', 'category', 'channel', 'scan', 'reference', 'rights']);
-    if (!opaque(r.id) || !validGtin(r.gtin)
+    if (!opaque(r.id) || (r.gtin !== null && !validGtin(r.gtin))
       || !member(r.category, categories) || !member(r.channel, channels)) return bad();
     const scan = obj(r.scan, ['decoded', 'deviceEvidenceRef']);
     const reference = obj(r.reference, ['identity', 'evidenceRef', 'canonicalProductId', 'formulaSnapshotId']);
     const rights = obj(r.rights, ['collectionEvidenceRef', 'permissionEvidenceRef', 'providerEvaluationAllowed']);
-    if (typeof scan.decoded !== 'boolean' || !opaque(scan.deviceEvidenceRef) || !opaque(reference.evidenceRef)
+    if (typeof scan.decoded !== 'boolean' || (r.gtin === null && scan.decoded) || !opaque(scan.deviceEvidenceRef) || !opaque(reference.evidenceRef)
       || (reference.canonicalProductId !== undefined && !opaque(reference.canonicalProductId))
       || (reference.formulaSnapshotId !== undefined && (!opaque(reference.formulaSnapshotId) || !reference.canonicalProductId))
       || !opaque(rights.collectionEvidenceRef) || !opaque(rights.permissionEvidenceRef)
@@ -104,19 +105,25 @@ function parseRuns(v: unknown, corpus: CoverageCorpus, corpusSha256: string): Ru
       const fixture = corpus.cases.find(c => c.id === entry.caseId);
       if (!fixture || !member(entry.outcome, outcomes) || !member(entry.action, actions) || !member(entry.claim, claims)
         || typeof entry.latencyMs !== 'number' || !Number.isFinite(entry.latencyMs) || entry.latencyMs < 0
-        || (source.kind === 'external' && !fixture.rights.providerEvaluationAllowed)) return bad();
+        || (source.kind === 'external' && fixture.gtin !== null && !fixture.rights.providerEvaluationAllowed)
+        || (fixture.gtin === null) !== (entry.outcome === 'no_barcode')
+        || (entry.outcome === 'no_barcode' && entry.latencyMs !== 0)) return bad();
       if (entry.outcome === 'candidate') {
         const candidate = obj(entry.candidate, ['identity', 'recordRef', 'retrievedAt', 'datasetVersion', 'canonicalProductId', 'formulaSnapshotId']);
         identity(candidate.identity);
         if (!opaque(candidate.recordRef) || !opaque(candidate.datasetVersion) || !iso(candidate.retrievedAt)
           || (candidate.canonicalProductId !== undefined && !opaque(candidate.canonicalProductId))
           || (candidate.formulaSnapshotId !== undefined && !opaque(candidate.formulaSnapshotId))) return bad();
-        const review = obj(entry.review, ['identityMatch', 'reviewerRef', 'evidenceRef', 'customerConfirmation']);
+        const review = obj(entry.review, ['identityMatch', 'reviewerRef', 'evidenceRef', 'customerConfirmation', 'customerUsefulness']);
         if (!member(review.identityMatch, matches) || !opaque(review.reviewerRef) || !opaque(review.evidenceRef)) return bad();
         if (review.customerConfirmation !== undefined) {
           const confirmation = obj(review.customerConfirmation, ['confirmedExactPackageVariant', 'evidenceRef']);
           if (review.identityMatch !== 'possible' || typeof confirmation.confirmedExactPackageVariant !== 'boolean'
             || !opaque(confirmation.evidenceRef)) return bad();
+        }
+        if (review.customerUsefulness !== undefined) {
+          const observation = obj(review.customerUsefulness, ['usefulSkincareResult', 'evidenceRef']);
+          if (typeof observation.usefulSkincareResult !== 'boolean' || !opaque(observation.evidenceRef)) return bad();
         }
       } else if (entry.candidate !== undefined || entry.review !== undefined) return bad();
       return entry as unknown as Entry;
@@ -142,24 +149,32 @@ export function evaluateCoverage(json: string, expectedSha256: string, rawRuns: 
   const sources = corpus.sources.map(source => {
     const run = runs.find(r => r.sourceId === source.id);
     const counts = { executed: 0, notRun: 0, candidate: 0, possibleCandidate: 0, confirmedPossibleCandidate: 0, exactCandidate: 0,
-      verifiedExactProduct: 0, verifiedFormula: 0, usefulHit: 0, honestNextAction: 0,
-      falseCertainty: 0, wrongCandidate: 0, miss: 0, error: 0, timeout: 0 };
+      verifiedExactProduct: 0, verifiedFormula: 0, identityRecovery: 0, usefulnessObserved: 0, usefulnessUnmeasured: total,
+      userReportedUseful: 0, usefulHit: 0, honestNextAction: 0,
+      falseCertainty: 0, wrongCandidate: 0, miss: 0, error: 0, timeout: 0, noBarcode: 0 };
     const latencies: number[] = [];
-    const byCategory = Object.fromEntries(categories.map(category => [category, { total: 0, usefulHit: 0, candidate: 0 }])) as Record<Category, { total: number; usefulHit: number; candidate: number }>;
-    const byChannel = Object.fromEntries(channels.map(channel => [channel, { total: 0, usefulHit: 0, candidate: 0 }])) as Record<Channel, { total: number; usefulHit: number; candidate: number }>;
+    const byCategory = Object.fromEntries(categories.map(category => [category, { total: 0, usefulHit: 0, identityRecovery: 0, candidate: 0 }])) as Record<Category, { total: number; usefulHit: number; identityRecovery: number; candidate: number }>;
+    const byChannel = Object.fromEntries(channels.map(channel => [channel, { total: 0, usefulHit: 0, identityRecovery: 0, candidate: 0 }])) as Record<Channel, { total: number; usefulHit: number; identityRecovery: number; candidate: number }>;
     for (const fixture of corpus.cases) {
       const category = byCategory[fixture.category]; const channel = byChannel[fixture.channel];
       category.total++; channel.total++;
       const entry = run?.entries.find(e => e.caseId === fixture.id);
       if (!entry) { counts.notRun++; continue; }
-      counts.executed++; latencies.push(entry.latencyMs);
+      counts.executed++;
+      if (entry.outcome !== 'no_barcode') latencies.push(entry.latencyMs);
       if (entry.outcome !== 'candidate') {
-        counts[entry.outcome]++;
+        if (entry.outcome === 'no_barcode') counts.noBarcode++;
+        else counts[entry.outcome]++;
         if (entry.claim !== 'candidate' || !['capture_label', 'search_name', 'report_missing'].includes(entry.action)) counts.falseCertainty++;
         else counts.honestNextAction++;
         continue;
       }
       counts.candidate++; category.candidate++; channel.candidate++;
+      const usefulness = entry.review!.customerUsefulness;
+      if (usefulness) {
+        counts.usefulnessObserved++; counts.usefulnessUnmeasured--;
+        if (usefulness.usefulSkincareResult) counts.userReportedUseful++;
+      }
       const match = entry.review!.identityMatch;
       if (match === 'exact') counts.exactCandidate++;
       if (match === 'possible') counts.possibleCandidate++;
@@ -178,7 +193,11 @@ export function evaluateCoverage(json: string, expectedSha256: string, rawRuns: 
       if (match === 'wrong' || match === 'unknown' || !warranted) counts.falseCertainty++;
       else counts.honestNextAction++;
       if (fixture.scan.decoded && (match === 'exact' || confirmedPossible) && warranted) {
-        counts.usefulHit++; category.usefulHit++; channel.usefulHit++;
+        counts.identityRecovery++; category.identityRecovery++; channel.identityRecovery++;
+        // A qualified identity hit alone is not evidence the user got useful skincare output.
+        if (usefulness?.usefulSkincareResult === true) {
+          counts.usefulHit++; category.usefulHit++; channel.usefulHit++;
+        }
       }
     }
     const complete = counts.notRun === 0;
@@ -187,6 +206,9 @@ export function evaluateCoverage(json: string, expectedSha256: string, rawRuns: 
       denominator: total, counts, rates: { decode: rate(decoded, total), candidate: complete ? rate(counts.candidate, total) : null,
         usefulScanHit: complete ? rate(counts.usefulHit, total) : null,
         usefulScanHitLowerBound: rate(counts.usefulHit, total),
+        identityRecovery: complete ? rate(counts.identityRecovery, total) : null,
+        identityRecoveryLowerBound: rate(counts.identityRecovery, total),
+        userReportedUsefulness: rate(counts.userReportedUseful, counts.usefulnessObserved),
         verifiedExactProduct: complete ? rate(counts.verifiedExactProduct, total) : null,
         verifiedFormula: complete ? rate(counts.verifiedFormula, total) : null,
         honestNextAction: complete ? rate(counts.honestNextAction, total) : null,

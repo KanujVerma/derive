@@ -9,8 +9,8 @@ const gtinB = '000000000017';
 const userAgent = 'DeriveCatalogEval/1.0 (contact@example.com)';
 const identity = { brand: 'Fiction', name: 'Synthetic Lotion', variant: '', packageSize: '100 mL', region: 'US' };
 function fixture() {
-  const row = (id: string, gtin: string) => ({ id, gtin, category: 'facial_moisturizer', channel: 'drugstore',
-    scan: { decoded: true, deviceEvidenceRef: 'synthetic-device' },
+  const row = (id: string, gtin: string | null) => ({ id, gtin, category: 'facial_moisturizer', channel: 'drugstore',
+    scan: { decoded: gtin !== null, deviceEvidenceRef: 'synthetic-device' },
     reference: { identity, evidenceRef: 'synthetic-package' },
     rights: { collectionEvidenceRef: 'synthetic-collection', permissionEvidenceRef: 'synthetic-permission', providerEvaluationAllowed: true } });
   const corpus = { schemaVersion: 1, cohort: 'synthetic-evaluator-test', cases: [row('a', gtinA), row('repeat-a', `0${gtinA}`), row('b', gtinB)],
@@ -88,6 +88,42 @@ test('human review must cover every candidate and must not fabricate customer co
     reviewerRef: 'reviewer', evidenceRef: `comparison-${entry.caseId}` }));
   reviews[0].evidenceRef = '';
   assert.throws(() => adjudicateOpenBeautyFactsRun(f.json, f.digest, pending, reviews));
+});
+
+test('missing-barcode encounters make zero provider reads and retain the entire cohort denominator', async () => {
+  const f = fixture();
+  for (const row of f.corpus.cases) {
+    row.gtin = null; row.scan.decoded = false; row.rights.providerEvaluationAllowed = false;
+  }
+  f.json = JSON.stringify(f.corpus); f.digest = coverageSha256(f.json);
+  let calls = 0;
+  const pending = await runOpenBeautyFactsEvaluation(f.json, f.digest, f.options, {
+    fetcher: async () => { calls++; throw new Error('no query allowed'); },
+  });
+  assert.equal(calls, 0);
+  const source = evaluateCoverage(f.json, f.digest, [pending]).sources[0];
+  assert.equal(source.status, 'COMPLETE'); assert.equal(source.denominator, 3);
+  assert.equal(source.counts.noBarcode, 3); assert.equal(source.counts.miss, 0);
+  assert.equal(source.rates.usefulScanHit, 0);
+  assert.deepEqual(source.latencyMs, { median: null, p95: null });
+});
+
+test('adjudication preserves explicit observed usefulness independently from identity-only coverage', async () => {
+  const f = fixture(); const pending = await runOpenBeautyFactsEvaluation(f.json, f.digest, f.options, {
+    clock: () => 0, sleep: async () => {}, fetcher: async url => response(String(url).includes(gtinA) ? gtinA : gtinB),
+  });
+  const reviews = pending.entries.map(entry => ({ caseId: entry.caseId, identityMatch: 'exact' as const,
+    reviewerRef: 'independent-reviewer', evidenceRef: `comparison-${entry.caseId}` }));
+  const identityOnly = adjudicateOpenBeautyFactsRun(f.json, f.digest, pending, reviews);
+  let source = evaluateCoverage(f.json, f.digest, [identityOnly]).sources[0];
+  assert.equal(source.counts.identityRecovery, 3); assert.equal(source.counts.usefulHit, 0);
+  const observed = adjudicateOpenBeautyFactsRun(f.json, f.digest, pending, reviews.map(review => ({ ...review,
+    customerUsefulness: { usefulSkincareResult: review.caseId === 'a', evidenceRef: `observation-${review.caseId}` } })));
+  source = evaluateCoverage(f.json, f.digest, [observed]).sources[0];
+  assert.equal(source.counts.usefulnessObserved, 3); assert.equal(source.counts.usefulHit, 1);
+  assert.equal(source.counts.verifiedFormula, 0);
+  assert.throws(() => adjudicateOpenBeautyFactsRun(f.json, f.digest, pending, reviews.map(review => ({ ...review,
+    customerUsefulness: { usefulSkincareResult: true, evidenceRef: '' } }))));
 });
 
 test('rate limit or upstream overload stops further queries and leaves unrun encounters visible', async () => {
