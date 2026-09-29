@@ -44,6 +44,40 @@ export function sanitizeAuthDrift(parsed) {
   };
 }
 
+/** Public Auth /settings is direct runtime authority for signup/confirmation flags, not SMTP delivery. */
+export function summarizePublicAuthSettings(parsed) {
+  if (!parsed || typeof parsed.disable_signup !== 'boolean' || typeof parsed.mailer_autoconfirm !== 'boolean'
+    || typeof parsed.external?.email !== 'boolean' || typeof parsed.external?.anonymous_users !== 'boolean') throw new Error('INVALID_PUBLIC_AUTH_SETTINGS');
+  return {
+    signupEnabled: !parsed.disable_signup,
+    mailerAutoconfirm: parsed.mailer_autoconfirm,
+    confirmEmailEnabled: !parsed.mailer_autoconfirm,
+    emailProviderEnabled: parsed.external.email,
+    anonymousEnabled: parsed.external.anonymous_users,
+    customSmtp: 'UNKNOWN', emailDeliveryTested: false, templateBodyVerified: false,
+  };
+}
+
+async function readbackPublicAuthSettings(cwd) {
+  const keys = await command(['projects', 'api-keys', '--project-ref', PROJECT_REF, '--output', 'json'], cwd);
+  if (!Array.isArray(keys)) throw new Error('PUBLIC_KEY_UNAVAILABLE');
+  // CLI may return other keys. Never expose, persist or use a service-role key.
+  const publicKey = keys.find(row => row?.name === 'anon' || row?.type === 'publishable')?.api_key;
+  if (typeof publicKey !== 'string' || !publicKey) throw new Error('PUBLIC_KEY_UNAVAILABLE');
+  const response = await fetch(`https://${PROJECT_REF}.supabase.co/auth/v1/settings`, {
+    method: 'GET', headers: { apikey: publicKey }, redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok || !response.body) throw new Error('PUBLIC_AUTH_READBACK_FAILED');
+  const reader = response.body.getReader(); const chunks = []; let bytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break;
+      bytes += value.byteLength; if (bytes > 65536) throw new Error('PUBLIC_AUTH_RESPONSE_TOO_LARGE'); chunks.push(value);
+    }
+  } finally { await reader.cancel().catch(() => {}); }
+  return summarizePublicAuthSettings(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks))));
+}
+
 async function command(args, cwd) {
   const { stdout } = await exec('supabase', args, { cwd, timeout: 60000, maxBuffer: 1024 * 1024, encoding: 'utf8' });
   return JSON.parse(stdout);
@@ -56,11 +90,12 @@ async function safeRead(reader) {
 export async function scannerHostedReadiness(cwd = process.cwd()) {
   const { stdout: revision } = await exec('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' });
   if (!/^[a-f\d]{40}\s*$/i.test(revision)) throw new Error('INVALID_SOURCE_REVISION');
-  const [migrations, functions, auth, authDrift] = await Promise.all([
+  const [migrations, functions, auth, authDrift, publicAuth] = await Promise.all([
     safeRead(() => readbackHostedMigrationInventory(cwd)),
     safeRead(() => readbackHostedFunctionInventory(cwd)),
     safeRead(() => readbackHostedAuthConfig()),
     safeRead(async () => sanitizeAuthDrift(await command(['config', 'diff', '--project-ref', PROJECT_REF, '--output-format', 'json'], cwd))),
+    safeRead(() => readbackPublicAuthSettings(cwd)),
   ]);
   // CLI database reads use an ephemeral login role. Keep them sequential to avoid role cleanup races.
   const catalogEvidence = await safeRead(() => readbackCatalogEvidence(PROJECT_REF, cwd));
@@ -68,7 +103,7 @@ export async function scannerHostedReadiness(cwd = process.cwd()) {
   return {
     schemaVersion: 1, scope: 'READ_ONLY_SCANNER_HOSTED_INVENTORY_NOT_ACTIVATION_APPROVAL',
     hostedProjectRef: PROJECT_REF, sourceRevision: revision.trim(), observedAt: new Date().toISOString(),
-    migrations, functions, catalogEvidence, catalogCounts, auth, authDrift,
+    migrations, functions, catalogEvidence, catalogCounts, auth, authDrift, publicAuth,
     activation: { ready: false, status: 'BLOCKED', reason: 'SCHEMA_RUNTIME_EMAIL_COVERAGE_AND_PHYSICAL_GATES_REQUIRE_SEPARATE_ACCEPTANCE' },
   };
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizeAuthDrift, sanitizeCatalogCounts, PROJECT_REF } from './readback-scanner-hosted-readiness.mjs';
+import { sanitizeAuthDrift, sanitizeCatalogCounts, summarizePublicAuthSettings, PROJECT_REF } from './readback-scanner-hosted-readiness.mjs';
 
 test('fixed target and catalog counts omit arbitrary returned fields', () => {
   assert.equal(PROJECT_REF, 'snojlbqovlawewwqbviz');
@@ -29,4 +29,17 @@ test('absence of drift never asserts signup, confirmations, or SMTP delivery rea
 test('observed custom SMTP boolean stays separate from end-to-end delivery', () => {
   const result = sanitizeAuthDrift({ changes: [{ path: ['auth', 'email', 'smtp', 'enabled'], remote: true }] });
   assert.equal(result.customSmtp, 'ENABLED'); assert.equal(result.emailDeliveryTested, false);
+});
+test('direct public Auth settings invert autoconfirm without inferring delivery', () => {
+  const result = summarizePublicAuthSettings({ disable_signup: false, mailer_autoconfirm: true, external: { email: true, anonymous_users: false }, secret: 'must-not-leave' });
+  assert.equal(result.signupEnabled, true); assert.equal(result.mailerAutoconfirm, true); assert.equal(result.confirmEmailEnabled, false);
+  assert.equal(result.emailProviderEnabled, true); assert.equal(result.anonymousEnabled, false); assert.equal(result.customSmtp, 'UNKNOWN'); assert.equal(result.emailDeliveryTested, false);
+  assert.doesNotMatch(JSON.stringify(result), /must-not-leave/);
+});
+test('direct confirmation-required and signup-disabled settings remain explicit', () => {
+  const result = summarizePublicAuthSettings({ disable_signup: true, mailer_autoconfirm: false, external: { email: false, anonymous_users: true } });
+  assert.equal(result.signupEnabled, false); assert.equal(result.confirmEmailEnabled, true); assert.equal(result.emailProviderEnabled, false); assert.equal(result.anonymousEnabled, true);
+});
+test('malformed public Auth settings do not default to a usable signup flow', () => {
+  for (const value of [null, {}, { disable_signup: 'false', mailer_autoconfirm: true }, { disable_signup: false, mailer_autoconfirm: true, external: { email: true } }]) assert.throws(() => summarizePublicAuthSettings(value));
 });

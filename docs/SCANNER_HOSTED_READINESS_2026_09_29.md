@@ -15,13 +15,16 @@ No hosted SQL, functions, Auth, SMTP, customer accounts, or payment configuratio
 | Edge names | 15 hosted / 24 source; no hosted-only names. | Existing function bundles contain current code. |
 | Catalog | 1 catalog-standard product; 0 catalog variants, identifiers and formulas. | Useful scan hit rate for target customers. |
 | Anonymous Auth | Remote `enable_anonymous_sign_ins=false`, directly observed in CLI config diff. | Permanent signup, confirmations, SMTP delivery or physical login. |
-| Permanent Auth / email | Read-only dashboard Email modal: email provider ON, OTP length 6, expiry 3600 seconds, minimum password 6. Full Management API readback unavailable without its access-token environment; CLI drift does not expose unchanged signup/confirmation flags. Signup, confirmations, custom SMTP and template body remain UNKNOWN. | No inference of readiness from local config/defaults or a provider being enabled. |
+| Permanent Auth / email | Direct hosted `GET /auth/v1/settings` HTTP 200: `disable_signup=false`, `mailer_autoconfirm=true`, `external.email=true`, `external.anonymous_users=false`. Thus signup enabled, Confirm Email OFF, email provider enabled, anonymous disabled. Dashboard modal also shows OTP 6/3600 seconds and minimum password 6. Custom SMTP, template body and email delivery remain UNKNOWN. | Existing auto-confirm is not verified email ownership, and does not prove password recovery delivery. |
 | Server key names | `GEMINI_API_KEY` and `JEV_API_KEY` present in secret-name inventory. Values/digests omitted. | Key validity, provider reliability or scanner dependence on AI. |
 
 The read-only Chrome fallback reached the signed-in Auth Providers Email modal;
 Save was disabled. A ScreenCaptureKit error temporarily interrupted readback, and
 the user was actively changing the browser, so inspection stopped without fighting
-their controls. Confirm Email and SMTP were not observed. No setting was changed.
+their controls. The later direct public Auth settings read established the signup and
+confirmation values without using the Management API token or browser. SMTP was not
+observed. No setting was changed. [Official Auth settings source](https://github.com/supabase/auth/blob/master/internal/api/settings.go)
+defines the returned fields and the inverse Confirm Email/autoconfirm relationship.
 The Supabase team-only default sender is not a production mail solution: it sends only
 to organization members and is capped at two messages/hour. This is a documented
 conditional risk, **not a claim that this project has no custom sender**.
@@ -174,8 +177,11 @@ Acceptance sequence:
 
 ## Founder decisions / external gates
 
-- Permanent account signup/confirmation policy: **unknown live settings**, not
-  automatically altered. Root must read actual controls/API and validate its chosen flow.
+- Permanent account signup is enabled; email autoconfirm is already ON (Confirm Email
+  OFF), directly read from hosted. Password signup can therefore return a session
+  without email delivery, but email ownership is unverified. This report does not
+  enable/disable confirmations; root must acknowledge the existing policy and test
+  actual signup, recovery and account lifecycle behavior.
 - If email is required, verify custom sender/OTP template and real non-team delivery.
   No domain purchase or SMTP change is implied by this report.
 - Open Beauty Facts customer display/reuse license review remains a gate; internal
@@ -188,7 +194,7 @@ Acceptance sequence:
 - No claim of three daily Checks until a separately reviewed user-visible usage
   authority exists. No Plus checkout in this scanner-only release.
 
-Tooling validation: five sanitization/fail-closed unit tests; read-only receipts;
+Tooling validation: eight sanitization/fail-closed unit tests; read-only receipts;
 diff/scope check. No app/runtime source edits, no hosted acceptance claim.
 
 The aggregate script serializes its two database queries: the CLI uses an ephemeral
