@@ -6,6 +6,11 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: Free Plan offer composition
+
+- **Predecessor:** `origin/main` `bf20d78443fbd8a939071bff4e64b372000d9053`.
+- **Scope:** Presentation only. The free Plan offer is Early Access, a short managed promise, the same `$25/month` commercial line, and three titled rows for routine, products, and ongoing adjustments. Waitlist identity, price cents, session pinning, and persistence are unchanged.
+
 ## 2026-09-29: Free Plan Managed waitlist
 
 - **Predecessor:** `origin/main` `459566af732d234783d64aa372bae78361b603d4`.
