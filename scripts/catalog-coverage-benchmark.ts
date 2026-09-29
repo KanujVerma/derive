@@ -2,8 +2,11 @@
 import { createHash } from 'node:crypto';
 
 // Offline, source-neutral replay. This module never calls a provider or writes to the catalog.
-const categories = ['cleanser', 'moisturizer', 'sunscreen', 'serum', 'treatment', 'other'] as const;
-const channels = ['drugstore', 'mass_retail', 'beauty_retail', 'direct_brand', 'other'] as const;
+const categories = [
+  'facial_cleanser', 'facial_moisturizer', 'sunscreen', 'facial_serum', 'facial_treatment',
+  'deodorant', 'antiperspirant', 'shampoo', 'conditioner', 'body_wash', 'body_moisturizer', 'other',
+] as const;
+const channels = ['drugstore', 'mass_retail', 'beauty_retail', 'warehouse_club', 'direct_brand', 'other'] as const;
 const outcomes = ['candidate', 'miss', 'error', 'timeout'] as const;
 const matches = ['exact', 'possible', 'wrong', 'unknown'] as const;
 const actions = ['confirm_candidate', 'show_verified_product', 'show_verified_formula', 'capture_label', 'search_name', 'report_missing'] as const;
@@ -196,6 +199,6 @@ export function evaluateCoverage(json: string, expectedSha256: string, rawRuns: 
     sourceWinner: 'NONE_SELECTED', sources };
 }
 export function unpreparedCoverageReport() {
-  return { schemaVersion: 1, status: 'RIGHTS_CLEARED_US_SKINCARE_CORPUS_REQUIRED', corpusCount: 0,
+  return { schemaVersion: 1, status: 'RIGHTS_CLEARED_US_PERSONAL_CARE_CORPUS_REQUIRED', corpusCount: 0,
     usefulScanHitRate: null, sourceWinner: 'NONE_SELECTED' };
 }

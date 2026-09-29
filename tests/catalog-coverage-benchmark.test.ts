@@ -13,9 +13,9 @@ interface TestEntry { caseId: string; outcome: string; latencyMs: number; action
     customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string } } }
 const candidate: TestCandidate = { identity, recordRef: 'synthetic-record', retrievedAt: '2026-09-28T00:00:00Z', datasetVersion: 'synthetic-v1' };
 function fixture() {
-  // Deliberately fabricated self-check, not a measured U.S. skincare corpus.
+  // Deliberately fabricated self-check, not a measured U.S. personal-care corpus.
   const corpus = { schemaVersion: 1, cohort: 'synthetic-test', cases: [
-    { id: 'a', gtin: '000000000000', category: 'moisturizer', channel: 'drugstore', scan: { decoded: true, deviceEvidenceRef: 'synthetic-device' },
+    { id: 'a', gtin: '000000000000', category: 'facial_moisturizer', channel: 'drugstore', scan: { decoded: true, deviceEvidenceRef: 'synthetic-device' },
       reference: { identity, evidenceRef: 'synthetic-reference', canonicalProductId: 'canonical-a', formulaSnapshotId: 'formula-a' },
       rights: { collectionEvidenceRef: 'synthetic-collection', permissionEvidenceRef: 'synthetic-permission', providerEvaluationAllowed: true } },
     { id: 'b', gtin: '000000000017', category: 'sunscreen', channel: 'beauty_retail', scan: { decoded: false, deviceEvidenceRef: 'synthetic-device' },
@@ -35,13 +35,30 @@ function fixture() {
 const evaluate = (f = fixture(), runs: unknown = [f.run]) => evaluateCoverage(f.json, f.digest, runs);
 
 test('no real corpus or run reports a winner or an accuracy number', () => {
-  assert.deepEqual(unpreparedCoverageReport(), { schemaVersion: 1, status: 'RIGHTS_CLEARED_US_SKINCARE_CORPUS_REQUIRED', corpusCount: 0,
+  assert.deepEqual(unpreparedCoverageReport(), { schemaVersion: 1, status: 'RIGHTS_CLEARED_US_PERSONAL_CARE_CORPUS_REQUIRED', corpusCount: 0,
     usefulScanHitRate: null, sourceWinner: 'NONE_SELECTED' });
   const f = fixture(); const report = evaluate(f, []);
   assert.equal(report.sourceWinner, 'NONE_SELECTED');
   assert.equal(report.sources[0].status, 'NOT_RUN');
   assert.equal(report.sources[0].rates.usefulScanHit, null);
   assert.equal(report.sources[0].counts.notRun, 2);
+});
+
+test('launch personal-care categories and warehouse-club channel retain separate denominator slices', () => {
+  const f = fixture();
+  const categories = ['facial_cleanser', 'facial_moisturizer', 'sunscreen', 'facial_serum', 'facial_treatment',
+    'deodorant', 'antiperspirant', 'shampoo', 'conditioner', 'body_wash', 'body_moisturizer'];
+  f.corpus.cases = categories.map((category, index) => ({ ...f.corpus.cases[0], id: `synthetic-${index}`, category,
+    channel: 'warehouse_club' }));
+  f.json = JSON.stringify(f.corpus); f.digest = coverageSha256(f.json);
+  const source = evaluate(f, []).sources[0];
+  assert.equal(source.denominator, categories.length);
+  assert.equal(source.byChannel.warehouse_club.total, categories.length);
+  for (const category of categories) assert.equal(source.byCategory[category as keyof typeof source.byCategory].total, 1);
+  assert.equal(source.byCategory.other.total, 0);
+  f.corpus.cases[0].category = 'moisturizer'; // Old ambiguous bucket must not swallow face/body moisturizer.
+  f.json = JSON.stringify(f.corpus); f.digest = coverageSha256(f.json);
+  assert.throws(() => evaluate(f, []));
 });
 
 test('full cohort denominator includes source misses, absent rows and camera decode failures', () => {
@@ -52,7 +69,7 @@ test('full cohort denominator includes source misses, absent rows and camera dec
   assert.equal(source.rates.usefulScanHit, null);
   assert.equal(source.rates.usefulScanHitLowerBound, .5);
   assert.equal(source.rates.decode, .5);
-  assert.equal(source.byCategory.moisturizer.usefulHit, 1);
+  assert.equal(source.byCategory.facial_moisturizer.usefulHit, 1);
   assert.equal(source.byCategory.sunscreen.usefulHit, 0);
   f.run.entries.push({ ...f.run.entries[0], caseId: 'b', candidate: { ...candidate, identity: f.corpus.cases[1].reference.identity } });
   assert.equal(evaluate(f).sources[0].counts.usefulHit, 1);

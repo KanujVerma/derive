@@ -9,7 +9,7 @@ const gtinB = '000000000017';
 const userAgent = 'DeriveCatalogEval/1.0 (contact@example.com)';
 const identity = { brand: 'Fiction', name: 'Synthetic Lotion', variant: '', packageSize: '100 mL', region: 'US' };
 function fixture() {
-  const row = (id: string, gtin: string) => ({ id, gtin, category: 'moisturizer', channel: 'drugstore',
+  const row = (id: string, gtin: string) => ({ id, gtin, category: 'facial_moisturizer', channel: 'drugstore',
     scan: { decoded: true, deviceEvidenceRef: 'synthetic-device' },
     reference: { identity, evidenceRef: 'synthetic-package' },
     rights: { collectionEvidenceRef: 'synthetic-collection', permissionEvidenceRef: 'synthetic-permission', providerEvaluationAllowed: true } });

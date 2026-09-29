@@ -4,11 +4,11 @@ This is a **read-only, offline evaluation tool**, not an importer or a live prod
 
 ## Current gate
 
-No representative U.S. skincare barcode corpus has been supplied or measured. Running the tool without inputs reports `RIGHTS_CLEARED_US_SKINCARE_CORPUS_REQUIRED`; the synthetic unit tests are **not** provider coverage evidence. No source wins by default. Do not present hit rates from fewer, hand-picked items as launch coverage.
+No representative U.S. launch-scope personal-care barcode corpus has been supplied or measured. Running the tool without inputs reports `RIGHTS_CLEARED_US_PERSONAL_CARE_CORPUS_REQUIRED`; the synthetic unit tests are **not** provider coverage evidence. No source wins by default. Do not present hit rates from fewer, hand-picked items as launch coverage.
 
 To build the corpus, ask the intended first users to select products they actually own or would scan in a store, with permission for evaluation. Record a scan encounter per selection (the same GTIN may appear for multiple people). For each encounter, privately retain the printed GTIN/UPC, product front/size/variant and barcode evidence, independent product identity, category, shopping channel, whether the physical app decoded it, and an opaque reference to permission and evidence. No face photos, health profile, participant names, purchase histories, or scraped retailer pages are needed. Source terms and the contributor's permission must independently allow each proposed provider query. Keep raw evidence and manifests out of Git.
 
-For a rapid 24-hour signal, collect an initial 20–30 encounters across cleanser, moisturizer, sunscreen, serum and treatment, reporting the small-sample caveat and every missing category. Then expand to at least ~100 target-cohort encounters from multiple people and shopping channels before treating a rate as a launch decision. Prefer participants' actual product mix over an artificially balanced catalog. Retain category/channel slices to expose, for example, strong cleanser coverage but poor sunscreen coverage. Record recruitment and sampling method, repeat-product frequency, packaging-only or missing-barcode cases, and a date. A convenience sample is not automatically representative.
+For a rapid 24-hour signal, collect an initial 20–30 encounters from the actual intended launch mix, reporting the small-sample caveat and every missing category. Then expand to at least ~100 target-cohort encounters from multiple people and shopping channels before treating a rate as a launch decision. The allowed categories are `facial_cleanser`, `facial_moisturizer`, `sunscreen`, `facial_serum`, `facial_treatment`, `deodorant`, `antiperspirant`, `shampoo`, `conditioner`, `body_wash`, `body_moisturizer`, and `other`. Do not put the named new categories into `other`. For hybrid products, choose the primary marketed purpose once and note secondary claims in private evidence so one encounter is not double-counted. Channels are `drugstore`, `mass_retail`, `beauty_retail`, `warehouse_club` (for Costco-style stores), `direct_brand`, and `other`. Prefer participants' actual product mix over an artificially balanced catalog. Retain category/channel slices to expose, for example, strong shampoo coverage but poor sunscreen coverage. Record recruitment and sampling method, repeat-product frequency, packaging-only or missing-barcode cases, and a date. A convenience sample is not automatically representative.
 
 ## Inputs and independent adjudication
 
@@ -22,7 +22,7 @@ For field shape only, this **fabricated** case uses an all-zero test code and mu
 {
   "id": "opaque-encounter-001",
   "gtin": "000000000000",
-  "category": "moisturizer",
+  "category": "facial_moisturizer",
   "channel": "drugstore",
   "scan": { "decoded": true, "deviceEvidenceRef": "private-device-note-001" },
   "reference": {
