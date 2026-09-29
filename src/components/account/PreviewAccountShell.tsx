@@ -1,34 +1,29 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '../ui/Icon';
-import { colors, spacing, typography } from '../../constants/theme';
+import React, { useState } from 'react';
+import { Linking } from 'react-native';
+import { publicLegalLinks } from '../../config/environment';
+import { openCustomerAccountLink } from '../../presentation/customer-journey/accountLinks';
+import { AccountSettingsShell } from './AccountSettingsShell';
+import { getAccountSettingsPresentation } from './accountSettingsPresentation';
 
-/** Local scanner shell has no connected account or membership record. */
+/** Development preview has privacy and help, and no canonical account to act on. */
 export function PreviewAccountShell() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
+  const [helpError, setHelpError] = useState<string | null>(null);
+  const open = async (section: 'privacy' | 'help', label: 'Privacy Policy' | 'Privacy Choices' | 'Help & feedback', url: string) => {
+    if (section === 'privacy') setPrivacyError(null);
+    else setHelpError(null);
+    const result = await openCustomerAccountLink(label, url, Linking);
+    if (section === 'privacy') setPrivacyError(result.error);
+    else setHelpError(result.error);
+  };
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Back">
-          <Icon name="back" size={20} color={colors.ink} />
-        </Pressable>
-        <Text style={styles.title}>Account & Settings</Text>
-      </View>
-      <View style={styles.content}>
-        <Text style={styles.body}>No account set up.</Text>
-      </View>
-    </View>
+    <AccountSettingsShell
+      presentation={getAccountSettingsPresentation({ kind: 'preview' })}
+      privacyError={privacyError}
+      helpError={helpError}
+      onOpenPrivacy={() => void open('privacy', 'Privacy Policy', publicLegalLinks.privacyUrl)}
+      onOpenPrivacyChoices={() => void open('privacy', 'Privacy Choices', publicLegalLinks.privacyChoicesUrl)}
+      onOpenHelp={() => void open('help', 'Help & feedback', publicLegalLinks.supportUrl)}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.canvas },
-  header: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, gap: spacing.sm },
-  back: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  title: { color: colors.ink, fontSize: typography.sizes.sectionTitle, fontWeight: typography.weights.semibold },
-  content: { padding: spacing.lg },
-  body: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: 23 },
-});

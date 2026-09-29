@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   TextInput,
   ActivityIndicator,
   Linking,
@@ -38,7 +39,7 @@ import { useScanContextStore } from '@/src/stores/scanContextStore';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { AccountSettingsButton } from '@/src/components/account/AccountSettingsButton';
-import { getPreviewCatalogDetail, searchPreviewCatalog } from '@/src/commerce/checkPreview';
+import { getPreviewCatalogDetail, matchPreviewProductLink, searchPreviewCatalog } from '@/src/commerce/checkPreview';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
@@ -110,6 +111,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [confirmedProduct, setConfirmedProduct] = useState<ScannableProductInput | null>(null);
   const [scanResult, setScanResult] = useState<ProductScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [productLink, setProductLink] = useState('');
+  const [linkNote, setLinkNote] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(!targetShell);
   const [captureRole, setCaptureRole] = useState<CaptureRole | null>(null);
   const [cameraAwaitingResult, setCameraAwaitingResult] = useState(false);
@@ -519,6 +522,16 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       });
   };
 
+  const checkProductLink = () => {
+    const trimmed = productLink.trim();
+    let url: URL;
+    try { url = new URL(trimmed); } catch { setLinkNote('Enter a full https link.'); return; }
+    if (url.protocol !== 'https:') { setLinkNote('Use an https link.'); return; }
+    const match = preview ? matchPreviewProductLink(trimmed) : null;
+    if (match) { setLinkNote(null); handleSelectSearchResult(match); return; }
+    setLinkNote('This link can\'t identify the product. Search by name.');
+  };
+
   const handleResetScan = () => {
     void Haptics.selectionAsync().catch(() => {});
     checkFlowRef.current?.abandon();
@@ -698,9 +711,23 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           key={`${captureRole}:${cameraSessionKey}`}
           initialRole={captureRole}
           live={integrated}
+          catalogSearch={preview ? searchPreviewCatalog : undefined}
+          onCatalogSelect={handleSelectSearchResult}
           detectionPaused={detectionPaused}
           onCaptureReady={handleCaptureReady}
-          onClose={() => { setCameraAwaitingResult(false); setDetectionPaused(false); setCaptureRole(null); }}
+          onClose={() => {
+            setCameraAwaitingResult(false);
+            setDetectionPaused(false);
+            setCatalogDetail(null);
+            setResolution(null);
+            setCandidates([]);
+            setConfirmedProduct(null);
+            setScanResult(null);
+            setUnknownBarcode(null);
+            setEvaluationError(null);
+            setCaptureEvidence(null);
+            setCaptureRole(null);
+          }}
           companion={companion && (
             <ScanResultSheet
               model={companion}
@@ -1123,11 +1150,39 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
-        <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
-          <Text style={styles.entryTitle}>Check a product</Text>
-          <Text style={styles.entryBody}>Scan a barcode or take a photo of the package.</Text>
+        <ScrollView contentContainerStyle={[styles.entryContent, { paddingTop: spacing.sm, paddingBottom: insets.bottom + spacing.xl }]}>
           <Button label="Open camera" variant="brand" onPress={() => openCapture('barcode')} style={styles.entryAction} />
-          <Button label="Search by name" variant="ghost" onPress={handleSearchNamePress} style={{ marginTop: spacing.sm }} />
+          <View style={styles.entrySearch}>
+            <CatalogProductSearch
+              label="Search by name"
+              actionLabel="Check"
+              search={preview ? searchPreviewCatalog : undefined}
+              onSelect={handleSelectSearchResult}
+              keepFocusAfterSelect={false}
+              errorCopy="Search is unavailable right now."
+              emptyCopy="No product match yet."
+            />
+          </View>
+          <View style={styles.linkCard}>
+            <Text style={styles.linkLabel}>Search by product link</Text>
+            <View style={styles.linkRow}>
+              <TextInput
+                value={productLink}
+                onChangeText={(value) => { setProductLink(value); setLinkNote(null); }}
+                placeholder="https://"
+                placeholderTextColor={colors.inkSubtle}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                accessibilityLabel="Product link"
+                style={styles.linkField}
+              />
+              <Pressable accessibilityRole="button" accessibilityLabel="Check link" onPress={checkProductLink} style={styles.linkCheck}>
+                <Text style={styles.linkCheckText}>Check</Text>
+              </Pressable>
+            </View>
+            {linkNote && <Text style={styles.linkNote}>{linkNote}</Text>}
+          </View>
         </ScrollView>
       </View>
     );
@@ -1408,6 +1463,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   entryAction: { marginTop: spacing.xl },
+  entrySearch: { marginTop: spacing.xl },
+  linkCard: { marginTop: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.xs },
+  linkLabel: { color: colors.ink, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold },
+  linkField: { flex: 1, minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, color: colors.ink, backgroundColor: colors.canvas },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  linkCheck: { minHeight: 48, justifyContent: 'center', paddingHorizontal: spacing.xs },
+  linkCheckText: { color: colors.brand, fontSize: typography.sizes.caption, fontWeight: typography.weights.bold },
+  linkNote: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption },
   cameraFrameContainer: {
     gap: spacing.md,
   },
