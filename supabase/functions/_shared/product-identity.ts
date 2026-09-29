@@ -58,11 +58,11 @@ function conservativeText(value: string | undefined): string {
   return (value ?? "").normalize("NFKC").toLowerCase().trim().replace(/\s+/g, " ");
 }
 
-function identityEvidenceText(value: string | undefined): string {
+export function identityEvidenceText(value: string | undefined): string {
   return conservativeText(value).replace(/[-‐‑]/g, " ").replace(/\s+/g, " ");
 }
 
-function matchesIngredientEvidence(ingredients: string[], record: CatalogResolutionRecord): boolean {
+export function matchesIngredientEvidence(ingredients: string[], record: CatalogResolutionRecord): boolean {
   if (record.formulaIngredients) {
     return ingredients.length === record.formulaIngredients.length
       && ingredients.every((ingredient, index) => Boolean(conservativeText(ingredient))
@@ -110,6 +110,17 @@ export function isValidGtin(value: string): boolean {
     .reverse()
     .reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
   return checkDigit === (10 - (sum % 10)) % 10;
+}
+
+// UPC-A is encoded as EAN-13 with one leading zero by many mobile scanners.
+// Do not conflate other GTIN lengths or erase the submitted representation.
+export function equivalentGtinRepresentations(barcode: string): Array<{ type: string; value: string }> {
+  const representations = [{ type: `gtin_${barcode.length}`, value: barcode }];
+  if (barcode.length === 12) representations.push({ type: "gtin_13", value: `0${barcode}` });
+  if (barcode.length === 13 && barcode.startsWith("0")) {
+    representations.push({ type: "gtin_12", value: barcode.slice(1) });
+  }
+  return representations;
 }
 
 export function normalizeIngredientFingerprint(ingredients: string[] | undefined): string | undefined {
@@ -192,9 +203,9 @@ export function resolveProductIdentity(
 ): ResolverDecision {
   const barcode = normalizeBarcode(evidence.barcode);
   if (barcode && isValidGtin(barcode)) {
+    const equivalentIdentifiers = equivalentGtinRepresentations(barcode);
     const assertions = catalog.filter((record) =>
-      record.identifierValue === barcode
-      && record.identifierType === `gtin_${barcode.length}`
+      equivalentIdentifiers.some(({ type, value }) => record.identifierType === type && record.identifierValue === value)
       && record.identifierAuthority
       && record.identifierVerifiedAt
       && AUTHORITATIVE_IDENTIFIER_SOURCES.has(record.identifierAuthority)

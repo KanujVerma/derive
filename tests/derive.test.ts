@@ -9332,6 +9332,18 @@ test('S6 resolver: GTIN validation fails closed', () => {
   assert.equal(isValidGtin('abc'), false);
 });
 
+test('S6 resolver: UPC-A and zero-prefixed EAN-13 share identity without changing the submitted code', () => {
+  const upcRecord: CatalogResolutionRecord = {
+    ...s6VerifiedCatalog[0], identifierType: 'gtin_12', identifierValue: '012345678905',
+  };
+  const eanRecord: CatalogResolutionRecord = {
+    ...upcRecord, identifierType: 'gtin_13', identifierValue: '0012345678905',
+  };
+  assert.equal(resolveProductIdentity({ barcode: '0012345678905' }, [upcRecord]).state, 'verified_product_formula');
+  assert.equal(resolveProductIdentity({ barcode: '012345678905' }, [eanRecord]).state, 'verified_product_formula');
+  assert.equal(resolveProductIdentity({ barcode: '112345678905' }, [eanRecord]).state, 'insufficient_evidence');
+});
+
 test('S6 integration: personalized Scan accepts only an owner-bound verified resolver case', () => {
   const scanFunction = fs.readFileSync(
     path.join(process.cwd(), 'supabase/functions/scan-product/index.ts'),
@@ -9359,16 +9371,21 @@ test('S6 endpoint: authenticates before evidence parsing and keeps photo/queue p
   );
   const authenticateIndex = resolverFunction.indexOf('await authenticate(req)');
   const entitlementIndex = resolverFunction.indexOf('await requireMemberEntitlement(admin, userId)');
-  const bodyIndex = resolverFunction.indexOf('parseRequest(await readJsonObject(req), userId)');
+  const bodyIndex = resolverFunction.indexOf('const body = await readJsonObject(req)');
   assert.ok(authenticateIndex >= 0 && authenticateIndex < bodyIndex);
   assert.ok(bodyIndex < entitlementIndex);
+  assert.match(resolverFunction, /parseRequest\(body, userId\)/);
   assert.match(resolverFunction, /identityKindFromVerifiedUser\(user\)/);
   assert.match(resolverFunction, /PHOTO_EVIDENCE_MANAGED_ONLY/);
   assert.match(resolverFunction, /managedAccess && decision\.requiresFounderReview/);
-  assert.match(resolverFunction, /loadCatalog\(admin, !managedAccess\)/);
+  assert.match(resolverFunction, /loadCatalog\(admin, userId, !managedAccess\)/);
   assert.match(resolverFunction, /isBarcodeOnly\(request\)/);
-  assert.match(resolverFunction, /loadBarcodeCatalog\(admin, !managedAccess, request\.barcode!\)/);
-  assert.match(resolverFunction, /\.eq\("identifier_type", `gtin_\$\{barcode\.length\}`\)\.eq\("identifier_value", barcode\)/);
+  assert.match(resolverFunction, /loadBarcodeCatalog\(admin, userId, !managedAccess, request\.barcode!\)/);
+  assert.match(resolverFunction, /loadExactTypedCatalog\(admin, userId, !managedAccess, request\.brand, request\.productName\)/);
+  assert.match(resolverFunction, /keepVisibleProducts\(admin, userId, freeOnly, productRows\)/);
+  assert.match(resolverFunction, /\.eq\("user_id", userId\)/);
+  assert.match(resolverFunction, /equivalentGtinRepresentations\(barcode\)/);
+  assert.match(resolverFunction, /\.eq\("identifier_type", type\)\.eq\("identifier_value", value\)/);
   assert.match(resolverFunction, /MAX_BARCODE_IDENTIFIERS = 100/);
   assert.match(resolverFunction, /\^\(file\|ph\|content\|https\?\):\\\/\\\//i);
   assert.match(resolverFunction, /source_authority, observed_at, verified_at/);

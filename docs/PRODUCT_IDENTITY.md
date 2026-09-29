@@ -44,6 +44,35 @@ must already exist under the immutable
 S-FREE-4 adds a separately granted private guest Check path; see
 [S_FREE_4_PRODUCT_EVIDENCE.md](S_FREE_4_PRODUCT_EVIDENCE.md).
 
+### Same-Check ingredient continuation (source increment; not hosted)
+
+`POST /functions/v1/resolve-product-identity` also accepts the additive
+`continue_ingredients` operation in `ProductIdentityResolver.ts`. It requires
+the original owner-bound Scan case ID, its exact current immutable snapshot ID,
+a new request UUID, and either a full ordered ingredient transcription or one
+previously granted private ingredient photo. It is deliberately one continuation
+per root Check, with a stable `attemptId` for future metering and opt-in history.
+An identical retry returns the same child case; changed evidence or a second
+continuation returns a conflict. The original case and truth snapshot are never
+rewritten. A later client composition must use the returned child snapshot while
+retaining the root attempt ID; it must not start a second Check or charge again.
+
+Photo-only continuation stores private evidence and remains formula-unverified:
+there is no OCR or image recognition. Text can select one verified formula only
+when its entire ordered ingredient list matches an authoritative catalog version
+for the original exact variant **and** the original barcode has a completed,
+authoritative assertion explicitly linking that version and was reported as
+device-origin evidence. `barcodeSource: 'member_input'` preserves pasted/link-derived
+origin in stored evidence and the snapshot; it cannot become a device scan by
+adding ingredient text. Omitted source preserves the legacy device-origin contract;
+explicit `device_barcode` serializes identically for retries. Changing origin on
+retry is a conflict; unsupported origins or origin without barcode are invalid.
+Origin is reported, not attested, and never creates catalog authority. Typed identity plus a
+transcription cannot authenticate a package formula. Conflicts and ambiguity
+remain unverified. No external provider data becomes formula truth through this
+path. The schema and endpoint require a coordinated migration/function rollout;
+the customer UI is a separate Kanuj-owned handoff, not active here.
+
 ## Trust states
 
 | State | Meaning | Allowed next step |
@@ -109,15 +138,29 @@ permanent client/server lane.
 - There is no numerical confidence or quality score in the customer contract.
 - Unknown and ambiguous evidence remains unknown or ambiguous.
 - Pure barcode checks query the existing `(identifier_type, identifier_value)`
-  index and load only linked products, variants, and formulas. Mixed evidence
-  (typed name, label, ingredients, or photos) retains the broad catalog read so
-  a contradictory product can still be surfaced. Existing-case replay also
-  retains broad readback and its immutable truth snapshot. This is a partial
-  scale improvement, not a complete indexed resolver.
+  index and load only linked products, variants, and formulas. UPC-A and its
+  single-zero-prefixed EAN-13 representation are queried as equivalent identifier
+  assertions without changing the submitted barcode or equating other GTIN forms.
+  Exact typed brand/name checks use a service-only normalized expression index;
+  mixed barcode plus typed identity uses both complete bounded candidate sets.
+  A 101st exact product is an explicit error, never a hidden winner.
+- Replays read only the persisted case and at most eight candidate IDs, so later
+  catalog growth cannot block an immutable result. Catalog-standard products and
+  the requester's own shelf-linked provisional products remain visible; another
+  customer's provisional products are excluded from barcode, typed, broad, and
+  replay candidate presentation. Direct Data API product reads follow the same
+  owner boundary: active managed members can read shared catalog-standard rows
+  and their own shelf-linked provisional rows; guests remain limited to their
+  own linked rows. Historical snapshots are not rewritten.
+- Ingredient-list and label/packaging text resolution still need the broad
+  catalog read to preserve formula and cross-product contradiction detection.
+  An alias is a search hint, not a verified resolver identity. These remaining
+  paths require a complete indexed evidence plan before large catalog activation.
 - Broad catalog reads page deterministically past the API's 1,000-row response
   limit. Above 10,000 rows per identity table they fail closed, never silently
   search a truncated catalog. Pure barcode reads also fail closed if one exact
-  GTIN has more than 100 identifier assertions.
+  GTIN (including its UPC-A/EAN-13 equivalent) has more than 100 identifier
+  assertions.
 
 ## Historical S6 review and rollout checklist
 
