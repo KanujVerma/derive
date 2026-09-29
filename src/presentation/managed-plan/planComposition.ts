@@ -21,7 +21,7 @@ export function resolvePlanPresentation(input: {
   if (isFreeIntegrationShell(input.shell) && input.managedAccess) return { kind: 'managed' };
 
   const status = input.fixtureStatus;
-  if (input.shell !== 'hosted_free_integration' && status && Object.prototype.hasOwnProperty.call(managedPlanFixtures, status)) {
+  if (status && Object.prototype.hasOwnProperty.call(managedPlanFixtures, status)) {
     return { kind: 'fixture', snapshot: managedPlanFixtures[status as ManagedPlanStatus] };
   }
   return { kind: 'free' };
