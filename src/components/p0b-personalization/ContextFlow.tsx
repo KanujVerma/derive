@@ -1,12 +1,14 @@
 import { editSensitivityInput } from '@/src/presentation/p0b-personalization/sensitivityInput';
 import React, { useState } from 'react';
-import { Text, TextInput, View, StyleSheet } from 'react-native';
+import { Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Screen } from '@/src/components/ui/Screen';
 import { Button } from '@/src/components/ui/Button';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { QuestionGroup } from '@/src/components/ui/QuestionGroup';
-import { colors, layout, spacing, typography } from '@/src/constants/theme';
-import { createContextDraft, relevantQuestions, toggleSecondaryGoal, validateContextDraft, GOALS, type Treatment, type Answer, type ContextDraft, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
+import { colors, layout, radii, spacing, typography } from '@/src/constants/theme';
+import { createContextDraft, relevantQuestions, validateContextDraft, GOALS, type Treatment, type Answer, type ContextDraft, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
+
+import { toggleProfileGoal } from '@/src/presentation/p0b-personalization/goalSelection';
 
 const goals = GOALS.map(([value, label]) => [value, value === 'dryness' ? 'Dryness' : label] as const);
 export interface ContextFlowProps {
@@ -35,7 +37,6 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   const [draft, setDraft] = useState(() => createContextDraft(initialDraft));
   const [sensitivityText, setSensitivityText] = useState(() => initialDraft?.sensitivities.state === 'answered' ? initialDraft.sensitivities.value.join('\n') : '');
   const [step, setStep] = useState(0);
-  const [otherGoalsVisible, setOtherGoalsVisible] = useState(() => Boolean(initialDraft?.secondaryGoals.length));
   const [validation, setValidation] = useState<string | null>(null);
   const fields = relevantQuestions(relevance);
   const hasContext = contextQuestions.length > 0 || fields.length > 0;
@@ -51,15 +52,24 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       {!editing && <Text style={styles.copy}>Step {step + 1} of {last + 1}</Text>}
     </View>
     {(editing || step === 0) && <View style={styles.questions}>
-      <AnswerChoices label="What would you most like to improve?" support="Choose one optional main priority." answer={draft.primaryGoal} basic allowWithheld={false} disabled={loading} choices={goals} onChange={value => { setValidation(null); setDraft(current => ({ ...current, primaryGoal: value, secondaryGoals: value.state === 'answered' ? current.secondaryGoals.filter(goal => goal !== value.value) : current.secondaryGoals })); }} />
-      <View style={styles.disclosure}>
-        <Button label={otherGoalsVisible ? 'Hide additional goals' : draft.secondaryGoals.length ? 'Review other goals' : 'Add other goals'} variant="ghost" disabled={loading} onPress={() => setOtherGoalsVisible(!otherGoalsVisible)} />
-        {otherGoalsVisible && <QuestionGroup label="Other goals" support="Optional. Choose up to two."><View style={styles.chips}>{goals.map(([value, label]) => <ChoiceChip key={value} label={label} selectionType="multiple" selected={draft.secondaryGoals.includes(value)} disabled={loading || (draft.primaryGoal.state === 'answered' && draft.primaryGoal.value === value) || (!draft.secondaryGoals.includes(value) && draft.secondaryGoals.length >= 2)} onSelect={() => { setValidation(null); setDraft(current => toggleSecondaryGoal(current, value)); }} />)}</View></QuestionGroup>}
-      </View>
+      <QuestionGroup label="What would you like to improve?" support="Optional. Choose up to three. Your first choice is Main."><View style={styles.chips}>
+        {goals.map(([value, label]) => {
+          const main = draft.primaryGoal.state === 'answered' && draft.primaryGoal.value === value;
+          const also = draft.secondaryGoals.includes(value);
+          const role = main ? 'Main' : also ? 'Also' : null;
+          const selected = main || also;
+          const count = (draft.primaryGoal.state === 'answered' ? 1 : 0) + draft.secondaryGoals.length;
+          const disabled = loading || (!selected && count >= 3);
+          return <TouchableOpacity key={value} activeOpacity={0.75} accessibilityRole="checkbox" accessibilityLabel={role ? `${label}, ${role}` : label} accessibilityState={{ checked: selected, disabled }} disabled={disabled} style={[styles.goal, main ? styles.mainGoal : also ? styles.alsoGoal : styles.unselectedGoal, disabled && styles.disabledGoal]} onPress={() => { if (disabled) return; setValidation(null); setDraft(current => toggleProfileGoal(current, value)); }}>
+            <Text style={[styles.goalLabel, main && styles.mainGoalLabel]}>{label}</Text>
+            {role && <Text style={[styles.goalRole, main && styles.mainGoalLabel]}>{role}</Text>}
+          </TouchableOpacity>;
+        })}
+      </View></QuestionGroup>
       {collectIntent && <AnswerChoices label="What are you deciding?" support="This choice is saved with your profile and reused for future Checks. You can change it." answer={draft.intent} disabled={loading} choices={[['add', 'Add to my routine'], ['replace', 'Replace something'], ['check_current', 'Check what I use']]} onChange={value => update('intent', value)} />}
     </View>}
     {(editing || step === 1) && <View style={styles.questions}>
-      {askSkinFeel && <AnswerChoices label="How does your skin usually feel?" answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Neither dry nor oily'], ['combination', 'Oily in some areas, dry in others'], ['oily', 'Oily']]} onChange={value => update('behavior', value)} />}
+      {askSkinFeel && <AnswerChoices label="How does your skin usually feel?" support="Combination: oily in some areas, dry in others." answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry / tight'], ['balanced', 'Balanced'], ['combination', 'Combination'], ['oily', 'Oily']]} onChange={value => update('behavior', value)} />}
       <AnswerChoices label="Do skincare products tend to irritate your skin?" answer={draft.reactivity} basic disabled={loading} choices={[['reacts_easily', 'My skin gets irritated easily'], ['generally_tolerates', 'I generally tolerate products']]} onChange={value => update('reactivity', value)} />
     </View>}
     {hasContext && (editing || step === 2) && <View style={styles.questions}>
@@ -88,5 +98,9 @@ export const styles = StyleSheet.create({
   copy: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
   error: { color: colors.actionStop.text, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
   group: { padding: layout.cardPadding, gap: spacing.sm }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  goal: { minHeight: layout.minTouchTarget, borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  mainGoal: { backgroundColor: colors.brand, borderColor: colors.brand }, alsoGoal: { backgroundColor: colors.brandLight, borderColor: colors.brand }, unselectedGoal: { backgroundColor: colors.surface, borderColor: colors.border }, disabledGoal: { opacity: 0.45 },
+  goalLabel: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, fontWeight: typography.weights.medium },
+  mainGoalLabel: { color: colors.inkInverse }, goalRole: { color: colors.brandDark, fontSize: typography.sizes.caption, fontWeight: typography.weights.semibold },
   input: { minHeight: layout.minTouchTarget, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 8, padding: spacing.sm, fontSize: typography.sizes.bodyRegular, color: colors.ink, backgroundColor: colors.surface },
 });
