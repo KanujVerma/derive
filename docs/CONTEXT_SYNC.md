@@ -6,6 +6,11 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: scanner-first landing page preview (apple-site)
+
+- **Owner / predecessor:** landing-page pass requested by Sami, based on main `bb30f41`. Scope is `apple-site/index.html`, new `apple-site/assets/**`, `site-config.js`, icons and this handoff; privacy, support, privacy-choices pages and `vercel.json` are unchanged. No app, scanner, Auth, scoring, database or provider change.
+- **Truth boundary:** ships in a coming-soon state because no public App Store listing is confirmed; no download link, notification form or Plus pricing. All phone visuals are labeled HTML illustrations built from the app's result language with fictional products. Not deployed; Vercel remains not Git-connected. Details and open claims: [LANDING_PAGE_HANDOFF.md](release/LANDING_PAGE_HANDOFF.md).
+
 ## 2026-09-29: bounded hosted acceptance preparation
 
 - **Owner / predecessor:** Sami operations, based on main `0b24c2ca58494bee6c4ffa428610c286a980808e`. Founder separately authorized reviewed scanner migrations/functions only after recoverable backup and all gates pass; no hosted reset, customer-data deletion, Auth-setting change, paid provider or app submission. Backup recovery verification is a separate required operation, not implied by this tool.
