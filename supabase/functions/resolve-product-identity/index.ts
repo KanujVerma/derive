@@ -27,6 +27,11 @@ import {
 } from "../_shared/runtime.ts";
 import { identityKindFromVerifiedUser } from "../_shared/access.ts";
 import { parseBarcodeSource } from "../_shared/barcode-provenance.ts";
+import {
+  exactIngredientEvidence,
+  IngredientCandidateLookupError,
+  lookupIngredientCandidates,
+} from "../_shared/ingredient-candidates.ts";
 
 const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
 const CATALOG_PAGE_SIZE = 1_000;
@@ -180,10 +185,15 @@ async function keepVisibleProducts<T extends { id: string; is_catalog_standard: 
   admin: SupabaseClient, userId: string, freeOnly: boolean, rows: T[],
 ): Promise<T[]> {
   if (freeOnly || rows.every((row) => row.is_catalog_standard)) return rows;
-  const owned = await loadPagedCatalogRows<{ id: string; product_id: string }>("owner product links", (from, to) =>
-    admin.from("user_products").select("id, product_id")
-      .eq("user_id", userId).order("id", { ascending: true }).range(from, to));
-  const ownedIds = new Set(owned.map((row) => row.product_id));
+  const privateIds = [...new Set(rows.filter((row) => !row.is_catalog_standard).map((row) => row.id))];
+  const ownedIds = new Set<string>();
+  for (let offset = 0; offset < privateIds.length; offset += MAX_EXACT_PRODUCTS) {
+    const owned = await loadPagedCatalogRows<{ id: string; product_id: string }>("owner product links", (from, to) =>
+      admin.from("user_products").select("id, product_id")
+        .eq("user_id", userId).in("product_id", privateIds.slice(offset, offset + MAX_EXACT_PRODUCTS))
+        .order("id", { ascending: true }).range(from, to));
+    for (const row of owned) ownedIds.add(row.product_id);
+  }
   return rows.filter((row) => row.is_catalog_standard || ownedIds.has(row.id));
 }
 
@@ -432,6 +442,59 @@ async function loadExactTypedCatalog(admin: SupabaseClient, userId: string, free
   ]);
   return projectCatalogRows(await keepVisibleProducts(admin, userId, freeOnly, productRows),
     variantRows, formulaRows, identifierRows, freeOnly);
+}
+
+/** Exact ingredients add candidates; they never override identifier evidence. */
+async function loadIngredientCatalog(admin: SupabaseClient, userId: string, freeOnly: boolean,
+  ingredients: string[]): Promise<CatalogResolutionRecord[]> {
+  let candidates;
+  try { candidates = await lookupIngredientCandidates(admin, userId, freeOnly, ingredients); }
+  catch (error) {
+    if (error instanceof IngredientCandidateLookupError) {
+      throw new ServiceError(error.code, "Ingredient evidence requires a complete catalog lookup",
+        error.code === "CATALOG_TOO_LARGE" ? 503 : 500);
+    }
+    throw error;
+  }
+  if (candidates.length === 0) return [];
+  const formulaRows = await loadPagedCatalogRows<FormulaRow>("ingredient formulas", (from, to) => {
+    const query = admin.from("product_formula_versions")
+      .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers, ingredients, region_code")
+      .in("id", candidates.map((row) => row.id)).eq("verification_status", "verified");
+    if (freeOnly) query.not("catalog_public_source_url", "is", null);
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  const original = new Map(candidates.map((row) => [row.id, row]));
+  if (formulaRows.length !== candidates.length || new Set(formulaRows.map((row) => row.id)).size !== candidates.length
+    || formulaRows.some((row) => !original.has(row.id) || row.variant_id !== original.get(row.id)!.variant_id
+      || row.region_code !== original.get(row.id)!.region_code || !exactIngredientEvidence(ingredients, row.ingredients)
+      || (!row.variant_id && !row.catalog_public_source_url))) {
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Ingredient evidence changed during resolution", 503);
+  }
+  const variantIds = [...new Set(formulaRows.flatMap((row) => row.variant_id ? [row.variant_id] : []))];
+  const variantRows = variantIds.length === 0 ? [] : await loadPagedCatalogRows<VariantRow>("ingredient variants", (from, to) => {
+    const query = admin.from("product_variants")
+      .select("id, product_id, variant_name, region_code, packaging_markers")
+      .in("id", variantIds).eq("lifecycle_status", "active");
+    if (freeOnly) query.eq("catalog_verification_status", "verified");
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (variantRows.length !== variantIds.length) {
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Ingredient variant visibility changed during resolution", 503);
+  }
+  const productIds = [...new Set(variantRows.map((row) => row.product_id))];
+  const productRows = productIds.length === 0 ? [] : await loadPagedCatalogRows<ProductRow>("ingredient products", (from, to) => {
+    const query = admin.from("products")
+      .select("id, brand, name, is_catalog_standard, catalog_verified_at").in("id", productIds);
+    if (freeOnly) query.eq("is_catalog_standard", true).not("catalog_verified_at", "is", null);
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  const visibleProducts = await keepVisibleProducts(admin, userId, freeOnly, productRows);
+  if (visibleProducts.length !== productIds.length) {
+    // Never discard an invisible/missing member of a previously ambiguous set.
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Ingredient product visibility changed during resolution", 503);
+  }
+  return projectCatalogRows(visibleProducts, variantRows, formulaRows, [], freeOnly);
 }
 
 async function loadCatalog(admin: SupabaseClient, userId: string, freeOnly: boolean): Promise<CatalogResolutionRecord[]> {
@@ -862,18 +925,23 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(await responseForCase(admin, userId, replay as ResolutionCaseRow));
     }
 
-    const needsBroadRead = Boolean(request.ingredientList?.length || request.labelText || request.packagingText
+    // Literal label contradictions still use the conservative existing path.
+    // Exact ingredients no longer require a full catalog scan.
+    const needsBroadRead = Boolean(request.labelText || request.packagingText
       || request.evidencePhotos.some((photo) => photo.extractedText
         && (photo.role === "front_label" || photo.role === "packaging")));
     const catalog = needsBroadRead
       ? await loadCatalog(admin, userId, !managedAccess)
       : isBarcodeOnly(request)
       ? await loadBarcodeCatalog(admin, userId, !managedAccess, request.barcode!)
-      : request.barcode || (request.brand && request.productName)
+      : request.barcode || (request.brand && request.productName) || request.ingredientList?.length
       ? (await Promise.all([
           request.barcode ? loadBarcodeCatalog(admin, userId, !managedAccess, request.barcode) : Promise.resolve([]),
           request.brand && request.productName
             ? loadExactTypedCatalog(admin, userId, !managedAccess, request.brand, request.productName)
+            : Promise.resolve([]),
+          request.ingredientList?.length
+            ? loadIngredientCatalog(admin, userId, !managedAccess, request.ingredientList)
             : Promise.resolve([]),
         ])).flat()
       : [];

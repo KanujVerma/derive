@@ -1,6 +1,7 @@
 import type { FreeContextRequest } from '../../contracts/FreeContext.ts';
 import type { ProductResolutionResult } from '../../contracts/ProductIdentityResolver.ts';
 import type { ShellPresentation } from '../../utils/shellPresentation.ts';
+import { isFreeIntegrationShell } from '../../utils/shellPresentation.ts';
 
 type CheckRequest = Extract<FreeContextRequest, { operation: 'record_check' }>;
 type SaveStatus = 'unavailable' | 'idle' | 'saving' | 'saved' | 'failed';
@@ -48,7 +49,7 @@ export function selectFreeCheckOwner(input: {
   accessOwnerId: string | null;
 }): string | null {
   const ownerId = input.sessionUserId;
-  return input.shell === 'local_free_integration' && input.authStatus === 'SIGNED_IN'
+  return isFreeIntegrationShell(input.shell) && input.authStatus === 'SIGNED_IN'
     && ownerId && input.accessStatus === 'READY'
     && input.accessUserId === ownerId && input.accessOwnerId === ownerId ? ownerId : null;
 }
