@@ -23,7 +23,7 @@ test('the free Plan offer explains delegation and the current price hypothesis',
   assert.deepEqual(managedOffer.benefits, [
     { title: 'Your routine', body: 'One clear morning and evening plan' },
     { title: 'Your products', body: 'Know what to keep, add, pause, or replace' },
-    { title: 'Ongoing adjustments', body: 'Check-ins guide changes, and you approve meaningful updates' },
+    { title: 'Ongoing adjustments', body: 'Check-ins guide changes.\nYou approve meaningful updates.' },
   ]);
   assert.equal(managedOffer.joinLabel, 'Join waitlist');
   assert.equal(managedOffer.joinNote, 'No payment today. We\'ll let you know in Derive when early access opens.');

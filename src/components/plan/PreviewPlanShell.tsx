@@ -90,7 +90,8 @@ export function PreviewPlanShell() {
           <Text style={styles.commercial}>{managedOffer.commercialTerm}</Text>
         </View>
         <Text style={styles.explanation}>{managedOffer.explanation}</Text>
-        <GroupedSection header={managedOffer.sectionLabel} style={styles.benefits}>
+        <Text style={styles.sectionLabel}>{managedOffer.sectionLabel}</Text>
+        <GroupedSection style={styles.benefits}>
           {managedOffer.benefits.map((benefit) => (
             <View key={benefit.title} style={styles.row}>
               <Text style={styles.rowTitle}>{benefit.title}</Text>
@@ -164,14 +165,43 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
     fontSize: typography.sizes.bodyRegular,
     lineHeight: typography.lineHeights.bodyRegular,
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
   },
-  benefits: { marginTop: spacing.xxl, marginBottom: spacing.xxl },
+  sectionLabel: {
+    color: colors.inkMuted,
+    fontSize: typography.sizes.micro,
+    lineHeight: typography.lineHeights.micro,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginTop: spacing.xxl,
+    marginBottom: spacing.xs,
+  },
+  benefits: { marginBottom: spacing.xxl },
   row: { minHeight: 44, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, justifyContent: 'center' },
   rowTitle: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, fontWeight: typography.weights.semibold },
   rowBody: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, marginTop: spacing.xxs },
   action: { gap: spacing.xs },
-  joinedTitle: { color: colors.ink, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
-  note: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption },
-  error: { color: colors.actionPause.text, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, fontWeight: typography.weights.medium, marginTop: spacing.xs },
+  joinedTitle: {
+    color: colors.ink,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: typography.lineHeights.bodyLarge,
+    fontWeight: typography.weights.semibold,
+    textAlign: 'center',
+  },
+  note: {
+    color: colors.inkMuted,
+    fontSize: typography.sizes.caption,
+    lineHeight: typography.lineHeights.caption,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  error: {
+    color: colors.actionPause.text,
+    fontSize: typography.sizes.caption,
+    lineHeight: typography.lineHeights.caption,
+    fontWeight: typography.weights.medium,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
 });
