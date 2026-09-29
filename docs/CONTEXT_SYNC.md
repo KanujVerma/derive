@@ -6,6 +6,11 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: bounded hosted acceptance preparation
+
+- **Owner / predecessor:** Sami operations, based on main `0b24c2ca58494bee6c4ffa428610c286a980808e`. Founder separately authorized reviewed scanner migrations/functions only after recoverable backup and all gates pass; no hosted reset, customer-data deletion, Auth-setting change, paid provider or app submission. Backup recovery verification is a separate required operation, not implied by this tool.
+- **Scope:** opt-in exact-project drill creates only two synthetic owners and checks public password signup/login, free access, context replay, owner isolation, unknown abstention, explicit Check history, honest retailer-link recovery and customer deletion. It never seeds catalog, uploads images or enables providers. Cleanup is fenced by exact generated ID/email/run tag; fallback cleanup remains a failed deletion test.
+- **Evidence boundary:** offline safety regressions are wired into the full suite. No live execution, useful scan coverage, real-email delivery, native UI or release acceptance is claimed. The supplied backup digest is a reference, not automated restore proof. Details: [SCANNER_HOSTED_SMOKE.md](SCANNER_HOSTED_SMOKE.md).
 ## 2026-09-29: bounded customer Check link composition
 
 - **Owner / predecessor:** Sami; composition predecessor `a2433ad`, main checkpoint `cf7482860c80c2d231b5672074559b40289b0ac5`. The validated link client/controller is wired into the actual existing integrated Check entry. Requests retain per-owner/input UUIDs on explicit retry; owner switches, newer input, reset, unmount and switching entry methods fence stale work. Keyboard Go and the visible Check action both submit, with accessible busy/error recovery.
