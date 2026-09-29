@@ -1,7 +1,7 @@
 import { customerController, currentCustomerOwner, ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
 import { bindCustomerOwnerLifecycle } from '@/src/presentation/personal-decision/customerController';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppState, Platform, View, ActivityIndicator, StyleSheet, Text, Pressable } from 'react-native';
@@ -17,7 +17,7 @@ import { getFreeAccessState } from '@/src/services/remote/freeAccess';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 import { publicEnvironment } from '@/src/config/environment';
 import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
-import { resolveScannerEntry } from '@/src/presentation/scanner-release/entry';
+import { needsScannerProfileRoute, resolveScannerEntry } from '@/src/presentation/scanner-release/entry';
 import { useScannerEntryStore } from '@/src/stores/scannerEntryStore';
 import { canOpenPersonalizationRoute } from '@/src/presentation/personalization/gateway';
 import { resolveLocalAccessRoute } from '@/src/utils/localAccessRouting';
@@ -28,6 +28,7 @@ export default function RootLayout() {
   useEffect(() => bindCustomerOwnerLifecycle(customerController, currentCustomerOwner, listener => useAuthStore.subscribe(listener), listener => useFreeAccessStore.subscribe(listener), () => ownerPinnedLegacyGateway.clear()), []);
   const router = useRouter();
   const segments = useSegments();
+  const entryParams = useGlobalSearchParams<{ p0b?: string; entry?: string; mode?: string }>();
   const authStatus = useAuthStore((s) => s.status);
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
   const isOnboardingCompleted = useOnboardingStore((s) => s.isCompleted);
@@ -176,7 +177,7 @@ export default function RootLayout() {
     if (!remoteEnabled) return;
     if (hostedScanner) {
       if (scannerEntry === 'auth' && segments[0] !== '(auth)') router.replace('/(auth)/login');
-      else if (scannerEntry === 'profile' && segments[0] !== 'personalize') {
+      else if (scannerEntry === 'profile' && needsScannerProfileRoute(segments, entryParams)) {
         router.replace({ pathname: '/personalize', params: { p0b: '1', entry: '1' } });
       } else if (scannerEntry === 'check' && access) {
         const route = resolveLocalAccessRoute(segments, { ...access, managedAccess: false });
@@ -191,7 +192,7 @@ export default function RootLayout() {
       return;
     }
     if (authStatus !== 'INITIALIZING' && redirectRoute) router.replace(redirectRoute as any);
-  }, [remoteEnabled, hostedScanner, scannerEntry, localFreeIntegration, localReady, access, segments, authStatus, redirectRoute]);
+  }, [remoteEnabled, hostedScanner, scannerEntry, localFreeIntegration, localReady, access, segments, entryParams.p0b, entryParams.entry, entryParams.mode, authStatus, redirectRoute]);
 
   if ((localFreeIntegration && (authError || accessStatus === 'ERROR')) || (hostedScanner && scannerEntry === 'error')) {
     return <SafeAreaProvider><View style={styles.loadingContainer}>

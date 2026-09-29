@@ -45,7 +45,7 @@ export default function ProfileScreen() {
   const access = useFreeAccessStore((s) => s.status === 'READY' && owner && s.userId === owner && s.access?.userId === owner ? s.access : null);
   if (shell === 'scanner_first_preview') return <PreviewAccountShell />;
   if (isFreeIntegrationShell(shell) && !access) return null;
-  if (isFreeIntegrationShell(shell) && access && !access.managedAccess) return <FreeAccountShell identityKind={access.identityKind} />;
+  if (isFreeIntegrationShell(shell) && access && (shell === 'hosted_free_integration' || !access.managedAccess)) return <FreeAccountShell identityKind={access.identityKind} />;
   return <LegacyProfileScreen />;
 }
 

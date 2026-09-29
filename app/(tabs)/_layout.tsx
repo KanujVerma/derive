@@ -125,7 +125,7 @@ export default function TabLayout() {
           href: null, // hide from tab bar
         }}
       />
-      <Tabs.Protected guard={!isFreeIntegrationShell(shell) || managedAccess}>
+      <Tabs.Protected guard={!isFreeIntegrationShell(shell) || (shell !== 'hosted_free_integration' && managedAccess)}>
       <Tabs.Screen
         name="ask"
         options={{

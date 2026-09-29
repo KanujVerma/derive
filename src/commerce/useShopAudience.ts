@@ -18,6 +18,7 @@ export function useShopAudience() {
   const remoteEnabled = isRemoteServiceEnabled();
   const freeAccess = useFreeAccessStore((state) => state.status === 'READY' && state.userId === sessionUserId ? state.access : null);
   const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled, supabaseUrl: publicEnvironment.supabaseUrl });
+  if (shell === 'hosted_free_integration') return 'non_member';
   if (isFreeIntegrationShell(shell)) return freeAccess?.userId === sessionUserId && freeAccess?.managedAccess ? 'member' : 'non_member';
   const audience = resolveShopAudience({
     remote: remoteEnabled,

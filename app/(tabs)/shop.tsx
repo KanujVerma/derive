@@ -78,7 +78,7 @@ export default function ShopScreen() {
   });
   const managedAccess = useFreeAccessStore((s) => s.status === 'READY' && s.access?.managedAccess === true);
   const bootstrapReady = useBootstrapStore((s) => s.status === 'READY');
-  const targetShell = shell === 'scanner_first_preview' || (isFreeIntegrationShell(shell) && !managedAccess);
+  const targetShell = shell === 'scanner_first_preview' || (isFreeIntegrationShell(shell) && (shell === 'hosted_free_integration' || !managedAccess));
   const isMember = audience === 'member';
   const isPublished = routine?.status === 'published';
 
