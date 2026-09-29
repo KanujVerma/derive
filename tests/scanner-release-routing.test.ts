@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { resolvePublicEnvironment } from '../src/config/environment.ts';
+import { isFreeIntegrationShell, resolveShellPresentation } from '../src/utils/shellPresentation.ts';
+import { resolveScannerEntry } from '../src/presentation/scanner-release/entry.ts';
+import { useScannerEntryStore } from '../src/stores/scannerEntryStore.ts';
+import { resolvePlanPresentation } from '../src/presentation/managed-plan/planComposition.ts';
+
+const hosted = 'https://snojlbqovlawewwqbviz.supabase.co';
+const configuration = { buildFlavor: 'production', useRemoteService: 'true', supabaseUrl: hosted,
+  supabasePublishableKey: 'sb_publishable_' + 'a'.repeat(22) + '_' + 'b'.repeat(8), scannerReleaseEnabled: 'true' };
+
+test('scanner release is explicit, exact-project, Remote and publishable-only', () => {
+  assert.equal(resolvePublicEnvironment(configuration).scannerReleaseEnabled, true);
+  for (const patch of [{ buildFlavor: 'development' }, { useRemoteService: 'false' },
+    { supabaseUrl: 'https://other.supabase.co' }, { supabasePublishableKey: '' },
+    { supabasePublishableKey: 'sb_secret_bad' }]) {
+    assert.throws(() => resolvePublicEnvironment({ ...configuration, ...patch }));
+  }
+  assert.equal(resolveShellPresentation({ buildFlavor: 'production', remoteEnabled: true, supabaseUrl: hosted }), 'legacy');
+  assert.equal(resolveShellPresentation({ buildFlavor: 'production', remoteEnabled: true, supabaseUrl: hosted, scannerReleaseEnabled: true }), 'hosted_free_integration');
+  assert.equal(isFreeIntegrationShell('hosted_free_integration'), true);
+  assert.equal(isFreeIntegrationShell('scanner_first_preview'), false);
+  assert.deepEqual(resolvePlanPresentation({ shell: 'hosted_free_integration', managedAccess: false, fixtureStatus: 'active' }), { kind: 'free' });
+});
+
+const ready = { authStatus: 'SIGNED_IN' as const, ownerId: 'owner-a', accessStatus: 'READY',
+  access: { userId: 'owner-a', identityKind: 'permanent' as const, freeProductAccess: true as const,
+    managedMembershipStatus: 'none' as const, managedAccess: false },
+  contextOwnerId: 'owner-a', contextStatus: 'ready', hasProfile: false, profileIntroHandled: false };
+
+test('scanner entry loads real owner context before optional profile and Check', () => {
+  assert.equal(resolveScannerEntry({ ...ready, authStatus: 'SIGNED_OUT' }), 'auth');
+  assert.equal(resolveScannerEntry({ ...ready, contextOwnerId: 'owner-b' }), 'loading');
+  assert.equal(resolveScannerEntry({ ...ready, access: { ...ready.access, userId: 'owner-b' } }), 'loading');
+  assert.equal(resolveScannerEntry({ ...ready, accessStatus: 'ERROR' }), 'error');
+  assert.equal(resolveScannerEntry({ ...ready, contextStatus: 'error' }), 'error');
+  assert.equal(resolveScannerEntry(ready), 'profile');
+  assert.equal(resolveScannerEntry({ ...ready, hasProfile: true }), 'check');
+  assert.equal(resolveScannerEntry({ ...ready, profileIntroHandled: true }), 'check');
+});
+
+test('profile skip is session-only and fenced against stale owners', () => {
+  const store = useScannerEntryStore.getState();
+  store.setOwner('owner-a'); store.markProfileIntroHandled('owner-a');
+  assert.equal(useScannerEntryStore.getState().profileIntroHandled, true);
+  store.setOwner('owner-a');
+  assert.equal(useScannerEntryStore.getState().profileIntroHandled, true);
+  store.setOwner('owner-b'); store.markProfileIntroHandled('owner-a');
+  assert.equal(useScannerEntryStore.getState().profileIntroHandled, false);
+  store.setOwner(null);
+});
