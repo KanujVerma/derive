@@ -31,7 +31,7 @@ import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import { useAuthStore } from '@/src/stores/authStore';
 import { PreviewAccountShell } from '@/src/components/account/PreviewAccountShell';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { FreeAccountShell } from '@/src/components/account/FreeAccountShell';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 
@@ -41,10 +41,11 @@ export default function ProfileScreen() {
     remoteEnabled: isRemoteServiceEnabled(),
     supabaseUrl: publicEnvironment.supabaseUrl,
   });
-  const access = useFreeAccessStore((s) => s.status === 'READY' ? s.access : null);
+  const owner = useAuthStore((s) => s.status === 'SIGNED_IN' ? s.sessionUserId : null);
+  const access = useFreeAccessStore((s) => s.status === 'READY' && owner && s.userId === owner && s.access?.userId === owner ? s.access : null);
   if (shell === 'scanner_first_preview') return <PreviewAccountShell />;
-  if (shell === 'local_free_integration' && !access) return null;
-  if (shell === 'local_free_integration' && access && !access.managedAccess) return <FreeAccountShell identityKind={access.identityKind} />;
+  if (isFreeIntegrationShell(shell) && !access) return null;
+  if (isFreeIntegrationShell(shell) && access && !access.managedAccess) return <FreeAccountShell identityKind={access.identityKind} />;
   return <LegacyProfileScreen />;
 }
 

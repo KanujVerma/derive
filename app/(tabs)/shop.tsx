@@ -52,7 +52,7 @@ import { resolveShopHomeState } from '@/src/commerce/shopState';
 import { hydratePlanState } from '@/src/services/deriveClient';
 import { PreviewShopShell } from '@/src/components/shop/PreviewShopShell';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 
@@ -78,7 +78,7 @@ export default function ShopScreen() {
   });
   const managedAccess = useFreeAccessStore((s) => s.status === 'READY' && s.access?.managedAccess === true);
   const bootstrapReady = useBootstrapStore((s) => s.status === 'READY');
-  const targetShell = shell === 'scanner_first_preview' || (shell === 'local_free_integration' && !managedAccess);
+  const targetShell = shell === 'scanner_first_preview' || (isFreeIntegrationShell(shell) && !managedAccess);
   const isMember = audience === 'member';
   const isPublished = routine?.status === 'published';
 

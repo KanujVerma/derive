@@ -1,6 +1,6 @@
 import { customerController, currentCustomerOwner, ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
 import { bindCustomerOwnerLifecycle } from '@/src/presentation/personal-decision/customerController';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,7 +16,9 @@ import { ensureLocalAnonymousSession, getCurrentSession, subscribeToAuth } from 
 import { getFreeAccessState } from '@/src/services/remote/freeAccess';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 import { publicEnvironment } from '@/src/config/environment';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { resolveScannerEntry } from '@/src/presentation/scanner-release/entry';
+import { useScannerEntryStore } from '@/src/stores/scannerEntryStore';
 import { canOpenPersonalizationRoute } from '@/src/presentation/personalization/gateway';
 import { resolveLocalAccessRoute } from '@/src/utils/localAccessRouting';
 import { refreshCustomerBootstrap, resolveCustomerBootstrap } from '@/src/services/deriveClient';
@@ -36,12 +38,31 @@ export default function RootLayout() {
   const remoteEnabled = isRemoteServiceEnabled();
   const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled, supabaseUrl: publicEnvironment.supabaseUrl });
   const localFreeIntegration = shell === 'local_free_integration';
+  const hostedScanner = shell === 'hosted_free_integration';
+  const freeIntegration = isFreeIntegrationShell(shell);
   const accessStatus = useFreeAccessStore((s) => s.status);
   const accessUserId = useFreeAccessStore((s) => s.userId);
   const access = useFreeAccessStore((s) => s.access);
   const [authError, setAuthError] = useState(false);
-  const localReady = localFreeIntegration && accessStatus === 'READY' && accessUserId === sessionUserId && access?.userId === sessionUserId;
-  const managedAccess = localReady && access?.managedAccess === true;
+  const localReady = freeIntegration && authStatus === 'SIGNED_IN' && accessStatus === 'READY' && accessUserId === sessionUserId && access?.userId === sessionUserId;
+  const managedAccess = !hostedScanner && localReady && access?.managedAccess === true;
+  const customerState = useSyncExternalStore(customerController.subscribe, customerController.getState);
+  const introOwner = useScannerEntryStore(s => s.ownerId);
+  const introHandled = useScannerEntryStore(s => s.profileIntroHandled);
+  const scannerEntry = resolveScannerEntry({ authStatus, ownerId: sessionUserId, accessStatus,
+    access, contextOwnerId: customerState.ownerId,
+    contextStatus: customerState.context?.ownerId === sessionUserId ? 'ready' : customerState.status,
+    hasProfile: Boolean(customerState.context?.profile),
+    profileIntroHandled: introOwner === sessionUserId && introHandled });
+
+  useEffect(() => {
+    if (hostedScanner) useScannerEntryStore.getState().setOwner(authStatus === 'SIGNED_IN' ? sessionUserId : null);
+  }, [hostedScanner, authStatus, sessionUserId]);
+  useEffect(() => {
+    if (hostedScanner && localReady && customerState.ownerId === sessionUserId && customerState.status === 'idle') {
+      void customerController.load();
+    }
+  }, [hostedScanner, localReady, sessionUserId, customerState.ownerId, customerState.status]);
   const destination = resolveAuthRoute({
     remoteEnabled,
     authStatus,
@@ -61,7 +82,7 @@ export default function RootLayout() {
     let previousAppState = AppState.currentState;
     let lastForegroundRefreshAt = 0;
     const refreshEstablishedMembership = () => {
-      if (localFreeIntegration) {
+      if (freeIntegration) {
         const auth = useAuthStore.getState();
         const projection = useFreeAccessStore.getState();
         if (auth.status === 'SIGNED_IN' && projection.status === 'READY' && projection.userId === auth.sessionUserId) {
@@ -111,7 +132,7 @@ export default function RootLayout() {
         document.removeEventListener('visibilitychange', onVisible);
       }
     };
-  }, [remoteEnabled, localFreeIntegration, managedAccess]);
+  }, [remoteEnabled, freeIntegration, managedAccess]);
 
   // Initialize session and subscribe to auth changes in remote mode
   useEffect(() => {
@@ -130,29 +151,39 @@ export default function RootLayout() {
   }, [localFreeIntegration, authStatus, accessStatus, authError]);
 
   useEffect(() => {
-    if (!localFreeIntegration || authStatus !== 'SIGNED_IN' || !sessionUserId) return;
+    if (!freeIntegration || authStatus !== 'SIGNED_IN' || !sessionUserId) return;
     if (accessUserId === sessionUserId && (accessStatus === 'RESOLVING' || accessStatus === 'READY' || accessStatus === 'ERROR')) return;
     const attempt = useFreeAccessStore.getState().start(sessionUserId);
     void getFreeAccessState().then((state) => {
       if (state.userId !== sessionUserId) throw new Error('Access state belongs to another session');
       useFreeAccessStore.getState().ready(state, attempt);
     }).catch(() => useFreeAccessStore.getState().fail(sessionUserId, attempt));
-  }, [localFreeIntegration, authStatus, sessionUserId, accessStatus, accessUserId]);
+  }, [freeIntegration, authStatus, sessionUserId, accessStatus, accessUserId]);
 
   // Trigger remote bootstrap resolution when signed in
   useEffect(() => {
-    if (!remoteEnabled || (localFreeIntegration && !managedAccess)) return;
+    if (!remoteEnabled || (freeIntegration && !managedAccess)) return;
     if (authStatus !== 'SIGNED_IN' || !sessionUserId) return;
 
     // Trigger resolution when unresolved or on identity transition
     if (profileResolution === 'UNRESOLVED' || resolvedUserId !== sessionUserId) {
       resolveCustomerBootstrap(sessionUserId);
     }
-  }, [remoteEnabled, localFreeIntegration, managedAccess, authStatus, sessionUserId, profileResolution, resolvedUserId]);
+  }, [remoteEnabled, freeIntegration, managedAccess, authStatus, sessionUserId, profileResolution, resolvedUserId]);
 
   // Route gating in remote mode
   useEffect(() => {
     if (!remoteEnabled) return;
+    if (hostedScanner) {
+      if (scannerEntry === 'auth' && segments[0] !== '(auth)') router.replace('/(auth)/login');
+      else if (scannerEntry === 'profile' && segments[0] !== 'personalize') {
+        router.replace({ pathname: '/personalize', params: { p0b: '1', entry: '1' } });
+      } else if (scannerEntry === 'check' && access) {
+        const route = resolveLocalAccessRoute(segments, { ...access, managedAccess: false });
+        if (route) router.replace(route);
+      }
+      return;
+    }
     if (localFreeIntegration) {
       if (!localReady || !access) return;
       const route = resolveLocalAccessRoute(segments, access);
@@ -160,18 +191,18 @@ export default function RootLayout() {
       return;
     }
     if (authStatus !== 'INITIALIZING' && redirectRoute) router.replace(redirectRoute as any);
-  }, [remoteEnabled, localFreeIntegration, localReady, access, segments, authStatus, redirectRoute]);
+  }, [remoteEnabled, hostedScanner, scannerEntry, localFreeIntegration, localReady, access, segments, authStatus, redirectRoute]);
 
-  if (localFreeIntegration && (authError || accessStatus === 'ERROR')) {
+  if ((localFreeIntegration && (authError || accessStatus === 'ERROR')) || (hostedScanner && scannerEntry === 'error')) {
     return <SafeAreaProvider><View style={styles.loadingContainer}>
       <Text style={styles.errorText}>Derive could not connect. Please try again.</Text>
-      <Pressable accessibilityRole="button" onPress={() => { setAuthError(false); useFreeAccessStore.getState().reset(); }}>
+      <Pressable accessibilityRole="button" onPress={() => { setAuthError(false); if (hostedScanner && localReady) void customerController.load(); else useFreeAccessStore.getState().reset(); }}>
         <Text style={styles.retryText}>Try again</Text>
       </Pressable>
     </View></SafeAreaProvider>;
   }
 
-  if ((localFreeIntegration && !localReady) || (remoteEnabled && authStatus === 'INITIALIZING')) {
+  if ((localFreeIntegration && !localReady) || (hostedScanner && scannerEntry === 'loading') || (remoteEnabled && authStatus === 'INITIALIZING')) {
     return (
       <SafeAreaProvider>
         <StatusBar style="dark" />
@@ -194,19 +225,19 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Protected guard={!localFreeIntegration && (!remoteEnabled || destination.type === 'AUTH_LOGIN')}>
+        <Stack.Protected guard={hostedScanner ? scannerEntry === 'auth' : (!localFreeIntegration && (!remoteEnabled || destination.type === 'AUTH_LOGIN'))}>
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         </Stack.Protected>
-        <Stack.Protected guard={!localFreeIntegration && remoteEnabled && destination.type === 'REMOTE_HOLDING'}>
+        <Stack.Protected guard={!freeIntegration && remoteEnabled && destination.type === 'REMOTE_HOLDING'}>
           <Stack.Screen name="holding" options={{ headerShown: false }} />
         </Stack.Protected>
-        <Stack.Protected guard={!localFreeIntegration && remoteEnabled && destination.type === 'REMOTE_MEMBERSHIP'}>
+        <Stack.Protected guard={!freeIntegration && remoteEnabled && destination.type === 'REMOTE_MEMBERSHIP'}>
           <Stack.Screen name="membership/index" options={{ headerShown: false }} />
         </Stack.Protected>
-        <Stack.Protected guard={localFreeIntegration ? managedAccess : (!remoteEnabled || destination.type === 'REMOTE_ONBOARDING')}>
+        <Stack.Protected guard={freeIntegration ? managedAccess : (!remoteEnabled || destination.type === 'REMOTE_ONBOARDING')}>
           <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         </Stack.Protected>
-        <Stack.Protected guard={localFreeIntegration ? localReady : (!remoteEnabled || destination.type === 'REMOTE_TABS')}>
+        <Stack.Protected guard={hostedScanner ? scannerEntry === 'check' : (localFreeIntegration ? localReady : (!remoteEnabled || destination.type === 'REMOTE_TABS'))}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="profile/index" options={{ headerShown: false }} />
           <Stack.Screen name="shop/scan" options={{ headerShown: false }} />
@@ -214,7 +245,7 @@ export default function RootLayout() {
         <Stack.Protected guard={canOpenPersonalizationRoute(shell, localReady)}>
           <Stack.Screen name="personalize/index" options={{ headerShown: false }} />
         </Stack.Protected>
-        <Stack.Protected guard={localFreeIntegration ? managedAccess : (!remoteEnabled || destination.type === 'REMOTE_TABS')}>
+        <Stack.Protected guard={freeIntegration ? managedAccess : (!remoteEnabled || destination.type === 'REMOTE_TABS')}>
           <Stack.Screen name="orders/index" options={{ headerShown: false }} />
           <Stack.Screen name="insights/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="shop/[productId]" options={{ headerShown: false }} />

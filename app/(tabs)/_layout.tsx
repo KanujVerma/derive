@@ -9,7 +9,7 @@ import { Icon, IconName } from '@/src/components/ui/Icon';
 import { publicEnvironment } from '@/src/config/environment';
 import { usesFreeExternalBetaPresentation } from '@/src/utils/membershipPresentation';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 
 const TAB_BAR_HEIGHT = 56;
@@ -125,7 +125,7 @@ export default function TabLayout() {
           href: null, // hide from tab bar
         }}
       />
-      <Tabs.Protected guard={shell !== 'local_free_integration' || managedAccess}>
+      <Tabs.Protected guard={!isFreeIntegrationShell(shell) || managedAccess}>
       <Tabs.Screen
         name="ask"
         options={{
