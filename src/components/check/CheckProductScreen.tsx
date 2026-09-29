@@ -1197,7 +1197,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
-        <ScrollView contentContainerStyle={[styles.entryContent, { paddingTop: spacing.sm, paddingBottom: insets.bottom + spacing.xl }]}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.entryContent, { paddingTop: spacing.sm, paddingBottom: insets.bottom + spacing.xl }]}>
           <Button label="Open camera" variant="brand" onPress={() => { abandonProductLink(); openCapture('barcode'); }} style={styles.entryAction} />
           <View style={styles.entrySearch}>
             <CatalogProductSearch
@@ -1226,6 +1226,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
+                returnKeyType="go"
+                onSubmitEditing={checkProductLink}
                 accessibilityLabel="Product link"
                 style={styles.linkField}
               />
