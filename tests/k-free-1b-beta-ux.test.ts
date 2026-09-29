@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { resolveCheckEntryState } from '../src/commerce/checkEntryState.ts';
+import { materialSurface } from '../src/presentation/ui/materialPolicy.ts';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -53,7 +54,7 @@ test('K-FREE-1B: new root shells use restrained shared chrome and useful copy', 
   assert.match(account, /ImpactFeedbackStyle\.Light/);
   assert.match(account, /minTouchTarget/);
   assert.match(read('src/components/shell/RootShellHeader.tsx'), /ScreenHeader/);
-  assert.match(read('src/components/ui/GlassContainer.tsx'), /fallbackDarkSurface/, 'dark floating controls need a legible non-glass fallback');
+  assert.equal(materialSurface('chrome', 'dark'), '#171A18', 'dark floating controls need a legible opaque fallback');
 });
 
 test('K-FREE-1B: customer copy contains no development explanations', () => {
