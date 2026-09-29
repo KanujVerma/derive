@@ -7,7 +7,7 @@ const status = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], {en
 assert.equal(status.API_URL, process.env.DERIVE_LOCAL_SUPABASE_API_URL ?? 'http://127.0.0.1:54321', 'Refuse hosted target');
 const make = (key) => createClient(status.API_URL,key,{auth:{persistSession:false,autoRefreshToken:false}});
 const admin = make(status.SERVICE_ROLE_KEY), a = make(status.ANON_KEY), b = make(status.ANON_KEY);
-let aId, bId, productId, variantId, formulaId;
+let aId, bId, productId, variantId, formulaId, normalizedTwinId, normalizedTwinVariantId;
 let uploadedPath;
 try {
   const first = await a.auth.signInAnonymously(), second = await b.auth.signInAnonymously();
@@ -53,6 +53,10 @@ try {
   assert.equal(exact.formula.formulaVersionId,formulaId); assert.equal(exact.formula.appliesToSelectedVariant,true);
   simultaneous.forEach(result=>assert.deepEqual(result.data.truthSnapshot,exact));
   assert.doesNotMatch(JSON.stringify(exact),/internal:\/\/|private-package-proof/);
+  const eanEquivalent = await a.functions.invoke('resolve-product-identity',{body:{requestId:randomUUID(),consumer:'scan',barcode:'0012345678905'}});
+  assert.ifError(eanEquivalent.error);
+  assert.equal(eanEquivalent.data.state,'verified_product_formula','zero-prefixed EAN-13 must resolve the UPC-A assertion');
+  assert.equal(eanEquivalent.data.formula.formulaVersionId,formulaId);
   const contradictory = await a.functions.invoke('resolve-product-identity',{body:{requestId:randomUUID(),consumer:'scan',barcode:'012345678905',brand:'Different'}});
   assert.ifError(contradictory.error);
   assert.equal(contradictory.data.state,'ambiguous_candidates','typed conflict must not use barcode-only candidate loading');
@@ -67,10 +71,27 @@ try {
   assert.equal(snapshot.formula,null); assert.equal(snapshot.product.productId,productId);
   assert.ok(snapshot.unknownFields.includes('formula'));
   assert.doesNotMatch(JSON.stringify(snapshot),/internal:\/\/|storagePath|extractedText/);
+  const mixedUnknownBarcode = await a.functions.invoke('resolve-product-identity',{body:{...input,requestId:randomUUID(),barcode:'000000000000'}});
+  assert.ifError(mixedUnknownBarcode.error);
+  assert.equal(mixedUnknownBarcode.data.state,'identified_formula_unverified','an unknown barcode must not hide an exact typed identity');
+  assert.equal(mixedUnknownBarcode.data.product.productId,productId);
   const repeated = await a.functions.invoke('resolve-product-identity',{body:input});
   assert.ifError(repeated.error); assert.deepEqual(repeated.data.truthSnapshot,snapshot);
   const changed = await a.functions.invoke('resolve-product-identity',{body:{...input,brand:'Different'}});
   assert.equal(changed.error?.context?.status,409,'same UUID cannot substitute new evidence');
+  const normalizedTwin = await admin.from('products').insert({brand:'P0A-Synthetic',name:product.data.name,
+    category:'cleanser',is_catalog_standard:true,catalog_source_reference:'internal://operator-source-twin',
+    catalog_public_source_url:'https://example.org/synthetic-twin',catalog_observed_at:now,catalog_verified_at:now}).select('id').single();
+  assert.ifError(normalizedTwin.error); normalizedTwinId=normalizedTwin.data.id;
+  const normalizedTwinVariant = await admin.from('product_variants').insert({product_id:normalizedTwinId,
+    variant_name:'Synthetic Exact',region_code:'US',catalog_verification_status:'verified',
+    catalog_source_reference:'internal://operator-variant-twin',catalog_public_source_url:'https://example.org/synthetic-variant-twin',
+    catalog_observed_at:now}).select('id').single();
+  assert.ifError(normalizedTwinVariant.error); normalizedTwinVariantId=normalizedTwinVariant.data.id;
+  const ambiguousTyped = await a.functions.invoke('resolve-product-identity',{body:{...input,requestId:randomUUID()}});
+  assert.ifError(ambiguousTyped.error);
+  assert.equal(ambiguousTyped.data.state,'ambiguous_candidates','indexed normalized duplicates must remain ambiguous');
+  assert.equal(ambiguousTyped.data.candidates.length,2);
   assert.ifError((await admin.from('products').update({name:'Changed catalog label'}).eq('id',productId)).error);
   const afterChange = await a.functions.invoke('resolve-product-identity',{body:input});
   assert.ifError(afterChange.error); assert.deepEqual(afterChange.data.truthSnapshot,snapshot);
@@ -90,5 +111,7 @@ try {
   if(bId) await admin.auth.admin.deleteUser(bId);
   if(variantId) await admin.from('product_identifiers').delete().eq('variant_id',variantId);
   if(formulaId) await admin.from('product_formula_versions').delete().eq('id',formulaId);
+  if(normalizedTwinVariantId) await admin.from('product_variants').delete().eq('id',normalizedTwinVariantId);
+  if(normalizedTwinId) await admin.from('products').delete().eq('id',normalizedTwinId);
   if(productId) await admin.from('products').delete().eq('id',productId);
 }
