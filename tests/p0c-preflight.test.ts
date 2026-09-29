@@ -7,7 +7,7 @@ import { EXPECTED_PROJECT_REF, HOSTED_GATES, SOURCE_FILES, preflightHostedFreeRe
 const PRIVATE = 'PRIVATE_CUSTOMER_OR_CREDENTIAL_NEVER_OUTPUT';
 const fixtures: Record<string, string> = {
   [SOURCE_FILES.config]: '[auth]\nenable_anonymous_sign_ins = true\n[functions.delete-customer-account]\nverify_jwt = true\n[functions.access-state]\nverify_jwt = true\n',
-  [SOURCE_FILES.auth]: 'ensureLocalAnonymousSession activeAdapter.getSession() activeAdapter.signInAnonymously()',
+  [SOURCE_FILES.auth]: 'ensureFreeScannerSession adapter.getSession() adapter.signInAnonymously() existing.data.session !== null',
   [SOURCE_FILES.shell]: "input.buildFlavor !== 'development'; return 'legacy'; local_free_integration",
   [SOURCE_FILES.identity]: 'user.is_anonymous === true; user.is_anonymous === false; IDENTITY_UNAVAILABLE',
   [SOURCE_FILES.access]: 'authenticate(req); identityKind === "permanent" && managedMembershipStatus === "active"',

@@ -67,7 +67,7 @@ test('Wave-1 silent Auth preserves a session and signs in anonymously only when 
     async signInWithOtp() { return { data: {}, error: null }; },
     async verifyOtp() { return { data: { session: null, user: null }, error: null }; },
     async getSession() { return { data: { session: existing ? { user: existing } : null }, error: null }; },
-    async signInAnonymously() { signIns++; return { data: { user: { id: 'anon-new' }, session: { user: { id: 'anon-new' } } }, error: null }; },
+    async signInAnonymously() { signIns++; return { data: { user: { id: 'anon-new', is_anonymous: true }, session: { user: { id: 'anon-new', is_anonymous: true } } }, error: null }; },
     async signOut() { return { error: null }; },
     onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
   };
@@ -131,7 +131,7 @@ test('Wave-1 auth events retain same-user access and purge it on a new UUID', ()
 
 test('Wave-1 free Account distinguishes anonymous from permanent without a membership claim', () => {
   assert.deepEqual(getFreeAccountPresentation('anonymous'), {
-    intro: 'You can use Check and My Stuff without signing in.', showSignOut: false,
+    intro: 'Your profile and saved checks are stored privately in Derive, without an email or password.', showSignOut: false,
   });
   assert.deepEqual(getFreeAccountPresentation('permanent'), {
     intro: '', showSignOut: true,

@@ -11,6 +11,8 @@ export interface PublicEnvironmentInput {
   developmentRuntime?: boolean;
   /** Explicit signed scanner candidate, independent of legacy membership. */
   scannerReleaseEnabled?: string;
+  /** Separately activated only after hosted signup abuse controls are accepted. */
+  scannerGuestEnabled?: string;
 }
 
 export type BuildFlavor = 'development' | 'remote-staging' | 'production';
@@ -23,6 +25,7 @@ export interface PublicEnvironment {
   useRemoteService: boolean;
   developmentSupabaseLanUrl?: string;
   scannerReleaseEnabled?: boolean;
+  scannerGuestEnabled?: boolean;
 }
 
 export interface StagingBuildDiagnostics {
@@ -124,6 +127,10 @@ export function resolvePublicEnvironment(
     input.useRemoteService,
   );
   const scannerReleaseEnabled = parseBooleanFlag('EXPO_PUBLIC_SCANNER_RELEASE_ENABLED', input.scannerReleaseEnabled);
+  const scannerGuestEnabled = parseBooleanFlag('EXPO_PUBLIC_SCANNER_GUEST_ENABLED', input.scannerGuestEnabled);
+  if (scannerGuestEnabled && !scannerReleaseEnabled) {
+    throw new Error('Hosted scanner guests require the explicit scanner release configuration.');
+  }
   if (scannerReleaseEnabled && (!useRemoteService || buildFlavor !== 'production'
     || supabaseUrl !== 'https://snojlbqovlawewwqbviz.supabase.co'
     || !/^sb_publishable_[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{8}$/.test(publishableKey))) {
@@ -184,6 +191,7 @@ export function resolvePublicEnvironment(
     supabaseKeySource,
     useRemoteService,
     ...(scannerReleaseEnabled ? { scannerReleaseEnabled: true } : {}),
+    ...(scannerGuestEnabled ? { scannerGuestEnabled: true } : {}),
     ...(approvedDevelopmentLanUrl ? { developmentSupabaseLanUrl: approvedDevelopmentLanUrl } : {}),
   });
 }
@@ -197,6 +205,7 @@ export const publicEnvironment = resolvePublicEnvironment({
   developmentSupabaseLanUrl: process.env.EXPO_PUBLIC_DEV_SUPABASE_LAN_URL,
   developmentRuntime: typeof __DEV__ !== 'undefined' && __DEV__,
   scannerReleaseEnabled: process.env.EXPO_PUBLIC_SCANNER_RELEASE_ENABLED,
+  scannerGuestEnabled: process.env.EXPO_PUBLIC_SCANNER_GUEST_ENABLED,
 });
 
 export interface PublicLegalLinks {

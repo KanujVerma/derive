@@ -15,8 +15,10 @@ export function resolveScannerEntry(input: {
   accessStatus: string; access: FreeAccessState | null;
   contextOwnerId: string | null; contextStatus: string; hasProfile: boolean;
   profileIntroHandled: boolean;
+  /** Guest startup must finish before any private route can mount. */
+  guestFirst?: boolean;
 }): ScannerEntry {
-  if (input.authStatus === 'SIGNED_OUT') return 'auth';
+  if (input.authStatus === 'SIGNED_OUT') return input.guestFirst ? 'loading' : 'auth';
   if (input.authStatus !== 'SIGNED_IN' || !input.ownerId) return 'loading';
   if (input.accessStatus === 'ERROR') return 'error';
   if (input.accessStatus !== 'READY' || input.access?.userId !== input.ownerId) return 'loading';
