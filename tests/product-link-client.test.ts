@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { parseProductLinkResult, ProductLinkError, resolveProductLink } from '../src/services/productLinks.ts';
+import { unresolvedProductTruth } from '../src/fixtures/product-truth/snapshots.ts';
 
 const requestId = '2f2f6f97-f988-4d46-b871-aeb8c2e2aa21';
 const input = { requestId, url: 'https://www.amazon.com/dp/B00ABC1234' };
@@ -44,6 +45,11 @@ test('malformed product and label responses cannot produce a client identity or 
     sourceUrl: `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${requestId}`, retrievedAt: '2026-09-29T00:00:00.000Z', identityStatus: 'label_title_only',
   } });
   assert.equal(result.status, 'label_candidate');
+  const linked = { status: 'resolution', source: 'open_beauty_facts_url', sourceUrl: 'https://world.openbeautyfacts.org/product/036000291452', barcode: '036000291452',
+    resolution: { caseId: unresolvedProductTruth.resolutionCaseId, state: 'insufficient_evidence', candidates: [],
+      nextAction: 'manual_review', requiresFounderReview: false, truthSnapshot: unresolvedProductTruth } };
+  assert.equal(parseProductLinkResult(linked).status, 'resolution');
+  assert.throws(() => parseProductLinkResult({ ...linked, resolution: { ...linked.resolution, caseId: requestId } }), ProductLinkError);
 });
 
 test('invalid local input fails before the remote call', async () => {
