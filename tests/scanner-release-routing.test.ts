@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolvePublicEnvironment } from '../src/config/environment.ts';
 import { isFreeIntegrationShell, resolveShellPresentation } from '../src/utils/shellPresentation.ts';
-import { resolveScannerEntry } from '../src/presentation/scanner-release/entry.ts';
+import { needsScannerProfileRoute, resolveScannerEntry } from '../src/presentation/scanner-release/entry.ts';
 import { useScannerEntryStore } from '../src/stores/scannerEntryStore.ts';
 import { resolvePlanPresentation } from '../src/presentation/managed-plan/planComposition.ts';
 
@@ -22,6 +22,7 @@ test('scanner release is explicit, exact-project, Remote and publishable-only', 
   assert.equal(isFreeIntegrationShell('hosted_free_integration'), true);
   assert.equal(isFreeIntegrationShell('scanner_first_preview'), false);
   assert.deepEqual(resolvePlanPresentation({ shell: 'hosted_free_integration', managedAccess: false, fixtureStatus: 'active' }), { kind: 'free' });
+  assert.deepEqual(resolvePlanPresentation({ shell: 'hosted_free_integration', managedAccess: true, fixtureStatus: 'active' }), { kind: 'free' });
 });
 
 const ready = { authStatus: 'SIGNED_IN' as const, ownerId: 'owner-a', accessStatus: 'READY',
@@ -49,4 +50,12 @@ test('profile skip is session-only and fenced against stale owners', () => {
   store.setOwner('owner-b'); store.markProfileIntroHandled('owner-a');
   assert.equal(useScannerEntryStore.getState().profileIntroHandled, false);
   store.setOwner(null);
+});
+
+test('restored or deep-linked editors are normalized to the real optional intro', () => {
+  assert.equal(needsScannerProfileRoute(['personalize'], {}), true);
+  assert.equal(needsScannerProfileRoute(['personalize'], { p0b: '1', entry: '1', mode: 'routine' }), true);
+  assert.equal(needsScannerProfileRoute(['personalize'], { p0b: '1', entry: '1' }), false);
+  assert.equal(needsScannerProfileRoute(['personalize'], { p0b: '1', entry: '1', mode: 'profile' }), false);
+  assert.equal(needsScannerProfileRoute(['(tabs)', 'check'], {}), true);
 });

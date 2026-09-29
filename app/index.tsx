@@ -35,6 +35,12 @@ export default function Index() {
     bootstrapRefreshing,
   });
 
+  // The root gate loads owner-bound context and chooses profile or Check.
+  if (shell === 'hosted_free_integration') {
+    if (authStatus === 'SIGNED_OUT') return <Redirect href="/(auth)/login" />;
+    return <View style={styles.loadingContainer}><ActivityIndicator size="small" color={colors.ink} /></View>;
+  }
+
   if (shell === 'local_free_integration') {
     if (accessStatus === 'READY' && access?.userId === sessionUserId) {
       return <Redirect href={resolveShellLanding(shell, access.managedAccess ? 'managed' : 'free')} />;

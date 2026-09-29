@@ -14,6 +14,9 @@ export function resolvePlanPresentation(input: {
   managedAccess: boolean;
   fixtureStatus?: string;
 }): PlanPresentation {
+  // Scanner-only candidate does not expose Managed or purchase presentation.
+  // This does not remove the identity's actual server membership.
+  if (input.shell === 'hosted_free_integration') return { kind: 'free' };
   if (input.shell === 'legacy') return { kind: 'managed' };
   if (isFreeIntegrationShell(input.shell) && input.managedAccess) return { kind: 'managed' };
 
