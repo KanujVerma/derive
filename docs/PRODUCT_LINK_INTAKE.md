@@ -1,6 +1,6 @@
 # Product-link intake (source candidate, not catalog truth)
 
-This bounded source increment adds an authenticated `resolve-product-link` Edge Function. It is not yet wired into Kanuj's Check UI or deployed; a signed-build link journey remains unverified. `POST` with `requestId` (UUID) and `url`; responses are private/no-store. The function never fetches a customer-submitted URL. It recognizes exact public hosts and constructs only an official DailyMed API URL from a validated SET ID.
+This bounded source increment adds an authenticated `resolve-product-link` Edge Function. The separate bounded Check composition now connects its validated client/controller to the existing local integrated Check link input; it is not deployed, and a signed-build link journey remains unverified. `POST` with `requestId` (UUID) and `url`; responses are private/no-store. The function never fetches a customer-submitted URL. It recognizes exact public hosts and constructs only an official DailyMed API URL from a validated SET ID.
 
 | Submitted link | Implemented behavior | What it does **not** establish |
 | --- | --- | --- |

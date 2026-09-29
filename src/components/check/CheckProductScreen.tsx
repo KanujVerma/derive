@@ -67,6 +67,7 @@ import type { DecisionNextStep } from '@/src/contracts/PersonalDecision';
 import { recordFreeCheck } from '@/src/services/remote/freeContext';
 import { MissingProductContribution } from '@/src/components/check/contribution/MissingProductContribution';
 import { selectCheckContributionRecovery } from '@/src/presentation/catalog-contribution/checkRecovery';
+import { createProductLinkController } from '@/src/presentation/product-links/controller';
 
 export default function CheckProductScreen({ productEventSink }: { productEventSink?: ProductEventSink } = {}) {
   const router = useRouter();
@@ -200,6 +201,31 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       accessStatus: access.status, accessUserId: access.userId,
       accessOwnerId: access.access?.userId ?? null,
     });
+  };
+  const linkOwnerGetterRef = useRef(currentLiveCheckOwner);
+  linkOwnerGetterRef.current = currentLiveCheckOwner;
+  const productLinkControllerRef = useRef<ReturnType<typeof createProductLinkController> | null>(null);
+  if (!productLinkControllerRef.current) productLinkControllerRef.current = createProductLinkController({
+    createRequestId: createCatalogRequestId,
+    getCurrentOwner: () => linkOwnerGetterRef.current(),
+  });
+  const productLinkController = productLinkControllerRef.current;
+  const productLinkState = useSyncExternalStore(productLinkController.subscribe, productLinkController.getState);
+  const visibleProductLinkState = productLinkState.ownerId === liveCheckOwner ? productLinkState : null;
+  useEffect(() => {
+    productLinkController.setOwner(liveCheckOwner);
+    setProductLink('');
+    setLinkNote(null);
+  }, [productLinkController, liveCheckOwner]);
+  useEffect(() => () => {
+    productLinkController.reset();
+    resolutionSequenceRef.current += 1;
+  }, [productLinkController]);
+  const abandonProductLink = () => {
+    productLinkController.reset();
+    setProductLink('');
+    setLinkNote(null);
+    resolutionSequenceRef.current += 1;
   };
 
   useEffect(() => {
@@ -522,7 +548,27 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       });
   };
 
-  const checkProductLink = () => {
+  const checkProductLink = async () => {
+    if (integrated) {
+      if (productLinkController.getState().kind === 'loading') return;
+      // Do not copy a prior owner's rendered input into a newly changed owner.
+      if (liveCheckOwner !== currentLiveCheckOwner()
+        || productLinkController.getState().ownerId !== liveCheckOwner) {
+        productLinkController.setOwner(currentLiveCheckOwner());
+        return;
+      }
+      productLinkController.setInput(productLink);
+      const requestSequence = ++resolutionSequenceRef.current;
+      const result = await productLinkController.submit();
+      if (!result || requestSequence !== resolutionSequenceRef.current) return;
+      // Only a validated owner-bound resolver case reaches the existing truth gate.
+      // A published label title or retailer identifier remains recovery, never truth.
+      if (result.status === 'resolution') {
+        checkFlowRef.current?.begin('unknown');
+        await showResolution(async () => result.resolution, undefined, result.barcode);
+      }
+      return;
+    }
     const trimmed = productLink.trim();
     let url: URL;
     try { url = new URL(trimmed); } catch { setLinkNote('Enter a full https link.'); return; }
@@ -535,6 +581,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const handleResetScan = () => {
     void Haptics.selectionAsync().catch(() => {});
     checkFlowRef.current?.abandon();
+    abandonProductLink();
     resolutionSequenceRef.current += 1;
     resolutionOwnerRef.current = null;
     setConfirmedProduct(null);
@@ -1151,13 +1198,14 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
         <ScrollView contentContainerStyle={[styles.entryContent, { paddingTop: spacing.sm, paddingBottom: insets.bottom + spacing.xl }]}>
-          <Button label="Open camera" variant="brand" onPress={() => openCapture('barcode')} style={styles.entryAction} />
+          <Button label="Open camera" variant="brand" onPress={() => { abandonProductLink(); openCapture('barcode'); }} style={styles.entryAction} />
           <View style={styles.entrySearch}>
             <CatalogProductSearch
               label="Search by name"
               actionLabel="Check"
               search={preview ? searchPreviewCatalog : undefined}
-              onSelect={handleSelectSearchResult}
+              onSelect={(item) => { abandonProductLink(); handleSelectSearchResult(item); }}
+              onQueryChange={() => { if (integrated) abandonProductLink(); }}
               keepFocusAfterSelect={false}
               errorCopy="Search is unavailable right now."
               emptyCopy="No product match yet."
@@ -1168,7 +1216,11 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
             <View style={styles.linkRow}>
               <TextInput
                 value={productLink}
-                onChangeText={(value) => { setProductLink(value); setLinkNote(null); }}
+                onChangeText={(value) => {
+                  setProductLink(value); setLinkNote(null);
+                  productLinkController.setInput(value);
+                  resolutionSequenceRef.current += 1;
+                }}
                 placeholder="https://"
                 placeholderTextColor={colors.inkSubtle}
                 autoCapitalize="none"
@@ -1177,11 +1229,20 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
                 accessibilityLabel="Product link"
                 style={styles.linkField}
               />
-              <Pressable accessibilityRole="button" accessibilityLabel="Check link" onPress={checkProductLink} style={styles.linkCheck}>
-                <Text style={styles.linkCheckText}>Check</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Check link"
+                accessibilityState={{ disabled: integrated && visibleProductLinkState?.kind === 'loading', busy: integrated && visibleProductLinkState?.kind === 'loading' }}
+                disabled={integrated && visibleProductLinkState?.kind === 'loading'} onPress={checkProductLink} style={styles.linkCheck}>
+                <Text style={styles.linkCheckText}>{integrated && visibleProductLinkState?.kind === 'loading' ? 'Checking…' : 'Check'}</Text>
               </Pressable>
             </View>
-            {linkNote && <Text style={styles.linkNote}>{linkNote}</Text>}
+            {!integrated && linkNote && <Text style={styles.linkNote}>{linkNote}</Text>}
+            {integrated && visibleProductLinkState?.kind === 'label_candidate' && (
+              <Text style={styles.linkNote}>Possible published label: {visibleProductLinkState.result.candidate.title}</Text>
+            )}
+            {integrated && visibleProductLinkState?.message && <Text accessibilityLiveRegion="polite" style={styles.linkNote}>{visibleProductLinkState.message}</Text>}
+            {integrated && (visibleProductLinkState?.kind === 'label_candidate' || visibleProductLinkState?.kind === 'needs_details' || visibleProductLinkState?.kind === 'error') && (
+              <Button label="Search by name" variant="ghost" size="medium" onPress={() => { abandonProductLink(); handleSearchNamePress(); }} />
+            )}
           </View>
         </ScrollView>
       </View>
