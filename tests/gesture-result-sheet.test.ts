@@ -97,3 +97,15 @@ test('an old closing animation cannot dismiss a replacement case or deliver twic
   unmounted.deactivate(); unmounted.dismiss();
   assert.deepEqual(delivered, ['case-b']);
 });
+
+test('camera companion preserves host extras and hides completely when the current owner changes', () => {
+  const r = renderer();
+  const { ScanResultSheet } = r.load('src/components/check/result-sheet/ScanResultSheet');
+  const { buildScanResultSheet } = r.load('src/presentation/check/result-sheet/model');
+  const model = buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-a' });
+  const props = { model, currentOwnerId: 'owner-a', currentSnapshot: null, currentResolverResult: null, currentScanId: 'scan-a', onDismiss: () => {}, children: React.createElement('p', {}, 'Current camera extras') };
+  assert.match(r.render(ScanResultSheet, props), /Current camera extras/);
+  assert.equal(r.sheets.length, 1);
+  assert.equal(r.render(ScanResultSheet, { ...props, currentOwnerId: 'owner-b' }), '');
+  assert.equal(r.sheets.length, 1, 'stale owner must not mount another gesture surface');
+});
