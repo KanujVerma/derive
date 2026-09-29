@@ -72,6 +72,21 @@ test('conflicting SPF observations do not choose one number',()=>{
   assert(packet.missing.includes('conflicting_spf'));
 });
 
+test('negated label statements cannot become positive product facts',()=>{
+  const packet=assess([row('front_label','Not a deodorant. No antiperspirant. Not broad spectrum. Not water resistant (80 minutes). No Drug Facts.')]);
+  assert.deepEqual(packet.facts,[]);
+  assert(packet.missing.includes('ingredient_list'));
+});
+
+test('positive statements retain their source after a separate negated label',()=>{
+  const secondId='88888888-8888-4888-8888-888888888888';
+  const packet=assess([row('front_label','Not water resistant (40 minutes).'),
+    row('front_label','Water Resistant (80 minutes).',secondId)]);
+  assert.equal(packet.facts.find(f=>f.code==='water_resistance_statement')?.value,'80 minutes');
+  assert.deepEqual(packet.facts.find(f=>f.code==='water_resistance_statement')?.basis,
+    {kind:'submitted_label',evidenceId:secondId,extraction:'member_input'});
+});
+
 test('submitted ingredient names remain incomplete observations; verified package formula is distinct',()=>{
   const observed=assess([row('ingredients','Ingredients: Water, Glycerin, Fragrance')],category('body_care'));
   assert.equal(observed.facts.find(f=>f.code==='observed_ingredients')?.certainty,'observed_unverified');

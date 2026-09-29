@@ -54,7 +54,12 @@ export function evaluateProductCheckFacts(input: FactsInput): ProductCheckFactsV
     } });
   };
   if (label.length) {
-    const firstMatch = (pattern: RegExp) => label.find((row) => pattern.test(row.extracted_text!));
+    const negated = (text: string, index: number) =>
+      /\b(?:not|no|non)[-\s]+(?:(?:a|an|the)\s+)?$/i.test(text.slice(Math.max(0, index - 30), index));
+    const matches = (row: StoredProductEvidence, pattern: RegExp) =>
+      [...row.extracted_text!.matchAll(new RegExp(pattern.source, 'gi'))]
+        .filter((match) => !negated(row.extracted_text!, match.index));
+    const firstMatch = (pattern: RegExp) => label.find((row) => matches(row, pattern).length > 0);
     const fixed = [
       ['deodorant_statement', 'deodorant', /\bdeodorant\b/i],
       ['antiperspirant_statement', 'antiperspirant', /\bantiperspirant\b|\banti-perspirant\b/i],
@@ -69,12 +74,12 @@ export function evaluateProductCheckFacts(input: FactsInput): ProductCheckFactsV
       const row = firstMatch(pattern);
       if (row) observed(row, code, value);
     }
-    const spfMatches = label.flatMap((row) => [...row.extracted_text!.matchAll(/\bSPF\s*([1-9]\d{0,2})(?:\s*\+)?(?=\W|$)/gi)]
+    const spfMatches = label.flatMap((row) => matches(row, /\bSPF\s*([1-9]\d{0,2})(?:\s*\+)?(?=\W|$)/gi)
       .map((match) => ({ row, value: Number(match[1]) })).filter((match) => match.value <= 200));
     const uniqueSpf = [...new Set(spfMatches.map((match) => match.value))];
     if (uniqueSpf.length === 1) observed(spfMatches[0].row, 'spf_statement', String(uniqueSpf[0]));
     if (uniqueSpf.length > 1) missing.add('conflicting_spf');
-    const resistance = label.flatMap((row) => [...row.extracted_text!.matchAll(/\bwater[-\s]+resistant\s*\(?\s*(40|80)\s*(?:minutes?|mins?)\s*\)?/gi)]
+    const resistance = label.flatMap((row) => matches(row, /\bwater[-\s]+resistant\s*\(?\s*(40|80)\s*(?:minutes?|mins?)\s*\)?/gi)
       .map((match) => ({ row, value: match[1] })));
     if (resistance.length && new Set(resistance.map((match) => match.value)).size === 1) {
       observed(resistance[0].row, 'water_resistance_statement', `${resistance[0].value} minutes`);
