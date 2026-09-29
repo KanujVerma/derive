@@ -42,8 +42,10 @@ export function AccountSettingsShell({
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
         <GroupedSection header="Account" footer={presentation.accountFooter ?? undefined} style={styles.section}>
           <View style={styles.row}>
-            <Text style={styles.rowTitle}>{presentation.accountTitle}</Text>
-            {presentation.accountSubtitle ? <Text style={styles.rowBody}>{presentation.accountSubtitle}</Text> : null}
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>{presentation.accountTitle}</Text>
+              {presentation.accountSubtitle ? <Text style={styles.rowBody}>{presentation.accountSubtitle}</Text> : null}
+            </View>
           </View>
           {presentation.showSignOut ? (
             <Pressable style={styles.row} accessibilityRole="button" onPress={onSignOut}>
