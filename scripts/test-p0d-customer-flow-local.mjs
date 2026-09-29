@@ -59,12 +59,12 @@ try {
  passed('immutable_facts', 'Actual resolver supplies the exact owner-bound product/variant/formula snapshot. Barcode is a synthetic API input, not camera proof.');
  const gateway = { load: async () => good(guest, 'personal-context', { operation: 'get_context' }), write: async (_owner, request) => good(guest, 'personal-context', request), evaluate: async (_owner, request) => good(guest, 'personal-decision', request) };
  controller = new CustomerController(gateway, randomUUID); controller.setOwner(owner); assert.equal(await controller.load(), true); assert.equal(controller.getState().context.profile, null);
- await controller.assess(snapshot); let selected = selectVisibleCustomerDecision(controller.getState(), owner, snapshot); assert(selected); assert.equal(selected.packet.action.kind, 'NOT_ENOUGH_INFORMATION');
+ await controller.assess(snapshot, 'add'); let selected = selectVisibleCustomerDecision(controller.getState(), owner, snapshot); assert(selected); assert.equal(selected.packet.action.kind, 'NOT_ENOUGH_INFORMATION');
  passed('optional_context', 'Factual Check works with empty context; canonical decision abstains before optional profile is supplied.');
  const profile = { intent: 'add', primaryGoal: 'dryness', secondaryGoals: [], skinBehavior: 'dry_tight', reactivity: 'generally_tolerates', reproductive: { pregnancy: 'no', nursing: 'no', tryingToConceive: 'no' }, sensitivities: { status: 'none_known', values: [] }, treatments: { status: 'none', values: [] } };
  assert.equal(await controller.save({ operation: 'save_profile', profile }), true);
  assert.equal(await controller.save({ operation: 'save_routine', routine: { completeness: 'complete', items: [] } }), true);
- await controller.assess(snapshot); selected = selectVisibleCustomerDecision(controller.getState(), owner, snapshot); assert(selected); const view = describePersonalDecision(selected.packet, selected.expectedBinding); assert.equal(view.kind, 'ready'); assert.equal(view.action, 'COULD_WORK'); assert.equal(view.nextStep, 'consider_use');
+ await controller.assess(snapshot, 'add'); selected = selectVisibleCustomerDecision(controller.getState(), owner, snapshot); assert(selected); const view = describePersonalDecision(selected.packet, selected.expectedBinding); assert.equal(view.kind, 'ready'); assert.equal(view.action, 'COULD_WORK'); assert.equal(view.nextStep, 'consider_use');
  passed('personal_decision', 'Existing CustomerController and bounded renderer produce supported moisturizer action/reason/next step from authoritative stored truth.');
  const reference = { kind: 'catalog', productId: fixtures.product, variantId: fixtures.variant, formulaVersionId: fixtures.formula };
  const item = { id: randomUUID(), reference, state: 'current', timing: 'pm', frequency: { kind: 'qualitative', value: 'daily' }, startedOn: null, stoppedOn: null, duration: null };
@@ -82,7 +82,7 @@ try {
  const [products, history, experiences] = await lists(guest); assert.equal(history.items.length, 2);
  const memory = mapFreeMyStuff(null, products.items, history.items, experiences.items); assert(memory.checks.some(check => check.productName === 'Product not identified')); assert(memory.products.some(product => product.source === 'user_reported' && product.name === 'Unidentified P0D wash'));
  passed('explicit_my_stuff', 'Explicit case save is idempotent. Unknown stays Product not identified; manual saved product remains user_reported.');
- const repeated = await resolveProduct(); await controller.assess(repeated.truthSnapshot); selected = selectVisibleCustomerDecision(controller.getState(), owner, repeated.truthSnapshot); assert(selected); assert.equal(selected.packet.action.kind, 'KEEP_CURRENT'); assert.equal(selected.contextRevision, controller.getState().context.revision);
+ const repeated = await resolveProduct(); await controller.assess(repeated.truthSnapshot, 'add'); selected = selectVisibleCustomerDecision(controller.getState(), owner, repeated.truthSnapshot); assert(selected); assert.equal(selected.packet.action.kind, 'KEEP_CURRENT'); assert.equal(selected.contextRevision, controller.getState().context.revision);
  passed('repeat_check', 'New immutable Check consumes current canonical routine/history and returns KEEP_CURRENT without duplicating history.');
  assert.deepEqual((await lists(other)).flatMap(list => list.items), []); assert.equal((await call(other, 'free-context', { operation: 'record_check', requestId: randomUUID(), caseId: resolved.caseId })).status, 404);
  controller.setOwner(users[1]); assert.equal(controller.getState().context, null); assert.equal(selectVisibleCustomerDecision(controller.getState(), users[1], repeated.truthSnapshot), null);

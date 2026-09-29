@@ -54,7 +54,7 @@ controller = new CustomerController(gateway, randomUUID);
 const state = () => controller.getState();
 const changeOwner = (id, client) => { owner = id; source = client; controller.setOwner(id); };
 async function assess(snapshot, expectedAction) {
-  await controller.assess(snapshot);
+  await controller.assess(snapshot, 'add');
   const visible = selectVisibleCustomerDecision(state(), owner, snapshot);
   assert(visible, 'Actual persisted result must survive the mobile owner/context/truth render gate');
   assert.equal(visible.packet.action.kind, expectedAction);
@@ -128,11 +128,11 @@ try {
 
   failLoad = true; assert.equal(await controller.load(), false); assert.equal(state().context, null); assert.equal(selectVisibleCustomerDecision(state(), aid, snapshot), null);
   failLoad = false; assert(await controller.load()); await assess(snapshot, 'USE_WITH_CAUTION');
-  failDecision = true; await controller.assess(snapshot); assert.equal(state().decision.kind, 'unavailable');
+  failDecision = true; await controller.assess(snapshot, 'add'); assert.equal(state().decision.kind, 'unavailable');
   failDecision = false; await assess(snapshot, 'USE_WITH_CAUTION');
   changeOwner(bid, b); assert.equal(state().context, null); assert.equal(selectVisibleCustomerDecision(state(), bid, snapshot), null);
   assert(await controller.load()); assert.equal(state().context.revision, 0); assert.equal(state().context.experiences.length, 0);
-  await controller.assess(snapshot); assert.equal(state().decision.kind, 'unavailable', 'B cannot use A resolver snapshot');
+  await controller.assess(snapshot, 'add'); assert.equal(state().decision.kind, 'unavailable', 'B cannot use A resolver snapshot');
   changeOwner(null, b); assert.equal(state().context, null); assert.equal(state().decision.kind, 'idle');
   changeOwner(aid, a); assert(await controller.load()); await assess(snapshot, 'USE_WITH_CAUTION');
   for (const client of [a, b]) for (const table of ['personal_context_heads', 'personal_context_revisions', 'personal_decision_assessments']) {
