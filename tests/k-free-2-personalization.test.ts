@@ -77,7 +77,7 @@ test('K-FREE-2: customer flow exposes optional navigation and no managed or remo
   assert.match(flow, /onSkip/);
   assert.match(flow, /onRemindLater/);
   assert.match(flow, /Back/);
-  assert.match(flow, /Skip this step/);
+  assert.match(flow, /Skip personalization/);
   assert.match(flow, /Step .* of 3/);
   assert.match(result, /FORMULA DETAILS/);
   assert.match(result, /PERSONAL FIT/);
