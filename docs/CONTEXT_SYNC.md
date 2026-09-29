@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-28: Scandit barcode comparison remains development-only
+
+- **Immutable predecessor:** `origin/main@459566af732d234783d64aa372bae78361b603d4`. The current Expo Camera Check scanner remains the customer implementation.
+- **Evaluation source:** a guarded native development route adds Scandit Barcode Capture for raw UPC/EAN decode comparison only. The optional license is a client-visible development-build variable in ignored `.env.local`, not a Supabase secret. Expo Go cannot run this native module. No candidate/product lookup, formula claim, Check case, customer release route, hosted activation, or purchase is added. A hidden route does not stop native frameworks from being linked into a release binary; keep this evaluation branch unmerged until commercial distribution terms are accepted.
+- **Proof and gate:** the full app test suite, both TypeScript checks, web/iOS JavaScript exports, Expo iOS prebuild, CocoaPods install, and an unsigned iOS Simulator native build passed. A physical same-device comparison with a valid trial key and real skincare bottles remains unverified. Scandit's student/education license is non-commercial; Derive must agree commercial production terms and show material useful-result lift before adoption. See [Scandit evaluation](SCANDIT_EVALUATION.md).
+
 ## 2026-09-28: Camera result sheet stays with the live preview
 
 - **Immutable predecessor:** origin/main `fe477af52a1eb93d1c38d82d9ab8a5b729bfccc3` after #156. Exact-head CI `36478510888` passed both jobs on `d955fbe0e51715e88557066b655de7b78eeed490` before that merge.

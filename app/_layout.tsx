@@ -223,6 +223,7 @@ export default function RootLayout() {
         </Stack.Protected>
         <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development' && shell !== 'legacy' && (!localFreeIntegration || localReady)}>
           <Stack.Screen name="personalize/fixture" options={{ headerShown: false }} />
+          <Stack.Screen name="scandit-lab" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!remoteEnabled}>
           <Stack.Screen name="founder/index" options={{ headerShown: false }} />
