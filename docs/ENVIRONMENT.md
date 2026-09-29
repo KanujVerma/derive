@@ -24,6 +24,7 @@ another.
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_DEV_SUPABASE_LAN_URL` | Development JS runtime only | Public local test target | Optional exact Mac private IPv4 base URL on port 54321 for physical scanner QA; never staging/production/release |
 | `EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL` | Expo mobile/web build | Public | Optional customer contact; configure only after send-and-receive mailbox verification |
+| `EXPO_PUBLIC_SCANDIT_LICENSE_KEY` | Native development build only | Client-visible vendor license | Optional Scandit barcode lab; never put a trial or education license into EAS preview/production. This is not a Supabase Edge secret and cannot be hidden from a shipped app. |
 | `SUPABASE_PROJECT_ID` | CLI / CI | Public identifier | Linking and deploying to a hosted project |
 | `SUPABASE_ACCESS_TOKEN` | CLI / CI | Secret | Headless Supabase management; interactive local login should use the CLI credential store instead |
 | `SUPABASE_DB_PASSWORD` | CLI / CI | Secret | Hosted migration and database operations |
