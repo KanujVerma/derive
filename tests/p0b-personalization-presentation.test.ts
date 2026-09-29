@@ -5,7 +5,7 @@ const routine = readFileSync(new URL('../src/components/p0b-personalization/Rout
 assert.ok(context.includes('const fields = relevantQuestions(relevance)'));
 assert.ok(context.includes('fields.map(field => <AnswerChoices'));
 assert.ok(context.includes('contextQuestions = []'));
-assert.ok(context.includes('Skip personalization'));
+// Step Skip and edit cancellation are exercised in ux-profile-step-skip.test.ts.
 assert.ok(context.includes('accessibilityRole="alert"'));
 assert.ok(context.includes('onApply(createContextDraft(draft))'));
 assert.ok(routine.includes('Manual name. Formula and ingredients are unverified.'));
