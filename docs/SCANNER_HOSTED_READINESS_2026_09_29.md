@@ -2,8 +2,10 @@
 
 Status: **NOT RELEASE READY. Read-only inventory, not authorization to deploy or activate.**
 
-Reviewed source: `3228830d598b0f6194e0751316ef3ecaa16d66b5` (main after #174).
-Exact hosted project: `snojlbqovlawewwqbviz`. Completed receipt: 2026-09-29 21:33 UTC.
+Reviewed main: `44eea2fc71edc5c864cd6dab6e4b4a12004fdf0e` (after #177 and #184,
+including #179 by ancestry). Reconciled source receipt:
+`1d9768a83748e67664c5cfbe5dfecc94c6bbc863`.
+Exact hosted project: `snojlbqovlawewwqbviz`. Completed receipt: 2026-09-29 21:52 UTC.
 Scope is scanner-only. Plus #180 is parked/default-off and is excluded from this rollout.
 No hosted SQL, functions, Auth, SMTP, customer accounts, or payment configuration was changed.
 
@@ -11,8 +13,8 @@ No hosted SQL, functions, Auth, SMTP, customer accounts, or payment configuratio
 
 | Boundary | Observed result | What this does not prove |
 | --- | --- | --- |
-| Migration ledger | 19 hosted / 35 committed source versions; no hosted-only versions; local CLI inventory matches HEAD. | Hosted SQL, grants, triggers and constraints match source. |
-| Edge names | 15 hosted / 24 source; no hosted-only names. | Existing function bundles contain current code. |
+| Migration ledger | 19 hosted / 36 committed source versions; no hosted-only versions; local CLI inventory matches HEAD. Dry-run lists the 17 versions below. | Hosted SQL, grants, triggers and constraints match source. |
+| Edge names | 15 hosted / 25 source; no hosted-only names. | Existing function bundles contain current code. |
 | Catalog | 1 catalog-standard product; 0 catalog variants, identifiers and formulas. | Useful scan hit rate for target customers. |
 | Anonymous Auth | Remote `enable_anonymous_sign_ins=false`, directly observed in CLI config diff. | Permanent signup, confirmations, SMTP delivery or physical login. |
 | Permanent Auth / email | Direct hosted `GET /auth/v1/settings` HTTP 200: `disable_signup=false`, `mailer_autoconfirm=true`, `external.email=true`, `external.anonymous_users=false`. Thus signup enabled, Confirm Email OFF, email provider enabled, anonymous disabled. Dashboard modal also shows OTP 6/3600 seconds and minimum password 6. Custom SMTP, template body and email delivery remain UNKNOWN. | Existing auto-confirm is not verified email ownership, and does not prove password recovery delivery. |
@@ -60,12 +62,26 @@ plan are accepted. Do not repair the ledger or skip historical migrations to fak
 14. `20260929050000_external_candidate_lookup_budget.sql`
 15. `20260929060000_indexed_product_identity_lookup.sql`
 16. `20260929070000_product_check_ingredient_continuation.sql` (#174 now merged)
+17. `20260929090000_indexed_ingredient_candidates.sql` (#179/#184 now merged)
 
 The earlier [P0-C rollout review](P0_C_HOSTED_ROLLOUT_REVIEW.md) details the high-risk
 Auth/profile trigger, raw-product read policy, founder-operation constraint,
 truth-snapshot trigger and deletion-upload fence boundaries. These are not all
 simple additive tables. Existing Managed behavior must remain intact even though
 Managed and Plus purchase are out of this scanner launch.
+
+Fresh aggregate schema-risk readback (no customer rows, IDs, emails or payloads):
+
+| Mutation boundary | Observed preflight | Remaining review |
+| --- | --- | --- |
+| Profile email / Auth triggers | `profiles.email` NOT NULL; zero anonymous blank-email rows; both expected profile Auth triggers present. | Compare trigger/function definitions and preserve permanent/Managed behavior. |
+| Founder operations constraint | Expected named constraint present; zero rows outside the replacement allowlist. | Review replacement constraint and privileges before apply. |
+| Product truth snapshots | Both new truth triggers absent; old product SELECT policy present. | Review UPDATE behavior, snapshot ownership and policy replacement. |
+| Deletion upload fence | New fence column absent; both expected private buckets present. | Review restrictive INSERT fence and retry-safe deletion behavior. |
+
+These presence/count checks do **not** establish SQL, grant or RLS parity. No recovery
+backup has been verified by this pass. The migrations cannot be treated as a harmless
+catalog-only batch: they alter existing identity/policy/constraint boundaries.
 
 The new candidate budget (#161) caps Open Beauty Facts at 12 requests/minute
 globally, not 60. That budget is not the promised customer-visible daily Check
@@ -76,7 +92,7 @@ quota. Source preparation/photo grant/assessment/provider limits remain distinct
 Missing source names: `access-state`, `catalog-contribution`,
 `external-product-candidates`, `free-context`, `free-personal-fit`,
 `personal-context`, `personal-decision`, `prepare-free-product-evidence`,
-`product-measurement`.
+`product-measurement`, `resolve-product-link`.
 
 For the bounded Check/My Stuff path, deploy reviewed revisions after migrations:
 `access-state`, `catalog-products`, `resolve-product-identity`, `free-context`,
@@ -91,12 +107,18 @@ inventory. Do not enable it as a shortcut around provider-license review.
 authenticates the token inside the function. Honor each reviewed function's config;
 never globally use `--no-verify-jwt`. Test actual gateway/manual denial paths.
 
+Landed source composition:
+
+- #177 link intake adds `resolve-product-link` and a separate owner-bound helper.
+  It requires the candidate-budget migration. OBF links extract a valid GTIN and
+  forward the caller token to the factual resolver as `barcodeSource=member_input`;
+  they do not fetch the OBF API. Amazon ASIN is recovery-only. DailyMed label-title
+  lookup is default-off behind `DERIVE_DAILYMED_LINK_ENABLED` and is not formula truth.
+- #179 plus #184 add migration `20260929090000` and compose the indexed ingredient
+  adapter into the existing resolver; candidate strings still cannot approve a formula.
+
 Pending at this checkpoint (refresh before preparing the release tree):
 
-- #177 link intake: adds `resolve-product-link`, separate owner-bound client helper;
-  requires the candidate budget migration and reviewed server URL/provider gates.
-- #179 indexed ingredient candidates: migration `20260929090000`; does not become
-  live ingredient continuation until the resolver actually composes its adapter.
 - #175 category facts: migration `20260929080000` plus its function; include only
   if accepted into the final source tree. No fabricated category/water-resistance facts.
 - Root client composition: signed release routing, profile-before-Check, actual
@@ -104,6 +126,16 @@ Pending at this checkpoint (refresh before preparing the release tree):
 
 Existing function-name parity must not conceal an old resolver/delete function.
 Review final function bundle/config readback and hosted owner-bound smoke separately.
+Existing hosted functions still carry the older September 22 revisions; current-source
+deployment cannot be inferred from a matching function name.
+
+Current-main release configuration is independently blocked: production EAS still
+selects Mock (`EXPO_PUBLIC_USE_REMOTE_SERVICE=false`), and the signed root only selects
+scanner-first for the special integration/preview shells. Root owns the separate
+release-routing branch. Kanuj's active #178/#181/#182/#183 UX PRs do not change hosted
+Auth or EAS; reconcile them before freezing the binary. #182's optional-profile skip
+copy must be composed deliberately with root's profile-before-Check entry. This is a
+review seam, not evidence that a counterpart branch is broken.
 
 ## Executable operator sequence
 
@@ -134,6 +166,7 @@ node scripts/readback-hosted-migration-inventory.mjs
 supabase functions deploy access-state --project-ref snojlbqovlawewwqbviz
 supabase functions deploy catalog-products --project-ref snojlbqovlawewwqbviz
 supabase functions deploy resolve-product-identity --project-ref snojlbqovlawewwqbviz
+supabase functions deploy resolve-product-link --project-ref snojlbqovlawewwqbviz
 supabase functions deploy free-context --project-ref snojlbqovlawewwqbviz
 supabase functions deploy free-personal-fit --project-ref snojlbqovlawewwqbviz
 supabase functions deploy personal-context --project-ref snojlbqovlawewwqbviz
@@ -143,12 +176,41 @@ node scripts/readback-hosted-function-inventory.mjs
 node scripts/readback-scanner-hosted-readiness.mjs --read-only
 ```
 
-Deploy `resolve-product-link`, `product-check-facts`, evidence/contribution or
+The link endpoint above is required only when root's accepted client includes link
+intake. Deploy `product-check-facts`, evidence/contribution or
 external candidates only if the final accepted tree/client requires them and its
 dependencies/gates are satisfied. Do not deploy all functions indiscriminately:
 existing Stripe/Managed functions and parked Plus work are out of scope. Inventory
 of all source names may still show intentional non-launch omissions; document them.
 Do not activate feature flags in this batch. Version/name parity is not success.
+
+### Exact authorization needed
+
+Root should ask for approval of the **named 17-migration batch and named scanner
+function revisions on `snojlbqovlawewwqbviz` from a frozen, clean, exact-CI-green SHA**,
+after reviewing the schema boundaries and capturing a recoverable backup. Authorization
+must exclude Auth/SMTP changes, anonymous activation, external-provider flag activation,
+billing/checkout and App Store public release. Separately authorize a bounded hosted
+test-user creation/cleanup drill; read-only inventory authorization is not that authority.
+
+On unexpected apply/readback/smoke failure, stop the rollout and keep the scanner client
+release disabled. Do not repair the migration ledger or drop tables to roll back. Restore
+previous Edge bundles only from recorded reviewed revisions; database recovery requires
+the accepted backup/restore plan or a separately reviewed forward repair. Existing Managed
+production behavior is not declared safe merely because the free-scanner tests pass.
+
+Backup option available in installed CLI 2.117.0: `db dump` supports linked exact-project
+output to a private file, separate roles/schema/data and explicit schema selection.
+Do not print dumps or a generated `--dry-run` dump script; connection details and
+customer data belong only in authorized, encrypted, access-controlled local storage,
+never Git. Free projects should use logical exports/off-site copies rather than assume
+managed daily-backup availability. Database backups exclude Storage object bytes.
+[Official backup guidance](https://supabase.com/docs/guides/platform/backups).
+The recovery set must additionally preserve migration history and custom Auth triggers/
+Storage policies, plus prior Edge bundles/config and a disposable-target restore rehearsal;
+default schema/data dumps alone do not prove those surfaces are recoverable.
+[Official CLI restore guidance](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore).
+No backup export, credential reset, plan upgrade or restore was performed here.
 
 Existing `test-*-local.mjs` scripts intentionally refuse hosted URLs. Do not remove
 their guard. Write/review a hosted-specific bounded disposable-user drill first:
@@ -194,8 +256,12 @@ Acceptance sequence:
 - No claim of three daily Checks until a separately reviewed user-visible usage
   authority exists. No Plus checkout in this scanner-only release.
 
-Tooling validation: eight sanitization/fail-closed unit tests; read-only receipts;
-diff/scope check. No app/runtime source edits, no hosted acceptance claim.
+Reconciled validation: **814/814 application tests** (88 files), **8/8** separate
+sanitization/fail-closed tooling tests, both TypeScript checks, web and iOS JavaScript
+exports, read-only receipts and migration dry-run. The read-only slice does not change
+database/Auth/Edge runtime, so it did not consume the shared local reset lease; the final
+head's Database & Integration CI must still pass before review readiness. No `app/**`
+edits by this workstream, no hosted acceptance claim.
 
 The aggregate script serializes its two database queries: the CLI uses an ephemeral
 login role, and parallel CLI queries produced an UNKNOWN receipt during cleanup.
