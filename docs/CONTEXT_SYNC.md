@@ -6,6 +6,15 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: Bounded UX consistency and useful context
+
+- **Predecessor:** clean `origin/main@d96cf55777bf0fa1fbfb50eb42fcd5b9da60a85b`; both main CI jobs in `36610789141` succeeded. Dirty shared/local composition work is preserved.
+- **Scope:** Kanuj owns shared Mineral presentation rules, optional profile presentation, actionable My Stuff, shared result content and later single-writer Check/route composition. Sami retains active capture/controller/resolution ownership; no competing scanner, contract copy, backend change or hosted activation.
+- **Shared foundation:** semantic question/section spacing and actions, correct single/multiple choice accessibility, embedded content/search variants, retained catalog-search selection and one async request gate, and runtime/accessibility-aware glass with opaque fallback. DESIGN now distinguishes current four-tab/system-sans rules from historical managed-first guidance.
+- **Parallel status:** profile, My Stuff and result leaves are independently in progress, not marked complete. [Decision/question matrix](ux/UX_CONSISTENCY_2026_09_29.md) and [execution plan](superpowers/plans/2026-09-29-ux-consistency.md) define write-sets and gates; root alone owns final composition and this ledger.
+- **Authority gaps:** stored profile intent is global, nullable primary goal cannot preserve a withheld choice, shelf saving is not canonical routine activation, and list-only Check history cannot supply immutable historical detail. These are not repaired through copy or invented client data. Camera local-recovery/companion exclusivity, deliberate rearm and same-case evidence continuation remain Sami handoffs.
+- **Evidence:** source tests and exports are separate from physical/gesture/material, clinical and unassisted-customer acceptance. No production deployment, billing/Plus activation, new scientific rule, public release or App Store action is implied.
+
 ## 2026-09-29: Account & Settings for free and preview
 
 - **Predecessor:** `origin/main` `d02f8ba1f81b9c181cb7bd1172ef8fb3867c92ab`.
