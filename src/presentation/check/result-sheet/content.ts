@@ -5,6 +5,7 @@ import { selectCustomerCheckFacts, type CustomerCheckFacts } from '../../persona
 import { describePersonalDecision, type PersonalDecisionView } from '../../personal-decision/result.ts';
 import { projectTrustedSnapshot } from '../../personal-decision/truthAdapter.ts';
 import { describePersonalFitRefresh, type PersonalFitRefreshInput } from '../../personalization/result.ts';
+import { resultSheetNextAction, type SheetModel } from './model.ts';
 
 export type CheckResultFitInput =
   | { kind: 'canonical'; packet: unknown; expectedBinding: DecisionBinding }
@@ -96,4 +97,14 @@ export function describeCheckResultContent(input: CheckResultContentInput): Chec
     reason: fit.state.kind === 'factual_only' ? 'Product facts are available. A supported personal result has not been assessed.'
       : view.message, criticalUnknowns: [],
   }, canPersonalize: false };
+}
+
+/** Keep resolver recovery for limitations; a working bound personal action already gives the next step. */
+export function resultSheetRecoveryCopy(model: Extract<SheetModel, { kind: 'result' }>, canAddRequestedEvidence: boolean,
+  content: CheckResultContentModel | null, hasContentAction: boolean): string | null {
+  if (content?.fit.kind === 'canonical' && hasContentAction) return null;
+  const copy = resultSheetNextAction(model, canAddRequestedEvidence);
+  if (!copy || copy === content?.outcome.reason || copy === content?.outcome.title) return null;
+  if (copy === 'The exact package formula remains unverified.' && content?.outcome.kind === 'formula_unverified') return null;
+  return copy;
 }

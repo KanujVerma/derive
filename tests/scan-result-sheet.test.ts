@@ -7,6 +7,7 @@ import {
   catalogImagePresentation, buildScanResultSheet, isCurrentSheetBinding, selectCurrentSheetModel,
   isCurrentRequestedEvidenceAction, resultSheetDetailMaxHeight,
   resultSheetNextAction,
+  resultSheetPresentationKey,
 } from '../src/presentation/check/result-sheet/model.ts';
 
 const product: CatalogProductSummary = {
@@ -206,4 +207,17 @@ test('a generic ingredient request is not actionable without the bound continuat
   assert.equal(resultSheetNextAction(model, true), null);
   const noRequest = buildScanResultSheet({ kind: 'snapshot', snapshot: ingredientSnapshot });
   if (noRequest.kind === 'result') assert.doesNotMatch(resultSheetNextAction(noRequest, false) ?? '', /photograph|add ingredient/i);
+});
+
+test('each new case, snapshot and pending operation owns a fresh scroll presentation', () => {
+  const previous = buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, ownerId: 'owner-a' });
+  const key = resultSheetPresentationKey(previous);
+  for (const snapshot of [ { ...verifiedProductTruth, snapshotId: 'new-snapshot' },
+    { ...verifiedProductTruth, caseRevision: 2 }, { ...verifiedProductTruth, resolutionCaseId: 'new-case' } ]) {
+    assert.notEqual(resultSheetPresentationKey(buildScanResultSheet({ kind: 'snapshot', snapshot, ownerId: 'owner-a' })), key);
+  }
+  assert.equal(resultSheetPresentationKey(buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, ownerId: 'owner-a' })), key);
+  assert.notEqual(resultSheetPresentationKey(buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, ownerId: 'owner-b' })), key);
+  const pending = buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-a' });
+  assert.notEqual(resultSheetPresentationKey(pending), resultSheetPresentationKey(buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-b' })));
 });

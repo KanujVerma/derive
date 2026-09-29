@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { describeCheckResultContent } from '../src/presentation/check/result-sheet/content.ts';
+import { describeCheckResultContent, resultSheetRecoveryCopy } from '../src/presentation/check/result-sheet/content.ts';
+import { buildScanResultSheet } from '../src/presentation/check/result-sheet/model.ts';
 import { verifiedProductTruth, unresolvedProductTruth, formulaOnlyProductTruth } from '../src/fixtures/product-truth/snapshots.ts';
 import { personalDecisionFixtures } from '../src/fixtures/personal-decision/fixtures.ts';
 import type { PersonalDecisionPacketV1 } from '../src/contracts/PersonalDecision.ts';
@@ -121,4 +122,29 @@ test('a malformed independent binding fails closed without throwing during prese
   const fit = decision('positive-role-match');
   fit.expectedBinding.sourceBoundaryRevision = undefined as unknown as string;
   assert.equal(describeCheckResultContent({ ownerId, snapshot: verifiedProductTruth, fit }).outcome.kind, 'service_failure');
+});
+
+test('unresolved limitations retain factual recovery without an unusable ingredient request', () => {
+  for (const snapshot of [unresolvedProductTruth, formulaOnlyProductTruth]) {
+    const sheet = buildScanResultSheet({ kind: 'snapshot', snapshot, ownerId });
+    const content = describeCheckResultContent({ ownerId, snapshot, fit: { kind: 'legacy', state: { kind: 'factual_only' } } });
+    if (sheet.kind !== 'result') throw new Error('Missing result');
+    assert.match(resultSheetRecoveryCopy(sheet, false, content, false)!, /Scan the barcode/);
+  }
+  const snapshot = { ...verifiedProductTruth, state: 'identified_formula_unverified' as const, formula: null,
+    catalogReferences: { ...verifiedProductTruth.catalogReferences, formulaVersionId: null } };
+  const sheet = buildScanResultSheet({ kind: 'snapshot', snapshot, ownerId });
+  if (sheet.kind !== 'result') throw new Error('Missing result');
+  const content = describeCheckResultContent({ ownerId, snapshot, fit: { kind: 'service_failure' } });
+  assert.doesNotMatch(resultSheetRecoveryCopy(sheet, false, content, false)!, /photograph|ingredient photo/i);
+  const formulaGap = describeCheckResultContent({ ownerId, snapshot, fit: { kind: 'legacy', state: { kind: 'factual_only' } } });
+  assert.equal(resultSheetRecoveryCopy(sheet, false, formulaGap, false), null, 'already displayed formula limitation is not repeated');
+});
+
+test('working bound decision action replaces fallback copy; absent action retains factual recovery', () => {
+  const sheet = buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, ownerId });
+  if (sheet.kind !== 'result') throw new Error('Missing result');
+  const content = describeCheckResultContent({ ownerId, snapshot: verifiedProductTruth, fit: decision('positive-role-match') });
+  assert.equal(resultSheetRecoveryCopy(sheet, false, content, true), null);
+  assert.equal(resultSheetRecoveryCopy(sheet, false, content, false), 'View formula details');
 });

@@ -5,11 +5,11 @@ import type { ProductResolutionResult } from '../../../contracts/ProductIdentity
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
 import { CheckResultContent } from './CheckResultContent';
-import type { CheckResultContentInput } from '../../../presentation/check/result-sheet/content';
+import { describeCheckResultContent, resultSheetRecoveryCopy, type CheckResultContentInput } from '../../../presentation/check/result-sheet/content';
 import type { DecisionNextStep } from '../../../contracts/PersonalDecision';
 import type { RequestedEvidenceAction, SheetBinding, SheetImage, SheetModel } from '../../../presentation/check/result-sheet/model';
 import { isCurrentRequestedEvidenceAction, isCurrentSheetBinding, resultSheetDetailMaxHeight,
-  selectCurrentSheetModel, resultSheetNextAction } from '../../../presentation/check/result-sheet/model';
+  selectCurrentSheetModel, resultSheetPresentationKey } from '../../../presentation/check/result-sheet/model';
 
 export interface ScanResultSheetProps {
   /** Null removes the sheet. The camera host retains ownership of detection and navigation. */
@@ -52,8 +52,7 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
   const reduceMotion = useRef(true);
   const visibleModel = selectCurrentSheetModel(model, currentOwnerId, currentSnapshot, currentScanId);
   const open = visibleModel !== null;
-  const sheetKey = visibleModel?.kind === 'result'
-    ? `${visibleModel.binding.caseId}:${visibleModel.binding.snapshotId}:${visibleModel.binding.caseRevision}` : visibleModel?.kind ?? 'closed';
+  const sheetKey = resultSheetPresentationKey(visibleModel);
 
   useEffect(() => {
     onPauseRef.current?.(open);
@@ -97,7 +96,11 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
   const currentContent = visibleModel.kind === 'result' && contentInput?.snapshot
     && contentInput.ownerId === currentOwnerId
     && isCurrentSheetBinding(visibleModel.binding, currentOwnerId, contentInput.snapshot) ? contentInput : null;
-  const nextAction = visibleModel.kind === 'result' ? resultSheetNextAction(visibleModel, canAddRequestedEvidence) : null;
+  const contentModel = currentContent ? describeCheckResultContent(currentContent) : null;
+  const hasContentAction = contentModel?.fit.kind === 'canonical'
+    && Boolean(onNextStep || contentModel.canPersonalize && onPersonalize);
+  const nextAction = visibleModel.kind === 'result'
+    ? resultSheetRecoveryCopy(visibleModel, canAddRequestedEvidence, contentModel, hasContentAction) : null;
 
   return (
     <View style={[styles.position, { bottom: Math.max(bottomInset, spacing.md) }]}
@@ -114,7 +117,7 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
             <View style={styles.handle} />
           </Pressable>
         </View>
-        <ScrollView style={{ maxHeight: Math.max(resultSheetDetailMaxHeight(height), Math.floor(height * 0.72) - layout.minTouchTarget) }}
+        <ScrollView key={sheetKey} style={{ maxHeight: Math.max(resultSheetDetailMaxHeight(height), Math.floor(height * 0.72) - layout.minTouchTarget) }}
           contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
           accessibilityLabel={expanded ? 'Result and supporting details' : 'Personal Fit and essential result'}>
           <View style={styles.summary}>
@@ -138,7 +141,7 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
               {currentContent ? <CheckResultContent input={currentContent} expanded={expanded} showIdentity={false}
                 onNextStep={onNextStep} onPersonalize={onPersonalize} onOpenSource={onOpenSource} />
                 : <Text style={styles.detail}>{visibleModel.detail}</Text>}
-              {!currentContent && nextAction && <Text style={styles.nextAction}>{nextAction}</Text>}
+              {nextAction && <Text style={styles.nextAction}>{nextAction}</Text>}
               {canAddRequestedEvidence && (
                 <Pressable onPress={addRequestedEvidence} style={styles.evidenceAction} accessibilityRole="button"
                   accessibilityLabel="Add ingredient photo" accessibilityHint="Adds evidence to this product check">

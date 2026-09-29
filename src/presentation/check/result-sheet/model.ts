@@ -151,3 +151,11 @@ export function resultSheetNextAction(model: Extract<SheetModel, { kind: 'result
   }
   return model.nextAction;
 }
+
+/** A different immutable result/request owns a fresh scroll position and disclosure state. */
+export function resultSheetPresentationKey(model: SheetModel | null): string {
+  if (!model) return 'closed';
+  return model.kind === 'result'
+    ? JSON.stringify([model.kind, model.binding.ownerId, model.binding.caseId, model.binding.snapshotId, model.binding.caseRevision])
+    : JSON.stringify([model.kind, model.ownerId, model.scanId]);
+}
