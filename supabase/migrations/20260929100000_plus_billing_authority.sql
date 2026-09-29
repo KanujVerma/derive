@@ -3,8 +3,11 @@ create table public.plus_billing_customers (
  user_id uuid primary key references public.profiles(id) on delete cascade,
  stripe_customer_id text unique check (stripe_customer_id ~ '^cus_[A-Za-z0-9]+$'),
  lease_token uuid, lease_until timestamptz,
+ checkout_attempt_id uuid,checkout_reserved_at timestamptz,checkout_session_id text check(checkout_session_id ~ '^cs_[A-Za-z0-9_]+$'),
  created_at timestamptz not null default now(),
- check ((lease_token is null) = (lease_until is null))
+ check ((lease_token is null) = (lease_until is null)),
+ check ((checkout_attempt_id is null) = (checkout_reserved_at is null)),
+ check (checkout_session_id is null or checkout_attempt_id is not null)
 );
 create table public.plus_billing_subscriptions (
  stripe_subscription_id text primary key check (stripe_subscription_id ~ '^sub_[A-Za-z0-9]+$'),
@@ -53,6 +56,31 @@ begin
  and lease_until>clock_timestamp() and (stripe_customer_id is null or stripe_customer_id=p_customer_id);
  if not found then raise exception 'PLUS_LEASE_OR_BINDING_CONFLICT'; end if;
 end; $$;
+create function public.reserve_plus_checkout_attempt(p_user_id uuid,p_token uuid,p_attempt_id uuid,p_rotate_attempt_id uuid default null)
+returns jsonb language plpgsql security invoker set search_path='' as $$
+declare binding public.plus_billing_customers;
+begin
+ select * into binding from public.plus_billing_customers where user_id=p_user_id for update;
+ if not found or p_attempt_id is null or binding.lease_token is distinct from p_token or binding.lease_until<=clock_timestamp()
+ or binding.stripe_customer_id is null then raise exception 'PLUS_LEASE_OR_BINDING_CONFLICT'; end if;
+ if p_rotate_attempt_id is not null and (binding.checkout_attempt_id is distinct from p_rotate_attempt_id or binding.checkout_session_id is null) then
+  raise exception 'PLUS_CHECKOUT_ATTEMPT_CONFLICT';
+ end if;
+ if binding.checkout_attempt_id is null or p_rotate_attempt_id is not null then
+  update public.plus_billing_customers set checkout_attempt_id=p_attempt_id,checkout_reserved_at=clock_timestamp(),checkout_session_id=null
+  where user_id=p_user_id returning * into binding;
+ end if;
+ return jsonb_build_object('attemptId',binding.checkout_attempt_id,'sessionId',binding.checkout_session_id,
+ 'reservedAt',to_char(binding.checkout_reserved_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
+end; $$;
+create function public.bind_plus_checkout_session(p_user_id uuid,p_token uuid,p_attempt_id uuid,p_session_id text)
+returns void language plpgsql security invoker set search_path='' as $$
+begin
+ if p_session_id is null or p_session_id !~ '^cs_[A-Za-z0-9_]+$' then raise exception 'PLUS_INVALID_CHECKOUT_SESSION'; end if;
+ update public.plus_billing_customers set checkout_session_id=p_session_id where user_id=p_user_id and lease_token=p_token
+ and lease_until>clock_timestamp() and checkout_attempt_id=p_attempt_id and (checkout_session_id is null or checkout_session_id=p_session_id);
+ if not found then raise exception 'PLUS_LEASE_OR_BINDING_CONFLICT'; end if;
+end; $$;
 create function public.commit_plus_billing_snapshot(p_user_id uuid,p_token uuid,p_event_id text,p_event_type text,
  p_event_created_at timestamptz,p_subscription_id text,p_customer_id text,p_price_id text,p_status text,
  p_period_end timestamptz,p_cancel boolean,p_paid_invoice_id text,p_paid_until timestamptz,p_hold text)
@@ -84,7 +112,11 @@ begin
  on conflict(stripe_subscription_id) do update set subscription_status=excluded.subscription_status,
  period_end=excluded.period_end,cancel_at_period_end=excluded.cancel_at_period_end,
  paid_invoice_id=excluded.paid_invoice_id,paid_until=excluded.paid_until,
- review_hold=coalesce(public.plus_billing_subscriptions.review_hold,excluded.review_hold),reconciled_at=clock_timestamp();
+ review_hold=coalesce(public.plus_billing_subscriptions.review_hold,excluded.review_hold),reconciled_at=clock_timestamp()
+ where public.plus_billing_subscriptions.user_id=excluded.user_id
+ and public.plus_billing_subscriptions.stripe_customer_id=excluded.stripe_customer_id
+ and public.plus_billing_subscriptions.stripe_price_id=excluded.stripe_price_id;
+ if not found then raise exception 'PLUS_SUBSCRIPTION_OWNER_CONFLICT'; end if;
  insert into public.plus_billing_events(event_id,user_id,event_type,stripe_created_at)
  values(p_event_id,p_user_id,p_event_type,p_event_created_at);
  return true;
@@ -124,9 +156,11 @@ end; $$;
 revoke all on function public.acquire_plus_billing_lease(uuid,uuid),public.release_plus_billing_lease(uuid,uuid),
  public.bind_plus_billing_customer(uuid,uuid,text),public.read_plus_billing_access(uuid),
  public.suspend_plus_billing_subscription(uuid,uuid,text,boolean),
+ public.reserve_plus_checkout_attempt(uuid,uuid,uuid,uuid),public.bind_plus_checkout_session(uuid,uuid,uuid,text),
  public.commit_plus_billing_snapshot(uuid,uuid,text,text,timestamptz,text,text,text,text,timestamptz,boolean,text,timestamptz,text)
  from public,anon,authenticated;
 grant execute on function public.acquire_plus_billing_lease(uuid,uuid),public.release_plus_billing_lease(uuid,uuid),
  public.bind_plus_billing_customer(uuid,uuid,text),public.read_plus_billing_access(uuid),
  public.suspend_plus_billing_subscription(uuid,uuid,text,boolean),
+ public.reserve_plus_checkout_attempt(uuid,uuid,uuid,uuid),public.bind_plus_checkout_session(uuid,uuid,uuid,text),
  public.commit_plus_billing_snapshot(uuid,uuid,text,text,timestamptz,text,text,text,text,timestamptz,boolean,text,timestamptz,text) to service_role;

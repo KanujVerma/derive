@@ -39,8 +39,12 @@ export function readPlusSubscriptionTruth(subscriptionValue:unknown,invoiceValue
   latestInvoice:null};
  if(invoiceValue===null)return truth;
  const invoice=record(invoiceValue),lines=record(invoice.lines);
+ const empty=(value:unknown)=>value===null||(Array.isArray(value)&&value.length===0);
  if(resourceId(subscription.latest_invoice)!==invoice.id||invoiceSubscription(invoice)!==subscription.id
   ||resourceId(invoice.customer)!==expectedCustomer||invoice.livemode!==expectedLive
+  ||!Array.isArray(invoice.discounts)||invoice.discounts.length!==0||!empty(invoice.total_discount_amounts)
+  ||!empty(invoice.total_pretax_credit_amounts)||invoice.starting_balance!==0
+  ||invoice.pre_payment_credit_notes_amount!==0||invoice.post_payment_credit_notes_amount!==0
   ||!Array.isArray(lines.data)||lines.has_more!==false||lines.data.length!==1)throw new Error('Invoice is not bound to Plus');
  const line=record(lines.data[0]);
  const pricing=line.pricing?record(line.pricing):null;
@@ -50,7 +54,8 @@ export function readPlusSubscriptionTruth(subscriptionValue:unknown,invoiceValue
  const detail=parent?.subscription_item_details?record(parent.subscription_item_details):null;
  const proration=detail?.proration??line.proration;
  const period=record(line.period);
- if(linePrice!==priceId||line.quantity!==1||proration!==false||!Number.isSafeInteger(period.end)
+ if(linePrice!==priceId||line.quantity!==1||line.amount!==499||proration!==false||!Number.isSafeInteger(period.end)
+  ||!Array.isArray(line.discounts)||line.discounts.length!==0||!empty(line.discount_amounts)||!empty(line.pretax_credit_amounts)
   ||typeof invoice.status!=='string'||typeof invoice.currency!=='string'||!Number.isSafeInteger(invoice.amount_paid)) {
   throw new Error('Invoice line does not prove a full Plus payment');
  }

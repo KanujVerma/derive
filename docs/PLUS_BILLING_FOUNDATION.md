@@ -10,6 +10,8 @@ The existing Managed flow creates `founding_beta` membership. Reusing it would i
 
 The conservative refund/dispute hold behavior below is implemented but **requires explicit founder policy approval before activation**. This is not a claim that founders have approved all billing/refund terms.
 
+This workstream is parked at a default-off source checkpoint after the founder changed first release to scanner-only. Database and live Stripe acceptance remain pending; Plus must not block scanner rollout.
+
 - One server-selected $4.99 USD/month licensed recurring price, quantity one. No annual plan, trial, promotion code, discounted/credit-funded grant, extra item, proration, or client-selected price.
 - A confirmed permanent account is required. Owner comes from Supabase Auth; customer binding is persisted under an owner lease, never recovered by email or return-page parameters.
 - Access requires current `active` Stripe subscription and its latest **paid** invoice covering the current item period with at least 499 cents paid in USD. Active status or Checkout completion alone is insufficient.
@@ -17,6 +19,7 @@ The conservative refund/dispute hold behavior below is implemented but **require
 - A linked partial/full refund or dispute puts that subscription in a latched `refund_or_dispute` review hold. Positive events cannot clear it. No automatic dispute-win restoration or hold-clear tool is included. A separately purchased replacement subscription can grant independently; an old held subscription is not a blanket account ban.
 - Unsupported item/price/pause/proration changes suspend the previous local grant and return a retryable error rather than pretending the old payment proves the new state. Stripe retrieval outages do not invent state; already proven access remains bounded by the stored paid-period expiry.
 - The event ledger is idempotent. A 120-second per-owner lease serializes current Stripe reads; commit checks the exact still-valid token, customer and owner. An expired writer cannot commit or suspend another lease's grant. Event delivery timestamps are audit evidence, not ordering authority.
+- Checkout reserves a server attempt before Stripe creation. Different client retry IDs reuse its idempotency key across expired leases; only a verified terminal session may rotate. An ambiguous attempt with no bound session stops for operator review at 23 hours, before Stripe's minimum 24-hour idempotency retention expires. SDK22 uses API version `2026-03-25.dahlia`, verified in its installed source.
 - Once a signed risk event is bound and the lease acquired, the negative hold is written before subsequent Stripe reads; a provider-read failure cannot restore the old grant. Processing errors are not acknowledged as success.
 
 ## Integration seams owned by the release orchestrator

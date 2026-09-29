@@ -1,5 +1,5 @@
 begin;
-select plan(30);
+select plan(37);
 select has_table('public','plus_billing_subscriptions','Plus has a separate subscription authority');
 select ok((select relrowsecurity from pg_class where oid='public.plus_billing_subscriptions'::regclass),'Plus subscriptions enable RLS');
 select ok(not has_table_privilege('authenticated','public.plus_billing_subscriptions','select'),'Clients cannot read raw billing state');
@@ -18,6 +18,13 @@ select is(public.acquire_plus_billing_lease('75000000-0000-4000-8000-00000000000
 select lives_ok($$select public.bind_plus_billing_customer('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000011','cus_plusone')$$,'Customer binds under lease');
 select throws_ok($$select public.bind_plus_billing_customer('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000012','cus_plustwo')$$,'P0001','PLUS_LEASE_OR_BINDING_CONFLICT','Stale lease cannot bind');
 select is(public.read_plus_billing_access('75000000-0000-4000-8000-000000000001')->>'state','inactive','Customer binding is not payment');
+select is(public.reserve_plus_checkout_attempt('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000011','75000000-0000-4000-8000-000000000021')->>'attemptId','75000000-0000-4000-8000-000000000021','Checkout reserves a server attempt');
+select is(public.reserve_plus_checkout_attempt('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000011','75000000-0000-4000-8000-000000000022')->>'attemptId','75000000-0000-4000-8000-000000000021','Different client retry cannot rotate an unbound attempt');
+select throws_ok($$select public.reserve_plus_checkout_attempt('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000011','75000000-0000-4000-8000-000000000022','75000000-0000-4000-8000-000000000021')$$,'P0001','PLUS_CHECKOUT_ATTEMPT_CONFLICT','Ambiguous provider failure cannot start a new attempt');
+select lives_ok($$select public.bind_plus_checkout_session('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000011','75000000-0000-4000-8000-000000000021','cs_test_first')$$,'Created session binds to same attempt');
+select throws_ok($$select public.bind_plus_checkout_session('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000012','75000000-0000-4000-8000-000000000021','cs_test_other')$$,'P0001','PLUS_LEASE_OR_BINDING_CONFLICT','Stale checkout writer cannot attach');
+select is(public.reserve_plus_checkout_attempt('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000011','75000000-0000-4000-8000-000000000022','75000000-0000-4000-8000-000000000021')->>'attemptId','75000000-0000-4000-8000-000000000022','Server-confirmed terminal session may rotate');
+select ok(not has_function_privilege('authenticated','public.reserve_plus_checkout_attempt(uuid,uuid,uuid,uuid)','execute'),'Clients cannot reserve attempts directly');
 select is(public.commit_plus_billing_snapshot('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000011','evt_pluspaid','invoice.paid',now(),'sub_plusone','cus_plusone','price_plus','active',now()+interval '30 days',false,'in_plusone',now()+interval '30 days',null),true,'Verified paid period commits');
 select is(public.read_plus_billing_access('75000000-0000-4000-8000-000000000001')->>'state','active','Paid Plus is active');
 select is((select count(*)::int from public.memberships where user_id='75000000-0000-4000-8000-000000000001'),0,'Plus does not grant Managed membership');

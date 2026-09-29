@@ -4,6 +4,7 @@ import {evaluatePlusBillingTruth,reconcileVerifiedPlusEvent,type PlusSubscriptio
 import {readPlusSubscriptionTruth,invoiceSubscription} from '../src/domain/plus-billing/stripeTruth.ts';
 import {plusBillingAccessSchema,parsePlusBillingLink} from '../src/contracts/PlusBilling.ts';
 import {plusBillingTransport,PlusBillingError} from '../src/services/remote/plusBillingTransport.ts';
+import {parsePlusCheckoutAttempt} from '../src/domain/plus-billing/checkoutAttempt.ts';
 const owner='75000000-0000-4000-8000-000000000001',other='75000000-0000-4000-8000-000000000002';
 const paid:PlusSubscriptionTruth={subscriptionId:'sub_plus',customerId:'cus_plus',priceId:'price_plus',status:'active',
  periodEnd:1900000000,cancelAtPeriodEnd:false,latestInvoice:{id:'in_plus',status:'paid',currency:'usd',amountPaid:499,periodEnd:1900000000}};
@@ -20,8 +21,11 @@ function stripeFixtures(){
  const subscription={id:'sub_plus',customer:'cus_plus',livemode:false,status:'active',cancel_at_period_end:false,
   pause_collection:null,pending_update:null as unknown,latest_invoice:'in_plus',items:{has_more:false,data:[{price,quantity:1,current_period_end:1900000000}]}};
  const invoice={id:'in_plus',customer:'cus_plus',livemode:false,status:'paid',currency:'usd',amount_paid:499,
+  discounts:[] as unknown[],total_discount_amounts:null as unknown,total_pretax_credit_amounts:null as unknown,
+  starting_balance:0,pre_payment_credit_notes_amount:0,post_payment_credit_notes_amount:0,
   parent:{type:'subscription_details',subscription_details:{subscription:'sub_plus'}},lines:{has_more:false,data:[{
-   quantity:1,pricing:{price_details:{price:'price_plus'}},parent:{subscription_item_details:{proration:false}},period:{end:1900000000}}]}};
+   quantity:1,amount:499,discounts:[] as unknown[],discount_amounts:null as unknown,pretax_credit_amounts:null as unknown,
+   pricing:{price_details:{price:'price_plus'}},parent:{subscription_item_details:{proration:false}},period:{end:1900000000}}]}};
  return {subscription,invoice};
 }
 test('paid current period grants Plus without a Managed tier',()=>{
@@ -106,4 +110,25 @@ test('client transport preserves only known server error codes',async()=>{
  const client={functions:{invoke:async()=>({data:null,error:{context:new Response(JSON.stringify({code:'PERMANENT_ACCOUNT_REQUIRED',message:'secret'}))}})}};
  await assert.rejects(plusBillingTransport(client).checkout(owner),(error:unknown)=>error instanceof PlusBillingError&&error.code==='PERMANENT_ACCOUNT_REQUIRED'&&!error.message.includes('secret'));
  await assert.rejects(plusBillingTransport(null).access(owner));
+});
+test('tax cannot hide invoice discounts, credits, or short product payment',()=>{
+ const mutations:Array<(i:ReturnType<typeof stripeFixtures>['invoice'])=>void>=[
+  i=>{i.discounts=['discount'];},i=>{i.total_discount_amounts=[{amount:50}];},i=>{i.total_pretax_credit_amounts=[{amount:50}];},
+  i=>{i.starting_balance=-50;},i=>{i.pre_payment_credit_notes_amount=50;},i=>{i.post_payment_credit_notes_amount=50;},
+  i=>{i.lines.data[0].discounts=['discount'];},i=>{i.lines.data[0].amount=449;},i=>{i.lines.data[0].pretax_credit_amounts=[{amount:50}];},
+ ];
+ for(const mutate of mutations){const {subscription,invoice}=stripeFixtures();invoice.amount_paid=525;mutate(invoice);
+  assert.throws(()=>readPlusSubscriptionTruth(subscription,invoice,'price_plus','cus_plus',false));}
+});
+test('checkout attempt is stable server identity across client retry IDs',()=>{
+ const attempt={attemptId:owner,sessionId:null,reservedAt:'2026-09-29T10:00:00Z'};
+ assert.equal(parsePlusCheckoutAttempt(attempt,Date.parse('2026-09-29T10:01:00Z')).attemptId,owner);
+});
+test('unbound checkout attempt stops before Stripe idempotency retention expires',()=>{
+ assert.throws(()=>parsePlusCheckoutAttempt({attemptId:owner,sessionId:null,reservedAt:'2026-09-28T10:00:00Z'},Date.parse('2026-09-29T10:00:00Z')),/REQUIRES_REVIEW/);
+ assert.equal(parsePlusCheckoutAttempt({attemptId:owner,sessionId:'cs_test_bound',reservedAt:'2026-09-28T10:00:00Z'},Date.parse('2026-09-29T10:00:00Z')).sessionId,'cs_test_bound');
+});
+test('malformed checkout attempt cannot become an idempotency key',()=>{
+ for(const change of [{attemptId:'client-value'},{sessionId:'https://evil'},{reservedAt:'never'}])
+  assert.throws(()=>parsePlusCheckoutAttempt({attemptId:owner,sessionId:null,reservedAt:'2026-09-29T10:00:00Z',...change},Date.parse('2026-09-29T10:01:00Z')));
 });
