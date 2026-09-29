@@ -6,6 +6,8 @@ import type {
   ProductResolutionResult,
 } from "../../../src/contracts/ProductIdentityResolver.ts";
 import {
+  equivalentGtinRepresentations,
+  identityEvidenceText,
   isValidGtin,
   normalizeBarcode,
   resolveProductIdentity,
@@ -28,6 +30,7 @@ const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
 const CATALOG_PAGE_SIZE = 1_000;
 const MAX_CATALOG_ROWS_PER_TABLE = 10_000;
 const MAX_BARCODE_IDENTIFIERS = 100;
+const MAX_EXACT_PRODUCTS = 100;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PHOTO_ROLES = new Set<ProductEvidencePhotoRole>(["front_label", "ingredients", "packaging"]);
 const ALLOWED_FIELDS = new Set([
@@ -126,6 +129,17 @@ async function loadPagedCatalogRows<T>(
     if (page.length < pageSize) return rows;
   }
   return rows;
+}
+
+async function keepVisibleProducts<T extends { id: string; is_catalog_standard: boolean }>(
+  admin: SupabaseClient, userId: string, freeOnly: boolean, rows: T[],
+): Promise<T[]> {
+  if (freeOnly || rows.every((row) => row.is_catalog_standard)) return rows;
+  const owned = await loadPagedCatalogRows<{ id: string; product_id: string }>("owner product links", (from, to) =>
+    admin.from("user_products").select("id, product_id")
+      .eq("user_id", userId).order("id", { ascending: true }).range(from, to));
+  const ownedIds = new Set(owned.map((row) => row.product_id));
+  return rows.filter((row) => row.is_catalog_standard || ownedIds.has(row.id));
 }
 
 function optionalString(value: unknown, field: string, max: number): string | undefined {
@@ -271,14 +285,16 @@ function isBarcodeOnly(request: ParsedRequest): boolean {
     && !request.ingredientList && request.evidencePhotos.length === 0);
 }
 
-async function loadBarcodeCatalog(admin: SupabaseClient, freeOnly: boolean, barcode: string): Promise<CatalogResolutionRecord[]> {
-  const identifierRows = await loadPagedCatalogRows<IdentifierRow>("barcode identifiers", (from, to) => {
-    const query = admin.from("product_identifiers")
-      .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at")
-      .eq("identifier_type", `gtin_${barcode.length}`).eq("identifier_value", barcode);
-    if (freeOnly) query.not("verified_at", "is", null);
-    return query.order("id", { ascending: true }).range(from, to);
-  });
+async function loadBarcodeCatalog(admin: SupabaseClient, userId: string,
+  freeOnly: boolean, barcode: string): Promise<CatalogResolutionRecord[]> {
+  const identifierRows = (await Promise.all(equivalentGtinRepresentations(barcode).map(({ type, value }) =>
+    loadPagedCatalogRows<IdentifierRow>("barcode identifiers", (from, to) => {
+      const query = admin.from("product_identifiers")
+        .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at")
+        .eq("identifier_type", type).eq("identifier_value", value);
+      if (freeOnly) query.not("verified_at", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    })))).flat();
   if (identifierRows.length === 0) return [];
   if (identifierRows.length > MAX_BARCODE_IDENTIFIERS) {
     throw new ServiceError("CATALOG_TOO_LARGE", "Barcode identity requires operator review", 503);
@@ -308,10 +324,67 @@ async function loadBarcodeCatalog(admin: SupabaseClient, freeOnly: boolean, barc
       return query.order("id", { ascending: true }).range(from, to);
     }),
   ]);
-  return projectCatalogRows(productRows, variantRows, formulaRows, identifierRows, freeOnly);
+  return projectCatalogRows(await keepVisibleProducts(admin, userId, freeOnly, productRows),
+    variantRows, formulaRows, identifierRows, freeOnly);
 }
 
-async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<CatalogResolutionRecord[]> {
+async function loadExactTypedCatalog(admin: SupabaseClient, userId: string, freeOnly: boolean,
+  brand: string, name: string): Promise<CatalogResolutionRecord[]> {
+  const { data: productIds, error } = await admin.rpc("lookup_product_identity_exact_ids", {
+    p_brand_key: identityEvidenceText(brand),
+    p_name_key: identityEvidenceText(name),
+    p_free_only: freeOnly,
+    p_user_id: userId,
+  });
+  if (error || !Array.isArray(productIds)) {
+    console.error("exact product identity lookup failed:", error?.code);
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Product identity catalog is unavailable", 500);
+  }
+  if (productIds.length > MAX_EXACT_PRODUCTS) {
+    throw new ServiceError("CATALOG_TOO_LARGE", "Product identity requires operator review", 503);
+  }
+  if (productIds.length === 0) return [];
+
+  const productRows = await loadPagedCatalogRows<ProductRow>("exact products", (from, to) => {
+    const query = admin.from("products")
+      .select("id, brand, name, is_catalog_standard, catalog_verified_at").in("id", productIds);
+    if (freeOnly) query.eq("is_catalog_standard", true).not("catalog_verified_at", "is", null);
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (productRows.length !== productIds.length) {
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Product identity catalog changed during resolution", 503);
+  }
+  const variantRows = await loadPagedCatalogRows<VariantRow>("exact variants", (from, to) => {
+    const query = admin.from("product_variants")
+      .select("id, product_id, variant_name, region_code, packaging_markers")
+      .in("product_id", productRows.map((row) => row.id)).eq("lifecycle_status", "active");
+    if (freeOnly) query.eq("catalog_verification_status", "verified");
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (variantRows.length === 0) return projectCatalogRows(
+    await keepVisibleProducts(admin, userId, freeOnly, productRows), [], [], [], freeOnly);
+  const variantIds = variantRows.map((row) => row.id);
+  const [formulaRows, identifierRows] = await Promise.all([
+    loadPagedCatalogRows<FormulaRow>("exact formulas", (from, to) => {
+      const query = admin.from("product_formula_versions")
+        .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers, ingredients, region_code")
+        .in("variant_id", variantIds);
+      if (freeOnly) query.eq("verification_status", "verified").not("catalog_public_source_url", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+    loadPagedCatalogRows<IdentifierRow>("exact identifiers", (from, to) => {
+      const query = admin.from("product_identifiers")
+        .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at")
+        .in("variant_id", variantIds);
+      if (freeOnly) query.not("verified_at", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+  ]);
+  return projectCatalogRows(await keepVisibleProducts(admin, userId, freeOnly, productRows),
+    variantRows, formulaRows, identifierRows, freeOnly);
+}
+
+async function loadCatalog(admin: SupabaseClient, userId: string, freeOnly: boolean): Promise<CatalogResolutionRecord[]> {
   const [productRows, variantRows, formulaRows, identifierRows] = await Promise.all([
     loadPagedCatalogRows<ProductRow>("products", (from, to) => {
       const query = admin.from("products").select("id, brand, name, is_catalog_standard, catalog_verified_at");
@@ -339,7 +412,8 @@ async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<Ca
     }),
   ]);
 
-  return projectCatalogRows(productRows, variantRows, formulaRows, identifierRows, freeOnly);
+  return projectCatalogRows(await keepVisibleProducts(admin, userId, freeOnly, productRows),
+    variantRows, formulaRows, identifierRows, freeOnly);
 }
 
 function projectCatalogRows(productRows: ProductRow[], variantRows: VariantRow[],
@@ -449,11 +523,64 @@ function recordForIds(catalog: CatalogResolutionRecord[], productId: string | nu
   );
 }
 
+interface StoredCandidateRow {
+  product_id: string | null;
+  variant_id: string | null;
+  formula_version_id: string | null;
+  candidate_basis: ProductResolutionCandidate["basis"];
+  match_reasons: string[] | null;
+}
+
+async function loadStoredCandidateNames(admin: SupabaseClient, userId: string,
+  candidates: StoredCandidateRow[]): Promise<Array<{
+  brand?: string; name?: string; variantName?: string;
+}>> {
+  const queryIds = <T extends string>(values: Array<T | null | undefined>): T[] =>
+    [...new Set(values.filter((value): value is T => Boolean(value)))];
+  const formulaIds = queryIds(candidates.map((candidate) => candidate.formula_version_id));
+  const formulaResult = formulaIds.length
+    ? await admin.from("product_formula_versions").select("id, variant_id").in("id", formulaIds)
+    : { data: [], error: null };
+  if (formulaResult.error) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
+  const formulas = new Map((formulaResult.data ?? []).map((row) => [row.id, row]));
+  const variantIds = queryIds([
+    ...candidates.map((candidate) => candidate.variant_id),
+    ...(formulaResult.data ?? []).map((row) => row.variant_id),
+  ]);
+  const variantResult = variantIds.length
+    ? await admin.from("product_variants").select("id, product_id, variant_name").in("id", variantIds)
+    : { data: [], error: null };
+  if (variantResult.error) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
+  const variants = new Map((variantResult.data ?? []).map((row) => [row.id, row]));
+  const productIds = queryIds([
+    ...candidates.map((candidate) => candidate.product_id),
+    ...(variantResult.data ?? []).map((row) => row.product_id),
+  ]);
+  const productResult = productIds.length
+    ? await admin.from("products").select("id, brand, name, is_catalog_standard").in("id", productIds)
+    : { data: [], error: null };
+  if (productResult.error) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
+  const visibleProducts = await keepVisibleProducts(admin, userId, false, productResult.data ?? []);
+  const products = new Map(visibleProducts.map((row) => [row.id, row]));
+  return candidates.map((candidate) => {
+    const formula = candidate.formula_version_id ? formulas.get(candidate.formula_version_id) : undefined;
+    if (candidate.formula_version_id && !formula) return {};
+    if (candidate.variant_id && formula?.variant_id && formula.variant_id !== candidate.variant_id) return {};
+    const variantId = candidate.variant_id ?? formula?.variant_id;
+    const variant = variantId ? variants.get(variantId) : undefined;
+    if (variantId && !variant) return {};
+    if (candidate.product_id && variant && variant.product_id !== candidate.product_id) return {};
+    const productId = candidate.product_id ?? variant?.product_id;
+    const product = productId ? products.get(productId) : undefined;
+    return { brand: product?.brand, name: product?.name, variantName: variant?.variant_name };
+  });
+}
+
 async function responseForCase(
   admin: SupabaseClient,
   userId: string,
   row: ResolutionCaseRow,
-  catalog: CatalogResolutionRecord[],
+  catalog?: CatalogResolutionRecord[],
   fallbackCandidates: ProductResolutionCandidate[] = [],
 ): Promise<ProductResolutionResult> {
   // Snapshot creation is serialized per case; retries return the immutable stored revision.
@@ -466,13 +593,16 @@ async function responseForCase(
   }
   const { data: storedCandidates, error } = await admin.from("product_resolution_candidates")
     .select("product_id, variant_id, formula_version_id, candidate_basis, match_reasons, rank_order")
-    .eq("case_id", row.id).order("rank_order", { ascending: true });
+    .eq("case_id", row.id).eq("user_id", userId).order("rank_order", { ascending: true });
   if (error) {
     console.error("product resolution candidate reload failed:", error.code);
     throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
   }
-  const candidates = (storedCandidates ?? []).map((candidate) => {
-    const record = recordForIds(catalog, candidate.product_id, candidate.variant_id, candidate.formula_version_id);
+  const replayNames = catalog ? undefined : await loadStoredCandidateNames(admin, userId, storedCandidates ?? []);
+  const candidates = (storedCandidates ?? []).map((candidate, index) => {
+    const record = catalog
+      ? recordForIds(catalog, candidate.product_id, candidate.variant_id, candidate.formula_version_id)
+      : replayNames?.[index];
     return {
       productId: candidate.product_id ?? undefined,
       variantId: candidate.variant_id ?? undefined,
@@ -546,15 +676,26 @@ Deno.serve(async (req: Request) => {
       if (replay.evidence_snapshot?.requestFingerprint && replay.evidence_snapshot.requestFingerprint !== requestFingerprint) {
         throw new ServiceError('REQUEST_CONFLICT', 'This request ID belongs to different evidence', 409);
       }
-      // Existing case presentation and immutable snapshots keep the original
-      // broad readback behavior, including non-barcode candidates.
-      const catalog = await loadCatalog(admin, !managedAccess);
-      return jsonResponse(await responseForCase(admin, userId, replay as ResolutionCaseRow, catalog));
+      // Persisted candidate IDs and the sealed truth revision are sufficient
+      // for replay; a growing catalog must never invalidate an old request ID.
+      return jsonResponse(await responseForCase(admin, userId, replay as ResolutionCaseRow));
     }
 
-    const catalog = isBarcodeOnly(request)
-      ? await loadBarcodeCatalog(admin, !managedAccess, request.barcode!)
-      : await loadCatalog(admin, !managedAccess);
+    const needsBroadRead = Boolean(request.ingredientList?.length || request.labelText || request.packagingText
+      || request.evidencePhotos.some((photo) => photo.extractedText
+        && (photo.role === "front_label" || photo.role === "packaging")));
+    const catalog = needsBroadRead
+      ? await loadCatalog(admin, userId, !managedAccess)
+      : isBarcodeOnly(request)
+      ? await loadBarcodeCatalog(admin, userId, !managedAccess, request.barcode!)
+      : request.barcode || (request.brand && request.productName)
+      ? (await Promise.all([
+          request.barcode ? loadBarcodeCatalog(admin, userId, !managedAccess, request.barcode) : Promise.resolve([]),
+          request.brand && request.productName
+            ? loadExactTypedCatalog(admin, userId, !managedAccess, request.brand, request.productName)
+            : Promise.resolve([]),
+        ])).flat()
+      : [];
 
     const photoText = request.evidencePhotos.filter((photo) => photo.extractedText);
     const decision = resolveProductIdentity({
