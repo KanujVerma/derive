@@ -20,14 +20,14 @@ export interface ContextFlowProps {
   onApply: (draft: ContextDraft) => void; onSkip: () => void;
   loading?: boolean; error?: string | null;
 }
-function AnswerChoices<T extends string>({ label, support, answer, choices, onChange, disabled, allowWithheld = true }: {
+function AnswerChoices<T extends string>({ label, support, answer, choices, onChange, disabled, allowWithheld = true, basic = false }: {
   label: string; support?: string; answer: Answer<T>; choices: readonly (readonly [T, string])[];
-  onChange: (answer: Answer<T>) => void; disabled: boolean; allowWithheld?: boolean;
+  onChange: (answer: Answer<T>) => void; disabled: boolean; allowWithheld?: boolean; basic?: boolean;
 }) {
   return <QuestionGroup label={label} support={support}><View style={styles.chips}>
-    {choices.map(([value, text]) => <ChoiceChip key={value} label={text} selectionType="single" selected={answer.state === 'answered' && answer.value === value} onSelect={() => onChange({ state: 'answered', value })} disabled={disabled} />)}
-    <ChoiceChip label="Leave unanswered" selectionType="single" selected={answer.state === 'unanswered'} onSelect={() => onChange({ state: 'unanswered' })} disabled={disabled} />
-    {allowWithheld && <ChoiceChip label="Prefer not to say" selectionType="single" selected={answer.state === 'withheld'} onSelect={() => onChange({ state: 'withheld' })} disabled={disabled} />}
+    {choices.map(([value, text]) => <ChoiceChip key={value} label={text} selectionType="single" selected={answer.state === 'answered' && answer.value === value} onSelect={() => onChange(basic && answer.state === 'answered' && answer.value === value ? { state: 'unanswered' } : { state: 'answered', value })} disabled={disabled} />)}
+    {!basic && <ChoiceChip label="Leave unanswered" selectionType="single" selected={answer.state === 'unanswered'} onSelect={() => onChange({ state: 'unanswered' })} disabled={disabled} />}
+    {!basic && allowWithheld && <ChoiceChip label="Prefer not to say" selectionType="single" selected={answer.state === 'withheld'} onSelect={() => onChange({ state: 'withheld' })} disabled={disabled} />}
   </View></QuestionGroup>;
 }
 /** Local optional collection. The host acknowledges saving and refreshes the originating Check. */
@@ -50,7 +50,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       {!editing && <Text style={styles.copy}>Step {step + 1} of {last + 1}</Text>}
     </View>
     {(editing || step === 0) && <View style={styles.questions}>
-      <AnswerChoices label="What would you most like to improve?" support="Choose one optional main priority." answer={draft.primaryGoal} allowWithheld={false} disabled={loading} choices={goals} onChange={value => { setValidation(null); setDraft(current => ({ ...current, primaryGoal: value, secondaryGoals: value.state === 'answered' ? current.secondaryGoals.filter(goal => goal !== value.value) : current.secondaryGoals })); }} />
+      <AnswerChoices label="What would you most like to improve?" support="Choose one optional main priority." answer={draft.primaryGoal} basic allowWithheld={false} disabled={loading} choices={goals} onChange={value => { setValidation(null); setDraft(current => ({ ...current, primaryGoal: value, secondaryGoals: value.state === 'answered' ? current.secondaryGoals.filter(goal => goal !== value.value) : current.secondaryGoals })); }} />
       <View style={styles.disclosure}>
         <Button label={otherGoalsVisible ? 'Hide additional goals' : draft.secondaryGoals.length ? 'Review other goals' : 'Add other goals'} variant="ghost" disabled={loading} onPress={() => setOtherGoalsVisible(!otherGoalsVisible)} />
         {otherGoalsVisible && <QuestionGroup label="Other goals" support="Optional. Choose up to two."><View style={styles.chips}>{goals.map(([value, label]) => <ChoiceChip key={value} label={label} selectionType="multiple" selected={draft.secondaryGoals.includes(value)} disabled={loading || (draft.primaryGoal.state === 'answered' && draft.primaryGoal.value === value) || (!draft.secondaryGoals.includes(value) && draft.secondaryGoals.length >= 2)} onSelect={() => { setValidation(null); setDraft(current => toggleSecondaryGoal(current, value)); }} />)}</View></QuestionGroup>}
@@ -58,8 +58,8 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       {collectIntent && <AnswerChoices label="What are you deciding?" support="This choice is saved with your profile and reused for future Checks. You can change it." answer={draft.intent} disabled={loading} choices={[['add', 'Add to my routine'], ['replace', 'Replace something'], ['check_current', 'Check what I use']]} onChange={value => update('intent', value)} />}
     </View>}
     {(editing || step === 1) && <View style={styles.questions}>
-      {askSkinFeel && <AnswerChoices label="How does your skin usually feel?" answer={draft.behavior} disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Neither dry nor oily'], ['combination', 'Oily in some areas, dry in others'], ['oily', 'Oily'], ['unsure', 'Not sure']]} onChange={value => update('behavior', value)} />}
-      <AnswerChoices label="Do skincare products tend to irritate your skin?" answer={draft.reactivity} disabled={loading} choices={[['reacts_easily', 'My skin gets irritated easily'], ['generally_tolerates', 'I generally tolerate products'], ['unsure', 'Not sure']]} onChange={value => update('reactivity', value)} />
+      {askSkinFeel && <AnswerChoices label="How does your skin usually feel?" answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Neither dry nor oily'], ['combination', 'Oily in some areas, dry in others'], ['oily', 'Oily']]} onChange={value => update('behavior', value)} />}
+      <AnswerChoices label="Do skincare products tend to irritate your skin?" answer={draft.reactivity} basic disabled={loading} choices={[['reacts_easily', 'My skin gets irritated easily'], ['generally_tolerates', 'I generally tolerate products']]} onChange={value => update('reactivity', value)} />
     </View>}
     {hasContext && (editing || step === 2) && <View style={styles.questions}>
       {contextQuestions.includes('treatments') && <QuestionGroup label="Treatments you use" support="Choose treatments you know you use."><View style={styles.chips}>
@@ -77,7 +77,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
     <View style={styles.actions}>
       <Button label={editing || step === last ? completionLabel : 'Continue'} loading={loading} onPress={() => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (editing || step === last) onApply(createContextDraft(draft)); else setStep(step + 1); }} />
       {!editing && step > 0 && <Button label="Back" variant="ghost" disabled={loading} onPress={() => setStep(step - 1)} />}
-      <Button label={editing ? 'Cancel profile edit' : 'Skip personalization'} variant="ghost" disabled={loading} onPress={onSkip} />
+      <Button label={editing ? 'Cancel profile edit' : 'Skip'} variant="ghost" disabled={loading} onPress={() => { if (editing) onSkip(); else if (step === last) onApply(createContextDraft(draft)); else setStep(step + 1); }} />
     </View>
   </View></Screen>;
 }
