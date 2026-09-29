@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/src/components/ui/Button';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { colors, layout, radii, spacing, typography } from '@/src/constants/theme';
 import type { DecisionBinding, DecisionNextStep } from '@/src/contracts/PersonalDecision';
 import { decisionPage } from '@/src/presentation/personal-decision/disclosure';
@@ -23,7 +24,7 @@ export function PersonalDecisionPanel({ packet, expectedBinding, onNextStep, emb
   const view = describePersonalDecision(packet, expectedBinding);
   if (view.kind === 'unavailable') {
     return <View style={embedded ? styles.embedded : styles.panel} accessibilityLiveRegion="polite">
-      <Text style={embedded ? styles.embeddedHeading : styles.eyebrow}>{embedded ? 'Personal Fit' : 'PERSONAL DECISION'}</Text>
+      {embedded ? <SectionHeader title="Personal Fit" /> : <Text style={styles.eyebrow}>PERSONAL DECISION</Text>}
       <Text style={styles.title} accessibilityRole="header">{view.title}</Text>
       <Text style={styles.body}>{view.message}</Text>
     </View>;
@@ -45,7 +46,7 @@ function ReadyDecisionPanel({ view, onNextStep, embedded, expanded }: { view: Ex
   // Every blocker remains expanded. Additional non-critical detail uses the disclosure.
   const visibleUnknowns = [...criticalUnknowns, ...otherUnknowns.slice(0, 1)];
   return <View style={embedded ? styles.embedded : styles.panel} accessibilityLiveRegion="polite">
-    <Text style={embedded ? styles.embeddedHeading : styles.eyebrow}>{embedded ? 'Personal Fit' : 'PERSONAL DECISION'}</Text>
+    {embedded ? <SectionHeader title="Personal Fit" /> : <Text style={styles.eyebrow}>PERSONAL DECISION</Text>}
     <Text style={styles.title} accessibilityRole="header">{view.title}</Text>
     <Text style={styles.reason}>{view.primaryReason}</Text>
     {view.criticalCautions.map((text, index) => <Text key={`critical-${index}`} style={styles.caution}>{text}</Text>)}
@@ -125,7 +126,6 @@ function PageNavigation({ page, label, onPage }: { page: ReturnType<typeof decis
 
 const styles = StyleSheet.create({
   embedded: {},
-  embeddedHeading: { color: colors.inkMuted, fontSize: typography.sizes.caption, fontWeight: typography.weights.medium },
   panel: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg },
   eyebrow: { color: colors.brand, fontSize: typography.sizes.micro, fontWeight: typography.weights.bold, letterSpacing: 1 },
   title: { color: colors.ink, fontSize: typography.sizes.sectionTitle, lineHeight: typography.lineHeights.sectionTitle,

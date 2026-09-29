@@ -5,6 +5,7 @@ import { colors, layout, spacing, typography } from '../../../constants/theme';
 import { describeCheckResultContent, type CheckResultContentInput } from '../../../presentation/check/result-sheet/content';
 import { PersonalDecisionPanel } from '../../personal-decision/PersonalDecisionPanel';
 import { PersonalFitSection } from '../../personalization/PersonalFitSection';
+import { SectionHeader } from '../../ui/SectionHeader';
 
 export interface CheckResultContentProps {
   input: CheckResultContentInput;
@@ -31,13 +32,13 @@ export function CheckResultContent({ input, expanded = true, showIdentity = true
       : fit.kind === 'legacy' ? <PersonalFitSection state={fit.state} embedded expanded={expanded}
         onPersonalize={model.canPersonalize ? onPersonalize : undefined} />
         : <View accessibilityLiveRegion="polite">
-          <Text style={styles.heading}>Personal Fit</Text>
+          <SectionHeader title="Personal Fit" />
           {model.outcome.kind === 'loading' && <ActivityIndicator style={styles.loading} color={colors.brand} />}
           <Text style={styles.title} accessibilityRole="header">{model.outcome.title}</Text>
           <Text style={styles.reason}>{model.outcome.reason}</Text>
         </View>}
     {expanded && <View style={styles.formula}>
-      <Text style={styles.heading} accessibilityRole="header">Formula details</Text>
+      <SectionHeader title="Formula details" />
       {facts.categoryLabel ? <Text style={styles.body}>{facts.categoryLabel}</Text> : null}
       {facts.formula ? <>
         <Text style={styles.body}>Verified ingredients for this exact package</Text>
@@ -58,7 +59,6 @@ const styles = StyleSheet.create({
   brand: { color: colors.inkMuted, fontSize: typography.sizes.caption },
   productName: { color: colors.ink, fontSize: typography.sizes.sectionTitle, lineHeight: typography.lineHeights.sectionTitle,
     fontWeight: typography.weights.semibold },
-  heading: { color: colors.inkMuted, fontSize: typography.sizes.caption, fontWeight: typography.weights.medium },
   title: { color: colors.ink, fontSize: typography.sizes.sectionTitle, lineHeight: typography.lineHeights.sectionTitle,
     fontWeight: typography.weights.semibold, marginTop: spacing.xs },
   reason: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, marginTop: spacing.xs },

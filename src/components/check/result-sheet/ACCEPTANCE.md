@@ -16,6 +16,8 @@ Identity leads, then Personal Fit or its limitation. Essential reason, all criti
 
 The surface is mineral-white; green is reserved for actions. Product names and essential content are not line-clamped. One bounded scroll area contains identity, answer and details. Drag interaction remains restricted to the existing handle; text scroll does not compete with a new gesture framework. Tap/accessible Expand, Collapse, Close and accessibility escape remain available. Layout animation observes Reduce Motion. Root owns modal focus restoration and keyboard/safe-area composition; physical verification remains required.
 
+The scroll view is keyed to owner/case/snapshot/revision (or owner/pending request), so a new result starts at its identity and essential guidance. Resolver recovery remains visible when shared content is a limitation or lacks a working bound action. A working personal action replaces fallback copy; an already displayed formula limitation is not repeated. This never adds unusable ingredient-photo instructions. Personal Fit and Formula details consume the reviewed shared `SectionHeader`.
+
 ## Lifecycle and return
 
 `createCheckResultLifecycle()` owns generation tokens only:
