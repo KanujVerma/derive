@@ -5,6 +5,7 @@ import { searchCatalogProducts } from '../../services/productCatalog';
 import { colors, radii, spacing, typography } from '../../constants/theme';
 import { catalogImagePresentation } from '../../presentation/check/result-sheet/model';
 import { Icon } from '../ui/Icon';
+import { createCatalogSearchController } from '../../presentation/catalog/searchController';
 
 interface Props {
   onSelect: (product: CatalogProductSummary) => void;
@@ -17,61 +18,57 @@ interface Props {
   onQueryChange?: (query: string) => void;
   errorCopy?: string;
   emptyCopy?: string;
+  embedded?: boolean;
+  preserveSelection?: boolean;
+  focusKey?: string | number;
 }
 
 export function CatalogProductSearch({
-  onSelect, selectedIds = [], actionLabel = 'Add', label = 'Add Product',
+  onSelect, selectedIds = [], actionLabel = 'Add', label = 'Add product',
   search = searchCatalogProducts,
   placeholder = 'Search brand or product name', keepFocusAfterSelect = true, onQueryChange,
   errorCopy = 'Search is unavailable right now. You can still add a product manually.',
   emptyCopy = 'No catalog match yet. Try another name or add it manually.',
+  embedded = false, preserveSelection = false, focusKey,
 }: Props) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<{ query: string; items: CatalogProductSummary[] }>({ query: '', items: [] });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [state, setState] = useState({ query: '', resultQuery: '', items: [] as CatalogProductSummary[], loading: false, error: false });
+  const { query, loading, error } = state;
   const inputRef = useRef<TextInput>(null);
-  const requestVersion = useRef(0);
-
+  const searchRef = useRef(search);
+  searchRef.current = search;
+  const controllerRef = useRef<ReturnType<typeof createCatalogSearchController<CatalogProductSummary>> | null>(null);
+  const controller = () => {
+    if (!controllerRef.current) controllerRef.current = createCatalogSearchController(value => searchRef.current(value), setState);
+    return controllerRef.current;
+  };
+  useEffect(() => () => { controllerRef.current?.dispose(); controllerRef.current = null; }, []);
+  const lastFocusKey = useRef(focusKey);
   useEffect(() => {
-    const cleaned = query.trim();
-    const version = ++requestVersion.current;
-    if (cleaned.length < 2) {
-      setResults({ query: '', items: [] });
-      setLoading(false);
-      setError(false);
-      return;
-    }
-    setLoading(true);
-    setError(false);
-    const timer = setTimeout(() => {
-      search(cleaned)
-        .then((items) => { if (requestVersion.current === version) setResults({ query: cleaned, items }); })
-        .catch(() => { if (requestVersion.current === version) { setResults({ query: cleaned, items: [] }); setError(true); } })
-        .finally(() => { if (requestVersion.current === version) setLoading(false); });
-    }, 275);
-    return () => { clearTimeout(timer); requestVersion.current++; };
-  }, [query, search]);
+    if (lastFocusKey.current === focusKey) return;
+    lastFocusKey.current = focusKey;
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [focusKey]);
 
   const select = (item: CatalogProductSummary) => {
-    onSelect(item);
-    setQuery('');
-    onQueryChange?.('');
-    setResults({ query: '', items: [] });
+    controller().select(preserveSelection);
+    if (!preserveSelection) onQueryChange?.('');
     if (keepFocusAfterSelect) inputRef.current?.focus();
     else inputRef.current?.blur();
+    onSelect(item);
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, embedded && styles.embedded]}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         ref={inputRef}
         style={styles.input}
         value={query}
-        onChangeText={(value) => { setQuery(value); setResults({ query: '', items: [] }); onQueryChange?.(value); }}
+        onChangeText={(value) => { controller().setQuery(value); onQueryChange?.(value); }}
+        onSubmitEditing={() => { void controller().submit(); }}
         placeholder={placeholder}
-        placeholderTextColor={colors.inkSubtle}
+        placeholderTextColor={colors.inkMuted}
         autoCorrect={false}
         autoCapitalize="none"
         accessibilityLabel="Search catalog products"
@@ -80,10 +77,10 @@ export function CatalogProductSearch({
       {query.trim().length === 1 && <Text style={styles.helper}>Type at least 2 characters.</Text>}
       {loading && <View style={styles.status}><ActivityIndicator size="small" color={colors.brand} /><Text style={styles.helper}>Searching products...</Text></View>}
       {error && <Text style={styles.helper} accessibilityRole="alert">{errorCopy}</Text>}
-      {!loading && !error && query.trim().length >= 2 && results.query === query.trim() && results.items.length === 0 && (
+      {!loading && !error && query.trim().length >= 2 && state.resultQuery === query.trim() && state.items.length === 0 && (
         <Text style={styles.helper}>{emptyCopy}</Text>
       )}
-      {!loading && !error && results.query === query.trim() && results.items.map((item) => {
+      {!loading && !error && state.resultQuery === query.trim() && state.items.map((item) => {
         const alreadyAdded = selectedIds.includes(item.productId);
         const image = catalogImagePresentation(item.imageUrl);
         return (
@@ -116,6 +113,7 @@ export function CatalogProductSearch({
 
 const styles = StyleSheet.create({
   container: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.xs },
+  embedded: { borderWidth: 0, borderRadius: 0, padding: 0, backgroundColor: 'transparent' },
   label: { color: colors.ink, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, color: colors.ink, backgroundColor: colors.canvas },
   helper: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: 19 },

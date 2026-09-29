@@ -163,3 +163,22 @@ export const layout = {
   ctaHeight: 54,
 } as const;
 
+/** Each relationship is spaced once, by its enclosing group. */
+export const rhythm = {
+  titleToSupport: spacing.xs,
+  labelToContent: spacing.xs,
+  relatedControls: spacing.sm,
+  relatedRows: spacing.md,
+  cardPadding: spacing.lg,
+  screenGutter: spacing.xl,
+  majorTransition: spacing.xxl,
+} as const;
+
+export const textStyles = {
+  sectionHeading: { fontFamily: typography.fontFamilies.sans, fontSize: typography.sizes.caption,
+    lineHeight: typography.lineHeights.caption, fontWeight: typography.weights.semibold, color: colors.inkMuted },
+  question: { fontFamily: typography.fontFamilies.sans, fontSize: typography.sizes.bodyLarge,
+    lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.medium, color: colors.ink },
+  supporting: { fontFamily: typography.fontFamilies.sans, fontSize: typography.sizes.caption,
+    lineHeight: typography.lineHeights.caption, color: colors.inkMuted },
+} as const;

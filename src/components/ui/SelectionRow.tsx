@@ -22,6 +22,7 @@ interface SelectionRowProps {
   badge?: string;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  embedded?: boolean;
 }
 
 export const SelectionRow: React.FC<SelectionRowProps> = ({
@@ -35,6 +36,7 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
   badge,
   disabled = false,
   style,
+  embedded = false,
 }) => {
   const handlePress = () => {
     if (disabled) return;
@@ -54,13 +56,14 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
       disabled={disabled}
       style={[
         styles.row,
+        embedded && styles.embedded,
         selected && styles.rowSelected,
         disabled && styles.rowDisabled,
         style,
       ]}
       accessible={true}
       accessibilityRole={isRadio ? 'radio' : 'checkbox'}
-      accessibilityState={{ selected, disabled }}
+      accessibilityState={{ checked: selected, disabled }}
       accessibilityLabel={`${title}${desc ? `, ${desc}` : ''}`}
     >
       <View style={styles.content}>
@@ -99,6 +102,7 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
 };
 
 const styles = StyleSheet.create({
+  embedded: { borderWidth: 0, borderRadius: 0 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

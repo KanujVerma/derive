@@ -7,6 +7,7 @@ import {
   StyleProp,
 } from 'react-native';
 import { colors, radii, typography, spacing } from '@/src/constants/theme';
+import { SectionHeader, type SectionHeaderAction } from './SectionHeader';
 
 interface GroupedSectionProps {
   header?: string;
@@ -14,6 +15,8 @@ interface GroupedSectionProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   containerStyle?: StyleProp<ViewStyle>;
+  headerAction?: SectionHeaderAction;
+  embedded?: boolean;
 }
 
 export const GroupedSection: React.FC<GroupedSectionProps> = ({
@@ -22,18 +25,18 @@ export const GroupedSection: React.FC<GroupedSectionProps> = ({
   children,
   style,
   containerStyle,
+  headerAction,
+  embedded = false,
 }) => {
   const validChildren = React.Children.toArray(children).filter(Boolean);
 
   return (
-    <View style={[styles.wrapper, style]}>
+    <View style={[styles.wrapper, embedded && styles.embeddedWrapper, style]}>
       {header && (
-        <Text style={styles.header} accessibilityRole="header">
-          {header}
-        </Text>
+        <View style={styles.header}><SectionHeader title={header} action={headerAction} /></View>
       )}
 
-      <View style={[styles.card, containerStyle]}>
+      <View style={[styles.card, embedded && styles.embeddedCard, containerStyle]}>
         {validChildren.map((child, index) => {
           const isLast = index === validChildren.length - 1;
           return (
@@ -55,15 +58,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   header: {
-    fontSize: typography.sizes.micro,
-    lineHeight: typography.lineHeights.micro,
-    fontWeight: typography.weights.bold,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: colors.inkMuted,
     marginBottom: spacing.xs,
-    paddingHorizontal: spacing.xs,
   },
+  embeddedWrapper: { marginBottom: 0 },
+  embeddedCard: { backgroundColor: 'transparent', borderWidth: 0, borderRadius: 0 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -79,7 +77,7 @@ const styles = StyleSheet.create({
   footer: {
     fontSize: typography.sizes.caption,
     lineHeight: typography.lineHeights.caption,
-    color: colors.inkSubtle,
+    color: colors.inkMuted,
     marginTop: spacing.xs,
     paddingHorizontal: spacing.xs,
   },
