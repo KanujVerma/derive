@@ -15,7 +15,7 @@ test('capture is presented above the tab navigator with a fresh native safe-area
 });
 
 test('capture options scroll independently of the shutter and expose all roles', () => {
-  const collecting = capture.slice(capture.indexOf('<View style={styles.collecting}>'), capture.indexOf('<View style={[styles.outcomeWrap'));
+  const collecting = capture.slice(capture.indexOf('style={styles.collecting}'), capture.indexOf('<View style={[styles.outcomeWrap'));
   assert.match(collecting, /<ScrollView style=\{styles\.controlScroll\}/);
   assert.ok(collecting.indexOf('</ScrollView>') < collecting.indexOf('<View style={styles.captureActions}>'));
   assert.doesNotMatch(collecting, /<ScrollView horizontal/);
@@ -26,7 +26,7 @@ test('capture options scroll independently of the shutter and expose all roles',
 
 test('barcode guide is visual-only and the camera/shutter retain existing safety controls', () => {
   assert.match(capture, /pointerEvents="none" style=\{styles\.guideArea\}/);
-  assert.match(capture, /const liveBarcode = !detectionPaused && !currentEvidence && !previewUri/);
+  assert.match(capture, /const liveBarcode = !detectionPaused && !notice && !currentEvidence && !previewUri/);
   assert.match(capture, /intent === 'barcode' \|\| \(intent === 'auto' && capturedPhotos\.length === 0\)/);
   assert.match(capture, /\{liveBarcode \? \(/);
   assert.match(capture, /onBarcodeScanned=\{liveBarcode \? onBarcode : undefined\}/);

@@ -30,7 +30,9 @@ test('auto barcode guide uses four corners without implying verified identity', 
   assert.match(capture, /guideTopLeft: \{[^\n]*borderTopLeftRadius: radii\.xs/);
   assert.doesNotMatch(capture, /guideCorner: \{[^\n]*borderRadius:/);
   assert.match(capture, /Alignment aid only: Expo still detects barcodes across the whole preview/);
-  assert.match(capture, /Photos do not verify the formula/);
+  assert.match(capture, /label="Add photo of ingredient list"/);
+  assert.match(capture, /'Or search by name'/);
+  assert.doesNotMatch(capture, /Photos do not verify the formula/);
 });
 
 test('capture and recovery controls stay accessible and scroll clear of the footer', () => {
@@ -43,12 +45,13 @@ test('capture and recovery controls stay accessible and scroll clear of the foot
 });
 
 test('default Auto keeps one visible shutter while the five modes open in a compact vertical popover', () => {
-  assert.match(capture, /\(showCorrection \|\| \(previewUri && !previewRole\)\) && <CameraGlass style=\{styles\.modeMenu\}>/);
-  assert.match(capture, /accessibilityLabel="Change part"/);
+  assert.match(capture, /showCorrection && !previewUri && <CameraGlass style=\{styles\.modeMenu\}>/);
+  assert.doesNotMatch(capture, /accessibilityLabel="Change part"/);
   assert.match(capture, /roleRow: \{[^\n]*flexDirection: 'column'/);
   assert.match(capture, /roleChip: \{[^\n]*minHeight: layout\.minTouchTarget/);
   assert.match(capture, /selected && <Icon name="check"/);
-  assert.match(capture, /!previewUri && !currentEvidence && <View style=\{\[styles\.selectorSlot/);
+  assert.match(capture, /<View style=\{styles\.controlRow\}>/);
+  assert.match(capture, /<View style=\{styles\.sideSlot\}>/);
   assert.match(capture, /LayoutAnimation\.configureNext\(\{ duration: 180/);
   assert.match(capture, /intent !== 'auto' && <CameraGlass style=\{styles\.guidancePill\}>/);
   assert.match(capture, /session\.evidence\.length > 0 && <Action label="Check product"/);

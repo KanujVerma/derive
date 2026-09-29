@@ -42,7 +42,7 @@
 
 **EVALUATION:** Define scanner depth before looking at outcomes: first supported Check, repeat Check, saved product, routine context used, and cross-product action, each measured as nonsensitive event names/counts. Track Managed information view, expressed interest, eligible invitation, actual activation, and service retention separately. Compare qualified cohorts and control for acquisition source and baseline intent; observational correlation is not causal evidence that scanning creates Managed demand. Interview people who decline as well as those who express interest. Keep skin details, photos, ingredient names, and sensitive context out of analytics.
 
-**OPEN FOUNDER DECISION:** Define the Early Access promise and what happens after an interest action. Approval of an interest CTA is distinct from approval to charge or offer Managed publicly.
+**IMPLEMENTED:** A free Plan screen explains Managed Skincare as delegated routine care at the `$25/month` hypothesis, with products purchased separately, and records owner-bound waitlist interest. Joining is not payment, enrollment, or proof of willingness to pay. There is no scarcity count, checkout, or notification campaign. Invitation and in-app notice come later from the canonical joined rows.
 
 ## Distribution, referrals, and commerce
 
@@ -61,6 +61,6 @@
 1. Whether the first external candidate can meet the preferred Derive plus Plus/Founding direction, or must use the Free-only fallback. Name and implement the exact Plus benefit before a paid offer.
 2. Whether to run Founding Plus at launch; if yes, approve eligibility, term, expiration/renewal terms, and the primary learning metric. Do not assume `250/60` is optimal.
 3. Whether to test `$4.99/month` and `$30–40/year` after value and cost evidence, and which price variants are allowed in a later experiment. No storefront product is approved by this note.
-4. What Managed Early Access commits Derive to do with expressed interest, and who can fulfill that response.
+4. Managed Early Access interest is a canonical waitlist join. Fulfillment, invitation, and any later notice are still open; the join itself does not start care or billing.
 
 Billing provider, iOS purchase path, referral rewards, commerce partner terms, and ads remain separate later decisions. Existing Stripe Founding Beta source does not grant authority to sell Plus in iOS or claim hosted Managed activation.
