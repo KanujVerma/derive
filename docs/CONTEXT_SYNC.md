@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: Account & Settings for free and preview
+
+- **Predecessor:** `origin/main` `d02f8ba1f81b9c181cb7bd1172ef8fb3867c92ab`.
+- **Scope:** One Account & Settings surface for development preview, anonymous Free, and permanent Free. Preview has no sign-out or deletion. Anonymous Free can delete session data and does not sign out. Permanent Free shows the real email, sign-out, and account deletion. Managed account stays on the existing screen. Save-account upgrade is not shown.
+- **Links:** Privacy Policy, Privacy Choices, and Help & feedback use the existing public legal URLs. The footer version comes from the Expo config, not the Expo Go binary.
+
 ## 2026-09-29: Free Plan offer composition
 
 - **Predecessor:** `origin/main` `bf20d78443fbd8a939071bff4e64b372000d9053`.

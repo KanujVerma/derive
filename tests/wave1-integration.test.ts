@@ -131,10 +131,10 @@ test('Wave-1 auth events retain same-user access and purge it on a new UUID', ()
 
 test('Wave-1 free Account distinguishes anonymous from permanent without a membership claim', () => {
   assert.deepEqual(getFreeAccountPresentation('anonymous'), {
-    intro: 'Check products without entering an email.', showSignOut: false,
+    intro: 'You can use Check and My Stuff without signing in.', showSignOut: false,
   });
   assert.deepEqual(getFreeAccountPresentation('permanent'), {
-    intro: 'Signed in for product checks.', showSignOut: true,
+    intro: '', showSignOut: true,
   });
 });
 
@@ -143,7 +143,11 @@ test('Wave-1 UI consumption keeps free flows apart from managed work', () => {
   const check = read('src/components/check/CheckProductScreen.tsx');
   const plan = read('app/(tabs)/plan.tsx');
   const shop = read('app/(tabs)/shop.tsx');
-  const account = read('src/components/account/FreeAccountShell.tsx');
+  const account = [
+    'src/components/account/accountSettingsPresentation.ts',
+    'src/components/account/AccountSettingsShell.tsx',
+    'src/components/account/FreeAccountShell.tsx',
+  ].map(read).join('\n');
   assert.match(root, /managedAccess/);
   assert.match(root, /local_free_integration/);
   assert.match(check, /searchPreviewCatalog/);
