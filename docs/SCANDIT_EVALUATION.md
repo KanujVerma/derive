@@ -7,6 +7,7 @@ The current Check flow keeps Expo Camera. This branch adds a separate native dev
 - A Scandit trial is non-billable, expires after 30 days, and is limited to 100 device activations. Scandit says trial scanning requires an internet connection. No public per-scan ceiling was found in its trial terms; confirm the exact license in the dashboard.
 - Scandit's Community Edition for Education is free with unlimited scans/devices **for non-commercial use only**. Derive's planned commercial app needs a separately agreed commercial production license. Do not assume a student signup grants commercial use.
 - Expo Go cannot run the native Scandit SDK. A custom native development build is required. The trial key belongs in the app-side development configuration, not Supabase Edge Functions. It is embedded in the development app bundle, so keep it out of Git and never reuse it as a server secret.
+- Even when this lab route is hidden, a normal native build from a branch containing the Scandit dependencies links their native frameworks. Keep this PR unmerged/draft while license and binary-distribution terms are unresolved; a hidden route alone is not a release isolation mechanism.
 - Scandit decodes UPC/EAN symbols; Derive still needs a verified barcode-to-product/variant/formula record or must show unknown. Better decoding alone does not improve catalog coverage.
 
 ## Local setup
