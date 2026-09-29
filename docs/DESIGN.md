@@ -1,4 +1,73 @@
-# Derive Design System: Direction A (Mineral)
+# Derive design: Direction A / Mineral
+
+## Current scanner-first contract
+
+Derive should help a person answer “Should I use this product?” before asking for optional context. Use warm ivory canvas, mineral-white content, dark ink and restrained Mineral green. Functional titles, labels, inputs and actions use system sans-serif. Existing managed-first references below are historical; they do not prescribe today's navigation, material implementation or questionnaire.
+
+Keep Check home minimal: shared mark/title/Account header, Open camera, name search, separate product-link input and intentional whitespace. Current root tabs are Check, My Stuff, Plan and Shop. Account is a Back subpage. Preserve the accepted Managed Early Access offer, $25/month display hypothesis, products purchased separately and honest canonical waitlist state. Changing tabs, offers, prices or entitlements requires a product decision.
+
+Consistency means the same role follows the same rule. Primary and secondary actions intentionally differ. Brand green identifies action/selection or a restrained offer eyebrow; it does not establish a favorable skincare finding. No universal score, decorative badge, filler, emoji or customer-copy em dash.
+
+## Semantic type and color
+
+| Role | Style | Rule |
+| --- | --- | --- |
+| Root/page title | System sans, 26/32, bold, ink | Reuse ScreenHeader/RootShellHeader and shared mark. |
+| Section heading | System sans, 13/18, semibold, inkMuted | Sentence case outside grouped content; optional adjacent action. No automatic uppercase or green status inference. |
+| Question | System sans, 17/24, medium, ink | Reuse QuestionGroup; necessary support remains readable below it. |
+| Body / row title | 15/22 or 17/24, ink | Size follows reading task and hierarchy; wrap long names. |
+| Necessary support / uncertainty | 13/18, inkMuted | Never use inkSubtle for necessary instructions, caution, errors or privacy explanations. |
+| Primary action | Mineral green, inverse text, at least 44pt | One obvious action per state; preserve meaningful secondary actions. |
+| Caution / error | Existing semantic alert color plus explicit text | Always include meaning in words, independent of color or payment. |
+
+`src/constants/theme.ts` is the actual palette. `textStyles` and `rhythm` are the shared semantic exports. Existing serif/mono tokens remain for historical consumers; this pass introduces no serif functional UI.
+
+## Spacing and anatomy
+
+| Relationship | Token / points | Owner |
+| --- | --- | --- |
+| Title to support | rhythm.titleToSupport / 8 | Header/group |
+| Question label to content | rhythm.labelToContent / 8 | QuestionGroup; no child top margin |
+| Related controls | rhythm.relatedControls / 12 | Control group |
+| Related rows | rhythm.relatedRows / 16 | List/group |
+| Card padding | rhythm.cardPadding / 20 | Content surface |
+| Root/content gutter | rhythm.screenGutter / 24 | Screen/header |
+| Major transition | rhythm.majorTransition / 32 | Parent composition |
+
+Spacing is applied once per relationship. Do not combine a label bottom margin with a chip-group top margin. Content groups own their gaps; embedded GroupedSection removes its default enclosing card and margin. Over-camera and narrow contextual overlays may use 16pt gutters deliberately, while their internal rows follow the same type and control rules.
+
+SectionHeader provides a persistent section action such as “+ Add” with explicit Add product/Add experience accessibility label and at least a 44pt target. An empty section does not duplicate that action in another card. Rows distinguish a title, necessary supporting metadata, and a real action. Decorative chevrons are omitted when no navigation exists. ChoiceChip announces radio for a single choice and checkbox for multiple choice; all sizes remain at least 44pt tall. SelectionRow embedded mode avoids nested bordered cards.
+
+CatalogProductSearch has an embedded variant for sheets/editors, so a search inside a grouped surface does not create another card. Its keyboard submit uses the same request gate as debounce. Contextual selection preserves query/results and supports focus restoration; existing additive consumers retain their default clear-after-add behavior.
+
+## Results and context
+
+Identity, Personal Fit or the actual limitation, essential reason/caution and relevant action come before optional Formula Details and source depth. These roles need coherent hierarchy, not identical cards. Critical cautions and meaningful unknowns remain visible at every sheet detent. Unknown identity, missing exact formula, missing context, unsupported rule, service failure, unacknowledged save and preview incapability remain distinct. Additional profile answers never repair missing formula evidence or unsupported science.
+
+Reuse shared result content for contextual camera/search/link surfaces and later full detail. Dismiss restores the originating scanner or query/list/scroll/focus. Tab switches retain valid state. Profile editing retains the same owner/product/case and refreshes only after canonical acknowledgment. Saved historical results require immutable owner-bound detail; current reassessment is a separately labeled action.
+
+Profile setup remains optional. Use an explicit main priority and progressive secondary goals, plain self-reported skin-feel wording, and separate reactivity. Collect treatment/sensitivity/reproductive context only at supported triggers. Blank, unsure, withheld and explicit no remain distinct where the actual contract supports them. My Stuff provides Skin profile, Your products, Check history and Your experience, with creation actions where supported. A saved/considering product does not become current routine context, and a reported reaction does not become a proven allergy.
+
+## Materials and accessibility
+
+| Surface | Treatment |
+| --- | --- |
+| Floating navigation/controls with content behind | GlassContainer material=chrome when actual module, API and compiled runtime support it. |
+| Reading, questionnaire, formula and result content | Mineral-white surface; GlassContainer material=content is opaque. |
+| Unsupported runtime or Reduce Transparency | Opaque readable light/dark Mineral fallback. No availability claim from module import alone. |
+| Rounded controls | Native surface and boundary follow the caller's actual radius; optional border can be omitted. |
+
+The existing expo-glass-effect package is sufficient. Camera-local BlurView plus tint is a different implementation, owned by Sami's active capture lane; coordinate its semantic alignment rather than replacing the scanner. GlassContainer explicitly observes Reduce Transparency. No motion is required to understand shared primitives; animated consumers must honor Reduce Motion and provide tap/accessible alternatives. Check long names, larger text, small/large screens, contrast, keyboard, safe area, scroll versus drag and VoiceOver on actual UI.
+
+Native tabs are evaluated only in an isolated compatibility prototype. Existing Router/navigation remains until state retention, legacy/target shell behavior, access-driven routes, insets, modal/camera presentation and physical accessibility are proven. A material correction does not authorize a navigation migration.
+
+See [the 2026-09-29 decision and question matrix](ux/UX_CONSISTENCY_2026_09_29.md) for inspected consumers, deferred authority gaps and acceptance gates. [Expo glass](https://docs.expo.dev/versions/latest/sdk/glass-effect/) documents runtime/accessibility checks; [Apple materials](https://developer.apple.com/design/human-interface-guidelines/materials) supplies the platform design anchor. Neither source proves Derive's runtime or clinical accuracy.
+
+---
+
+The reference below preserves earlier managed-first design guidance, including obsolete five-tab and display-serif rules. The current contract above and actual source take precedence.
+
+## Historical managed-first design reference
 
 Derive's visual language is modeled on Apple-grade minimalism and quiet luxury. It conveys calm, architectural precision rather than clinical coldness or frantic gamification.
 

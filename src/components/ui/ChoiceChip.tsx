@@ -8,8 +8,9 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, typography, spacing } from '@/src/constants/theme';
+import { colors, radii, typography, spacing, layout } from '@/src/constants/theme';
 import { Icon, IconName } from './Icon';
+import { choiceAccessibility } from '../../presentation/ui/selection';
 
 interface ChoiceChipProps {
   label: string;
@@ -19,6 +20,7 @@ interface ChoiceChipProps {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   size?: 'small' | 'medium';
+  selectionType?: 'single' | 'multiple';
 }
 
 export const ChoiceChip: React.FC<ChoiceChipProps> = ({
@@ -29,6 +31,7 @@ export const ChoiceChip: React.FC<ChoiceChipProps> = ({
   disabled = false,
   style,
   size = 'medium',
+  selectionType = 'multiple',
 }) => {
   const handlePress = async () => {
     if (disabled) return;
@@ -39,6 +42,7 @@ export const ChoiceChip: React.FC<ChoiceChipProps> = ({
   };
 
   const isSmall = size === 'small';
+  const accessibility = choiceAccessibility(selectionType, selected, disabled);
 
   return (
     <TouchableOpacity
@@ -46,8 +50,8 @@ export const ChoiceChip: React.FC<ChoiceChipProps> = ({
       onPress={handlePress}
       disabled={disabled}
       accessible={true}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: selected, disabled }}
+      accessibilityRole={accessibility.role}
+      accessibilityState={accessibility.state}
       accessibilityLabel={label}
       style={[
         styles.chip,
@@ -82,6 +86,7 @@ export const ChoiceChip: React.FC<ChoiceChipProps> = ({
 
 const styles = StyleSheet.create({
   chip: {
+    minWidth: layout.minTouchTarget,
     borderRadius: radii.full,
     flexDirection: 'row',
     alignItems: 'center',
@@ -91,7 +96,7 @@ const styles = StyleSheet.create({
   chipSmall: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
-    minHeight: 32,
+    minHeight: 44,
   },
   chipMedium: {
     paddingHorizontal: spacing.md,
