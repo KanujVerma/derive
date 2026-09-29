@@ -94,3 +94,31 @@ test('concurrent save presses issue one request and publish only after acknowled
   assert.equal(controller.getState().status, 'saving'); release(saved(requests[0]));
   assert.equal((await pending)?.state, 'stopped'); assert.equal(controller.getState().status, 'saved');
 });
+
+test('an owner transition during acknowledged-state publication prevents stale save return', async () => {
+  const { controller, changeOwner } = setup();
+  controller.enterManual({ name: 'Cream' }); controller.chooseState('using');
+  const stop = controller.subscribe(() => {
+    if (controller.getState().status === 'saved') { changeOwner('B'); changeOwner('A'); }
+  });
+  assert.equal(await controller.save(), null);
+  assert.equal(controller.getState().status, 'editing');
+  assert.equal(controller.getState().draft.product, null);
+  stop();
+});
+
+test('delivering an acknowledged record requires its original owner generation and happens once', async () => {
+  const { controller, changeOwner } = setup();
+  controller.enterManual({ name: 'Cream' }); controller.chooseState('using');
+  const first = await controller.save(); assert.ok(first);
+  let deliveries = 0;
+  assert.equal(controller.deliverAcknowledgement(first, () => { deliveries++; }), true);
+  assert.equal(controller.deliverAcknowledgement(first, () => { deliveries++; }), false);
+  assert.equal(deliveries, 1);
+  changeOwner('B'); changeOwner('A');
+  controller.enterManual({ name: 'New cream' }); controller.chooseState('considering');
+  const second = await controller.save(); assert.ok(second);
+  changeOwner('B'); changeOwner('A');
+  assert.equal(controller.deliverAcknowledgement(second, () => { deliveries++; }), false);
+  assert.equal(deliveries, 1);
+});

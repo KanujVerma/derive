@@ -22,6 +22,7 @@ export class ProductEntryController {
   private state: ProductEntryState = { ownerId: null, draft: { product: null, state: null }, status: 'unavailable', error: null };
   private generation = 0;
   private pending: SaveRequest | null = null;
+  private acknowledged: { record: FreeSavedProduct; ownerId: string; generation: number; epoch: number | undefined } | null = null;
   private listeners = new Set<() => void>();
   private gateway: ProductEntryGateway;
   constructor(gateway: ProductEntryGateway) { this.gateway = gateway; }
@@ -30,7 +31,7 @@ export class ProductEntryController {
   private publish(patch: Partial<ProductEntryState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); }
   setOwner(ownerId: string | null) {
     if (ownerId === this.state.ownerId) return;
-    this.generation++; this.pending = null;
+    this.generation++; this.pending = null; this.acknowledged = null;
     this.publish({ ownerId, draft: { product: null, state: null }, status: ownerId ? 'editing' : 'unavailable', error: null });
   }
   private edit(patch: Partial<ProductEntryDraft>) {
@@ -40,6 +41,15 @@ export class ProductEntryController {
   enterManual(product: { name: string; brand?: string }) { this.edit({ product: { ...product } }); }
   selectCatalog(product: { productId: string; name: string; brand?: string }) { this.edit({ product: { ...product } }); }
   chooseState(state: FreeProductState) { this.edit({ state }); }
+  /** Acknowledgment can cross a microtask boundary before the host returns to its list. */
+  deliverAcknowledgement(record: FreeSavedProduct, onSaved: (record: FreeSavedProduct) => void): boolean {
+    const ack = this.acknowledged;
+    if (!ack || ack.record !== record || ack.ownerId !== this.state.ownerId || ack.generation !== this.generation
+      || this.gateway.getOwner() !== ack.ownerId || this.gateway.getOwnerEpoch?.() !== ack.epoch || this.state.status !== 'saved') return false;
+    this.acknowledged = null;
+    onSaved(record);
+    return true;
+  }
   async save(): Promise<FreeSavedProduct | null> {
     const owner = this.state.ownerId, generation = this.generation, epoch = this.gateway.getOwnerEpoch?.();
     const current = () => this.state.ownerId === owner && this.generation === generation && this.gateway.getOwner() === owner && this.gateway.getOwnerEpoch?.() === epoch;
@@ -61,8 +71,9 @@ export class ProductEntryController {
         || (request.product.productId ? result.productId !== request.product.productId || result.source !== 'catalog'
           : result.productId !== null || result.source !== 'user_reported' || result.name !== request.product.name || result.brand !== (request.product.brand ?? null))) throw new Error('UNCONFIRMED_PRODUCT');
       this.pending = null;
+      this.acknowledged = { record: result, ownerId: owner, generation, epoch };
       this.publish({ status: 'saved', error: null });
-      return result;
+      return current() ? result : null;
     } catch {
       if (current()) this.publish({ status: 'error', error: 'This save was not confirmed. Retry the same save before changing its details, or go back.' });
       return null;
