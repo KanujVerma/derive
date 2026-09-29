@@ -6,6 +6,8 @@ import type { ProductResolutionResult } from '../src/contracts/ProductIdentityRe
 import {
   catalogImagePresentation, buildScanResultSheet, isCurrentSheetBinding, selectCurrentSheetModel,
   isCurrentRequestedEvidenceAction, resultSheetDetailMaxHeight,
+  resultSheetNextAction,
+  resultSheetPresentationKey,
 } from '../src/presentation/check/result-sheet/model.ts';
 
 const product: CatalogProductSummary = {
@@ -195,4 +197,27 @@ test('case/state/product mismatch or non-requested capture never starts another 
   if (noSnapshotRequest.kind === 'result') assert.equal(noSnapshotRequest.requestedEvidence, null);
   const noResolver = buildScanResultSheet({ kind: 'snapshot', snapshot: ingredientSnapshot });
   if (noResolver.kind === 'result') assert.equal(noResolver.requestedEvidence, null);
+});
+
+test('a generic ingredient request is not actionable without the bound continuation callback', () => {
+  const model = buildScanResultSheet({ kind: 'snapshot', snapshot: ingredientSnapshot, resolverResult: ingredientResolution });
+  assert.equal(model.kind, 'result');
+  if (model.kind !== 'result') return;
+  assert.doesNotMatch(resultSheetNextAction(model, false) ?? '', /photograph|add ingredient/i);
+  assert.equal(resultSheetNextAction(model, true), null);
+  const noRequest = buildScanResultSheet({ kind: 'snapshot', snapshot: ingredientSnapshot });
+  if (noRequest.kind === 'result') assert.doesNotMatch(resultSheetNextAction(noRequest, false) ?? '', /photograph|add ingredient/i);
+});
+
+test('each new case, snapshot and pending operation owns a fresh scroll presentation', () => {
+  const previous = buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, ownerId: 'owner-a' });
+  const key = resultSheetPresentationKey(previous);
+  for (const snapshot of [ { ...verifiedProductTruth, snapshotId: 'new-snapshot' },
+    { ...verifiedProductTruth, caseRevision: 2 }, { ...verifiedProductTruth, resolutionCaseId: 'new-case' } ]) {
+    assert.notEqual(resultSheetPresentationKey(buildScanResultSheet({ kind: 'snapshot', snapshot, ownerId: 'owner-a' })), key);
+  }
+  assert.equal(resultSheetPresentationKey(buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, ownerId: 'owner-a' })), key);
+  assert.notEqual(resultSheetPresentationKey(buildScanResultSheet({ kind: 'snapshot', snapshot: verifiedProductTruth, ownerId: 'owner-b' })), key);
+  const pending = buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-a' });
+  assert.notEqual(resultSheetPresentationKey(pending), resultSheetPresentationKey(buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-b' })));
 });

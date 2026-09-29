@@ -1,23 +1,26 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/src/components/ui/Button';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { colors, radii, spacing, typography } from '@/src/constants/theme';
 import { describePersonalFitRefresh, type PersonalFitRefreshInput } from '@/src/presentation/personalization/result';
 
 export interface PersonalFitSectionProps {
   state: PersonalFitRefreshInput;
   onPersonalize?: () => void;
+  embedded?: boolean;
+  expanded?: boolean;
 }
 
 /** Mount beside the existing FORMULA DETAILS on the same product result. */
-export function PersonalFitSection({ state, onPersonalize }: PersonalFitSectionProps) {
+export function PersonalFitSection({ state, onPersonalize, embedded = false, expanded = true }: PersonalFitSectionProps) {
   const view = describePersonalFitRefresh(state);
-  return <View style={styles.card}>
-    <Text style={styles.eyebrow}>PERSONAL FIT</Text>
+  return <View style={embedded ? styles.embedded : styles.card}>
+    {embedded ? <SectionHeader title="Personal Fit" /> : <Text style={styles.eyebrow}>PERSONAL FIT</Text>}
     {view.kind === 'loading' && <ActivityIndicator color={colors.brand} style={styles.spinner} />}
     <Text style={styles.title}>{view.title}</Text>
     <Text style={styles.message}>{view.message}</Text>
-    {view.fit?.evidenceUsed.length ? <>
+    {expanded && view.fit?.evidenceUsed.length ? <>
       <Text style={styles.evidenceHeading}>Based on</Text>
       {view.fit.evidenceUsed.map((item) => <Text key={item} style={styles.evidence}>• {item}</Text>)}
     </> : null}
@@ -27,6 +30,7 @@ export function PersonalFitSection({ state, onPersonalize }: PersonalFitSectionP
 }
 
 const styles = StyleSheet.create({
+  embedded: {},
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg },
   eyebrow: { color: colors.brand, fontSize: typography.sizes.micro, fontWeight: typography.weights.bold, letterSpacing: 1.2 },
   title: { color: colors.ink, fontSize: typography.sizes.sectionTitle, fontWeight: typography.weights.semibold, marginTop: spacing.sm },
