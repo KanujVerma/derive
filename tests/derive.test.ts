@@ -9371,9 +9371,10 @@ test('S6 endpoint: authenticates before evidence parsing and keeps photo/queue p
   );
   const authenticateIndex = resolverFunction.indexOf('await authenticate(req)');
   const entitlementIndex = resolverFunction.indexOf('await requireMemberEntitlement(admin, userId)');
-  const bodyIndex = resolverFunction.indexOf('parseRequest(await readJsonObject(req), userId)');
+  const bodyIndex = resolverFunction.indexOf('const body = await readJsonObject(req)');
   assert.ok(authenticateIndex >= 0 && authenticateIndex < bodyIndex);
   assert.ok(bodyIndex < entitlementIndex);
+  assert.match(resolverFunction, /parseRequest\(body, userId\)/);
   assert.match(resolverFunction, /identityKindFromVerifiedUser\(user\)/);
   assert.match(resolverFunction, /PHOTO_EVIDENCE_MANAGED_ONLY/);
   assert.match(resolverFunction, /managedAccess && decision\.requiresFounderReview/);
