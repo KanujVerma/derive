@@ -18,17 +18,20 @@ import { createCatalogRequestId } from '@/src/services/productCatalog';
 export default function PersonalDecisionFixtureScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ scenario?: string; mode?: string }>();
+  const params = useLocalSearchParams<{ scenario?: string; mode?: string; fresh?: string; focused?: string }>();
   const [mode, setMode] = useState(params.mode ?? 'decision');
   const [message, setMessage] = useState<string | null>(null);
+  const focused = params.focused === '1';
+  const fresh = params.fresh === '1';
   const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled: isRemoteServiceEnabled(), supabaseUrl: publicEnvironment.supabaseUrl });
   if (!__DEV__ || publicEnvironment.buildFlavor !== 'development' || shell === 'legacy') return <Screen><Text>Fixture preview unavailable.</Text><Button label="Back" onPress={() => router.back()} /></Screen>;
   const fixture = personalDecisionFixtures.find(item => item.id === params.scenario) ?? personalDecisionFixtures[0];
-  return <View style={{ flex: 1 }}><View style={{ padding: 16, paddingTop: insets.top + 16 }}><Text accessibilityRole="header">DEVELOPMENT FIXTURE</Text><Text>Synthetic context and product examples. Nothing here is saved or evaluated by a live service.</Text>
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{['decision', 'profile', 'routine', 'experience'].map(value => <Button key={value} label={value} size="medium" variant="ghost" onPress={() => setMode(value)} />)}</View>
+  return <View style={{ flex: 1 }}><View style={{ padding: 16, paddingTop: insets.top + 16 }}><Text accessibilityRole="header">{focused ? 'Preview · answers are not saved' : 'DEVELOPMENT FIXTURE'}</Text>
+    {focused ? <Button label="Back" size="medium" variant="ghost" onPress={() => router.back()} /> : <Text>Synthetic context and product examples. Nothing here is saved or evaluated by a live service.</Text>}
+    {!focused && <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{['decision', 'profile', 'routine', 'experience'].map(value => <Button key={value} label={value} size="medium" variant="ghost" onPress={() => setMode(value)} />)}</View>}
     {message && <Text accessibilityLiveRegion="polite">{message}</Text>}
   </View>
-    {mode === 'profile' && <ContextFlow initialDraft={basicContext} onApply={() => setMessage('Fixture draft applied locally. Nothing saved.')} onSkip={() => setMode('decision')} />}
+    {mode === 'profile' && <ContextFlow initialDraft={fresh ? undefined : basicContext} collectIntent={false} completionLabel="Done" onApply={() => { if (focused) router.back(); else setMessage('Preview finished. Answers were not saved.'); }} onSkip={() => { if (focused) router.back(); else setMode('decision'); }} />}
     {mode === 'routine' && <RoutineContext initialDraft={partialRoutine} createItemId={createCatalogRequestId} onApply={() => setMessage('Fixture routine applied locally. Nothing saved.')} onSkip={() => setMode('decision')} />}
     {mode === 'experience' && <ExperienceContext createRecordId={createCatalogRequestId} existing={{ draft: noReactionReport, revisionId: '00000000-0000-4000-8000-000000000003' }} onApply={() => setMessage('Fixture correction applied locally. Nothing saved.')} onSkip={() => setMode('decision')} />}
     {mode === 'decision' && <Screen scrollable><Text>Scenario: {fixture.id}</Text><PersonalDecisionPanel packet={fixture.packet} expectedBinding={fixture.binding} onNextStep={step => { if (step === 'add_context') setMode('profile'); else if (step === 'review_routine' || step === 'keep_current') setMode('routine'); else setMessage(`Fixture next step: ${step.replaceAll('_', ' ')}. No live action performed.`); }} /><Button label="Back" variant="ghost" onPress={() => router.back()} /></Screen>}
