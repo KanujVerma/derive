@@ -8,7 +8,7 @@ import * as React from 'react';
 const nativeRequire = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 type Element = { type: string | ((props: any) => unknown); props: Record<string, any> };
-export function componentHarness(file: string, name: string, initialProps: Record<string, any>) {
+export function componentHarness(file: string, name: string, initialProps: Record<string, any>, options: { modules?: Record<string, any>; developmentRuntime?: boolean } = {}) {
   const slots: any[] = [];
   let cursor = 0;
   const cache = new Map<string, any>();
@@ -23,6 +23,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     const source = readFileSync(path, 'utf8');
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
     function requireModule(id: string): any {
+      if (options.modules && id in options.modules) return options.modules[id];
       if (id === 'react') return react;
       if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
@@ -34,7 +35,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       }
       return nativeRequire(id);
     }
-    new Function('require', 'module', 'exports', output)(requireModule, module, module.exports);
+    new Function('require', 'module', 'exports', '__DEV__', output)(requireModule, module, module.exports, options.developmentRuntime ?? true);
     cache.set(path, module.exports); return module.exports;
   }
   const Component = load(resolve(root, file))[name];
