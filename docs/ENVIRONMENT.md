@@ -18,8 +18,9 @@ another.
 
 | Variable | Runtime | Sensitivity | When required |
 | --- | --- | --- | --- |
-| `EXPO_PUBLIC_USE_REMOTE_SERVICE` | Expo mobile/web build | Public | `false` in development and production profiles; `true` only in the explicit Remote staging profile before launch approval |
+| `EXPO_PUBLIC_USE_REMOTE_SERVICE` | Expo mobile/web build | Public | `false` in ordinary development/production profiles; `true` in explicit Remote staging and scanner-release candidates. A candidate is not hosted activation or launch approval. |
 | `EXPO_PUBLIC_BUILD_FLAVOR` | Expo mobile/web build | Public | `development`, `remote-staging`, or `production`; empty local value defaults to development |
+| `EXPO_PUBLIC_SCANNER_RELEASE_ENABLED` | Expo mobile/web build | Public presentation flag | Empty/off ordinarily; `scanner-release` sets true with production Remote and the exact reviewed hosted project. This creates no entitlement or hosted activation. See SCANNER_RELEASE_ROUTING.md. |
 | `EXPO_PUBLIC_SUPABASE_URL` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_DEV_SUPABASE_LAN_URL` | Development JS runtime only | Public local test target | Optional exact Mac private IPv4 base URL on port 54321 for physical scanner QA; never staging/production/release |
@@ -109,7 +110,7 @@ guest activation, native ATS relaxation or production configuration changed.
 
 ## L0 Remote staging build boundary
 
-`eas.json` has three explicit build profiles. `development` is an internal development client with Remote disabled. `production` is store-signed with Remote disabled. `remote-staging` is store-signed and TestFlight-capable, sets `EXPO_PUBLIC_BUILD_FLAVOR=remote-staging` and `EXPO_PUBLIC_USE_REMOTE_SERVICE=true`, and explicitly selects EAS environment `preview`. The explicit preview selection matters because a store distribution build otherwise selects the production environment by default. The build flavor is independent of service mode; a later approved production Remote activation remains possible without redefining flavor semantics.
+`eas.json` has four explicit build profiles. `development` is an internal development client with Remote disabled. `production` is store-signed with Remote disabled. `remote-staging` is store-signed and TestFlight-capable, sets `EXPO_PUBLIC_BUILD_FLAVOR=remote-staging` and `EXPO_PUBLIC_USE_REMOTE_SERVICE=true`, and explicitly selects EAS environment `preview`. The explicit preview selection matters because a store distribution build otherwise selects the production environment by default. `scanner-release` explicitly selects production Remote, the scanner-only presentation flag and EAS environment `production`; its public URL/key must be configured separately, and its hosted/native/device gates remain open. The build flavor is independent of service mode. See [SCANNER_RELEASE_ROUTING.md](SCANNER_RELEASE_ROUTING.md); no build or submission is triggered by adding a profile.
 
 EAS preview provides `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as public client configuration. L0 first validated the profile with both absent. H1A then verified the existing Derive Supabase project and matched the stored preview values privately against its exact URL and enabled publishable key. This is configuration proof, not a shipped binary or customer session. Do not copy the key into `eas.json`, source, or a PR. Never use a service-role or secret key in Expo.
 
