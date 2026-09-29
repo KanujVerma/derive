@@ -112,14 +112,15 @@ test('K2 gateway clears transient status and demo answers when Auth UUID changes
   assert.match(editor, /saveProfile\(ownerId, answers\)/);
 });
 
-test('K2 Mock My Stuff opens the same local editor without an Auth UUID', () => {
+test('K2 Mock My Stuff offers fresh canonical preview without an Auth UUID', () => {
   assert.equal(resolvePersonalizationOwnerId(null, 'scanner_first_preview'), 'mock-preview:local-session');
   assert.equal(resolvePersonalizationOwnerId(null, 'local_free_integration'), null);
   assert.equal(resolvePersonalizationOwnerId(null, 'legacy'), null);
   assert.equal(resolvePersonalizationOwnerId('guest-A', 'scanner_first_preview'), 'guest-A');
   const stuff = read('../app/(tabs)/my-stuff.tsx');
   const editor = read('../app/personalize/index.tsx');
-  assert.match(stuff, /onEditProfile=.*router\.push\('\/personalize'\)/);
+  assert.match(stuff, /onEditProfile=.*liveOwner \? openEditor\('profile'\).*shell === 'scanner_first_preview'/);
+  assert.match(stuff, /pathname: '\/personalize\/fixture', params: \{ mode: 'profile', fresh: '1', focused: '1' \}/);
   assert.match(editor, /resolvePersonalizationOwnerId/);
   assert.match(editor, /PersonalizationFlow/);
   assert.doesNotMatch(editor, /mock-preview.*supabase|legacy.*mock-preview/s);

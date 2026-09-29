@@ -124,7 +124,7 @@ export default function MyStuffScreen() {
           onCorrectExperience={liveOwner ? experienceId => openEditor('history', { experienceId }) : undefined}
           onAddProductExperience={live ? product => openEditor('history', { entry: 'new', productRecordId: product.id }) : undefined}
           onEditRoutine={liveOwner ? () => openEditor('routine') : undefined}
-          onEditProfile={targetShell ? () => liveOwner ? openEditor('profile') : router.push('/personalize') : undefined}
+          onEditProfile={targetShell ? () => liveOwner ? openEditor('profile') : shell === 'scanner_first_preview' ? router.push({ pathname: '/personalize/fixture', params: { mode: 'profile', fresh: '1', focused: '1' } }) : router.push('/personalize') : undefined}
           onChangeProductState={live ? (id: string, state: ProductState) => runAction(id,
             () => myStuffStore.getState().changeProductState(id, state)) : undefined}
           onRemoveProduct={live ? (id: string) => runAction(id,

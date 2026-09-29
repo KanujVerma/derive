@@ -980,12 +980,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
             setCaptureEvidence(null);
             setCaptureRole(null);
           }}
-          companion={companion && (fullResult && sharedResultInput
-            ? <CheckResultPresentation visible={isCheckFocused && !editingContext} inline full input={sharedResultInput} presentationKey={resultKey}
-                onFullChange={setFullResult} onClose={dismissCameraResult} onNextStep={resultNextStep} onOpenSource={(url) => void Linking.openURL(url).catch(() => {})}>
-                {renderResultExtras()}
-              </CheckResultPresentation>
-            : <ScanResultSheet
+          companion={companion && <ScanResultSheet
               model={companion}
               currentOwnerId={liveCheckOwner}
               currentSnapshot={resolution?.truthSnapshot ?? null}
@@ -996,9 +991,9 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
               onOpenSource={(url) => void Linking.openURL(url).catch(() => {})}
               onDetectionPausedChange={setDetectionPaused}
               onDismiss={dismissCameraResult}
-              onOpenDetails={() => setFullResult(true)}
-            />
-          )}
+            >
+              {renderResultExtras()}
+            </ScanResultSheet>}
         />
       </View>
     );

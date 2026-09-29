@@ -96,12 +96,12 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       <Icon name="close" size={20} color={colors.inkMuted} />
     </Pressable>
   </View>, [close, dismissLabel, guard, index]);
-  return <GestureHandlerRootView style={styles.root} pointerEvents="box-none">
+  return <GestureHandlerRootView style={styles.root} pointerEvents="box-none" accessibilityViewIsModal>
     <BottomSheet ref={sheet} index={initialDetent} snapPoints={['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose overrideReduceMotion={ReduceMotion.System}
       onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={guard.dismiss}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
-      <BottomSheetScrollView accessibilityViewIsModal onAccessibilityEscape={close}
+      <BottomSheetScrollView onAccessibilityEscape={close}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {children}
