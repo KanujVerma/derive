@@ -138,6 +138,9 @@ function candidateFrom(raw: unknown, query: OtcSunscreenLabelQuery, exactValue: 
     ? names.some((name) => normalizedName(name) === normalizedName(exactValue))
     : [...productNdcs, ...packageNdcs].includes(exactValue);
   if (!matched || names.length === 0) return undefined;
+  const matchedName = query.kind === "exact_brand_name"
+    ? names.find((name) => normalizedName(name) === normalizedName(exactValue))!
+    : names[0]!;
   const sunscreenText = [...names, ...strings(label.purpose), ...strings(label.active_ingredient)].join(" ");
   if (!/sunscreen/i.test(sunscreenText)) return undefined;
   return {
@@ -145,7 +148,7 @@ function candidateFrom(raw: unknown, query: OtcSunscreenLabelQuery, exactValue: 
     sourceRecordId: label.id,
     splSetId: label.set_id,
     effectiveTime: label.effective_time,
-    brandName: names[0]!,
+    brandName: matchedName,
     productNdcs,
     packageNdcs,
     activeIngredientLabelText: strings(label.active_ingredient, 16),
@@ -192,7 +195,8 @@ export async function lookupOtcSunscreenLabelCandidates(
     dailyUrl.searchParams.set("pagesize", "2");
     const daily = await boundedJson(dailyUrl.toString(), undefined, fetcher, timeoutMs);
     if (daily.status === 200 && Array.isArray(daily.body?.data)) {
-      const match = daily.body.data.map(record).find((item) => item?.setid === candidates[0]!.splSetId);
+      const matches = daily.body.data.map(record).filter((item) => item?.setid === candidates[0]!.splSetId);
+      const match = matches.length === 1 ? matches[0] : undefined;
       if (match && Number.isSafeInteger(match.spl_version) && (match.spl_version as number) > 0
           && typeof match.published_date === "string") {
         candidates[0]!.dailyMed = {

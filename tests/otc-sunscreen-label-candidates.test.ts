@@ -101,6 +101,19 @@ test("segmented NDC lookup searches the exact NDC field; cannot turn label into 
   ]);
 });
 
+test("exact brand alias is displayed instead of an unrelated first array entry", async () => {
+  const aliasLabel = { ...label, openfda: { ...label.openfda, brand_name: ["Other listed brand", "Olay Regenerist SPF 15"] } };
+  const result = await lookupOtcSunscreenLabelCandidates(
+    { kind: "exact_brand_name", value: "Olay Regenerist SPF 15" },
+    { enabled: true, apiKey: "test-key", fetcher: (async (input: string | URL | Request) =>
+      String(input).includes("dailymed.nlm.nih.gov") ? json({ data: [] })
+        : json({ meta: { results: { total: 1 } }, results: [aliasLabel] })) as typeof fetch },
+  );
+  assert.equal(result.status, "candidates");
+  if (result.status !== "candidates") return;
+  assert.equal(result.candidates[0]!.brandName, "Olay Regenerist SPF 15");
+});
+
 test("wrong brand, non-OTC, and non-sunscreen records abstain", async () => {
   for (const changed of [
     { openfda: { ...label.openfda, brand_name: ["Different sunscreen"] } },
