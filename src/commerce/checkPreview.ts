@@ -33,6 +33,18 @@ export async function searchPreviewCatalog(query: string): Promise<CatalogProduc
   return SEARCH_NAMES.some((name) => name.toLowerCase().includes(normalized)) ? [SUMMARY] : [];
 }
 
+export function matchPreviewProductLink(value: string): CatalogProductSummary | null {
+  try {
+    const url = new URL(value.trim());
+    const sample = new URL(SAMPLE.sourceReference!);
+    if (url.protocol !== 'https:' || url.hostname !== sample.hostname) return null;
+    const path = url.pathname.replace(/\/$/, '');
+    return path === sample.pathname.replace(/\/$/, '') ? SUMMARY : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getPreviewCatalogDetail(productId: string): CatalogProductDetail | null {
   return productId === SAMPLE.productId ? SAMPLE : null;
 }
