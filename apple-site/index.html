@@ -2,21 +2,353 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Derive</title>
-  <link rel="stylesheet" href="/styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Derive: skincare, less guesswork</title>
+  <meta name="description" content="Derive is a free iPhone app that helps you understand the skincare products you use or are considering, and which facts matter for your skin.">
+  <meta name="theme-color" content="#F6F3EC">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Derive">
+  <meta property="og:title" content="Derive: skincare, less guesswork">
+  <meta property="og:description" content="Scan or search a skincare product to see what's in it, and what matters for your skin.">
+  <meta property="og:image" content="https://derive-beta-site.vercel.app/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The Derive mark on warm ivory with the line: Your skincare. Less guesswork.">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preload" href="/assets/fonts/instrument-sans-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/landing.css">
+  <script src="/site-config.js" defer></script>
+  <script src="/assets/landing.js" defer></script>
 </head>
 <body>
-  <main>
-    <p class="mark">Derive</p>
-    <h1>Make sense of your skincare.</h1>
-    <p class="lead">Derive beta</p>
-    <p>Derive helps invited beta members organize their skincare routines, products, and progress. A free way to check a product is in development and is not yet available in the hosted beta.</p>
-    <p>Derive is for U.S. adults 18 and older. It offers cosmetic skincare guidance, not medical diagnosis or care.</p>
-    <nav>
-      <a href="/privacy">Privacy Policy</a>
-      <a href="/support">Support</a>
-    </nav>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" data-header>
+    <div class="shell header-inner">
+      <a class="brand" href="/" aria-label="Derive home">
+        <img src="/assets/derive-mark-64.png" width="30" height="29" alt="">
+        <span>Derive</span>
+      </a>
+      <nav class="header-nav" aria-label="Page">
+        <a href="#how">How it works</a>
+        <a href="#example">Example</a>
+      </nav>
+      <a class="button button-small header-cta" href="#how" data-cta="header" hidden
+         data-available-label="Get the app">Get the app</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- A. Hero -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <h1 id="hero-title">Your skincare.<br>Less guesswork.</h1>
+          <p class="hero-lead">Scan or search a product to understand what's in it, and what matters for your skin.</p>
+          <div class="cta-row">
+            <a class="button" href="#how" data-cta="primary"
+               data-available-label="Get Derive for iPhone">See how it works</a>
+            <a class="text-link" href="#example" data-cta="secondary">See an example</a>
+          </div>
+          <p class="availability" data-availability-note
+             data-available-text="Free to use. iPhone only.">Coming to iPhone. Checking a product will be free.</p>
+          <div class="qr" data-qr hidden>
+            <img src="" alt="" width="88" height="88" data-qr-img>
+            <p>Scan with your iPhone camera to open the App Store.</p>
+          </div>
+        </div>
+
+        <figure class="hero-visual">
+          <div class="hero-stage">
+          <div class="phone" role="img" aria-label="Example Derive result on iPhone. Barrier Repair Cream, a moisturizer, exact formula verified. Result: Could work. As a moisturizer, this fits your dryness goal by product role. Results and tolerance are not established.">
+            <div class="phone-screen screen-result" aria-hidden="true">
+              <div class="app-bar">
+                <span class="app-back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></span>
+                <span class="app-bar-title">Result</span>
+                <span class="app-bar-spacer"></span>
+              </div>
+              <div class="product-row">
+                <span class="thumb"><svg viewBox="0 0 24 24"><path d="M9.5 3h5v3h-5z"/><path d="M8 6h8a1 1 0 0 1 1 1v12.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19.5V7a1 1 0 0 1 1-1z"/><path d="M10 11h4"/></svg></span>
+                <span class="product-text">
+                  <span class="product-brand">Example brand</span>
+                  <span class="product-name">Barrier Repair Cream</span>
+                  <span class="product-status">Exact formula verified</span>
+                </span>
+              </div>
+              <div class="decision">
+                <span class="decision-title">Could work</span>
+                <p class="decision-reason">As a moisturizer, this fits your dryness goal by product role. Results and tolerance are not established.</p>
+                <span class="decision-label">In your routine</span>
+                <p class="decision-body">This would add a role to your routine.</p>
+                <span class="decision-label">What is uncertain</span>
+                <p class="decision-body">Individual tolerance is unknown.</p>
+                <span class="app-button">Consider this product</span>
+                <span class="app-link">Why Derive thinks this</span>
+              </div>
+            </div>
+          </div>
+          </div>
+          <figcaption>Example result. Product and profile are illustrative.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- B. See it work -->
+    <section class="section how" id="how" aria-labelledby="how-title">
+      <div class="shell">
+        <div class="section-head">
+          <h2 id="how-title">Scan. Understand. Make&nbsp;it&nbsp;personal.</h2>
+          <p>One product, from the shelf to an answer you can act on.</p>
+        </div>
+
+        <div class="demo" data-demo data-step="4">
+          <ol class="demo-steps" role="list">
+            <li>
+              <button type="button" class="demo-step" data-step-target="1" aria-controls="demo-phone">
+                <span class="step-index">1</span>
+                <span class="step-copy">
+                  <span class="step-title">Scan or search</span>
+                  <span class="step-text">Point your camera at the barcode, or type the product's name.</span>
+                </span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="demo-step" data-step-target="2" aria-controls="demo-phone">
+                <span class="step-index">2</span>
+                <span class="step-copy">
+                  <span class="step-title">See what it is</span>
+                  <span class="step-text">Derive shows the product it found and what it can confirm about the formula.</span>
+                </span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="demo-step" data-step-target="3" aria-controls="demo-phone">
+                <span class="step-index">3</span>
+                <span class="step-copy">
+                  <span class="step-title">Add context, if you want</span>
+                  <span class="step-text">Your goals, what your skin reacts to, and what you already use. Skip it anytime.</span>
+                </span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="demo-step" data-step-target="4" aria-controls="demo-phone">
+                <span class="step-index">4</span>
+                <span class="step-copy">
+                  <span class="step-title">Get an answer that fits</span>
+                  <span class="step-text">What to do, why it applies to you, and what is still uncertain.</span>
+                </span>
+              </button>
+            </li>
+          </ol>
+
+          <figure class="demo-visual">
+            <div class="phone phone-demo" id="demo-phone" aria-live="polite">
+              <!-- Camera stays mounted underneath, as in the app -->
+              <div class="camera" aria-hidden="true">
+                <div class="camera-top">
+                  <span>Check</span>
+                </div>
+                <div class="camera-frame">
+                  <svg class="camera-product" viewBox="0 0 120 200" aria-hidden="true">
+                    <rect x="44" y="6" width="32" height="22" rx="4"/>
+                    <path d="M30 34c0-4 3-7 7-7h46c4 0 7 3 7 7v146c0 7-5 12-12 12H42c-7 0-12-5-12-12z"/>
+                    <path class="label-line" d="M44 88h32M44 100h24"/>
+                    <path class="barcode" d="M44 140v26M48 140v26M53 140v26M56 140v26M61 140v26M66 140v26M69 140v26M74 140v26"/>
+                  </svg>
+                  <span class="camera-hint">Center the barcode</span>
+                  <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
+                </div>
+                <div class="camera-bottom">
+                  <span class="shutter"></span>
+                  <span class="search-pill"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>Search by name</span>
+                </div>
+              </div>
+
+              <div class="sheet" data-screen="1" aria-label="Step 1: the camera is ready to scan a product barcode, or you can search by name."></div>
+
+              <div class="sheet sheet-product" data-screen="2" aria-label="Step 2: Derive found Daily Hydrating Lotion, a moisturizer. Exact formula verified.">
+                <span class="sheet-handle" aria-hidden="true"></span>
+                <div class="product-row" aria-hidden="true">
+                  <span class="thumb"><svg viewBox="0 0 24 24"><path d="M9.5 3h5v3h-5z"/><path d="M8 6h8a1 1 0 0 1 1 1v12.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19.5V7a1 1 0 0 1 1-1z"/><path d="M10 11h4"/></svg></span>
+                  <span class="product-text">
+                    <span class="product-brand">Example brand</span>
+                    <span class="product-name">Daily Hydrating Lotion</span>
+                    <span class="product-status">Exact formula verified</span>
+                  </span>
+                </div>
+                <div class="sheet-detail" aria-hidden="true">
+                  <p class="decision-body strong">Moisturizer. The label lists glycerin, ceramide NP, niacinamide and fragrance (parfum).</p>
+                  <p class="decision-body">Add your skincare context for a more personal answer.</p>
+                  <span class="app-button app-button-small">View full result</span>
+                </div>
+              </div>
+
+              <div class="sheet sheet-context" data-screen="3" aria-label="Step 3: optional context. Main priority: dryness. Reacts to: fragrance. Already uses an evening moisturizer.">
+                <span class="sheet-handle" aria-hidden="true"></span>
+                <div aria-hidden="true">
+                  <span class="sheet-title">Your skincare context</span>
+                  <span class="sheet-sub">Optional. Change it anytime.</span>
+                  <span class="question">Main priority</span>
+                  <span class="chips">
+                    <span class="chip is-on">Dryness</span><span class="chip">Breakouts</span><span class="chip">Redness</span>
+                  </span>
+                  <span class="question">Anything your skin reacts to?</span>
+                  <span class="chips"><span class="chip is-on">Fragrance</span><span class="chip">Not sure</span></span>
+                  <span class="question">What you already use</span>
+                  <span class="routine-row">Evening moisturizer <span>A few times a week</span></span>
+                  <span class="app-button app-button-small">Update my answer</span>
+                </div>
+              </div>
+
+              <div class="sheet sheet-result" data-screen="4" aria-label="Step 4: Use with caution. The formula lists an ingredient you reported as a sensitivity. This is not an allergy diagnosis. You already use a moisturizer in the evening, so this would duplicate that role. Individual tolerance is unknown.">
+                <span class="sheet-handle" aria-hidden="true"></span>
+                <div aria-hidden="true">
+                  <div class="product-row compact">
+                    <span class="thumb"><svg viewBox="0 0 24 24"><path d="M9.5 3h5v3h-5z"/><path d="M8 6h8a1 1 0 0 1 1 1v12.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19.5V7a1 1 0 0 1 1-1z"/><path d="M10 11h4"/></svg></span>
+                    <span class="product-text">
+                      <span class="product-name">Daily Hydrating Lotion</span>
+                      <span class="product-status">Exact formula verified</span>
+                    </span>
+                  </div>
+                  <span class="decision-title">Use with caution</span>
+                  <p class="decision-reason">The formula lists an ingredient you reported as a sensitivity. This is not an allergy diagnosis.</p>
+                  <span class="decision-label">In your routine</span>
+                  <p class="decision-body">You already use a moisturizer in the evening a few times a week. This would duplicate that routine role.</p>
+                  <span class="decision-label">What is uncertain</span>
+                  <p class="decision-body">Individual tolerance is unknown.</p>
+                  <span class="app-button app-button-small">Review my routine</span>
+                </div>
+              </div>
+            </div>
+            <figcaption>
+              <span>Illustrative example built from Derive's app screens.</span>
+              <button type="button" class="demo-toggle" data-demo-toggle hidden aria-pressed="false">Pause</button>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- C. Why it is personal -->
+    <section class="section personal" id="example" aria-labelledby="personal-title">
+      <div class="shell personal-grid">
+        <div class="personal-copy">
+          <h2 id="personal-title"><span class="h2-line">Not just what's in it.</span> <span class="h2-line">What matters for you.</span></h2>
+          <p>The same product can deserve a different answer for different people. Derive considers what you choose to tell it, and only says what the evidence supports.</p>
+
+          <div class="profile">
+            <p class="profile-title">Example profile</p>
+            <dl>
+              <div><dt>Main priority</dt><dd>Dryness</dd></div>
+              <div><dt>Reported sensitivity</dt><dd>Fragrance</dd></div>
+              <div><dt>Already uses</dt><dd>An evening moisturizer, a few times a week</dd></div>
+            </dl>
+          </div>
+
+          <p class="honesty">If Derive can't confirm a product or its exact formula, it tells you, and suggests what would help.</p>
+        </div>
+
+        <div class="compare" data-compare>
+          <div class="segmented" role="tablist" aria-label="Choose a view of this example">
+            <button type="button" role="tab" id="tab-facts" aria-controls="panel-facts" aria-selected="false" tabindex="-1">Product details</button>
+            <button type="button" role="tab" id="tab-profile" aria-controls="panel-profile" aria-selected="true">For this example profile</button>
+          </div>
+
+          <article class="result-card">
+            <header class="result-head">
+              <span class="thumb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3h5v3h-5z"/><path d="M8 6h8a1 1 0 0 1 1 1v12.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19.5V7a1 1 0 0 1 1-1z"/><path d="M10 11h4"/></svg></span>
+              <div>
+                <p class="product-brand">Example brand <span aria-hidden="true">·</span> Moisturizer</p>
+                <h3 class="product-name">Daily Hydrating Lotion</h3>
+                <p class="product-status">Exact formula verified</p>
+              </div>
+            </header>
+
+            <div class="panel-stack">
+              <div class="panel" role="tabpanel" id="panel-facts" aria-labelledby="tab-facts" data-panel="facts">
+                <p class="panel-label">Product details</p>
+                <dl class="facts">
+                  <div><dt>What it is</dt><dd>A moisturizer for daily use.</dd></div>
+                  <div><dt>Listed ingredients</dt><dd>Water, glycerin, caprylic/capric triglyceride, ceramide NP, niacinamide, fragrance (parfum), and others.</dd></div>
+                  <div><dt>On the label</dt><dd>Fragrance is listed. Niacinamide is listed.</dd></div>
+                </dl>
+                <p class="panel-note">Every fact carries the same weight until Derive knows what matters to you.</p>
+              </div>
+
+              <div class="panel" role="tabpanel" id="panel-profile" aria-labelledby="tab-profile" data-panel="profile">
+                <p class="panel-label">For this example profile</p>
+                <p class="verdict">Use with caution</p>
+                <p class="verdict-reason">The formula lists <mark>fragrance</mark>, which this profile reported as a sensitivity. This is not an allergy diagnosis.</p>
+                <dl class="facts">
+                  <div><dt>In your routine</dt><dd>You already use an evening moisturizer. This would duplicate that role.</dd></div>
+                  <div><dt>What is uncertain</dt><dd>Individual tolerance is unknown.</dd></div>
+                </dl>
+                <details class="why">
+                  <summary>Why Derive thinks this</summary>
+                  <div class="why-body">
+                    <ul>
+                      <li>The verified formula for this product</li>
+                      <li>The sensitivity reported in this profile</li>
+                      <li>The routine reported in this profile</li>
+                    </ul>
+                    <p>Derive offers cosmetic skincare guidance, not medical diagnosis or treatment.</p>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </article>
+          <p class="compare-caption">Illustrative example. Not an assessment of your skin.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- D. Plus preview -->
+    <section class="section plus" id="plus" aria-labelledby="plus-title">
+      <div class="shell plus-grid">
+        <div>
+          <h2 id="plus-title">Derive Plus</h2>
+          <p class="plus-status">In development</p>
+        </div>
+        <div class="plus-copy">
+          <p class="plus-line">A clearer view of how your products fit together.</p>
+          <p>We're building a way to compare a product you already use with one you're considering, side by side, using what you've told Derive.</p>
+          <p class="plus-note">Not available yet. Details will be shared before it launches. Checking a product stays free.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- E. Final invitation -->
+    <section class="section final" aria-labelledby="final-title">
+      <div class="shell final-inner">
+        <img class="final-mark" src="/assets/derive-mark-128.png" width="56" height="54" alt="">
+        <h2 id="final-title">Start with something you already use.</h2>
+        <p>Pick up a product from your shelf. Derive shows what it can confirm, what's uncertain, and what to do next.</p>
+        <div class="cta-row centered">
+          <a class="button" href="#how" data-cta="final"
+             data-available-label="Get Derive for iPhone">See how it works</a>
+        </div>
+        <p class="availability" data-availability-note
+           data-available-text="Free to use. iPhone only.">Coming to iPhone. Checking a product will be free.</p>
+      </div>
+    </section>
   </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <a class="brand brand-small" href="/" aria-label="Derive home">
+        <img src="/assets/derive-mark-64.png" width="22" height="21" alt="">
+        <span>Derive</span>
+      </a>
+      <p class="footer-scope">Cosmetic skincare guidance, not medical diagnosis or treatment.</p>
+      <nav class="footer-nav" aria-label="Legal and support">
+        <a href="/privacy">Privacy</a>
+        <a href="/privacy-choices">Privacy choices</a>
+        <a href="/support">Support</a>
+      </nav>
+    </div>
+  </footer>
 </body>
 </html>
