@@ -6,6 +6,24 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: Account & Settings for free and preview
+
+- **Predecessor:** `origin/main` `d02f8ba1f81b9c181cb7bd1172ef8fb3867c92ab`.
+- **Scope:** One Account & Settings surface for development preview, anonymous Free, and permanent Free. Preview has no sign-out or deletion. Anonymous Free can delete session data and does not sign out. Permanent Free shows the real email, sign-out, and account deletion. Managed account stays on the existing screen. Save-account upgrade is not shown.
+- **Links:** Privacy Policy, Privacy Choices, and Help & feedback use the existing public legal URLs. The footer version comes from the Expo config, not the Expo Go binary.
+
+## 2026-09-29: Free Plan offer composition
+
+- **Predecessor:** `origin/main` `bf20d78443fbd8a939071bff4e64b372000d9053`.
+- **Scope:** Presentation only. The free Plan offer is Early Access, a short managed promise, the same `$25/month` commercial line, and three titled rows for routine, products, and ongoing adjustments. Waitlist identity, price cents, session pinning, and persistence are unchanged.
+
+## 2026-09-29: Free Plan Managed waitlist
+
+- **Predecessor:** `origin/main` `459566af732d234783d64aa372bae78361b603d4`.
+- **Scope:** Free Plan explains Managed Skincare as delegated routine care at the `$25/month` hypothesis and records an owner-bound waitlist join. No payment, checkout, intake, scarcity, or notification campaign. Active managed routines stay on the existing Plan screen.
+- **Persistence:** Additive `public.managed_waitlist` with session-derived owner, idempotent join/read/withdraw, and account-deletion cascade. A joined row has no withdrawal time; leaving sets one, and joining again clears it. A signed-out screen cannot become "on the waitlist." The Plan screen calls the measurement contract; without an installed sink that call transmits nothing. Analytics failure does not block the join.
+- **Ownership:** Kanuj customer outcome. Sami stewardship review for Auth, RLS, and deletion. No edits to open catalog or `config.toml` write-sets.
+
 ## 2026-09-28: Exact-barcode catalog candidate loading
 
 - **Immutable predecessor:** `origin/main@459566a` after Kanuj #150. This Sami-owned resolver change does not touch Kanuj's camera or decision surfaces.
@@ -1898,3 +1916,9 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 - **Hosted:** Exact project `snojlbqovlawewwqbviz` at source `666fe1d` has 19/30 migration versions and 15/22 Edge Function names; 11 and seven respectively are pending, with no hosted-only versions/names. Deployed function revisions, Auth configuration and actual guest lifecycle remain unknown. The read-only catalog inventory found one sourced product, one alias, and zero active sourced variants, verified authoritative GTIN assertions or verified formula versions. `GEMINI_API_KEY` was absent from hosted secret-name inventory. No hosted write or public guest activation occurred.
 - **Release:** Free barcode/name Check is the earlier founder-approved first-release direction; newer Free/Plus documentation warrants final scope reconciliation. No automatic photo identification, Jev runtime adapter, PostHog transport, payment activation, or customer-facing contribution loop is implied by these landings. Founder public retention/consent/reviewer decisions, useful catalog coverage, P0-C rollout and Kanuj's physical/App Store acceptance remain gates. See [Sami portfolio](SAMI_PORTFOLIO.md).
 - **P0-C local follow-up:** #145 merged at `924371b5808c02b1e0b450b9734abe366c379c0f` after both exact-head CI jobs passed. The fresh-reset local regression exercises guest deletion with over 100 paginated skin objects, both private buckets, malformed metadata fail-closed behavior, upload fence persistence, retry and neighboring owner survival. It changes no hosted setting or customer app code; hosted failure/race and physical acceptance remain open.
+
+## 2026-09-29: OBF evaluation budget reconciled with current main
+
+- **Scope:** PR #161 retains a default-OFF, authenticated candidate lookup and a private atomic request ledger. It is reconciled with main `d96cf55777bf0fa1fbfb50eb42fcd5b9da60a85b`; no customer source activation or canonical import occurred.
+- **Correction:** the official product-read limit checked today is 15/minute/IP. The global reservation cap is now 12/minute, leaving headroom; the previous 60/minute proposal was too high. Tests cover the permitted twelfth reservation and denied thirteenth. Per-owner and daily abuse caps remain distinct from completed-Check allowances.
+- **Open gates:** source display/storage rights, target-product hit rate, and reviewed hosted rollout remain unresolved. Candidate identity cannot become canonical formula evidence.

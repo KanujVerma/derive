@@ -63,6 +63,7 @@ Owns `app/**`, `src/components/**`, `src/constants/**`, customer-facing client s
 - **K-FREE-3 / K3-S3 / Check memory, LANDED (PRs #48, #64 and #66):** MY STUFF reads/writes through owner-bound local free context. Check history saves only after an explicit customer action; retained Check results clear on local owner change. Hosted deployment remains gated.
 - **K-FREE-4 / K4-S4, LANDED locally (PRs #49 and #65):** K4-COMPOSE handoff prep (PR #55) is also landed. Camera evidence connects to S-FREE-4 and S6; candidate/unknown states remain non-authoritative, and no hosted deployment is implied. Typed client handling for the S-FREE-4 429 quota response remains open.
 - **K-PAID-1A, LANDED presentation foundation (PR #52):** free Managed Skincare offer, upgrade states, context reuse, managed intake/photo and Plan states; fixture-backed. KPAID-COMPOSE (PR #56) is landed; integration consumes stable Sami contracts.
+- **Managed waitlist:** Kanuj owns the free Plan offer and owner-bound waitlist outcome, including the additive `managed_waitlist` table. It does not activate billing, intake, or notifications. Sami reviews the Auth, RLS, and deletion invariants.
 - **K-ACCEPT-1:** scanner-first physical/TestFlight acceptance after platform contracts and release hardening.
 - **K-GROWTH, later:** shareable Check result and referral UX.
 

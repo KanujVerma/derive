@@ -1,7 +1,8 @@
 import type { FreeAccessState } from '../../contracts/FreeAccess.ts';
+import { getAccountSettingsPresentation } from './accountSettingsPresentation.ts';
 
+/** Kept for existing free-account callers. The settings screen uses the fuller model. */
 export function getFreeAccountPresentation(identityKind: FreeAccessState['identityKind']) {
-  return identityKind === 'anonymous'
-    ? { intro: 'Check products without entering an email.', showSignOut: false }
-    : { intro: 'Signed in for product checks.', showSignOut: true };
+  const presentation = getAccountSettingsPresentation({ kind: identityKind === 'anonymous' ? 'anonymous' : 'permanent' });
+  return { intro: presentation.accountSubtitle, showSignOut: presentation.showSignOut };
 }

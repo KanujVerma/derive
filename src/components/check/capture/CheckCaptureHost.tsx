@@ -13,10 +13,12 @@ interface Props {
   initialRole?: CaptureRole;
   live?: boolean;
   detectionPaused?: boolean;
+  catalogSearch?: (query: string) => Promise<import('../../../contracts/ProductCatalog').CatalogProductSummary[]>;
+  onCatalogSelect?: (product: import('../../../contracts/ProductCatalog').CatalogProductSummary) => void;
   companion?: React.ReactNode;
 }
 
-export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', live = false, detectionPaused = false, companion = null }: Props) {
+export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', live = false, detectionPaused = false, catalogSearch, onCatalogSelect, companion = null }: Props) {
   const selectedProcessor = useMemo(() => processor ?? (live ? createLiveFreeEvidenceProcessor() : pendingCaptureProcessor), [processor, live]);
   const bridge = useMemo(() => createCheckCaptureBridge(selectedProcessor), [selectedProcessor]);
 
@@ -31,6 +33,8 @@ export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRo
             initialRole={initialRole}
             autoFinishBarcode
             detectionPaused={detectionPaused}
+            catalogSearch={catalogSearch}
+            onCatalogSelect={onCatalogSelect}
             processor={bridge.processor}
             onEvidenceReady={(handoff) => onCaptureReady(bridge.handoff(handoff))}
           />

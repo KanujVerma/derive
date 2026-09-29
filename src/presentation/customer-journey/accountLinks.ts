@@ -1,5 +1,9 @@
 /** Native/browser failures stay customer-visible and retryable; raw transport details stay private. */
-export async function openCustomerAccountLink(label: 'Privacy' | 'Support', url: string, links: { openURL: (url: string) => Promise<unknown> }): Promise<{ error: string | null }> {
+export async function openCustomerAccountLink(
+  label: 'Privacy' | 'Privacy Policy' | 'Privacy Choices' | 'Support' | 'Help & feedback',
+  url: string,
+  links: { openURL: (url: string) => Promise<unknown> },
+): Promise<{ error: string | null }> {
  try {
   if (!url.trim()) throw new Error('Link unavailable');
   await links.openURL(url);
