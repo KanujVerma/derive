@@ -61,7 +61,13 @@ Photo-only continuation stores private evidence and remains formula-unverified:
 there is no OCR or image recognition. Text can select one verified formula only
 when its entire ordered ingredient list matches an authoritative catalog version
 for the original exact variant **and** the original barcode has a completed,
-authoritative assertion explicitly linking that version. Typed identity plus a
+authoritative assertion explicitly linking that version and was reported as
+device-origin evidence. `barcodeSource: 'member_input'` preserves pasted/link-derived
+origin in stored evidence and the snapshot; it cannot become a device scan by
+adding ingredient text. Omitted source preserves the legacy device-origin contract;
+explicit `device_barcode` serializes identically for retries. Changing origin on
+retry is a conflict; unsupported origins or origin without barcode are invalid.
+Origin is reported, not attested, and never creates catalog authority. Typed identity plus a
 transcription cannot authenticate a package formula. Conflicts and ambiguity
 remain unverified. No external provider data becomes formula truth through this
 path. The schema and endpoint require a coordinated migration/function rollout;

@@ -26,6 +26,7 @@ import {
   requireMemberEntitlement,
 } from "../_shared/runtime.ts";
 import { identityKindFromVerifiedUser } from "../_shared/access.ts";
+import { parseBarcodeSource } from "../_shared/barcode-provenance.ts";
 
 const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
 const CATALOG_PAGE_SIZE = 1_000;
@@ -35,7 +36,7 @@ const MAX_EXACT_PRODUCTS = 100;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PHOTO_ROLES = new Set<ProductEvidencePhotoRole>(["front_label", "ingredients", "packaging"]);
 const ALLOWED_FIELDS = new Set([
-  "requestId", "consumer", "barcode", "brand", "productName", "variantName",
+  "requestId", "consumer", "barcode", "barcodeSource", "brand", "productName", "variantName",
   "regionCode", "labelText", "packagingText", "ingredientList", "evidencePhotos",
 ]);
 
@@ -49,6 +50,7 @@ interface ParsedRequest extends ResolverEvidence {
   requestId: string;
   consumer: "scan" | "shelf";
   evidencePhotos: ParsedEvidencePhoto[];
+  barcodeSource?: "member_input";
 }
 
 interface IngredientContinuation {
@@ -240,6 +242,10 @@ function parseRequest(body: Record<string, unknown>, userId: string): ParsedRequ
   if (barcodeInput && (!barcode || !isValidGtin(barcode))) {
     throw new ServiceError("INVALID_BARCODE", "Barcode must be a valid GTIN-8, UPC-A, EAN-13, or GTIN-14", 400);
   }
+  const barcodeSource = parseBarcodeSource(body.barcodeSource, Boolean(barcode));
+  if (!barcodeSource.ok) {
+    throw new ServiceError("INVALID_PAYLOAD", "Barcode source requires a barcode and a supported origin", 400);
+  }
 
   const rawPhotos = body.evidencePhotos ?? [];
   if (!Array.isArray(rawPhotos) || rawPhotos.length > 3) {
@@ -270,6 +276,7 @@ function parseRequest(body: Record<string, unknown>, userId: string): ParsedRequ
     requestId,
     consumer: body.consumer,
     barcode,
+    barcodeSource: barcodeSource.source,
     brand: optionalString(body.brand, "brand", 120),
     productName: optionalString(body.productName, "productName", 180),
     variantName: optionalString(body.variantName, "variantName", 180),
@@ -541,7 +548,7 @@ function projectCatalogRows(productRows: ProductRow[], variantRows: VariantRow[]
 
 function buildEvidenceRows(request: ParsedRequest): Record<string, unknown>[] {
   const rows: Record<string, unknown>[] = [];
-  if (request.barcode) rows.push({ evidence_type: "barcode", source_type: "device_barcode", extracted_text: request.barcode });
+  if (request.barcode) rows.push({ evidence_type: "barcode", source_type: request.barcodeSource ?? "device_barcode", extracted_text: request.barcode });
   const typedIdentity = [request.brand, request.productName, request.variantName, request.regionCode].filter(Boolean).join(" | ");
   if (typedIdentity) rows.push({ evidence_type: "typed_identity", source_type: "member_input", extracted_text: typedIdentity });
   if (request.labelText) rows.push({ evidence_type: "front_label", source_type: "member_input", extracted_text: request.labelText });
@@ -734,8 +741,9 @@ async function continueIngredients(admin: SupabaseClient, userId: string,
   let hasFormula = false;
   let hasExactFormulaMatch = false;
   if (input.ingredientList) {
-    // Formula promotion requires the original Check's authoritative barcode
-    // assertion to link the exact formula. Typed identity plus transcription
+    // Formula selection requires the original Check's reported device barcode
+    // plus an authoritative catalog assertion linking the exact formula. Origin
+    // is not attested. Pasted/link identity plus transcription
     // alone cannot authenticate a package or silently promote catalog truth.
     const observedBarcodes = oldEvidence.filter((row) => row.evidence_type === "barcode"
       && row.source_type === "device_barcode" && row.extracted_text)

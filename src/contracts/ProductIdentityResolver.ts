@@ -30,6 +30,8 @@ export interface ResolveProductIdentityInput {
   requestId: string;
   consumer: ProductResolutionConsumer;
   barcode?: string;
+  /** Reported origin, not attestation. Links/typed codes must use member_input. */
+  barcodeSource?: 'device_barcode' | 'member_input';
   brand?: string;
   productName?: string;
   variantName?: string;

@@ -65,6 +65,39 @@ try {
   assert.equal(initial.data.state, 'identified_formula_unverified');
   const original = initial.data.truthSnapshot;
   assert.equal(original.formula, null);
+  // Legacy device requests and explicitly reported device requests replay identically.
+  const rootRow = await admin.from('product_resolution_cases').select('request_id')
+    .eq('id', initial.data.caseId).single();
+  assert.ifError(rootRow.error);
+  const explicitDevice = await invoke(a, { requestId: rootRow.data.request_id, consumer: 'scan',
+    barcode: '012345678905', barcodeSource: 'device_barcode' });
+  assert.ifError(explicitDevice.error);
+  assert.equal(explicitDevice.data.caseId, initial.data.caseId);
+  assert.equal((await invoke(a, { requestId: rootRow.data.request_id, consumer: 'scan',
+    barcode: '012345678905', barcodeSource: 'member_input' })).error?.context?.status, 409,
+    'changing barcode origin on retry must fail');
+  for (const body of [
+    { barcode: '012345678905', barcodeSource: 'trusted_ocr' },
+    { brand: 'Fixture', productName: name, barcodeSource: 'member_input' },
+  ]) {
+    assert.equal((await invoke(a, { requestId: randomUUID(), consumer: 'scan', ...body })).error?.context?.status, 400);
+  }
+  const linkedRoot = await invoke(a, { requestId: randomUUID(), consumer: 'scan',
+    barcode: '012345678905', barcodeSource: 'member_input' });
+  assert.ifError(linkedRoot.error);
+  assert.equal(linkedRoot.data.truthSnapshot.evidence.find((item) => item.type === 'barcode').source,
+    'member_input');
+  const linkedEvidence = await admin.from('product_resolution_evidence').select('source_type')
+    .eq('case_id', linkedRoot.data.caseId).eq('evidence_type', 'barcode').single();
+  assert.ifError(linkedEvidence.error);
+  assert.equal(linkedEvidence.data.source_type, 'member_input');
+  const linkedContinuation = await invoke(a, { operation: 'continue_ingredients', requestId: randomUUID(),
+    rootCaseId: linkedRoot.data.caseId, parentSnapshotId: linkedRoot.data.truthSnapshot.snapshotId,
+    ingredientList: ['Water', 'Glycerin'] });
+  assert.ifError(linkedContinuation.error);
+  assert.equal(linkedContinuation.data.state, 'identified_formula_unverified',
+    'link-derived code plus copied ingredients is not a reported package scan');
+  assert.equal(linkedContinuation.data.truthSnapshot.formula, null);
 
   const input = { operation: 'continue_ingredients', requestId: randomUUID(),
     rootCaseId: initial.data.caseId, parentSnapshotId: original.snapshotId,
