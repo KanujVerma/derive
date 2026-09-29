@@ -108,10 +108,16 @@ permanent client/server lane.
   Storage-first before account deletion completes.
 - There is no numerical confidence or quality score in the customer contract.
 - Unknown and ambiguous evidence remains unknown or ambiguous.
-- Catalog reads page deterministically past the API's 1,000-row response limit.
-  Above 10,000 rows per identity table the resolver fails closed until an indexed
-  retrieval milestone replaces bounded in-memory matching; it never silently
-  searches a truncated catalog.
+- Pure barcode checks query the existing `(identifier_type, identifier_value)`
+  index and load only linked products, variants, and formulas. Mixed evidence
+  (typed name, label, ingredients, or photos) retains the broad catalog read so
+  a contradictory product can still be surfaced. Existing-case replay also
+  retains broad readback and its immutable truth snapshot. This is a partial
+  scale improvement, not a complete indexed resolver.
+- Broad catalog reads page deterministically past the API's 1,000-row response
+  limit. Above 10,000 rows per identity table they fail closed, never silently
+  search a truncated catalog. Pure barcode reads also fail closed if one exact
+  GTIN has more than 100 identifier assertions.
 
 ## Historical S6 review and rollout checklist
 
