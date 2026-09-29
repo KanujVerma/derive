@@ -17,6 +17,7 @@ function renderer() {
   const cache = new Map<string, { exports: any }>();
   const native = (tag: string) => ({ children }: any) => React.createElement(tag, {}, children);
   const sheets: any[] = [];
+  const modalScopes: any[] = [], scrollScopes: any[] = [];
   const sheet = (props: any) => { sheets.push(props); return React.createElement('section', {}, props.children); };
   function load(path: string): any {
     path = resolve(root, path);
@@ -28,9 +29,9 @@ function renderer() {
       if (name === 'react-native') return { Modal: native('div'), KeyboardAvoidingView: native('div'), View: native('div'), Text: native('span'), Pressable: native('button'), Image: native('img'), ActivityIndicator: native('i'), ScrollView: native('div'),
         StyleSheet: { create: (value: unknown) => value, absoluteFill: {}, hairlineWidth: 1 }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ height: 844, width: 390, fontScale: 1 }), AccessibilityInfo: {}, findNodeHandle: () => null };
       if (name === 'react-native-safe-area-context') return { SafeAreaProvider: native('div'), useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }) };
-      if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: native('div') };
+      if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: (props: any) => { modalScopes.push(props); return React.createElement('div', {}, props.children); } };
       if (name === 'react-native-reanimated') return { ReduceMotion: { System: 'system' } };
-      if (name === '@gorhom/bottom-sheet') return { __esModule: true, default: sheet, BottomSheetScrollView: native('div'), BottomSheetBackdrop: native('div') };
+      if (name === '@gorhom/bottom-sheet') return { __esModule: true, default: sheet, BottomSheetScrollView: (props: any) => { scrollScopes.push(props); return React.createElement('div', {}, props.children); }, BottomSheetBackdrop: native('div') };
       if (name.endsWith('/Icon')) return { Icon: native('i') };
       if (name.endsWith('/Button')) return { Button: ({ label }: any) => React.createElement('button', {}, label) };
       if (name.startsWith('.') || name.startsWith('@/')) return load(name.startsWith('@/') ? name.slice(2) : resolve(dirname(file), name));
@@ -40,7 +41,7 @@ function renderer() {
     new Script(`(function(require,module,exports){${js}\n})`, { filename: file }).runInThisContext()(dependency, module, module.exports);
     return module.exports;
   }
-  return { load, sheets, render: (component: any, props: any) => renderToStaticMarkup(React.createElement(component, props)) };
+  return { load, sheets, modalScopes, scrollScopes, render: (component: any, props: any) => renderToStaticMarkup(React.createElement(component, props)) };
 }
 
 test('sheet continuous mode exposes all bound reasons, evidence and uncertainties without another disclosure', () => {
@@ -108,4 +109,13 @@ test('camera companion preserves host extras and hides completely when the curre
   assert.equal(r.sheets.length, 1);
   assert.equal(r.render(ScanResultSheet, { ...props, currentOwnerId: 'owner-b' }), '');
   assert.equal(r.sheets.length, 1, 'stale owner must not mount another gesture surface');
+});
+
+
+test('VoiceOver modal scope includes the handle and Close as well as the scroll content', () => {
+  const r = renderer();
+  const { CheckResultPresentation } = r.load('src/components/check/result-sheet/CheckResultPresentation');
+  r.render(CheckResultPresentation, { visible: true, presentationKey: 'accessible-case', input: null, onClose: () => {} });
+  assert.equal(r.modalScopes[0].accessibilityViewIsModal, true);
+  assert.equal(r.scrollScopes[0].accessibilityViewIsModal, undefined);
 });
