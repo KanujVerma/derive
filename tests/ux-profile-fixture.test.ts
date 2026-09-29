@@ -24,7 +24,7 @@ test('focused fresh phone preview opens unanswered setup and returns without per
   assert.ok(textContent(nodes).includes('Preview · answers are not saved'));
   assert.ok(!nodes.some(node => node.props.label === 'decision'));
   assert.ok(!nodes.some(node => node.props.label === 'What are you deciding?'));
-  assert.equal(control(nodes, 'Redness & sensitivity').props.selected, false);
+  assert.equal(control(nodes, 'Redness & sensitivity').props.accessibilityState.checked, false);
   assert.ok(nodes.some(node => node.props.label === 'Continue'));
   press(control(nodes, 'Dryness'));
   press(control(preview.harness.render(), 'Continue'));
@@ -48,7 +48,7 @@ test('focused skip and Back return to the originating page', () => {
 test('nonfresh fixture still previews editing existing sample answers with truthful Done label', () => {
   const preview = fixture({ mode: 'profile' });
   const nodes = preview.harness.render();
-  assert.equal(control(nodes, 'Redness & sensitivity').props.selected, true);
+  assert.equal(control(nodes, 'Redness & sensitivity').props.accessibilityState.checked, true);
   assert.ok(nodes.some(node => node.props.label === 'Done'));
 });
 

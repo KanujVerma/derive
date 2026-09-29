@@ -27,7 +27,7 @@ test('Skip on the first step advances without inventing a goal and selected main
   const flow = componentHarness(file, 'ContextFlow', { collectIntent: false, onApply(value: ContextDraft) { applied = value; }, onSkip() {} });
   press(control(flow.render(), 'Dryness'));
   press(control(flow.render(), 'Dryness'));
-  assert.equal(control(flow.render(), 'Dryness').props.selected, false);
+  assert.equal(control(flow.render(), 'Dryness').props.accessibilityState.checked, false);
   press(control(flow.render(), 'Skip'));
   assert.equal(applied, undefined);
   assert.ok(flow.render().some(node => node.props.label === 'Do skincare products tend to irritate your skin?'));
