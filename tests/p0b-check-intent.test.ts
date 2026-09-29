@@ -40,14 +40,14 @@ test('explicit Check intent overrides saved profile intent and is frozen in pers
   const response = await evaluateDecisionRequest(owner, { ...request, checkIntent: 'add' }, deps);
   assert.equal(response.packet.action.kind, 'COULD_WORK');
   assert.equal(response.expectedBinding.checkIntent, 'add');
-  assert.equal((saved.get(request.requestId)!.input.request as any).checkIntent, 'add');
+  assert.equal(saved.get(request.requestId)!.input.request.checkIntent, 'add');
   assert.equal(context.profile!.data.intent, 'withheld');
 });
 
 test('intent parsing preserves unanswered and withheld while rejecting unsupported input', () => {
   const { request } = setup();
-  assert.equal((parseDecisionRequest(request) as any).checkIntent, 'unanswered');
-  for (const checkIntent of ['add', 'replace', 'check_current', 'unanswered', 'withheld']) assert.equal((parseDecisionRequest({ ...request, checkIntent }) as any).checkIntent, checkIntent);
+  assert.equal(parseDecisionRequest(request).checkIntent, 'unanswered');
+  for (const checkIntent of ['add', 'replace', 'check_current', 'unanswered', 'withheld']) assert.equal(parseDecisionRequest({ ...request, checkIntent }).checkIntent, checkIntent);
   for (const checkIntent of [null, '', 'use', 'unsure', false, {}]) assert.throws(() => parseDecisionRequest({ ...request, checkIntent }), error => error instanceof DecisionServiceError && error.code === 'INVALID_PAYLOAD');
 });
 
@@ -86,6 +86,8 @@ test('same-case context edits retain Check intent while new cases and owners sta
   await controller.assess(snapshot, 'check_current'); assert.equal(calls[3].checkIntent, 'check_current'); assert.notEqual(calls[2].requestId, calls[3].requestId);
   await controller.assess({ ...snapshot, resolutionCaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }); assert.equal(calls[4].checkIntent, 'unanswered');
   controller.setOwner('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'); await controller.load(); await controller.assess(snapshot); assert.equal(calls[5].checkIntent, 'unanswered');
+  await controller.assess(snapshot, 'add'); controller.setOriginSnapshot(owner, snapshot);
+  assert.equal(controller.getState().checkIntent, 'add', 'A stale origin callback cannot clear the next owner Check intent');
 });
 
 test('client refuses a server receipt bound to a different intent even when packet agrees', async () => {

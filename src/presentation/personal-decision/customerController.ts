@@ -42,7 +42,7 @@ export class CustomerController {
     this.publish({ checkIntent: 'unanswered', decision: { kind: 'idle' } });
   }
   setOriginSnapshot(ownerId: string | null, snapshot: ProductTruthSnapshotV1 | null) {
-    this.selectCheckCase(ownerId && this.state.ownerId === ownerId ? snapshot?.resolutionCaseId ?? null : null);
+    if (ownerId === this.state.ownerId) this.selectCheckCase(snapshot?.resolutionCaseId ?? null);
     const projected = snapshot ? projectTrustedSnapshot({ snapshot }) : null;
     const identity = projected?.identity.state === 'known' ? projected.identity.value : null;
     const formula = projected?.formula.state === 'known' ? projected.formula.value : null;
