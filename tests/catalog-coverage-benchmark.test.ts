@@ -9,7 +9,8 @@ import { coverageSha256, evaluateCoverage, parseCoverageCorpus, unpreparedCovera
 const identity = { brand: 'Fiction', name: 'Synthetic Lotion', variant: 'Plain', packageSize: '100 mL', region: 'US' };
 interface TestCandidate { identity: typeof identity; recordRef: string; retrievedAt: string; datasetVersion: string; canonicalProductId?: string; formulaSnapshotId?: string }
 interface TestEntry { caseId: string; outcome: string; latencyMs: number; action: string; claim: string; candidate?: TestCandidate;
-  review?: { identityMatch: string; reviewerRef: string; evidenceRef: string } }
+  review?: { identityMatch: string; reviewerRef: string; evidenceRef: string;
+    customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string } } }
 const candidate: TestCandidate = { identity, recordRef: 'synthetic-record', retrievedAt: '2026-09-28T00:00:00Z', datasetVersion: 'synthetic-v1' };
 function fixture() {
   // Deliberately fabricated self-check, not a measured U.S. skincare corpus.
@@ -93,7 +94,11 @@ test('wrong and unreviewed candidate identity cannot count as useful or honest',
     assert.equal(source.counts.falseCertainty, 1);
   }
   f.run.entries[0].review!.identityMatch = 'possible';
+  assert.equal(evaluate(f).sources[0].counts.usefulHit, 0);
+  assert.equal(evaluate(f).sources[0].counts.possibleCandidate, 1);
+  f.run.entries[0].review!.customerConfirmation = { confirmedExactPackageVariant: true, evidenceRef: 'synthetic-customer-observation' };
   assert.equal(evaluate(f).sources[0].counts.usefulHit, 1);
+  assert.equal(evaluate(f).sources[0].counts.confirmedPossibleCandidate, 1);
 });
 
 test('miss/error/timeout remain separate and can provide a cautious fallback action', () => {

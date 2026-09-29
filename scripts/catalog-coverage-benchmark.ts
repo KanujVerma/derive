@@ -25,7 +25,8 @@ interface CorpusCase {
 interface Source { id: string; kind: SourceKind; evaluationPermissionRef: string; termsReviewRef: string }
 export interface CoverageCorpus { schemaVersion: 1; cohort: string; cases: CorpusCase[]; sources: Source[] }
 interface Candidate { identity: Identity; recordRef: string; retrievedAt: string; datasetVersion: string; canonicalProductId?: string; formulaSnapshotId?: string }
-interface Review { identityMatch: Match; reviewerRef: string; evidenceRef: string }
+interface Review { identityMatch: Match; reviewerRef: string; evidenceRef: string;
+  customerConfirmation?: { confirmedExactPackageVariant: boolean; evidenceRef: string } }
 interface Entry { caseId: string; outcome: Outcome; latencyMs: number; action: Action; claim: Claim; candidate?: Candidate; review?: Review }
 interface Run { sourceId: string; adapterVersion: string; corpusSha256: string; entries: Entry[] }
 
@@ -107,8 +108,13 @@ function parseRuns(v: unknown, corpus: CoverageCorpus, corpusSha256: string): Ru
         if (!opaque(candidate.recordRef) || !opaque(candidate.datasetVersion) || !iso(candidate.retrievedAt)
           || (candidate.canonicalProductId !== undefined && !opaque(candidate.canonicalProductId))
           || (candidate.formulaSnapshotId !== undefined && !opaque(candidate.formulaSnapshotId))) return bad();
-        const review = obj(entry.review, ['identityMatch', 'reviewerRef', 'evidenceRef']);
+        const review = obj(entry.review, ['identityMatch', 'reviewerRef', 'evidenceRef', 'customerConfirmation']);
         if (!member(review.identityMatch, matches) || !opaque(review.reviewerRef) || !opaque(review.evidenceRef)) return bad();
+        if (review.customerConfirmation !== undefined) {
+          const confirmation = obj(review.customerConfirmation, ['confirmedExactPackageVariant', 'evidenceRef']);
+          if (review.identityMatch !== 'possible' || typeof confirmation.confirmedExactPackageVariant !== 'boolean'
+            || !opaque(confirmation.evidenceRef)) return bad();
+        }
       } else if (entry.candidate !== undefined || entry.review !== undefined) return bad();
       return entry as unknown as Entry;
     });
@@ -132,7 +138,7 @@ export function evaluateCoverage(json: string, expectedSha256: string, rawRuns: 
   const decoded = corpus.cases.filter(c => c.scan.decoded).length;
   const sources = corpus.sources.map(source => {
     const run = runs.find(r => r.sourceId === source.id);
-    const counts = { executed: 0, notRun: 0, candidate: 0, possibleCandidate: 0, exactCandidate: 0,
+    const counts = { executed: 0, notRun: 0, candidate: 0, possibleCandidate: 0, confirmedPossibleCandidate: 0, exactCandidate: 0,
       verifiedExactProduct: 0, verifiedFormula: 0, usefulHit: 0, honestNextAction: 0,
       falseCertainty: 0, wrongCandidate: 0, miss: 0, error: 0, timeout: 0 };
     const latencies: number[] = [];
@@ -154,6 +160,8 @@ export function evaluateCoverage(json: string, expectedSha256: string, rawRuns: 
       const match = entry.review!.identityMatch;
       if (match === 'exact') counts.exactCandidate++;
       if (match === 'possible') counts.possibleCandidate++;
+      const confirmedPossible = match === 'possible' && entry.review!.customerConfirmation?.confirmedExactPackageVariant === true;
+      if (confirmedPossible) counts.confirmedPossibleCandidate++;
       if (match === 'wrong') counts.wrongCandidate++;
       const productVerified = source.kind === 'canonical' && match === 'exact'
         && !!fixture.reference.canonicalProductId && entry.candidate!.canonicalProductId === fixture.reference.canonicalProductId;
@@ -166,7 +174,7 @@ export function evaluateCoverage(json: string, expectedSha256: string, rawRuns: 
         || entry.claim === 'canonical_formula' && formulaVerified && entry.action === 'show_verified_formula';
       if (match === 'wrong' || match === 'unknown' || !warranted) counts.falseCertainty++;
       else counts.honestNextAction++;
-      if (fixture.scan.decoded && (match === 'exact' || match === 'possible') && warranted) {
+      if (fixture.scan.decoded && (match === 'exact' || confirmedPossible) && warranted) {
         counts.usefulHit++; category.usefulHit++; channel.usefulHit++;
       }
     }
