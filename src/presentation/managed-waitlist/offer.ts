@@ -3,21 +3,21 @@ export const MANAGED_WAITLIST_OFFER_VERSION = 'managed_waitlist_v1';
 export const MANAGED_WAITLIST_PRICE_CENTS = 2500;
 
 export const managedOffer = {
+  eyebrow: 'Early Access',
   name: 'Managed Skincare',
   tagline: 'Your skincare, handled.',
   price: '$25/month',
   commercialTerm: 'Products purchased separately',
-  explanation: 'Derive builds your routine, follows how it\'s going, and adjusts it when something needs to change.',
+  sectionLabel: 'What Derive handles',
   benefits: [
-    'One clear morning and evening routine',
-    'Know what to keep, add, pause, or replace',
-    'Check-ins that help your routine adapt over time',
-    'You approve meaningful changes before they go live',
+    { title: 'Your routine', body: 'Morning and evening plan' },
+    { title: 'Your products', body: 'What to keep, add, pause, or replace' },
+    { title: 'Ongoing adjustments', body: 'Check-ins guide changes.\nYou approve meaningful updates.' },
   ],
   joinLabel: 'Join waitlist',
-  joinNote: 'We\'ll let you know in Derive when early access opens. No payment today.',
+  joinNote: 'No payment today.\nWe\'ll let you know when early access opens.',
   joinedTitle: 'You\'re on the waitlist',
   joinedNote: 'We\'ll let you know when Managed Skincare opens.',
   leaveLabel: 'Leave waitlist',
-  error: 'Couldn\'t join the waitlist. Try again.',
+  error: 'Couldn\'t join right now. Try again.',
 } as const;

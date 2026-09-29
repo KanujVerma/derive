@@ -6,12 +6,30 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: Account & Settings for free and preview
+
+- **Predecessor:** `origin/main` `d02f8ba1f81b9c181cb7bd1172ef8fb3867c92ab`.
+- **Scope:** One Account & Settings surface for development preview, anonymous Free, and permanent Free. Preview has no sign-out or deletion. Anonymous Free can delete session data and does not sign out. Permanent Free shows the real email, sign-out, and account deletion. Managed account stays on the existing screen. Save-account upgrade is not shown.
+- **Links:** Privacy Policy, Privacy Choices, and Help & feedback use the existing public legal URLs. The footer version comes from the Expo config, not the Expo Go binary.
+
+## 2026-09-29: Free Plan offer composition
+
+- **Predecessor:** `origin/main` `bf20d78443fbd8a939071bff4e64b372000d9053`.
+- **Scope:** Presentation only. The free Plan offer is Early Access, a short managed promise, the same `$25/month` commercial line, and three titled rows for routine, products, and ongoing adjustments. Waitlist identity, price cents, session pinning, and persistence are unchanged.
+
 ## 2026-09-29: Free Plan Managed waitlist
 
 - **Predecessor:** `origin/main` `459566af732d234783d64aa372bae78361b603d4`.
 - **Scope:** Free Plan explains Managed Skincare as delegated routine care at the `$25/month` hypothesis and records an owner-bound waitlist join. No payment, checkout, intake, scarcity, or notification campaign. Active managed routines stay on the existing Plan screen.
 - **Persistence:** Additive `public.managed_waitlist` with session-derived owner, idempotent join/read/withdraw, and account-deletion cascade. A joined row has no withdrawal time; leaving sets one, and joining again clears it. A signed-out screen cannot become "on the waitlist." The Plan screen calls the measurement contract; without an installed sink that call transmits nothing. Analytics failure does not block the join.
 - **Ownership:** Kanuj customer outcome. Sami stewardship review for Auth, RLS, and deletion. No edits to open catalog or `config.toml` write-sets.
+
+## 2026-09-28: Exact-barcode catalog candidate loading
+
+- **Immutable predecessor:** `origin/main@459566a` after Kanuj #150. This Sami-owned resolver change does not touch Kanuj's camera or decision surfaces.
+- **Source behavior:** a new barcode-only resolution loads exact GTIN assertions through the existing identifier index, then only their linked variants, products, and formula versions. Mixed evidence and existing-case replay keep the prior broad catalog read, preserving cross-product contradictions and immutable snapshot presentation. The same deterministic resolver and provenance requirements decide whether a formula is verified; an unknown barcode stays unknown.
+- **Local proof:** 770 application tests, both TypeScript checks, iOS/web exports, fresh isolated database reset, 24 pgTAP files/575 assertions, and a real local Edge smoke covering exact verified barcode, unknown barcode, typed contradiction, replay, ownership and deletion passed. The isolated test stack used ports `57321`/`57322`; no hosted data or settings changed.
+- **Remaining gap:** broad name/mixed-evidence resolution and replay still have a 10,000-row fail-closed bound. This change does not add GTIN/formula catalog coverage, image recognition, Gemini, hosted deployment or App Store readiness. The three name-only catalog seeds remain in separate PR #159 pending review.
 
 ## 2026-09-28: Camera result sheet stays with the live preview
 

@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, LayoutAnimation, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, LayoutAnimation, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
+import { CatalogProductSearch } from '../../catalog/CatalogProductSearch';
+import type { CatalogProductSummary } from '../../../contracts/ProductCatalog';
 import { captureRecovery } from '../../../presentation/capture/captureRecovery';
 import { createCaptureOperationGate } from '../../../presentation/capture/captureOperationGate';
 import { canObserveLiveBarcode, initialCaptureIntent, isObservedRetailBarcode, shutterPhotoRole, type CaptureIntent } from '../../../presentation/capture/autoCapture';
@@ -17,6 +19,10 @@ import {
 const roleLabels: Record<CaptureRole, string> = {
   barcode: 'Barcode', front_label: 'Front label', ingredients: 'Ingredients', packaging: 'Packaging',
 };
+type CaptureNotice =
+  | { kind: 'status'; title: string; detail: string }
+  | { kind: 'miss'; title: string; detail: string }
+  | { kind: 'named'; title: string; detail: string };
 const prompts: Record<CaptureRole, string> = {
   barcode: 'Place the barcode inside the frame',
   front_label: 'Frame the product name and brand',
@@ -31,10 +37,13 @@ interface Props {
   initialRole?: CaptureRole;
   autoFinishBarcode?: boolean;
   detectionPaused?: boolean;
+  catalogSearch?: (query: string) => Promise<CatalogProductSummary[]>;
+  onCatalogSelect?: (product: CatalogProductSummary) => void;
 }
 
-export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false }: Props) {
+export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, catalogSearch, onCatalogSelect }: Props) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
   const [session, setSession] = useState(createCaptureSession);
   const [role, setRole] = useState<CaptureRole>(initialRole);
@@ -45,6 +54,8 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const [busy, setBusy] = useState(false);
   const [torch, setTorch] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CaptureNotice | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [canRetry, setCanRetry] = useState(false);
   const [canCollectMore, setCanCollectMore] = useState(true);
   const camera = useRef<CameraView>(null);
@@ -58,9 +69,19 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const operations = useRef(createCaptureOperationGate()).current;
   const currentEvidence = intent === 'auto' ? undefined : session.evidence.find((item) => item.role === role);
   const capturedPhotos = session.evidence.filter((item) => item.kind === 'local_photo');
-  const nextMissingPhoto = nextPhotoRole(session);
-  const liveBarcode = !detectionPaused && !currentEvidence && !previewUri
+  const liveBarcode = !detectionPaused && !notice && !currentEvidence && !previewUri
     && (intent === 'barcode' || (intent === 'auto' && capturedPhotos.length === 0));
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(Math.min(event.endCoordinates.height, Math.round(windowHeight * 0.46)));
+    });
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    const didHide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); didHide.remove(); };
+  }, [windowHeight]);
 
   useEffect(() => {
     mounted.current = true;
@@ -112,7 +133,8 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const capturePhoto = async () => {
-    if (intent === 'barcode' || (intent === 'auto' && !nextPhotoRole(currentSession.current)) || busy) return;
+    const hasPhoto = currentSession.current.evidence.some((item) => item.kind === 'local_photo');
+    if (intent === 'barcode' || (intent === 'auto' && hasPhoto) || busy) return;
     await operations.run(async (isCurrent) => {
       setBusy(true);
       setError(null);
@@ -120,6 +142,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         const photo = await camera.current?.takePictureAsync({ quality: 0.85 });
         if (!isCurrent()) return;
         if (!photo?.uri) throw new Error('No photo returned');
+        setShowCorrection(false);
         setPreviewRole(shutterPhotoRole(intent));
         setPreview(photo.uri);
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -134,10 +157,9 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const usePhoto = () => {
     if (!previewActive.current || !previewUri || !previewRole) return;
     dispatchCapture({ type: 'photo', role: previewRole, uri: previewUri });
-    const nextRole = nextPhotoRole(currentSession.current);
-    setRole(nextRole ?? 'barcode');
-    setIntent(nextRole ?? 'auto');
-    latestIntent.current = nextRole ?? 'auto';
+    setRole('barcode');
+    setIntent('auto');
+    latestIntent.current = 'auto';
     scanLocked.current = currentSession.current.evidence.some((item) => item.role === 'barcode');
     setShowCorrection(false);
     setPreview(null);
@@ -152,14 +174,30 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
       scanLocked.current = true;
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (autoFinishBarcode && !currentSession.current.evidence.some((item) => item.kind === 'local_photo')) {
-        mounted.current = false;
         onEvidenceReady(toCaptureHandoff(reduceCapture(currentSession.current, { type: 'barcode', value: data })));
-        return;
       }
       dispatchCapture({ type: 'barcode', value: data });
+      setNotice({ kind: 'miss', title: 'No product match', detail: "This barcode isn't in the catalog." });
     });
   };
 
+  const viewSavedPhoto = (targetRole: CaptureRole) => {
+    if (operations.isBusy() || targetRole === 'barcode') return;
+    setRole(targetRole);
+    setIntent(targetRole);
+    latestIntent.current = targetRole;
+    setPreview(null);
+    setPreviewRole(null);
+    setShowCorrection(false);
+    setNotice(null);
+    void Haptics.selectionAsync().catch(() => {});
+  };
+  const keepSavedPhoto = () => {
+    setRole('barcode');
+    setIntent('auto');
+    latestIntent.current = 'auto';
+    setShowCorrection(false);
+  };
   const retakeRole = (targetRole: CaptureRole) => {
     if (operations.isBusy()) return;
     requestSequence.current += 1;
@@ -175,26 +213,42 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
     void Haptics.selectionAsync().catch(() => {});
   };
 
+  const dismissNotice = () => setNotice(null);
+  const photographIngredients = () => {
+    Keyboard.dismiss();
+    setNotice(null);
+    selectRole('ingredients');
+  };
+  const noticePan = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 14,
+    onPanResponderRelease: (_event, gesture) => { if (gesture.dy > 28) setNotice(null); },
+  })).current;
+
   const processEvidence = async () => {
     if (!mounted.current || !currentSession.current.evidence.length || currentSession.current.phase === 'processing') return;
     await operations.run(async (isCurrent) => {
       const sequence = ++requestSequence.current;
-      // Native barcode callbacks may precede the next React render.
       const evidence = currentSession.current.evidence;
-      dispatchCapture({ type: 'process' });
+      setNotice({ kind: 'status', title: 'Checking product', detail: 'Looking at what you captured.' });
       setError(null);
       setCanRetry(false);
       try {
         const result = await processor.process(evidence);
         if (!isCurrent() || sequence !== requestSequence.current) return;
+        if (result.state === 'insufficient_evidence') {
+          const hasBarcode = evidence.some((item) => item.kind === 'barcode');
+          setNotice({ kind: 'miss', title: hasBarcode ? 'No product match' : 'Not identified yet', detail: hasBarcode ? "This barcode isn't in the catalog." : "This photo isn't enough to identify the product." });
+          return;
+        }
+        setNotice(null);
+        dispatchCapture({ type: 'process' });
         dispatchCapture({ type: 'resolved', result });
       } catch (cause) {
         if (!isCurrent() || sequence !== requestSequence.current) return;
-        dispatchCapture({ type: 'resolved', result: { state: 'insufficient_evidence', candidates: [] } });
         const recovery = captureRecovery(cause);
         setCanRetry(recovery.canRetry);
         setCanCollectMore(recovery.canCollectMore);
-        setError(recovery.message);
+        setNotice({ kind: 'status', title: 'Could not check', detail: 'Try Check product again, or search by name.' });
       }
     });
   };
@@ -250,7 +304,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           }} />
         </View>
       ) : session.phase === 'collecting' ? (
-        <View style={styles.collecting}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.collecting}>
           <View pointerEvents="none" style={styles.guideArea}>
             {liveBarcode ? (
               // Alignment aid only: Expo still detects barcodes across the whole preview.
@@ -262,7 +316,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
               </View>
             ) : null}
           </View>
-          {(showCorrection || (previewUri && !previewRole)) && <CameraGlass style={styles.modeMenu}>
+          {showCorrection && !previewUri && <CameraGlass style={styles.modeMenu}>
             <ScrollView style={styles.controlScroll} contentContainerStyle={styles.controlContent}>
               {previewUri && <Text style={styles.modeTitle}>Which part is in this photo?</Text>}
               <View style={styles.roleRow}>
@@ -286,44 +340,79 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           </CameraGlass>}
           <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
             {!previewUri && capturedPhotos.length > 0 && <View accessibilityLabel="Captured product photos" style={styles.evidenceTray}>
-              {capturedPhotos.map((item) => <Pressable key={item.role} accessibilityRole="button" accessibilityLabel={`${roleLabels[item.role]} photo captured. Tap to retake`} onPress={() => retakeRole(item.role)} style={styles.evidenceThumbButton}>
+              {capturedPhotos.map((item) => <Pressable key={item.role} accessibilityRole="button" accessibilityLabel={`${roleLabels[item.role]} photo saved. Tap to view`} onPress={() => viewSavedPhoto(item.role)} style={styles.evidenceThumbButton}>
                 <Image source={{ uri: item.value }} style={styles.evidenceThumb} resizeMode="cover" />
                 <Text style={styles.evidenceThumbLabel} numberOfLines={1}>{roleLabels[item.role]}</Text>
               </Pressable>)}
             </View>}
             {!previewUri && currentEvidence && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{roleLabels[role]} saved</Text></CameraGlass>}
+            {!previewUri && !currentEvidence && intent === 'auto' && capturedPhotos.length === 0 && <Text style={styles.hint}>Hold the barcode steady in the frame.</Text>}
             {!previewUri && !currentEvidence && intent !== 'auto' && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{prompts[role]}</Text></CameraGlass>}
-            {previewUri && <CameraGlass style={styles.guidancePill}><Text style={styles.hint}>Photos do not verify the formula.</Text></CameraGlass>}
             {error && <Text style={styles.error}>{error}</Text>}
             <View style={styles.captureActions}>
                 {previewUri ? (
                   <View style={styles.photoActionStack}>
-                    {previewRole && !showCorrection && <Pressable accessibilityRole="button" accessibilityLabel="Change part" onPress={() => operations.whenIdle(() => { animateOptions(); setShowCorrection(true); })} style={styles.changePart}><Text style={styles.changePartText}>Change part</Text></Pressable>}
-                    <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => { setShowCorrection(false); setPreview(null); setPreviewRole(null); }} />{previewRole && <Action label={session.evidence.some((item) => item.role === previewRole) ? 'Replace photo' : 'Use photo'} accessibilityLabel={`${session.evidence.some((item) => item.role === previewRole) ? 'Replace' : 'Use'} ${roleLabels[previewRole]} photo`} onPress={usePhoto} />}</View>
+                    {(showCorrection || !previewRole) && <CameraGlass style={styles.previewMenu}>
+                      <Text style={styles.modeTitle}>Which part is in this photo?</Text>
+                      <View style={styles.roleRow}>
+                        {captureRoles.map((item) => {
+                          if (item === 'barcode') return null;
+                          const selected = previewRole === item;
+                          return (
+                            <Pressable key={item} accessibilityRole="button" accessibilityLabel={roleLabels[item]} accessibilityState={{ selected, disabled: busy }} disabled={busy} onPress={() => operations.whenIdle(() => { setPreviewRole(item); setShowCorrection(false); })} style={[styles.roleChip, selected && styles.roleChipActive]}>
+                              <Text style={[styles.roleText, selected && styles.roleTextActive]}>{roleLabels[item]}</Text>
+                              {selected && <Icon name="check" size={18} color={colors.brandDark} />}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </CameraGlass>}
+                    <View style={styles.actionRow}>
+                      <Action label="Retake" secondary onPress={() => { setShowCorrection(false); setPreview(null); setPreviewRole(null); }} />
+                      {previewRole && <Action label={session.evidence.some((item) => item.role === previewRole) ? 'Replace photo' : 'Use photo'} accessibilityLabel={`${session.evidence.some((item) => item.role === previewRole) ? 'Replace' : 'Use'} ${roleLabels[previewRole]} photo`} onPress={usePhoto} />}
+                    </View>
                   </View>
                 ) : currentEvidence ? (
-                  <View style={styles.actionRow}><Action label="Retake" secondary onPress={() => retakeRole(role)} /><Action label="Check product" onPress={() => void processEvidence()} /></View>
-                ) : intent === 'barcode' ? (
-                  <View style={styles.actionRow}>{session.evidence.length > 0 && <Action label="Check product" onPress={() => void processEvidence()} />}</View>
+                  <View style={styles.controlRow}>
+                    <View style={styles.sideSlot} />
+                    <View style={styles.actionRow}><Action label="Keep" onPress={keepSavedPhoto} /><Action label="Retake" secondary onPress={() => retakeRole(role)} /><Action label="Check product" onPress={() => void processEvidence()} /></View>
+                    <View style={styles.sideSlot} />
+                  </View>
                 ) : (
-                  <View style={styles.photoActionStack}>
-                    {session.evidence.length > 0 && <Action label="Check product" onPress={() => void processEvidence()} />}
-                    {(intent !== 'auto' || nextMissingPhoto) && <Pressable accessibilityRole="button" accessibilityLabel={intent === 'auto' ? 'Take front label photo' : `Take ${roleLabels[role]} photo`} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void capturePhoto()} style={[styles.shutter, busy && styles.shutterBusy]}>
-                      {busy ? <ActivityIndicator color={colors.inkInverse} /> : <View style={styles.shutterInner} />}
-                    </Pressable>}
+                  <View style={styles.controlRow}>
+                    <View style={styles.sideSlot} />
+                    <View style={styles.centerCluster}>
+                      {session.evidence.length > 0 && <Action label="Check product" onPress={() => void processEvidence()} />}
+                      {intent !== 'barcode' && (intent !== 'auto' || capturedPhotos.length === 0) && <Pressable accessibilityRole="button" accessibilityLabel={intent === 'auto' ? 'Take front label photo' : `Take ${roleLabels[role]} photo`} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void capturePhoto()} style={[styles.shutter, busy && styles.shutterBusy]}>
+                        {busy ? <ActivityIndicator color={colors.inkInverse} /> : <View style={styles.shutterInner} />}
+                      </Pressable>}
+                    </View>
+                    <View style={styles.sideSlot}>
+                      <CameraGlass style={styles.selectorPill}>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`Capture options, ${intent === 'auto' ? 'Auto' : roleLabels[role]}`} accessibilityState={{ expanded: showCorrection, disabled: busy }} disabled={busy} onPress={() => operations.whenIdle(() => { animateOptions(); setShowCorrection((value) => !value); })} style={styles.selectorButton}>
+                          <Text style={styles.selectorText} numberOfLines={1}>{intent === 'auto' ? 'Auto' : roleLabels[role]}</Text>
+                          <Icon name={showCorrection ? 'up' : 'down'} size={14} color={colors.inkInverse} />
+                        </Pressable>
+                      </CameraGlass>
+                    </View>
                   </View>
                 )}
             </View>
-            {!previewUri && !currentEvidence && <View style={[styles.selectorSlot, { bottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]}>
-              <CameraGlass style={styles.selectorPill}>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Capture options, ${intent === 'auto' ? 'Auto' : roleLabels[role]}`} accessibilityState={{ expanded: showCorrection, disabled: busy }} disabled={busy} onPress={() => operations.whenIdle(() => { animateOptions(); setShowCorrection((value) => !value); })} style={styles.selectorButton}>
-                  <Text style={styles.selectorText} numberOfLines={1}>{intent === 'auto' ? 'Auto' : roleLabels[role]}</Text>
-                  <Icon name={showCorrection ? 'up' : 'down'} size={14} color={colors.inkInverse} />
-                </Pressable>
+          </View>
+            {notice && <View style={[styles.noticeWrap, { bottom: (keyboardHeight > 0 ? Math.min(keyboardHeight, Math.round(windowHeight * 0.42)) : Math.max(insets.bottom, spacing.md)) + (keyboardHeight > 0 ? spacing.sm : 0) }]} {...noticePan.panHandlers}>
+              <CameraGlass style={styles.notice}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Dismiss result" onPress={dismissNotice} style={styles.noticeHandle}><View style={styles.noticeBar} /></Pressable>
+                <Text style={styles.noticeTitle}>{notice.title}</Text>
+                {notice.kind === 'miss' ? (
+                  <View style={styles.noticeActions}>
+                    <Text style={styles.noticeDetail}>{notice.detail}</Text>
+                    {!capturedPhotos.some((item) => item.role === 'ingredients') && <Action label="Add photo of ingredient list" onPress={photographIngredients} />}
+                    <CatalogProductSearch label={capturedPhotos.some((item) => item.role === 'ingredients') ? 'Search by name' : 'Or search by name'} actionLabel="Check" placeholder="Brand or product name" search={catalogSearch} keepFocusAfterSelect={false} emptyCopy="No product match yet." errorCopy="Search is unavailable right now." onSelect={(item) => { Keyboard.dismiss(); onCatalogSelect?.(item); setNotice({ kind: 'named', title: item.brand, detail: `${item.name}. The photo did not verify the formula.` }); }} />
+                  </View>
+                ) : <Text style={styles.noticeDetail}>{notice.detail}</Text>}
               </CameraGlass>
             </View>}
-          </View>
-        </View>
+          </KeyboardAvoidingView>
       ) : (
         <View style={[styles.outcomeWrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
           <ScrollView contentContainerStyle={styles.outcomeScroll}>
@@ -374,6 +463,7 @@ const styles = StyleSheet.create({
   iconButton: { minWidth: layout.minTouchTarget, minHeight: layout.minTouchTarget, width: layout.minTouchTarget + spacing.xs, height: layout.minTouchTarget + spacing.xs, alignItems: 'center', justifyContent: 'center' },
   collecting: { flex: 1 },
   modeMenu: { position: 'absolute', right: spacing.md, bottom: 126, zIndex: 2, width: 210, maxHeight: 260, padding: spacing.xs, borderRadius: radii.lg },
+  previewMenu: { width: 240, maxWidth: '100%', padding: spacing.xs, borderRadius: radii.lg },
   modeTitle: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold, textAlign: 'center' },
   guideArea: { flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   barcodeGuide: { width: '88%', maxWidth: 320, height: '68%', maxHeight: 320, minHeight: 120 },
@@ -388,7 +478,9 @@ const styles = StyleSheet.create({
   evidenceThumb: { width: layout.minTouchTarget, height: layout.minTouchTarget, borderRadius: radii.sm },
   evidenceThumbLabel: { color: colors.inkInverse, fontSize: typography.sizes.caption, fontWeight: typography.weights.medium, maxWidth: 72 },
   guidancePill: { maxWidth: '100%', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radii.full },
-  selectorSlot: { position: 'absolute', right: spacing.xs, width: 112 },
+  controlRow: { width: '100%', flexDirection: 'row', alignItems: 'center' },
+  sideSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  centerCluster: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   selectorPill: { width: 112, height: 52, borderRadius: radii.full },
   selectorButton: { minHeight: layout.minTouchTarget, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xxs, paddingHorizontal: spacing.xs },
   selectorText: { color: colors.inkInverse, fontSize: typography.sizes.caption, fontWeight: typography.weights.semibold, flexShrink: 1 },
@@ -397,6 +489,13 @@ const styles = StyleSheet.create({
   captureActions: { flexShrink: 0 },
   prompt: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.medium, lineHeight: typography.lineHeights.bodyRegular, textAlign: 'center' },
   hint: { color: colors.brandLight, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, marginTop: spacing.xs, textAlign: 'center' },
+  noticeWrap: { position: 'absolute', left: spacing.md, right: spacing.md, zIndex: 4 },
+  notice: { borderRadius: radii.xl, paddingHorizontal: spacing.md, paddingBottom: spacing.md },
+  noticeHandle: { minHeight: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
+  noticeBar: { width: 36, height: 5, borderRadius: radii.full, backgroundColor: colors.inkInverse },
+  noticeTitle: { color: colors.inkInverse, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold, textAlign: 'center' },
+  noticeDetail: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, textAlign: 'center', marginTop: spacing.xs },
+  noticeActions: { gap: spacing.sm, marginTop: spacing.sm },
   roleRow: { flexDirection: 'column', gap: spacing.xxs },
   roleChip: { minHeight: layout.minTouchTarget, borderRadius: radii.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   roleChipActive: { backgroundColor: colors.brandLight, borderColor: colors.brand },
@@ -404,8 +503,6 @@ const styles = StyleSheet.create({
   roleTextActive: { color: colors.brandDark },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   photoActionStack: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  changePart: { minHeight: layout.minTouchTarget, justifyContent: 'center', paddingHorizontal: spacing.md },
-  changePartText: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.medium, textAlign: 'center', textDecorationLine: 'underline' },
   action: { minHeight: layout.ctaHeight, minWidth: 116, maxWidth: '100%', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.full, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   secondaryAction: { backgroundColor: 'rgba(30,54,44,0.72)', borderWidth: 1, borderColor: colors.inkInverse },
   actionText: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold, textAlign: 'center' },

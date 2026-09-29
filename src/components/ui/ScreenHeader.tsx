@@ -24,6 +24,7 @@ interface ScreenHeaderProps {
     onPress: () => void;
     accessibilityLabel: string;
   };
+  leading?: React.ReactNode;
   rightAccessory?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   hasBottomDivider?: boolean;
@@ -36,6 +37,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   onBack,
   titleFont = 'sans',
   rightAction,
+  leading,
   rightAccessory,
   style,
   hasBottomDivider = false,
@@ -73,6 +75,8 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
             <Icon name="back" size={20} color={colors.ink} />
           </TouchableOpacity>
         )}
+
+        {leading ? <View style={styles.leading}>{leading}</View> : null}
 
         <View style={styles.titleContainer}>
           <Text
@@ -125,6 +129,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: layout.minTouchTarget,
+  },
+  leading: {
+    marginRight: spacing.xs,
   },
   titleContainer: {
     flex: 1,

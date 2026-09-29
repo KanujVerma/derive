@@ -27,6 +27,7 @@ import { identityKindFromVerifiedUser } from "../_shared/access.ts";
 const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
 const CATALOG_PAGE_SIZE = 1_000;
 const MAX_CATALOG_ROWS_PER_TABLE = 10_000;
+const MAX_BARCODE_IDENTIFIERS = 100;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PHOTO_ROLES = new Set<ProductEvidencePhotoRole>(["front_label", "ingredients", "packaging"]);
 const ALLOWED_FIELDS = new Set([
@@ -261,6 +262,55 @@ async function verifyEvidencePhotos(admin: SupabaseClient, userId: string,
   }
 }
 
+// A barcode with no other observations cannot contradict a different catalog
+// product. Use the identifier index and only its related rows in that case;
+// richer evidence still needs the full catalog for cross-product conflicts.
+function isBarcodeOnly(request: ParsedRequest): boolean {
+  return Boolean(request.barcode && !request.brand && !request.productName && !request.variantName
+    && !request.regionCode && !request.labelText && !request.packagingText
+    && !request.ingredientList && request.evidencePhotos.length === 0);
+}
+
+async function loadBarcodeCatalog(admin: SupabaseClient, freeOnly: boolean, barcode: string): Promise<CatalogResolutionRecord[]> {
+  const identifierRows = await loadPagedCatalogRows<IdentifierRow>("barcode identifiers", (from, to) => {
+    const query = admin.from("product_identifiers")
+      .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at")
+      .eq("identifier_type", `gtin_${barcode.length}`).eq("identifier_value", barcode);
+    if (freeOnly) query.not("verified_at", "is", null);
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (identifierRows.length === 0) return [];
+  if (identifierRows.length > MAX_BARCODE_IDENTIFIERS) {
+    throw new ServiceError("CATALOG_TOO_LARGE", "Barcode identity requires operator review", 503);
+  }
+  const variantIds = [...new Set(identifierRows.map((row) => row.variant_id))];
+  const variantRows = await loadPagedCatalogRows<VariantRow>("barcode variants", (from, to) => {
+    const query = admin.from("product_variants")
+      .select("id, product_id, variant_name, region_code, packaging_markers")
+      .in("id", variantIds).eq("lifecycle_status", "active");
+    if (freeOnly) query.eq("catalog_verification_status", "verified");
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (variantRows.length === 0) return [];
+  const productIds = [...new Set(variantRows.map((row) => row.product_id))];
+  const [productRows, formulaRows] = await Promise.all([
+    loadPagedCatalogRows<ProductRow>("barcode products", (from, to) => {
+      const query = admin.from("products")
+        .select("id, brand, name, is_catalog_standard, catalog_verified_at").in("id", productIds);
+      if (freeOnly) query.eq("is_catalog_standard", true).not("catalog_verified_at", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+    loadPagedCatalogRows<FormulaRow>("barcode formulas", (from, to) => {
+      const query = admin.from("product_formula_versions")
+        .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers, ingredients, region_code")
+        .in("variant_id", variantRows.map((row) => row.id));
+      if (freeOnly) query.eq("verification_status", "verified").not("catalog_public_source_url", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+  ]);
+  return projectCatalogRows(productRows, variantRows, formulaRows, identifierRows, freeOnly);
+}
+
 async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<CatalogResolutionRecord[]> {
   const [productRows, variantRows, formulaRows, identifierRows] = await Promise.all([
     loadPagedCatalogRows<ProductRow>("products", (from, to) => {
@@ -289,6 +339,11 @@ async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<Ca
     }),
   ]);
 
+  return projectCatalogRows(productRows, variantRows, formulaRows, identifierRows, freeOnly);
+}
+
+function projectCatalogRows(productRows: ProductRow[], variantRows: VariantRow[],
+  formulaRows: FormulaRow[], identifierRows: IdentifierRow[], freeOnly: boolean): CatalogResolutionRecord[] {
   const products = new Map(productRows.map((row) => [row.id, row]));
   const variants = new Map(variantRows.map((row) => [row.id, row]));
   const formulasByVariant = new Map<string, FormulaRow[]>();
@@ -477,8 +532,6 @@ Deno.serve(async (req: Request) => {
       throw new ServiceError("MEMBERSHIP_REQUIRED", "Managed Shelf requires an active membership", 403);
     }
     await verifyEvidencePhotos(admin, userId, request.evidencePhotos, managedAccess);
-    const catalog = await loadCatalog(admin, !managedAccess);
-
     const { data: replay, error: replayError } = await admin.from("product_resolution_cases")
       .select("id, consumer, resolution_state, product_id, variant_id, formula_version_id, next_action, requires_founder_review, evidence_snapshot")
       .eq("user_id", userId).eq("request_id", request.requestId).maybeSingle();
@@ -493,8 +546,15 @@ Deno.serve(async (req: Request) => {
       if (replay.evidence_snapshot?.requestFingerprint && replay.evidence_snapshot.requestFingerprint !== requestFingerprint) {
         throw new ServiceError('REQUEST_CONFLICT', 'This request ID belongs to different evidence', 409);
       }
+      // Existing case presentation and immutable snapshots keep the original
+      // broad readback behavior, including non-barcode candidates.
+      const catalog = await loadCatalog(admin, !managedAccess);
       return jsonResponse(await responseForCase(admin, userId, replay as ResolutionCaseRow, catalog));
     }
+
+    const catalog = isBarcodeOnly(request)
+      ? await loadBarcodeCatalog(admin, !managedAccess, request.barcode!)
+      : await loadCatalog(admin, !managedAccess);
 
     const photoText = request.evidencePhotos.filter((photo) => photo.extractedText);
     const decision = resolveProductIdentity({

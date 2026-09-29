@@ -82,6 +82,8 @@ test('K-FREE-1: target preview keeps managed hydration out of Plan and sample da
   assert.match(stuff, /RootShellHeader/);
   assert.match(read('src/components/account/AccountSettingsButton.tsx'), /Account and Settings/);
   assert.match(read('src/components/shell/RootShellHeader.tsx'), /AccountSettingsButton/);
+  assert.match(read('src/components/shell/RootShellHeader.tsx'), /assets\/logo\.png/);
+  assert.doesNotMatch(read('src/components/account/AccountSettingsShell.tsx'), /logo\.png|RootShellHeader/);
   assert.match(read('src/components/shop/PreviewShopShell.tsx'), /RootShellHeader/);
   assert.match(read('src/components/plan/PreviewPlanShell.tsx'), /RootShellHeader/);
   assert.match(read('src/components/check/CheckProductScreen.tsx'), /RootShellHeader/);
