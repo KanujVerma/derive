@@ -35,7 +35,9 @@ test('focused fresh phone preview opens unanswered setup and returns without per
 
 test('focused skip and Back return to the originating page', () => {
   const skip = fixture({ mode: 'profile', fresh: '1', focused: '1' });
-  press(control(skip.harness.render(), 'Skip personalization'));
+  press(control(skip.harness.render(), 'Skip'));
+  assert.equal(skip.exits(), 0);
+  press(control(skip.harness.render(), 'Skip'));
   assert.equal(skip.exits(), 1);
   const back = fixture({ mode: 'profile', fresh: '1', focused: '1' });
   press(control(back.harness.render(), 'Back'));
