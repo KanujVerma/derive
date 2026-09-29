@@ -12,13 +12,14 @@ import { styles } from './ContextFlow';
 export interface ExperienceContextProps {
   /** New reports use the host UUID. Corrections retain the existing report ID and revision. */
   createRecordId: () => string; existing?: { draft: ExperienceDraft; revisionId: string };
+  initialDraft?: ExperienceDraft;
   availableProducts?: readonly Extract<RoutineReference, { kind: 'catalog' }>[];
   onApply: (edit: ExperienceEdit) => void; onSkip: () => void; loading?: boolean; error?: string | null;
 }
 const kinds: readonly [ExperienceKind, string][] = [['reacted', 'I reacted to it'], ['tolerated', 'I tolerated it'], ['no_reaction_reported', 'No reaction to report'], ['liked', 'I liked it'], ['finished', 'I finished it'], ['ineffective', 'It did not help my goal']];
 /** User reports remain reports. The host owns record revisions and persistence. */
-export function ExperienceContext({ createRecordId, existing, availableProducts = [], onApply, onSkip, loading = false, error }: ExperienceContextProps) {
-  const [edit, setEdit] = useState<ExperienceEdit>(() => existing ? prepareExperienceEdit(existing.draft, existing.revisionId) : { draft: createExperienceDraft(createRecordId()), supersedesRevisionId: null });
+export function ExperienceContext({ createRecordId, existing, initialDraft, availableProducts = [], onApply, onSkip, loading = false, error }: ExperienceContextProps) {
+  const [edit, setEdit] = useState<ExperienceEdit>(() => existing ? prepareExperienceEdit(existing.draft, existing.revisionId) : { draft: createExperienceDraft(initialDraft?.id ?? createRecordId(), initialDraft), supersedesRevisionId: null });
   const [symptomsText, setSymptomsText] = useState(() => existing?.draft.symptoms.join('\n') ?? '');
   const [validation, setValidation] = useState<string | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(() => Boolean(existing?.draft.occurred.start || existing?.draft.occurred.end || existing?.draft.symptoms.length || existing?.draft.note));

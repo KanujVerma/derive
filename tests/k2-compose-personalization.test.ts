@@ -25,13 +25,15 @@ test('K2 explicit session demo retains answers only for its gateway instance and
   assert.equal((await createPersonalizationGateway('session_demo').loadProfile('guest-A')).kind, 'unavailable');
 });
 
-test('K2 Check puts factual result before separate Personal Fit and keeps Formula Details', () => {
+test('Check shares identity and Personal Fit before optional formula details', () => {
   const check = read('../src/components/check/CheckProductScreen.tsx');
-  const result = check.slice(check.indexOf('if (catalogDetail) {'), check.indexOf('if (resolution && !catalogDetail)'));
-  assert.ok(result.indexOf('previewProductHeading') < result.indexOf('<PersonalFitSection'));
-  assert.ok(result.indexOf('header="Formula Details"') < result.indexOf('<PersonalFitSection'));
-  assert.match(result, /onPersonalize=\{.*openPersonalization/);
-  assert.match(result, /Verified ingredients for this exact package/);
+  const content = read('../src/components/check/result-sheet/CheckResultContent.tsx');
+  const host = read('../src/components/check/result-sheet/CheckResultPresentation.tsx');
+  assert.ok(content.indexOf('styles.identity') < content.indexOf('<PersonalDecisionPanel'));
+  assert.ok(content.indexOf('<PersonalDecisionPanel') < content.indexOf('title="Formula details"'));
+  assert.match(check, /sharedResultInput = .*selectCheckContentInput/s);
+  assert.match(host, /<CheckResultContent input=\{input\} expanded=\{full \|\| expanded\}/);
+  assert.match(content, /Verified ingredients for this exact package/);
 });
 
 test('K2 optional editor returns to the mounted result and My Stuff reuses it', () => {
@@ -42,7 +44,7 @@ test('K2 optional editor returns to the mounted result and My Stuff reuses it', 
   assert.match(screen, /onSkip=\{\(\) => router\.back\(\)\}/);
   assert.match(screen, /onComplete=.*saveProfile/s);
   assert.match(screen, /router\.back\(\)/);
-  assert.match(check, /router\.push\('\/personalize'\)/);
+  assert.match(check, /pathname: '\/personalize', params: \{ p0b: '1', mode, source: 'check', snapshotId:/);
   assert.match(stuff, /onEditProfile=.*personalize/);
   assert.doesNotMatch(screen + stuff, /evaluateProduct|scan-product|skin_profiles|onboardingStore|membership/);
 });
@@ -51,7 +53,7 @@ test('K2 retains Mock preview and Remote Staging legacy branches', () => {
   const check = read('../src/components/check/CheckProductScreen.tsx');
   assert.match(check, /const preview = shell === 'scanner_first_preview'/);
   assert.match(check, /const integrated = shell === 'local_free_integration'/);
-  assert.match(check, /targetShell \? \([\s\S]*<PersonalFitSection/);
+  assert.match(check, /<CheckResultPresentation[\s\S]*input=\{sharedResultInput\}/);
   assert.doesNotMatch(check.slice(check.indexOf('if (catalogDetail) {'), check.indexOf('if (resolution && !catalogDetail)')), /Not available yet/);
   assert.match(check, /if \(!targetShell && audience !== 'member'\)/);
   assert.match(check, /evaluateProduct/); // Legacy member path remains available only outside target shell.
@@ -81,13 +83,12 @@ test('K2 Personal Fit copy is concise and states an unavailable save once', () =
   assert.doesNotMatch(ready.message, /fit.*great|fits you|below/i);
 });
 
-test('K2 Check renders one Personal Fit section with a minimal action', () => {
-  const check = read('../src/components/check/CheckProductScreen.tsx');
+test('shared result renders Personal Fit once and keeps context actions relevant', () => {
+  const content = read('../src/components/check/result-sheet/CheckResultContent.tsx');
   const section = read('../src/components/personalization/PersonalFitSection.tsx');
-  const integratedResult = check.slice(check.indexOf('if (catalogDetail) {'), check.indexOf('if (resolution && !catalogDetail)'));
-  assert.equal((integratedResult.match(/<PersonalFitSection/g) ?? []).length, 1);
-  assert.doesNotMatch(integratedResult, /<Text[^>]*>Not personalized yet/);
-  assert.doesNotMatch(integratedResult, /Personalization unavailable\. Your answers were not saved/);
+  assert.equal((content.match(/<PersonalFitSection/g) ?? []).length, 1);
+  assert.match(content, /onPersonalize=\{model\.canPersonalize \? onPersonalize : undefined\}/);
+  assert.doesNotMatch(content, /<Text[^>]*>Not personalized yet/);
   assert.match(section, /label=\"Personalize\"/);
   assert.doesNotMatch(section, /label=\"Personalize Derive\"/);
 });
@@ -147,7 +148,7 @@ test('K2 My Stuff offers the shared editor only in scanner-first shells', () => 
   assert.match(stuff, /onEditProfile=\{targetShell \? .*router\.push\('\/personalize'\).* : undefined\}/);
 });
 
-test('K2 Mock Check exposes factual Personal Fit and returns unavailable after optional completion', async () => {
+test('Mock Check shares catalog facts with an explicit preview capability limit', async () => {
   const ownerId = resolvePersonalizationOwnerId(null, 'scanner_first_preview');
   const gateway = createPersonalizationGateway();
   assert.equal(gateway.lastSaveStatus(ownerId), null);
@@ -155,9 +156,8 @@ test('K2 Mock Check exposes factual Personal Fit and returns unavailable after o
   assert.equal(gateway.lastSaveStatus(ownerId)?.kind, 'unavailable');
   assert.equal((await gateway.getFit(ownerId, 'preview-product')).kind, 'unavailable');
   const check = read('../src/components/check/CheckProductScreen.tsx');
-  const result = check.slice(check.indexOf('if (catalogDetail) {'), check.indexOf('if (resolution && !catalogDetail)'));
+  const composition = read('../src/presentation/check/result-sheet/composition.ts');
   assert.match(check, /resolvePersonalizationOwnerId\(sessionUserId, shell\)/);
-  assert.match(result, /<PersonalFitSection state=\{personalFitState\} onPersonalize=\{openPersonalization\}/);
-  assert.ok(result.indexOf('header=\"Formula Details\"') < result.indexOf('<PersonalFitSection'));
-  assert.doesNotMatch(result, /GREAT FIT|COULD WORK|Not available yet/);
+  assert.match(check, /customerState, preview, legacyState: personalFitState/);
+  assert.match(composition, /input\.preview.*snapshot: null.*preview_unavailable/);
 });

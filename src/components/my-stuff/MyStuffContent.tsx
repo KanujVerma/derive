@@ -49,6 +49,7 @@ export function MyStuffContent({
   onAddProduct, onAddExperience, onCorrectExperience, onAddProductExperience,
   canonicalExperiences, experienceStatus = 'ready', experienceError, onRetryExperiences,
   hasMoreCanonicalExperiences, onLoadMoreCanonicalExperiences,
+  memoryStatus = 'ready', onEditRoutine,
 }: {
   model: MyStuffViewModel;
   liveFree?: boolean;
@@ -73,6 +74,8 @@ export function MyStuffContent({
   onRetryExperiences?: () => void;
   hasMoreCanonicalExperiences?: boolean;
   onLoadMoreCanonicalExperiences?: () => void;
+  memoryStatus?: 'loading' | 'ready' | 'error';
+  onEditRoutine?: () => void;
 }) {
   const view = buildMyStuffPresentation(model, canonicalExperiences);
   const copy = myStuffCopy(liveFree);
@@ -151,7 +154,8 @@ export function MyStuffContent({
               ))}
             </View> : null}
           </View>
-        )) : <EmptyRow text={view.productSummary} />}
+        )) : <EmptyRow text={memoryStatus === 'loading' ? 'Loading your products...' : memoryStatus === 'error' ? 'Unavailable' : view.productSummary} />}
+        {onEditRoutine ? <Action label="Review products I use" onPress={onEditRoutine} disabled={!!busyId} /> : null}
         {moreControl('products')}
       </GroupedSection>
 
@@ -164,7 +168,7 @@ export function MyStuffContent({
             </View>
             {onRemoveEntry ? removeControl('checks', check.id) : null}
           </View>
-        )) : <EmptyRow text={view.checkSummary} />}
+        )) : <EmptyRow text={memoryStatus === 'loading' ? 'Loading your checks...' : memoryStatus === 'error' ? 'Unavailable' : view.checkSummary} />}
         {moreControl('checks')}
       </GroupedSection>
 

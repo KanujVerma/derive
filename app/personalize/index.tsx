@@ -10,7 +10,7 @@ import type { CustomerWrite } from '@/src/presentation/personal-decision/custome
 import { profileFromStorage, profileToStorage, routineFromStorage, routineToStorage, experienceFromStorage, experienceToStorage, catalogReferenceKey, contextProductLabel } from '@/src/presentation/p0b-personalization/storageAdapter';
 import { createCatalogRequestId } from '@/src/services/productCatalog';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
-import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PersonalizationFlow } from '@/src/components/personalization/PersonalizationFlow';
@@ -24,6 +24,21 @@ import { useAuthStore } from '@/src/stores/authStore';
 import { publicEnvironment } from '@/src/config/environment';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { ProductEntry } from '@/src/components/my-stuff/ProductEntry';
+import { myStuffStore } from '@/src/presentation/my-stuff/myStuffRemote';
+import { createEditorReturnGate, experienceDraftForProduct } from '@/src/presentation/personal-decision/editorEntry';
+import { createExperienceDraft, selectExperienceCatalogProduct } from '@/src/presentation/p0b-personalization/experience';
+
+function useEditorReturnGate() {
+  const [gate] = useState(() => createEditorReturnGate(currentCustomerOwner()));
+  useEffect(() => {
+    const sync = () => { const owner = currentCustomerOwner(); gate.observeOwner(owner); customerController.setOwner(owner); };
+    sync();
+    const auth = useAuthStore.subscribe(sync), access = useFreeAccessStore.subscribe(sync);
+    return () => { auth(); access(); gate.invalidate(); };
+  }, [gate]);
+  return gate;
+}
 
 /** The same optional editor is opened from Check and My Stuff. Back retains the originating screen. */
 function LegacyPersonalizeScreen() {
@@ -43,78 +58,96 @@ function PersonalizeEditor({ ownerId, gateway, live }: {
   ownerId: string | null; gateway: PersonalizationGateway; live: boolean;
 }) {
   const router = useRouter();
+  const gate = useEditorReturnGate();
   const [initialDraft, setInitialDraft] = useState<PersonalizationDraft | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const savingRef = useRef(false);
   useEffect(() => {
+    if (!live || !ownerId) return;
     let active = true;
-    void gateway.loadProfile(ownerId).then((result) => {
+    setLoaded(false); setLoadError(false);
+    void gateway.loadProfile(ownerId).then(result => {
       if (!active) return;
       if (result.kind === 'ready') setInitialDraft(result.profile);
       setLoaded(true);
     }).catch(() => { if (active) { setLoadError(true); setLoaded(true); } });
     return () => { active = false; };
-  }, [ownerId, gateway]);
-
-  if (!ownerId || !loaded) return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
-  if (loadError) return <View style={{ flex: 1, backgroundColor: colors.canvas, padding: 24, justifyContent: 'center' }}>
-    <Text>We could not load your skin profile. Please try again.</Text>
-    <Button label="Back" variant="outline" onPress={() => router.back()} />
-  </View>;
+  }, [ownerId, gateway, live, loadAttempt]);
+  if (!live || !ownerId) return <PersonalizationFlow available={false} onComplete={() => {}} onSkip={() => router.back()} />;
+  if (!loaded) return <Screen><Text>Loading your skin profile...</Text><Button label="Back" variant="ghost" onPress={() => router.back()} /></Screen>;
+  if (loadError) return <Screen><Text>Your skin profile could not be loaded.</Text>
+    <Button label="Try again" onPress={() => setLoadAttempt(value => value + 1)} />
+    <Button label="Back" variant="ghost" onPress={() => router.back()} />
+  </Screen>;
   return <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-    {saveError && <Text accessibilityRole="alert" style={{ padding: 12, color: colors.actionStop.text }}>
-      Your answers were not saved. Please try again.
-    </Text>}
-    {saving && <Text style={{ padding: 12, color: colors.inkMuted }}>Saving your answers...</Text>}
-    <PersonalizationFlow initialDraft={initialDraft ?? undefined}
-      onComplete={(answers) => {
-        if (saving) return;
-        setSaving(true); setSaveError(false);
-        void gateway.saveProfile(ownerId, answers).then((result) => {
-          if (result.kind === 'ready' || !live) router.back();
-          else setSaveError(true);
-        }).catch(() => { if (!live) router.back(); else setSaveError(true); })
-          .finally(() => setSaving(false));
-      }}
-      onSkip={() => router.back()} />
+    <PersonalizationFlow initialDraft={initialDraft ?? undefined} available={live} loading={saving}
+      error={saveError ? 'Your answers were not saved. Please try again.' : null}
+      onComplete={answers => {
+        if (savingRef.current || currentCustomerOwner() !== ownerId) return;
+        const token = gate.begin(ownerId);
+        savingRef.current = true; setSaving(true); setSaveError(false);
+        void gateway.saveProfile(ownerId, answers).then(result => {
+          if (result.kind === 'ready' && gate.takeReturn(token, currentCustomerOwner())) router.back();
+          else if (gate.isCurrent(token, currentCustomerOwner())) setSaveError(true);
+        }).catch(() => { if (gate.isCurrent(token, currentCustomerOwner())) setSaveError(true); })
+          .finally(() => { savingRef.current = false; if (gate.isCurrent(token, currentCustomerOwner())) setSaving(false); });
+      }} onSkip={() => router.back()} />
   </View>;
 }
 
-
 /** P0-B uses the same route and back stack; legacy draft/profile behavior stays isolated. */
 export default function PersonalizeScreen() {
-  const params = useLocalSearchParams<{ p0b?: string; mode?: string; source?: string; snapshotId?: string }>();
+  const params = useLocalSearchParams<{ p0b?: string; mode?: string; source?: string; snapshotId?: string; entry?: string; experienceId?: string; productRecordId?: string }>();
   const session = useAuthStore(state => state.sessionUserId);
   const status = useAuthStore(state => state.status);
   const access = useFreeAccessStore(state => state.status);
   const owner = currentCustomerOwner();
-  return params.p0b === '1' ? <ProgressiveEditor key={owner ?? 'unavailable'} ownerId={owner} mode={params.mode} decisionSnapshotId={params.source === 'check' ? params.snapshotId : undefined} /> : <LegacyPersonalizeScreen />;
+  const router = useRouter();
+  if (params.mode === 'product') return <ProductEntry key={owner ?? 'unavailable'} ownerId={owner} onClose={() => router.back()} onSaved={() => {
+    if (owner && currentCustomerOwner() === owner) { myStuffStore.getState().setOwner(owner); void myStuffStore.getState().load(); router.back(); }
+  }} />;
+  return params.p0b === '1' || Boolean(owner) ? <ProgressiveEditor key={owner ?? 'unavailable'} ownerId={owner} mode={params.mode} entry={params.entry} experienceId={params.experienceId} productRecordId={params.productRecordId} decisionSnapshotId={params.source === 'check' ? params.snapshotId : undefined} /> : <LegacyPersonalizeScreen />;
 }
 
-function ProgressiveEditor({ ownerId, mode, decisionSnapshotId }: { ownerId: string | null; mode?: string; decisionSnapshotId?: string }) {
+function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry, experienceId, productRecordId }: { ownerId: string | null; mode?: string; decisionSnapshotId?: string; entry?: string; experienceId?: string; productRecordId?: string }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const state = useSyncExternalStore(customerController.subscribe, customerController.getState);
-  const [section, setSection] = useState<'profile' | 'routine' | 'history'>(mode === 'routine' || mode === 'history' ? mode : 'profile');
+  const [section] = useState<'profile' | 'routine' | 'history'>(mode === 'routine' || mode === 'history' ? mode : 'profile');
   const [questionDecision] = useState(() => { const current = customerController.getState(); return current.ownerId === ownerId && current.decision.kind === 'ready' && current.decision.expectedBinding.productSnapshotId === decisionSnapshotId ? current.decision : null; });
-  const [editingExperience, setEditingExperience] = useState<string | 'new' | null>(null);
+  const directExperience = entry === 'new' || Boolean(experienceId);
+  const [editingExperience, setEditingExperience] = useState<string | 'new' | null>(entry === 'new' ? 'new' : experienceId ?? null);
+  const [newReportId] = useState(createCatalogRequestId);
+  const gate = useEditorReturnGate();
   useEffect(() => { customerController.setOwner(ownerId); if (ownerId) void customerController.load(); }, [ownerId]);
   const context = state.ownerId === ownerId ? state.context : null;
   const close = () => router.back();
   if (!ownerId) return <Screen><Text>Personal context is unavailable in this session.</Text><Button label="Back" onPress={close} /></Screen>;
   if (!context) return <Screen><Text>{state.error ?? 'Loading your personal context...'}</Text><Button label="Try again" onPress={() => void customerController.load()} /><Button label="Back" variant="ghost" onPress={close} /></Screen>;
-  const save = (input: CustomerWrite) => { void customerController.save(input).then(saved => { if (saved && currentCustomerOwner() === ownerId) close(); }); };
+  const save = (input: CustomerWrite) => {
+    const token = gate.begin(ownerId);
+    void customerController.save(input).then(saved => { if (saved && gate.takeReturn(token, currentCustomerOwner())) close(); });
+  };
   const loading = state.status === 'saving' || state.status === 'loading';
   const existing = editingExperience && editingExperience !== 'new' ? context.experiences.find(item => item.data.id === editingExperience) : null;
   const displayLabels = state.originReference ? { ...state.displayLabels, [catalogReferenceKey(state.originReference)]: state.originReference.label } : state.displayLabels;
   const historyRefs = context.experiences.flatMap(item => item.data.reference.kind === 'catalog' ? [item.data.reference] : []);
   const routineRefs = context.routine?.data.items.flatMap(item => item.reference.kind === 'catalog' ? [item.reference] : []) ?? [];
-  const candidates = [...routineRefs, ...historyRefs, ...(state.originReference ? [state.originReference] : [])];
+  const saved = myStuffStore.getState();
+  const fromSaved = productRecordId ? experienceDraftForProduct(newReportId, ownerId, saved.ownerId, saved.model.products.find(product => product.id === productRecordId)) : null;
+  const fromCheck = !productRecordId && questionDecision && state.originReference && questionDecision.expectedBinding.productId === state.originReference.productId
+    ? { ...createExperienceDraft(newReportId), reference: selectExperienceCatalogProduct(state.originReference) } : null;
+  const initialExperience = fromSaved ?? fromCheck;
+  const candidates = [...routineRefs, ...historyRefs, ...(state.originReference ? [state.originReference] : []), ...(initialExperience?.reference.kind === 'catalog' ? [initialExperience.reference] : [])];
   const uniqueRefs = [...new Map(candidates.map(item => [catalogReferenceKey(item), item])).values()];
-  const refs = uniqueRefs.map((item, index) => ({ ...item, label: contextProductLabel(item, displayLabels, index + 1) }));
-  const presentationLabels = { ...displayLabels, ...Object.fromEntries(refs.map(item => [catalogReferenceKey(item), item.label])) };
+  const entryLabels = initialExperience?.reference.kind === 'catalog'
+    ? { ...displayLabels, [catalogReferenceKey(initialExperience.reference)]: initialExperience.reference.label } : displayLabels;
+  const refs = uniqueRefs.map((item, index) => ({ ...item, label: contextProductLabel(item, entryLabels, index + 1) }));
+  const presentationLabels = { ...entryLabels, ...Object.fromEntries(refs.map(item => [catalogReferenceKey(item), item.label])) };
   const selectedMissing = editingExperience && editingExperience !== 'new' && !existing;
   const questionBinding = questionDecision?.expectedBinding;
   const ready = questionDecision && questionBinding?.ownerId === ownerId && questionBinding.profileRevision === (context.profile?.id ?? null) && questionBinding.routineRevision === (context.routine?.id ?? null) && questionBinding.historyRevision === context.historyRevision ? questionDecision.packet : null;
@@ -123,15 +156,14 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId }: { ownerId: str
   const editQuestions = deriveProfileEditQuestions(context.profile?.data ?? null, jitReproductive, jitContext);
   const reproductive = editQuestions.reproductive, questions = editQuestions.context;
   return <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 12, paddingTop: insets.top + 12 }}>
-      <Button label="Skin and goals" size="medium" variant="ghost" disabled={loading} onPress={() => { setSection('profile'); setEditingExperience(null); }} />
-      <Button label="Routine" size="medium" variant="ghost" disabled={loading} onPress={() => { setSection('routine'); setEditingExperience(null); }} />
-      <Button label="Experiences" size="medium" variant="ghost" disabled={loading} onPress={() => { setSection('history'); setEditingExperience(null); }} />
+    <View style={{ paddingHorizontal: 24, paddingTop: insets.top, alignItems: 'flex-start' }}>
+      <Button label="Back" size="medium" variant="ghost" disabled={loading} onPress={close} />
     </View>
     {section === 'profile' && <ContextFlow key={'profile:' + context.revision} initialDraft={context.profile ? profileFromStorage(context.profile.data) : undefined} contextQuestions={questions} relevance={reproductive.length ? { fields: reproductive, evidenceReason: jitReproductive.length ? 'These answers can change the caution shown for this product. You can leave them unanswered.' : 'Review the answers you have already shared. You can change them or leave them unanswered.' } : undefined} loading={loading} error={state.error} onApply={draft => save({ operation: 'save_profile', profile: profileToStorage(draft) })} onSkip={close} />}
     {section === 'routine' && <RoutineContext key={'routine:' + context.revision} initialDraft={context.routine ? routineFromStorage(context.routine.data, presentationLabels) : undefined} createItemId={createCatalogRequestId} availableProducts={refs} loading={loading} error={state.error} onApply={draft => save({ operation: 'save_routine', routine: routineToStorage(draft) })} onSkip={close} />}
-    {section === 'history' && selectedMissing && <Screen><Text>This report is not in the loaded history. Load the latest history before correcting it.</Text><Button label="Back to experiences" onPress={() => setEditingExperience(null)} /></Screen>}
-    {section === 'history' && editingExperience && !selectedMissing && <ExperienceContext key={(existing?.id ?? 'new') + ':' + context.revision} createRecordId={createCatalogRequestId} existing={existing ? { draft: experienceFromStorage(existing.data, presentationLabels, context.experiences.indexOf(existing) + 1), revisionId: existing.id } : undefined} availableProducts={refs} loading={loading} error={state.error} onApply={edit => save({ operation: 'append_experience', experience: experienceToStorage(edit.draft), supersedesRevisionId: edit.supersedesRevisionId })} onSkip={() => setEditingExperience(null)} />}
+    {section === 'history' && selectedMissing && <Screen><Text>This report is not in the loaded history. Load the latest history before correcting it.</Text><Button label="Back" onPress={directExperience ? close : () => setEditingExperience(null)} /></Screen>}
+    {section === 'history' && editingExperience === 'new' && productRecordId && !initialExperience && <Screen><Text>This saved product could not be loaded for this account.</Text><Button label="Back to My Stuff" onPress={close} /></Screen>}
+    {section === 'history' && editingExperience && !selectedMissing && !(editingExperience === 'new' && productRecordId && !initialExperience) && <ExperienceContext key={(existing?.id ?? 'new') + ':' + context.revision} createRecordId={createCatalogRequestId} initialDraft={editingExperience === 'new' ? initialExperience ?? undefined : undefined} existing={existing ? { draft: experienceFromStorage(existing.data, presentationLabels, context.experiences.indexOf(existing) + 1), revisionId: existing.id } : undefined} availableProducts={refs} loading={loading} error={state.error} onApply={edit => save({ operation: 'append_experience', experience: experienceToStorage(edit.draft), supersedesRevisionId: edit.supersedesRevisionId })} onSkip={directExperience ? close : () => setEditingExperience(null)} />}
     {section === 'history' && !editingExperience && <Screen scrollable><Text style={{ color: colors.ink, fontSize: 24, marginBottom: 16 }}>Product experiences</Text><Text>Reports describe what you noticed. They do not establish ingredient causation.</Text>
       {state.error && <Text accessibilityRole="alert">{state.error}</Text>}
       {context.historyTruncated && <><Text>Showing a limited history. Other reports may exist.</Text><Button label="Load more experiences" disabled={loading} variant="outline" onPress={() => void customerController.loadMoreHistory()} /></>}
