@@ -1,16 +1,7 @@
 import type { ParsedProductLink } from './product-link-intake.ts';
+import type { ProductLinkLabelCandidate } from '../../../src/contracts/ProductLinkIntake.ts';
 
-export interface DailyMedLabelCandidate {
-  source: 'dailymed_spl';
-  sourceRecordId: string;
-  sourceVersion: number;
-  title: string;
-  publishedDate: string;
-  sourceUrl: string;
-  retrievedAt: string;
-  /** A published label title is not exact package, GTIN, formula, or FDA approval. */
-  identityStatus: 'label_title_only';
-}
+export type DailyMedLabelCandidate = ProductLinkLabelCandidate;
 
 export type DailyMedLinkLookup =
   | { status: 'candidate'; candidate: DailyMedLabelCandidate }

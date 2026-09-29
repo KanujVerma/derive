@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: bounded product-link intake
+
+- **Owner / predecessor:** Sami; `origin/main` `d96cf55777bf0fa1fbfb50eb42fcd5b9da60a85b`. Authenticated `resolve-product-link` extracts a checksum-valid GTIN from Open Beauty Facts URLs and forwards the caller JWT into the existing owner-bound resolver. It never fetches a submitted URL. Default-off DailyMed lookup uses one constructed official API request, durable external budget from #161, and returns label-title provenance only. Amazon/short/unknown links return name/photo recovery without scraping or product authority.
+- **Client handoff:** `src/services/productLinks.ts` validates responses/snapshot bindings, preserves stable request IDs and typed quota failure, and performs no automatic retry. Current `CheckProductScreen.checkProductLink` is preview-only; the root composition owner connects the helper with the existing owner/sequence guard. No `app/**` or Check UI changes in this slice.
+- **Gates:** Shared budget migration #161 must precede DailyMed activation; hosted rollout, UI composition and physical acceptance remain separate. No hosted activation, billing, allowance debit, external-image reuse or canonical formula promotion occurred. Repeatable local Auth/owner/retry/recovery smoke is `scripts/test-product-link-local.mjs`.
+
 ## 2026-09-29: Account & Settings for free and preview
 
 - **Predecessor:** `origin/main` `d02f8ba1f81b9c181cb7bd1172ef8fb3867c92ab`.

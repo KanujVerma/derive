@@ -34,6 +34,7 @@ Deno.serve((request: Request) => handleProductLink(request, {
       body: JSON.stringify({ requestId, consumer: 'scan', barcode }),
       signal: AbortSignal.timeout(8_000),
     }).catch(() => { throw new ServiceError('RESOLUTION_UNAVAILABLE', 'Product resolution is unavailable', 503); });
+    if (response.status === 429) throw new ServiceError('RATE_LIMITED', 'Product lookup is temporarily limited', 429);
     if (!response.ok) {
       console.error('product link resolver failed:', response.status);
       throw new ServiceError('RESOLUTION_UNAVAILABLE', 'Product resolution is unavailable', 503);
