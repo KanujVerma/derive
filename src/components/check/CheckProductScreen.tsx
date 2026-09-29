@@ -41,7 +41,7 @@ import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { AccountSettingsButton } from '@/src/components/account/AccountSettingsButton';
 import { getPreviewCatalogDetail, matchPreviewProductLink, searchPreviewCatalog } from '@/src/commerce/checkPreview';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { CheckCaptureHost } from '@/src/components/check/capture/CheckCaptureHost';
@@ -80,7 +80,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     supabaseUrl: publicEnvironment.supabaseUrl,
   });
   const preview = shell === 'scanner_first_preview';
-  const integrated = shell === 'local_free_integration';
+  const integrated = isFreeIntegrationShell(shell);
   const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
