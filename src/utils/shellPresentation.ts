@@ -4,7 +4,10 @@ import { isApprovedDevelopmentLanBackend } from '../config/localDevelopmentBacke
 import type { ShopAudience } from '../commerce/types.ts';
 
 /** Client presentation only. This is not an access or membership decision. */
-export type ShellPresentation = 'legacy' | 'scanner_first_preview' | 'local_free_integration';
+export type ShellPresentation = 'legacy' | 'scanner_first_preview' | 'local_free_integration' | 'hosted_free_integration';
+export function isFreeIntegrationShell(shell: ShellPresentation): boolean {
+  return shell === 'local_free_integration' || shell === 'hosted_free_integration';
+}
 export type FutureShellAudience = 'free' | 'managed';
 
 export const TARGET_ROOT_TABS = ['check', 'my-stuff', 'plan', 'shop'] as const;
@@ -16,7 +19,11 @@ export function resolveShellPresentation(input: {
   supabaseUrl?: string;
   developmentLanUrl?: string;
   developmentRuntime?: boolean;
+  scannerReleaseEnabled?: boolean;
 }): ShellPresentation {
+  if ((input.scannerReleaseEnabled ?? publicEnvironment.scannerReleaseEnabled) === true
+    && input.buildFlavor === 'production' && input.remoteEnabled
+    && input.supabaseUrl === 'https://snojlbqovlawewwqbviz.supabase.co') return 'hosted_free_integration';
   if (input.buildFlavor !== 'development') return 'legacy';
   if (!input.remoteEnabled) return 'scanner_first_preview';
   if (isApprovedDevelopmentLanBackend({
