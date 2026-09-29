@@ -107,8 +107,8 @@ set local request.jwt.claim.sub = 'f1100000-0000-4000-8000-000000000003';
 select is((select public.current_member_is_active()), true,
   'permanent active member retains managed access');
 select results_eq($$select name from public.products order by name$$,
-  array['Provisional Wash'::text, 'Public Wash'::text, 'Unsourced Wash'::text],
-  'managed member retains historical product reads');
+  array['Public Wash'::text, 'Unsourced Wash'::text],
+  'managed member retains standard product reads without another owner provisional row');
 
 select * from finish();
 rollback;
