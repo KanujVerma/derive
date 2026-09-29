@@ -23,7 +23,8 @@ import type { PersonalizationDraft } from '@/src/presentation/personalization/dr
 import { useAuthStore } from '@/src/stores/authStore';
 import { publicEnvironment } from '@/src/config/environment';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { useScannerEntryStore } from '@/src/stores/scannerEntryStore';
 
 /** The same optional editor is opened from Check and My Stuff. Back retains the originating screen. */
 function LegacyPersonalizeScreen() {
@@ -34,7 +35,7 @@ function LegacyPersonalizeScreen() {
     supabaseUrl: publicEnvironment.supabaseUrl,
   });
   const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
-  const live = shell === 'local_free_integration';
+  const live = isFreeIntegrationShell(shell);
   return <PersonalizeEditor key={ownerId ?? 'signed-out'} ownerId={ownerId}
     gateway={live ? ownerPinnedLegacyGateway : personalizationGateway} live={live} />;
 }
@@ -85,15 +86,15 @@ function PersonalizeEditor({ ownerId, gateway, live }: {
 
 /** P0-B uses the same route and back stack; legacy draft/profile behavior stays isolated. */
 export default function PersonalizeScreen() {
-  const params = useLocalSearchParams<{ p0b?: string; mode?: string; source?: string; snapshotId?: string }>();
+  const params = useLocalSearchParams<{ p0b?: string; mode?: string; source?: string; snapshotId?: string; entry?: string }>();
   const session = useAuthStore(state => state.sessionUserId);
   const status = useAuthStore(state => state.status);
   const access = useFreeAccessStore(state => state.status);
   const owner = currentCustomerOwner();
-  return params.p0b === '1' ? <ProgressiveEditor key={owner ?? 'unavailable'} ownerId={owner} mode={params.mode} decisionSnapshotId={params.source === 'check' ? params.snapshotId : undefined} /> : <LegacyPersonalizeScreen />;
+  return params.p0b === '1' ? <ProgressiveEditor key={owner ?? 'unavailable'} ownerId={owner} mode={params.mode} entry={params.entry === '1'} decisionSnapshotId={params.source === 'check' ? params.snapshotId : undefined} /> : <LegacyPersonalizeScreen />;
 }
 
-function ProgressiveEditor({ ownerId, mode, decisionSnapshotId }: { ownerId: string | null; mode?: string; decisionSnapshotId?: string }) {
+function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry = false }: { ownerId: string | null; mode?: string; decisionSnapshotId?: string; entry?: boolean }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const state = useSyncExternalStore(customerController.subscribe, customerController.getState);
@@ -102,7 +103,13 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId }: { ownerId: str
   const [editingExperience, setEditingExperience] = useState<string | 'new' | null>(null);
   useEffect(() => { customerController.setOwner(ownerId); if (ownerId) void customerController.load(); }, [ownerId]);
   const context = state.ownerId === ownerId ? state.context : null;
-  const close = () => router.back();
+  const close = () => {
+    if (entry) {
+      if (!ownerId || currentCustomerOwner() !== ownerId) return;
+      useScannerEntryStore.getState().markProfileIntroHandled(ownerId);
+      router.replace('/(tabs)/check');
+    } else router.back();
+  };
   if (!ownerId) return <Screen><Text>Personal context is unavailable in this session.</Text><Button label="Back" onPress={close} /></Screen>;
   if (!context) return <Screen><Text>{state.error ?? 'Loading your personal context...'}</Text><Button label="Try again" onPress={() => void customerController.load()} /><Button label="Back" variant="ghost" onPress={close} /></Screen>;
   const save = (input: CustomerWrite) => { void customerController.save(input).then(saved => { if (saved && currentCustomerOwner() === ownerId) close(); }); };
