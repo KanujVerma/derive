@@ -13,16 +13,19 @@ and customer Check behavior are unchanged.
 `POST /functions/v1/external-product-candidates` with `{ "barcode": "<valid GTIN>" }`
 requires a valid Supabase Auth session (a guest session is sufficient). The
 endpoint returns one of `found`, `not_found`, `incomplete`, `rate_limited`, or
-`unavailable`. A `found` response has one candidate with source
+`unavailable`. `rate_limited` returns HTTP 429 without an automatic retry. A
+`found` response has one candidate with source
 `open_beauty_facts`, `sourceLicense: ODbL-1.0`, exact barcode, source page URL,
-retrieval time, optional source modification time, brand/name/quantity/category,
+retrieval time, optional source modification time, observed barcode and OBF's
+returned barcode, brand/name/quantity/category,
 `canonicalProductId: null`, and `formulaVerified: false`. All other statuses
 have `candidate: null`. Callers must never translate `found` into a verified
 Derive product or use OBF ingredient text as verified formula data.
 
 The adapter queries the official OBF v3 endpoint once with only bounded
 identity fields and a contactable User-Agent. The response is capped at 32 KiB,
-times out after 2.5 seconds, refuses redirects, validates exact source barcode,
+times out after 2.5 seconds, refuses redirects, validates exact source barcode
+or only its UPC-A/zero-prefixed EAN-13 equivalent,
 and never returns upstream raw JSON. Provider errors and malformed content are
 unavailable, not fabricated matches.
 
@@ -36,8 +39,12 @@ resolved:
 1. Review ODbL attribution, database-rights, storage, reuse, share-alike, and
    commercial-use implications for the proposed response and any cache. No bulk
    import into proprietary canonical tables is authorized.
-2. Add abuse protection / per-user lookup limits and provider-429 backoff. The
-   current endpoint is only suitable for bounded local evaluation.
+2. Add a durable, atomic per-user and global lookup reservation before the
+   outbound call, plus provider-429 backoff. Existing photo-grant quotas and
+   measurement-event abuse caps serve different purposes and cannot safely be
+   reused. A database migration is required; an in-memory Edge counter is not a
+   distributed limit. The current endpoint is only suitable for bounded local
+   evaluation.
 3. Benchmark representative U.S. skincare barcodes for exact hit, useful
    identity, variant ambiguity, stale/misclassified products, 429, and latency.
    Compare with the canonical-only baseline. Do not use row count as the launch

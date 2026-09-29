@@ -12,7 +12,10 @@ export interface OpenBeautyFactsCandidate {
   sourceUrl: string;
   retrievedAt: string;
   sourceModifiedAt: string | null;
+  /** Digits seen by Derive's scanner. UPC-A and zero-prefixed EAN-13 are equivalent. */
   barcode: string;
+  /** Identifier actually returned by OBF, retained for source provenance. */
+  sourceBarcode: string;
   brand: string | null;
   name: string;
   quantity: string | null;
@@ -34,6 +37,13 @@ function cleanLabel(value: unknown): string | null {
 function modifiedAt(value: unknown): string | null {
   if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > 4_102_444_800) return null;
   return new Date((value as number) * 1_000).toISOString();
+}
+
+function sameRetailBarcode(observed: string, returned: unknown): returned is string {
+  if (typeof returned !== 'string' || !isValidGtin(returned)) return false;
+  if (returned === observed) return true;
+  return (observed.length === 12 && returned === `0${observed}`)
+    || (observed.length === 13 && observed.startsWith('0') && returned === observed.slice(1));
 }
 
 async function readBoundedJson(response: Response): Promise<unknown> {
@@ -94,18 +104,21 @@ export async function lookupOpenBeautyFacts(
       return { status: 'unavailable', candidate: null };
     }
     const product = body.product as Record<string, unknown>;
-    // Exact code agreement is required; a provider alias is not silently trusted.
-    if (body.code !== barcode || product.code !== barcode) return { status: 'unavailable', candidate: null };
+    // Only the mathematically equivalent UPC-A / zero-prefixed EAN-13 form is
+    // accepted. Preserve the provider's actual identifier rather than erasing it.
+    if (!sameRetailBarcode(barcode, body.code) || !sameRetailBarcode(barcode, product.code)) {
+      return { status: 'unavailable', candidate: null };
+    }
     const name = cleanLabel(product.product_name);
     if (!name) return { status: 'incomplete', candidate: null };
     return {
       status: 'found',
       candidate: {
         source: 'open_beauty_facts', sourceLicense: 'ODbL-1.0',
-        sourceUrl: `${OBF_ORIGIN}/product/${barcode}`,
+        sourceUrl: `${OBF_ORIGIN}/product/${product.code}`,
         retrievedAt: (options.now ?? (() => new Date()))().toISOString(),
         sourceModifiedAt: modifiedAt(product.last_modified_t),
-        barcode, brand: cleanLabel(product.brands), name,
+        barcode, sourceBarcode: product.code, brand: cleanLabel(product.brands), name,
         quantity: cleanLabel(product.quantity), category: cleanLabel(product.categories),
         canonicalProductId: null, formulaVerified: false,
       },
