@@ -8,7 +8,7 @@ const host = read('src/components/check/capture/CheckCaptureHost.tsx');
 const capture = read('src/components/check/capture/ProductEvidenceCapture.tsx');
 
 test('canonical Check opens one Auto host for barcode or package photo', () => {
-  assert.match(check, /<Button label="Open camera" variant="brand"[^>]*onPress=\{\(\) => openCapture\('barcode'\)\}/);
+  assert.match(check, /<Button label="Open camera" variant="brand"[^\n]*onPress=\{\(\) => \{ abandonProductLink\(\); openCapture\('barcode'\); \}\}/);
   assert.match(check, /<CheckCaptureHost[\s\S]*initialRole=\{captureRole\}[\s\S]*live=\{integrated\}[\s\S]*onCaptureReady=\{handleCaptureReady\}/);
   assert.equal((check.match(/<CameraView/g) ?? []).length, 1, 'the other camera is legacy member Scan');
   assert.ok(check.indexOf('if (targetShell) {') < check.indexOf('if (permission && !permission.granted)'), 'target entry returns before legacy camera');
