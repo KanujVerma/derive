@@ -62,7 +62,7 @@ export function identityEvidenceText(value: string | undefined): string {
   return conservativeText(value).replace(/[-‐‑]/g, " ").replace(/\s+/g, " ");
 }
 
-function matchesIngredientEvidence(ingredients: string[], record: CatalogResolutionRecord): boolean {
+export function matchesIngredientEvidence(ingredients: string[], record: CatalogResolutionRecord): boolean {
   if (record.formulaIngredients) {
     return ingredients.length === record.formulaIngredients.length
       && ingredients.every((ingredient, index) => Boolean(conservativeText(ingredient))

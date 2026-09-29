@@ -44,6 +44,35 @@ must already exist under the immutable
 S-FREE-4 adds a separately granted private guest Check path; see
 [S_FREE_4_PRODUCT_EVIDENCE.md](S_FREE_4_PRODUCT_EVIDENCE.md).
 
+### Same-Check ingredient continuation (source increment; not hosted)
+
+`POST /functions/v1/resolve-product-identity` also accepts the additive
+`continue_ingredients` operation in `ProductIdentityResolver.ts`. It requires
+the original owner-bound Scan case ID, its exact current immutable snapshot ID,
+a new request UUID, and either a full ordered ingredient transcription or one
+previously granted private ingredient photo. It is deliberately one continuation
+per root Check, with a stable `attemptId` for future metering and opt-in history.
+An identical retry returns the same child case; changed evidence or a second
+continuation returns a conflict. The original case and truth snapshot are never
+rewritten. A later client composition must use the returned child snapshot while
+retaining the root attempt ID; it must not start a second Check or charge again.
+
+Photo-only continuation stores private evidence and remains formula-unverified:
+there is no OCR or image recognition. Text can select one verified formula only
+when its entire ordered ingredient list matches an authoritative catalog version
+for the original exact variant **and** the original barcode has a completed,
+authoritative assertion explicitly linking that version and was reported as
+device-origin evidence. `barcodeSource: 'member_input'` preserves pasted/link-derived
+origin in stored evidence and the snapshot; it cannot become a device scan by
+adding ingredient text. Omitted source preserves the legacy device-origin contract;
+explicit `device_barcode` serializes identically for retries. Changing origin on
+retry is a conflict; unsupported origins or origin without barcode are invalid.
+Origin is reported, not attested, and never creates catalog authority. Typed identity plus a
+transcription cannot authenticate a package formula. Conflicts and ambiguity
+remain unverified. No external provider data becomes formula truth through this
+path. The schema and endpoint require a coordinated migration/function rollout;
+the customer UI is a separate Kanuj-owned handoff, not active here.
+
 ## Trust states
 
 | State | Meaning | Allowed next step |
