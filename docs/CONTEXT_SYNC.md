@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-29: bounded customer Check link composition
+
+- **Owner / predecessor:** Sami; composition predecessor `a2433ad`, main checkpoint `cf7482860c80c2d231b5672074559b40289b0ac5`. The validated link client/controller is wired into the actual existing integrated Check entry. Requests retain per-owner/input UUIDs on explicit retry; owner switches, newer input, reset, unmount and switching entry methods fence stale work. Keyboard Go and the visible Check action both submit, with accessible busy/error recovery.
+- **Truth boundary:** Only the authenticated nested resolver case enters existing `showResolution`; label titles remain plain-text possible matches at the entry, and unsupported/retailer URLs use name/camera recovery. No new result renderer, camera, shared primitive, navigation, external provider, allowance debit or canonical promotion. Published Kanuj UX search/result/profile/My Stuff branches were inspected and their write-sets preserved.
+- **Evidence / open gates:** Four new composition regressions and the then-current 808-test suite passed; both TypeScript checks and web/iOS exports passed. This is source/injected-transport verification, not hosted or signed-build acceptance. #174 resolver provenance and #177 endpoint remain integration prerequisites; DailyMed remains disabled, arbitrary retailer fetch remains unsupported, and physical/hosted link QA remains pending.
+
 ## 2026-09-29: bounded product-link intake
 
 - **Owner / predecessor:** Sami; `origin/main` `d96cf55777bf0fa1fbfb50eb42fcd5b9da60a85b`. Authenticated `resolve-product-link` extracts a checksum-valid GTIN from Open Beauty Facts URLs and forwards the caller JWT into the existing owner-bound resolver. It never fetches a submitted URL. Default-off DailyMed lookup uses one constructed official API request, durable external budget from #161, and returns label-title provenance only. Amazon/short/unknown links return name/photo recovery without scraping or product authority.
