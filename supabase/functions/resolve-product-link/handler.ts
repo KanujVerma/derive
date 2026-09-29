@@ -19,6 +19,11 @@ interface Dependencies<TAuth extends LinkAuth> {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** A pasted URL supplies customer-entered evidence, never a camera observation. */
+export function linkBarcodeResolutionInput(requestId: string, barcode: string) {
+  return { requestId, consumer: 'scan' as const, barcode, barcodeSource: 'member_input' as const };
+}
+
 export async function handleProductLink<TAuth extends LinkAuth>(request: Request, deps: Dependencies<TAuth>): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: deps.corsHeaders });
   if (request.method !== 'POST') return deps.respond({ code: 'METHOD_NOT_ALLOWED', error: 'POST required' }, 405);

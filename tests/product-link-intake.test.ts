@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { parseProductLink, InvalidProductLink } from '../supabase/functions/_shared/product-link-intake.ts';
 import { lookupDailyMedLink } from '../supabase/functions/_shared/dailymed-link-candidate.ts';
-import { handleProductLink } from '../supabase/functions/resolve-product-link/handler.ts';
+import { handleProductLink, linkBarcodeResolutionInput } from '../supabase/functions/resolve-product-link/handler.ts';
 import type { ProductResolutionResult } from '../src/contracts/ProductIdentityResolver.ts';
 
 const SET_ID = '9c084eb9-91b0-49be-9830-19c8920d4b21';
@@ -16,6 +16,9 @@ test('Edge import map includes dependencies used by the shared runtime', () => {
 });
 
 test('exact supported links normalize without claiming source metadata or formula truth', () => {
+  assert.deepEqual(linkBarcodeResolutionInput(REQUEST_ID, '036000291452'), {
+    requestId: REQUEST_ID, consumer: 'scan', barcode: '036000291452', barcodeSource: 'member_input',
+  });
   assert.deepEqual(parseProductLink(`${dailyUrl}&audience=consumer&utm_source=x`), {
     kind: 'dailymed_label', source: 'dailymed', setId: SET_ID, canonicalUrl: dailyUrl, requestedVersion: undefined,
   });

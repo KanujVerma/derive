@@ -46,6 +46,11 @@ try {
   assert.equal(firstResult.data.status, 'resolution');
   assert.equal(firstResult.data.resolution.state, 'insufficient_evidence');
   assert.equal(firstResult.data.resolution.product, undefined);
+  assert.equal(firstResult.data.resolution.truthSnapshot.evidence.find((item) => item.type === 'barcode')?.source, 'member_input');
+  const storedEvidence = await admin.from('product_resolution_evidence').select('source_type')
+    .eq('case_id', firstResult.data.resolution.caseId).eq('evidence_type', 'barcode');
+  assert.ifError(storedEvidence.error);
+  assert.deepEqual(storedEvidence.data, [{ source_type: 'member_input' }]);
   const retried = await invoke(first, input);
   assert.ifError(retried.error);
   assert.equal(retried.data.resolution.caseId, firstResult.data.resolution.caseId);

@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import type { ProductResolutionResult } from '../../../src/contracts/ProductIdentityResolver.ts';
 import { authenticate, corsHeaders, errorResponse, jsonResponse, readJsonObject, ServiceError } from '../_shared/runtime.ts';
-import { handleProductLink } from './handler.ts';
+import { handleProductLink, linkBarcodeResolutionInput } from './handler.ts';
 
 const states = new Set(['verified_product_formula', 'identified_formula_unverified', 'ambiguous_candidates', 'formula_only', 'insufficient_evidence']);
 
@@ -31,7 +31,7 @@ Deno.serve((request: Request) => handleProductLink(request, {
     const response = await fetch(destination, {
       method: 'POST', redirect: 'error',
       headers: { 'content-type': 'application/json', Authorization: originalRequest.headers.get('Authorization') ?? '', apikey: anonKey },
-      body: JSON.stringify({ requestId, consumer: 'scan', barcode }),
+      body: JSON.stringify(linkBarcodeResolutionInput(requestId, barcode)),
       signal: AbortSignal.timeout(8_000),
     }).catch(() => { throw new ServiceError('RESOLUTION_UNAVAILABLE', 'Product resolution is unavailable', 503); });
     if (response.status === 429) throw new ServiceError('RATE_LIMITED', 'Product lookup is temporarily limited', 429);
