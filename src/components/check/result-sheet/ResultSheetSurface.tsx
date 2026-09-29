@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, Modal, Platform, Pressable, StyleSheet, View, type View as NativeView } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ReduceMotion } from 'react-native-reanimated';
@@ -63,14 +63,17 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     if (sheet.current) sheet.current.close(); else guard.dismiss();
   }, [guard]);
   requestClose.current = close;
-  useEffect(() => {
+  useLayoutEffect(() => {
     guard.activate();
+    return () => guard.deactivate();
+  }, [guard]);
+  useEffect(() => {
     const frame = requestAnimationFrame(() => {
       if (!guard.isCurrent() || Platform.OS === 'web') return;
       const node = findNodeHandle(handle.current);
       if (node) AccessibilityInfo.setAccessibilityFocus(node);
     });
-    return () => { cancelAnimationFrame(frame); guard.deactivate(); };
+    return () => cancelAnimationFrame(frame);
   }, [guard]);
   const backdrop = useCallback((props: BottomSheetBackdropProps) => <BottomSheetBackdrop {...props}
     appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.18} pressBehavior="close" />, []);

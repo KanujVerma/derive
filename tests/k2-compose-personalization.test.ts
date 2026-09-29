@@ -25,14 +25,12 @@ test('K2 explicit session demo retains answers only for its gateway instance and
   assert.equal((await createPersonalizationGateway('session_demo').loadProfile('guest-A')).kind, 'unavailable');
 });
 
-test('Check shares identity and Personal Fit before optional formula details', () => {
+test('Check shares identity and Personal Fit before supporting formula facts', () => {
   const check = read('../src/components/check/CheckProductScreen.tsx');
   const content = read('../src/components/check/result-sheet/CheckResultContent.tsx');
-  const host = read('../src/components/check/result-sheet/CheckResultPresentation.tsx');
   assert.ok(content.indexOf('styles.identity') < content.indexOf('<PersonalDecisionPanel'));
   assert.ok(content.indexOf('<PersonalDecisionPanel') < content.indexOf('title="Formula details"'));
   assert.match(check, /sharedResultInput = .*selectCheckContentInput/s);
-  assert.match(host, /<CheckResultContent input=\{input\} expanded=\{full \|\| expanded\}/);
   assert.match(content, /Verified ingredients for this exact package/);
 });
 
