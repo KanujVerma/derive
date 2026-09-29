@@ -153,6 +153,18 @@ verify_jwt = true
 import_map = "./functions/catalog-products/deno.json"
 entrypoint = "./functions/catalog-products/index.ts"
 
+[functions.resolve-product-link]
+enabled = true
+verify_jwt = true
+import_map = "./functions/resolve-product-link/deno.json"
+entrypoint = "./functions/resolve-product-link/index.ts"
+
+[functions.external-product-candidates]
+enabled = true
+verify_jwt = true
+import_map = "./functions/external-product-candidates/deno.json"
+entrypoint = "./functions/external-product-candidates/index.ts"
+
 [functions.catalog-contribution]
 enabled = true
 verify_jwt = true

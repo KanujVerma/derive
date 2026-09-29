@@ -40,10 +40,13 @@ test('K-FREE-1B: new root shells use restrained shared chrome and useful copy', 
   for (const screen of [stuff, plan, shop]) assert.match(screen, /RootShellHeader/);
   assert.match(stuff, /GroupedSection/);
   assert.doesNotMatch(stuff, /loadArthur|useRoutineStore|Nothing saved yet/);
-  assert.match(plan, /Managed Skincare/);
-  assert.match(plan, /\$25\/month/);
-  assert.match(plan, /Enrollment coming soon/);
-  assert.doesNotMatch(plan, /ensureInitialRoutineProposal|Stripe|onboarding/);
+  const offer = read('src/presentation/managed-waitlist/offer.ts');
+  assert.match(offer, /Managed Skincare/);
+  assert.match(offer, /\$25\/month/);
+  assert.match(offer, /Join waitlist/);
+  assert.doesNotMatch(offer, /Enrollment coming soon|Founder review/);
+  assert.match(plan, /managedOffer/);
+  assert.doesNotMatch(plan, /ensureInitialRoutineProposal|Stripe|onboarding|Enrollment coming soon/);
   assert.match(shop, /Coming soon/);
   assert.match(shop, /Check a Product/);
   assert.doesNotMatch(shop, /createProductCheckout|priceDisplay|discountPercent/);

@@ -30,6 +30,8 @@ export interface ResolveProductIdentityInput {
   requestId: string;
   consumer: ProductResolutionConsumer;
   barcode?: string;
+  /** Reported origin, not attestation. Links/typed codes must use member_input. */
+  barcodeSource?: 'device_barcode' | 'member_input';
   brand?: string;
   productName?: string;
   variantName?: string;
@@ -92,4 +94,24 @@ export interface ProductResolutionResult {
   candidates: ProductResolutionCandidate[];
   nextAction: ProductResolutionNextAction;
   requiresFounderReview: boolean;
+}
+
+/** Add ingredients to one existing Check. The original truth snapshot is never rewritten. */
+export interface ContinueProductIngredientsInput {
+  operation: 'continue_ingredients';
+  requestId: string;
+  rootCaseId: string;
+  parentSnapshotId: string;
+  /** A complete, ordered transcription; input is candidate evidence, not authority. */
+  ingredientList?: string[];
+  /** Private ingredient photo only. No automatic text recognition is implied. */
+  evidencePhoto?: Pick<ProductEvidencePhoto, 'storagePath' | 'role'>;
+}
+
+export interface ContinueProductIngredientsResult extends ProductResolutionResult {
+  /** Stable identity for history, analytics and future free-check metering. */
+  attemptId: string;
+  /** One root decision plus one ingredient continuation; no branching. */
+  attemptRevision: 2;
+  parentSnapshotId: string;
 }

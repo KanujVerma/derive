@@ -6,7 +6,10 @@ import type {
   ProductResolutionResult,
 } from "../../../src/contracts/ProductIdentityResolver.ts";
 import {
+  equivalentGtinRepresentations,
+  identityEvidenceText,
   isValidGtin,
+  matchesIngredientEvidence,
   normalizeBarcode,
   resolveProductIdentity,
   type CatalogResolutionRecord,
@@ -23,14 +26,22 @@ import {
   requireMemberEntitlement,
 } from "../_shared/runtime.ts";
 import { identityKindFromVerifiedUser } from "../_shared/access.ts";
+import { parseBarcodeSource } from "../_shared/barcode-provenance.ts";
+import {
+  exactIngredientEvidence,
+  IngredientCandidateLookupError,
+  lookupIngredientCandidates,
+} from "../_shared/ingredient-candidates.ts";
 
 const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
 const CATALOG_PAGE_SIZE = 1_000;
 const MAX_CATALOG_ROWS_PER_TABLE = 10_000;
+const MAX_BARCODE_IDENTIFIERS = 100;
+const MAX_EXACT_PRODUCTS = 100;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PHOTO_ROLES = new Set<ProductEvidencePhotoRole>(["front_label", "ingredients", "packaging"]);
 const ALLOWED_FIELDS = new Set([
-  "requestId", "consumer", "barcode", "brand", "productName", "variantName",
+  "requestId", "consumer", "barcode", "barcodeSource", "brand", "productName", "variantName",
   "regionCode", "labelText", "packagingText", "ingredientList", "evidencePhotos",
 ]);
 
@@ -44,6 +55,49 @@ interface ParsedRequest extends ResolverEvidence {
   requestId: string;
   consumer: "scan" | "shelf";
   evidencePhotos: ParsedEvidencePhoto[];
+  barcodeSource?: "member_input";
+}
+
+interface IngredientContinuation {
+  requestId: string;
+  rootCaseId: string;
+  parentSnapshotId: string;
+  ingredientList?: string[];
+  evidencePhotos: ParsedEvidencePhoto[];
+}
+
+function parseIngredientContinuation(body: Record<string, unknown>, userId: string): IngredientContinuation {
+  if (Object.keys(body).some((key) => ![
+    "operation", "requestId", "rootCaseId", "parentSnapshotId", "ingredientList", "evidencePhoto",
+  ].includes(key))) throw new ServiceError("INVALID_PAYLOAD", "Unexpected continuation fields", 400);
+  const requestId = optionalString(body.requestId, "requestId", 40);
+  const rootCaseId = optionalString(body.rootCaseId, "rootCaseId", 40);
+  const parentSnapshotId = optionalString(body.parentSnapshotId, "parentSnapshotId", 40);
+  if (![requestId, rootCaseId, parentSnapshotId].every((value) => value && UUID_PATTERN.test(value))) {
+    throw new ServiceError("INVALID_PAYLOAD", "Continuation IDs must be UUIDs", 400);
+  }
+  const ingredientList = parseStringArray(body.ingredientList, "ingredientList", 300);
+  const photo = body.evidencePhoto;
+  let evidencePhotos: ParsedEvidencePhoto[] = [];
+  if (photo !== undefined) {
+    if (!photo || typeof photo !== "object" || Array.isArray(photo)) {
+      throw new ServiceError("INVALID_PAYLOAD", "Ingredient photo is invalid", 400);
+    }
+    const value = photo as Record<string, unknown>;
+    if (Object.keys(value).some((key) => !["storagePath", "role"].includes(key))
+      || value.role !== "ingredients") {
+      throw new ServiceError("INVALID_PAYLOAD", "Only a private ingredient photo is accepted", 400);
+    }
+    const storagePath = optionalString(value.storagePath, "evidencePhoto.storagePath", 500);
+    if (!storagePath || !isFreePhotoPath(userId, "ingredients", storagePath)) {
+      throw new ServiceError("INVALID_EVIDENCE_PATH", "A granted private ingredient photo is required", 400);
+    }
+    evidencePhotos = [{ role: "ingredients", storagePath }];
+  }
+  if (!ingredientList && evidencePhotos.length === 0) {
+    throw new ServiceError("INSUFFICIENT_EVIDENCE", "Ingredient text or a private photo is required", 400);
+  }
+  return { requestId: requestId!, rootCaseId: rootCaseId!, parentSnapshotId: parentSnapshotId!, ingredientList, evidencePhotos };
 }
 
 interface ResolutionCaseRow {
@@ -127,6 +181,22 @@ async function loadPagedCatalogRows<T>(
   return rows;
 }
 
+async function keepVisibleProducts<T extends { id: string; is_catalog_standard: boolean }>(
+  admin: SupabaseClient, userId: string, freeOnly: boolean, rows: T[],
+): Promise<T[]> {
+  if (freeOnly || rows.every((row) => row.is_catalog_standard)) return rows;
+  const privateIds = [...new Set(rows.filter((row) => !row.is_catalog_standard).map((row) => row.id))];
+  const ownedIds = new Set<string>();
+  for (let offset = 0; offset < privateIds.length; offset += MAX_EXACT_PRODUCTS) {
+    const owned = await loadPagedCatalogRows<{ id: string; product_id: string }>("owner product links", (from, to) =>
+      admin.from("user_products").select("id, product_id")
+        .eq("user_id", userId).in("product_id", privateIds.slice(offset, offset + MAX_EXACT_PRODUCTS))
+        .order("id", { ascending: true }).range(from, to));
+    for (const row of owned) ownedIds.add(row.product_id);
+  }
+  return rows.filter((row) => row.is_catalog_standard || ownedIds.has(row.id));
+}
+
 function optionalString(value: unknown, field: string, max: number): string | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   if (typeof value !== "string" || value.trim().length === 0 || value.length > max) {
@@ -182,6 +252,10 @@ function parseRequest(body: Record<string, unknown>, userId: string): ParsedRequ
   if (barcodeInput && (!barcode || !isValidGtin(barcode))) {
     throw new ServiceError("INVALID_BARCODE", "Barcode must be a valid GTIN-8, UPC-A, EAN-13, or GTIN-14", 400);
   }
+  const barcodeSource = parseBarcodeSource(body.barcodeSource, Boolean(barcode));
+  if (!barcodeSource.ok) {
+    throw new ServiceError("INVALID_PAYLOAD", "Barcode source requires a barcode and a supported origin", 400);
+  }
 
   const rawPhotos = body.evidencePhotos ?? [];
   if (!Array.isArray(rawPhotos) || rawPhotos.length > 3) {
@@ -212,6 +286,7 @@ function parseRequest(body: Record<string, unknown>, userId: string): ParsedRequ
     requestId,
     consumer: body.consumer,
     barcode,
+    barcodeSource: barcodeSource.source,
     brand: optionalString(body.brand, "brand", 120),
     productName: optionalString(body.productName, "productName", 180),
     variantName: optionalString(body.variantName, "variantName", 180),
@@ -261,7 +336,168 @@ async function verifyEvidencePhotos(admin: SupabaseClient, userId: string,
   }
 }
 
-async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<CatalogResolutionRecord[]> {
+// A barcode with no other observations cannot contradict a different catalog
+// product. Use the identifier index and only its related rows in that case;
+// richer evidence still needs the full catalog for cross-product conflicts.
+function isBarcodeOnly(request: ParsedRequest): boolean {
+  return Boolean(request.barcode && !request.brand && !request.productName && !request.variantName
+    && !request.regionCode && !request.labelText && !request.packagingText
+    && !request.ingredientList && request.evidencePhotos.length === 0);
+}
+
+async function loadBarcodeCatalog(admin: SupabaseClient, userId: string,
+  freeOnly: boolean, barcode: string): Promise<CatalogResolutionRecord[]> {
+  const identifierRows = (await Promise.all(equivalentGtinRepresentations(barcode).map(({ type, value }) =>
+    loadPagedCatalogRows<IdentifierRow>("barcode identifiers", (from, to) => {
+      const query = admin.from("product_identifiers")
+        .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at")
+        .eq("identifier_type", type).eq("identifier_value", value);
+      if (freeOnly) query.not("verified_at", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    })))).flat();
+  if (identifierRows.length === 0) return [];
+  if (identifierRows.length > MAX_BARCODE_IDENTIFIERS) {
+    throw new ServiceError("CATALOG_TOO_LARGE", "Barcode identity requires operator review", 503);
+  }
+  const variantIds = [...new Set(identifierRows.map((row) => row.variant_id))];
+  const variantRows = await loadPagedCatalogRows<VariantRow>("barcode variants", (from, to) => {
+    const query = admin.from("product_variants")
+      .select("id, product_id, variant_name, region_code, packaging_markers")
+      .in("id", variantIds).eq("lifecycle_status", "active");
+    if (freeOnly) query.eq("catalog_verification_status", "verified");
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (variantRows.length === 0) return [];
+  const productIds = [...new Set(variantRows.map((row) => row.product_id))];
+  const [productRows, formulaRows] = await Promise.all([
+    loadPagedCatalogRows<ProductRow>("barcode products", (from, to) => {
+      const query = admin.from("products")
+        .select("id, brand, name, is_catalog_standard, catalog_verified_at").in("id", productIds);
+      if (freeOnly) query.eq("is_catalog_standard", true).not("catalog_verified_at", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+    loadPagedCatalogRows<FormulaRow>("barcode formulas", (from, to) => {
+      const query = admin.from("product_formula_versions")
+        .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers, ingredients, region_code")
+        .in("variant_id", variantRows.map((row) => row.id));
+      if (freeOnly) query.eq("verification_status", "verified").not("catalog_public_source_url", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+  ]);
+  return projectCatalogRows(await keepVisibleProducts(admin, userId, freeOnly, productRows),
+    variantRows, formulaRows, identifierRows, freeOnly);
+}
+
+async function loadExactTypedCatalog(admin: SupabaseClient, userId: string, freeOnly: boolean,
+  brand: string, name: string): Promise<CatalogResolutionRecord[]> {
+  const { data: productIds, error } = await admin.rpc("lookup_product_identity_exact_ids", {
+    p_brand_key: identityEvidenceText(brand),
+    p_name_key: identityEvidenceText(name),
+    p_free_only: freeOnly,
+    p_user_id: userId,
+  });
+  if (error || !Array.isArray(productIds)) {
+    console.error("exact product identity lookup failed:", error?.code);
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Product identity catalog is unavailable", 500);
+  }
+  if (productIds.length > MAX_EXACT_PRODUCTS) {
+    throw new ServiceError("CATALOG_TOO_LARGE", "Product identity requires operator review", 503);
+  }
+  if (productIds.length === 0) return [];
+
+  const productRows = await loadPagedCatalogRows<ProductRow>("exact products", (from, to) => {
+    const query = admin.from("products")
+      .select("id, brand, name, is_catalog_standard, catalog_verified_at").in("id", productIds);
+    if (freeOnly) query.eq("is_catalog_standard", true).not("catalog_verified_at", "is", null);
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (productRows.length !== productIds.length) {
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Product identity catalog changed during resolution", 503);
+  }
+  const variantRows = await loadPagedCatalogRows<VariantRow>("exact variants", (from, to) => {
+    const query = admin.from("product_variants")
+      .select("id, product_id, variant_name, region_code, packaging_markers")
+      .in("product_id", productRows.map((row) => row.id)).eq("lifecycle_status", "active");
+    if (freeOnly) query.eq("catalog_verification_status", "verified");
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (variantRows.length === 0) return projectCatalogRows(
+    await keepVisibleProducts(admin, userId, freeOnly, productRows), [], [], [], freeOnly);
+  const variantIds = variantRows.map((row) => row.id);
+  const [formulaRows, identifierRows] = await Promise.all([
+    loadPagedCatalogRows<FormulaRow>("exact formulas", (from, to) => {
+      const query = admin.from("product_formula_versions")
+        .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers, ingredients, region_code")
+        .in("variant_id", variantIds);
+      if (freeOnly) query.eq("verification_status", "verified").not("catalog_public_source_url", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+    loadPagedCatalogRows<IdentifierRow>("exact identifiers", (from, to) => {
+      const query = admin.from("product_identifiers")
+        .select("id, variant_id, formula_version_id, identifier_type, identifier_value, source_authority, observed_at, verified_at")
+        .in("variant_id", variantIds);
+      if (freeOnly) query.not("verified_at", "is", null);
+      return query.order("id", { ascending: true }).range(from, to);
+    }),
+  ]);
+  return projectCatalogRows(await keepVisibleProducts(admin, userId, freeOnly, productRows),
+    variantRows, formulaRows, identifierRows, freeOnly);
+}
+
+/** Exact ingredients add candidates; they never override identifier evidence. */
+async function loadIngredientCatalog(admin: SupabaseClient, userId: string, freeOnly: boolean,
+  ingredients: string[]): Promise<CatalogResolutionRecord[]> {
+  let candidates;
+  try { candidates = await lookupIngredientCandidates(admin, userId, freeOnly, ingredients); }
+  catch (error) {
+    if (error instanceof IngredientCandidateLookupError) {
+      throw new ServiceError(error.code, "Ingredient evidence requires a complete catalog lookup",
+        error.code === "CATALOG_TOO_LARGE" ? 503 : 500);
+    }
+    throw error;
+  }
+  if (candidates.length === 0) return [];
+  const formulaRows = await loadPagedCatalogRows<FormulaRow>("ingredient formulas", (from, to) => {
+    const query = admin.from("product_formula_versions")
+      .select("id, variant_id, normalized_ingredient_fingerprint, verification_status, source_reference, catalog_public_source_url, observed_at, packaging_markers, ingredients, region_code")
+      .in("id", candidates.map((row) => row.id)).eq("verification_status", "verified");
+    if (freeOnly) query.not("catalog_public_source_url", "is", null);
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  const original = new Map(candidates.map((row) => [row.id, row]));
+  if (formulaRows.length !== candidates.length || new Set(formulaRows.map((row) => row.id)).size !== candidates.length
+    || formulaRows.some((row) => !original.has(row.id) || row.variant_id !== original.get(row.id)!.variant_id
+      || row.region_code !== original.get(row.id)!.region_code || !exactIngredientEvidence(ingredients, row.ingredients)
+      || (!row.variant_id && !row.catalog_public_source_url))) {
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Ingredient evidence changed during resolution", 503);
+  }
+  const variantIds = [...new Set(formulaRows.flatMap((row) => row.variant_id ? [row.variant_id] : []))];
+  const variantRows = variantIds.length === 0 ? [] : await loadPagedCatalogRows<VariantRow>("ingredient variants", (from, to) => {
+    const query = admin.from("product_variants")
+      .select("id, product_id, variant_name, region_code, packaging_markers")
+      .in("id", variantIds).eq("lifecycle_status", "active");
+    if (freeOnly) query.eq("catalog_verification_status", "verified");
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  if (variantRows.length !== variantIds.length) {
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Ingredient variant visibility changed during resolution", 503);
+  }
+  const productIds = [...new Set(variantRows.map((row) => row.product_id))];
+  const productRows = productIds.length === 0 ? [] : await loadPagedCatalogRows<ProductRow>("ingredient products", (from, to) => {
+    const query = admin.from("products")
+      .select("id, brand, name, is_catalog_standard, catalog_verified_at").in("id", productIds);
+    if (freeOnly) query.eq("is_catalog_standard", true).not("catalog_verified_at", "is", null);
+    return query.order("id", { ascending: true }).range(from, to);
+  });
+  const visibleProducts = await keepVisibleProducts(admin, userId, freeOnly, productRows);
+  if (visibleProducts.length !== productIds.length) {
+    // Never discard an invisible/missing member of a previously ambiguous set.
+    throw new ServiceError("CATALOG_UNAVAILABLE", "Ingredient product visibility changed during resolution", 503);
+  }
+  return projectCatalogRows(visibleProducts, variantRows, formulaRows, [], freeOnly);
+}
+
+async function loadCatalog(admin: SupabaseClient, userId: string, freeOnly: boolean): Promise<CatalogResolutionRecord[]> {
   const [productRows, variantRows, formulaRows, identifierRows] = await Promise.all([
     loadPagedCatalogRows<ProductRow>("products", (from, to) => {
       const query = admin.from("products").select("id, brand, name, is_catalog_standard, catalog_verified_at");
@@ -289,6 +525,12 @@ async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<Ca
     }),
   ]);
 
+  return projectCatalogRows(await keepVisibleProducts(admin, userId, freeOnly, productRows),
+    variantRows, formulaRows, identifierRows, freeOnly);
+}
+
+function projectCatalogRows(productRows: ProductRow[], variantRows: VariantRow[],
+  formulaRows: FormulaRow[], identifierRows: IdentifierRow[], freeOnly: boolean): CatalogResolutionRecord[] {
   const products = new Map(productRows.map((row) => [row.id, row]));
   const variants = new Map(variantRows.map((row) => [row.id, row]));
   const formulasByVariant = new Map<string, FormulaRow[]>();
@@ -369,7 +611,7 @@ async function loadCatalog(admin: SupabaseClient, freeOnly: boolean): Promise<Ca
 
 function buildEvidenceRows(request: ParsedRequest): Record<string, unknown>[] {
   const rows: Record<string, unknown>[] = [];
-  if (request.barcode) rows.push({ evidence_type: "barcode", source_type: "device_barcode", extracted_text: request.barcode });
+  if (request.barcode) rows.push({ evidence_type: "barcode", source_type: request.barcodeSource ?? "device_barcode", extracted_text: request.barcode });
   const typedIdentity = [request.brand, request.productName, request.variantName, request.regionCode].filter(Boolean).join(" | ");
   if (typedIdentity) rows.push({ evidence_type: "typed_identity", source_type: "member_input", extracted_text: typedIdentity });
   if (request.labelText) rows.push({ evidence_type: "front_label", source_type: "member_input", extracted_text: request.labelText });
@@ -394,11 +636,64 @@ function recordForIds(catalog: CatalogResolutionRecord[], productId: string | nu
   );
 }
 
+interface StoredCandidateRow {
+  product_id: string | null;
+  variant_id: string | null;
+  formula_version_id: string | null;
+  candidate_basis: ProductResolutionCandidate["basis"];
+  match_reasons: string[] | null;
+}
+
+async function loadStoredCandidateNames(admin: SupabaseClient, userId: string,
+  candidates: StoredCandidateRow[]): Promise<Array<{
+  brand?: string; name?: string; variantName?: string;
+}>> {
+  const queryIds = <T extends string>(values: Array<T | null | undefined>): T[] =>
+    [...new Set(values.filter((value): value is T => Boolean(value)))];
+  const formulaIds = queryIds(candidates.map((candidate) => candidate.formula_version_id));
+  const formulaResult = formulaIds.length
+    ? await admin.from("product_formula_versions").select("id, variant_id").in("id", formulaIds)
+    : { data: [], error: null };
+  if (formulaResult.error) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
+  const formulas = new Map((formulaResult.data ?? []).map((row) => [row.id, row]));
+  const variantIds = queryIds([
+    ...candidates.map((candidate) => candidate.variant_id),
+    ...(formulaResult.data ?? []).map((row) => row.variant_id),
+  ]);
+  const variantResult = variantIds.length
+    ? await admin.from("product_variants").select("id, product_id, variant_name").in("id", variantIds)
+    : { data: [], error: null };
+  if (variantResult.error) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
+  const variants = new Map((variantResult.data ?? []).map((row) => [row.id, row]));
+  const productIds = queryIds([
+    ...candidates.map((candidate) => candidate.product_id),
+    ...(variantResult.data ?? []).map((row) => row.product_id),
+  ]);
+  const productResult = productIds.length
+    ? await admin.from("products").select("id, brand, name, is_catalog_standard").in("id", productIds)
+    : { data: [], error: null };
+  if (productResult.error) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
+  const visibleProducts = await keepVisibleProducts(admin, userId, false, productResult.data ?? []);
+  const products = new Map(visibleProducts.map((row) => [row.id, row]));
+  return candidates.map((candidate) => {
+    const formula = candidate.formula_version_id ? formulas.get(candidate.formula_version_id) : undefined;
+    if (candidate.formula_version_id && !formula) return {};
+    if (candidate.variant_id && formula?.variant_id && formula.variant_id !== candidate.variant_id) return {};
+    const variantId = candidate.variant_id ?? formula?.variant_id;
+    const variant = variantId ? variants.get(variantId) : undefined;
+    if (variantId && !variant) return {};
+    if (candidate.product_id && variant && variant.product_id !== candidate.product_id) return {};
+    const productId = candidate.product_id ?? variant?.product_id;
+    const product = productId ? products.get(productId) : undefined;
+    return { brand: product?.brand, name: product?.name, variantName: variant?.variant_name };
+  });
+}
+
 async function responseForCase(
   admin: SupabaseClient,
   userId: string,
   row: ResolutionCaseRow,
-  catalog: CatalogResolutionRecord[],
+  catalog?: CatalogResolutionRecord[],
   fallbackCandidates: ProductResolutionCandidate[] = [],
 ): Promise<ProductResolutionResult> {
   // Snapshot creation is serialized per case; retries return the immutable stored revision.
@@ -411,13 +706,16 @@ async function responseForCase(
   }
   const { data: storedCandidates, error } = await admin.from("product_resolution_candidates")
     .select("product_id, variant_id, formula_version_id, candidate_basis, match_reasons, rank_order")
-    .eq("case_id", row.id).order("rank_order", { ascending: true });
+    .eq("case_id", row.id).eq("user_id", userId).order("rank_order", { ascending: true });
   if (error) {
     console.error("product resolution candidate reload failed:", error.code);
     throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be loaded", 500);
   }
-  const candidates = (storedCandidates ?? []).map((candidate) => {
-    const record = recordForIds(catalog, candidate.product_id, candidate.variant_id, candidate.formula_version_id);
+  const replayNames = catalog ? undefined : await loadStoredCandidateNames(admin, userId, storedCandidates ?? []);
+  const candidates = (storedCandidates ?? []).map((candidate, index) => {
+    const record = catalog
+      ? recordForIds(catalog, candidate.product_id, candidate.variant_id, candidate.formula_version_id)
+      : replayNames?.[index];
     return {
       productId: candidate.product_id ?? undefined,
       variantId: candidate.variant_id ?? undefined,
@@ -450,6 +748,133 @@ async function responseForCase(
   };
 }
 
+async function continueIngredients(admin: SupabaseClient, userId: string,
+  body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const input = parseIngredientContinuation(body, userId);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(input)));
+  const fingerprint = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const { data: root, error: rootError } = await admin.from("product_resolution_cases")
+    .select("id,consumer,resolution_state,next_action,product_id,variant_id,truth_revision,requires_founder_review,evidence_snapshot")
+    .eq("id", input.rootCaseId).eq("user_id", userId).maybeSingle();
+  if (rootError) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Check could not be loaded", 503);
+  if (!root || root.consumer !== "scan") throw new ServiceError("CHECK_NOT_FOUND", "Your Check was not found", 404);
+  const { data: prior, error: priorError } = await admin.from("product_resolution_continuations")
+    .select("child_case_id,parent_snapshot_id,request_id,evidence_fingerprint")
+    .eq("root_case_id", root.id).eq("user_id", userId).maybeSingle();
+  if (priorError) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Check could not be loaded", 503);
+  if (prior) {
+    if (prior.request_id !== input.requestId || prior.parent_snapshot_id !== input.parentSnapshotId
+      || prior.evidence_fingerprint !== fingerprint) {
+      throw new ServiceError("CONTINUATION_CONFLICT", "This Check already has ingredient evidence", 409);
+    }
+    const { data: child, error } = await admin.from("product_resolution_cases")
+      .select("id,consumer,resolution_state,product_id,variant_id,formula_version_id,next_action,requires_founder_review,evidence_snapshot")
+      .eq("id", prior.child_case_id).eq("user_id", userId).single();
+    if (error || !child) throw new ServiceError("RESOLUTION_UNAVAILABLE", "Check could not be loaded", 503);
+    return { ...await responseForCase(admin, userId, child as ResolutionCaseRow),
+      attemptId: root.id, attemptRevision: 2, parentSnapshotId: input.parentSnapshotId };
+  }
+  if (root.resolution_state !== "identified_formula_unverified" || root.next_action !== "photograph_ingredients"
+    || !root.product_id || !root.variant_id || root.requires_founder_review
+    || (Array.isArray(root.evidence_snapshot?.conflicts) && root.evidence_snapshot.conflicts.length > 0)) {
+    throw new ServiceError("CHECK_NOT_ELIGIBLE", "This Check is not awaiting ingredients", 409);
+  }
+  const { data: parent, error: parentError } = await admin.from("product_truth_snapshots")
+    .select("id,case_revision").eq("id", input.parentSnapshotId).eq("case_id", root.id)
+    .eq("user_id", userId).maybeSingle();
+  if (parentError || !parent || parent.case_revision !== root.truth_revision) {
+    throw new ServiceError("PARENT_SNAPSHOT_CONFLICT", "Refresh this Check before adding evidence", 409);
+  }
+  await verifyEvidencePhotos(admin, userId, input.evidencePhotos, false);
+  const { data: oldEvidence, error: evidenceError } = await admin.from("product_resolution_evidence")
+    .select("evidence_type,source_type,storage_path,extracted_text")
+    .eq("case_id", root.id).eq("user_id", userId).order("created_at", { ascending: true }).limit(21);
+  if (evidenceError || !oldEvidence || oldEvidence.length > 20) {
+    throw new ServiceError("RESOLUTION_UNAVAILABLE", "Check evidence could not be loaded", 503);
+  }
+  if (oldEvidence.some((item) => item.evidence_type === "ingredients" && item.extracted_text)) {
+    throw new ServiceError("CHECK_NOT_ELIGIBLE", "This Check already has ingredient text for review", 409);
+  }
+  const evidence = [...oldEvidence.map((row) => ({
+    evidence_type: row.evidence_type, source_type: row.source_type,
+    storage_path: row.storage_path, extracted_text: row.extracted_text,
+  })), ...buildEvidenceRows({ requestId: input.requestId, consumer: "scan",
+    ingredientList: input.ingredientList, evidencePhotos: input.evidencePhotos })];
+  let matched: FormulaRow | undefined;
+  let hasFormula = false;
+  let hasExactFormulaMatch = false;
+  if (input.ingredientList) {
+    // Formula selection requires the original Check's reported device barcode
+    // plus an authoritative catalog assertion linking the exact formula. Origin
+    // is not attested. Pasted/link identity plus transcription
+    // alone cannot authenticate a package or silently promote catalog truth.
+    const observedBarcodes = oldEvidence.filter((row) => row.evidence_type === "barcode"
+      && row.source_type === "device_barcode" && row.extracted_text)
+      .flatMap((row) => equivalentGtinRepresentations(row.extracted_text!));
+    let linkedFormulaIds = new Set<string>();
+    if (observedBarcodes.length) {
+      const assertions = await loadPagedCatalogRows<IdentifierRow>("continuation identifiers", (from, to) =>
+        admin.from("product_identifiers")
+          .select("id,variant_id,formula_version_id,identifier_type,identifier_value,source_authority,observed_at,verified_at")
+          .eq("variant_id", root.variant_id).not("verified_at", "is", null)
+          .in("identifier_value", [...new Set(observedBarcodes.map((item) => item.value))])
+          .order("id", { ascending: true }).range(from, to));
+      if (assertions.length > MAX_BARCODE_IDENTIFIERS) {
+        throw new ServiceError("CATALOG_TOO_LARGE", "Barcode formula assertions require review", 503);
+      }
+      linkedFormulaIds = new Set(assertions.filter((assertion) =>
+        assertion.formula_version_id && ["manufacturer", "gs1", "founder"].includes(assertion.source_authority)
+        && observedBarcodes.some((observed) => observed.type === assertion.identifier_type
+          && observed.value === assertion.identifier_value))
+        .map((assertion) => assertion.formula_version_id!));
+    }
+    const { data: variant, error: variantError } = await admin.from("product_variants")
+      .select("region_code").eq("id", root.variant_id).eq("product_id", root.product_id).maybeSingle();
+    if (variantError || !variant) {
+      throw new ServiceError("CATALOG_UNAVAILABLE", "Product variant could not be loaded", 503);
+    }
+    const formulas = await loadPagedCatalogRows<FormulaRow>("continuation formulas", (from, to) =>
+      admin.from("product_formula_versions")
+        .select("id,variant_id,normalized_ingredient_fingerprint,verification_status,source_reference,catalog_public_source_url,observed_at,packaging_markers,ingredients,region_code")
+        .eq("variant_id", root.variant_id).eq("verification_status", "verified")
+        .not("catalog_public_source_url", "is", null)
+        .order("id", { ascending: true }).range(from, to));
+    hasFormula = formulas.length > 0;
+    const exactMatches = formulas.filter((formula) => matchesIngredientEvidence(input.ingredientList!, {
+      formulaIngredients: formula.ingredients, ingredientFingerprint: formula.normalized_ingredient_fingerprint,
+    }) && (!formula.region_code || !variant.region_code || formula.region_code === variant.region_code));
+    hasExactFormulaMatch = exactMatches.length > 0;
+    const matches = exactMatches.filter((formula) => linkedFormulaIds.has(formula.id));
+    // Multiple matching versions are still ambiguous; a photo with no text
+    // never supplies formula identity, even when a catalog formula exists.
+    if (matches.length === 1) matched = matches[0];
+  }
+  const conflicts = input.ingredientList && hasFormula && !hasExactFormulaMatch ? ["ingredient_mismatch"] : [];
+  const state = matched ? "verified_product_formula" : "identified_formula_unverified";
+  const candidate = { product_id: root.product_id, variant_id: root.variant_id,
+    formula_version_id: matched?.id ?? null,
+    candidate_basis: matched ? "ingredient_fingerprint" : "combined_candidate_evidence",
+    match_reasons: [matched ? "exact ordered ingredients match one verified formula for the prior variant"
+      : "prior Check identity retained; ingredient formula remains unverified"] };
+  const { data: saved, error: saveError } = await admin.rpc("record_product_resolution_continuation", {
+    p_user_id: userId, p_root_case_id: root.id, p_parent_snapshot_id: input.parentSnapshotId,
+    p_request_id: input.requestId, p_evidence_fingerprint: fingerprint,
+    p_resolution_state: state,
+    p_next_action: matched ? "evaluate_product_fit" : "photograph_ingredients",
+    p_product_id: root.product_id, p_variant_id: root.variant_id,
+    p_formula_version_id: matched?.id ?? null, p_conflicts: conflicts,
+    p_evidence: evidence, p_candidates: [candidate],
+  });
+  if (saveError || !saved) {
+    if (["23505", "23514"].includes(saveError?.code ?? "")) {
+      throw new ServiceError("CONTINUATION_CONFLICT", "This Check changed or already has ingredient evidence", 409);
+    }
+    throw new ServiceError("RESOLUTION_UNAVAILABLE", "Ingredient evidence could not be saved", 503);
+  }
+  return { ...await responseForCase(admin, userId, saved as ResolutionCaseRow),
+    attemptId: root.id, attemptRevision: 2, parentSnapshotId: input.parentSnapshotId };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ code: "METHOD_NOT_ALLOWED", error: "POST required" }, 405);
@@ -459,7 +884,11 @@ Deno.serve(async (req: Request) => {
     let identityKind;
     try { identityKind = identityKindFromVerifiedUser(user); }
     catch { throw new ServiceError("IDENTITY_UNAVAILABLE", "Account identity could not be verified", 503); }
-    const request = parseRequest(await readJsonObject(req), userId);
+    const body = await readJsonObject(req);
+    if (body.operation === "continue_ingredients") {
+      return jsonResponse(await continueIngredients(admin, userId, body));
+    }
+    const request = parseRequest(body, userId);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(request)));
     const requestFingerprint = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
     // Free Check can use server-granted private photos. Managed Shelf remains
@@ -477,8 +906,6 @@ Deno.serve(async (req: Request) => {
       throw new ServiceError("MEMBERSHIP_REQUIRED", "Managed Shelf requires an active membership", 403);
     }
     await verifyEvidencePhotos(admin, userId, request.evidencePhotos, managedAccess);
-    const catalog = await loadCatalog(admin, !managedAccess);
-
     const { data: replay, error: replayError } = await admin.from("product_resolution_cases")
       .select("id, consumer, resolution_state, product_id, variant_id, formula_version_id, next_action, requires_founder_review, evidence_snapshot")
       .eq("user_id", userId).eq("request_id", request.requestId).maybeSingle();
@@ -493,8 +920,31 @@ Deno.serve(async (req: Request) => {
       if (replay.evidence_snapshot?.requestFingerprint && replay.evidence_snapshot.requestFingerprint !== requestFingerprint) {
         throw new ServiceError('REQUEST_CONFLICT', 'This request ID belongs to different evidence', 409);
       }
-      return jsonResponse(await responseForCase(admin, userId, replay as ResolutionCaseRow, catalog));
+      // Persisted candidate IDs and the sealed truth revision are sufficient
+      // for replay; a growing catalog must never invalidate an old request ID.
+      return jsonResponse(await responseForCase(admin, userId, replay as ResolutionCaseRow));
     }
+
+    // Literal label contradictions still use the conservative existing path.
+    // Exact ingredients no longer require a full catalog scan.
+    const needsBroadRead = Boolean(request.labelText || request.packagingText
+      || request.evidencePhotos.some((photo) => photo.extractedText
+        && (photo.role === "front_label" || photo.role === "packaging")));
+    const catalog = needsBroadRead
+      ? await loadCatalog(admin, userId, !managedAccess)
+      : isBarcodeOnly(request)
+      ? await loadBarcodeCatalog(admin, userId, !managedAccess, request.barcode!)
+      : request.barcode || (request.brand && request.productName) || request.ingredientList?.length
+      ? (await Promise.all([
+          request.barcode ? loadBarcodeCatalog(admin, userId, !managedAccess, request.barcode) : Promise.resolve([]),
+          request.brand && request.productName
+            ? loadExactTypedCatalog(admin, userId, !managedAccess, request.brand, request.productName)
+            : Promise.resolve([]),
+          request.ingredientList?.length
+            ? loadIngredientCatalog(admin, userId, !managedAccess, request.ingredientList)
+            : Promise.resolve([]),
+        ])).flat()
+      : [];
 
     const photoText = request.evidencePhotos.filter((photo) => photo.extractedText);
     const decision = resolveProductIdentity({
