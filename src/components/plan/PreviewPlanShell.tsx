@@ -82,15 +82,19 @@ export function PreviewPlanShell() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <RootShellHeader title="Plan" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}>
+        <Text style={styles.eyebrow}>{managedOffer.eyebrow}</Text>
         <Text style={styles.name}>{managedOffer.name}</Text>
         <Text style={styles.tagline}>{managedOffer.tagline}</Text>
-        <Text style={styles.price}>{managedOffer.price}</Text>
-        <Text style={styles.commercial}>{managedOffer.commercialTerm}</Text>
+        <View style={styles.commercialBlock}>
+          <Text style={styles.price}>{managedOffer.price}</Text>
+          <Text style={styles.commercial}>{managedOffer.commercialTerm}</Text>
+        </View>
         <Text style={styles.explanation}>{managedOffer.explanation}</Text>
-        <GroupedSection>
+        <GroupedSection header={managedOffer.sectionLabel} style={styles.benefits}>
           {managedOffer.benefits.map((benefit) => (
-            <View key={benefit} style={styles.row}>
-              <Text style={styles.rowText}>{benefit}</Text>
+            <View key={benefit.title} style={styles.row}>
+              <Text style={styles.rowTitle}>{benefit.title}</Text>
+              <Text style={styles.rowBody}>{benefit.body}</Text>
             </View>
           ))}
         </GroupedSection>
@@ -119,7 +123,11 @@ export function PreviewPlanShell() {
             <Text style={styles.note}>{managedOffer.joinNote}</Text>
           </View>
         )}
-        {failed ? <Text style={styles.error}>{managedOffer.error}</Text> : null}
+        {failed ? (
+          <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+            {managedOffer.error}
+          </Text>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -127,22 +135,43 @@ export function PreviewPlanShell() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
-  content: { paddingHorizontal: layout.gutter, paddingTop: spacing.lg },
-  name: { color: colors.ink, fontSize: typography.sizes.sectionTitle, fontWeight: typography.weights.semibold },
-  tagline: { color: colors.ink, fontSize: typography.sizes.bodyLarge, marginTop: spacing.xxs },
-  price: { color: colors.brand, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold, marginTop: spacing.md },
-  commercial: { color: colors.inkMuted, fontSize: typography.sizes.caption, marginTop: spacing.xxs },
+  content: { paddingHorizontal: layout.gutter, paddingTop: spacing.xs },
+  eyebrow: {
+    color: colors.brand,
+    fontSize: typography.sizes.micro,
+    lineHeight: typography.lineHeights.micro,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  name: {
+    color: colors.ink,
+    fontSize: typography.sizes.sectionTitle,
+    lineHeight: typography.lineHeights.sectionTitle,
+    fontWeight: typography.weights.semibold,
+    marginTop: spacing.xxs,
+  },
+  tagline: {
+    color: colors.ink,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: typography.lineHeights.bodyLarge,
+    marginTop: spacing.xxs,
+  },
+  commercialBlock: { marginTop: spacing.lg },
+  price: { color: colors.brand, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
+  commercial: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, marginTop: spacing.xxs },
   explanation: {
     color: colors.inkMuted,
     fontSize: typography.sizes.bodyRegular,
     lineHeight: typography.lineHeights.bodyRegular,
-    marginTop: spacing.lg,
-    marginBottom: spacing.lg,
+    marginTop: spacing.xl,
   },
-  row: { minHeight: 54, paddingHorizontal: spacing.lg, justifyContent: 'center' },
-  rowText: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
-  action: { marginTop: spacing.xl, gap: spacing.sm },
-  joinedTitle: { color: colors.ink, fontSize: typography.sizes.bodyLarge, fontWeight: typography.weights.semibold },
+  benefits: { marginTop: spacing.xxl, marginBottom: spacing.xxl },
+  row: { minHeight: 44, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, justifyContent: 'center' },
+  rowTitle: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, fontWeight: typography.weights.semibold },
+  rowBody: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, marginTop: spacing.xxs },
+  action: { gap: spacing.xs },
+  joinedTitle: { color: colors.ink, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
   note: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption },
-  error: { color: colors.inkMuted, fontSize: typography.sizes.caption, marginTop: spacing.sm },
+  error: { color: colors.actionPause.text, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption, fontWeight: typography.weights.medium, marginTop: spacing.xs },
 });

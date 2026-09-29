@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createCanonicalWaitlistStore } from '../src/presentation/managed-waitlist/canonical.ts';
-import { managedOffer } from '../src/presentation/managed-waitlist/offer.ts';
+import { MANAGED_WAITLIST_OFFER_VERSION, MANAGED_WAITLIST_PRICE_CENTS, managedOffer } from '../src/presentation/managed-waitlist/offer.ts';
 import { resolvePlanPresentation } from '../src/presentation/managed-plan/planComposition.ts';
 import {
   acceptOwnerResult,
@@ -16,18 +16,23 @@ test('the free Plan offer explains delegation and the current price hypothesis',
   assert.equal(managedOffer.name, 'Managed Skincare');
   assert.equal(managedOffer.tagline, 'Your skincare, handled.');
   assert.equal(managedOffer.price, '$25/month');
+  assert.equal(managedOffer.eyebrow, 'Early Access');
   assert.equal(managedOffer.commercialTerm, 'Products purchased separately');
+  assert.equal(managedOffer.explanation, 'Derive builds and manages your routine over time.');
+  assert.equal(managedOffer.benefits.length, 3);
   assert.deepEqual(managedOffer.benefits, [
-    'One clear morning and evening routine',
-    'Know what to keep, add, pause, or replace',
-    'Check-ins that help your routine adapt over time',
-    'You approve meaningful changes before they go live',
+    { title: 'Your routine', body: 'One clear morning and evening plan' },
+    { title: 'Your products', body: 'Know what to keep, add, pause, or replace' },
+    { title: 'Ongoing adjustments', body: 'Check-ins guide changes, and you approve meaningful updates' },
   ]);
   assert.equal(managedOffer.joinLabel, 'Join waitlist');
-  assert.match(managedOffer.joinNote, /No payment today/);
+  assert.equal(managedOffer.joinNote, 'No payment today. We\'ll let you know in Derive when early access opens.');
+  assert.equal(managedOffer.error, 'Couldn\'t join right now. Try again.');
   assert.equal(managedOffer.joinedTitle, 'You\'re on the waitlist');
   const copy = JSON.stringify(managedOffer);
-  assert.doesNotMatch(copy, /Founder review|AI-powered|clinical|dermatologist|guaranteed|unlimited|spots left|checkout|subscriber/i);
+  assert.doesNotMatch(copy, /Founder review|AI-powered|clinical|dermatologist|guaranteed|unlimited|spots left|checkout|subscriber|follows how/i);
+  assert.equal(MANAGED_WAITLIST_OFFER_VERSION, 'managed_waitlist_v1');
+  assert.equal(MANAGED_WAITLIST_PRICE_CENTS, 2500);
 });
 
 test('joining, leaving, and changing owner stay on the waitlist record', async () => {
@@ -121,7 +126,9 @@ test('the free Plan screen owns the waitlist and the managed routine screen does
   const managed = read('src/components/plan/managed/ManagedPlanPresentation.tsx');
   assert.match(plan, /kind === 'free'\) return <PreviewPlanShell/);
   assert.match(plan, /LegacyManagedPlanScreen/);
+  assert.match(offer, /managedOffer.sectionLabel/);
   assert.match(offer, /managedOffer.joinLabel/);
+  assert.doesNotMatch(read('supabase/migrations/20260929040000_managed_waitlist.sql'), /Your routine/);
   assert.match(offer, /managedOffer.leaveLabel/);
   assert.doesNotMatch(offer, /Enrollment coming soon|Stripe|checkout|createMemoryWaitlistStore/);
   assert.doesNotMatch(managed, /Join waitlist|managed_waitlist/);
