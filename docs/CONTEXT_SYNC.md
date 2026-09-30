@@ -12,6 +12,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 - **Boundaries:** “Using now” is stored only for products added on that question. Manual names stay unverified and without a formula. “Broke me out” and “felt too drying” are `reacted` reports plus the customer's symptom words, not new outcome kinds and not ingredient causation. The evaluator currently treats a `reacted` report as a reaction and does not read those symptom strings. “Anything else” stays on the setup bundle as raw user-reported context and is not written into the profile record, because no approved interpretation or profile field exists.
 - **Not claimed:** hosted persistence of the raw note, a new experience enum, provider calls, or physical acceptance of the setup flow.
 
+## 2026-09-30: Lookup-first Check is a target, not a runtime
+
+- **Predecessor:** `origin/main` at `e8c0738ff185028b2db51492a4a67937d421fa14`, the merge of per-Check intent. This entry records the decision only. It does not claim a cache, enrichment job, provider call, or latency measurement.
+- **Decision:** [ADR-41](DECISIONS.md) accepts a lookup-first known-product Check. The hot path reads canonical product and formula intelligence and evaluates the current private context deterministically. The cold path may extract new evidence later, then make subsequent known-product Checks lookup-first. A cached model result is not product truth.
+- **Ownership:** Kanuj owns the customer latency requirement and customer-flow acceptance. Sami owns later backend, provider, and perception benchmark execution. No provider is selected, and this note does not authorize a model integration or hosted deployment.
+- **Two benchmarks stay separate.** The decision benchmark compares the deterministic baseline with text or structured challengers, including Jev and Gemini structured output. Jev is not the image extractor. The perception benchmark compares barcode, on-device OCR including Apple Vision as a candidate, and multimodal extractors on identity, transcription, abstention, latency, cost, privacy, and review burden. Neither benchmark has a winner. About $5 of Jev credit is already loaded for a future bounded decision run; this pass does not spend it or place a credential in source.
+- **UX boundary:** Current profile, My Stuff, and Check presentation continue without waiting on those benchmarks.
+
 ## 2026-09-29: Bounded UX consistency and useful context
 
 - **Predecessor:** clean `origin/main@d96cf55777bf0fa1fbfb50eb42fcd5b9da60a85b`; both main CI jobs in `36610789141` succeeded. Dirty shared/local composition work is preserved.
