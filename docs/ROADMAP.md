@@ -82,6 +82,8 @@ Delay broad scanner-first outreach until Derive has honest identity/unknown reco
 
 Derive currently has no funding. Evaluate scanner/model choices against cost per activated user, cost per useful repeat user, free volume, fixed minimums, per-device/per-scan pricing and fallback quality. Do not lock a quote-based core acquisition dependency without production-economics evidence.
 
+Known-product Check latency is an accepted target in [ADR-41](DECISIONS.md), not a measured result and not a blocker for the current customer-experience pass. A known barcode should feel immediate, and a known-product Personal Fit should avoid a network generative-model call when reusable formula intelligence already exists. Cold-path ingestion and the separate decision and perception benchmarks can take longer. Sami owns executing those provider and perception benchmarks. No provider is selected, and finishing the current profile, My Stuff, and Check presentation does not wait on that execution.
+
 ## Later capabilities
 
 Makeup/layering and shade/tint can extend the event and product truth model later, but do not delay the initial cosmetic-skincare beta. Tint depth/undertone must be self-selected or explicitly confirmed; never infer demographic categories from imagery. Later capabilities must meet the same evidence, ownership and privacy rules.
