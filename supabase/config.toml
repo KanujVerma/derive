@@ -165,6 +165,12 @@ verify_jwt = true
 import_map = "./functions/external-product-candidates/deno.json"
 entrypoint = "./functions/external-product-candidates/index.ts"
 
+[functions.private-upc-lookup]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-upc-lookup/deno.json"
+entrypoint = "./functions/private-upc-lookup/index.ts"
+
 [functions.catalog-contribution]
 enabled = true
 verify_jwt = true
