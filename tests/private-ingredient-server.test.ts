@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseGroundedAnswer, parseIngredientQuery, safeGroundedUrl, safeSearchSuggestions, searchPublishedIngredients }
+import { parseGroundedAnswer, parseIngredientQuery, parseIngredientRequest, safeGroundedUrl, safeSearchSuggestions, searchPublishedIngredients }
   from '../supabase/functions/_shared/private-ingredient-search.ts';
 import { handlePrivateIngredientSearch } from '../supabase/functions/private-ingredient-search/handler.ts';
 
@@ -18,6 +18,17 @@ test('ingredient input is bounded, exact and never accepts profile/photos/owner/
   for (const bad of [{ ...query, userId: owner }, { ...query, ingredients: ['fake'] }, { ...query, name: '' },
     { ...query, barcode: '12345678' }, { ...query, name: 'a'.repeat(181) }, { ...query, brand: 1 }, { ...query, size: 'x\n' }]) {
     assert.throws(() => parseIngredientQuery(bad), /INVALID_INGREDIENT_QUERY/);
+  }
+});
+
+test('personal mode requires explicit one-shot consent and cannot accept client-supplied context', () => {
+  assert.deepEqual(parseIngredientRequest(query), query);
+  const personal = { ...query, personalization: 'basic_skin_context' as const, contextSharingConsent: true as const };
+  assert.deepEqual(parseIngredientRequest(personal), personal);
+  for (const bad of [{ ...query, personalization: 'basic_skin_context' }, { ...query, contextSharingConsent: true },
+    { ...personal, contextSharingConsent: false }, { ...personal, profile: { skinBehavior: 'dry_tight' } },
+    { ...personal, ownerId: owner }, { ...personal, personalization: 'full_history' }]) {
+    assert.throws(() => parseIngredientRequest(bad), /INVALID_INGREDIENT_QUERY/);
   }
 });
 

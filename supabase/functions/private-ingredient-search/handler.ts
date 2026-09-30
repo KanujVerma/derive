@@ -1,10 +1,10 @@
-import { parseIngredientQuery } from '../_shared/private-ingredient-search.ts';
-import type { PrivateIngredientQuery, PrivateIngredientSearch } from '../../../src/contracts/PrivateIngredientSearch.ts';
+import { parseIngredientRequest } from '../_shared/private-ingredient-search.ts';
+import type { PrivateIngredientRequest, PrivateIngredientSearch } from '../../../src/contracts/PrivateIngredientSearch.ts';
 
 interface Dependencies<T extends { userId: string }> {
   enabled: boolean; allowedUserIds: readonly string[];
   authenticate: (req: Request) => Promise<T>;
-  search: (query: PrivateIngredientQuery, identity: T) => Promise<PrivateIngredientSearch>;
+  search: (query: PrivateIngredientRequest, identity: T) => Promise<PrivateIngredientSearch>;
   failure: (code: string, message: string, status: number) => Error;
   respond: (body: unknown, status?: number) => Response;
   errorResponse: (error: unknown) => Response;
@@ -30,11 +30,11 @@ export async function handlePrivateIngredientSearch<T extends { userId: string }
       text += decoder.decode(value, { stream: true });
     }
     text += decoder.decode();
-    let query: PrivateIngredientQuery;
-    try { query = parseIngredientQuery(JSON.parse(text)); }
+    let query: PrivateIngredientRequest;
+    try { query = parseIngredientRequest(JSON.parse(text)); }
     catch { throw deps.failure('INVALID_PAYLOAD', 'A bounded product identity is required', 400); }
     const result = await deps.search(query, identity);
     return deps.respond(result, result.status === 'rate_limited' ? 429
-      : ['configuration_required', 'unavailable'].includes(result.status) ? 503 : 200);
+      : ['configuration_required', 'unavailable', 'personalization_disabled', 'context_unavailable'].includes(result.status) ? 503 : 200);
   } catch (error) { return deps.errorResponse(error); }
 }

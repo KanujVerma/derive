@@ -1,6 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { authenticate, corsHeaders, errorResponse, jsonResponse, ServiceError } from '../_shared/runtime.ts';
-import { searchPublishedIngredients } from '../_shared/private-ingredient-search.ts';
+import { runPrivateIngredientSearch } from '../_shared/private-ingredient-runtime.ts';
+import { loadPrivateIngredientContext } from '../_shared/private-ingredient-context.ts';
 import { handlePrivateIngredientSearch } from './handler.ts';
 
 const allowedUserIds = (Deno.env.get('DERIVE_UPC_PRIVATE_TESTER_IDS') ?? '').split(',')
@@ -10,8 +11,10 @@ Deno.serve((req: Request) => handlePrivateIngredientSearch(req, {
   enabled: Deno.env.get('DERIVE_GEMINI_INGREDIENT_TEST_ENABLED') === 'true', allowedUserIds,
   authenticate, corsHeaders, respond: jsonResponse, errorResponse,
   failure: (code, message, status) => new ServiceError(code, message, status),
-  search: (query, { admin, userId }) => searchPublishedIngredients(query, {
+  search: (query, { admin, userId }) => runPrivateIngredientSearch(query, {
     apiKey: Deno.env.get('GEMINI_API_KEY') ?? '',
+    personalContextApproved: Deno.env.get('DERIVE_GEMINI_PERSONAL_CONTEXT_APPROVED') === 'true',
+    loadContext: () => loadPrivateIngredientContext(admin, userId),
     reserveRequest: async () => {
       const { error } = await admin.rpc('reserve_private_grounded_search', { p_user_id: userId });
       if (!error) return 'reserved';

@@ -5,7 +5,8 @@ const object = (value: unknown): value is Record<string, unknown> => Boolean(val
 const label = (value: unknown, limit: number): value is string => typeof value === 'string' && value.trim().length > 0
   && value.length <= limit && !/[\x00-\x1f\x7f]/.test(value);
 const optionalLabel = (value: unknown, limit: number) => value === null || label(value, limit);
-const emptyStatuses = new Set(['configuration_required', 'rate_limited', 'unavailable', 'no_grounded_answer']);
+const emptyStatuses = new Set(['configuration_required', 'rate_limited', 'unavailable', 'no_grounded_answer',
+  'personalization_disabled', 'profile_missing', 'context_unavailable', 'context_changed']);
 
 export function validIngredientQuery(value: unknown): value is PrivateIngredientQuery {
   return object(value) && typeof value.barcode === 'string' && validPrivateBarcode(value.barcode)
@@ -70,20 +71,27 @@ export function parsePrivateIngredientSearch(value: unknown, query: PrivateIngre
     || !Array.isArray(value.sources) || value.sources.length < 1 || value.sources.length > 32
     || !value.sources.every(source => object(source) && label(source.title, 500) && safeIngredientSourceUrl(source.url))
     || typeof value.retrievedAt !== 'string' || value.retrievedAt.length > 40 || !Number.isFinite(Date.parse(value.retrievedAt))
-    || value.formulaVerified !== false || value.canonicalProductId !== null) throw new Error('INVALID_INGREDIENT_RESPONSE');
+    || value.formulaVerified !== false || value.canonicalProductId !== null
+    || (value.answerKind !== undefined && !['published_ingredients', 'contextual_web_guidance'].includes(String(value.answerKind)))
+    || (value.answerKind === 'contextual_web_guidance' && (typeof value.contextVersion !== 'string' || !/^[a-f\d]{64}$/.test(value.contextVersion)))
+    || (value.answerKind !== 'contextual_web_guidance' && value.contextVersion !== undefined)) throw new Error('INVALID_INGREDIENT_RESPONSE');
   return { status: 'grounded_answer', query: { barcode: query.barcode, name: query.name, brand: query.brand, size: query.size },
     text: value.text, searchSuggestionsHtml: value.searchSuggestionsHtml,
     sources: value.sources.map(source => ({ title: source.title as string, url: source.url as string })),
-    retrievedAt: value.retrievedAt, formulaVerified: false, canonicalProductId: null };
+    retrievedAt: value.retrievedAt, formulaVerified: false, canonicalProductId: null,
+    ...(value.answerKind === undefined ? {} : { answerKind: value.answerKind as PrivateGroundedAnswer['answerKind'] }),
+    ...(value.answerKind === 'contextual_web_guidance' ? { contextVersion: value.contextVersion as string } : {}) };
 }
 
 export async function requestPrivateIngredientSearch(query: PrivateIngredientQuery, ownerId: string,
-  getOwner: () => string | null, getQueryKey: () => string, client: PrivateLookupClient): Promise<PrivateIngredientSearch> {
+  getOwner: () => string | null, getQueryKey: () => string, client: PrivateLookupClient,
+  personalized = false): Promise<PrivateIngredientSearch> {
   if (!validIngredientQuery(query)) throw new Error('INVALID_INGREDIENT_QUERY');
   const key = ingredientQueryKey(query);
   const current = () => Boolean(ownerId) && getOwner() === ownerId && getQueryKey() === key;
   if (!current()) throw new Error('INGREDIENT_SCOPE_CHANGED');
-  const body = { barcode: query.barcode, name: query.name, brand: query.brand, size: query.size };
+  const body = { barcode: query.barcode, name: query.name, brand: query.brand, size: query.size,
+    ...(personalized ? { personalization: 'basic_skin_context' as const, contextSharingConsent: true as const } : {}) };
   const { data, error } = await client.functions.invoke('private-ingredient-search', { body });
   if (!current()) throw new Error('INGREDIENT_SCOPE_CHANGED');
   if (error) {
@@ -96,12 +104,19 @@ export async function requestPrivateIngredientSearch(query: PrivateIngredientQue
         try { details = await (context.clone() as Response).json(); } catch { /* No unsafe fallback from unreadable errors. */ }
       }
       if (!current()) throw new Error('INGREDIENT_SCOPE_CHANGED');
-      if (object(details) && details.status === 'configuration_required') return { status: 'configuration_required' };
+      if (object(details) && ['configuration_required', 'personalization_disabled', 'context_unavailable'].includes(String(details.status))) {
+        return { status: details.status } as PrivateIngredientSearch;
+      }
       return { status: 'unavailable' };
     }
     throw new Error(status === 403 ? 'PRIVATE_TESTER_REQUIRED' : status === 401 ? 'SIGN_IN_REQUIRED' : 'INGREDIENT_UNAVAILABLE');
   }
-  return parsePrivateIngredientSearch(data, query);
+  const result = parsePrivateIngredientSearch(data, query);
+  if (result.status === 'grounded_answer'
+    && (personalized ? result.answerKind !== 'contextual_web_guidance' : result.answerKind === 'contextual_web_guidance')) {
+    throw new Error('INVALID_INGREDIENT_RESPONSE');
+  }
+  return result;
 }
 
 export type PrivateIngredientState = { ownerId: string; queryKey: string } & (

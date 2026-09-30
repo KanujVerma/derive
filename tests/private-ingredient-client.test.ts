@@ -26,10 +26,35 @@ test('grounded result must echo exact query and preserve full answer + suggestio
 });
 
 test('empty statuses remain typed and unknown statuses fail closed', () => {
-  for (const status of ['configuration_required', 'rate_limited', 'unavailable', 'no_grounded_answer']) {
+  for (const status of ['configuration_required', 'rate_limited', 'unavailable', 'no_grounded_answer',
+    'personalization_disabled', 'profile_missing', 'context_unavailable', 'context_changed']) {
     assert.deepEqual(parsePrivateIngredientSearch({ status }, query), { status });
   }
   assert.throws(() => parsePrivateIngredientSearch({ status: 'verified' }, query), /INVALID_INGREDIENT_RESPONSE/);
+});
+
+test('contextual display is explicitly typed and carries only an opaque saved-context snapshot', () => {
+  const personal = { ...answer, answerKind: 'contextual_web_guidance' as const, contextVersion: 'a'.repeat(64) };
+  assert.deepEqual(parsePrivateIngredientSearch(personal, query), personal);
+  for (const changed of [{ ...personal, contextVersion: undefined }, { ...personal, contextVersion: 'private raw profile' },
+    { ...personal, answerKind: 'published_ingredients' }, { ...personal, answerKind: 'verified_fit' }]) {
+    assert.throws(() => parsePrivateIngredientSearch(changed, query), /INVALID_INGREDIENT_RESPONSE/);
+  }
+});
+
+test('personal request sends consent/mode only, never client context, and requires a contextual response', async () => {
+  const personal = { ...answer, answerKind: 'contextual_web_guidance' as const, contextVersion: 'b'.repeat(64) };
+  const client = { functions: { invoke: async (_name: string, options: { body: object }) => {
+    assert.deepEqual(options.body, { ...query, personalization: 'basic_skin_context', contextSharingConsent: true });
+    return { data: personal, error: null };
+  } } };
+  assert.deepEqual(await requestPrivateIngredientSearch(query, owner, () => owner, () => ingredientQueryKey(query), client, true), personal);
+  const wrong = { functions: { invoke: async () => ({ data: answer, error: null }) } };
+  await assert.rejects(requestPrivateIngredientSearch(query, owner, () => owner, () => ingredientQueryKey(query), wrong, true), /INVALID_INGREDIENT_RESPONSE/);
+  const leaked = { functions: { invoke: async () => ({ data: personal, error: null }) } };
+  await assert.rejects(requestPrivateIngredientSearch(query, owner, () => owner, () => ingredientQueryKey(query), leaked), /INVALID_INGREDIENT_RESPONSE/);
+  const off = { functions: { invoke: async () => ({ data: null, error: { context: new Response(JSON.stringify({ status: 'personalization_disabled' }), { status: 503 }) } }) } };
+  assert.deepEqual(await requestPrivateIngredientSearch(query, owner, () => owner, () => ingredientQueryKey(query), off, true), { status: 'personalization_disabled' });
 });
 
 test('source links permit public HTTPS only, never local/IP/credential/nonstandard-port destinations', () => {
@@ -128,6 +153,9 @@ test('native display uses isolated no-script/no-cache WebView and exact manually
   assert.match(native, /incognito cacheEnabled=\{false\}/);
   assert.match(native, /onShouldStartLoadWithRequest/); assert.match(native, /Linking.openURL/);
   assert.match(native, /Not package-verified ingredients, medical advice or a personal-fit result/);
+  assert.match(native, /Alert.alert\('Share basic skin context with Google\?'/);
+  assert.match(native, /Allow this search/);
+  assert.match(native, /No identity, photos, pregnancy answers, prescriptions or reaction history/);
   assert.match(parent, /<PrivateIngredientSearch ownerId=\{ownerId\} query=\{\{ barcode: candidate.observedBarcode/);
   assert.doesNotMatch(native, /from ['"][^'"]*analytics|analytics\.(?:track|capture)|recordFreeCheck|evaluateProduct|\.insert\(|\.upsert\(/);
   assert.doesNotMatch(web, /requestPrivateIngredientSearch|WebView|dangerouslySetInnerHTML/);
