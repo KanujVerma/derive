@@ -1,5 +1,13 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-09-30: private UPC-to-published-ingredient preparation
+
+- Sami local branch `sami/upc-private-phone`, predecessor `4579f07`, upstream still `9f88e47`. User reported that Old Spice Fresh High Endurance was correctly identified by external UPC fallback on the actual phone; this is identity evidence, not formula evidence.
+- Added explicit **Find published ingredients**, authenticated/default-off Gemini Google Search endpoint, exact tester allowlist, owner/product fencing, durable global 20/day and ten-second attempt budget, and isolated full-answer/source/unchanged-suggestion display. No personal context, images, canonical promotion, save, rating, analytics or hosted change. Kanuj's decision engine and active UX leaves remain untouched.
+- Live provider gate: the current 3.8 Flash product-only request returned 429 quota exhausted; 2.5 Flash returned 404 unavailable to this account. Founder cannot inspect billing immediately. Continue implementation/tests without claiming live ingredients. The local phone server has a deliberately blank ingredient key until quota/billing is resolved; UPC remains enabled.
+- Validation: fresh isolated migration reset and 702/702 database assertions across 31 files; 884/884 app tests; both TypeScript checks; web/iOS JavaScript exports. Real isolated Auth → Edge → client smoke passed unauthenticated 401, non-tester 403, invalid-query 400 and allowed-owner missing-key 503 → typed `configuration_required`, with zero Google requests. Both exact synthetic owners were removed and absence read back; isolated containers stopped with volumes preserved. Actual local phone-stack migration applied without reset and non-tester 403/cleanup verified. No ingredient-list hit, full grounded widget or physical answer-panel acceptance is claimed.
+- Founder requested a complete stop at the productive checkpoint until Gemini access is resolved. All agents are stopped/completed; no follow-up automation, further feature work, push or merge is scheduled. Existing local phone services remain available; only the disposable proof stack was stopped. Resume with quota/billing verification and one live exact-variant ingredient/display test, not more fixture scaffolding. See [private ingredient search](PRIVATE_INGREDIENT_SEARCH.md).
+
 This repository-native ledger records meaningful cross-agent checkpoints. Current implementation/runtime/tests and the canonical docs outrank historical entries below. GitHub is the sole durable project context; Drive is limited to customer-research artifacts. Past `Drive Status` and `DRIVE_SYNC_PAYLOAD` lines document their historical checkpoints and impose no current sync requirement.
 
 **Core Rules**:

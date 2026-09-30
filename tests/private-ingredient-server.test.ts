@@ -85,6 +85,14 @@ test('empty key and denied budget do not call Google, provider quota/config/erro
   }
   assert.equal((await searchPublishedIngredients(query, { apiKey: 'key', reserveRequest: async () => 'reserved',
     fetcher: async () => new Response('x'.repeat(131073)) })).status, 'unavailable');
+  let timedCalls = 0;
+  assert.equal((await searchPublishedIngredients(query, { apiKey: 'key', timeoutMs: 5, reserveRequest: async () => 'reserved',
+    fetcher: async (_url, options) => {
+      timedCalls++;
+      await new Promise((_resolve, reject) => options!.signal!.addEventListener('abort', () => reject(Error('timeout')), { once: true }));
+      throw Error('must not finish');
+    } })).status, 'unavailable');
+  assert.equal(timedCalls, 1);
 });
 
 const deps = () => ({ enabled: true, allowedUserIds: [owner], authenticate: async () => ({ userId: owner }),
