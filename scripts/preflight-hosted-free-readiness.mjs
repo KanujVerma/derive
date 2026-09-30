@@ -102,7 +102,7 @@ export async function preflightHostedFreeReadiness(options = {}) {
     localAccessGatewayJwtConfigured: booleanSetting(sources.config, 'functions.access-state', 'verify_jwt'),
     localAuthCaptchaConfigured: booleanSetting(sources.config, 'auth.captcha', 'enabled'),
     localOnlyShellGate: sourceShape(sources.shell, [/input\.buildFlavor !== 'development'/, /return 'legacy'/, /local_free_integration/]),
-    persistedSessionBeforeGuestCreation: sourceShape(sources.auth, [/ensureLocalAnonymousSession/, /activeAdapter\.getSession\(\)/, /activeAdapter\.signInAnonymously\(\)/]),
+    persistedSessionBeforeGuestCreation: sourceShape(sources.auth, [/ensureFreeScannerSession/, /adapter\.getSession\(\)/, /adapter\.signInAnonymously\(\)/, /existing\.data\.session !== null/]),
     guestUpgradeApiInInspectedAuthModule: sourceShape(sources.auth, [/\.(?:updateUser|linkIdentity)\(/]),
     verifiedAnonymousIdentity: sourceShape(sources.identity, [/user\.is_anonymous === true/, /user\.is_anonymous === false/, /IDENTITY_UNAVAILABLE/]),
     managedIdentitySeparation: sourceShape(sources.access, [/authenticate\(req\)/, /identityKind === "permanent" && managedMembershipStatus === "active"/]),

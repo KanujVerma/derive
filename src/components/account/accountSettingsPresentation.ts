@@ -41,8 +41,8 @@ export function getAccountSettingsPresentation(input: {
     return {
       kind: 'anonymous',
       accountTitle: 'Using Derive without an account',
-      accountSubtitle: 'You can use Check and My Stuff without signing in.',
-      accountFooter: 'This session may not be recoverable if you lose access to it.',
+      accountSubtitle: 'Your profile and saved checks are stored privately in Derive, without an email or password.',
+      accountFooter: 'This phone remembers your guest session. Clearing app data or losing the session can make your saved data inaccessible. It is not recoverable on another phone yet.',
       showSignOut: false,
       showDelete: true,
       deleteLabel: 'Delete Derive data',

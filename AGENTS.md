@@ -8,6 +8,8 @@ The target architecture is not proof of runtime behavior. Development Mock and e
 
 ## Truth and references
 
+**2026-09-29 guest-first direction:** founder approved no visible signup for the scanner beta. Hosted guest bootstrap is separately default-off until signup abuse/challenge and device acceptance; preserve existing sessions and owner-bound context. Do not treat preview memory as durable storage or ordinary signup as guest-data linking. See [SCANNER_RELEASE_ROUTING.md](docs/SCANNER_RELEASE_ROUTING.md).
+
 GitHub `main` is the durable checkpoint. For what exists, prefer runtime, source and tests over stale prose. Accepted ADRs describe intent, not implementation. Before substantial work, fetch/inspect branch freshness and preserve dirty or unpushed work. Read only references relevant to the task:
 
 - [ROADMAP.md](docs/ROADMAP.md): objective, active P0s, gates and history.

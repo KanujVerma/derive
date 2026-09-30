@@ -36,7 +36,8 @@
       "env": {
         "EXPO_PUBLIC_USE_REMOTE_SERVICE": "true",
         "EXPO_PUBLIC_BUILD_FLAVOR": "production",
-        "EXPO_PUBLIC_SCANNER_RELEASE_ENABLED": "true"
+        "EXPO_PUBLIC_SCANNER_RELEASE_ENABLED": "true",
+        "EXPO_PUBLIC_SCANNER_GUEST_ENABLED": "false"
       }
     },
     "production": {

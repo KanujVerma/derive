@@ -21,6 +21,7 @@ another.
 | `EXPO_PUBLIC_USE_REMOTE_SERVICE` | Expo mobile/web build | Public | `false` in ordinary development/production profiles; `true` in explicit Remote staging and scanner-release candidates. A candidate is not hosted activation or launch approval. |
 | `EXPO_PUBLIC_BUILD_FLAVOR` | Expo mobile/web build | Public | `development`, `remote-staging`, or `production`; empty local value defaults to development |
 | `EXPO_PUBLIC_SCANNER_RELEASE_ENABLED` | Expo mobile/web build | Public presentation flag | Empty/off ordinarily; `scanner-release` sets true with production Remote and the exact reviewed hosted project. This creates no entitlement or hosted activation. See SCANNER_RELEASE_ROUTING.md. |
+| `EXPO_PUBLIC_SCANNER_GUEST_ENABLED` | Expo mobile/web build | Public guest-startup opt-in | Default off, including the current scanner-release profile. Requires scanner release configuration. Only activate after signup abuse controls, app challenge/token acquisition and hosted/phone guest acceptance; source preparation alone does not enable hosted anonymous Auth. |
 | `EXPO_PUBLIC_SUPABASE_URL` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_DEV_SUPABASE_LAN_URL` | Development JS runtime only | Public local test target | Optional exact Mac private IPv4 base URL on port 54321 for physical scanner QA; never staging/production/release |

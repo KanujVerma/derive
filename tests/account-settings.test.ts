@@ -18,7 +18,9 @@ test('preview, anonymous, and permanent account settings stay distinct', () => {
 
   const anonymous = getAccountSettingsPresentation({ kind: 'anonymous' });
   assert.equal(anonymous.accountTitle, 'Using Derive without an account');
-  assert.match(anonymous.accountFooter ?? '', /may not be recoverable/);
+  assert.match(anonymous.accountSubtitle, /stored privately in Derive/);
+  assert.match(anonymous.accountFooter ?? '', /Clearing app data/);
+  assert.match(anonymous.accountFooter ?? '', /not recoverable on another phone yet/);
   assert.equal(anonymous.showSignOut, false);
   assert.equal(anonymous.deleteLabel, 'Delete Derive data');
 

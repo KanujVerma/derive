@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore.ts';
 import { useUserStore } from '../stores/userStore.ts';
 import { resetCustomerSessionData } from './sessionReset.ts';
 import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
+import type { ShellPresentation } from '../utils/shellPresentation.ts';
 
 export interface AuthSessionUser {
   id: string;
@@ -238,22 +239,39 @@ function projectAuthenticatedSession(user: { id: string; email?: string | null }
 
 let anonymousStart: Promise<string> | null = null;
 
-/** Local-only caller: preserve the persisted session; create a guest only when none exists. */
-export function ensureLocalAnonymousSession(): Promise<string> {
+/** Only real free-scanner integrations may bootstrap guests; never Mock or legacy Remote. */
+export function ensureFreeScannerSession(shell: ShellPresentation): Promise<string> {
+  if (shell !== 'local_free_integration' && shell !== 'hosted_free_integration') {
+    return Promise.reject(new Error('Guest bootstrap is not enabled for this shell'));
+  }
   if (anonymousStart) return anonymousStart;
+  const adapter = activeAdapter;
   anonymousStart = (async () => {
-    const existing = await activeAdapter.getSession();
-    if (existing.error) throw new Error('Auth session could not be checked');
-    if (existing.data?.session?.user?.id) return projectAuthenticatedSession(existing.data.session.user);
-    if (!activeAdapter.signInAnonymously) throw new Error('Anonymous Auth is unavailable');
-    const created = await activeAdapter.signInAnonymously();
+    const existing = await adapter.getSession();
+    // A read failure is not an absent session. Never replace an uncertain owner.
+    if (existing.error || !existing.data || !('session' in existing.data)) {
+      throw new Error('Auth session could not be checked');
+    }
+    if (existing.data.session !== null) {
+      const user = existing.data.session?.user;
+      if (typeof user?.id !== 'string' || !user.id.trim()) throw new Error('Invalid stored session');
+      return projectAuthenticatedSession(user);
+    }
+    if (!adapter.signInAnonymously) throw new Error('Anonymous Auth is unavailable');
+    const created = await adapter.signInAnonymously();
     if (created.error || !created.data?.session?.user?.id || !created.data?.user?.id
-      || created.data.session.user.id !== created.data.user.id) {
+      || created.data.session.user.id !== created.data.user.id
+      || created.data.user.is_anonymous !== true || created.data.session.user.is_anonymous !== true) {
       throw new Error('Anonymous Auth could not be established');
     }
     return projectAuthenticatedSession(created.data.user);
   })().finally(() => { anonymousStart = null; });
   return anonymousStart;
+}
+
+/** Compatibility entry for existing exact-local integration harnesses. */
+export function ensureLocalAnonymousSession(): Promise<string> {
+  return ensureFreeScannerSession('local_free_integration');
 }
 
 /**

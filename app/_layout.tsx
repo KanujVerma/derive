@@ -12,7 +12,7 @@ import { useOnboardingStore } from '@/src/stores/onboardingStore';
 import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { startAuthAutoRefresh, stopAuthAutoRefresh } from '@/src/services/supabase';
-import { ensureLocalAnonymousSession, getCurrentSession, subscribeToAuth } from '@/src/services/authClient';
+import { ensureFreeScannerSession, getCurrentSession, subscribeToAuth } from '@/src/services/authClient';
 import { getFreeAccessState } from '@/src/services/remote/freeAccess';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 import { publicEnvironment } from '@/src/config/environment';
@@ -40,7 +40,9 @@ export default function RootLayout() {
   const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled, supabaseUrl: publicEnvironment.supabaseUrl });
   const localFreeIntegration = shell === 'local_free_integration';
   const hostedScanner = shell === 'hosted_free_integration';
+  const hostedGuest = hostedScanner && publicEnvironment.scannerGuestEnabled === true;
   const freeIntegration = isFreeIntegrationShell(shell);
+  const guestBootstrap = localFreeIntegration || hostedGuest;
   const accessStatus = useFreeAccessStore((s) => s.status);
   const accessUserId = useFreeAccessStore((s) => s.userId);
   const access = useFreeAccessStore((s) => s.access);
@@ -54,7 +56,7 @@ export default function RootLayout() {
     access, contextOwnerId: customerState.ownerId,
     contextStatus: customerState.context?.ownerId === sessionUserId ? 'ready' : customerState.status,
     hasProfile: Boolean(customerState.context?.profile),
-    profileIntroHandled: introOwner === sessionUserId && introHandled });
+    profileIntroHandled: introOwner === sessionUserId && introHandled, guestFirst: hostedGuest });
 
   useEffect(() => {
     if (hostedScanner) useScannerEntryStore.getState().setOwner(authStatus === 'SIGNED_IN' ? sessionUserId : null);
@@ -139,17 +141,21 @@ export default function RootLayout() {
   useEffect(() => {
     if (!remoteEnabled) return;
 
-    if (!localFreeIntegration) void getCurrentSession();
+    if (!guestBootstrap) void getCurrentSession();
     const { unsubscribe } = subscribeToAuth();
     return () => unsubscribe();
-  }, [remoteEnabled, localFreeIntegration]);
+  }, [remoteEnabled, guestBootstrap]);
 
-  // Only the local development integration may silently create a guest session.
+  // Preserve an existing session; otherwise create one authenticated guest owner.
+  // The hosted scanner shell is already restricted to the reviewed project/build.
   useEffect(() => {
-    if (!localFreeIntegration || authError || accessStatus === 'ERROR') return;
+    if (!guestBootstrap || authError || accessStatus === 'ERROR') return;
     if (authStatus !== 'INITIALIZING' && authStatus !== 'SIGNED_OUT') return;
-    void ensureLocalAnonymousSession().then(() => setAuthError(false)).catch(() => setAuthError(true));
-  }, [localFreeIntegration, authStatus, accessStatus, authError]);
+    let active = true;
+    void ensureFreeScannerSession(shell).then(() => { if (active) setAuthError(false); })
+      .catch(() => { if (active) setAuthError(true); });
+    return () => { active = false; };
+  }, [guestBootstrap, shell, authStatus, accessStatus, authError]);
 
   useEffect(() => {
     if (!freeIntegration || authStatus !== 'SIGNED_IN' || !sessionUserId) return;
@@ -194,7 +200,7 @@ export default function RootLayout() {
     if (authStatus !== 'INITIALIZING' && redirectRoute) router.replace(redirectRoute as any);
   }, [remoteEnabled, hostedScanner, scannerEntry, localFreeIntegration, localReady, access, segments, entryParams.p0b, entryParams.entry, entryParams.mode, authStatus, redirectRoute]);
 
-  if ((localFreeIntegration && (authError || accessStatus === 'ERROR')) || (hostedScanner && scannerEntry === 'error')) {
+  if ((freeIntegration && authError) || (localFreeIntegration && accessStatus === 'ERROR') || (hostedScanner && scannerEntry === 'error')) {
     return <SafeAreaProvider><View style={styles.loadingContainer}>
       <Text style={styles.errorText}>Derive could not connect. Please try again.</Text>
       <Pressable accessibilityRole="button" onPress={() => { setAuthError(false); if (hostedScanner && localReady) void customerController.load(); else useFreeAccessStore.getState().reset(); }}>

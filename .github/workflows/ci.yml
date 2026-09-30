@@ -117,6 +117,9 @@ jobs:
       - name: Run Wave-1 mobile free-access integration harness
         run: node --experimental-strip-types scripts/test-wave1-local.mjs
 
+      - name: Verify scanner guest session restart and owner isolation
+        run: node --experimental-strip-types scripts/test-scanner-guest-local.mjs --run-local
+
       - name: Run S-FREE-2 personal fit E2E harness
         run: node scripts/test-s-free-2-local.mjs
 

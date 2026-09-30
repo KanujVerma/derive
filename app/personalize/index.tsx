@@ -103,6 +103,7 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry = false }:
   const [editingExperience, setEditingExperience] = useState<string | 'new' | null>(null);
   useEffect(() => { customerController.setOwner(ownerId); if (ownerId) void customerController.load(); }, [ownerId]);
   const context = state.ownerId === ownerId ? state.context : null;
+  const guest = useFreeAccessStore(s => s.userId === ownerId && s.access?.userId === ownerId && s.access.identityKind === 'anonymous');
   const close = () => {
     if (entry) {
       if (!ownerId || currentCustomerOwner() !== ownerId) return;
@@ -130,7 +131,10 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry = false }:
   const editQuestions = deriveProfileEditQuestions(context.profile?.data ?? null, jitReproductive, jitContext);
   const reproductive = editQuestions.reproductive, questions = editQuestions.context;
   return <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 12, paddingTop: insets.top + 12 }}>
+    {entry && guest && <Text style={{ paddingHorizontal: 16, paddingTop: insets.top + 12, color: colors.inkMuted }}>
+      Your answers are saved privately in Derive. This phone remembers your guest session; clearing app data can lose access. You cannot restore it on another phone yet.
+    </Text>}
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 12, paddingTop: entry && guest ? 12 : insets.top + 12 }}>
       <Button label="Skin and goals" size="medium" variant="ghost" disabled={loading} onPress={() => { setSection('profile'); setEditingExperience(null); }} />
       <Button label="Routine" size="medium" variant="ghost" disabled={loading} onPress={() => { setSection('routine'); setEditingExperience(null); }} />
       <Button label="Experiences" size="medium" variant="ghost" disabled={loading} onPress={() => { setSection('history'); setEditingExperience(null); }} />
