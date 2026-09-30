@@ -34,8 +34,8 @@ test('editing preserves hidden intent and treatment answers and keeps an existin
   press(control(nodes, 'Maintain my skin'));
   nodes = flow.render();
   assert.equal(control(nodes, 'Maintain my skin').props.accessibilityState.checked, true);
-  assert.equal(control(nodes, 'Dryness').props.accessibilityLabel, 'Dryness, Main');
-  assert.equal(control(nodes, 'Maintain my skin').props.accessibilityLabel, 'Maintain my skin, Also');
+  assert.equal(control(nodes, 'Dryness').props.accessibilityLabel, 'Dryness, primary goal, selected');
+  assert.equal(control(nodes, 'Maintain my skin').props.accessibilityLabel, 'Maintain my skin, additional goal, selected');
   press(control(nodes, 'Save skin profile'));
   assert.deepEqual(saved?.intent, { state: 'answered', value: 'replace' });
   assert.deepEqual(saved?.treatments, { state: 'answered', value: ['benzoyl_peroxide'] });

@@ -55,7 +55,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
   return { render };
 }
 export function control(nodes: Element[], label: string): Element {
-  const found = nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label || node.props.accessibilityLabel === `${label}, Main` || node.props.accessibilityLabel === `${label}, Also`);
+  const found = nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label || (typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith(`${label}, `)));
   if (!found) throw new Error(`Missing control: ${label}`);
   return found;
 }

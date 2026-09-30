@@ -48,21 +48,18 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   return <Screen scrollable><View style={styles.flow}>
     <View style={styles.intro}>
       <Text style={styles.title}>Your skin profile</Text>
-      <Text style={styles.copy}>Optional. You can skip and still see product facts.</Text>
       {!editing && <Text style={styles.copy}>Step {step + 1} of {last + 1}</Text>}
     </View>
     {(editing || step === 0) && <View style={styles.questions}>
-      <QuestionGroup label="What would you like to improve?" support="Optional. Choose up to three. Your first choice is Main."><View style={styles.chips}>
+      <QuestionGroup label="What would you like to improve?" support="Choose up to three."><View style={styles.chips}>
         {goals.map(([value, label]) => {
           const main = draft.primaryGoal.state === 'answered' && draft.primaryGoal.value === value;
           const also = draft.secondaryGoals.includes(value);
-          const role = main ? 'Main' : also ? 'Also' : null;
           const selected = main || also;
           const count = (draft.primaryGoal.state === 'answered' ? 1 : 0) + draft.secondaryGoals.length;
           const disabled = loading || (!selected && count >= 3);
-          return <TouchableOpacity key={value} activeOpacity={0.75} accessibilityRole="checkbox" accessibilityLabel={role ? `${label}, ${role}` : label} accessibilityState={{ checked: selected, disabled }} disabled={disabled} style={[styles.goal, main ? styles.mainGoal : also ? styles.alsoGoal : styles.unselectedGoal, disabled && styles.disabledGoal]} onPress={() => { if (disabled) return; setValidation(null); setDraft(current => toggleProfileGoal(current, value)); }}>
-            <Text style={[styles.goalLabel, main && styles.mainGoalLabel]}>{label}</Text>
-            {role && <Text style={[styles.goalRole, main && styles.mainGoalLabel]}>{role}</Text>}
+          return <TouchableOpacity key={value} activeOpacity={0.75} accessibilityRole="checkbox" accessibilityLabel={selected ? `${label}, ${main ? 'primary goal' : 'additional goal'}, selected` : label} accessibilityState={{ checked: selected, disabled }} disabled={disabled} style={[styles.goal, main ? styles.mainGoal : also ? styles.alsoGoal : styles.unselectedGoal, disabled && styles.disabledGoal]} onPress={() => { if (disabled) return; setValidation(null); setDraft(current => toggleProfileGoal(current, value)); }}>
+            <Text style={[styles.goalLabel, main && styles.mainGoalLabel, !main && also && styles.alsoGoalLabel]}>{label}</Text>
           </TouchableOpacity>;
         })}
       </View></QuestionGroup>
@@ -98,9 +95,10 @@ export const styles = StyleSheet.create({
   copy: { color: colors.inkMuted, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
   error: { color: colors.actionStop.text, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
   group: { padding: layout.cardPadding, gap: spacing.sm }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  goal: { minHeight: layout.minTouchTarget, borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  goal: { minHeight: layout.minTouchTarget, borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   mainGoal: { backgroundColor: colors.brand, borderColor: colors.brand }, alsoGoal: { backgroundColor: colors.brandLight, borderColor: colors.brand }, unselectedGoal: { backgroundColor: colors.surface, borderColor: colors.border }, disabledGoal: { opacity: 0.45 },
   goalLabel: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular, fontWeight: typography.weights.medium },
-  mainGoalLabel: { color: colors.inkInverse }, goalRole: { color: colors.brandDark, fontSize: typography.sizes.caption, fontWeight: typography.weights.semibold },
+  alsoGoalLabel: { color: colors.ink },
+  mainGoalLabel: { color: colors.inkInverse },
   input: { minHeight: layout.minTouchTarget, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 8, padding: spacing.sm, fontSize: typography.sizes.bodyRegular, color: colors.ink, backgroundColor: colors.surface },
 });
