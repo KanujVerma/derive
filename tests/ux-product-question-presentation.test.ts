@@ -15,10 +15,10 @@ test('fresh profile asks skin feel and irritation on step 2 for any goal', () =>
   const feel = nodes.find(node => node.props.label === 'How does your skin usually feel?');
   const irritation = nodes.find(node => node.props.label === 'When you try a new skincare product, does your skin get irritated easily?');
   assert.ok(feel);
-  assert.equal(feel?.props.support, 'Combination: Oily in some areas, dry in others.');
+  assert.equal(feel?.props.support, undefined);
   assert.ok(irritation);
   assert.equal(irritation?.props.support, 'Think stinging, burning, redness, or peeling.');
-  for (const label of ['Dry or tight', 'Balanced', 'Oily', 'Combination', 'Yes, often', 'Usually not']) assert.ok(control(nodes, label));
+  for (const label of ['Dry or tight', 'Neither dry nor oily', 'Oily in some areas, dry in others', 'Oily', 'Yes, often', 'Usually not']) assert.ok(control(nodes, label));
   const unsure = nodes.filter(node => node.props.label === 'Not sure');
   assert.equal(unsure.length, 2);
   press(unsure[0]);

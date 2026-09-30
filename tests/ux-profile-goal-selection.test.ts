@@ -95,9 +95,9 @@ test('short skin-feel labels retain the same saved meanings and explain Combinat
   let applied: ContextDraft | undefined;
   const flow = componentHarness(file, 'ContextFlow', { initialDraft: draft, collectIntent: false, onApply(value: ContextDraft) { applied = value; }, onSkip() {} });
   const nodes = flow.render();
-  for (const label of ['Dry or tight', 'Balanced', 'Oily', 'Combination', 'Not sure']) assert.ok(control(nodes, label));
-  assert.ok(nodes.some(node => node.props.support === 'Combination: Oily in some areas, dry in others.'));
-  press(control(nodes, 'Combination'));
+  for (const label of ['Dry or tight', 'Neither dry nor oily', 'Oily in some areas, dry in others', 'Oily', 'Not sure']) assert.ok(control(nodes, label));
+  assert.equal(nodes.find(node => node.props.label === 'How does your skin usually feel?')?.props.support, undefined);
+  press(control(nodes, 'Oily in some areas, dry in others'));
   press(control(flow.render(), 'Save skin profile'));
   assert.deepEqual(applied?.behavior, { state: 'answered', value: 'combination' });
 });

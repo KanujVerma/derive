@@ -29,6 +29,10 @@ test('focused fresh phone preview opens unanswered setup and returns without per
   assert.ok(nodes.some(node => node.props.label === 'Continue'));
   press(control(nodes, 'Dryness'));
   press(control(preview.harness.render(), 'Continue'));
+  press(control(preview.harness.render(), 'Continue'));
+  assert.ok(preview.harness.render().some(node => node.props.label === 'What are you using now?'));
+  press(control(preview.harness.render(), 'Continue'));
+  press(control(preview.harness.render(), 'Continue'));
   nodes = preview.harness.render();
   press(control(nodes, 'Done'));
   assert.equal(preview.exits(), 1);
@@ -38,6 +42,8 @@ test('focused fresh phone preview opens unanswered setup and returns without per
 test('focused Skip returns to the originating page and step Back stays inside the profile', () => {
   const skip = fixture({ mode: 'profile', fresh: '1', focused: '1' });
   press(control(skip.harness.render(), 'Skip'));
+  assert.equal(skip.exits(), 0);
+  for (let step = 0; step < 3; step += 1) press(control(skip.harness.render(), 'Skip'));
   assert.equal(skip.exits(), 0);
   press(control(skip.harness.render(), 'Skip'));
   assert.equal(skip.exits(), 1);
@@ -66,8 +72,8 @@ test('fixture stays unavailable outside development and in legacy shell', () => 
 test('cold focused preview closes through a safe destination for Done and final Skip', () => {
   for (const action of ['Done', 'Skip']) {
     const preview = fixture({ mode: 'profile', fresh: '1', focused: '1' }, true, 'development', 'free', false);
-    if (action === 'Done') press(control(preview.harness.render(), 'Continue'));
-    if (action === 'Skip') press(control(preview.harness.render(), 'Skip'));
+    if (action === 'Done') for (let step = 0; step < 4; step += 1) press(control(preview.harness.render(), 'Continue'));
+    if (action === 'Skip') for (let step = 0; step < 4; step += 1) press(control(preview.harness.render(), 'Skip'));
     press(control(preview.harness.render(), action));
     assert.equal(preview.exits(), 0);
     assert.deepEqual(preview.destinations, ['/(tabs)/my-stuff']);

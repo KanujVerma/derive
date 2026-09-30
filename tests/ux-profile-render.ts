@@ -28,6 +28,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
       if (id.startsWith('@/src/components/ui/')) { const component = id.slice(id.lastIndexOf('/') + 1); return { [component]: component }; }
+      if (id.endsWith('/CatalogProductSearch')) return { CatalogProductSearch: ({ label, onSelect, onQueryChange }: { label?: string; onSelect: (product: { productId: string; brand: string; name: string }) => void; onQueryChange?: (query: string) => void }) => React.createElement('button', { label, onPress: () => onSelect({ productId: 'catalog-product', brand: 'CeraVe', name: 'Moisturizer' }), onQueryChange }) };
       if (id.startsWith('@/') || id.startsWith('.')) {
         const target = id.startsWith('@/') ? resolve(root, id.slice(2)) : resolve(dirname(path), id);
         const full = /\.(tsx?|js)$/.test(target) ? target : target + (target.includes('/components/') ? '.tsx' : '.ts');

@@ -6,11 +6,15 @@ import { Button } from '@/src/components/ui/Button';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
 import { QuestionGroup } from '@/src/components/ui/QuestionGroup';
 import { colors, layout, radii, spacing, typography } from '@/src/constants/theme';
-import { createContextDraft, relevantQuestions, validateContextDraft, GOALS, type Treatment, type Answer, type ContextDraft, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
+import { createContextDraft, relevantQuestions, validateContextDraft, GOALS, type Treatment, type Answer, type ContextDraft, type RoutineReference, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
 
 import { toggleProfileGoal } from '@/src/presentation/p0b-personalization/goalSelection';
+import { addCurrentProduct, addSetupExperience, catalogFamilyReference, createSetupBundle, currentUseItem, experienceFromNotice, manualUnverifiedReference, removeSetupExperience, removeSetupProduct, replaceSetupOwner, setAdditionalNote, type SetupBundle, type SetupNotice } from '@/src/presentation/p0b-personalization/setup';
+import { CatalogProductSearch } from '@/src/components/catalog/CatalogProductSearch';
+import type { CatalogProductSummary } from '@/src/contracts/ProductCatalog';
 
 const goals = GOALS.map(([value, label]) => [value, value === 'dryness' ? 'Dryness' : label] as const);
+const notices = [['irritated', 'Irritated my skin'], ['broke_out', 'Broke me out'], ['too_drying', 'Felt too drying'], ['didnt_help', "Didn't help"], ['liked', 'I liked it']] as const;
 export interface ContextFlowProps {
   initialDraft?: ContextDraft; relevance?: SafetyRelevance;
   /** Context questions are shown only when the caller establishes relevance. */
@@ -19,6 +23,11 @@ export interface ContextFlowProps {
   collectIntent?: boolean;
   /** The host names the completion action, including temporary previews. */
   completionLabel?: string;
+  /** Fresh setup may also record current products, product experiences, and a raw note. Profile editing does not replay those stages. */
+  setup?: boolean;
+  ownerId?: string | null;
+  createId?: () => string;
+  onSetup?: (bundle: SetupBundle) => void;
   onApply: (draft: ContextDraft) => void; onSkip: () => void;
   loading?: boolean; error?: string | null;
 }
@@ -33,17 +42,36 @@ function AnswerChoices<T extends string>({ label, support, answer, choices, onCh
   </View></QuestionGroup>;
 }
 /** Local optional collection. The host acknowledges saving and refreshes the originating Check. */
-export function ContextFlow({ initialDraft, relevance, contextQuestions = [], collectIntent = true, completionLabel = 'Save skin profile', onApply, onSkip, loading = false, error }: ContextFlowProps) {
+export function ContextFlow({ initialDraft, relevance, contextQuestions = [], collectIntent = true, completionLabel = 'Save skin profile', setup = false, ownerId = null, createId, onSetup, onApply, onSkip, loading = false, error }: ContextFlowProps) {
   const [draft, setDraft] = useState(() => createContextDraft(initialDraft));
   const [sensitivityText, setSensitivityText] = useState(() => initialDraft?.sensitivities.state === 'answered' ? initialDraft.sensitivities.value.join('\n') : '');
   const [step, setStep] = useState(0);
   const [validation, setValidation] = useState<string | null>(null);
+  const [bundle, setBundle] = useState(() => createSetupBundle(ownerId));
+  const [manualName, setManualName] = useState('');
+  const [pending, setPending] = useState<RoutineReference | null>(null);
   const fields = relevantQuestions(relevance);
   const hasContext = contextQuestions.length > 0 || fields.length > 0;
-  const last = hasContext ? 2 : 1;
   const editing = Boolean(initialDraft);
+  const extended = setup && !editing && !hasContext;
+  const last = hasContext ? 2 : extended ? 4 : 1;
+  const currentBundle = bundle.ownerId === ownerId ? bundle : createSetupBundle(ownerId);
+  if (currentBundle !== bundle) setBundle(currentBundle);
   const update = <K extends keyof ContextDraft>(key: K, value: ContextDraft[K]) => { setValidation(null); setDraft(current => ({ ...current, [key]: value })); };
-  const continueOrApply = () => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (editing || step === last) onApply(createContextDraft(draft)); else setStep(step + 1); };
+  const finish = () => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (extended) onSetup?.(currentBundle); onApply(createContextDraft(draft)); };
+  const continueOrApply = () => { if (editing || step === last) finish(); else setStep(step + 1); };
+  const addNamedProduct = (reference: ReturnType<typeof manualUnverifiedReference> | ReturnType<typeof catalogFamilyReference>) => {
+    const id = createId?.();
+    if (!id) return;
+    setBundle(addCurrentProduct(currentBundle, currentUseItem(id, reference)));
+    setManualName('');
+  };
+  const addNoticedProduct = (reference: ReturnType<typeof manualUnverifiedReference> | ReturnType<typeof catalogFamilyReference>, notice: SetupNotice) => {
+    const id = createId?.();
+    if (!id) return;
+    setBundle(addSetupExperience(currentBundle, experienceFromNotice(id, reference, notice)));
+    setManualName('');
+  };
   return <Screen scrollable><View style={styles.flow}>
     <View style={styles.intro}>
       <Text style={styles.title}>Your skin profile</Text>
@@ -65,8 +93,35 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       {collectIntent && <AnswerChoices label="What are you deciding?" support="This choice is saved with your profile and reused for future Checks. You can change it." answer={draft.intent} disabled={loading} choices={[['add', 'Add to my routine'], ['replace', 'Replace something'], ['check_current', 'Check what I use']]} onChange={value => update('intent', value)} />}
     </View>}
     {(editing || step === 1) && <View style={styles.questions}>
-      <AnswerChoices label="How does your skin usually feel?" support="Combination: Oily in some areas, dry in others." answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Balanced'], ['oily', 'Oily'], ['combination', 'Combination'], ['unsure', 'Not sure']]} onChange={value => update('behavior', value)} />
+      <AnswerChoices label="How does your skin usually feel?" answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Neither dry nor oily'], ['combination', 'Oily in some areas, dry in others'], ['oily', 'Oily'], ['unsure', 'Not sure']]} onChange={value => update('behavior', value)} />
       <AnswerChoices label="When you try a new skincare product, does your skin get irritated easily?" support="Think stinging, burning, redness, or peeling." answer={draft.reactivity} basic disabled={loading} choices={[['reacts_easily', 'Yes, often'], ['generally_tolerates', 'Usually not'], ['unsure', 'Not sure']]} onChange={value => update('reactivity', value)} />
+    </View>}
+    {extended && step === 2 && <View style={styles.questions}>
+      <QuestionGroup label="What are you using now?" support="Add the skincare products you use regularly.">
+        <CatalogProductSearch embedded label="Search products" selectedIds={currentBundle.products.flatMap(product => product.reference.kind === 'catalog' ? [product.reference.productId] : [])} onQueryChange={setManualName} onSelect={(product: CatalogProductSummary) => addNamedProduct(catalogFamilyReference(product))} />
+        <Button label="Add this name" variant="secondary" disabled={loading || !manualName.trim()} onPress={() => addNamedProduct(manualUnverifiedReference(manualName))} />
+        {currentBundle.products.map(product => <View key={product.id} style={styles.chips}>
+          <Text>{product.reference.label}</Text>
+          <Text>Using now</Text>
+          <Button label={`Remove ${product.reference.label}`} variant="ghost" onPress={() => setBundle(removeSetupProduct(currentBundle, product.id))} />
+        </View>)}
+      </QuestionGroup>
+    </View>}
+    {extended && step === 3 && <View style={styles.questions}>
+      <QuestionGroup label="Any skincare products that didn't agree with your skin?">
+        <CatalogProductSearch embedded label="Search products" onQueryChange={value => setPending(value.trim() ? manualUnverifiedReference(value) : null)} onSelect={(product: CatalogProductSummary) => setPending(catalogFamilyReference(product))} />
+        {notices.map(([notice, label]) => <Button key={notice} label={label} variant="secondary" disabled={loading || !pending?.label.trim()} onPress={() => { if (pending) addNoticedProduct(pending, notice); setPending(null); }} />)}
+        {currentBundle.experiences.map(experience => <View key={experience.id} style={styles.chips}>
+          <Text>{experience.reference.label}</Text>
+          <Text>{experience.kind}</Text>
+          <Button label={`Remove ${experience.reference.label}`} variant="ghost" onPress={() => setBundle(removeSetupExperience(currentBundle, experience.id))} />
+        </View>)}
+      </QuestionGroup>
+    </View>}
+    {extended && step === 4 && <View style={styles.questions}>
+      <QuestionGroup label="Anything else you'd like Derive to know?">
+        <TextInput style={styles.input} accessibilityLabel="Anything else" multiline placeholder="Anything we didn't cover." value={currentBundle.additionalNote ?? ''} onChangeText={text => setBundle(setAdditionalNote(currentBundle, text))} />
+      </QuestionGroup>
     </View>}
     {hasContext && (editing || step === 2) && <View style={styles.questions}>
       {contextQuestions.includes('treatments') && <QuestionGroup label="Treatments you use" support="Choose treatments you know you use."><View style={styles.chips}>
@@ -84,7 +139,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
     <View style={styles.actions}>
       <Button label={editing || step === last ? completionLabel : 'Continue'} loading={loading} onPress={continueOrApply} />
       {!editing && step > 0 && <Button label="Back" variant="ghost" disabled={loading} onPress={() => setStep(step - 1)} />}
-      <Button label={editing ? 'Cancel profile edit' : 'Skip'} variant="ghost" disabled={loading} onPress={() => { if (editing) onSkip(); else if (step === last) continueOrApply(); else setStep(step + 1); }} />
+      <Button label={editing ? 'Cancel profile edit' : 'Skip'} variant="ghost" disabled={loading} onPress={() => { if (editing) onSkip(); else if (step === last) finish(); else setStep(step + 1); }} />
     </View>
   </View></Screen>;
 }
