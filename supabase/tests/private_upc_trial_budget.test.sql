@@ -1,10 +1,15 @@
 begin;
-select plan(12);
+select plan(16);
 select has_table('private', 'upc_trial_reservations', 'UPC quota is durable and global');
 select ok(not has_table_privilege('authenticated', 'private.upc_trial_reservations', 'select'), 'quota ledger is private');
 select ok(not has_function_privilege('authenticated', 'public.reserve_private_upc_trial(uuid)', 'execute'), 'customer cannot reserve directly');
+select ok(not has_table_privilege('anon', 'private.upc_trial_reservations', 'select'), 'anonymous database role cannot read the ledger');
+select ok(not has_function_privilege('anon', 'public.reserve_private_upc_trial(uuid)', 'execute'), 'anonymous database role cannot reserve directly');
+select ok((select relrowsecurity from pg_class where oid = 'private.upc_trial_reservations'::regclass), 'quota ledger has RLS enabled');
 insert into auth.users (id, is_anonymous, raw_user_meta_data) values ('e6000000-0000-4000-8000-000000000001', true, '{}'::jsonb);
+set local role service_role;
 select lives_ok($$select public.reserve_private_upc_trial('e6000000-0000-4000-8000-000000000001')$$, 'known active owner reserves');
+reset role;
 select throws_ok($$select public.reserve_private_upc_trial('e6000000-0000-4000-8000-000000000001')$$, 'P0001', 'UPC_TRIAL_LIMIT', 'immediate repeat denied');
 select is((select count(*)::int from private.upc_trial_reservations), 1, 'denied attempt does not consume quota');
 delete from auth.users where id = 'e6000000-0000-4000-8000-000000000001';
@@ -17,6 +22,8 @@ select throws_ok($$select public.reserve_private_upc_trial('e6000000-0000-4000-8
 update private.upc_trial_reservations set reserved_at = clock_timestamp() - interval '2 days';
 select lives_ok($$select public.reserve_private_upc_trial('e6000000-0000-4000-8000-000000000002')$$, 'expired quota recovered');
 select is((select count(*)::int from private.upc_trial_reservations), 1, 'expired rows pruned');
+update public.profiles set deletion_started_at = clock_timestamp() where id = 'e6000000-0000-4000-8000-000000000002';
+select throws_ok($$select public.reserve_private_upc_trial('e6000000-0000-4000-8000-000000000002')$$, 'P0001', 'UPC_OWNER_UNAVAILABLE', 'owner pending deletion cannot reserve');
 select throws_ok($$select public.reserve_private_upc_trial(null)$$, 'P0001', 'UPC_OWNER_UNAVAILABLE', 'null owner denied');
 select * from finish();
 rollback;
