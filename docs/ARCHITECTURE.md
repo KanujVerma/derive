@@ -20,6 +20,14 @@ P0-B's seven focused source PRs are merged. Development Remote with exact local 
 
 The target access model separates anonymous identity, permanent identity, free product intelligence, and paid Managed Skincare. Managed access requires permanent identity plus server-owned entitlement. Product facts may be shared only under their source/rights rules; profiles, routines, experiences, and evidence photos remain owner-bound and private.
 
+A known product Check is lookup-first. That path is accepted target architecture in [ADR-41](DECISIONS.md) and is not current runtime. No reusable product-intelligence cache or enrichment pipeline is implemented.
+
+Hot path: a barcode or other known identity resolves to the canonical product and formula, reads reusable precomputed product intelligence, combines it with the current private profile, routine, history, and per-Check intent, and runs the deterministic personal decision. It does not call a generative model to repeat intelligence already derived for that formula.
+
+Cold path: an unknown product, unresolved package, or useful new evidence may use bounded extraction chosen later by benchmark. Candidate evidence still requires canonical resolution or review before it can become reusable product or formula intelligence. Later Checks of that known product use the hot path.
+
+A cached model result is not product truth. Formula revisions invalidate dependent derived intelligence. Personal and sensitive context never enters a global product cache. A provider outage must not block a known-product deterministic Check when the required cached truth is already available. Latency figures in ADR-41 are targets, not measurements.
+
 The product decision flow is:
 
 CAPTURE / SEARCH

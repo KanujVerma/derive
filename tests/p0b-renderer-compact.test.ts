@@ -12,7 +12,10 @@ function actualPacket() {
   const source = readFileSync(new URL('./p0b-renderer-capacity.test.ts', import.meta.url), 'utf8');
   const block = source.split('const generatedPacketGzip = [')[1].split("].join('');")[0];
   const compressed = [...block.matchAll(/'([A-Za-z0-9+/=]+)'/g)].map(match => match[1]).join('');
-  return JSON.parse(gunzipSync(Buffer.from(compressed, 'base64')).toString('utf8'));
+  const packet = JSON.parse(gunzipSync(Buffer.from(compressed, 'base64')).toString('utf8'));
+  // Explicit add precondition of the archived capacity scenario.
+  packet.binding.checkIntent = 'add';
+  return packet;
 }
 
 test('P0-B maximum corpus groups displayed meanings while retaining every finding and source', () => {

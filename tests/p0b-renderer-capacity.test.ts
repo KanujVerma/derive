@@ -220,6 +220,8 @@ test('P0-B actual bounded engine corpus retains all material findings through pa
   assert.equal(raw.byteLength, 614023);
   assert.ok(raw.byteLength <= 1_048_576);
   const packet = JSON.parse(raw.toString('utf8'));
+  // The archived engine fixture predates per-Check binding; its scenario explicitly used add.
+  packet.binding.checkIntent = 'add';
   const parsed = personalDecisionPacketSchema.safeParse(packet);
   assert.equal(parsed.success, true);
   if (!parsed.success) return;

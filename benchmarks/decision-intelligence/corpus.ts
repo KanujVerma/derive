@@ -12,7 +12,7 @@ export interface Case {
   makeInput: () => EvaluationInput;
 }
 const make = (edit: (value: EvaluationInput) => void = () => {}): EvaluationInput => {
-  const value = reviewedInput(); edit(value); return value;
+  const value = reviewedInput(); edit(value); value.binding.checkIntent = value.intent; return value;
 };
 const existing = (value: EvaluationInput) => {
   value.routine!.items = [{ id: 'moisturizer-1', productId: 'existing', variantId: 'existing-variant', formulaVersionId: 'existing-formula',

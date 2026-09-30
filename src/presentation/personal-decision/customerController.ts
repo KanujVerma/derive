@@ -1,11 +1,11 @@
 import { GOALS } from '../p0b-personalization/draft.ts';
 import type { SafetyField } from '../p0b-personalization/draft.ts';
 import { hasVerifiedPackageFormula } from '../../contracts/ProductTruthSnapshot.ts';
-import type { DecisionTruthRef } from '../../contracts/PersonalDecisionService.ts';
+import type { PersonalDecisionRequest, DecisionTruthRef } from '../../contracts/PersonalDecisionService.ts';
 import { projectTrustedSnapshot } from './truthAdapter.ts';
 import { describePersonalDecision } from './result.ts';
 import type { PersonalContextRequest, PersonalContextSnapshot, PersonalContextWriteResult, PersonalExperiencePage, ContextProductReference, PersonalProfileInput } from '../../contracts/PersonalContext.ts';
-import type { DecisionBinding, PersonalDecisionPacketV1 } from '../../contracts/PersonalDecision.ts';
+import type { CheckIntent, DecisionBinding, PersonalDecisionPacketV1 } from '../../contracts/PersonalDecision.ts';
 import type { ProductTruthSnapshotV1 } from '../../contracts/ProductTruthSnapshot.ts';
 export type CustomerWrite = { operation: 'save_profile'; profile: Extract<PersonalContextRequest, { operation: 'save_profile' }>['profile'] }
   | { operation: 'save_routine'; routine: Extract<PersonalContextRequest, { operation: 'save_routine' }>['routine'] }
@@ -16,12 +16,13 @@ export interface CustomerGateway {
   load(ownerId: string): Promise<PersonalContextSnapshot>;
   write(ownerId: string, request: Exclude<PersonalContextRequest, { operation: 'get_context' | 'get_revision' | 'get_experiences' }>): Promise<PersonalContextWriteResult>;
   history?(ownerId: string, request: { operation: 'get_experiences'; atRevision: number; limit: number; cursor?: string }): Promise<PersonalExperiencePage>;
-  evaluate(ownerId: string, request: { operation: 'evaluate'; requestId: string; caseId: string; snapshotId: string }): Promise<{ kind: 'unavailable'; reason: string } | { kind: 'ready'; assessmentId: string; ownerId: string; contextRevision: number; snapshotRef: { caseId: string; snapshotId: string }; packet: PersonalDecisionPacketV1; expectedBinding: DecisionBinding; runtime: 'authoritative' | 'local_fixture'; truthRef: { caseId: string; snapshotId: string; caseRevision: number; resolverVersion: string; sourceBoundaryRevision: string; categoryBoundaryRevision: string | null } }>;
+  evaluate(ownerId: string, request: PersonalDecisionRequest): Promise<{ kind: 'unavailable'; reason: string } | { kind: 'ready'; assessmentId: string; ownerId: string; contextRevision: number; snapshotRef: { caseId: string; snapshotId: string }; packet: PersonalDecisionPacketV1; expectedBinding: DecisionBinding; runtime: 'authoritative' | 'local_fixture'; truthRef: { caseId: string; snapshotId: string; caseRevision: number; resolverVersion: string; sourceBoundaryRevision: string; categoryBoundaryRevision: string | null } }>;
 }
-export interface CustomerState { displayLabels: Record<string, string>; originReference: { kind: 'catalog'; label: string; productId: string; variantId: string | null; formulaVersionId: string | null } | null; ownerId: string | null; context: PersonalContextSnapshot | null; status: 'idle' | 'loading' | 'ready' | 'saving' | 'error'; error: string | null; decision: CustomerDecision }
+export interface CustomerState { checkIntent: CheckIntent; displayLabels: Record<string, string>; originReference: { kind: 'catalog'; label: string; productId: string; variantId: string | null; formulaVersionId: string | null } | null; ownerId: string | null; context: PersonalContextSnapshot | null; status: 'idle' | 'loading' | 'ready' | 'saving' | 'error'; error: string | null; decision: CustomerDecision }
 /** Host-owned authenticated controller. No persistent client context or snapshot promotion. */
 export class CustomerController {
-  private state: CustomerState = { displayLabels: {}, originReference: null, ownerId: null, context: null, status: 'idle', error: null, decision: { kind: 'idle' } };
+  private state: CustomerState = { checkIntent: 'unanswered', displayLabels: {}, originReference: null, ownerId: null, context: null, status: 'idle', error: null, decision: { kind: 'idle' } };
+  private checkCaseId: string | null = null;
   private generation = 0; private loadSequence = 0; private evaluationSequence = 0;
   private listeners = new Set<() => void>();
   private labelSequence = 0;
@@ -34,8 +35,14 @@ export class CustomerController {
   getState = (): CustomerState => this.state;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private publish(patch: Partial<CustomerState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); }
-  setOwner(ownerId: string | null) { if (ownerId === this.state.ownerId) return; this.generation++; this.pending = null; this.pendingAssessment = null; this.historyCursor = undefined; this.publish({ displayLabels: {}, originReference: null, ownerId, context: null, status: 'idle', error: null, decision: { kind: 'idle' } }); }
+  setOwner(ownerId: string | null) { if (ownerId === this.state.ownerId) return; this.generation++; this.checkCaseId = null; this.pending = null; this.pendingAssessment = null; this.historyCursor = undefined; this.publish({ checkIntent: 'unanswered', displayLabels: {}, originReference: null, ownerId, context: null, status: 'idle', error: null, decision: { kind: 'idle' } }); }
+  private selectCheckCase(caseId: string | null) {
+    if (caseId === this.checkCaseId) return;
+    this.checkCaseId = caseId; this.pendingAssessment = null; this.evaluationSequence++;
+    this.publish({ checkIntent: 'unanswered', decision: { kind: 'idle' } });
+  }
   setOriginSnapshot(ownerId: string | null, snapshot: ProductTruthSnapshotV1 | null) {
+    if (ownerId === this.state.ownerId) this.selectCheckCase(snapshot?.resolutionCaseId ?? null);
     const projected = snapshot ? projectTrustedSnapshot({ snapshot }) : null;
     const identity = projected?.identity.state === 'known' ? projected.identity.value : null;
     const formula = projected?.formula.state === 'known' ? projected.formula.value : null;
@@ -83,11 +90,14 @@ export class CustomerController {
       return false;
     } finally { if (this.writingGeneration === generation) this.writingGeneration = null; }
   }
-  async assess(snapshot: ProductTruthSnapshotV1 | null): Promise<void> {
+  async assess(snapshot: ProductTruthSnapshotV1 | null, checkIntent?: CheckIntent): Promise<void> {
+    this.selectCheckCase(snapshot?.resolutionCaseId ?? null);
+    if (checkIntent !== undefined && checkIntent !== this.state.checkIntent) this.publish({ checkIntent, decision: { kind: 'idle' } });
+    const intent = this.state.checkIntent;
     const owner = this.state.ownerId, context = this.state.context, generation = this.generation, sequence = ++this.evaluationSequence;
     if (!owner || !context || context.ownerId !== owner || context.profile && context.profile.ownerId !== owner || context.routine && context.routine.ownerId !== owner || context.experiences.some(item => item.ownerId !== owner) || !snapshot) { this.publish({ decision: { kind: 'unavailable', reason: "We don't have enough product evidence for a personal decision. Product facts are still available." } }); return; }
-    const key = JSON.stringify([owner, context.revision, snapshot.resolutionCaseId, snapshot.snapshotId]);
-    if (!this.pendingAssessment || this.pendingAssessment.key !== key) this.pendingAssessment = { key, request: { operation: 'evaluate', requestId: this.createId(), caseId: snapshot.resolutionCaseId, snapshotId: snapshot.snapshotId } };
+    const key = JSON.stringify([owner, context.revision, snapshot.resolutionCaseId, snapshot.snapshotId, intent]);
+    if (!this.pendingAssessment || this.pendingAssessment.key !== key) this.pendingAssessment = { key, request: { operation: 'evaluate', requestId: this.createId(), caseId: snapshot.resolutionCaseId, snapshotId: snapshot.snapshotId, checkIntent: intent } };
     const request = this.pendingAssessment.request;
     this.publish({ decision: { kind: 'loading' } });
     try { const result = await this.gateway.evaluate(owner, request);
@@ -101,7 +111,7 @@ export class CustomerController {
       // Independent server-loaded source binding is checked against the live owner/context and originating immutable envelope.
       if (truth.caseId !== snapshot.resolutionCaseId || truth.snapshotId !== snapshot.snapshotId || truth.caseRevision !== snapshot.caseRevision || truth.resolverVersion !== snapshot.resolverVersion || truth.sourceBoundaryRevision !== boundary || binding.sourceBoundaryRevision !== boundary || binding.productSnapshotRevision !== String(snapshot.caseRevision)
         || result.runtime !== 'authoritative' || result.ownerId !== owner || result.contextRevision !== context.revision || result.snapshotRef.caseId !== snapshot.resolutionCaseId || result.snapshotRef.snapshotId !== snapshot.snapshotId
-        || binding.ownerId !== owner || binding.productSnapshotId !== snapshot.snapshotId || binding.profileRevision !== (context.profile?.id ?? null) || binding.routineRevision !== (context.routine?.id ?? null) || binding.historyRevision !== context.historyRevision
+        || binding.checkIntent !== intent || binding.ownerId !== owner || binding.productSnapshotId !== snapshot.snapshotId || binding.profileRevision !== (context.profile?.id ?? null) || binding.routineRevision !== (context.routine?.id ?? null) || binding.historyRevision !== context.historyRevision
         || binding.productId !== (identity?.productId ?? null) || binding.variantId !== (identity?.variantId ?? null) || binding.formulaVersionId !== (formula?.formulaVersionId ?? null)) throw new Error('STALE_DECISION');
       if (result.packet.id !== request.requestId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result.assessmentId)) throw new Error('ASSESSMENT_MISMATCH');
       if (describePersonalDecision(result.packet, binding).kind !== 'ready') throw new Error('INVALID_PACKET');
@@ -119,7 +129,7 @@ export function selectVisibleCustomerDecision(state: CustomerState, ownerId: str
   const identity = projected.identity.state === 'known' ? projected.identity.value : null;
   const formula = projected.formula.state === 'known' ? projected.formula.value : null;
   const boundary = `p0a/v1:${snapshot.resolverVersion}` + (truth.categoryBoundaryRevision ? `:category:${truth.categoryBoundaryRevision}` : '');
-  if (decision.contextRevision !== state.context.revision || binding.ownerId !== ownerId || binding.productSnapshotId !== snapshot.snapshotId || binding.productSnapshotRevision !== String(snapshot.caseRevision) || binding.sourceBoundaryRevision !== boundary || truth.sourceBoundaryRevision !== boundary
+  if (binding.checkIntent !== state.checkIntent || decision.contextRevision !== state.context.revision || binding.ownerId !== ownerId || binding.productSnapshotId !== snapshot.snapshotId || binding.productSnapshotRevision !== String(snapshot.caseRevision) || binding.sourceBoundaryRevision !== boundary || truth.sourceBoundaryRevision !== boundary
     || truth.snapshotId !== snapshot.snapshotId || truth.caseId !== snapshot.resolutionCaseId || truth.caseRevision !== snapshot.caseRevision || truth.resolverVersion !== snapshot.resolverVersion
     || binding.profileRevision !== (state.context.profile?.id ?? null) || binding.routineRevision !== (state.context.routine?.id ?? null) || binding.historyRevision !== state.context.historyRevision
     || binding.productId !== (identity?.productId ?? null) || binding.variantId !== (identity?.variantId ?? null) || binding.formulaVersionId !== (formula?.formulaVersionId ?? null)) return null;

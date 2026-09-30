@@ -1,11 +1,46 @@
-# Camera result sheet acceptance seam
+# Shared Check result content and contextual presentation
 
-This leaf is a presentation module. It is not wired into `CheckProductScreen` or the scanner, and is not physical-device or hosted acceptance.
+At the starting main `d96cf55`, Check already mounts the factual camera companion. This leaf adds optional shared Personal Fit content and a transient lifecycle helper. Search/link and personal-content composition remain the root writer's integration pass. This is source validation, not physical-device, hosted or clinical acceptance.
 
-- Build a `SheetModel` from the current immutable `ProductTruthSnapshotV1`. Pass a `CatalogProductSummary` only when it comes from the catalog service. The model accepts its image only when the product ID matches the snapshot, and visibly labels it as a product image whose package may differ from the exact variant. The current catalog service returns `imageUrl: null` until public image rights and provenance are reviewed.
-- Mount `ScanResultSheet` over the live camera when a result is ready. Wire `onDetectionPausedChange` to barcode detection so detection remains paused while any sheet is open, including loading and errors. On dismiss, clear the model and resume detection. Keep the camera mounted; do not manufacture another scan request merely because the sheet expands or closes.
-- Pass the live owner and snapshot to the sheet. Its full-result action checks case ID, snapshot ID, revision, owner, product, variant, and verified formula before invoking `onOpenDetails`. The composition host must recheck these values immediately before navigation or a personal action; it must also use the existing bound personal-decision gate for Personal Fit.
-- Pass the current authoritative resolver result as well. Only a matching `photograph_ingredients` next action and snapshot `nextRequiredEvidence: ingredients` expose `add_requested_evidence`. The callback carries a bound case/snapshot and ingredient photo role. The host must recheck the binding and preserve the pinned check when opening capture. If no supported same-case evidence path exists, omit the callback and leave only the factual next-action text. This leaf neither retains evidence nor claims photo extraction. Other evidence roles and multi-photo accumulation require a separate capture composition pass.
-- Show a local customer capture only when its owner, case, snapshot and evidence ID match the immutable snapshot's member-input photo evidence. Label it `Your photo, unverified`. Do not substitute it for a catalog image or make identity or formula claims from it.
-- Bind loading/error cards to the current owner and scan-operation ID. Clear them as soon as the owner or scan changes or a snapshot arrives. Expanded details scroll inside a viewport cap, so large text does not cover the camera.
-- The handle expands by tap or upward swipe and collapses by tap or downward swipe. The close control returns to scanning. On a physical iPhone, check safe area, 44-point controls, dynamic text, VoiceOver labels, animation, repeated scans, and camera detection pause/resume. Verify unknown, ambiguous, and formula-only states never show a product image as confirmed identity.
+## Consumer API
+
+`CheckResultContent({ input, expanded?, showIdentity?, onNextStep?, onPersonalize?, onOpenSource? })` is reusable in a contextual sheet or full-detail page. `input` supplies the current owner, immutable snapshot (or bounded catalog facts when no snapshot exists), and one fit state:
+
+- `{ kind: 'canonical', packet, expectedBinding }`: independently loaded current binding. The presenter rechecks owner, snapshot/revision, source boundary, product, variant and formula against the originating truth envelope, then uses the existing packet presenter.
+- `{ kind: 'legacy', state }`: the existing supported Personal Fit response. It is hidden behind unresolved identity/formula evidence. Legacy factual-only does not establish that a profile questionnaire can improve the result.
+- `{ kind: 'loading' | 'service_failure' | 'profile_save_failure' | 'preview_unavailable' }`: distinct operation and capability limitations. No fabricated saved state or supported advice.
+
+Identity leads, then Personal Fit or its limitation. Essential reason, all critical cautions/unknowns, reported cautions, uncertainty and the supported next action do not depend on expansion. Expansion adds formula/source and supporting decision disclosure. Missing identity/formula and unsupported rules do not invite an irrelevant profile questionnaire. A prior-reaction caution can remain useful while the exact formula is unverified. The presenter never evaluates ingredients or invents advice.
+
+`ScanResultSheet` adds `contentInput?`, `onNextStep?`, `onPersonalize?`, `onOpenSource?`, and `dismissLabel?`. Detection callback is optional for non-camera consumers. Existing callers retain factual content. Personal content is accepted only when its owner and immutable case binding match the sheet. The host must still use `selectVisibleCustomerDecision` with the current saved context immediately before supplying a packet and recheck current context before actions. Passing a packet's own binding as independent authority is invalid.
+
+The surface is mineral-white; green is reserved for actions. Product names and essential content are not line-clamped. One bounded scroll area contains identity, answer and details. Drag interaction remains restricted to the existing handle; text scroll does not compete with a new gesture framework. Tap/accessible Expand, Collapse, Close and accessibility escape remain available. Layout animation observes Reduce Motion. Root owns modal focus restoration and keyboard/safe-area composition; physical verification remains required.
+
+The scroll view is keyed to owner/case/snapshot/revision (or owner/pending request), so a new result starts at its identity and essential guidance. Resolver recovery remains visible when shared content is a limitation or lacks a working bound action. A working personal action replaces fallback copy; an already displayed formula limitation is not repeated. This never adds unusable ingredient-photo instructions. Personal Fit and Formula details consume the reviewed shared `SectionHeader`.
+
+## Lifecycle and return
+
+`createCheckResultLifecycle()` owns generation tokens only:
+
+1. `begin(ownerId, origin, requestId)` pins a camera/search/link/history origin and invalidates older work. Search pins query, scroll offset and selected product ID; link pins its input and scroll offset.
+2. Check `canPublish(token, currentOwnerId)` before publishing every pending result. `bind(token, currentOwnerId, { snapshotId, caseRevision, formulaVersionId, contextRevision })` pins the acknowledged current result.
+3. Check `canAct(token, currentOwnerId, currentBinding)` immediately before contextual navigation or actions. Context/formula/snapshot revisions are exact; optional context refresh does not rewrite history.
+4. `dismiss(token, currentOwnerId)` returns the originating context once and invalidates pending callbacks. `invalidate()` handles owner/access changes and abandoned operations. A stale dismiss cannot clear the next result.
+
+Keep Check home/search mounted and opt into the root-owned search preservation API. Closing a result restores input/results/scroll and focus. Tab focus itself must not clear the result. Suspend the sheet before profile editing and reopen the same case only after canonical acknowledgement and current-context refresh. These host behaviors are not implemented inside this leaf.
+
+## Product evidence and ownership
+
+Catalog images require a matching product and approved public provenance. Private customer photos require matching owner/case/snapshot/evidence and retain the `Your photo, unverified` label. The current catalog service returns no public image until rights/provenance are reviewed.
+
+Only a matching authoritative `photograph_ingredients` action plus snapshot `nextRequiredEvidence: ingredients` and a working same-case callback exposes `Add ingredient photo`. Without the callback, copy states the unverified-formula limitation instead of instructing unusable photo collection. The host rechecks case/snapshot/resolver immediately before navigation. This leaf neither implements ingredient continuation nor promotes photos to formula truth. Sami owns that capture/resolver handoff and PR #174; do not copy its unmerged backend work.
+
+Sami also owns local camera-notice exclusivity and deliberate detection rearm. Root must pause detection while any result, including loading/error, is active. Dismissal must not remount into an immediate same-barcode reopen loop. No camera/controller code was changed here.
+
+Saved history remains metadata until an owner-bound sealed detail contract exists. Re-resolving current catalog facts and assessing current context must never be labeled the original historical result.
+
+## Verification
+
+Focused tests cover immutable facts, owner/snapshot/formula mismatch, context versus unsupported-rule limitations, unverified-formula prior caution, save/preview/service/loading distinctions, relevant profile actions, stale close/publication, retained origin, revision-bound actions and unavailable ingredient continuation. Run full unit, both TypeScript checks, web/iOS exports and diff/scope checks before integration; rerun after composition and shared-primitives reconciliation.
+
+Physical acceptance still needs small/large iPhones, long names, larger text, VoiceOver focus/escape/labels, keyboard-open search sheets, text scroll versus handle drag, Reduce Motion/Transparency, critical cautions at collapsed presentation, and camera pause/notice/rearm. No physical or clinical claims follow from compilation or these semantic tests.
