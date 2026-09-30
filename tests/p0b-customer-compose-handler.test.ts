@@ -24,7 +24,7 @@ const dependencies: DecisionDependencies = {
   persist: async (_owner, id, input, packet) => { saved.set(id, { assessmentId, input, packet }); return { assessmentId, packet, replayed: false }; },
 };
 const controller = new CustomerController({ load: async () => context, write: async () => { throw new Error('Unused'); }, evaluate: (ownerId, request) => evaluateDecisionRequest(ownerId, request, dependencies) }, () => requestId);
-controller.setOwner(owner); await controller.load(); await controller.assess(snapshot);
+controller.setOwner(owner); await controller.load(); await controller.assess(snapshot, 'add');
 const decision = controller.getState().decision;
 assert.equal(decision.kind, 'ready');
 if (decision.kind === 'ready') {

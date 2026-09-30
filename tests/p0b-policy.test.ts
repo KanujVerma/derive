@@ -5,7 +5,7 @@ import { input } from './fixtures/p0b/policy.ts';
 import type { EvaluationInput } from '../src/domain/personal-decision/evaluate.ts';
 let passed = 0;
 function test(name: string, run: () => void) { run(); passed++; console.log(`PASS ${name}`); }
-function evaluate(change: (i: EvaluationInput) => void = () => { }) { const i = input(); change(i); const p = evaluatePersonalDecision(i); assert.deepEqual(validatePersonalDecisionPacket(p, i.binding), []); return p; }
+function evaluate(change: (i: EvaluationInput) => void = () => { }) { const i = input(); change(i); i.binding.checkIntent = i.intent; const p = evaluatePersonalDecision(i); assert.deepEqual(validatePersonalDecisionPacket(p, i.binding), []); return p; }
 function formula(i: EvaluationInput, ingredients: string[]) {
     assert.equal(i.product.formula.state, 'known');
     if (i.product.formula.state === 'known')
