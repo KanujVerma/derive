@@ -22,6 +22,8 @@ import { useBootstrapStore } from '@/src/stores/bootstrapStore';
 import { useAuthStore } from '@/src/stores/authStore';
 import { resolveAuthRoute } from '@/src/utils/authRouting';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
+import { publicEnvironment } from '@/src/config/environment';
+import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -77,6 +79,10 @@ export default function VerifyOtpScreen() {
       try {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
+      if (resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled: isRemoteServiceEnabled(), supabaseUrl: publicEnvironment.supabaseUrl }) === 'hosted_free_integration') {
+        router.replace('/');
+        return;
+      }
       const destination = resolveAuthRoute({
         remoteEnabled: isRemoteServiceEnabled(),
         authStatus: 'SIGNED_IN',

@@ -11,12 +11,12 @@ const entry = check.slice(entryStart, entryEnd);
 
 test('current Check has one plain camera entry and a visible name-search fallback', () => {
   assert.ok(searchStart > 0 && entryStart > searchStart && entryEnd > entryStart);
-  assert.match(entry, /<Button label="Open camera" variant="brand"[^>]*onPress=\{\(\) => openCapture\('barcode'\)\}/);
+  assert.match(entry, /<Button label="Open camera" variant="brand"[^\n]*onPress=\{\(\) => \{ abandonProductLink\(\); openCapture\('barcode'\); \}\}/);
   assert.match(entry, /<CatalogProductSearch[\s\S]*label="Search by name"/);
   assert.match(entry, /accessibilityLabel="Product link"/);
   assert.match(entry, /Search by product link/);
   assert.match(entry, /accessibilityLabel="Check link"/);
-  assert.doesNotMatch(entry, /<Button label="Search by name"/);
+  assert.match(entry, /visibleProductLinkState\?\.kind === 'label_candidate'[\s\S]*<Button label="Search by name"/, 'name-search button is contextual recovery, not a duplicate default entry action');
   assert.doesNotMatch(entry, /<CaptureEntry|Other ways to identify|Scan barcode/);
 });
 
