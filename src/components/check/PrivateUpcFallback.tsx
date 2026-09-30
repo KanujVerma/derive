@@ -76,7 +76,7 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode
           ? 'Your session needs to be refreshed before external lookup.' : 'External lookup is unavailable. Search by name or try again.'}
       </Text>}
       {needsTester && <Text selectable style={styles.caption}>Tester account ID: {ownerId}</Text>}
-      {!loading && !needsTester && <Button label="Retry external lookup" variant="outline" size="medium"
+      {!loading && <Button label="Retry external lookup" variant="outline" size="medium"
         onPress={() => { void controller.current?.retry(); }} />}
     </View>
   );
