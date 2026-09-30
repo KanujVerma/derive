@@ -20,6 +20,7 @@ const product: P0BProductEvaluationProjectionV1 = {
   sources: [{ id: 'fixture-label', revision: 'label:1' }],
 };
 const binding: DecisionBinding = {
+  checkIntent: 'add',
   ownerId: 'fixture-owner:1', productSnapshotId: product.snapshotId, productSnapshotRevision: product.snapshotRevision,
   sourceBoundaryRevision: product.sourceBoundaryRevision,
   productId: 'fixture-product:1', variantId: 'fixture-variant:1', formulaVersionId: 'fixture-formula:1',
