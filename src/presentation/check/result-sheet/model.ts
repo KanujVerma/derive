@@ -142,3 +142,20 @@ export function selectCurrentSheetModel(model: SheetModel | null, ownerId: strin
 export function resultSheetDetailMaxHeight(viewportHeight: number): number {
   return Math.max(96, Math.min(320, Math.floor(viewportHeight * 0.42)));
 }
+
+/** A missing same-case callback is a capability limitation, not an instruction to collect photos. */
+export function resultSheetNextAction(model: Extract<SheetModel, { kind: 'result' }>, canAddRequestedEvidence: boolean): string | null {
+  if (canAddRequestedEvidence) return null;
+  if (model.requestedEvidence || model.nextAction === 'Photograph the ingredient list') {
+    return 'The exact package formula remains unverified.';
+  }
+  return model.nextAction;
+}
+
+/** A different immutable result/request owns a fresh scroll position and disclosure state. */
+export function resultSheetPresentationKey(model: SheetModel | null): string {
+  if (!model) return 'closed';
+  return model.kind === 'result'
+    ? JSON.stringify([model.kind, model.binding.ownerId, model.binding.caseId, model.binding.snapshotId, model.binding.caseRevision])
+    : JSON.stringify([model.kind, model.ownerId, model.scanId]);
+}

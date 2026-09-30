@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/src/components/ui/Button';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { colors, layout, radii, spacing, typography } from '@/src/constants/theme';
 import type { DecisionBinding, DecisionNextStep } from '@/src/contracts/PersonalDecision';
 import { decisionPage } from '@/src/presentation/personal-decision/disclosure';
@@ -12,41 +13,46 @@ export interface PersonalDecisionPanelProps {
   packet: unknown;
   /** Independently loaded by authenticated composition; never copied from packet. */
   expectedBinding: DecisionBinding;
-  onNextStep: (step: DecisionNextStep) => void;
+  onNextStep?: (step: DecisionNextStep) => void;
+  /** Shared result owns the surface and its supporting disclosure. Defaults preserve existing callers. */
+  embedded?: boolean;
+  expanded?: boolean;
+  /** Result sheets render every supporting record in one continuous scroll. */
+  continuous?: boolean;
 }
 
 /** Standalone evidence-bound surface; current Check integration remains separately owned. */
-export function PersonalDecisionPanel({ packet, expectedBinding, onNextStep }: PersonalDecisionPanelProps) {
+export function PersonalDecisionPanel({ packet, expectedBinding, onNextStep, embedded = false, expanded = true, continuous = false }: PersonalDecisionPanelProps) {
   const view = describePersonalDecision(packet, expectedBinding);
   if (view.kind === 'unavailable') {
-    return <View style={styles.panel} accessibilityLiveRegion="polite">
-      <Text style={styles.eyebrow}>PERSONAL DECISION</Text>
+    return <View style={embedded ? styles.embedded : styles.panel} accessibilityLiveRegion="polite">
+      {embedded ? <SectionHeader title="Personal Fit" /> : <Text style={styles.eyebrow}>PERSONAL DECISION</Text>}
       <Text style={styles.title} accessibilityRole="header">{view.title}</Text>
       <Text style={styles.body}>{view.message}</Text>
     </View>;
   }
-  return <ReadyDecisionPanel key={view.presentationKey} view={view} onNextStep={onNextStep} />;
+  return <ReadyDecisionPanel key={view.presentationKey} view={view} onNextStep={onNextStep} embedded={embedded} expanded={expanded} continuous={continuous} />;
 }
-function ReadyDecisionPanel({ view, onNextStep }: { view: Extract<PersonalDecisionView, { kind: 'ready' }>; onNextStep: (step: DecisionNextStep) => void }) {
+function ReadyDecisionPanel({ view, onNextStep, embedded, expanded, continuous }: { view: Extract<PersonalDecisionView, { kind: 'ready' }>; onNextStep?: (step: DecisionNextStep) => void; embedded: boolean; expanded: boolean; continuous: boolean }) {
   const [showWhy, setShowWhy] = useState(false);
   const [groupPage, setGroupPage] = useState(0);
   const [evidencePages, setEvidencePages] = useState<Record<number, number | undefined>>({});
   const [reviewCautions, setReviewCautions] = useState(false);
   const [cautionPage, setCautionPage] = useState(0);
-  const additionalCautions = view.secondaryCautions.slice(1);
+  const additionalCautions = embedded || continuous ? [] : view.secondaryCautions.slice(1);
   const cautions = decisionPage(additionalCautions, cautionPage, 3);
   // A specific unknown stated as the primary reason is already visible, including blockers.
   const additionalUnknowns = view.unknowns.filter((unknown) => unknown.text !== view.primaryReason);
   const criticalUnknowns = additionalUnknowns.filter((unknown) => unknown.critical);
   const otherUnknowns = additionalUnknowns.filter((unknown) => !unknown.critical);
   // Every blocker remains expanded. Additional non-critical detail uses the disclosure.
-  const visibleUnknowns = [...criticalUnknowns, ...otherUnknowns.slice(0, 1)];
-  return <View style={styles.panel} accessibilityLiveRegion="polite">
-    <Text style={styles.eyebrow}>PERSONAL DECISION</Text>
+  const visibleUnknowns = continuous ? additionalUnknowns : [...criticalUnknowns, ...otherUnknowns.slice(0, 1)];
+  return <View style={embedded ? styles.embedded : styles.panel} accessibilityLiveRegion="polite">
+    {embedded ? <SectionHeader title="Personal Fit" /> : <Text style={styles.eyebrow}>PERSONAL DECISION</Text>}
     <Text style={styles.title} accessibilityRole="header">{view.title}</Text>
     <Text style={styles.reason}>{view.primaryReason}</Text>
     {view.criticalCautions.map((text, index) => <Text key={`critical-${index}`} style={styles.caution}>{text}</Text>)}
-    {view.secondaryCautions[0] && <Text style={styles.caution}>{view.secondaryCautions[0]}</Text>}
+    {(embedded || continuous ? view.secondaryCautions : view.secondaryCautions.slice(0, 1)).map((text, index) => <Text key={`secondary-${index}`} style={styles.caution}>{text}</Text>)}
     {additionalCautions.length > 0 && <>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: reviewCautions }} style={styles.disclosure}
         onPress={() => setReviewCautions(!reviewCautions)}>
@@ -57,7 +63,7 @@ function ReadyDecisionPanel({ view, onNextStep }: { view: Extract<PersonalDecisi
         <PageNavigation page={cautions} label="cautions" onPage={setCautionPage} />
       </View>}
     </>}
-    {view.routineImpacts.length > 0 && <View style={styles.section}>
+    {expanded && view.routineImpacts.length > 0 && <View style={styles.section}>
       <Text style={styles.label}>In your routine</Text>
       {view.routineImpacts.map((text, index) => <Text key={`impact-${index}`} style={styles.body}>{text}</Text>)}
     </View>}
@@ -65,18 +71,25 @@ function ReadyDecisionPanel({ view, onNextStep }: { view: Extract<PersonalDecisi
       <Text style={styles.label}>What is uncertain</Text>
       {visibleUnknowns.map((unknown, index) => <Text key={`unknown-${index}`} style={styles.body}>{unknown.text}</Text>)}
     </View>}
-    <Button label={view.nextStepLabel} variant="brand" size="large"
-      onPress={() => onNextStep(view.nextStep)} style={styles.action} />
-    <Pressable onPress={() => setShowWhy(!showWhy)} accessibilityRole="button"
+    {onNextStep && <Button label={view.nextStepLabel} variant="brand" size="large"
+      onPress={() => onNextStep(view.nextStep)} style={styles.action} />}
+    {expanded && !continuous && <Pressable onPress={() => setShowWhy(!showWhy)} accessibilityRole="button"
       accessibilityLabel={showWhy ? 'Hide why Derive thinks this' : 'Why Derive thinks this'}
       accessibilityState={{ expanded: showWhy }} style={styles.disclosure}>
       <Text style={styles.disclosureText}>{showWhy ? 'Hide details' : 'Why Derive thinks this'}</Text>
-    </Pressable>
-    {showWhy && <View style={styles.details}>
-      <DecisionDisclosure groups={view.detailGroups} page={groupPage} evidencePages={evidencePages}
+    </Pressable>}
+    {expanded && (continuous || showWhy) && <View style={styles.details}>
+      {continuous ? <View>
+        <Text style={styles.label}>Why Derive thinks this</Text>
+        {view.detailGroups.map((group, index) => <View key={index} style={styles.detail}>
+          <Text style={styles.detailText}>{group.reason}</Text>
+          <Text style={styles.evidence}>{group.findingIds.length} linked findings</Text>
+          {group.evidence.map((row, position) => <Text key={position} style={styles.evidence}>{row.label}</Text>)}
+        </View>)}
+      </View> : <DecisionDisclosure groups={view.detailGroups} page={groupPage} evidencePages={evidencePages}
         onPage={page => { setGroupPage(page); setEvidencePages({}); }}
-        onEvidencePage={(index, page) => setEvidencePages(current => ({ ...current, [index]: page }))} />
-      {otherUnknowns.slice(1).map((unknown, index) => <Text key={`more-unknown-${index}`} style={styles.detailText}>{unknown.text}</Text>)}
+        onEvidencePage={(index, page) => setEvidencePages(current => ({ ...current, [index]: page }))} />}
+      {!continuous && otherUnknowns.slice(1).map((unknown, index) => <Text key={`more-unknown-${index}`} style={styles.detailText}>{unknown.text}</Text>)}
       <Text style={styles.evidence}>Evaluation {view.versions.engine} · Policy {view.versions.policy}</Text>
     </View>}
   </View>;
@@ -121,6 +134,7 @@ function PageNavigation({ page, label, onPage }: { page: ReturnType<typeof decis
 }
 
 const styles = StyleSheet.create({
+  embedded: {},
   panel: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg },
   eyebrow: { color: colors.brand, fontSize: typography.sizes.micro, fontWeight: typography.weights.bold, letterSpacing: 1 },
   title: { color: colors.ink, fontSize: typography.sizes.sectionTitle, lineHeight: typography.lineHeights.sectionTitle,
