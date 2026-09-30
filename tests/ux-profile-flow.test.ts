@@ -14,7 +14,7 @@ assert.equal(control(nodes, 'Dryness').props.accessibilityRole, 'checkbox');
 press(control(nodes, 'Continue'));
 nodes = harness.render();
 assert.ok(nodes.some(node => node.props.label === 'How does your skin usually feel?'));
-press(control(nodes, 'Dry / tight'));
+press(control(nodes, 'Dry or tight'));
 nodes = harness.render();
 press(control(nodes, 'Save skin profile'));
 assert.ok(applied);
@@ -28,7 +28,7 @@ press(control(harness.render(), 'Skip'));
 assert.equal(exited, 0, 'Step Skip applies the retained draft instead of exiting');
 const edit = createContextDraft(); edit.primaryGoal = { state: 'answered', value: 'maintain' }; edit.secondaryGoals = ['simplify'];
 const editHarness = componentHarness(file, 'ContextFlow', { initialDraft: edit, onApply() {}, onSkip() {} });
-assert.equal(control(editHarness.render(), 'Simplify my routine').props.accessibilityLabel, 'Simplify my routine, Also', 'Existing other goals are visible during editing');
+assert.equal(control(editHarness.render(), 'Simplify my routine').props.accessibilityLabel, 'Simplify my routine, additional goal, selected', 'Existing other goals are visible during editing');
 const states = ['unanswered', 'unsure', 'withheld'] as const;
 for (const state of states) {
   const draft = createContextDraft(); draft.treatments = { state }; draft.sensitivities = { state };

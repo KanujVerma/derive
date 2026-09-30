@@ -1945,3 +1945,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 - **Scope:** PR #161 retains a default-OFF, authenticated candidate lookup and a private atomic request ledger. It is reconciled with main `d96cf55777bf0fa1fbfb50eb42fcd5b9da60a85b`; no customer source activation or canonical import occurred.
 - **Correction:** the official product-read limit checked today is 15/minute/IP. The global reservation cap is now 12/minute, leaving headroom; the previous 60/minute proposal was too high. Tests cover the permitted twelfth reservation and denied thirteenth. Per-owner and daily abuse caps remain distinct from completed-Check allowances.
 - **Open gates:** source display/storage rights, target-product hit rate, and reviewed hosted rollout remain unresolved. Candidate identity cannot become canonical formula evidence.
+
+
+## 2026-09-30 — combined local Check/profile preview
+
+Dedicated `kanuj/ux-check-profile-preview` worktree starts at Check commit `f37602425de24e1ad9c86427e7e0ec51f27f799b`. The fresh five-step ContextFlow, setup bundle and goal selection come from profile commit `3c0423a65a629a48c45d37f63b1493466d8fee3b`; existing contextual experience preselection remains intact. This is selective frontend composition, not a merge of the branches' unrelated release/backend changes. Both source worktrees are preserved.
+
+In Development Mock, Check name search and camera-host name search use the existing CheckResultPresentation. My Stuff → Skin profile opens `/personalize/fixture?mode=profile&fresh=1&focused=1`; Done/final Skip returns through the existing stack. Nonfresh profile edits do not replay setup. Both fixture product searches now receive the same local CeraVe catalog search seam as Check. The fixture remains development-only, does not write or persist answers, and does not promote product/formula truth or produce a personal decision. Existing owner/revision guards and sheet appearance are unchanged.
+
+Validation: full `npm test`, app and test typechecks, web and iOS JavaScript exports, and diff whitespace check. Focused host tests exercise entry/camera search → factual sheet → close/reopen and My Stuff → all five profile steps → Done/back; native gesture/camera acceptance remains on the iPhone. Known profile behavior outside this integration (note trimming, goal retap semantics, manual Add query state, reacted labeling) is retained.

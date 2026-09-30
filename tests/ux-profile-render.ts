@@ -16,7 +16,12 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     const index = cursor++;
     if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
     return [slots[index], (update: any) => { slots[index] = typeof update === 'function' ? update(slots[index]) : update; }];
-  } };
+  }, useRef(initial: any) {
+    const index = cursor++;
+    if (!(index in slots)) slots[index] = { current: initial };
+    return slots[index];
+  }, useEffect() {}, useCallback(callback: any) { return callback; },
+  useSyncExternalStore(_subscribe: any, getSnapshot: any) { return getSnapshot(); } };
   function load(path: string): any {
     if (cache.has(path)) return cache.get(path);
     const module = { exports: {} as any }; cache.set(path, module.exports);
@@ -25,9 +30,10 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     function requireModule(id: string): any {
       if (options.modules && id in options.modules) return options.modules[id];
       if (id === 'react') return react;
-      if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', StyleSheet: { create: (styles: any) => styles } };
+      if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
       if (id.startsWith('@/src/components/ui/')) { const component = id.slice(id.lastIndexOf('/') + 1); return { [component]: component }; }
+      if (id.endsWith('/CatalogProductSearch')) return { CatalogProductSearch: ({ label, onSelect, onQueryChange }: { label?: string; onSelect: (product: { productId: string; brand: string; name: string }) => void; onQueryChange?: (query: string) => void }) => React.createElement('button', { label, onPress: () => onSelect({ productId: 'catalog-product', brand: 'CeraVe', name: 'Moisturizer' }), onQueryChange }) };
       if (id.startsWith('@/') || id.startsWith('.')) {
         const target = id.startsWith('@/') ? resolve(root, id.slice(2)) : resolve(dirname(path), id);
         const full = /\.(tsx?|js)$/.test(target) ? target : target + (target.includes('/components/') ? '.tsx' : '.ts');
@@ -35,7 +41,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       }
       return nativeRequire(id);
     }
-    new Function('require', 'module', 'exports', '__DEV__', output)(requireModule, module, module.exports, options.developmentRuntime ?? true);
+    new Function('require', 'module', 'exports', '__DEV__', 'React', output)(requireModule, module, module.exports, options.developmentRuntime ?? true, react);
     cache.set(path, module.exports); return module.exports;
   }
   const Component = load(resolve(root, file))[name];
@@ -55,7 +61,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
   return { render };
 }
 export function control(nodes: Element[], label: string): Element {
-  const found = nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label || node.props.accessibilityLabel === `${label}, Main` || node.props.accessibilityLabel === `${label}, Also`);
+  const found = nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label || (typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith(`${label}, `)));
   if (!found) throw new Error(`Missing control: ${label}`);
   return found;
 }

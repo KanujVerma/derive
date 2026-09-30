@@ -14,7 +14,8 @@ test('basic questions use substantive choices and step Skip preserves the earlie
   press(control(nodes, 'Dryness'));
   press(control(flow.render(), 'Continue'));
   nodes = flow.render();
-  for (const label of ['Leave unanswered', 'Prefer not to say', 'Not sure']) assert.ok(!nodes.some(node => node.props.label === label));
+  for (const label of ['Leave unanswered', 'Prefer not to say']) assert.ok(!nodes.some(node => node.props.label === label));
+  assert.equal(nodes.filter(node => node.props.label === 'Not sure').length, 2);
   press(control(nodes, 'Skip'));
   assert.deepEqual(applied?.primaryGoal, { state: 'answered', value: 'dryness' });
   assert.deepEqual(applied?.behavior, { state: 'unanswered' });
@@ -30,7 +31,7 @@ test('Skip on the first step advances without inventing a goal and selected main
   assert.equal(control(flow.render(), 'Dryness').props.accessibilityState.checked, false);
   press(control(flow.render(), 'Skip'));
   assert.equal(applied, undefined);
-  assert.ok(flow.render().some(node => node.props.label === 'Do skincare products tend to irritate your skin?'));
+  assert.ok(flow.render().some(node => node.props.label === 'When you try a new skincare product, does your skin get irritated easily?'));
   press(control(flow.render(), 'Skip'));
   assert.deepEqual((applied as ContextDraft | undefined)?.primaryGoal, { state: 'unanswered' });
 });
