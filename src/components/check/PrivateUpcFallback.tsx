@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { colors, radii, spacing, typography } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
+import { PrivateIngredientSearch } from '@/src/components/check/PrivateIngredientSearch';
 import { publicEnvironment } from '@/src/config/environment';
 import { supabase } from '@/src/services/supabase';
 import { useAuthStore } from '@/src/stores/authStore';
@@ -59,6 +60,8 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode
           {candidate.size && <Text style={styles.body}>{candidate.size}</Text>}
           <Text style={styles.caption}>UPCitemdb · retrieved {new Date(candidate.retrievedAt).toLocaleDateString()}</Text>
           <Text style={styles.caption}>Barcode {candidate.sourceBarcode}</Text>
+          <PrivateIngredientSearch ownerId={ownerId} query={{ barcode: candidate.observedBarcode,
+            name: candidate.name, brand: candidate.brand, size: candidate.size }} />
         </View>
       ))}
       {result && result.candidates.length > 0 && <Text style={styles.body}>
