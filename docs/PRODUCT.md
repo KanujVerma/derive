@@ -8,6 +8,8 @@ There is no universal numerical compatibility, health, safety, or product-qualit
 
 The intended differentiator is that the same product may lead to a different decision for a different person, routine, or history. The decision must remain bound to the exact supported product and formula revision.
 
+A one-time setup can feel like one flow while writing three different records: the skin profile (goals, usual skin feel, general reactivity), current products the customer says they use, and product experiences they report. The customer does not need to know those boundaries. Products and experiences are the same records My Stuff edits later. A free-text “anything else” note is user-reported raw context only. It is not an allergy, diagnosis, product fact, pregnancy state, treatment, or safety finding until an approved interpretation path exists. Pregnancy, nursing, trying to conceive, and broad treatment questions stay just-in-time when a resolved product makes them relevant. A reported product reaction does not establish an ingredient cause.
+
 ### Obvious by default
 
 Derive should feel simpler than the intelligence behind it. Complexity belongs behind the interface. A first-time customer should understand what to do without founder explanation or knowledge of Derive's internal evidence, model, catalog, or truth systems.

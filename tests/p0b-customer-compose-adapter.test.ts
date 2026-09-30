@@ -4,7 +4,7 @@ import { createContextDraft, manualRoutineItem } from '../src/presentation/p0b-p
 const draft = createContextDraft(); draft.treatments = { state: 'unsure' }; draft.sensitivities = { state: 'withheld' };
 assert.equal(profileToStorage(draft).treatments.status, 'unsure');
 assert.deepEqual(profileToStorage(profileFromStorage(profileToStorage(draft))), profileToStorage(draft));
-const routine = { completeness: 'partial' as const, items: [manualRoutineItem('00000000-0000-4000-8000-000000000001', 'Cream')] };
+const routine = { completeness: 'partial' as const, items: [{ ...manualRoutineItem('00000000-0000-4000-8000-000000000001', 'Cream'), status: 'current' as const }] };
 assert.equal(routineToStorage(routine).items[0].startedOn, null);
 assert.deepEqual(routineToStorage(routineFromStorage(routineToStorage(routine))), routineToStorage(routine));
 const stored = { id: routine.items[0].id, reference: { kind: 'manual' as const, name: 'Cream', brand: 'Known brand' }, kind: 'no_reaction_reported' as const, occurred: { start: null, end: null }, useContext: { timing: 'pm' as const, frequency: { kind: 'exact' as const, count: 2, unit: 'week' as const }, startedOn: '2026-01-01', stoppedOn: null, duration: { count: 2, unit: 'months' as const } }, symptoms: [], note: null };

@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-09-30: Richer one-time setup writes separate records
+
+- **Scope:** Kanuj's profile presentation branch. One setup flow can collect goals, skin feel, reactivity, products the customer says they use now, and product experiences. Profile editing does not replay the product stages. This is not a new schema.
+- **Boundaries:** “Using now” is stored only for products added on that question. Manual names stay unverified and without a formula. “Broke me out” and “felt too drying” are `reacted` reports plus the customer's symptom words, not new outcome kinds and not ingredient causation. The evaluator currently treats a `reacted` report as a reaction and does not read those symptom strings. “Anything else” stays on the setup bundle as raw user-reported context and is not written into the profile record, because no approved interpretation or profile field exists.
+- **Not claimed:** hosted persistence of the raw note, a new experience enum, provider calls, or physical acceptance of the setup flow.
+
 ## 2026-09-30: Lookup-first Check is a target, not a runtime
 
 - **Predecessor:** `origin/main` at `e8c0738ff185028b2db51492a4a67937d421fa14`, the merge of per-Check intent. This entry records the decision only. It does not claim a cache, enrichment job, provider call, or latency measurement.
