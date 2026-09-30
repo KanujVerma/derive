@@ -68,6 +68,8 @@ import { recordFreeCheck } from '@/src/services/remote/freeContext';
 import { MissingProductContribution } from '@/src/components/check/contribution/MissingProductContribution';
 import { selectCheckContributionRecovery } from '@/src/presentation/catalog-contribution/checkRecovery';
 import { createProductLinkController } from '@/src/presentation/product-links/controller';
+import { PrivateUpcFallback } from '@/src/components/check/PrivateUpcFallback';
+import { privateCheckEnabled } from '@/src/presentation/external-products/checkFallback';
 
 export default function CheckProductScreen({ productEventSink }: { productEventSink?: ProductEventSink } = {}) {
   const router = useRouter();
@@ -475,14 +477,16 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   useEffect(() => {
-    if (!cameraResultNeedsExistingPage({
+    const privateBarcodeMiss = cameraAwaitingResult && !isCheckingProduct && Boolean(unknownBarcode)
+      && privateCheckEnabled(__DEV__, publicEnvironment.buildFlavor, process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED);
+    if (!privateBarcodeMiss && !cameraResultNeedsExistingPage({
       awaiting: cameraAwaitingResult, checking: isCheckingProduct, ownerId: liveCheckOwner,
       scanId: cameraScanId, error: evaluationError, resolution, catalogProduct: catalogDetail,
     })) return;
     setCameraAwaitingResult(false);
     setDetectionPaused(false);
     setCaptureRole(null);
-  }, [cameraAwaitingResult, isCheckingProduct, liveCheckOwner, cameraScanId, evaluationError, resolution, catalogDetail]);
+  }, [cameraAwaitingResult, isCheckingProduct, liveCheckOwner, cameraScanId, evaluationError, resolution, catalogDetail, unknownBarcode]);
 
   const handleBarcodeScanned = (scanningResult: BarcodeScanningResult) => {
     if (isScanningLockedRef.current) return;
@@ -853,6 +857,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
         <RootShellHeader title="Check" />
         <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
           <Text style={styles.entryBody}>No verified barcode match.</Text>
+          <PrivateUpcFallback barcode={unknownBarcode} ownerId={liveCheckOwner} />
           {recovery && <MissingProductContribution contextKey={recovery.contextKey}
             availability={recovery.availability} initial={recovery.initial} embedded
             onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
