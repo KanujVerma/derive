@@ -14,7 +14,7 @@ assert.equal(control(nodes, 'Dryness').props.accessibilityRole, 'checkbox');
 press(control(nodes, 'Continue'));
 nodes = harness.render();
 assert.ok(nodes.some(node => node.props.label === 'How does your skin usually feel?'));
-press(control(nodes, 'Dry / tight'));
+press(control(nodes, 'Dry or tight'));
 nodes = harness.render();
 press(control(nodes, 'Save skin profile'));
 assert.ok(applied);

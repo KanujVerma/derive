@@ -42,7 +42,6 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   const hasContext = contextQuestions.length > 0 || fields.length > 0;
   const last = hasContext ? 2 : 1;
   const editing = Boolean(initialDraft);
-  const askSkinFeel = (draft.primaryGoal.state === 'answered' && draft.primaryGoal.value === 'dryness') || draft.secondaryGoals.includes('dryness') || draft.behavior.state !== 'unanswered';
   const update = <K extends keyof ContextDraft>(key: K, value: ContextDraft[K]) => { setValidation(null); setDraft(current => ({ ...current, [key]: value })); };
   const continueOrApply = () => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (editing || step === last) onApply(createContextDraft(draft)); else setStep(step + 1); };
   return <Screen scrollable><View style={styles.flow}>
@@ -66,8 +65,8 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       {collectIntent && <AnswerChoices label="What are you deciding?" support="This choice is saved with your profile and reused for future Checks. You can change it." answer={draft.intent} disabled={loading} choices={[['add', 'Add to my routine'], ['replace', 'Replace something'], ['check_current', 'Check what I use']]} onChange={value => update('intent', value)} />}
     </View>}
     {(editing || step === 1) && <View style={styles.questions}>
-      {askSkinFeel && <AnswerChoices label="How does your skin usually feel?" support="Combination: oily in some areas, dry in others." answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry / tight'], ['balanced', 'Balanced'], ['combination', 'Combination'], ['oily', 'Oily']]} onChange={value => update('behavior', value)} />}
-      <AnswerChoices label="Do skincare products tend to irritate your skin?" answer={draft.reactivity} basic disabled={loading} choices={[['reacts_easily', 'My skin gets irritated easily'], ['generally_tolerates', 'I generally tolerate products']]} onChange={value => update('reactivity', value)} />
+      <AnswerChoices label="How does your skin usually feel?" support="Combination: Oily in some areas, dry in others." answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Balanced'], ['oily', 'Oily'], ['combination', 'Combination'], ['unsure', 'Not sure']]} onChange={value => update('behavior', value)} />
+      <AnswerChoices label="When you try a new skincare product, does your skin get irritated easily?" support="Think stinging, burning, redness, or peeling." answer={draft.reactivity} basic disabled={loading} choices={[['reacts_easily', 'Yes, often'], ['generally_tolerates', 'Usually not'], ['unsure', 'Not sure']]} onChange={value => update('reactivity', value)} />
     </View>}
     {hasContext && (editing || step === 2) && <View style={styles.questions}>
       {contextQuestions.includes('treatments') && <QuestionGroup label="Treatments you use" support="Choose treatments you know you use."><View style={styles.chips}>
