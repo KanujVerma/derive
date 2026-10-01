@@ -22,6 +22,7 @@ export function ExternalProductActions({ ownerId, query }: { ownerId: string; qu
   const live = useRef<{ owner: string | null; key: string }>({ owner: ownerId, key });
   live.current = { owner: sessionOwner === ownerId && currentCustomerOwner() === ownerId ? ownerId : null, key };
   const [state, setState] = useState<ExternalProductSaveState | null>(null);
+  const [historyScope, setHistoryScope] = useState<string | null>(null);
   const saver = useRef<ReturnType<typeof createExternalProductSaver> | null>(null);
   useEffect(() => {
     setState(null);
@@ -39,6 +40,7 @@ export function ExternalProductActions({ ownerId, query }: { ownerId: string; qu
   const visible = state?.ownerId === ownerId && state.queryKey === key ? state : null;
   const context = describeExternalSavedContext(ownerId, contextState.status,
     contextState.ownerId === ownerId ? contextState.context : null, contextState.displayLabels);
+  const historyOpen = historyScope === JSON.stringify([ownerId, key]);
   const openHistory = () => {
     if (currentCustomerOwner() === ownerId) router.push({ pathname: '/personalize', params: { p0b: '1', mode: 'history' } });
   };
@@ -51,7 +53,13 @@ export function ExternalProductActions({ ownerId, query }: { ownerId: string; qu
     ]);
   };
   return <View style={styles.section}>
-    <Text style={styles.title}>Your saved context</Text>
+    <Button label={historyOpen ? 'Hide reported history' : 'Your reported history'} variant="ghost" size="medium"
+      onPress={() => {
+        if (live.current.owner === ownerId && currentCustomerOwner() === ownerId) {
+          setHistoryScope(historyOpen ? null : JSON.stringify([ownerId, key]));
+        }
+      }} />
+    {historyOpen && <View style={styles.section}>
     {context.kind === 'loading' ? <Text style={styles.body}>Loading your saved profile and reaction reports…</Text>
       : context.kind === 'unavailable' ? <><Text style={styles.body}>Your saved context could not be loaded. This is not a personalized assessment.</Text>
         <Button label="Reload saved context" variant="outline" onPress={() => { if (currentCustomerOwner() === ownerId) void customerController.load(); }} /></>
@@ -67,6 +75,7 @@ export function ExternalProductActions({ ownerId, query }: { ownerId: string; qu
       </>}
     <Text style={styles.body}>Barcode recognition does not supply an ingredient list. This panel shows your reported history, not an ingredient comparison or a personal-fit result. A shared brand alone does not establish shared ingredients or the cause of a reaction.</Text>
     <Button label="View or record a past reaction" variant="outline" size="medium" onPress={openHistory} />
+    </View>}
     {visible?.kind === 'saved' ? <><Text style={styles.body} accessibilityLiveRegion="polite">Saved to My Stuff · added by you, formula unverified.</Text>
       <Button label="Open My Stuff" variant="outline" size="medium" onPress={() => { if (currentCustomerOwner() === ownerId) router.push('/(tabs)/my-stuff'); }} /></>
       : <Button label="Save product to My Stuff" variant="brand" size="medium" loading={visible?.kind === 'saving'} disabled={visible?.kind === 'saving'} onPress={confirmSave} />}

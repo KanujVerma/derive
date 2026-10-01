@@ -50,7 +50,7 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode
   const loading = !visible || visible.kind === 'loading';
   return (
     <View style={styles.card} accessibilityLiveRegion="polite">
-      <Text style={styles.title}>External product lookup · private test</Text>
+      <Text style={styles.caption}>PRODUCT LOOKUP · PRIVATE TEST</Text>
       {loading && <View style={styles.loading}><ActivityIndicator color={colors.brand} />
         <Text style={styles.body}>Looking for a possible barcode match…</Text></View>}
       {result && result.candidates.map((candidate, index) => (
@@ -61,14 +61,15 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode
           {candidate.size && <Text style={styles.body}>{candidate.size}</Text>}
           <Text style={styles.caption}>UPCitemdb · retrieved {new Date(candidate.retrievedAt).toLocaleDateString()}</Text>
           <Text style={styles.caption}>Barcode {candidate.sourceBarcode}</Text>
-          <ExternalProductActions ownerId={ownerId} query={{ barcode: candidate.observedBarcode,
-            name: candidate.name, brand: candidate.brand, size: candidate.size }} />
         </View>
       ))}
       {result && <PublishedProductIngredients ownerId={ownerId} query={{ barcode,
         name: result.status === 'found' ? result.candidates[0].name : null,
         brand: result.status === 'found' ? result.candidates[0].brand : null,
         size: result.status === 'found' ? result.candidates[0].size : null }} />}
+      {result?.candidates.map((candidate, index) => <ExternalProductActions key={candidate.sourceRecordId + ':' + index}
+        ownerId={ownerId} query={{ barcode: candidate.observedBarcode,
+          name: candidate.name, brand: candidate.brand, size: candidate.size }} />)}
       {result && result.candidates.length > 0 && <Text style={styles.body}>
         This identifies a possible product only. Ingredients, formula and personal fit are not verified. Save only after confirming the label matches your bottle.
       </Text>}
