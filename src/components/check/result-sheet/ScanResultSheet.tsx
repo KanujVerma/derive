@@ -1,12 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ProductTruthSnapshotV1 } from '../../../contracts/ProductTruthSnapshot';
 import type { ProductResolutionResult } from '../../../contracts/ProductIdentityResolver';
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
-import { CheckResultContent } from './CheckResultContent';
+import { CheckResultContent, CheckResultView } from './CheckResultContent';
 import { ResultSheetSurface } from './ResultSheetSurface';
-import { describePersonalDecision } from '../../../presentation/personal-decision/result';
 import { describeCheckResultContent, resultSheetRecoveryCopy, type CheckResultContentInput } from '../../../presentation/check/result-sheet/content';
 import type { DecisionNextStep } from '../../../contracts/PersonalDecision';
 import type { RequestedEvidenceAction, SheetBinding, SheetImage, SheetModel } from '../../../presentation/check/result-sheet/model';
@@ -48,7 +47,6 @@ function ProductThumbnail({ image }: { image: SheetImage }) {
 export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, currentResolverResult, currentScanId, bottomInset = 0,
   onDetectionPausedChange, onDismiss, onAddRequestedEvidence, contentInput, onNextStep,
   onPersonalize, onOpenSource, children, dismissLabel = 'Close result and scan another product' }: ScanResultSheetProps) {
-  const { fontScale } = useWindowDimensions();
   const onPauseRef = useRef(onDetectionPausedChange);
   onPauseRef.current = onDetectionPausedChange;
   const visibleModel = selectCurrentSheetModel(model, currentOwnerId, currentSnapshot, currentScanId);
@@ -76,16 +74,10 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
   const contentModel = currentContent ? describeCheckResultContent(currentContent) : null;
   const hasContentAction = contentModel?.fit.kind === 'canonical'
     && Boolean(onNextStep || contentModel.canPersonalize && onPersonalize);
-  const decision = contentModel?.fit.kind === 'canonical'
-    ? describePersonalDecision(contentModel.fit.packet, contentModel.fit.expectedBinding) : null;
-  const needsRoom = fontScale > 1.15 || Boolean(contentModel?.outcome.criticalUnknowns.length)
-    || decision?.kind === 'ready' && (decision.criticalCautions.length > 0 || decision.secondaryCautions.length > 0);
   const nextAction = visibleModel.kind === 'result'
     ? resultSheetRecoveryCopy(visibleModel, canAddRequestedEvidence, contentModel, hasContentAction) : null;
 
-  return (
-    <ResultSheetSurface inline presentationKey={sheetKey} onClose={onDismiss} dismissLabel={dismissLabel}
-      initialDetent={needsRoom ? 1 : 0} bottomInset={bottomInset}>
+  const summary = <View style={{ gap: spacing.md }}>
           <View style={styles.summary}>
             {visibleModel.kind === 'result'
               ? <ProductThumbnail image={visibleModel.image} />
@@ -94,15 +86,23 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
               {visibleModel.kind === 'loading' && <ActivityIndicator size="small" color={colors.brand} style={styles.loading} />}
               {visibleModel.kind === 'result' && visibleModel.brand && <Text style={styles.brand}>{visibleModel.brand}</Text>}
               <Text style={styles.title} accessibilityRole="header">{visibleModel.title}</Text>
-              {visibleModel.kind === 'result' && <Text style={styles.status}>{visibleModel.status}</Text>}
             </View>
           </View>
           {visibleModel.kind === 'result' && visibleModel.image.kind !== 'placeholder'
             && <Text style={styles.photoLabel}>{visibleModel.image.label}</Text>}
+    {currentContent ? <CheckResultContent input={currentContent} section="summary" showIdentity={false} />
+      : visibleModel.kind === 'result' ? <CheckResultView showIdentity={false} section="summary"
+        facts={{ brand: visibleModel.brand ?? '', name: visibleModel.title, categoryLabel: '', formula: null, source: null }}
+        verdict={{ state: 'unknown', label: 'Not enough information', reason: visibleModel.detail, findings: [] }} />
+      : <Text style={styles.detail}>{visibleModel.detail}</Text>}
+  </View>;
+  return (
+    <ResultSheetSurface inline presentationKey={sheetKey} onClose={onDismiss} dismissLabel={dismissLabel}
+      summary={summary} bottomInset={bottomInset}>
             <View style={[styles.details, styles.detailsContent]}>
-              {currentContent ? <CheckResultContent input={currentContent} expanded continuous showIdentity={false}
+              {currentContent ? <CheckResultContent input={currentContent} section="findings" showIdentity={false}
                 onNextStep={onNextStep} onPersonalize={onPersonalize} onOpenSource={onOpenSource} />
-                : <Text style={styles.detail}>{visibleModel.detail}</Text>}
+                : null}
               {nextAction && nextAction !== 'View formula details' && <Text style={styles.nextAction}>{nextAction}</Text>}
               {canAddRequestedEvidence && (
                 <Pressable onPress={addRequestedEvidence} style={styles.evidenceAction} accessibilityRole="button"

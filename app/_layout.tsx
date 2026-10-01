@@ -253,6 +253,9 @@ export default function RootLayout() {
           <Stack.Screen name="check-in/index" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="refill/index" options={{ presentation: 'modal', headerShown: false }} />
         </Stack.Protected>
+        <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development' && shell === 'scanner_first_preview'}>
+          <Stack.Screen name="check-preview" options={{ headerShown: false }} />
+        </Stack.Protected>
         <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development' && shell !== 'legacy' && (!localFreeIntegration || localReady)}>
           <Stack.Screen name="personalize/fixture" options={{ headerShown: false }} />
         </Stack.Protected>

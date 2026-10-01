@@ -52,6 +52,11 @@ test('private scan provides explicit save/history actions and no contradictory m
   assert.match(component, /captureCustomerFunctionClient/); assert.match(component, /View or record a past reaction/);
   assert.doesNotMatch(component, /fetch\(|GEMINI_API_KEY|analytics\./);
   const check = readFileSync(new URL('../src/components/check/CheckProductScreen.tsx', import.meta.url), 'utf8');
-  assert.match(check, /!externalTest && recovery && <MissingProductContribution/);
-  assert.match(check, /No package-verified formula in Derive’s catalog/);
+  // Canonical recovery is now inside Kanuj's canonical result presentation, not the private sheet.
+  assert.match(check, /<CheckResultPresentation visible=\{!privateBarcodeResult && isCheckFocused && !editingContext/);
+  assert.match(check, /<CheckResultPresentation[\s\S]*?\{renderResultExtras\(\)\}[\s\S]*?<\/CheckResultPresentation>/);
+  assert.match(check, /contextualRecovery && <MissingProductContribution/);
+  const privateResult = check.slice(check.indexOf('{privateBarcodeResult &&'), check.indexOf('</PrivateUpcFallback>'));
+  assert.match(privateResult, /isCheckFocused && !editingContext && unknownBarcode/);
+  assert.doesNotMatch(privateResult, /MissingProductContribution|renderResultExtras/);
 });

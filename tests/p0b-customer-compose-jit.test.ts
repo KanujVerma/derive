@@ -22,6 +22,9 @@ const tryingOnly = await evaluate({ pregnancy: 'no', nursing: 'no', tryingToConc
 assert.deepEqual(deriveJitReproductiveQuestions(tryingOnly.response.packet, tryingOnly.response.expectedBinding, tryingOnly.context), ['trying']);
 const withheld = await evaluate({ pregnancy: 'no', nursing: 'no', tryingToConceive: 'withheld' });
 assert.deepEqual(deriveJitReproductiveQuestions(withheld.response.packet, withheld.response.expectedBinding, withheld.context), ['trying']);
+const knownTrying = await evaluate({ pregnancy: 'no', nursing: 'no', tryingToConceive: 'yes' });
+assert.deepEqual(deriveJitReproductiveQuestions(knownTrying.response.packet, knownTrying.response.expectedBinding, knownTrying.context), [], 'a known answer cannot repair missing reviewed guidance through another question');
+assert.deepEqual(deriveProfileEditQuestions(knownTrying.context.profile!.data, [], []).reproductive, ['pregnancy', 'trying', 'nursing'], 'previously shared answers remain editable');
 for (const result of [await evaluate(undefined, false), await evaluate(undefined, true, false)]) assert.deepEqual(deriveJitReproductiveQuestions(result.response.packet, result.response.expectedBinding, result.context), []);
 assert.deepEqual(deriveProfileEditQuestions(null, [], []), { reproductive: [], context: [] });
 assert.deepEqual(deriveProfileEditQuestions(profileToStorage(createContextDraft()), [], []), { reproductive: [], context: [] });

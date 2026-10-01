@@ -20,11 +20,11 @@ test('barcode-only finishes capture while existing photos require reviewed mixed
   assert.match(check, /if \(handoff\.barcodeLookup\) \{[\s\S]*?openResolution\(\{ consumer: 'scan', barcode: handoff\.barcodeLookup\.barcode \}\);[\s\S]*?return;/);
 });
 
-test('photo handoff shows its existing server case and retains K2 result separation', () => {
+test('photo handoff shows its existing server case and shares Personal Fit content', () => {
   assert.match(check, /if \(integrated && handoff\.resolvedCase\) \{[\s\S]*?showResolution\(async \(\) => resolvedCase\)/);
   assert.match(check, /setCandidates\(result\.state === 'ambiguous_candidates' \? result\.candidates : \[\]\)/);
-  assert.match(check, /header="Formula Details"/);
-  assert.match(check, /<PersonalFitSection state=\{personalFitState\} onPersonalize=\{openPersonalization\}/);
+  assert.match(check, /contentInput=\{sharedResultInput \?\? undefined\}/);
+  assert.match(check, /<CheckResultPresentation[\s\S]*input=\{sharedResultInput\}/);
   assert.match(check, /if \(!targetShell && audience !== 'member'\)/);
 });
 

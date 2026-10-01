@@ -1,5 +1,21 @@
 # P0-B reported personal context
 
+## Local profile coverage preview — 2026-10-01
+
+The integrated development preview collects optional product-specific feedback in step 3 of the existing five-step setup. Verified catalog category selects moisturizer choices (Works well, Still feels dry, Too heavy, specific adverse reports, Not sure); manual or unsupported categories keep general choices. Category is read from the catalog fact, never guessed from a name. The guarded setup fixture also offers an explicitly fictional Comfort Cream for testing. This fixture is not available to live Check search.
+
+Current feedback is multi-select and local only: Works well and Too heavy can coexist. Generic Not helping remains generic; Still feels dry is not converted into an adverse report or an efficacy comparison. One product's texture dislike does not become a general texture preference. Clear and removal affect only the explicitly edited current answer; historical reports are separate. Known none, unanswered and unknown remain distinct setup states.
+
+`/check-preview` adds optional questions after useful findings: Replace / Add / Not sure / Skip intent, an explicit target choice when replacing, and texture preference only for authored category/label examples with a material texture description. Answers belong to one fictional Check; reopening retains them, choosing another example starts a new context, and changing targets clears that target's current feedback. Multiple same-role products never select a target implicitly. Adding a same-role product alone is not presented as a negative fit in this demonstration. The initial result, four tinted verdict states and Source-only disclosures remain intact. No new questions are wired into live Check or persistence.
+
+**Backend handoff (Sami, with Kanuj/founders for policy):** [Per-Check intent authority](P0_B_CHECK_INTENT.md) is now implemented on current main: request, persisted assessment input, binding and controller carry explicit intent; omitted intent is unanswered and global profile intent is not used. The live Check does not yet ask the preview intent questions. `EvaluationInput` still has no per-Check replacement target, texture preference, category-specific current feedback or feedback revision. The routine contract can represent complete/partial/unknown, but setup answers are not persisted as routine snapshots. Family-level setup selection has no variant/formula picker; its null exact references cannot establish scanned-product experience. Live implementation needs an owner-bound request/context contract, explicit immutable revision/binding and reassessment semantics, provenance-backed texture facts, and approved bounded presentation/policy behavior. No DB migration, rule expansion or service change is included here.
+
+**Policy differences to decide before live integration:** the live evaluator intentionally emits same-product reaction caution even for old/unknown formula reports, with formula-class uncertainty and changed-formula findings (`evaluate.ts`, history loop). The guarded mismatch demonstration keeps the earlier reaction tied to its actual variant/formula and does not claim reaction to the scanned formula. Preserve the existing live policy until founders decide how this conservative caution should read. Likewise, live Add can produce role redundancy/KEEP_CURRENT; this preview's neutral same-role wording is not a live policy change. Routine placement never proves layering compatibility; multi-product combinations still require supported formula/interaction evidence. Whether texture mismatch should drive amber, and how multiple current feedback dimensions should persist and be corrected, remain live product/policy decisions.
+
+Validation for this scoped preview includes focused model/production-handler tests, the full app suite, both TypeScript checks and web/iOS exports. Browser verification is responsive web evidence only; physical iPhone acceptance and exact-head CI remain separate gates.
+
+Browser inspection also caught missing web checked-state attributes on the existing ChoiceChip. It now explicitly supplies `aria-checked` alongside native accessibilityState; the selected multi-fact feedback was verified as checked in the browser DOM.
+
 P0-B2 stores what a person reported and the exact revisions used in a decision. It does not infer a routine from a saved product, a product role from its name, or ingredient causation from a reaction. The new endpoint is additive; existing free-context, free-personal-fit, managed Shelf, and paid routine endpoints keep their contracts.
 
 ## Storage and writes
@@ -14,7 +30,7 @@ An experience has a stable `id`. Initial creation sets `supersedesRevisionId: nu
 
 ## Truthful unknowns
 
-- Profile intent includes add, replace, check_current, unanswered, and withheld. Primary and secondary goals remain separate; no legacy array position becomes a primary goal.
+- Stored profile intent retains add, replace, check_current, unanswered, and withheld for provenance; decision intent comes from the per-Check request. Primary and secondary goals remain separate; no legacy array position becomes a primary goal.
 - Pregnancy, trying to conceive, and nursing are independent yes/no/unsure/unanswered/withheld values. A withheld value remains distinct from no.
 - Routine completeness is partial, complete, or unknown. Missing items from a partial routine cannot establish non-use.
 - Routine item IDs stay stable across snapshots. State, timing, frequency, dates, and duration are explicitly reported. Qualitative few_times_week stays qualitative; exact frequency requires its own count and unit.

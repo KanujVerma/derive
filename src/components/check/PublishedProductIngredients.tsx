@@ -67,7 +67,7 @@ export function PublishedProductIngredients({ query, ownerId }: { query: Product
     {result && result.evidence.length === 0 && <View style={styles.statusCard}><Text style={styles.title}>Ingredient list unavailable</Text><Text style={styles.body}>
       {result.status === 'rate_limited' ? 'Ingredient lookup is temporarily rate limited. Try again later.'
         : result.status === 'unavailable' ? 'An ingredient source could not be reached. Try again, or check your package.'
-        : result.status === 'ambiguous' ? 'Several label variants matched. Check the exact product name and SPF on your package.'
+        : result.status === 'ambiguous' ? 'The source search could not confidently match a list to this exact product. Add the ingredient text from your bottle below.'
         : 'The connected sources have no matching list. Add the ingredient text from your bottle below to get local notes.'}
     </Text></View>}
     {visible?.kind === 'error' && <View style={styles.statusCard}><Text style={styles.title}>Ingredient lookup interrupted</Text><Text style={styles.body}>Your product match is still here. Retry below, or add the ingredient text from your bottle.</Text></View>}

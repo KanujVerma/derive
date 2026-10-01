@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import * as React from 'react';
+import { componentHarness, textContent } from './ux-profile-render.ts';
 import type { PrivateUpcLookup } from '../src/contracts/PrivateUpcLookup.ts';
 import { createPrivateCheckFallback, createPrivateCheckRequestMemo, privateCheckEnabled,
   visiblePrivateCheckState, type PrivateCheckState } from '../src/presentation/external-products/checkFallback.ts';
@@ -92,9 +94,12 @@ test('denied tester error is preserved and invalid/absent owners never call the 
 test('normal Check wires only the canonical-miss branch; external UI never creates product/formula/decision truth', () => {
   const check = readFileSync(new URL('../src/components/check/CheckProductScreen.tsx', import.meta.url), 'utf8');
   const component = readFileSync(new URL('../src/components/check/PrivateUpcFallback.tsx', import.meta.url), 'utf8');
-  const start = check.indexOf('if (targetShell && unknownBarcode)');
-  const end = check.indexOf('// 1. RESULT VIEW', start);
-  assert.match(check.slice(start, end), /<PrivateUpcFallback barcode=\{unknownBarcode\} ownerId=\{liveCheckOwner\} \/>/);
+  assert.match(check, /privateBarcodeResult = Boolean\(unknownBarcode && liveCheckOwner\)/);
+  assert.match(check, /privateBarcodeResult && isCheckFocused && !editingContext && unknownBarcode && <PrivateUpcFallback/);
+  assert.match(check, /barcode=\{unknownBarcode\} ownerId=\{liveCheckOwner\}/);
+  assert.match(check, /sheet=\{\{ presentationKey: resultKey, onClose: closeContextualResult \}\}/);
+  assert.match(check, /visible=\{!privateBarcodeResult && isCheckFocused/);
+  assert.doesNotMatch(check, /if \(targetShell && unknownBarcode\)/);
   assert.equal(check.split('<PrivateUpcFallback').length - 1, 1);
   assert.match(component, /process\.env\.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED/);
   assert.match(check, /privateBarcodeMiss = cameraAwaitingResult && !isCheckingProduct && Boolean\(unknownBarcode\)\s*&& privateCheckEnabled\(__DEV__, publicEnvironment.buildFlavor, process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED\)/);
@@ -105,4 +110,57 @@ test('normal Check wires only the canonical-miss branch; external UI never creat
   assert.match(component, /sourceBarcode/);
   assert.match(component, /retrievedAt/);
   assert.doesNotMatch(component, /evaluateProduct|recordFreeCheck|resolveCatalogIdentity|PersonalDecisionPanel|\.insert\(|\.upsert\(/);
+});
+
+test('private match uses the new result sheet while preserving ingredient and explicit save children', () => {
+  const candidate = { sourceRecordId: 'upc-record', observedBarcode: barcode, sourceBarcode: barcode,
+    name: 'Exact deodorant 3 oz', brand: 'Example', size: '3 oz', retrievedAt: '2026-10-01T12:00:00Z' };
+  const state = { kind: 'result', ownerId, barcode,
+    result: { status: 'found', candidates: [candidate], truncated: false } };
+  const auth = Object.assign((selector: (value: { sessionUserId: string }) => unknown) => selector({ sessionUserId: ownerId }),
+    { getState: () => ({ sessionUserId: ownerId }) });
+  let closed = 0;
+  const harness = componentHarness('src/components/check/PrivateUpcFallback.tsx', 'PrivateUpcFallback',
+    { ownerId, barcode, sheet: { presentationKey: 'scan-generation-7', onClose: () => { closed++; } } }, {
+      modules: {
+        react: { ...React, useState: () => [state, () => {}], useRef: (current: unknown) => ({ current }), useEffect() {} },
+        '@/src/config/environment': { publicEnvironment: { buildFlavor: 'development' } },
+        '@/src/services/supabase': { supabase: {} },
+        '@/src/stores/authStore': { useAuthStore: auth },
+        '@/src/components/check/PublishedProductIngredients': { PublishedProductIngredients: 'PublishedProductIngredients' },
+        '@/src/components/check/ExternalProductActions': { ExternalProductActions: 'ExternalProductActions' },
+        '@/src/components/check/result-sheet/ResultSheetSurface': { ResultSheetSurface: 'ResultSheetSurface' },
+        '@/src/components/check/result-sheet/CheckResultContent': { CheckResultView: 'CheckResultView' },
+      },
+    });
+  const priorFlag = process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED;
+  process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED = 'true';
+  try {
+    const nodes = harness.render();
+    const surface = nodes.find(node => node.type === 'ResultSheetSurface');
+    assert.ok(surface);
+    assert.equal(surface.props.keepDetailsMounted, true);
+    assert.deepEqual(JSON.parse(surface.props.presentationKey), [ownerId, barcode, 'scan-generation-7']);
+    const summaryView = React.Children.toArray(surface.props.summary.props.children)
+      .find(value => React.isValidElement(value) && value.type === 'CheckResultView') as React.ReactElement<any>;
+    assert.ok(summaryView);
+    assert.equal(summaryView.props.facts.name, candidate.name);
+    assert.equal(summaryView.props.facts.formula, null);
+    assert.equal(summaryView.props.verdict.state, 'unknown');
+    assert.equal(summaryView.props.verdict.label, 'Not enough information');
+    assert.deepEqual(nodes.find(node => node.type === 'PublishedProductIngredients')?.props.query,
+      { barcode, name: candidate.name, brand: candidate.brand, size: candidate.size });
+    assert.equal(nodes.find(node => node.type === 'ExternalProductActions')?.props.ownerId, ownerId);
+    assert.match(textContent(nodes), /Save only after confirming the label/);
+    surface.props.onClose();
+    assert.equal(closed, 1);
+    const changedOwner = harness.render({ ownerId: 'another-owner' });
+    assert.equal(changedOwner.some(node => node.type === 'ResultSheetSurface'), false);
+    assert.equal(changedOwner.some(node => node.type === 'PublishedProductIngredients'), false);
+    assert.equal(changedOwner.some(node => node.type === 'ExternalProductActions'), false);
+    assert.doesNotMatch(textContent(changedOwner), /Exact deodorant/);
+  } finally {
+    if (priorFlag === undefined) delete process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED;
+    else process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED = priorFlag;
+  }
 });

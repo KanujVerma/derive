@@ -8,6 +8,8 @@ import {
   buildMyStuffPresentation,
   myStuffCopy,
   formatMyStuffDate,
+  experienceLabels,
+  type CanonicalExperienceView,
   type ExperienceKind,
   type MyStuffViewModel,
   type ProductState,
@@ -19,10 +21,12 @@ const productBadge: Record<ProductState, StatusBadgeVariant> = {
   stopped: 'info',
 };
 const experienceBadge: Record<ExperienceKind, StatusBadgeVariant> = {
-  tolerated: 'keep',
+  tolerated: 'info',
   reacted: 'alert',
   liked: 'active',
   finished: 'info',
+  no_reaction_reported: 'info',
+  ineffective: 'info',
 };
 
 function EmptyRow({ text }: { text: string }) {
@@ -42,6 +46,10 @@ export function MyStuffContent({
   hasMore,
   loadingMore,
   busyId,
+  onAddProduct, onAddExperience, onCorrectExperience, onAddProductExperience,
+  canonicalExperiences, experienceStatus = 'ready', experienceError, onRetryExperiences,
+  hasMoreCanonicalExperiences, onLoadMoreCanonicalExperiences,
+  memoryStatus = 'ready', onEditRoutine,
 }: {
   model: MyStuffViewModel;
   liveFree?: boolean;
@@ -56,8 +64,20 @@ export function MyStuffContent({
   hasMore?: Partial<Record<'products' | 'checks' | 'experiences', boolean>>;
   loadingMore?: Partial<Record<'products' | 'checks' | 'experiences', boolean>>;
   busyId?: string | null;
+  onAddProduct?: () => void;
+  onAddExperience?: () => void;
+  onCorrectExperience?: (stableExperienceId: string) => void;
+  onAddProductExperience?: (product: MyStuffViewModel['products'][number]) => void;
+  canonicalExperiences?: readonly CanonicalExperienceView[];
+  experienceStatus?: 'loading' | 'ready' | 'error';
+  experienceError?: string | null;
+  onRetryExperiences?: () => void;
+  hasMoreCanonicalExperiences?: boolean;
+  onLoadMoreCanonicalExperiences?: () => void;
+  memoryStatus?: 'loading' | 'ready' | 'error';
+  onEditRoutine?: () => void;
 }) {
-  const view = buildMyStuffPresentation(model);
+  const view = buildMyStuffPresentation(model, canonicalExperiences);
   const copy = myStuffCopy(liveFree);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
@@ -81,7 +101,7 @@ export function MyStuffContent({
   const profileRow = (
     <View style={[styles.row, styles.horizontal]}>
       <View style={styles.main}>
-        <Text style={styles.title}>{view.profile.summary}</Text>
+        <Text style={styles.title}>{model.profile ? view.profile.summary : 'Set up skin profile'}</Text>
         {view.profile.skinFeel ? <Text style={styles.detail}>{view.profile.skinFeel}</Text> : null}
         {view.profile.concerns.length > 0 ? (
           <Text style={styles.detail}>{view.profile.concerns.join(' · ')}</Text>
@@ -99,7 +119,7 @@ export function MyStuffContent({
           <Pressable
             onPress={onEditProfile}
             accessibilityRole="button"
-            accessibilityLabel="Edit skin profile"
+            accessibilityLabel={model.profile ? "Edit skin profile" : "Set up skin profile"}
             style={({ pressed }) => pressed && styles.pressed}
           >
             {profileRow}
@@ -108,7 +128,7 @@ export function MyStuffContent({
       </GroupedSection>
       )}
 
-      <GroupedSection header={copy.productHeader}>
+      <GroupedSection header={copy.productHeader} headerAction={onAddProduct ? { label: '+ Add', accessibilityLabel: 'Add product', onPress: onAddProduct, disabled: !!busyId } : undefined}>
         {view.products.length ? view.products.map((product) => (
           <View key={product.id} style={styles.row}>
             <View style={styles.horizontal}>
@@ -124,6 +144,7 @@ export function MyStuffContent({
                 onPress={() => setEditingProduct(editingProduct === product.id ? null : product.id)} /> : null}
               {onRemoveProduct ? removeControl('products', product.id) : null}
             </View> : null}
+            {onAddProductExperience ? <Action label="Add experience" accessibilityLabel={`Add experience for ${product.name}`} disabled={!!busyId} onPress={() => onAddProductExperience(product)} /> : null}
             {editingProduct === product.id ? <View style={styles.actions}>
               {(['using', 'considering', 'stopped'] as const).filter((state) => state !== product.state).map((state) => (
                 <Action key={state} label={state} disabled={busyId === product.id} onPress={() => {
@@ -133,7 +154,8 @@ export function MyStuffContent({
               ))}
             </View> : null}
           </View>
-        )) : <EmptyRow text={view.productSummary} />}
+        )) : <EmptyRow text={memoryStatus === 'loading' ? 'Loading your products...' : memoryStatus === 'error' ? 'Unavailable' : view.productSummary} />}
+        {onEditRoutine ? <Action label="Review products I use" onPress={onEditRoutine} disabled={!!busyId} /> : null}
         {moreControl('products')}
       </GroupedSection>
 
@@ -146,33 +168,46 @@ export function MyStuffContent({
             </View>
             {onRemoveEntry ? removeControl('checks', check.id) : null}
           </View>
-        )) : <EmptyRow text={view.checkSummary} />}
+        )) : <EmptyRow text={memoryStatus === 'loading' ? 'Loading your checks...' : memoryStatus === 'error' ? 'Unavailable' : view.checkSummary} />}
         {moreControl('checks')}
       </GroupedSection>
 
-      <GroupedSection header={experienceHeader ?? copy.experienceHeader} footer={copy.experienceFooter}>
-        {view.experiences.length ? view.experiences.map((experience) => (
-          <View key={experience.id} style={styles.row}>
+      <GroupedSection header={canonicalExperiences ? copy.experienceHeader : experienceHeader ?? copy.experienceHeader}
+        headerAction={onAddExperience ? { label: '+ Add', accessibilityLabel: 'Add experience', onPress: onAddExperience, disabled: !!busyId || experienceStatus === 'loading' } : undefined}
+        footer={copy.experienceFooter}>
+        {experienceStatus === 'loading' ? <EmptyRow text="Loading your experiences..." /> : null}
+        {experienceStatus === 'error' ? <View style={styles.row}>
+          <Text style={styles.detail} accessibilityRole="alert">{experienceError ?? 'Your experiences could not be loaded.'}</Text>
+          {onRetryExperiences ? <Action label="Try again" onPress={onRetryExperiences} /> : null}
+        </View> : null}
+        {view.experienceRows.length ? view.experienceRows.map((experience) => (
+          <View key={experience.key} style={styles.row}>
             <View style={styles.horizontal}>
               <View style={styles.main}>
                 <Text style={styles.title}>{experience.productName}</Text>
-                {experience.source === 'user_reported' ? <Text style={styles.detail}>Added by you</Text> : null}
+                <Text style={styles.detail}>{experience.origin === 'personal_context' ? 'Your report' : 'Saved report'}</Text>
+                {experience.formulaContext === 'manual' ? <Text style={styles.detail}>Added by you · formula unverified</Text>
+                  : experience.formulaContext === 'unconfirmed' ? <Text style={styles.detail}>Formula at the time of use is unconfirmed</Text> : null}
                 {experience.note ? <Text style={styles.detail}>{experience.note}</Text> : null}
-                {experience.notedAt ? <Text style={styles.detail}>{formatMyStuffDate(experience.notedAt, liveFree)}</Text> : null}
+                {experience.occurred?.start ? <Text style={styles.detail}>{experience.occurred.start}{experience.occurred.end && experience.occurred.end !== experience.occurred.start ? ` to ${experience.occurred.end}` : ''}</Text>
+                  : experience.occurred?.end ? <Text style={styles.detail}>Until {experience.occurred.end}</Text> : null}
+                {experience.notedAt ? <Text style={styles.detail}>Saved {formatMyStuffDate(experience.notedAt, liveFree)}</Text> : null}
               </View>
-              <StatusBadge label={experience.kind} variant={experienceBadge[experience.kind]} />
+              <StatusBadge label={experienceLabels[experience.kind]} variant={experienceBadge[experience.kind]} />
             </View>
-            {onRemoveEntry ? removeControl('experiences', experience.id) : null}
+            {experience.origin === 'personal_context' && onCorrectExperience ? <Action label="Correct experience" accessibilityLabel={`Correct experience for ${experience.productName}`} disabled={!!busyId || experienceStatus === 'loading'} onPress={() => onCorrectExperience(experience.id)} /> : null}
+            {experience.origin === 'legacy_free_context' && onRemoveEntry ? removeControl('experiences', experience.id) : null}
           </View>
-        )) : <EmptyRow text={experienceEmptyText ?? view.experienceSummary} />}
+        )) : experienceStatus === 'ready' ? <EmptyRow text={canonicalExperiences ? view.experienceSummary : experienceEmptyText ?? view.experienceSummary} /> : null}
+        {hasMoreCanonicalExperiences && onLoadMoreCanonicalExperiences ? <Action label={experienceStatus === 'loading' ? 'Loading more...' : 'Load more experiences'} disabled={experienceStatus === 'loading'} onPress={onLoadMoreCanonicalExperiences} /> : null}
         {moreControl('experiences')}
       </GroupedSection>
     </>
   );
 }
 
-function Action({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress}
+function Action({ label, accessibilityLabel, onPress, disabled }: { label: string; accessibilityLabel?: string; onPress: () => void; disabled?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ disabled: !!disabled }} disabled={disabled} onPress={onPress}
     style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
     <Text style={styles.actionText}>{label}</Text>
   </Pressable>;
@@ -185,7 +220,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     justifyContent: 'center',
   },
-  horizontal: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  horizontal: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   main: { flex: 1 },
   title: {
     color: colors.ink,

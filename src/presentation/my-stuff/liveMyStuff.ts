@@ -26,7 +26,7 @@ export function mapFreeMyStuff(
       summaryUnit: 'skin goal',
     } : null,
     products: products.map((product) => ({
-      id: product.id, name: product.name, brand: product.brand ?? undefined,
+      id: product.id, productId: product.productId, name: product.name, brand: product.brand ?? undefined,
       state: product.state, source: product.source,
     })),
     checks: checks.map((check) => ({

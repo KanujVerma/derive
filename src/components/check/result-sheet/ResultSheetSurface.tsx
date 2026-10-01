@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, Modal, Platform, Pressable, StyleSheet, View, type View as NativeView } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions, type View as NativeView } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ReduceMotion } from 'react-native-reanimated';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, type BottomSheetBackdropProps, type BottomSheetHandleProps } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, radii, spacing } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
+import { resultSheetGeometry } from '../../../presentation/check/result-sheet/geometry';
 
 /** Guards the local animation only. Check still owns the result lifetime and close action. */
 export function createSheetDismissGuard(key: string, onClose: () => void, currentKey: () => string | null) {
@@ -32,6 +33,10 @@ interface Props {
   dismissLabel?: string;
   initialDetent?: 0 | 1;
   bottomInset?: number;
+  /** Only identity and verdict appear in the collapsed fold. Findings appear on the first upward swipe. */
+  summary?: React.ReactNode;
+  /** Private async lookup details must survive collapsing so requests/editor state are not restarted. */
+  keepDetailsMounted?: boolean;
   children: React.ReactNode;
 }
 
@@ -49,10 +54,13 @@ export function ResultSheetSurface({ visible = true, inline = false, presentatio
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, children }: Omit<Props, 'visible' | 'inline'> & {
+  initialDetent = 0, bottomInset = 0, summary, children, keepDetailsMounted = false }: Omit<Props, 'visible' | 'inline'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const [summaryHeight, setSummaryHeight] = useState(0);
+  const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight });
   const sheet = useRef<BottomSheet>(null);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
@@ -63,6 +71,9 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     if (sheet.current) sheet.current.close(); else guard.dismiss();
   }, [guard]);
   requestClose.current = close;
+  useEffect(() => {
+    if (summary && summaryHeight && geometry.needsFullHeight && guard.isCurrent()) sheet.current?.snapToIndex(2);
+  }, [summaryHeight, geometry.needsFullHeight, guard, summary]);
   useLayoutEffect(() => {
     guard.activate();
     return () => guard.deactivate();
@@ -79,7 +90,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.18} pressBehavior="close" />, []);
   const renderHandle = useCallback((_props: BottomSheetHandleProps) => <View style={styles.handleRow}>
     <Pressable ref={handle} style={styles.dragTarget} accessibilityRole="adjustable" accessibilityLabel="Product result"
-      accessibilityHint="Swipe up for details. Swipe down to return. Double tap to expand or collapse."
+      accessibilityHint="Swipe up for findings. Swipe down to return. Double tap to expand or collapse."
       accessibilityValue={{ min: 0, max: 2, now: Math.max(index, 0), text: index === 0 ? 'Compact' : 'Expanded' }}
       accessibilityActions={[{ name: 'increment', label: 'Expand result' }, { name: 'decrement', label: 'Collapse result' }, { name: 'escape', label: dismissLabel }]}
       onAccessibilityEscape={close}
@@ -97,14 +108,18 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     </Pressable>
   </View>, [close, dismissLabel, guard, index]);
   return <GestureHandlerRootView style={styles.root} pointerEvents="box-none" accessibilityViewIsModal>
-    <BottomSheet ref={sheet} index={initialDetent} snapPoints={['44%', '70%', '94%']} enableDynamicSizing={false}
+    <BottomSheet ref={sheet} index={initialDetent} snapPoints={summary ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose overrideReduceMotion={ReduceMotion.System}
       onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={guard.dismiss}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
       <BottomSheetScrollView onAccessibilityEscape={close}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        {children}
+        {summary && <View onLayout={event => { const measured = event.nativeEvent.layout.height; if (Math.abs(measured - summaryHeight) >= 1) setSummaryHeight(measured); }}>{summary}</View>}
+        {keepDetailsMounted ? <View style={summary && index === 0 ? { display: 'none' } : undefined}
+          accessibilityElementsHidden={Boolean(summary && index === 0)}
+          importantForAccessibility={summary && index === 0 ? 'no-hide-descendants' : 'auto'}>{children}</View>
+          : (!summary || index > 0) && children}
       </BottomSheetScrollView>
     </BottomSheet>
   </GestureHandlerRootView>;

@@ -13,10 +13,12 @@ import { personalDecisionFixtures } from '../src/fixtures/personal-decision/fixt
 const require = createRequire(import.meta.url);
 const { renderToStaticMarkup } = require('react-dom/server') as { renderToStaticMarkup: (element: React.ReactNode) => string };
 const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
-function renderer() {
+function renderer(interactive = false) {
   const cache = new Map<string, { exports: any }>();
   const native = (tag: string) => ({ children }: any) => React.createElement(tag, {}, children);
   const sheets: any[] = [];
+  const pressables: any[] = [], state: any[] = [];
+  let stateCursor = 0;
   const modalScopes: any[] = [], scrollScopes: any[] = [];
   const sheet = (props: any) => { sheets.push(props); return React.createElement('section', {}, props.children); };
   function load(path: string): any {
@@ -26,8 +28,14 @@ function renderer() {
     if (cache.has(file)) return cache.get(file)!.exports;
     const module = { exports: {} as any }; cache.set(file, module);
     const dependency = (name: string): any => {
-      if (name === 'react-native') return { Modal: native('div'), KeyboardAvoidingView: native('div'), View: native('div'), Text: native('span'), Pressable: native('button'), Image: native('img'), ActivityIndicator: native('i'), ScrollView: native('div'),
-        StyleSheet: { create: (value: unknown) => value, absoluteFill: {}, hairlineWidth: 1 }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ height: 844, width: 390, fontScale: 1 }), AccessibilityInfo: {}, findNodeHandle: () => null };
+      if (name === 'react' && interactive) return { ...React, useState: (initial: any) => {
+        const index = stateCursor++;
+        if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial;
+        return [state[index], (next: any) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
+      } };
+      if (name === 'react-native') return { Modal: native('div'), KeyboardAvoidingView: native('div'), View: native('div'), Text: native('span'), Image: native('img'), ActivityIndicator: native('i'), ScrollView: native('div'),
+        StyleSheet: { create: (value: unknown) => value, absoluteFill: {}, hairlineWidth: 1 }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ height: 844, width: 390, fontScale: 1 }), AccessibilityInfo: {}, findNodeHandle: () => null,
+        Pressable: (props: any) => { pressables.push(props); return React.createElement('button', {}, props.children); } };
       if (name === 'react-native-safe-area-context') return { SafeAreaProvider: native('div'), useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }) };
       if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: (props: any) => { modalScopes.push(props); return React.createElement('div', {}, props.children); } };
       if (name === 'react-native-reanimated') return { ReduceMotion: { System: 'system' } };
@@ -41,7 +49,10 @@ function renderer() {
     new Script(`(function(require,module,exports){${js}\n})`, { filename: file }).runInThisContext()(dependency, module, module.exports);
     return module.exports;
   }
-  return { load, sheets, modalScopes, scrollScopes, render: (component: any, props: any) => renderToStaticMarkup(React.createElement(component, props)) };
+  return { load, sheets, modalScopes, scrollScopes, pressables, render: (component: any, props: any) => {
+    stateCursor = 0; pressables.length = 0;
+    return renderToStaticMarkup(React.createElement(component, props));
+  } };
 }
 
 test('sheet continuous mode exposes all bound reasons, evidence and uncertainties without another disclosure', () => {
@@ -62,8 +73,9 @@ test('preview product keeps unverified package formula primary and save incapabi
   const r = renderer();
   const { CheckResultContent } = r.load('src/components/check/result-sheet/CheckResultContent');
   const html = r.render(CheckResultContent, { input: { ownerId: null, snapshot: null, catalogFacts: { brand: 'CeraVe', name: 'Moisturizing Cream', categoryLabel: 'Moisturizer', formula: null, source: null }, fit: { kind: 'preview_unavailable' } }, continuous: true });
-  assert.ok(html.indexOf('Exact formula not verified') >= 0);
-  assert.ok(html.indexOf('Exact formula not verified') < html.indexOf('preview cannot save'));
+  assert.match(html, /Not enough information/);
+  assert.match(html, /ingredient list for your exact package has not been verified/);
+  assert.ok(html.indexOf('ingredient list') < html.indexOf('No personal assessment is saved'));
   assert.doesNotMatch(html, /Personal Fit unavailable in this preview/);
 });
 
@@ -76,7 +88,7 @@ test('root result mounts one scroll-connected swipe sheet with complete content 
   assert.equal(r.sheets[0].enableDynamicSizing, false);
   assert.equal(r.sheets[0].overrideReduceMotion, 'system');
   assert.ok(r.sheets[0].snapPoints.length >= 2);
-  assert.match(html, /Preserved host extras/);
+  assert.doesNotMatch(html, /Preserved host extras/, 'collapsed fold hides the next section');
   assert.doesNotMatch(html, /View full result|Hide formula details|Check result<\/span>/);
 });
 
@@ -105,7 +117,7 @@ test('camera companion preserves host extras and hides completely when the curre
   const { buildScanResultSheet } = r.load('src/presentation/check/result-sheet/model');
   const model = buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-a' });
   const props = { model, currentOwnerId: 'owner-a', currentSnapshot: null, currentResolverResult: null, currentScanId: 'scan-a', onDismiss: () => {}, children: React.createElement('p', {}, 'Current camera extras') };
-  assert.match(r.render(ScanResultSheet, props), /Current camera extras/);
+  assert.doesNotMatch(r.render(ScanResultSheet, props), /Current camera extras/);
   assert.equal(r.sheets.length, 1);
   assert.equal(r.render(ScanResultSheet, { ...props, currentOwnerId: 'owner-b' }), '');
   assert.equal(r.sheets.length, 1, 'stale owner must not mount another gesture surface');
@@ -118,4 +130,80 @@ test('VoiceOver modal scope includes the handle and Close as well as the scroll 
   r.render(CheckResultPresentation, { visible: true, presentationKey: 'accessible-case', input: null, onClose: () => {} });
   assert.equal(r.modalScopes[0].accessibilityViewIsModal, true);
   assert.equal(r.scrollScopes[0].accessibilityViewIsModal, undefined);
+});
+
+test('first expanded detent reveals findings and host actions directly', () => {
+  const r = renderer();
+  const { ResultSheetSurface } = r.load('src/components/check/result-sheet/ResultSheetSurface');
+  const html = r.render(ResultSheetSurface, { presentationKey: 'expanded', onClose() {}, initialDetent: 1,
+    summary: React.createElement('p', {}, 'Product and verdict'), children: React.createElement('p', {}, 'Substantive finding and action') });
+  assert.match(html, /Product and verdict/); assert.match(html, /Substantive finding and action/);
+  assert.equal(r.sheets[0].index, 1);
+});
+
+test('fixed verdict and substantive findings stay visible while only Source toggles provenance', () => {
+  for (const id of ['moisturizer', 'cleanser', 'sunscreen']) {
+    const r = renderer(true);
+    const { CheckResultView } = r.load('src/components/check/result-sheet/CheckResultContent');
+    const { describeResultExample } = r.load('src/presentation/check/result-sheet/examples');
+    const props = describeResultExample(id);
+    const render = () => r.render(CheckResultView, props);
+    let html = render();
+    assert.ok(html.indexOf(props.facts.name) < html.indexOf('PERSONAL FIT'));
+    for (const finding of props.verdict.findings) {
+      assert.match(html, new RegExp(finding.title));
+      assert.ok(html.includes(finding.reason));
+      for (const limit of finding.limits) assert.ok(html.includes(limit), 'material limits remain visible with sources closed');
+    }
+    assert.doesNotMatch(html, /Evidence &amp; limits|Why this result|Fictional skin profile|Fictional package label/);
+    assert.equal(r.pressables.length, 3, 'no verdict or finding-title expander');
+    for (let i = 0; i < r.pressables.length; i++) {
+      const control = r.pressables[i];
+      assert.equal(control.accessibilityRole, 'button'); assert.equal(control.accessibilityState.expanded, false);
+      assert.ok(control.style.minHeight >= 44); assert.ok(control.style.minWidth >= 44);
+      assert.equal(control.accessibilityLabel, `Show sources for ${props.verdict.findings[i].title}`);
+    }
+    r.pressables[0].onPress(); html = render();
+    assert.match(html, /Fictional package label/);
+    assert.equal(r.pressables[0].accessibilityState.expanded, true);
+    assert.equal(r.pressables[1].accessibilityState.expanded, false);
+    assert.ok(html.includes(props.verdict.reason));
+    for (const finding of props.verdict.findings) assert.ok(html.includes(finding.reason), 'Source cannot hide main reasoning');
+    r.pressables[1].onPress(); html = render();
+    assert.equal(r.pressables[1].accessibilityState.expanded, true);
+    r.pressables[0].onPress(); html = render();
+    assert.equal(r.pressables[0].accessibilityState.expanded, false);
+    assert.equal(r.pressables[1].accessibilityState.expanded, true);
+    if (id !== 'sunscreen') { assert.doesNotMatch(html, /Fictional package label/); assert.match(html, /Recorded steps/); }
+  }
+});
+
+test('live cautions and unknowns remain visible with all sources closed', () => {
+  for (const id of ['caution', 'missing-formula', 'routine-not-provided', 'partial-routine', 'intent-unknown']) {
+    const r = renderer(true);
+    const { CheckResultView } = r.load('src/components/check/result-sheet/CheckResultContent');
+    const { describeResultExample } = r.load('src/presentation/check/result-sheet/examples');
+    const props = describeResultExample(id);
+    const html = r.render(CheckResultView, props);
+    const escaped = (text: string) => renderToStaticMarkup(React.createElement('span', {}, text)).slice(6, -7);
+    assert.ok(html.includes(escaped(props.verdict.reason)));
+    for (const finding of props.verdict.findings) {
+      assert.ok(html.includes(escaped(finding.reason)));
+      for (const limit of finding.limits) assert.ok(html.includes(escaped(limit)));
+    }
+    assert.ok(r.pressables.every(control => control.accessibilityState.expanded === false && control.accessibilityLabel.startsWith('Show sources for')));
+  }
+});
+
+test('compact fold contains only the complete identity and fixed four-state verdict', () => {
+  for (const [id, label] of [['moisturizer', 'Good fit'], ['redundancy', 'Some tradeoffs'], ['caution', 'Not a good fit'], ['missing-formula', 'Not enough information']]) {
+    const r = renderer(true);
+    const { CheckResultView } = r.load('src/components/check/result-sheet/CheckResultContent');
+    const { describeResultExample } = r.load('src/presentation/check/result-sheet/examples');
+    const props = describeResultExample(id);
+    const html = r.render(CheckResultView, { ...props, section: 'summary' });
+    assert.ok(html.includes(props.facts.name)); assert.ok(html.includes(label)); assert.ok(html.includes(props.verdict.reason));
+    assert.equal(r.pressables.length, 0, 'verdict has no disclosure or tap action');
+    assert.doesNotMatch(html, /Source|For your dryness|In your routine|Texture<\/span>/);
+  }
 });

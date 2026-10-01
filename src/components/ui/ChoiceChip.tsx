@@ -51,6 +51,7 @@ export const ChoiceChip: React.FC<ChoiceChipProps> = ({
       disabled={disabled}
       accessible={true}
       accessibilityRole={accessibility.role}
+      aria-checked={selected}
       accessibilityState={accessibility.state}
       accessibilityLabel={label}
       style={[

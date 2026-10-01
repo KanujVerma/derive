@@ -63,7 +63,7 @@ test('label/recovery/quota remain entry-only outcomes with explicit retry and ac
   assert.match(entry, /visibleProductLinkState\.result\.candidate\.title/);
   assert.match(entry, /accessibilityLiveRegion="polite"/);
   assert.match(entry, /visibleProductLinkState\?\.kind === 'loading'/);
-  assert.match(source, /<ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle=\{\[styles\.entryContent/);
+  assert.match(source, /<ScrollView ref=\{entryScroll\}[\s\S]*keyboardShouldPersistTaps="handled"[\s\S]*contentContainerStyle=\{\[styles\.entryContent/);
   assert.match(entry, /returnKeyType="go"[\s\S]*onSubmitEditing=\{checkProductLink\}/);
   assert.match(entry, /label="Search by name"/);
   assert.doesNotMatch(linkAction, /evaluateProduct\(|openResolution\(|setConfirmedProduct\(|setCatalogDetail\(/);

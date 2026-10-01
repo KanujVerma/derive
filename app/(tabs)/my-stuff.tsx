@@ -8,6 +8,8 @@ import { useStore } from 'zustand';
 import { Button } from '@/src/components/ui/Button';
 import { customerController, currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
 import { MyStuffContent } from '@/src/components/my-stuff/MyStuffContent';
+import { Icon } from '@/src/components/ui/Icon';
+import { mapCanonicalExperiences } from '@/src/presentation/my-stuff/myStuffPresentation';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { colors, layout, spacing } from '@/src/constants/theme';
 import { anonymousEmptyMyStuff } from '@/src/fixtures/my-stuff/myStuffFixtures';
@@ -62,58 +64,76 @@ export default function MyStuffScreen() {
   const runAction = (id: string, action: () => Promise<void>) => {
     if (!liveOwner || ownerId !== liveOwner || busyId) return;
     const actionOwner = liveOwner;
+    const actionEpoch = myStuffStore.getState().ownerEpoch;
     setBusyId(id);
     setActionError(null);
     void action().catch(() => {
-      if (myStuffStore.getState().ownerId === actionOwner && useAuthStore.getState().sessionUserId === actionOwner) {
+      if (myStuffStore.getState().ownerId === actionOwner && myStuffStore.getState().ownerEpoch === actionEpoch && useAuthStore.getState().sessionUserId === actionOwner) {
         setActionError('That change could not be saved. Try again.');
       }
     }).finally(() => {
-      if (myStuffStore.getState().ownerId === actionOwner) setBusyId(null);
+      if (myStuffStore.getState().ownerId === actionOwner && myStuffStore.getState().ownerEpoch === actionEpoch) setBusyId(null);
     });
   };
-  const live = Boolean(liveOwner && ownerId === liveOwner && customerState.ownerId === liveOwner);
+  const live = Boolean(liveOwner && ownerId === liveOwner);
   const canonical = describeCanonicalMyStuff(customerState, liveOwner);
-  const openEditor = (mode: string) => router.push({ pathname: '/personalize', params: { p0b: '1', mode } });
-  const canonicalProfile = liveOwner ? <GroupedSection header="Skin and goals"><View style={{ padding: spacing.md }}>
-    {canonical.kind === 'ready' ? <><Text style={styles.message}>{canonical.hasProfile ? `Main goal: ${canonical.primaryGoal ?? 'Not selected'}` : 'Choose a main goal for personalized checks.'}</Text>{canonical.secondaryGoals.length > 0 && <Text style={styles.message}>Other goals: {canonical.secondaryGoals.join(', ')}</Text>}</> : <Text style={styles.message}>{canonical.kind === 'loading' ? 'Loading your skin and goals...' : 'Your current skin and goals are unavailable.'}</Text>}
-    <Button label="Skin and goals" variant="outline" onPress={() => openEditor('profile')} />
-  </View></GroupedSection> : undefined;
-  const hideEmptyUntilResolved = live && status !== 'ready' && !model.profile
-    && !model.products.length && !model.checks.length && !model.experiences.length;
+  const context = liveOwner && customerState.ownerId === liveOwner && customerState.context?.ownerId === liveOwner
+    ? customerState.context : null;
+  const openEditor = (mode: string, extra: Record<string, string> = {}) => router.push({
+    pathname: '/personalize', params: { p0b: '1', mode, source: 'my-stuff', ...extra },
+  });
+  const canonicalProfile = liveOwner ? <GroupedSection header="Skin profile">
+    {canonical.kind === 'ready' ? <Pressable accessibilityRole="button"
+      accessibilityLabel={canonical.hasProfile ? 'Edit skin profile' : 'Set up skin profile'}
+      onPress={() => openEditor('profile')} style={styles.profileRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.profileTitle}>{canonical.hasProfile
+          ? canonical.primaryGoal ? `Main priority: ${canonical.primaryGoal}` : 'Skin profile saved'
+          : 'Set up skin profile'}</Text>
+        {canonical.secondaryGoals.length > 0 && <Text style={styles.support}>{canonical.secondaryGoals.join(' · ')}</Text>}
+      </View>
+      <Icon name="forward" size={18} color={colors.inkMuted} />
+    </Pressable> : <View style={styles.profileRow}>
+      <Text style={styles.support}>{canonical.kind === 'loading' ? 'Loading your skin profile...' : 'Your skin profile could not be loaded.'}</Text>
+      {canonical.kind !== 'loading' && <Button label="Try again" variant="ghost" onPress={() => void customerController.load()} />}
+    </View>}
+  </GroupedSection> : undefined;
+  const memoryStatus = liveOwner ? !live || status === 'idle' || status === 'loading' ? 'loading'
+    : status === 'error' ? 'error' : 'ready' : 'ready';
+  const experienceStatus = liveOwner ? customerState.status === 'loading' || !context && !customerState.error ? 'loading'
+    : customerState.error || memoryStatus === 'error' ? 'error' : 'ready' : 'ready';
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <RootShellHeader title="My Stuff" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}>
-        {hideEmptyUntilResolved && status === 'loading'
-          ? <Text style={styles.message}>Loading your saved context…</Text> : null}
-        {live && (error || actionError) ? <View>
-          <Text style={styles.message}>{error || actionError}</Text>
-          {status === 'error' ? <Pressable accessibilityRole="button" onPress={() => void myStuffStore.getState().load()}>
-            <Text style={styles.retry}>Try again</Text>
-          </Pressable> : null}
+        {liveOwner && (error || actionError) ? <View>
+          <Text accessibilityRole="alert" style={styles.message}>{error || actionError}</Text>
+          {status === 'error' ? <Button label="Try again" variant="ghost" onPress={() => void myStuffStore.getState().load()} /> : null}
         </View> : null}
-        {canonicalProfile}
-        {liveOwner && currentCustomerOwner() === liveOwner && <>
-          <GroupedSection header="Product experiences"><View style={{ padding: spacing.md }}><Text style={styles.message}>{canonical.kind === 'ready' ? canonical.experienceSummary : canonical.kind === 'loading' ? 'Loading your product experiences...' : 'Your current product experiences are unavailable.'}</Text><Button label="View or record an experience" variant="outline" onPress={() => openEditor('history')} /></View></GroupedSection>
-          <Button label="Edit routine" variant="ghost" onPress={() => openEditor('routine')} />
-        </>}
-        {!hideEmptyUntilResolved ? <MyStuffContent key={liveOwner ?? 'preview'} model={live ? model : anonymousEmptyMyStuff}
-          liveFree={isFreeIntegrationShell(shell)}
-          profileContent={liveOwner ? <></> : undefined}
-          experienceHeader={liveOwner ? 'Other saved reports' : undefined}
-          experienceEmptyText={liveOwner ? 'No other saved reports' : undefined}
-          onEditProfile={targetShell ? () => liveOwner ? router.push({ pathname: '/personalize', params: { p0b: '1', mode: 'profile' } }) : router.push('/personalize') : undefined}
+        <MyStuffContent key={liveOwner ?? 'preview'} model={live ? model : anonymousEmptyMyStuff}
+          liveFree={isFreeIntegrationShell(shell)} memoryStatus={memoryStatus}
+          profileContent={canonicalProfile}
+          canonicalExperiences={liveOwner ? context ? mapCanonicalExperiences(context, customerState.displayLabels) : [] : undefined}
+          experienceStatus={experienceStatus}
+          experienceError={customerState.error ?? (memoryStatus === 'error' ? 'Some saved reports could not be loaded.' : null)}
+          onRetryExperiences={() => { void customerController.load(); void myStuffStore.getState().load(); }}
+          hasMoreCanonicalExperiences={Boolean(context?.historyTruncated)}
+          onLoadMoreCanonicalExperiences={() => void customerController.loadMoreHistory()}
+          onAddProduct={targetShell ? () => router.push({ pathname: '/personalize', params: { mode: 'product', source: 'my-stuff' } }) : undefined}
+          onAddExperience={targetShell ? () => openEditor('history', { entry: 'new' }) : undefined}
+          onCorrectExperience={liveOwner ? experienceId => openEditor('history', { experienceId }) : undefined}
+          onAddProductExperience={live ? product => openEditor('history', { entry: 'new', productRecordId: product.id }) : undefined}
+          onEditRoutine={liveOwner ? () => openEditor('routine') : undefined}
+          onEditProfile={targetShell ? () => liveOwner ? openEditor('profile') : shell === 'scanner_first_preview' ? router.push({ pathname: '/personalize/fixture', params: { mode: 'profile', fresh: '1', focused: '1' } }) : router.push('/personalize') : undefined}
           onChangeProductState={live ? (id: string, state: ProductState) => runAction(id,
             () => myStuffStore.getState().changeProductState(id, state)) : undefined}
           onRemoveProduct={live ? (id: string) => runAction(id,
             () => myStuffStore.getState().removeProduct(id)) : undefined}
           onRemoveEntry={live ? (section, id) => runAction(id,
             () => myStuffStore.getState().removeEntry(section, id)) : undefined}
-          onLoadMore={live ? (section) => void myStuffStore.getState().loadMore(section) : undefined}
-          hasMore={live ? { products: Boolean(cursors.products), checks: Boolean(cursors.checks),
-            experiences: Boolean(cursors.experiences) } : undefined}
-          loadingMore={live ? loadingMore : undefined} busyId={busyId} /> : null}
+          onLoadMore={live ? section => void myStuffStore.getState().loadMore(section) : undefined}
+          hasMore={live ? { products: Boolean(cursors.products), checks: Boolean(cursors.checks), experiences: Boolean(cursors.experiences) } : undefined}
+          loadingMore={live ? loadingMore : undefined} busyId={busyId} />
       </ScrollView>
     </View>
   );
@@ -124,4 +144,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: layout.gutter, paddingTop: spacing.lg },
   message: { color: colors.inkMuted, marginBottom: spacing.md },
   retry: { color: colors.brand, marginBottom: spacing.md },
+  profileRow: { minHeight: layout.minTouchTarget, padding: layout.cardPadding, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  profileTitle: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '600' },
+  support: { color: colors.inkMuted, fontSize: 13, lineHeight: 18 },
 });

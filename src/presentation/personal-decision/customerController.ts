@@ -165,7 +165,7 @@ export function deriveJitReproductiveQuestions(packet: PersonalDecisionPacketV1 
     if (!['yes', 'no'].includes(answers.pregnancy)) questions.add('pregnancy');
     if (!['yes', 'no'].includes(answers.nursing)) questions.add('nursing');
   }
-  if (relatedNeed('reviewed_claim') && answers.tryingToConceive !== 'no') questions.add('trying');
+  if (relatedNeed('reviewed_claim') && !['yes', 'no'].includes(answers.tryingToConceive)) questions.add('trying');
   return (['pregnancy', 'trying', 'nursing'] as const).filter(field => questions.has(field));
 }
 /** Explicit editing of already shared answers adds no new sensitive intake. */

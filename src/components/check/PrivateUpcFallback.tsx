@@ -4,6 +4,8 @@ import { colors, radii, spacing, typography } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
 import { PublishedProductIngredients } from '@/src/components/check/PublishedProductIngredients';
 import { ExternalProductActions } from '@/src/components/check/ExternalProductActions';
+import { ResultSheetSurface } from '@/src/components/check/result-sheet/ResultSheetSurface';
+import { CheckResultView } from '@/src/components/check/result-sheet/CheckResultContent';
 import { publicEnvironment } from '@/src/config/environment';
 import { supabase } from '@/src/services/supabase';
 import { useAuthStore } from '@/src/stores/authStore';
@@ -12,7 +14,11 @@ import { createPrivateCheckFallback, createPrivateCheckRequestMemo, privateCheck
   type PrivateCheckState } from '@/src/presentation/external-products/checkFallback';
 
 /** Private identity evidence after a canonical barcode miss; never a formula or personal decision. */
-export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode: string; ownerId: string | null }) {
+export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, children }: {
+  barcode: string; ownerId: string | null;
+  sheet?: { presentationKey: string; onClose: () => void };
+  children?: React.ReactNode;
+}) {
   const sessionOwnerId = useAuthStore(state => state.sessionUserId);
   const ownerId = checkOwnerId === sessionOwnerId ? checkOwnerId : null;
   const liveOwner = useRef(ownerId);
@@ -48,12 +54,25 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode
   const limited = result?.status === 'rate_limited';
   const needsTester = visible?.kind === 'error' && visible.code === 'PRIVATE_TESTER_REQUIRED';
   const loading = !visible || visible.kind === 'loading';
-  return (
-    <View style={styles.card} accessibilityLiveRegion="polite">
+  const candidate = result?.status === 'found' ? result.candidates[0] : null;
+  const summary = <View style={styles.summary}>
+    <Text style={styles.caption}>PRODUCT LOOKUP · PRIVATE TEST</Text>
+    {loading ? <View style={styles.loading}><ActivityIndicator color={colors.brand} />
+      <Text style={styles.body}>Looking for a possible barcode match…</Text></View>
+      : <CheckResultView section="summary" facts={{ brand: candidate?.brand ?? '',
+        name: candidate?.name ?? (result?.status === 'ambiguous' ? 'Confirm the matching product' : 'Product details unavailable'),
+        categoryLabel: candidate?.size ?? '', formula: null, source: null }}
+        verdict={{ state: 'unknown', label: 'Not enough information', findings: [],
+          reason: candidate ? 'Product identified by an external listing. Ingredient notes are below; this is not a verified personal-fit verdict.'
+            : 'An exact product and ingredient list are needed before assessing personal fit.' }} />}
+  </View>;
+  const content = <View style={sheet ? styles.summary : styles.card} accessibilityLiveRegion="polite">
+      {!sheet && <>
       <Text style={styles.caption}>PRODUCT LOOKUP · PRIVATE TEST</Text>
       {loading && <View style={styles.loading}><ActivityIndicator color={colors.brand} />
         <Text style={styles.body}>Looking for a possible barcode match…</Text></View>}
-      {result && result.candidates.map((candidate, index) => (
+      </>}
+      {result && (!sheet || result.status === 'ambiguous') && result.candidates.map((candidate, index) => (
         <View key={candidate.sourceRecordId + ':' + index} style={styles.candidate}>
           <Text style={styles.caption}>{result.status === 'ambiguous' ? 'Possible match — confirm the label' : 'Possible product match'}</Text>
           {candidate.brand && <Text style={styles.body}>{candidate.brand}</Text>}
@@ -63,6 +82,7 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode
           <Text style={styles.caption}>Barcode {candidate.sourceBarcode}</Text>
         </View>
       ))}
+      {sheet && candidate && <Text style={styles.caption}>UPCitemdb · retrieved {new Date(candidate.retrievedAt).toLocaleDateString()} · Barcode {candidate.sourceBarcode}</Text>}
       {result && <PublishedProductIngredients ownerId={ownerId} query={{ barcode,
         name: result.status === 'found' ? result.candidates[0].name : null,
         brand: result.status === 'found' ? result.candidates[0].brand : null,
@@ -87,11 +107,16 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode
       {needsTester && <Text selectable style={styles.caption}>Tester account ID: {ownerId}</Text>}
       {!loading && <Button label="Retry external lookup" variant="outline" size="medium"
         onPress={() => { void controller.current?.retry(); }} />}
-    </View>
-  );
+      {children}
+    </View>;
+  return sheet ? <ResultSheetSurface presentationKey={JSON.stringify([ownerId, barcode, sheet.presentationKey])}
+    summary={summary} keepDetailsMounted onClose={sheet.onClose} dismissLabel="Close product result">
+    {content}
+  </ResultSheetSurface> : content;
 }
 
 const styles = StyleSheet.create({
+  summary: { gap: spacing.md },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,
     borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md, marginVertical: spacing.md },
   candidate: { gap: spacing.xs, paddingBottom: spacing.sm },

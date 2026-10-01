@@ -109,6 +109,9 @@ try {
 
   const name = 'Synthetic QA Cedar 123, café';
   const manual = manualRoutineItem(randomUUID(), name);
+  assert.equal(manual.status, null, 'Adding a name does not assume current routine use');
+  assert.throws(() => routineToStorage({ completeness: 'partial', items: [manual] }), /Choose a use status/);
+  manual.status = 'current'; // Explicit customer choice, as required by the routine editor.
   assert(await controller.save({ operation: 'save_routine', routine: routineToStorage({ completeness: 'partial', items: [manual] }) }));
   assert.equal(state().context.routine.data.items[0].reference.name, name, 'Exact client-entered Unicode text survives actual persistence');
   const partial = await assess(snapshot, 'NOT_ENOUGH_INFORMATION');
