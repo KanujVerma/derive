@@ -177,6 +177,18 @@ verify_jwt = true
 import_map = "./functions/private-ingredient-search/deno.json"
 entrypoint = "./functions/private-ingredient-search/index.ts"
 
+[functions.private-product-ingredients]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-product-ingredients/deno.json"
+entrypoint = "./functions/private-product-ingredients/index.ts"
+
+[functions.private-ingredient-explanation]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-ingredient-explanation/deno.json"
+entrypoint = "./functions/private-ingredient-explanation/index.ts"
+
 [functions.catalog-contribution]
 enabled = true
 verify_jwt = true
