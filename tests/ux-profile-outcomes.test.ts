@@ -36,6 +36,6 @@ test('five-step handlers preserve exact outcome wording and raw note typing with
   control(flow.render(), 'Anything else').props.onChangeText('I use sunscreen');
   press(control(flow.render(), 'Save skin profile'));
   assert.equal(result?.additionalNote, 'I use sunscreen');
-  assert.equal(result?.previewOnly.currentOutcomes['id-1'], 'too_heavy');
+  assert.deepEqual(result?.previewOnly.currentFeedback?.['id-1'], ['too_heavy']);
   assert.equal(result?.previewOnly.pastReports[0].outcome, 'stung');
 });

@@ -9,7 +9,7 @@ import { colors, layout, radii, spacing, typography } from '@/src/constants/them
 import { createContextDraft, relevantQuestions, validateContextDraft, GOALS, type Treatment, type Answer, type ContextDraft, type RoutineReference, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
 
 import { toggleProfileGoal } from '@/src/presentation/p0b-personalization/goalSelection';
-import { addCurrentProduct, addPastOutcome, setCurrentOutcome, setSetupAnswer, removePastOutcome, productOutcomeLabels, catalogFamilyReference, createSetupBundle, currentUseItem, manualUnverifiedReference, removeSetupProduct, setAdditionalNote, type SetupBundle, type ProductOutcome } from '@/src/presentation/p0b-personalization/setup';
+import { addCurrentProduct, addPastOutcome, currentProductFeedback, currentFeedbackChoices, currentFeedbackLabels, toggleCurrentFeedback, clearCurrentFeedback, setSetupAnswer, removePastOutcome, productOutcomeLabels, catalogFamilyReference, createSetupBundle, currentUseItem, manualUnverifiedReference, removeSetupProduct, setAdditionalNote, type SetupBundle, type ProductOutcome } from '@/src/presentation/p0b-personalization/setup';
 import { CatalogProductSearch } from '@/src/components/catalog/CatalogProductSearch';
 import type { CatalogProductSummary } from '@/src/contracts/ProductCatalog';
 
@@ -64,10 +64,10 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   const update = <K extends keyof ContextDraft>(key: K, value: ContextDraft[K]) => { setValidation(null); setDraft(current => ({ ...current, [key]: value })); };
   const finish = () => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (extended) onSetup?.(currentBundle); onApply(createContextDraft(draft)); };
   const continueOrApply = () => { if (editing || step === last) finish(); else setStep(step + 1); };
-  const addNamedProduct = (reference: ReturnType<typeof manualUnverifiedReference> | ReturnType<typeof catalogFamilyReference>) => {
+  const addNamedProduct = (reference: ReturnType<typeof manualUnverifiedReference> | ReturnType<typeof catalogFamilyReference>, catalog?: CatalogProductSummary) => {
     const id = createId?.();
     if (!id) return;
-    setBundle(addCurrentProduct(currentBundle, currentUseItem(id, reference)));
+    setBundle(addCurrentProduct(currentBundle, currentUseItem(id, reference), catalog));
     setManualName('');
   };
   const addNoticedProduct = (reference: ReturnType<typeof manualUnverifiedReference> | ReturnType<typeof catalogFamilyReference>, notice: ProductOutcome) => {
@@ -102,14 +102,18 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
     </View>}
     {extended && step === 2 && <View style={styles.questions}>
       <QuestionGroup label="What are you using now?" support="Add the skincare products you use regularly.">
-        <CatalogProductSearch embedded label="Search products" search={catalogSearch} selectedIds={currentBundle.products.flatMap(product => product.reference.kind === 'catalog' ? [product.reference.productId] : [])} onQueryChange={setManualName} onSelect={(product: CatalogProductSummary) => addNamedProduct(catalogFamilyReference(product))} />
+        <CatalogProductSearch embedded label="Search products" search={catalogSearch} selectedIds={currentBundle.products.flatMap(product => product.reference.kind === 'catalog' ? [product.reference.productId] : [])} onQueryChange={setManualName} onSelect={(product: CatalogProductSummary) => addNamedProduct(catalogFamilyReference(product), product)} />
         <Button label="Add this name" variant="secondary" disabled={loading || !manualName.trim()} onPress={() => addNamedProduct(manualUnverifiedReference(manualName))} />
         {currentBundle.products.map(product => <View key={product.id} style={styles.disclosure}>
           <Text>{product.reference.label}</Text>
           <Text style={styles.copy}>Using now</Text>
           <Button label="How’s it working for you?" variant="ghost" onPress={() => setOutcomeOpen(outcomeOpen === product.id ? null : product.id)} />
-          {currentBundle.previewOnly.currentOutcomes[product.id] && <Text style={styles.copy}>{productOutcomeLabels[currentBundle.previewOnly.currentOutcomes[product.id]]}</Text>}
-          {outcomeOpen === product.id && <View style={styles.chips}>{(Object.entries(productOutcomeLabels) as [ProductOutcome, string][]).map(([outcome, label]) => <ChoiceChip key={outcome} label={label} selectionType="single" selected={currentBundle.previewOnly.currentOutcomes[product.id] === outcome} disabled={loading} onSelect={() => setBundle(setCurrentOutcome(currentBundle, product.id, outcome))} />)}</View>}
+          {currentProductFeedback(currentBundle, product.id).length > 0 && <Text style={styles.copy}>{currentProductFeedback(currentBundle, product.id).map(value => currentFeedbackLabels[value]).join(' · ')}</Text>}
+          {outcomeOpen === product.id && <View style={styles.disclosure}>
+            <Text style={styles.copy}>Optional. Choose all that apply to this product.</Text>
+            <View style={styles.chips}>{currentFeedbackChoices(currentBundle.previewOnly.catalogCategories?.[product.id]).map(([outcome, label]) => <ChoiceChip key={outcome} label={label} selectionType="multiple" selected={currentProductFeedback(currentBundle, product.id).includes(outcome)} disabled={loading} onSelect={() => setBundle(toggleCurrentFeedback(currentBundle, product.id, outcome))} />)}</View>
+            <Button label="Clear feedback" variant="ghost" disabled={loading} onPress={() => setBundle(clearCurrentFeedback(currentBundle, product.id))} />
+          </View>}
           <Button label={`Remove ${product.reference.label}`} variant="ghost" onPress={() => setBundle(removeSetupProduct(currentBundle, product.id))} />
         </View>)}
         {!currentBundle.products.length && <View style={styles.chips}>{([['none', 'No skincare products'], ['unknown', 'Not sure']] as const).map(([value, label]) => <ChoiceChip key={value} label={label} selectionType="single" selected={currentBundle.previewOnly.currentProducts === value} disabled={loading} onSelect={() => setBundle(setSetupAnswer(currentBundle, 'currentProducts', value))} />)}</View>}

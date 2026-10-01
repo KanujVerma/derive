@@ -67,22 +67,22 @@ test('routine-role finding does not assume adding intent or manufacture amber', 
 });
 const categoryCopy = {
   moisturizer: {
-    summary: 'A dry-skin moisturizer for your evening routine.',
+    summary: 'A moisturizer labelled for dry skin.',
     rows: [['For your dryness', 'Labelled to moisturize dry skin.'],
-      ['In your routine', 'Adds an evening moisturizer after your cleanser.'],
-      ['Texture', 'Rich cream, matching your stated preference.']],
+      ['In your routine', 'Your complete recorded routine has no moisturizer. Placement does not establish layering compatibility.'],
+      ['Texture', 'Labelled as a rich cream. Your texture preference is unknown.']],
   },
   cleanser: {
-    summary: 'A cream cleanser for your dry-skin routine.',
-    rows: [['For dry skin', 'Labelled for dry skin. Your current wash leaves your skin feeling tight.'],
-      ['In your routine', 'Replaces your evening gel cleanser.'],
-      ['Texture', 'Non-foaming cream, your preferred cleanser type.']],
+    summary: 'A cream cleanser labelled for dry skin.',
+    rows: [['For dry skin', 'Labelled for dry skin.'],
+      ['In your routine', 'You recorded an evening gel cleanser. Replacement intent has not been provided.'],
+      ['Texture', 'Labelled as a non-foaming cream. Your texture preference is unknown.']],
   },
   sunscreen: {
     summary: 'SPF 50 with water resistance for outdoor swims.',
     rows: [['Protection', 'Broad-spectrum SPF 50.'],
       ['For swimming', 'Water resistant for 80 minutes. Reapply after swimming or towel drying, following the label.'],
-      ['In your routine', 'Replaces your morning sunscreen on swim days.']],
+      ['In your routine', 'You recorded a morning sunscreen. Replacement intent has not been provided.']],
   },
 };
 test('category examples expose specific label, profile and routine facts without new authority', () => {
@@ -96,8 +96,8 @@ test('category examples expose specific label, profile and routine facts without
   }
   const moisturizer = describeResultExample('moisturizer').verdict;
   assert.deepEqual(moisturizer.findings[0].evidence.map(row => row.detail), ['Moisturizer for dry skin', 'Dry skin']);
-  assert.deepEqual(moisturizer.findings[2].evidence.map(row => row.detail), ['Rich cream', 'Rich texture']);
-  assert.ok(moisturizer.findings[1].evidence.some(row => row.detail.includes('Check intent: add')));
+  assert.deepEqual(moisturizer.findings[2].evidence.map(row => row.detail), ['Rich cream']);
+  assert.ok(moisturizer.findings[1].evidence.some(row => row.detail.includes('Intent unanswered')));
   const swimming = describeResultExample('sunscreen').verdict.findings[1];
   assert.match(swimming.limits.join(' '), /80 minutes.*immediately.*every 2 hours.*Not waterproof/);
   assert.ok(swimming.evidence.some(row => row.detail.includes('immediately after towel drying')));
@@ -129,8 +129,8 @@ test('bound live goal facts, uncertainties and material cautions stay in the vis
 
 test('fictional category sources contain only the facts supporting their finding', () => {
   const cleanser = describeResultExample('cleanser').verdict.findings;
-  assert.deepEqual(cleanser[0].evidence.map(row => row.detail), ['Cleanser for dry skin', 'Dry skin; current wash leaves skin feeling tight']);
-  assert.deepEqual(cleanser[2].evidence.map(row => row.detail), ['Non-foaming cream', 'Cream cleanser']);
+  assert.deepEqual(cleanser[0].evidence.map(row => row.detail), ['Cleanser for dry skin', 'Dry skin']);
+  assert.deepEqual(cleanser[2].evidence.map(row => row.detail), ['Non-foaming cream']);
   const sunscreen = describeResultExample('sunscreen').verdict.findings;
   assert.deepEqual(sunscreen[0].evidence.map(row => row.detail), ['Broad-spectrum SPF 50']);
   assert.deepEqual(sunscreen[1].evidence.slice(0, 2).map(row => row.detail), ['Water resistant for 80 minutes', 'Outdoor swimming for about one hour']);

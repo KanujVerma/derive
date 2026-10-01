@@ -14,7 +14,7 @@ import { publicEnvironment } from '@/src/config/environment';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { createCatalogRequestId } from '@/src/services/productCatalog';
-import { searchPreviewCatalog } from '@/src/commerce/checkPreview';
+import { searchSetupPreviewCatalog } from '@/src/fixtures/p0b-personalization/setupCatalog';
 let setupSerial = 1;
 /** Native visual acceptance only. No network requests, auth changes, or persistence. */
 export default function PersonalDecisionFixtureScreen() {
@@ -34,7 +34,7 @@ export default function PersonalDecisionFixtureScreen() {
     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{['decision', 'profile', 'routine', 'experience'].map(value => <Button key={value} label={value} size="medium" variant="ghost" onPress={() => setMode(value)} />)}</View>
     {message && <Text accessibilityLiveRegion="polite">{message}</Text>}
   </View>}
-    {mode === 'profile' && <ContextFlow initialDraft={fresh ? undefined : basicContext} collectIntent={false} setup={focused} catalogSearch={searchPreviewCatalog} createId={() => `00000000-0000-4000-8000-${String(setupSerial++).padStart(12, '0')}`} completionLabel="Done" onApply={() => { if (focused) closePreview(); else setMessage('Preview finished. Answers were not saved.'); }} onSkip={() => { if (focused) closePreview(); else setMode('decision'); }} />}
+    {mode === 'profile' && <ContextFlow initialDraft={fresh ? undefined : basicContext} collectIntent={false} setup={focused} catalogSearch={searchSetupPreviewCatalog} createId={() => `00000000-0000-4000-8000-${String(setupSerial++).padStart(12, '0')}`} completionLabel="Done" onApply={() => { if (focused) closePreview(); else setMessage('Preview finished. Answers were not saved.'); }} onSkip={() => { if (focused) closePreview(); else setMode('decision'); }} />}
     {mode === 'routine' && <RoutineContext initialDraft={partialRoutine} createItemId={createCatalogRequestId} onApply={() => setMessage('Fixture routine applied locally. Nothing saved.')} onSkip={() => setMode('decision')} />}
     {mode === 'experience' && <ExperienceContext createRecordId={createCatalogRequestId} existing={{ draft: noReactionReport, revisionId: '00000000-0000-4000-8000-000000000003' }} onApply={() => setMessage('Fixture correction applied locally. Nothing saved.')} onSkip={() => setMode('decision')} />}
     {mode === 'decision' && <Screen scrollable><Text>Scenario: {fixture.id}</Text><PersonalDecisionPanel packet={fixture.packet} expectedBinding={fixture.binding} onNextStep={step => { if (step === 'add_context') setMode('profile'); else if (step === 'review_routine' || step === 'keep_current') setMode('routine'); else setMessage(`Fixture next step: ${step.replaceAll('_', ' ')}. No live action performed.`); }} /><Button label="Back" variant="ghost" onPress={closePreview} /></Screen>}

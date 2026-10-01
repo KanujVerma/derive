@@ -1,5 +1,17 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-01 — optional profile coverage and per-Check development questions
+
+Local `kanuj/ux-check-profile-preview`, starting clean at `3466059272af36ceae912c0289e3794144a16c00`. Origin was fetched; branch diverges from current main (25 local / 55 main commits at inspection). This preserves the selected integrated preview and unpublished counterpart work; no merge, push or hosted action is authorized by this pass.
+
+The five-step setup now offers optional, multi-fact current-product feedback. Catalog moisturizer category enables Works well / Still feels dry / Too heavy plus specific adverse and unknown choices. Manual/unknown/sunscreen/deodorant/haircare retain general meanings. Legacy Not helping is not hydration failure; Too heavy is not a general preference; current edits do not erase historical reports. The guarded setup search supplies a clearly fictional Comfort Cream alongside the existing sourced cleanser sample.
+
+The guarded Check preview has optional per-Check intent, explicit replacement targets and evidence-backed authored texture questions. Answers update structured findings and verdict together; reopening preserves the same context, new examples clear it, and changing targets clears current target feedback. None/skipped/partial routines, several same-role products, irrelevant goals, exact variant/formula mismatch and unsupported categories have explicit demonstrations and tests. All useful findings remain visible on expansion; only Source controls disclose provenance. Questions are honestly demo-only, unsaved and unavailable to live/remote/production Check.
+
+See [P0-B context](P0_B_CONTEXT.md) for the precise Sami backend handoff and founder policy decisions: global stored intent, absent per-Check target/texture/current-feedback revision, same-family reaction caution across formula changes, Add/KEEP_CURRENT policy, and unsupported layering compatibility. No migration, live clinical rule, billing, Auth/RLS, truth promotion or analytics change.
+
+Validation: focused production handlers and edge models, full app tests, both TypeScript checks, web/iOS JavaScript exports and diff inspection. Responsive browser screenshots are review evidence; physical iPhone touch acceptance is unrun. Expo port 8083 is preserved. Exact-head CI remains required before any future merge.
+
 This repository-native ledger records meaningful cross-agent checkpoints. Current implementation/runtime/tests and the canonical docs outrank historical entries below. GitHub is the sole durable project context; Drive is limited to customer-research artifacts. Past `Drive Status` and `DRIVE_SYNC_PAYLOAD` lines document their historical checkpoints and impose no current sync requirement.
 
 **Core Rules**:

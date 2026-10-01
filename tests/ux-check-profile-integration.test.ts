@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { componentHarness, control, press, textContent } from './ux-profile-render.ts';
 import { searchPreviewCatalog, getPreviewCatalogDetail } from '../src/commerce/checkPreview.ts';
+import { searchSetupPreviewCatalog } from '../src/fixtures/p0b-personalization/setupCatalog.ts';
 
 /** Host state/handlers and projections run normally; native hosts, stores and network I/O are inert. */
 function previewModules() {
@@ -32,6 +33,7 @@ function previewModules() {
     '@/src/services/analytics': { analytics: { track() {} } },
     '@/src/commerce/useShopAudience': { useShopAudience: () => 'member' },
     '@/src/commerce/checkPreview': { searchPreviewCatalog, getPreviewCatalogDetail },
+    '@/src/fixtures/p0b-personalization/setupCatalog': { searchSetupPreviewCatalog },
     '@/src/presentation/personalization/gateway': { personalizationGateway: { lastSaveStatus: () => null }, resolvePersonalizationOwnerId: () => null },
     '@/src/presentation/personal-decision/customerGateway': { currentCustomerOwner: () => null, customerController: { subscribe() {}, getState: () => state, setOwner() {}, setOriginSnapshot() {} } },
     '@/src/presentation/personal-decision/customerController': { selectVisibleCustomerDecision: () => null, describeCanonicalMyStuff: () => ({ kind: 'unavailable' }), canShowLegacyPersonalFit: () => true },
@@ -91,12 +93,12 @@ test('My Stuff opens fresh five-step setup, uses local searches and Done returns
   press(control(setup.render(), 'Continue'));
   press(control(setup.render(), 'Continue'));
   let search = setup.render().find(node => node.type === 'CatalogProductSearch')!;
-  assert.equal(search.props.search, searchPreviewCatalog);
+  assert.equal(search.props.search, searchSetupPreviewCatalog);
   search.props.onSelect((await search.props.search('CeraVe'))[0]);
   assert.match(textContent(setup.render()), /CeraVe Renewing SA Cleanser/);
   press(control(setup.render(), 'Continue'));
   search = setup.render().find(node => node.type === 'CatalogProductSearch')!;
-  assert.equal(search.props.search, searchPreviewCatalog);
+  assert.equal(search.props.search, searchSetupPreviewCatalog);
   press(control(setup.render(), 'Continue'));
   assert.match(textContent(setup.render()), /Step\s+5\s+of\s+5/);
   press(control(setup.render(), 'Done'));
