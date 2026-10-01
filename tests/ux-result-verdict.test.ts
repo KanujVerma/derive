@@ -65,43 +65,64 @@ test('routine-role finding does not assume adding intent or manufacture amber', 
   assert.equal(added.state, 'tradeoffs'); assert.match(added.reason, /Adding this would duplicate/);
   assert.equal(describeDecisionVerdict(f.packet, { ...f.binding, ownerId: 'stale' }, { intent: 'add' }).state, 'unknown');
 });
-test('category examples have distinct concrete facts, complementary findings and individual evidence', () => {
-  for (const [id, feature] of [['cleanser', 'Non-foaming cream'], ['moisturizer', 'Rich cream'], ['sunscreen', 'Water resistant for 80 minutes']] as const) {
+const categoryCopy = {
+  moisturizer: {
+    summary: 'A dry-skin moisturizer for your evening routine.',
+    rows: [['For your dryness', 'Labelled to moisturize dry skin.'],
+      ['In your routine', 'Adds an evening moisturizer after your cleanser.'],
+      ['Texture', 'Rich cream, matching your stated preference.']],
+  },
+  cleanser: {
+    summary: 'A cream cleanser for your dry-skin routine.',
+    rows: [['For dry skin', 'Labelled for dry skin. Your current wash leaves your skin feeling tight.'],
+      ['In your routine', 'Replaces your evening gel cleanser.'],
+      ['Texture', 'Non-foaming cream, your preferred cleanser type.']],
+  },
+  sunscreen: {
+    summary: 'SPF 50 with water resistance for outdoor swims.',
+    rows: [['Protection', 'Broad-spectrum SPF 50.'],
+      ['For swimming', 'Water resistant for 80 minutes. Reapply after swimming or towel drying, following the label.'],
+      ['In your routine', 'Replaces your morning sunscreen on swim days.']],
+  },
+};
+test('category examples expose specific label, profile and routine facts without new authority', () => {
+  for (const [id, expected] of Object.entries(categoryCopy)) {
     const e = describeResultExample(id);
-    assert.equal(e.verdict.state, 'good'); assert.match(e.verdict.reason, new RegExp(feature));
-    assert.equal(e.verdict.findings.length, id === 'sunscreen' ? 2 : 1);
-    assert.ok(e.verdict.findings.every(f => f.reason !== e.verdict.reason && f.evidence.length > 0));
-    assert.ok(e.verdict.summaryFinding!.evidence.some(f => f.label === 'Your preference'));
-    assert.ok(e.verdict.summaryFinding!.evidence.some(f => f.label === 'Package description'));
-    assert.ok(e.verdict.summaryFinding!.limits.length > 0);
-    assert.ok(e.verdict.findings.every(f => f.title !== 'Your goal'));
-    assert.doesNotMatch(e.verdict.findings.map(f => f.reason).join(' '), /does not replace|different role|does not assess/);
+    assert.equal(e.verdict.state, 'good'); assert.equal(e.verdict.reason, expected.summary);
+    assert.deepEqual(e.verdict.findings.map(f => [f.title, f.reason]), expected.rows);
+    assert.ok(e.verdict.findings.every(f => f.evidence.length > 0));
     assert.equal(e.facts.formula, null); assert.equal(e.facts.source, null);
-    assert.doesNotMatch(e.verdict.reason, /will (prevent|cure|protect|hydrate)|cerave|la roche|Reddit|clinical|research/i);
+    assert.doesNotMatch(JSON.stringify(e.verdict), /will (prevent|cure|protect|hydrate)|cerave|la roche|Reddit|clinical|research|absorption|pore effects/i);
   }
-  assert.equal(describeResultExample('moisturizer').verdict.reason, 'Rich cream · Your preferred texture');
-  assert.equal(describeResultExample('moisturizer').verdict.findings[0].reason, 'Evening, after cleanser');
-  assert.match(describeResultExample('cleanser').verdict.findings[0].reason, /Replaces your gel wash/);
-  assert.match(describeResultExample('sunscreen').verdict.findings[1].reason, /Reapply after swimming or towel-drying.*not waterproof/);
+  const moisturizer = describeResultExample('moisturizer').verdict;
+  assert.ok(moisturizer.findings[0].evidence.some(row => row.detail.includes('moisturizer for dry skin')));
+  assert.ok(moisturizer.findings[2].evidence.some(row => row.detail.includes('explicitly wants a rich texture')));
+  assert.ok(moisturizer.findings[1].evidence.some(row => row.detail.includes('Check intent: add')));
+  const swimming = describeResultExample('sunscreen').verdict.findings[1];
+  assert.match(swimming.limits.join(' '), /80 minutes.*immediately.*every 2 hours.*Not waterproof/);
+  assert.ok(swimming.evidence.some(row => row.detail.includes('immediately after towel drying')));
   assert.equal(describeResultExample('redundancy').verdict.state, 'tradeoffs');
   assert.equal(describeResultExample('intent-unknown').verdict.state, 'unknown');
   assert.equal(describeResultExample('replacement').verdict.state, 'unknown');
 });
 
-test('only the repeated goal is removed; verdict evidence and distinct goal facts survive', () => {
+test('bound live goal facts, uncertainties and material cautions stay in the visible finding list', () => {
   const f = fixture('positive-role-match');
   const goal = f.packet.findings[0];
   const v = describeDecisionVerdict(f.packet, f.binding);
-  assert.equal(v.findings.some(row => row.id === goal.id), false);
-  assert.equal(v.summaryFinding!.id, goal.id);
-  assert.equal(v.summaryFinding!.evidence.length, goal.evidence.length);
-  assert.ok(v.summaryFinding!.limits.some(limit => limit.includes('individual results or tolerance')));
-  assert.doesNotMatch(v.reason, /preferred texture|rich cream/i, 'live facts do not carry a texture preference');
+  const row = v.findings.find(row => row.id === goal.id)!;
+  assert.equal(row.evidence.length, goal.evidence.length);
+  assert.ok(row.limits.some(limit => limit.includes('individual results or tolerance')));
+  assert.doesNotMatch(v.reason, /preferred texture|rich cream|labelled to moisturize/i, 'live facts do not borrow fixture preferences or label claims');
+  goal.evidence.push({ kind: 'reviewed_claim', claimId: 'fixture-claim', claimRevision: '1', sourceId: 'fixture-review', sourceRevision: '1', applicability: 'applicable', limitations: ['Applicability is limited to the reviewed context.'] });
+  const reviewed = describeDecisionVerdict(f.packet, f.binding).findings.find(row => row.id === goal.id)!;
+  assert.ok(reviewed.limits.includes('Applicability is limited to the reviewed context.'), 'reviewed limitations cannot be hidden in Source');
+  assert.ok(reviewed.evidence.some(row => row.detail.includes('Publication details were not supplied')));
   f.packet.findings.push({ ...goal, id: 'another-goal', display: { kind: 'role_match', goal: 'maintain', category: 'moisturizer', evidenceIndexes: [0, 1] } });
   const distinct = describeDecisionVerdict(f.packet, f.binding);
   assert.ok(distinct.findings.some(row => row.id === 'another-goal' && row.reason.includes('maintaining your skin')));
   const caution = fixture('caution');
   const cautious = describeDecisionVerdict(caution.packet, caution.binding);
-  assert.ok(cautious.findings.some(row => row.title === 'Your goal'), 'a goal distinct from the caution stays visible');
-  assert.ok(cautious.findings.some(row => row.id === cautious.summaryFinding!.id), 'material caution stays in findings');
+  assert.ok(cautious.findings.some(row => row.title === 'Your goal'));
+  assert.ok(cautious.findings.some(row => row.id === 'prior-reaction' && row.reason.includes('reported a reaction')));
 });

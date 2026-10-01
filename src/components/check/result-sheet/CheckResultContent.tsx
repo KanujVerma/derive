@@ -19,46 +19,35 @@ const tones = {
   poor: { ...colors.actionStop, icon: 'close' as IconName },
   unknown: { text: colors.inkMuted, bg: colors.surfaceMuted, border: colors.borderStrong, icon: 'info' as IconName },
 };
-function EvidenceRows({ finding, onSource }: { finding: ResultFinding; onSource?: () => void }) {
-  return <View style={styles.evidence}>
+function SourceDisclosure({ finding, onSource }: { finding: ResultFinding; onSource?: () => void }) {
+  const [open, setOpen] = useState(false);
+  if (finding.evidence.length === 0 && !onSource) return null;
+  return <View>
+    <Pressable onPress={() => setOpen(value => !value)} style={styles.sourceControl} accessibilityRole="button"
+      accessibilityLabel={`${open ? 'Hide' : 'Show'} sources for ${finding.title}`} accessibilityState={{ expanded: open }}>
+      <Text style={styles.link}>Source</Text><Icon name={open ? 'up' : 'down'} size={15} color={colors.brand} />
+    </Pressable>
+    {open && <View style={styles.evidence}>
       {finding.evidence.map((item, index) => <View key={index}><Text style={styles.evidenceLabel}>{item.label}</Text><Text style={styles.detail}>{item.detail}</Text></View>)}
-      {finding.limits.map((limit, index) => <Text key={index} style={styles.detail}>{limit}</Text>)}
-      {onSource && <Pressable accessibilityRole="link" accessibilityLabel="View product source" onPress={onSource} style={styles.disclosure}><Text style={styles.link}>Product source</Text></Pressable>}
-    </View>;
+      {onSource && <Pressable accessibilityRole="link" accessibilityLabel={`View product source for ${finding.title}`} onPress={onSource} style={styles.sourceControl}><Text style={styles.link}>Product source</Text></Pressable>}
+    </View>}
+  </View>;
 }
 function FindingCard({ finding, onSource }: { finding: ResultFinding; onSource?: () => void }) {
-  const [open, setOpen] = useState(false);
-  const hasDetails = finding.evidence.length > 0 || finding.limits.length > 0 || Boolean(onSource);
-  const content = <>
-    <View style={styles.findingHeading}><Text style={styles.findingTitle} accessibilityRole="header">{finding.title}</Text>
-      {hasDetails && <Icon name={open ? 'up' : 'down'} size={18} color={colors.brand} />}</View>
-    <Text style={styles.body}>{finding.reason}</Text>
-  </>;
   return <View style={styles.finding}>
-    {hasDetails ? <Pressable onPress={() => setOpen(value => !value)} style={styles.findingTrigger} accessibilityRole="button"
-      accessibilityLabel={`${finding.title}. ${finding.reason} ${open ? 'Hide' : 'Show'} evidence.`} accessibilityState={{ expanded: open }}>
-      {content}
-    </Pressable> : content}
-    {open && <EvidenceRows finding={finding} onSource={onSource} />}
+    <Text style={styles.findingTitle} accessibilityRole="header">{finding.title}</Text>
+    <Text style={styles.body}>{finding.reason}</Text>
+    {finding.limits.map((limit, index) => <Text key={index} style={styles.detail}>{limit}</Text>)}
+    <SourceDisclosure finding={finding} onSource={onSource} />
   </View>;
 }
 function VerdictBlock({ verdict }: { verdict: VerdictPresentation }) {
-  const [open, setOpen] = useState(false);
   const tone = tones[verdict.state];
-  const finding = verdict.summaryFinding;
-  const hasDetails = finding && (finding.evidence.length > 0 || finding.limits.length > 0);
-  const content = <>
-    <View style={styles.verdictTitleRow}><Icon name={tone.icon} size={22} color={tone.text} />
-      <Text style={[styles.verdictTitle, { color: tone.text }]} accessibilityRole="header">{verdict.label}</Text>
-      {hasDetails && <Icon name={open ? 'up' : 'down'} size={18} color={tone.text} />}</View>
-    <Text style={styles.reason}>{verdict.reason}</Text>
-  </>;
   return <View style={styles.fitBlock}><Text style={styles.eyebrow}>PERSONAL FIT</Text>
     <View style={[styles.verdict, { backgroundColor: tone.bg, borderColor: tone.border }]} accessibilityLiveRegion="polite">
-      {hasDetails ? <Pressable onPress={() => setOpen(value => !value)} style={styles.findingTrigger} accessibilityRole="button"
-        accessibilityLabel={`${verdict.label}. ${verdict.reason} ${open ? 'Hide' : 'Show'} evidence for personal fit.`}
-        accessibilityState={{ expanded: open }}>{content}</Pressable> : content}
-      {open && finding && <EvidenceRows finding={finding} />}
+      <View style={styles.verdictTitleRow}><Icon name={tone.icon} size={22} color={tone.text} />
+        <Text style={[styles.verdictTitle, { color: tone.text }]} accessibilityRole="header">{verdict.label}</Text></View>
+      <Text style={styles.reason}>{verdict.reason}</Text>
     </View>
   </View>;
 }
@@ -108,11 +97,9 @@ const styles = StyleSheet.create({
   verdictTitle: { flex: 1, fontSize: typography.sizes.sectionTitle, lineHeight: typography.lineHeights.sectionTitle, fontWeight: typography.weights.semibold },
   reason: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular }, findings: { gap: spacing.md },
   finding: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, gap: spacing.xs },
-  findingHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  findingTrigger: { minHeight: layout.minTouchTarget, gap: spacing.xs },
-  findingTitle: { flex: 1, color: colors.ink, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
+  findingTitle: { color: colors.ink, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
   body: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
-  disclosure: { minHeight: layout.minTouchTarget, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sourceControl: { minHeight: layout.minTouchTarget, minWidth: layout.minTouchTarget, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   link: { color: colors.brand, fontSize: typography.sizes.caption, fontWeight: typography.weights.medium }, evidence: { gap: spacing.sm },
   evidenceLabel: { color: colors.ink, fontSize: typography.sizes.caption, fontWeight: typography.weights.semibold },
   detail: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption },

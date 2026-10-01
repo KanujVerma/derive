@@ -13,8 +13,6 @@ export interface ResultFinding {
 }
 export interface VerdictPresentation {
   state: VerdictState; label: string; reason: string; findings: ResultFinding[];
-  /** Retained evidence for the verdict, including a goal row removed only when it repeats the summary. */
-  summaryFinding?: ResultFinding;
 }
 const goals: Record<string, string> = { dryness: 'dryness', breakouts: 'breakouts', dark_spots: 'dark marks',
   oiliness: 'oiliness', texture: 'texture', redness: 'redness', fine_lines: 'fine lines',
@@ -59,7 +57,7 @@ function reason(finding: Finding, fallback: string, intent?: CheckPresentationIn
 function evidence(e: DecisionEvidence): { label: string; detail: string } | null {
   if (e.kind === 'observation') return null;
   if (e.kind === 'context_fact') return { label: e.section === 'history' ? 'Product experience' : e.section === 'routine' ? 'Recorded routine' : 'Skin profile', detail: e.section === 'history' ? 'Your own report of this product experience.' : e.section === 'routine' ? 'Your recorded routine context.' : 'Your recorded skin profile answers.' };
-  if (e.kind === 'reviewed_claim') return { label: 'Reviewed evidence', detail: e.limitations.length ? e.limitations.join(' ') : 'A reviewed claim record. Publication details were not supplied.' };
+  if (e.kind === 'reviewed_claim') return { label: 'Reviewed evidence', detail: 'A reviewed claim record. Publication details were not supplied.' };
   return { label: e.kind === 'routine_product_fact' ? 'Current product record' : 'Product record',
     detail: e.scope === 'formula' ? 'The verified ingredient list for this package.' : e.scope === 'category' ? 'The sourced product role.' : 'The confirmed product and variant.' };
 }
@@ -89,7 +87,7 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
     const group = groups.find(g => g.findingIds.includes(f.id));
     return { id: f.id, title: title[f.kind], reason: reason(f, group?.reason ?? view.primaryReason, options.intent),
       evidence: f.evidence.map(evidence).filter((e): e is NonNullable<typeof e> => e !== null),
-      limits: [...new Set([...f.uncertainty, ...packet.evidenceNeeds.filter(n => f.evidenceNeedIds.includes(n.id)).map(n => {
+      limits: [...new Set([...f.uncertainty, ...f.evidence.flatMap(e => e.kind === 'reviewed_claim' ? e.limitations : []), ...packet.evidenceNeeds.filter(n => f.evidenceNeedIds.includes(n.id)).map(n => {
         if (n.code === 'routine_completeness') return 'An unrecorded routine does not mean you have no routine.';
         if (n.code === 'individual_tolerance') return 'Tolerance of this new product is not established.';
         return n.state === 'withheld' ? 'You chose not to provide this context.' : `Unresolved: ${n.code.replaceAll('_', ' ')}.`;
@@ -116,10 +114,7 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
     const detail = reason(caution, view.primaryReason, options.intent).split('. ')[0];
     summary = `${summary.split('. ')[0]}. ${detail.replace(/\.$/, '')}.`;
   }
-  const summaryFinding = deciding ? ordered.find(f => f.id === deciding.id) : undefined;
-  const distinct = ordered.filter(f => !(f.id === positive?.id && summaryFinding?.id === f.id && f.reason === summary));
-  return { state, label: verdictLabels[state], reason: summary, findings: distinct,
-    ...(summaryFinding ? { summaryFinding } : {}) };
+  return { state, label: verdictLabels[state], reason: summary, findings: ordered };
 }
 
 /** Snapshot, owner and independently loaded revisions are checked before any positive presentation. */

@@ -141,31 +141,69 @@ test('first expanded detent reveals findings and host actions directly', () => {
   assert.equal(r.sheets[0].index, 1);
 });
 
-test('fact rows and verdict disclose their own evidence with accessible state and comfortable targets', () => {
-  const r = renderer(true);
-  const { CheckResultView } = r.load('src/components/check/result-sheet/CheckResultContent');
-  const { describeResultExample } = r.load('src/presentation/check/result-sheet/examples');
-  const props = describeResultExample('moisturizer');
-  const render = () => r.render(CheckResultView, props);
-  let html = render();
-  assert.ok(html.indexOf('Comfort Moisturizing Cream') < html.indexOf('PERSONAL FIT'));
-  assert.ok(html.indexOf('PERSONAL FIT') < html.indexOf('In your routine'));
-  assert.match(html, /Rich cream · Your preferred texture/);
-  assert.match(html, /In your routine/); assert.match(html, /Evening, after cleanser/);
-  assert.doesNotMatch(html, /Your goal|Evidence &amp; limits|Why this result|Fictional preference/);
-  assert.equal(r.pressables.length, 2);
-  for (const row of r.pressables) {
-    assert.equal(row.accessibilityRole, 'button'); assert.equal(row.accessibilityState.expanded, false);
-    assert.ok(row.style.minHeight >= 44); assert.match(row.accessibilityLabel, /Show evidence/);
+test('fixed verdict and substantive findings stay visible while only Source toggles provenance', () => {
+  for (const id of ['moisturizer', 'cleanser', 'sunscreen']) {
+    const r = renderer(true);
+    const { CheckResultView } = r.load('src/components/check/result-sheet/CheckResultContent');
+    const { describeResultExample } = r.load('src/presentation/check/result-sheet/examples');
+    const props = describeResultExample(id);
+    const render = () => r.render(CheckResultView, props);
+    let html = render();
+    assert.ok(html.indexOf(props.facts.name) < html.indexOf('PERSONAL FIT'));
+    for (const finding of props.verdict.findings) {
+      assert.match(html, new RegExp(finding.title));
+      assert.ok(html.includes(finding.reason));
+      for (const limit of finding.limits) assert.ok(html.includes(limit), 'material limits remain visible with sources closed');
+    }
+    assert.doesNotMatch(html, /Evidence &amp; limits|Why this result|Fictional profile answers|Fictional package excerpt/);
+    assert.equal(r.pressables.length, 3, 'no verdict or finding-title expander');
+    for (let i = 0; i < r.pressables.length; i++) {
+      const control = r.pressables[i];
+      assert.equal(control.accessibilityRole, 'button'); assert.equal(control.accessibilityState.expanded, false);
+      assert.ok(control.style.minHeight >= 44); assert.ok(control.style.minWidth >= 44);
+      assert.equal(control.accessibilityLabel, `Show sources for ${props.verdict.findings[i].title}`);
+    }
+    r.pressables[0].onPress(); html = render();
+    assert.match(html, /Fictional package excerpt/);
+    assert.equal(r.pressables[0].accessibilityState.expanded, true);
+    assert.equal(r.pressables[1].accessibilityState.expanded, false);
+    assert.ok(html.includes(props.verdict.reason));
+    for (const finding of props.verdict.findings) assert.ok(html.includes(finding.reason), 'Source cannot hide main reasoning');
+    r.pressables[1].onPress(); html = render();
+    assert.equal(r.pressables[1].accessibilityState.expanded, true);
+    r.pressables[0].onPress(); html = render();
+    assert.equal(r.pressables[0].accessibilityState.expanded, false);
+    assert.equal(r.pressables[1].accessibilityState.expanded, true);
+    if (id !== 'sunscreen') { assert.doesNotMatch(html, /Fictional package excerpt/); assert.match(html, /Recorded steps/); }
   }
-  r.pressables[0].onPress(); html = render();
-  assert.match(html, /Fictional preference: richer evening cream/);
-  assert.match(html, /Package description/); assert.match(html, /does not establish hydration/);
-  assert.equal(r.pressables[0].accessibilityState.expanded, true);
-  assert.equal(r.pressables[1].accessibilityState.expanded, false);
-  r.pressables[1].onPress(); html = render();
-  assert.match(html, /Recorded steps/); assert.match(html, /Intent: add an evening moisturizer/);
-  assert.equal(r.pressables[1].accessibilityState.expanded, true);
-  r.pressables[0].onPress(); html = render();
-  assert.doesNotMatch(html, /Fictional preference/); assert.match(html, /Recorded steps/);
+});
+
+test('live cautions and unknowns remain visible with all sources closed', () => {
+  for (const id of ['caution', 'missing-formula', 'routine-not-provided', 'partial-routine', 'intent-unknown']) {
+    const r = renderer(true);
+    const { CheckResultView } = r.load('src/components/check/result-sheet/CheckResultContent');
+    const { describeResultExample } = r.load('src/presentation/check/result-sheet/examples');
+    const props = describeResultExample(id);
+    const html = r.render(CheckResultView, props);
+    const escaped = (text: string) => renderToStaticMarkup(React.createElement('span', {}, text)).slice(6, -7);
+    assert.ok(html.includes(escaped(props.verdict.reason)));
+    for (const finding of props.verdict.findings) {
+      assert.ok(html.includes(escaped(finding.reason)));
+      for (const limit of finding.limits) assert.ok(html.includes(escaped(limit)));
+    }
+    assert.ok(r.pressables.every(control => control.accessibilityState.expanded === false && control.accessibilityLabel.startsWith('Show sources for')));
+  }
+});
+
+test('compact fold contains only the complete identity and fixed four-state verdict', () => {
+  for (const [id, label] of [['moisturizer', 'Good fit'], ['redundancy', 'Some tradeoffs'], ['caution', 'Not a good fit'], ['missing-formula', 'Not enough information']]) {
+    const r = renderer(true);
+    const { CheckResultView } = r.load('src/components/check/result-sheet/CheckResultContent');
+    const { describeResultExample } = r.load('src/presentation/check/result-sheet/examples');
+    const props = describeResultExample(id);
+    const html = r.render(CheckResultView, { ...props, section: 'summary' });
+    assert.ok(html.includes(props.facts.name)); assert.ok(html.includes(label)); assert.ok(html.includes(props.verdict.reason));
+    assert.equal(r.pressables.length, 0, 'verdict has no disclosure or tap action');
+    assert.doesNotMatch(html, /Source|For your dryness|In your routine|Texture<\/span>/);
+  }
 });
