@@ -13,10 +13,12 @@ import { personalDecisionFixtures } from '../src/fixtures/personal-decision/fixt
 const require = createRequire(import.meta.url);
 const { renderToStaticMarkup } = require('react-dom/server') as { renderToStaticMarkup: (element: React.ReactNode) => string };
 const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
-function renderer() {
+function renderer(interactive = false) {
   const cache = new Map<string, { exports: any }>();
   const native = (tag: string) => ({ children }: any) => React.createElement(tag, {}, children);
   const sheets: any[] = [];
+  const pressables: any[] = [], state: any[] = [];
+  let stateCursor = 0;
   const modalScopes: any[] = [], scrollScopes: any[] = [];
   const sheet = (props: any) => { sheets.push(props); return React.createElement('section', {}, props.children); };
   function load(path: string): any {
@@ -26,8 +28,14 @@ function renderer() {
     if (cache.has(file)) return cache.get(file)!.exports;
     const module = { exports: {} as any }; cache.set(file, module);
     const dependency = (name: string): any => {
-      if (name === 'react-native') return { Modal: native('div'), KeyboardAvoidingView: native('div'), View: native('div'), Text: native('span'), Pressable: native('button'), Image: native('img'), ActivityIndicator: native('i'), ScrollView: native('div'),
-        StyleSheet: { create: (value: unknown) => value, absoluteFill: {}, hairlineWidth: 1 }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ height: 844, width: 390, fontScale: 1 }), AccessibilityInfo: {}, findNodeHandle: () => null };
+      if (name === 'react' && interactive) return { ...React, useState: (initial: any) => {
+        const index = stateCursor++;
+        if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial;
+        return [state[index], (next: any) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
+      } };
+      if (name === 'react-native') return { Modal: native('div'), KeyboardAvoidingView: native('div'), View: native('div'), Text: native('span'), Image: native('img'), ActivityIndicator: native('i'), ScrollView: native('div'),
+        StyleSheet: { create: (value: unknown) => value, absoluteFill: {}, hairlineWidth: 1 }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ height: 844, width: 390, fontScale: 1 }), AccessibilityInfo: {}, findNodeHandle: () => null,
+        Pressable: (props: any) => { pressables.push(props); return React.createElement('button', {}, props.children); } };
       if (name === 'react-native-safe-area-context') return { SafeAreaProvider: native('div'), useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }) };
       if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: (props: any) => { modalScopes.push(props); return React.createElement('div', {}, props.children); } };
       if (name === 'react-native-reanimated') return { ReduceMotion: { System: 'system' } };
@@ -41,7 +49,10 @@ function renderer() {
     new Script(`(function(require,module,exports){${js}\n})`, { filename: file }).runInThisContext()(dependency, module, module.exports);
     return module.exports;
   }
-  return { load, sheets, modalScopes, scrollScopes, render: (component: any, props: any) => renderToStaticMarkup(React.createElement(component, props)) };
+  return { load, sheets, modalScopes, scrollScopes, pressables, render: (component: any, props: any) => {
+    stateCursor = 0; pressables.length = 0;
+    return renderToStaticMarkup(React.createElement(component, props));
+  } };
 }
 
 test('sheet continuous mode exposes all bound reasons, evidence and uncertainties without another disclosure', () => {
@@ -128,4 +139,33 @@ test('first expanded detent reveals findings and host actions directly', () => {
     summary: React.createElement('p', {}, 'Product and verdict'), children: React.createElement('p', {}, 'Substantive finding and action') });
   assert.match(html, /Product and verdict/); assert.match(html, /Substantive finding and action/);
   assert.equal(r.sheets[0].index, 1);
+});
+
+test('fact rows and verdict disclose their own evidence with accessible state and comfortable targets', () => {
+  const r = renderer(true);
+  const { CheckResultView } = r.load('src/components/check/result-sheet/CheckResultContent');
+  const { describeResultExample } = r.load('src/presentation/check/result-sheet/examples');
+  const props = describeResultExample('moisturizer');
+  const render = () => r.render(CheckResultView, props);
+  let html = render();
+  assert.ok(html.indexOf('Comfort Moisturizing Cream') < html.indexOf('PERSONAL FIT'));
+  assert.ok(html.indexOf('PERSONAL FIT') < html.indexOf('In your routine'));
+  assert.match(html, /Rich cream · Your preferred texture/);
+  assert.match(html, /In your routine/); assert.match(html, /Evening, after cleanser/);
+  assert.doesNotMatch(html, /Your goal|Evidence &amp; limits|Why this result|Fictional preference/);
+  assert.equal(r.pressables.length, 2);
+  for (const row of r.pressables) {
+    assert.equal(row.accessibilityRole, 'button'); assert.equal(row.accessibilityState.expanded, false);
+    assert.ok(row.style.minHeight >= 44); assert.match(row.accessibilityLabel, /Show evidence/);
+  }
+  r.pressables[0].onPress(); html = render();
+  assert.match(html, /Fictional preference: richer evening cream/);
+  assert.match(html, /Package description/); assert.match(html, /does not establish hydration/);
+  assert.equal(r.pressables[0].accessibilityState.expanded, true);
+  assert.equal(r.pressables[1].accessibilityState.expanded, false);
+  r.pressables[1].onPress(); html = render();
+  assert.match(html, /Recorded steps/); assert.match(html, /Intent: add an evening moisturizer/);
+  assert.equal(r.pressables[1].accessibilityState.expanded, true);
+  r.pressables[0].onPress(); html = render();
+  assert.doesNotMatch(html, /Fictional preference/); assert.match(html, /Recorded steps/);
 });

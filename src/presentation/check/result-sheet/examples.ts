@@ -5,41 +5,36 @@ import type { CustomerCheckFacts } from '../../personal-decision/customerControl
 /** Fictional label/person/routine facts. No source URL, authoritative snapshot or new live evaluation rule. */
 interface CategoryExample {
   category: 'Cleanser' | 'Moisturizer' | 'Sunscreen'; name: string; summary: string;
-  goal: string; placement: string; categoryFact: string;
+  placement: string; categoryFact?: string;
   labelEvidence: string; profileEvidence: string; routineEvidence: string; limits: string;
 }
 const categories: Record<string, CategoryExample> = {
   cleanser: {
     category: 'Cleanser', name: 'Hydrating Cream Cleanser',
-    summary: 'You described tight skin after washing and want a cream cleanser. This is a non-foaming cream labeled for dry skin.',
-    goal: 'Your goal is less post-wash tightness. The dry-skin label is relevant, but it does not establish how your skin will respond.',
-    placement: 'This would replace your evening gel wash. Your moisturizer remains a separate step.',
-    categoryFact: 'It is a rinse-off cleanser, so it does not replace a leave-on moisturizer.',
+    summary: 'Non-foaming cream · Your preferred cleanser type',
+    placement: 'Evening · Replaces your gel wash',
     labelEvidence: 'Fictional package: non-foaming cream cleanser for dry skin. Rinse off after cleansing.',
-    profileEvidence: 'Fictional person reports post-wash tightness and prefers a cream cleanser.',
-    routineEvidence: 'Fictional routine: gel wash followed by moisturizer each evening. This Check is explicitly about replacement.',
-    limits: 'The label does not establish that it will feel gentler or prevent irritation for this person.',
+    profileEvidence: 'Fictional preference: cream cleanser. Reported experience: tight skin after washing.',
+    routineEvidence: 'Fictional routine: evening gel wash, then moisturizer. Intent: replace the gel wash.',
+    limits: 'The label does not establish whether this cleanser will feel gentler or irritate your skin.',
   },
   moisturizer: {
     category: 'Moisturizer', name: 'Comfort Moisturizing Cream',
-    summary: 'You want a richer texture when your skin feels dry. This leave-on cream matches that preference.',
-    goal: 'Your dryness goal is about comfort after cleansing. The cream texture matches your preference, without proving a hydration result.',
-    placement: 'This would occupy the evening moisturizer step after your cleanser. Your morning sunscreen has a different role.',
-    categoryFact: 'The package describes a rich cream. That is a texture choice to consider if you also want something lightweight.',
-    labelEvidence: 'Fictional package: rich, leave-on moisturizing cream. No individual outcome or tolerability claim.',
-    profileEvidence: 'Fictional person reports dry, tight skin and wants a richer evening cream.',
-    routineEvidence: 'Fictional complete routine: evening cleanser and morning sunscreen. This Check is about adding an evening moisturizer.',
-    limits: 'A stated texture does not establish absorption, pore effects or individual tolerance.',
+    summary: 'Rich cream · Your preferred texture',
+    placement: 'Evening, after cleanser',
+    labelEvidence: 'Fictional package: rich, leave-on moisturizing cream.',
+    profileEvidence: 'Fictional preference: richer evening cream. Reported experience: dry, tight skin.',
+    routineEvidence: 'Fictional complete routine: evening cleanser and morning sunscreen. Intent: add an evening moisturizer.',
+    limits: 'The label describes texture; it does not establish hydration, absorption, pore effects or how your skin will tolerate this cream.',
   },
   sunscreen: {
     category: 'Sunscreen', name: 'Outdoor Swim Sunscreen SPF 50',
-    summary: 'You swim outdoors for about an hour. Its label lists broad-spectrum SPF 50 and 80-minute water resistance.',
-    goal: 'You want a sun-protection step for outdoor swims. The water-resistance label is relevant to that activity, without guaranteeing protection in use.',
-    placement: 'This would replace your morning sunscreen on swim days. It does not replace your moisturizer.',
-    categoryFact: 'The label says to reapply after swimming or towel-drying. Water resistance is time-limited, not waterproof.',
+    summary: 'Broad-spectrum SPF 50 · Water resistant for 80 minutes',
+    placement: 'Swim days · Replaces your morning sunscreen',
+    categoryFact: 'Reapply after swimming or towel-drying. Water resistant, not waterproof.',
     labelEvidence: 'Fictional package: broad-spectrum SPF 50, water resistant for 80 minutes. Directions include reapplication after swimming or towel-drying.',
-    profileEvidence: 'Fictional person swims outdoors for roughly one hour and wants a sunscreen for that activity.',
-    routineEvidence: 'Fictional routine: morning moisturizer and daily sunscreen. This Check is explicitly about replacement on swim days.',
+    profileEvidence: 'Fictional activity: outdoor swims of about one hour. Preference: sunscreen for swimming.',
+    routineEvidence: 'Fictional routine: morning moisturizer and daily sunscreen. Intent: replace sunscreen on swim days.',
     limits: 'SPF and water-resistance labels do not establish application amount, actual protection, white cast or tolerance.',
   },
 };
@@ -51,12 +46,10 @@ export const resultExamples = [
 ] as const;
 function categoryFindings(example: CategoryExample): ResultFinding[] {
   return [
-    { id: 'goal-role', title: 'Your goal', reason: example.goal,
-      evidence: [{ label: 'Your preference', detail: example.profileEvidence }, { label: 'Package description', detail: example.labelEvidence }], limits: [example.limits] },
-    { id: 'routine-placement', title: 'Your routine', reason: example.placement,
-      evidence: [{ label: 'Recorded steps', detail: example.routineEvidence }], limits: ['This placement does not assess combinations or individual tolerance.'] },
-    { id: 'category-fact', title: example.category === 'Sunscreen' ? 'Water resistance' : example.category === 'Cleanser' ? 'Rinse-off step' : 'Cream texture', reason: example.categoryFact,
-      evidence: [{ label: 'Package description', detail: example.labelEvidence }], limits: [example.limits] },
+    { id: 'routine-placement', title: 'In your routine', reason: example.placement,
+      evidence: [{ label: 'Recorded steps', detail: example.routineEvidence }], limits: [] },
+    ...(example.categoryFact ? [{ id: 'category-fact', title: 'Water resistance', reason: example.categoryFact,
+      evidence: [{ label: 'Package directions', detail: example.labelEvidence }], limits: [] }] : []),
   ];
 }
 /** Only the guarded development route consumes these authored examples. Live presentation remains narrow and bound. */
@@ -79,6 +72,10 @@ export function describeResultExample(id: string) {
   const facts: CustomerCheckFacts = { brand: 'Example', name: category?.name ?? (id === 'long-label' ? 'Daily moisturizing lotion for face and body in a family-size pump bottle' : 'Daily Moisturizer'),
     categoryLabel: category?.category ?? 'Moisturizer', formula: null, source: null };
   const verdict = describeDecisionVerdict(fixture.packet, fixture.binding, { intent });
-  if (category && verdict.state === 'good') { verdict.reason = category.summary; verdict.findings = categoryFindings(category); }
+  if (category && verdict.state === 'good') {
+    verdict.reason = category.summary; verdict.findings = categoryFindings(category);
+    verdict.summaryFinding = { id: 'category-summary', title: 'Personal fit', reason: category.summary,
+      evidence: [{ label: 'Package description', detail: category.labelEvidence }, { label: 'Your preference', detail: category.profileEvidence }], limits: [category.limits] };
+  }
   return { facts, verdict };
 }

@@ -6,6 +6,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-10-01: Fact-first Check copy and inline evidence
+
+- **Predecessor:** local `kanuj/ux-check-profile-preview@7ebe66174d800fd1da113676755f5109ce78398f`; clean starting worktree. Main freshness was fetched for inspection; no main integration, push or deployment.
+- **Approved copy:** fictional moisturizer now reads “Rich cream · Your preferred texture” and “In your routine / Evening, after cleanser.” Cleanser and sunscreen retain concrete label, replacement and reapplication facts. Redundant goal, texture and cross-category moisturizer explanations are removed; useful package facts, explicit preferences, provenance and material limits remain in their evidence.
+- **Shared result behavior:** the finding title/body is a minimum-44pt tappable row with a chevron and accessible expanded state. Evidence opens immediately underneath that row. The verdict has its own evidence disclosure. There is no global accordion; swipe-up still exposes findings directly. Only an exactly repeated supported goal row is folded into the verdict, with its evidence/uncertainties retained; distinct goal facts, cautions and unknowns stay visible. Four labels and evaluation/binding rules are unchanged; live facts do not acquire the example's texture preference.
+- **Physical observation:** the existing Expo Go session on the wired iPhone 17 Pro Max refreshed without a server restart or phone navigation. A current CoreDevice capture shows the concise moisturizer verdict and routine row, chevrons and expanded recorded-step evidence. It is fictional Development Mock evidence, not a live assessment or native gesture/VoiceOver acceptance.
+- **Validation:** focused projection/render interaction regressions, full app tests, app/test TypeScript, web/iOS JavaScript exports and final diff checks. Exports and capture are outside Git; existing Expo port/address and unrelated source work remain intact.
+
 ## 2026-10-01: Physical preview recovery and safe-area correction
 
 - **Predecessor:** `kanuj/ux-check-profile-preview@0972e48c3de478636a13b6f5f237942e0d3e253a`.

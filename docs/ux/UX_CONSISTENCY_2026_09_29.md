@@ -54,4 +54,10 @@ Root owns these shared files until publication. Feature writers own disjoint pro
 
 ## Acceptance gates
 
+### 2026-10-01 local result copy follow-up
+
+The combined `kanuj/ux-check-profile-preview` now uses direct fictional label/preference facts in its category examples: “Rich cream · Your preferred texture” and “In your routine / Evening, after cleanser.” Live results remain projections of retained validated fields; missing texture preferences cannot be filled from fixture copy. Only a supported goal finding whose text exactly repeats the verdict is removed from the finding list, with its evidence and limits accessible from the verdict. Distinct goal findings, material cautions and unknowns remain visible.
+
+Findings are immediately visible on swipe-up. Each finding's title/body and chevron form a minimum-44pt button that expands its own evidence underneath, with an accessible label and expanded state. The verdict has its own disclosure; no global accordion or repeated “Evidence & limits” links. Source provenance and meaningful limits remain accessible. Repeated category-separation explanations and generic routine disclaimers are removed from the fictional examples; sunscreen reapplication and water-resistance limits remain. This is local presentation work, not a new decision policy, schema, score, source capability or hosted activation.
+
 Every implementation PR: focused/full unit, app/test TypeScript, web/iOS exports, scope/secret/diff audit, independent review and both CI jobs at its exact head. No backend behavior changes are planned. Visual review covers small/large screens, long names, larger text, keyboard, scroll/drag, focus, errors and reduced transparency/motion. Physical camera/gesture/material and unassisted customer acceptance remain separate and pending until observed.

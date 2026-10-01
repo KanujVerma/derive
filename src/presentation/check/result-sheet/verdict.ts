@@ -13,6 +13,8 @@ export interface ResultFinding {
 }
 export interface VerdictPresentation {
   state: VerdictState; label: string; reason: string; findings: ResultFinding[];
+  /** Retained evidence for the verdict, including a goal row removed only when it repeats the summary. */
+  summaryFinding?: ResultFinding;
 }
 const goals: Record<string, string> = { dryness: 'dryness', breakouts: 'breakouts', dark_spots: 'dark marks',
   oiliness: 'oiliness', texture: 'texture', redness: 'redness', fine_lines: 'fine lines',
@@ -114,7 +116,10 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
     const detail = reason(caution, view.primaryReason, options.intent).split('. ')[0];
     summary = `${summary.split('. ')[0]}. ${detail.replace(/\.$/, '')}.`;
   }
-  return { state, label: verdictLabels[state], reason: summary, findings: ordered };
+  const summaryFinding = deciding ? ordered.find(f => f.id === deciding.id) : undefined;
+  const distinct = ordered.filter(f => !(f.id === positive?.id && summaryFinding?.id === f.id && f.reason === summary));
+  return { state, label: verdictLabels[state], reason: summary, findings: distinct,
+    ...(summaryFinding ? { summaryFinding } : {}) };
 }
 
 /** Snapshot, owner and independently loaded revisions are checked before any positive presentation. */

@@ -66,17 +66,42 @@ test('routine-role finding does not assume adding intent or manufacture amber', 
   assert.equal(describeDecisionVerdict(f.packet, { ...f.binding, ownerId: 'stale' }, { intent: 'add' }).state, 'unknown');
 });
 test('category examples have distinct concrete facts, complementary findings and individual evidence', () => {
-  for (const [id, feature] of [['cleanser', 'non-foaming cream'], ['moisturizer', 'richer texture'], ['sunscreen', '80-minute water resistance']] as const) {
+  for (const [id, feature] of [['cleanser', 'Non-foaming cream'], ['moisturizer', 'Rich cream'], ['sunscreen', 'Water resistant for 80 minutes']] as const) {
     const e = describeResultExample(id);
     assert.equal(e.verdict.state, 'good'); assert.match(e.verdict.reason, new RegExp(feature));
-    assert.equal(e.verdict.findings.length, 3);
-    assert.ok(e.verdict.findings.every(f => f.reason !== e.verdict.reason && f.evidence.length > 0 && f.limits.length > 0));
+    assert.equal(e.verdict.findings.length, id === 'sunscreen' ? 2 : 1);
+    assert.ok(e.verdict.findings.every(f => f.reason !== e.verdict.reason && f.evidence.length > 0));
+    assert.ok(e.verdict.summaryFinding!.evidence.some(f => f.label === 'Your preference'));
+    assert.ok(e.verdict.summaryFinding!.evidence.some(f => f.label === 'Package description'));
+    assert.ok(e.verdict.summaryFinding!.limits.length > 0);
+    assert.ok(e.verdict.findings.every(f => f.title !== 'Your goal'));
+    assert.doesNotMatch(e.verdict.findings.map(f => f.reason).join(' '), /does not replace|different role|does not assess/);
     assert.equal(e.facts.formula, null); assert.equal(e.facts.source, null);
     assert.doesNotMatch(e.verdict.reason, /will (prevent|cure|protect|hydrate)|cerave|la roche|Reddit|clinical|research/i);
   }
-  assert.match(describeResultExample('cleanser').verdict.findings[1].reason, /replace your evening gel wash/);
-  assert.match(describeResultExample('sunscreen').verdict.findings[2].reason, /not waterproof/);
+  assert.equal(describeResultExample('moisturizer').verdict.reason, 'Rich cream · Your preferred texture');
+  assert.equal(describeResultExample('moisturizer').verdict.findings[0].reason, 'Evening, after cleanser');
+  assert.match(describeResultExample('cleanser').verdict.findings[0].reason, /Replaces your gel wash/);
+  assert.match(describeResultExample('sunscreen').verdict.findings[1].reason, /Reapply after swimming or towel-drying.*not waterproof/);
   assert.equal(describeResultExample('redundancy').verdict.state, 'tradeoffs');
   assert.equal(describeResultExample('intent-unknown').verdict.state, 'unknown');
   assert.equal(describeResultExample('replacement').verdict.state, 'unknown');
+});
+
+test('only the repeated goal is removed; verdict evidence and distinct goal facts survive', () => {
+  const f = fixture('positive-role-match');
+  const goal = f.packet.findings[0];
+  const v = describeDecisionVerdict(f.packet, f.binding);
+  assert.equal(v.findings.some(row => row.id === goal.id), false);
+  assert.equal(v.summaryFinding!.id, goal.id);
+  assert.equal(v.summaryFinding!.evidence.length, goal.evidence.length);
+  assert.ok(v.summaryFinding!.limits.some(limit => limit.includes('individual results or tolerance')));
+  assert.doesNotMatch(v.reason, /preferred texture|rich cream/i, 'live facts do not carry a texture preference');
+  f.packet.findings.push({ ...goal, id: 'another-goal', display: { kind: 'role_match', goal: 'maintain', category: 'moisturizer', evidenceIndexes: [0, 1] } });
+  const distinct = describeDecisionVerdict(f.packet, f.binding);
+  assert.ok(distinct.findings.some(row => row.id === 'another-goal' && row.reason.includes('maintaining your skin')));
+  const caution = fixture('caution');
+  const cautious = describeDecisionVerdict(caution.packet, caution.binding);
+  assert.ok(cautious.findings.some(row => row.title === 'Your goal'), 'a goal distinct from the caution stays visible');
+  assert.ok(cautious.findings.some(row => row.id === cautious.summaryFinding!.id), 'material caution stays in findings');
 });

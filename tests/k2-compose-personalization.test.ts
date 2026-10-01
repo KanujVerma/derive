@@ -28,8 +28,8 @@ test('K2 explicit session demo retains answers only for its gateway instance and
 test('Check shares identity and Personal Fit before supporting formula facts', () => {
   const check = read('../src/components/check/CheckProductScreen.tsx');
   const content = read('../src/components/check/result-sheet/CheckResultContent.tsx');
-  assert.ok(content.indexOf('styles.identityRow') < content.indexOf('PERSONAL FIT'));
-  assert.ok(content.indexOf('PERSONAL FIT') < content.indexOf('verdict.findings.map'));
+  assert.ok(content.indexOf('styles.identityRow') < content.indexOf('<VerdictBlock'));
+  assert.ok(content.indexOf('<VerdictBlock') < content.indexOf('verdict.findings.map'));
   assert.match(check, /sharedResultInput = .*selectCheckContentInput/s);
   assert.match(content, /ingredient list has been verified for this package/);
 });
