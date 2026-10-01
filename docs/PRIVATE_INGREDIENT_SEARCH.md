@@ -1,5 +1,19 @@
 # Private published-ingredient search
 
+## Current UI (September 30)
+
+The private UPC screen now uses the [free-source ingredient lookup](FREE_INGREDIENT_LOOKUP.md)
+instead of the Gemini buttons described below. It automatically queries Open Beauty
+Facts and DailyMed using identity only, displays sourced lists when found, and has
+no profile processing during retrieval. Separate local ingredient notes now compare
+available lists or explicitly pasted bottle text with saved basic skin context.
+Optional Gemini wording uses a new no-search endpoint, explicit consent and an
+unapproved-processing gate; the current phone backend cannot send a real profile.
+The older Google Search endpoint below is not invoked by that screen.
+The historical implementation/setup below is not proof
+of current UI behavior or working Google Search. Free-source coverage remains poor
+on the first diagnostic Target samples; see the linked evidence and limitations.
+
 Sami P0-A, local phone-testing extension only. On a private UPC candidate, the
 customer explicitly taps **Find published ingredients** or, after one-shot
 permission, **Ingredients + my skin**. The authenticated
@@ -25,12 +39,44 @@ This private slice is phone-only; web shows a notice without querying Google.
 
 This is an ephemeral sourced answer, not an extracted ingredient dataset.
 `formulaVerified=false` and `canonicalProductId=null` remain mandatory. No
-canonical table, formula continuation, personal-decision-engine input, save action,
+canonical table, formula continuation, personal-decision-engine input, AI-answer save action,
 numeric score, event tracking or response cache is added. Contextual mode requests
 limited cosmetic commentary within the same original answer, not a second grading
 pipeline. A grounded answer can
 still describe an uncertain variant or a missing list; successful search does
 not mean successful package/formula verification.
+
+## Confirmed product save and saved-context display
+
+The private UPC card now offers **Save product to My Stuff**. The customer must
+confirm that the displayed name matches their bottle. The existing authenticated
+`free-context` service saves only that confirmed name/brand as a `user_reported`
+product, initially `considering`; no barcode, provider response, ingredient list,
+formula or canonical identity is written. My Stuff already reads, changes state
+and deletes these records. Repeated saves inspect the paged shelf first; request
+IDs survive response-loss retries within the mounted action. An existing manual
+item keeps its state. This is not automatic scan-history saving, restoration of
+the Check screen, or persistence of a Google answer.
+
+The same card displays the authenticated owner's saved basic skin description
+and up to three past reaction reports through the existing personal-context
+controller. Modern and legacy reports remain observations. Names, symptoms and
+notes stay in the application; none are added to a model request or analytics.
+No reaction report means only that none appears in the loaded history, not a
+tolerance/safety finding. Truncated/display-limited history is disclosed. There
+is a direct action to view or record a durable experience using the existing
+editor. The component does not read the legacy unowned onboarding draft store.
+
+This report display is **not** an ingredient comparison or a personalized
+suitability assessment. The live ingredient dependency is still blocked. In
+private UPC mode, the separate missing-product contribution card is suppressed
+so a returned possible identity is not contradicted by “We couldn't find this
+product”; the explicit catalog-formula limitation and name-search action remain.
+
+Real exact-local Auth → Edge → database tests verified save, product/profile/
+reaction readback through a fresh client, duplicate avoidance, owner isolation
+and forged-owner rejection. Tagged synthetic accounts were removed and absence
+read back. No actual phone owner, hosted database or catalog was reset/modified.
 
 [Google's grounding terms](https://ai.google.dev/gemini-api/terms) require the
 associated suggestions and restrict modification, caching and reuse for other
@@ -111,7 +157,23 @@ accuracy. A successful current-key response, full widget/citation display on the
 iPhone and exact product/variant/package comparison remain pending. No hosted
 deployment, public provider activation, GitHub push or App Store release is implied.
 
-## Current verification and phone-test sequence
+## Latest local save verification
+
+The confirmed-product-save pass at predecessor `04bf307` passed **952/952 TAP
+tests**, both TypeScript checks and fresh web/iOS JavaScript exports (129 test
+files, including 20 assertion-only files). The real local save/readback test is
+`node --experimental-strip-types scripts/test-external-product-save-local.mjs --local-no-provider`.
+It uses exact tagged synthetic owners, no provider requests and no database reset.
+Physical acceptance of the new action/history panel remains pending.
+
+Phone acceptance for the save slice: reload, scan a barcode, confirm the bottle
+name with **Save product to My Stuff → Matches — save**, open My Stuff, close and
+reopen the app, and verify the product still appears there. Check that the saved
+reaction report appears on the next identified candidate. The Check screen itself
+is temporary; a My Stuff item is the durable record. No ingredient-based result
+should be claimed from this sequence.
+
+## Predecessor ingredient verification and pending phone test
 
 Reconciled current main `575566b` through merge `3982ad6`, preserving Kanuj's
 per-Check intent and result presentation. Full source suite: **940/940 TAP tests**

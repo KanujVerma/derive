@@ -143,7 +143,7 @@ test('controller is manual-only, double-tap deduplicated, owner/query cancellati
   scope = owner + ':' + ingredientQueryKey(query); controller.dispose(); await controller.run(); assert.equal(calls, 1);
 });
 
-test('native display uses isolated no-script/no-cache WebView and exact manually-triggered client; web never queries', () => {
+test('historical search keeps isolated native display; current screen uses free ingredient sources instead', () => {
   const native = readFileSync(new URL('../src/components/check/PrivateIngredientSearch.tsx', import.meta.url), 'utf8');
   const web = readFileSync(new URL('../src/components/check/PrivateIngredientSearch.web.tsx', import.meta.url), 'utf8');
   const parent = readFileSync(new URL('../src/components/check/PrivateUpcFallback.tsx', import.meta.url), 'utf8');
@@ -156,7 +156,8 @@ test('native display uses isolated no-script/no-cache WebView and exact manually
   assert.match(native, /Alert.alert\('Share basic skin context with Google\?'/);
   assert.match(native, /Allow this search/);
   assert.match(native, /No identity, photos, pregnancy answers, prescriptions or reaction history/);
-  assert.match(parent, /<PrivateIngredientSearch ownerId=\{ownerId\} query=\{\{ barcode: candidate.observedBarcode/);
+  assert.doesNotMatch(parent, /<PrivateIngredientSearch/);
+  assert.match(parent, /<PublishedProductIngredients ownerId=\{ownerId\} query=\{\{ barcode/);
   assert.doesNotMatch(native, /from ['"][^'"]*analytics|analytics\.(?:track|capture)|recordFreeCheck|evaluateProduct|\.insert\(|\.upsert\(/);
   assert.doesNotMatch(web, /requestPrivateIngredientSearch|WebView|dangerouslySetInnerHTML/);
 });

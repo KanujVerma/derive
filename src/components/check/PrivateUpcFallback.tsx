@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { colors, radii, spacing, typography } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
-import { PrivateIngredientSearch } from '@/src/components/check/PrivateIngredientSearch';
+import { PublishedProductIngredients } from '@/src/components/check/PublishedProductIngredients';
+import { ExternalProductActions } from '@/src/components/check/ExternalProductActions';
 import { publicEnvironment } from '@/src/config/environment';
 import { supabase } from '@/src/services/supabase';
 import { useAuthStore } from '@/src/stores/authStore';
@@ -60,12 +61,16 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId }: { barcode
           {candidate.size && <Text style={styles.body}>{candidate.size}</Text>}
           <Text style={styles.caption}>UPCitemdb · retrieved {new Date(candidate.retrievedAt).toLocaleDateString()}</Text>
           <Text style={styles.caption}>Barcode {candidate.sourceBarcode}</Text>
-          <PrivateIngredientSearch ownerId={ownerId} query={{ barcode: candidate.observedBarcode,
+          <ExternalProductActions ownerId={ownerId} query={{ barcode: candidate.observedBarcode,
             name: candidate.name, brand: candidate.brand, size: candidate.size }} />
         </View>
       ))}
+      {result && <PublishedProductIngredients ownerId={ownerId} query={{ barcode,
+        name: result.status === 'found' ? result.candidates[0].name : null,
+        brand: result.status === 'found' ? result.candidates[0].brand : null,
+        size: result.status === 'found' ? result.candidates[0].size : null }} />}
       {result && result.candidates.length > 0 && <Text style={styles.body}>
-        This identifies a possible product only. Ingredients, formula and personal fit are not verified. Nothing is saved to your products.
+        This identifies a possible product only. Ingredients, formula and personal fit are not verified. Save only after confirming the label matches your bottle.
       </Text>}
       {result?.truncated && <Text style={styles.body}>More possible matches exist; this list is incomplete.</Text>}
       {limited && <Text style={styles.body}>The shared free lookup allowance is temporarily full. Wait at least 11 seconds before trying again; the daily allowance may also be exhausted.</Text>}

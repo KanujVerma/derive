@@ -849,18 +849,20 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   }
 
   if (targetShell && unknownBarcode) {
+    const externalTest = privateCheckEnabled(__DEV__, publicEnvironment.buildFlavor, process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED);
     const recovery = selectCheckContributionRecovery({ targetShell, ownerId: liveCheckOwner,
       caseId: resolution?.caseId ?? null, reason: 'unknown_barcode', observedBarcode: unknownBarcode,
       observedName: null });
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RootShellHeader title="Check" />
-        <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + spacing.xl }]}>
-          <Text style={styles.entryBody}>No verified barcode match.</Text>
+        <ScrollView contentContainerStyle={[styles.entryContent, { paddingBottom: insets.bottom + 120 }]}>
+          <Text style={styles.entryBody}>No package-verified formula in Derive’s catalog.</Text>
           <PrivateUpcFallback barcode={unknownBarcode} ownerId={liveCheckOwner} />
-          {recovery && <MissingProductContribution contextKey={recovery.contextKey}
+          {!externalTest && recovery && <MissingProductContribution contextKey={recovery.contextKey}
             availability={recovery.availability} initial={recovery.initial} embedded
             onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
+          {externalTest && <Button label="Search by name" variant="outline" onPress={handleSearchNamePress} style={styles.entryAction} />}
           <Button label="Scan another barcode" variant="outline" onPress={() => openCapture('barcode')} style={styles.entryAction} />
         </ScrollView>
       </View>
