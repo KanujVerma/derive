@@ -84,6 +84,69 @@ test('HTML strips executable/navigation noise and normalizes visible ingredient 
   assert.match(entities.text, /Water, Glycerin & Oat\./);
 });
 
+test('short manufacturer headings match narrowly recognized UPC marketing tails without losing formula variants', () => {
+  const lotion = { ...query, name: 'Aveeno Daily Moisturizing Lotion for Dry Skin 12 fl oz', brand: 'Aveeno', size: '12 fl oz' };
+  assert.equal(sameIngredientProduct(lotion, 'Aveeno Daily Moisturizing Lotion'), true);
+  assert.equal(sameIngredientProduct(lotion, 'Aveeno Daily Moisturizing Lotion Skin Relief'), false);
+  assert.equal(sameIngredientProduct(lotion, 'Aveeno Daily Moisturizing Lotion Sheer Hydration'), false);
+  assert.equal(sameIngredientProduct({ ...lotion, name: lotion.name + ' Fragrance Free' }, 'Aveeno Daily Moisturizing Lotion'), false);
+  assert.equal(sameIngredientProduct({ ...lotion, name: lotion.name + ' SPF 30' }, 'Aveeno Daily Moisturizing Lotion SPF 50'), false);
+  const cream = { ...query, name: 'CeraVe Moisturizing Cream Body and Face Moisturizer for Dry Skin 16 oz', brand: 'CeraVe', size: '16 oz' };
+  assert.equal(sameIngredientProduct(cream, 'CeraVe Moisturizing Cream'), true);
+  assert.equal(sameIngredientProduct(cream, 'CeraVe Moisturizing Lotion'), false);
+  assert.equal(sameIngredientProduct({ ...cream, name: cream.name + ' 1%' }, 'CeraVe Moisturizing Cream 2%'), false);
+});
+
+test('matching Product JSON-LD recovers explicit ingredient facts without executing scripts', () => {
+  const structured = { '@context': 'https://schema.org', '@type': 'Product', name: title,
+    additionalProperty: [{ '@type': 'PropertyValue', name: 'Ingredients', value: list }] };
+  const result = ingredientPageText(`<title>${title}</title><h1>${title}</h1>
+    <script>throw Error('must not execute'); fabricated ingredients</script>
+    <script type="application/ld+json">${JSON.stringify(structured)}</script>`);
+  assert.equal(result.title, title + ' | ' + title);
+  assert.match(result.text, /Water, Propylene Glycol, Sodium Stearate, Fragrance\./);
+  assert.doesNotMatch(result.text, /throw Error|must not execute|fabricated|additionalProperty|schema.org/);
+  assert.equal(parseWebIngredientExtraction(extracted, query, [{ ...page, ...result }]).status, 'found');
+});
+
+test('bounded JSON-LD graphs support explicit lists but reject unrelated variants and arbitrary metadata', () => {
+  const graph = { '@graph': [
+    { '@type': ['Thing', 'Product'], name: title, ingredients: list },
+    { '@type': 'Product', name: 'Old Spice High Endurance Pure Sport Deodorant', ingredients: 'Wrong fragrance, Wrong list.' },
+    { '@type': 'Product', name: title + ' Antiperspirant', ingredients: 'Wrong aluminum, Wrong list.' },
+    { '@type': 'WebPage', name: title, ingredients: 'Wrong page metadata.' },
+    { '@type': 'Product', name: title, description: 'Wrong description pretending ingredients.',
+      additionalProperty: [{ name: 'Fragrance', value: 'Wrong property.' }] },
+  ] };
+  const result = ingredientPageText(`<title>${title}</title><script type='application/ld+json'>${JSON.stringify(graph)}</script>`);
+  assert.match(result.text, /Water, Propylene Glycol/);
+  assert.doesNotMatch(result.text, /Wrong|Pure Sport|Antiperspirant|description|Fragrance pretending/);
+  const malformed = ingredientPageText(`<title>${title}</title><script type="application/ld+json">{broken</script>`);
+  assert.doesNotMatch(malformed.text, /broken|Ingredients/);
+  const inactive = ingredientPageText(`<title>${title}</title>
+    <!-- <script type="application/ld+json">${JSON.stringify(graph)}</script> -->
+    <script data-type="application/ld+json">${JSON.stringify(graph)}</script>`);
+  assert.doesNotMatch(inactive.text, /Ingredients|Propylene|Wrong/);
+  const oversized = ingredientPageText(`<title>${title}</title><script type="application/ld+json">${JSON.stringify({
+    '@type': 'Product', name: title, ingredients: list, ignored: 'x'.repeat(66_000),
+  })}</script>`);
+  assert.doesNotMatch(oversized.text, /Ingredients|Propylene/);
+});
+
+test('structured lists remain separate source passages and do not replace conflicting formula checks', () => {
+  const html = `<title>${title}</title><script type="application/ld+json">${JSON.stringify([
+    { '@type': 'Product', name: title, additionalProperty: { name: 'Ingredient list', value: list } },
+    { '@type': 'https://schema.org/Product', name: title, ingredients: 'Water, Glycerin, Fragrance.' },
+  ])}</script>`;
+  const result = ingredientPageText(html);
+  assert.match(result.text, /Water, Propylene Glycol/);
+  assert.match(result.text, /Water, Glycerin, Fragrance/);
+  assert.equal(parseWebIngredientExtraction({ status: 'ambiguous', sourceIndex: null,
+    productName: null, ingredientsText: null }, query, [{ ...page, ...result }]).status, 'ambiguous');
+  assert.equal(parseWebIngredientExtraction({ ...extracted, ingredientsText: 'Water, Sodium Stearate, Glycerin.' },
+    query, [{ ...page, ...result }]).status, 'not_found');
+});
+
 test('variant/form guards distinguish plain deodorant, antiperspirant, sprays, scent and SPF', () => {
   assert.equal(sameIngredientProduct(query, title), true);
   for (const name of ['Old Spice High Endurance Fresh Antiperspirant Deodorant',

@@ -53,7 +53,7 @@ struct AppleSyntheticBenchmark {
         let corpus = try JSONDecoder().decode(Corpus.self, from: data)
         // Deliberately reject general-purpose runs. This corpus is invented cosmetic
         // text and enum-only context, not a clinical or real-user evaluation.
-        guard corpus.corpusVersion == "synthetic-ingredient-guidance/1",
+        guard corpus.corpusVersion == "synthetic-ingredient-guidance/2",
               corpus.cases.count == 12,
               corpus.cases.allSatisfy({ $0.input.productName == "Synthetic cosmetic test product" }) else {
             throw NSError(domain: "ExpectedSyntheticCorpus", code: 1)

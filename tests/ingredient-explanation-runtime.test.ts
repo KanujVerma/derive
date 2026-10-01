@@ -89,6 +89,18 @@ test('other personal care cannot transmit facial goals or facial skin type', asy
   assert.equal(result.status, 'answer');
 });
 
+test('explanation uses the server-selected model rather than a hardcoded model', async () => {
+  const result = await runIngredientExplanation(request, { ...deps(), model: 'gemini-configured-test',
+    fetcher: async (url) => {
+      assert.equal(String(url), 'https://generativelanguage.googleapis.com/v1beta/models/gemini-configured-test:generateContent');
+      return provider();
+    } });
+  assert.equal(result.status, 'answer');
+  if (result.status === 'answer') assert.equal(result.model, 'gemini-configured-test');
+  assert.deepEqual(await runIngredientExplanation(request, { ...deps(), model: '../untrusted',
+    fetcher: unused }), { status: 'configuration_required' });
+});
+
 test('profile changes, deletion and failed re-read suppress a stale answer', async () => {
   for (const next of [{ ...snapshot, version: 'new-version' }, null, 'failure']) {
     let reads = 0;

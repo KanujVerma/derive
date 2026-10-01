@@ -15,6 +15,7 @@ const env = readFileSync(workdir + '/ingredient-empty-key.env', 'utf8');
 assert.match(env, /^GEMINI_API_KEY=\s*$/m, 'Smoke requires an explicitly empty provider key');
 assert.match(env, /^DERIVE_GEMINI_INGREDIENT_TEST_ENABLED=true$/m);
 assert.match(env, /^DERIVE_UPC_PRIVATE_TESTER_IDS=e7000000-0000-4000-8000-000000000003$/m);
+assert.doesNotMatch(env, /^DERIVE_GEMINI_PERSONAL_CONTEXT_APPROVED=true$/m, 'Smoke must not enable actual personal processing');
 const status = JSON.parse(execFileSync('supabase', ['status', '--workdir', workdir, '--output', 'json'], {
   encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
 }));
@@ -51,8 +52,20 @@ try {
   assert.deepEqual(await missingKey.error.context.clone().json(), { status: 'configuration_required' });
   const response = await requestPrivateIngredientSearch(query, allowed, () => allowed, () => ingredientQueryKey(query), client);
   assert.deepEqual(response, { status: 'configuration_required' });
+  const explanation = { productName: 'Synthetic moisturizer', ingredientsText: 'Water, Glycerin, Fragrance',
+    category: 'skincare', contextSharingConsent: true };
+  const deniedExplanation = await other.functions.invoke('private-ingredient-explanation', { body: explanation });
+  assert.equal(deniedExplanation.error?.context?.status, 403);
+  const forgedExplanation = await client.functions.invoke('private-ingredient-explanation', {
+    body: { ...explanation, profile: { skinBehavior: 'dry_tight' } },
+  });
+  assert.equal(forgedExplanation.error?.context?.status, 400);
+  const blockedExplanation = await client.functions.invoke('private-ingredient-explanation', { body: explanation });
+  assert.equal(blockedExplanation.error?.context?.status, 503);
+  assert.deepEqual(await blockedExplanation.error.context.clone().json(), { status: 'personalization_disabled' });
   console.log(JSON.stringify({ scope: 'isolated_local_auth_edge_client_no_google', providerRequests: 0,
-    checks: ['unauthenticated_401', 'non_tester_403', 'invalid_query_400', 'missing_key_503', 'typed_configuration_required'] }));
+    checks: ['unauthenticated_401', 'non_tester_403', 'invalid_query_400', 'missing_key_503', 'typed_configuration_required',
+      'explanation_non_tester_403', 'explanation_forged_profile_400', 'explanation_privacy_gate_503'] }));
 } finally {
   let failed = false;
   for (const id of owners) {

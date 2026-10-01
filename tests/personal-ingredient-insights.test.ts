@@ -123,3 +123,61 @@ test('local notes UI scopes pasted state to owner and product and has no provide
   assert.match(source, /'user_label'/);
   assert.doesNotMatch(source, /fetch\(|\.invoke\(|AsyncStorage|saveFreeProduct|GEMINI|\.experiences|analytics\./);
 });
+
+test('the same formula produces genuinely different findings for dry and comfortable profiles', () => {
+  const formula = [evidence('Water, Glycerin, Sodium Hyaluronate, Petrolatum, Dimethicone')];
+  const dry = buildPersonalIngredientInsights(context({ skinBehavior: 'dry_tight' }), formula);
+  const comfortable = buildPersonalIngredientInsights(context(), formula);
+  assert.match(dry.sentences.join(' '), /Glycerin and Hyaluronic acid help draw water into the skin/);
+  assert.match(dry.sentences.join(' '), /Petrolatum helps reduce moisture loss/);
+  assert.match(dry.sentences.join(' '), /Dimethicone is commonly used in moisturizing formulas/);
+  assert.doesNotMatch(comfortable.sentences.join(' '), /draw water|reduce moisture loss/);
+  assert.notDeepEqual(dry.sentences, comfortable.sentences);
+});
+
+test('moisture copy agrees with the particular ingredients present rather than templating all roles', () => {
+  const glycerin = buildPersonalIngredientInsights(context({ primaryGoal: 'dryness' }), [evidence('Glycerol')]);
+  assert.match(glycerin.sentences[0], /Glycerin helps draw water into the skin/);
+  assert.doesNotMatch(glycerin.sentences.join(' '), /Petrolatum|Dimethicone|Hyaluronic acid/);
+  const petrolatum = buildPersonalIngredientInsights(context({ skinBehavior: 'dry_tight' }), [evidence('White petrolatum 41%')]);
+  assert.match(petrolatum.sentences[0], /Petrolatum helps reduce moisture loss/);
+  assert.doesNotMatch(petrolatum.sentences[0], /draw water|concentration.*41/);
+});
+
+test('caution appears before moisture support and neither cancels the other', () => {
+  const result = buildPersonalIngredientInsights(context({ skinBehavior: 'dry_tight', reactivity: 'reacts_easily' }),
+    [evidence('Water, Glycerin, Fragrance, Alcohol Denat.')]);
+  assert.equal(result.sentences.length, 4);
+  assert.match(result.sentences[0], /fragrance free alternative/);
+  assert.match(result.sentences[1], /alcohol denat/);
+  assert.match(result.sentences[2], /Glycerin helps draw water/);
+  assert.match(result.sentences[3], /unverified published list/);
+  assert.equal('verdict' in result, false);
+  assert.equal('score' in result, false);
+});
+
+test('a saved but unanswered or withheld profile is not treated as a personalized comparison', () => {
+  for (const answer of ['unanswered', 'withheld', 'unsure'] as const) {
+    const result = buildPersonalIngredientInsights(context({ skinBehavior: answer, reactivity: answer }),
+      [evidence('Water, Glycerin, Fragrance')]);
+    assert.equal(result.status, 'profile_missing');
+    assert.match(result.sentences[0], /does not include skin details we can compare/);
+    assert.doesNotMatch(result.sentences.join(' '), /reported dryness|reacts easily|no specific ingredient note/);
+  }
+});
+
+test('unsupported goals remain explicit limits rather than positive suitability claims', () => {
+  const result = buildPersonalIngredientInsights(context({ primaryGoal: 'breakouts', secondaryGoals: ['dark_spots'],
+    skinBehavior: 'oily_shiny' }), [evidence('Glycerin, Petrolatum')]);
+  assert.equal(result.status, 'ready');
+  assert.match(result.sentences[0], /do not assess whether this product will meet your other skin goals/);
+  assert.doesNotMatch(result.sentences.join(' '), /clog|comedogenic|treat|prevent|good fit|safe to use/);
+});
+
+test('other personal care no-finding state explains why a facial profile is not enough', () => {
+  const result = buildPersonalIngredientInsights(context({ skinBehavior: 'dry_tight', primaryGoal: 'dryness' }),
+    [evidence('Glycerin, Petrolatum, Parfum')], 'published', 'other_personal_care');
+  assert.match(result.sentences[0], /facial skin type and goals do not tell us/);
+  assert.match(result.sentences[0], /only compare general skin reactivity/);
+  assert.doesNotMatch(result.sentences.join(' '), /draw water|reduce moisture loss|moisture support/);
+});

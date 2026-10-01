@@ -81,7 +81,7 @@ export function PublishedProductIngredients({ query, ownerId }: { query: Product
     {result && result.evidence.length > 1 && <Text style={styles.body}>Two sources returned lists. They are shown separately because versions can differ; compare them with your package.</Text>}
     {result && result.evidence.length === 0 && !searchWeb && <View style={styles.statusCard}><Text style={styles.title}>{missing.title}</Text><Text style={styles.body}>{missing.body}</Text></View>}
     {visible?.kind === 'error' && <View style={styles.statusCard}><Text style={styles.title}>Ingredient lookup interrupted</Text><Text style={styles.body}>Your product match is still here. Retry below, or add the ingredient text from your bottle.</Text></View>}
-    <WebProductIngredients ownerId={ownerId} query={query} enabled={searchWeb}
+    <WebProductIngredients key={scope + ':' + attempt} ownerId={ownerId} query={query} enabled={searchWeb}
       onEvidence={onWebEvidence} onComplete={onWebComplete} />
     {!loading && (!searchWeb || currentWeb?.complete || currentWeb?.evidence) && <PersonalIngredientNotes ownerId={ownerId}
       evidence={result?.evidence ?? []} webEvidence={currentWeb?.evidence ?? null} productKey={key}
@@ -89,7 +89,7 @@ export function PublishedProductIngredients({ query, ownerId }: { query: Product
       category={/\b(deodorant|antiperspirant|shampoo|conditioner|hair)\b/i.test(query.name ?? '') ? 'other_personal_care' : 'skincare'} />}
     {!loading && <Button label="Refresh ingredient lookup" variant="ghost" size="medium" onPress={() => {
       if (live.current !== scope || useAuthStore.getState().sessionUserId !== ownerId) return;
-      memo.current = null; setAttempt(n => n + 1);
+      memo.current = null; setWeb(null); setAttempt(n => n + 1);
     }} />}
   </View>;
 }

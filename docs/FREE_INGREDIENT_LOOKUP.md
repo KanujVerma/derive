@@ -2,6 +2,14 @@
 
 ## Product-only web fallback, October 1
 
+The recovery pass also preserves explicit ingredient declarations embedded in
+bounded Product JSON-LD that matches the page title. Scripts are never executed;
+unrelated recommended products, arbitrary descriptions and other metadata are
+excluded. Narrow use-description tails in UPC titles can match shorter manufacturer
+headings without dropping named variant, form, SPF or strength checks. Customer
+refresh now clears both source stages rather than reusing a previous web result.
+These changes improve retrieval opportunities, not measured store coverage.
+
 The local private result now falls back to `private-web-product-ingredients`
 when Open Beauty Facts and DailyMed return no accepted ingredient list. The
 server searches with SerpApi Google Light, considers the first five organic
@@ -102,6 +110,12 @@ prove product suitability. They do not read reaction history, prescriptions or
 pregnancy answers. If sources have no list, the customer can paste their bottle's
 ingredient text and explicitly compare it locally. Pasted text is not saved.
 
+Notes now distinguish moisture roles for the particular recognized ingredients
+and put relevant irritation cautions first. An entirely unanswered/withheld
+profile abstains rather than claiming a comparison; the existing skin-context
+editor is offered. Other goals and personal-care categories retain explicit
+limits rather than inheriting facial-moisturizer guidance.
+
 An optional, separate **Get a personal explanation** action requests
 one-shot consent for Gemini wording. The new `private-ingredient-explanation`
 endpoint uses supplied ingredient text and server-read minimal skin context;
@@ -111,6 +125,12 @@ approved with an appropriate paid project. The phone environment remains unappro
 for personal processing even though a server model key is now loaded for public
 product extraction. No actual customer's context has been sent to Google.
 No ChatGPT or Jev integration is represented by this button.
+
+The explanation endpoint now forwards the operator's `GEMINI_MODEL` setting.
+The latest three synthetic-profile live attempts returned `unavailable`; an
+instrumented follow-up timed out without an HTTP response. This is not a working
+phone AI result or evidence of a specific credential/quota error. No actual
+customer profile was transmitted, and the personal-processing gate is unchanged.
 
 A bounded live adapter test with public ingredients and synthetic context returned
 HTTP 200 and two full sentences with Gemini 3.8 Flash. An earlier bounded basic

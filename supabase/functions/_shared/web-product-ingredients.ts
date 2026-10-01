@@ -64,6 +64,52 @@ export function buildWebIngredientSearchQuery(query: WebProductIngredientsReques
 }
 
 export interface IngredientWebPage { url: string; title: string; text: string }
+
+/** Read structured product facts as data, never execute scripts or use unrelated page metadata. */
+function structuredIngredientText(html: string, pageTitle: string): string {
+  const passages: string[] = [];
+  let inspected = 0;
+  for (const script of html.replace(/<!--[\s\S]*?-->/g, ' ').matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+    if (++inspected > 40) break;
+    if (!/(?:^|\s)type\s*=\s*(?:"application\/ld\+json"|'application\/ld\+json')/i.test(script[1])
+      || script[2].length > 65_536) continue;
+    let parsed: unknown;
+    try { parsed = JSON.parse(script[2]); } catch { continue; }
+    const pending: Array<{ value: unknown; depth: number }> = [{ value: parsed, depth: 0 }];
+    let nodes = 0;
+    while (pending.length && ++nodes <= 200) {
+      const { value, depth } = pending.pop()!;
+      if (depth > 8) continue;
+      if (Array.isArray(value)) {
+        for (const entry of value.slice(0, 40)) pending.push({ value: entry, depth: depth + 1 });
+        continue;
+      }
+      if (!object(value)) continue;
+      if (Array.isArray(value['@graph'])) pending.push({ value: value['@graph'], depth: depth + 1 });
+      const types = Array.isArray(value['@type']) ? value['@type'].slice(0, 8) : [value['@type']];
+      if (!types.some(type => type === 'Product' || type === 'https://schema.org/Product' || type === 'http://schema.org/Product')
+        || !label(value.name, 240)
+        // The named Product must belong to this page, not a related-product tile.
+        || !sameIngredientProduct({ barcode: '', name: value.name, brand: null, size: null }, pageTitle)) continue;
+      const lists: unknown[] = [value.ingredients];
+      const properties = Array.isArray(value.additionalProperty) ? value.additionalProperty.slice(0, 40)
+        : object(value.additionalProperty) ? [value.additionalProperty] : [];
+      for (const property of properties) {
+        if (object(property) && typeof property.name === 'string'
+          && /^(?:ingredients|ingredient list)$/i.test(property.name.trim())) lists.push(property.value);
+      }
+      for (const list of lists) {
+        if (typeof list !== 'string' || list.trim().length < 8 || list.length > 16_000
+          || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(list)) continue;
+        const passage = `${value.name} Ingredients ${normalizeWhitespace(list)}`;
+        if (!passages.includes(passage)) passages.push(passage);
+        if (passages.length >= 8) return passages.join('\n');
+      }
+    }
+  }
+  return passages.join('\n');
+}
+
 export function ingredientPageText(html: string): { title: string; text: string } {
   const cleaned = html.replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<(script|style|nav|header|footer|noscript|svg|iframe)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ');
@@ -71,17 +117,23 @@ export function ingredientPageText(html: string): { title: string; text: string 
   const documentTitle = cleaned.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1] ?? '';
   const toText = (value: string) => normalizeWhitespace(decodeEntities(value.replace(/<[^>]*>/g, ' ')));
   // Manufacturers often put the brand only in <title>, and the variant only in <h1>.
-  return { title: normalizeWhitespace([toText(heading), toText(documentTitle)].filter(Boolean).join(' | ')).slice(0, 500),
-    text: toText(cleaned).slice(0, 60000) };
+  const title = normalizeWhitespace([toText(heading), toText(documentTitle)].filter(Boolean).join(' | ')).slice(0, 500);
+  const structured = structuredIngredientText(html, title);
+  return { title, text: normalizeWhitespace([structured, toText(cleaned)].filter(Boolean).join('\n')).slice(0, 60000) };
 }
 
 /** Size and marketing tokens don't establish formula. Named variant/form/SPF do. */
 export function sameIngredientProduct(query: WebProductIngredientsRequest, productName: string): boolean {
   const actual = words(productName);
   const requested = words(query.name);
+  // UPC titles sometimes append a use description absent from the manufacturer's
+  // heading. Strip only these narrow phrases, never named formula lines or claims
+  // such as sensitive skin, fragrance free, SPF, strength, or medicated.
+  const identityWords = (value: string) => value.replace(/\bfor dry skin\b/g, ' ')
+    .replace(/\b(cream) body and face moisturizer\b/g, '$1').replace(/\s+/g, ' ').trim();
   const ignored = new Set(['for', 'and', 'with', 'the', 'a', 'of', 'by', 'men', 'women', 'scent', 'oz', 'ounce', 'ounces',
     'fl', 'fluid', 'ml', 'milliliter', 'milliliters', 'g', 'gram', 'grams', 'pack', 'count', 'ct', 'stick', 'bottle']);
-  const meaningful = requested.split(' ').filter(token => !ignored.has(token) && !/^\d+$/.test(token));
+  const meaningful = identityWords(requested).split(' ').filter(token => !ignored.has(token) && !/^\d+$/.test(token));
   const actualTokens = new Set(actual.split(' '));
   if (meaningful.length < 2 || meaningful.some(token => !actualTokens.has(token))) return false;
   if (query.brand && words(query.brand).split(' ').some(token => !actualTokens.has(token))) return false;

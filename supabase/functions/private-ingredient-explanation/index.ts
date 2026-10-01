@@ -13,6 +13,7 @@ Deno.serve((req: Request) => handleIngredientExplanation(req, {
   failure: (code, message, status) => new ServiceError(code, message, status),
   explain: (query, { admin, userId }) => runIngredientExplanation(query, {
     apiKey: Deno.env.get('GEMINI_API_KEY') ?? '',
+    model: Deno.env.get('GEMINI_MODEL') || undefined,
     personalContextApproved: Deno.env.get('DERIVE_GEMINI_PERSONAL_CONTEXT_APPROVED') === 'true',
     loadContext: () => loadPrivateIngredientContext(admin, userId),
     reserveRequest: async () => {

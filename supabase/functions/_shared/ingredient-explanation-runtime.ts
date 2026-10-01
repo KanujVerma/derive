@@ -21,6 +21,8 @@ export function parseIngredientExplanationRequest(value: unknown): IngredientExp
 /** Ephemeral cosmetic explanation. No canonical formula, numeric score or persistent AI history. */
 export async function runIngredientExplanation(request: IngredientExplanationRequest, deps: {
   apiKey: string;
+  /** Use the same operator-selected model as ingredient retrieval. Never client supplied. */
+  model?: string;
   /** Paid-project processing and the provider disclosure must be explicitly reviewed. */
   personalContextApproved: boolean;
   loadContext: () => Promise<PrivateIngredientContextSnapshot | null>;
@@ -46,7 +48,7 @@ export async function runIngredientExplanation(request: IngredientExplanationReq
   let result: Awaited<ReturnType<typeof explainIngredientContext>>;
   try { result = await explainIngredientContext({ productName: parsed.productName,
     ingredientsText: parsed.ingredientsText, category: parsed.category, context },
-  { apiKey: deps.apiKey, fetch: deps.fetcher }); }
+  { apiKey: deps.apiKey, model: deps.model, fetch: deps.fetcher }); }
   catch { return { status: 'unavailable' }; }
   if (result.status !== 'answer') return result;
   try {

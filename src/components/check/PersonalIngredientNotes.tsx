@@ -55,7 +55,8 @@ export function PersonalIngredientNotes({ ownerId, evidence, webEvidence = null,
     notes: buildPersonalIngredientInsights(context, [item], 'published', category) })) : [];
   const manual = contextReady && !lists.length && currentPasted?.compared
     ? buildPersonalIngredientInsights(context, [{ ingredientsText: currentPasted.compared }], 'user_label', category) : null;
-  const missingProfile = contextReady && (!context?.profile || context.profile.ownerId !== ownerId);
+  const missingProfile = contextReady && (!context?.profile || context.profile.ownerId !== ownerId
+    || results.some(result => result.notes.status === 'profile_missing') || manual?.status === 'profile_missing');
   const editorOpen = editorScope === scope;
   return <View style={styles.card}>
     <View style={styles.heading}>

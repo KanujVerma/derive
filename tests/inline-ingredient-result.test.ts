@@ -74,3 +74,10 @@ test('visual fixture is development-only and explicitly synthetic, not provider 
   assert.match(source, /DEVELOPMENT PREVIEW · SYNTHETIC DATA/);
   assert.doesNotMatch(source, /requestProductIngredients|\.invoke\(|fetch\(/);
 });
+
+test('manual refresh clears old web evidence and creates a new web lookup instance', () => {
+  const source = readFileSync(file, 'utf8');
+  assert.match(source, /<WebProductIngredients key=\{scope \+ ':' \+ attempt\}/);
+  assert.match(source, /memo.current = null; setWeb\(null\); setAttempt\(n => n \+ 1\)/);
+  assert.match(source, /if \(live.current !== scope \|\| useAuthStore.getState\(\).sessionUserId !== ownerId\) return;/);
+});

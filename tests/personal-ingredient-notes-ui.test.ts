@@ -24,3 +24,11 @@ test('missing ingredients offer a collapsed accessible editor scoped to the acti
   assert.match(source, /does not save the text or send it to AI/);
   assert.match(source, /Any optional AI explanation is a separate action/);
 });
+
+test('an unanswered saved profile offers the same context editor as a missing profile', () => {
+  assert.match(source, /results\.some\(result => result\.notes\.status === 'profile_missing'\)/);
+  assert.match(source, /manual\?\.status === 'profile_missing'/);
+  assert.match(source, /missingProfile &&/);
+  assert.match(source, /label="Add skin context"/);
+  assert.match(source, /if \(isCurrent\(\)\) router\.push/);
+});

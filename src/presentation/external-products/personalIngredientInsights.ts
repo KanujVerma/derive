@@ -33,6 +33,13 @@ function matchedNames(text: string): string[] {
   return ALIASES.filter((ingredient) => ingredient.names.some((name) => entries.has(name))).map((ingredient) => ingredient.name);
 }
 
+function namesInSentence(names: string[]): string {
+  if (names.length < 3) return names.join(' and ');
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+const PROFILE_PROMPT = 'Save your skin type, goals or reactivity to get local ingredient notes matched to that context.';
+
 /**
  * Private local cosmetic notes only: no provider calls or authoritative fit score.
  * General moisture/fragrance notes are grounded in AAD guidance:
@@ -54,11 +61,16 @@ export function buildPersonalIngredientInsights(
   const profile = context?.profile;
   if (!context || !profile || profile.ownerId !== context.ownerId) {
     return { status: 'profile_missing', basis: 'local_rules', ingredientNames,
-      sentences: ['Save your skin type, goals or reactivity to get local ingredient notes matched to that context.'] };
+      sentences: [PROFILE_PROMPT] };
   }
   const projected = cosmeticContextFromPersonalProfile(profile.data);
   if (!projected) return { status: 'profile_missing', basis: 'local_rules', ingredientNames,
-    sentences: ['Save your skin type, goals or reactivity to get local ingredient notes matched to that context.'] };
+    sentences: [PROFILE_PROMPT] };
+  const hasSkinDetails = !['unanswered', 'withheld', 'unsure'].includes(projected.skinBehavior)
+    || !['unanswered', 'withheld', 'unsure'].includes(projected.reactivity)
+    || projected.goals.length > 0;
+  if (!hasSkinDetails) return { status: 'profile_missing', basis: 'local_rules', ingredientNames,
+    sentences: ['Your saved profile does not include skin details we can compare with this ingredient list yet.', PROFILE_PROMPT] };
   // Facial goals/type do not establish deodorant, hair or scalp suitability.
   // Retain only general skin-contact reactivity for other personal care.
   const relevantContext: IngredientCosmeticContext = category === 'other_personal_care'
@@ -68,20 +80,30 @@ export function buildPersonalIngredientInsights(
   const list = sourceType === 'user_label' ? 'the ingredient text you pasted' : 'this published list';
   const has = (name: string) => ingredientNames.includes(name);
   const sentences: string[] = [];
-  if (dry) {
-    const moisturizers = ingredientNames.filter((name) => ['Glycerin', 'Petrolatum', 'Dimethicone', 'Hyaluronic acid'].includes(name));
-    if (moisturizers.length) {
-      sentences.push(`You reported dryness or tightness, and ${list} includes ${moisturizers.join(' and ')}. These are commonly used in moisturizing formulas, but the ingredient list alone cannot show how well this finished product will moisturize your skin.`);
-    }
-  }
+  // Surface possible friction before benefits, without converting caution into a verdict.
   if (has('Fragrance') && (dry || reactive)) {
-    sentences.push(`${reactive ? 'You reported that your skin reacts easily' : 'You reported dryness or tightness'}, and ${list} includes fragrance or parfum. Fragrance can irritate some people, so that is a reason to be cautious, not proof that this product will irritate you.`);
+    sentences.push(`${reactive ? 'You reported that your skin reacts easily' : 'You reported dryness or tightness'}, and ${list} includes fragrance or parfum. A fragrance free alternative may be worth considering. This is a reason for caution, not proof that this product will irritate you.`);
   }
   if (has('Alcohol denat.') && (dry || reactive)) {
     sentences.push(`${dry ? 'Because you reported dryness or tightness' : 'Because you reported that your skin reacts easily'}, alcohol denat. is worth noting in ${list}. It can feel drying or irritating for some people, but its concentration and the full formula matter.`);
   }
+  if (dry) {
+    const moistureNotes: string[] = [];
+    const humectants = ingredientNames.filter((name) => ['Glycerin', 'Hyaluronic acid'].includes(name));
+    if (humectants.length) moistureNotes.push(`${namesInSentence(humectants)} ${humectants.length === 1 ? 'helps' : 'help'} draw water into the skin`);
+    if (has('Petrolatum')) moistureNotes.push('Petrolatum helps reduce moisture loss');
+    if (has('Dimethicone')) moistureNotes.push('Dimethicone is commonly used in moisturizing formulas');
+    if (moistureNotes.length) {
+      sentences.push(`You reported dryness or tightness, and ${list} includes ingredients used for moisture support. ${moistureNotes.join('. ')}. The ingredient list alone cannot show how well this finished product will moisturize your skin.`);
+    }
+  }
   if (!sentences.length) {
-    sentences.push('These limited local rules found no specific ingredient note for the skin details you saved. That is not a compatibility verdict, and it does not mean the product cannot irritate your skin.');
+    const limit = category === 'other_personal_care'
+      ? 'Your facial skin type and goals do not tell us how a deodorant or hair care product will suit you. We only compare general skin reactivity for these products.'
+      : projected.goals.some((goal) => !['dryness', 'simplify', 'maintain'].includes(goal))
+        ? 'These rules compare moisture support and possible irritation. They do not assess whether this product will meet your other skin goals.'
+        : 'These rules compare moisture support and possible irritation, not every ingredient or every skin concern.';
+    sentences.push(`We found no specific ingredient note for the skin details you saved. ${limit} That is not a compatibility verdict, and it does not mean the product cannot irritate your skin.`);
   }
   sentences.push(sourceType === 'user_label'
     ? 'These notes use ingredient text you pasted, not a formula verified by Derive. Check that the text matches your exact package. They do not identify the cause of a past reaction or predict your individual tolerance.'
