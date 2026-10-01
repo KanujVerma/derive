@@ -35,6 +35,8 @@ interface Props {
   bottomInset?: number;
   /** Only identity and verdict appear in the collapsed fold. Findings appear on the first upward swipe. */
   summary?: React.ReactNode;
+  /** Private async lookup details must survive collapsing so requests/editor state are not restarted. */
+  keepDetailsMounted?: boolean;
   children: React.ReactNode;
 }
 
@@ -52,7 +54,7 @@ export function ResultSheetSurface({ visible = true, inline = false, presentatio
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, children }: Omit<Props, 'visible' | 'inline'> & {
+  initialDetent = 0, bottomInset = 0, summary, children, keepDetailsMounted = false }: Omit<Props, 'visible' | 'inline'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
@@ -114,7 +116,10 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {summary && <View onLayout={event => { const measured = event.nativeEvent.layout.height; if (Math.abs(measured - summaryHeight) >= 1) setSummaryHeight(measured); }}>{summary}</View>}
-        {(!summary || index > 0) && children}
+        {keepDetailsMounted ? <View style={summary && index === 0 ? { display: 'none' } : undefined}
+          accessibilityElementsHidden={Boolean(summary && index === 0)}
+          importantForAccessibility={summary && index === 0 ? 'no-hide-descendants' : 'auto'}>{children}</View>
+          : (!summary || index > 0) && children}
       </BottomSheetScrollView>
     </BottomSheet>
   </GestureHandlerRootView>;

@@ -74,6 +74,8 @@ import { captureCustomerFunctionClient, type CustomerFunctionClient } from '@/sr
 import { MissingProductContribution } from '@/src/components/check/contribution/MissingProductContribution';
 import { selectCheckContributionRecovery } from '@/src/presentation/catalog-contribution/checkRecovery';
 import { createProductLinkController } from '@/src/presentation/product-links/controller';
+import { PrivateUpcFallback } from '@/src/components/check/PrivateUpcFallback';
+import { privateCheckEnabled } from '@/src/presentation/external-products/checkFallback';
 
 export default function CheckProductScreen({ productEventSink }: { productEventSink?: ProductEventSink } = {}) {
   const router = useRouter();
@@ -639,14 +641,16 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   useEffect(() => {
-    if (!cameraResultNeedsExistingPage({
+    const privateBarcodeMiss = cameraAwaitingResult && !isCheckingProduct && Boolean(unknownBarcode)
+      && privateCheckEnabled(__DEV__, publicEnvironment.buildFlavor, process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED);
+    if (!privateBarcodeMiss && !cameraResultNeedsExistingPage({
       awaiting: cameraAwaitingResult, checking: isCheckingProduct, ownerId: liveCheckOwner,
       scanId: cameraScanId, error: evaluationError, resolution, catalogProduct: catalogDetail,
     })) return;
     setCameraAwaitingResult(false);
     setDetectionPaused(false);
     setCaptureRole(null);
-  }, [cameraAwaitingResult, isCheckingProduct, liveCheckOwner, cameraScanId, evaluationError, resolution, catalogDetail]);
+  }, [cameraAwaitingResult, isCheckingProduct, liveCheckOwner, cameraScanId, evaluationError, resolution, catalogDetail, unknownBarcode]);
 
   const handleBarcodeScanned = (scanningResult: BarcodeScanningResult) => {
     if (isScanningLockedRef.current) return;
@@ -901,6 +905,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const resultNextStep = visibleDecision && (visibleDecision.packet.action.nextStep !== 'add_context'
     || contextEditorDestination(visibleDecision.packet)) ? handleDecisionStep : undefined;
   const resultKey = personalTarget?.snapshotId ?? catalogDetail?.productId ?? String(resultOperation?.generation ?? 'pending');
+  const privateBarcodeResult = Boolean(unknownBarcode && liveCheckOwner)
+    && privateCheckEnabled(__DEV__, publicEnvironment.buildFlavor, process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED);
   const recoveryReason = unknownBarcode ? 'unknown_barcode'
     : resolution && (resolution.state === 'insufficient_evidence' || resolution.state === 'formula_only') ? 'unresolved_check'
       : captureEvidence?.localPhotos.length && !captureEvidence.resolvedCase ? 'unresolved_photo' : null;
@@ -1088,13 +1094,20 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
             )}
           </View>
         </ScrollView>
-        <CheckResultPresentation visible={isCheckFocused && !editingContext && (contextualResultOpen || Boolean(catalogDetail || resolution || unknownBarcode || captureEvidence || isCheckingProduct || evaluationError))}
+        <CheckResultPresentation visible={!privateBarcodeResult && isCheckFocused && !editingContext && (contextualResultOpen || Boolean(catalogDetail || resolution || unknownBarcode || captureEvidence || isCheckingProduct || evaluationError))}
           input={sharedResultInput} presentationKey={resultKey} loading={isCheckingProduct} error={evaluationError}
           dismissLabel={resultOriginRef.current?.kind === 'camera' ? 'Back to Check' : 'Close result'}
           full={fullResult} onFullChange={setFullResult} onClose={closeContextualResult}
           onNextStep={resultNextStep} onOpenSource={(url) => void Linking.openURL(url).catch(() => {})}>
           {renderResultExtras()}
         </CheckResultPresentation>
+        {privateBarcodeResult && isCheckFocused && !editingContext && unknownBarcode && <PrivateUpcFallback
+          key={JSON.stringify([liveCheckOwner, unknownBarcode, resultOperation?.generation])}
+          barcode={unknownBarcode} ownerId={liveCheckOwner}
+          sheet={{ presentationKey: resultKey, onClose: closeContextualResult }}>
+          <Button label="Search by name" variant="outline" onPress={handleSearchNamePress} />
+          <Button label="Scan another barcode" variant="outline" onPress={() => openCapture('barcode')} />
+        </PrivateUpcFallback>}
       </View>
     );
   }

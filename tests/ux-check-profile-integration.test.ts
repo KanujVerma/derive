@@ -42,6 +42,7 @@ function previewModules() {
     '@/src/components/check/result-sheet/ScanResultSheet': { ScanResultSheet: 'ScanResultSheet' },
     '@/src/components/check/result-sheet/CheckResultPresentation': { CheckResultPresentation: 'CheckResultPresentation' },
     '@/src/components/check/contribution/MissingProductContribution': { MissingProductContribution: 'MissingProductContribution' },
+    '@/src/components/check/PrivateUpcFallback': { PrivateUpcFallback: denyNetwork },
     '@/src/components/account/AccountSettingsButton': { AccountSettingsButton: 'AccountSettingsButton' },
     '@/src/components/shell/RootShellHeader': { RootShellHeader: 'RootShellHeader' },
     '@/src/components/my-stuff/MyStuffContent': { MyStuffContent: 'MyStuffContent' },

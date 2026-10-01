@@ -25,6 +25,41 @@ test('scanner release is explicit, exact-project, Remote and publishable-only', 
   assert.deepEqual(resolvePlanPresentation({ shell: 'hosted_free_integration', managedAccess: true, fixtureStatus: 'active' }), { kind: 'free' });
 });
 
+test('private scanner public configuration parses the presentation flag strictly', () => {
+  assert.equal(resolvePublicEnvironment({ privateUpcTestEnabled: 'true' }).privateUpcTestEnabled, true);
+  assert.equal(resolvePublicEnvironment({ privateUpcTestEnabled: 'false' }).privateUpcTestEnabled, undefined);
+  assert.throws(() => resolvePublicEnvironment({ privateUpcTestEnabled: 'yes' }));
+});
+
+test('hosted private scanner presentation requires every development-only boundary', () => {
+  const privateTest = { buildFlavor: 'development' as const, remoteEnabled: true,
+    supabaseUrl: hosted, developmentRuntime: true, privateUpcTestEnabled: true };
+  assert.equal(resolveShellPresentation(privateTest), 'hosted_free_integration');
+  for (const patch of [{ developmentRuntime: false }, { privateUpcTestEnabled: false },
+    { supabaseUrl: 'https://other.supabase.co' }, { supabaseUrl: hosted + '/' },
+    { supabaseUrl: hosted + '/functions/v1' },
+    { buildFlavor: 'remote-staging' as const }, { buildFlavor: 'production' as const }]) {
+    assert.equal(resolveShellPresentation({ ...privateTest, ...patch }), 'legacy');
+  }
+  assert.equal(resolveShellPresentation({ ...privateTest, remoteEnabled: false }), 'scanner_first_preview');
+  assert.equal(resolveShellPresentation({ ...privateTest, developmentRuntime: false,
+    scannerReleaseEnabled: true }), 'legacy');
+  assert.equal(resolveShellPresentation({ buildFlavor: 'development', remoteEnabled: true,
+    supabaseUrl: hosted, privateUpcTestEnabled: true }), 'legacy',
+  'a public flag alone cannot substitute for the actual development runtime');
+});
+
+test('hosted private scanner keeps permanent sign-in and owner-bound entry requirements', () => {
+  const shell = resolveShellPresentation({ buildFlavor: 'development', remoteEnabled: true,
+    supabaseUrl: hosted, developmentRuntime: true, privateUpcTestEnabled: true });
+  assert.equal(shell, 'hosted_free_integration');
+  assert.notEqual(shell, 'local_free_integration', 'no local anonymous signup path');
+  assert.equal(resolveScannerEntry({ ...ready, authStatus: 'SIGNED_OUT' }), 'auth');
+  assert.equal(resolveScannerEntry({ ...ready, accessStatus: 'ERROR' }), 'error');
+  assert.equal(resolveScannerEntry({ ...ready, contextOwnerId: 'owner-b' }), 'loading');
+  assert.equal(resolveScannerEntry({ ...ready, hasProfile: true }), 'check');
+});
+
 const ready = { authStatus: 'SIGNED_IN' as const, ownerId: 'owner-a', accessStatus: 'READY',
   access: { userId: 'owner-a', identityKind: 'permanent' as const, freeProductAccess: true as const,
     managedMembershipStatus: 'none' as const, managedAccess: false },

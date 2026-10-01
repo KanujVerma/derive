@@ -11,6 +11,8 @@ export interface PublicEnvironmentInput {
   developmentRuntime?: boolean;
   /** Explicit signed scanner candidate, independent of legacy membership. */
   scannerReleaseEnabled?: string;
+  /** Presentation opt-in only. Server Auth and tester authorization still apply. */
+  privateUpcTestEnabled?: string;
 }
 
 export type BuildFlavor = 'development' | 'remote-staging' | 'production';
@@ -23,6 +25,7 @@ export interface PublicEnvironment {
   useRemoteService: boolean;
   developmentSupabaseLanUrl?: string;
   scannerReleaseEnabled?: boolean;
+  privateUpcTestEnabled?: boolean;
 }
 
 export interface StagingBuildDiagnostics {
@@ -124,6 +127,7 @@ export function resolvePublicEnvironment(
     input.useRemoteService,
   );
   const scannerReleaseEnabled = parseBooleanFlag('EXPO_PUBLIC_SCANNER_RELEASE_ENABLED', input.scannerReleaseEnabled);
+  const privateUpcTestEnabled = parseBooleanFlag('EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED', input.privateUpcTestEnabled);
   if (scannerReleaseEnabled && (!useRemoteService || buildFlavor !== 'production'
     || supabaseUrl !== 'https://snojlbqovlawewwqbviz.supabase.co'
     || !/^sb_publishable_[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{8}$/.test(publishableKey))) {
@@ -184,6 +188,7 @@ export function resolvePublicEnvironment(
     supabaseKeySource,
     useRemoteService,
     ...(scannerReleaseEnabled ? { scannerReleaseEnabled: true } : {}),
+    ...(privateUpcTestEnabled ? { privateUpcTestEnabled: true } : {}),
     ...(approvedDevelopmentLanUrl ? { developmentSupabaseLanUrl: approvedDevelopmentLanUrl } : {}),
   });
 }
@@ -197,6 +202,7 @@ export const publicEnvironment = resolvePublicEnvironment({
   developmentSupabaseLanUrl: process.env.EXPO_PUBLIC_DEV_SUPABASE_LAN_URL,
   developmentRuntime: typeof __DEV__ !== 'undefined' && __DEV__,
   scannerReleaseEnabled: process.env.EXPO_PUBLIC_SCANNER_RELEASE_ENABLED,
+  privateUpcTestEnabled: process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED,
 });
 
 export interface PublicLegalLinks {

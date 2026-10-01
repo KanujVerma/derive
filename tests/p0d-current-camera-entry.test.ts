@@ -18,7 +18,9 @@ test('current Check has one plain camera entry and a visible name-search fallbac
   assert.match(entry, /accessibilityLabel="Check link"/);
   assert.match(entry, /preserveSelection[\s\S]*focusKey=\{searchFocusKey\}/);
   assert.match(entry, /onScroll=[\s\S]*entryScrollOffset\.current/);
-  assert.match(entry, /<CheckResultPresentation visible=\{isCheckFocused/);
+  assert.match(entry, /<CheckResultPresentation visible=\{!privateBarcodeResult && isCheckFocused && !editingContext/);
+  assert.match(entry, /privateBarcodeResult && isCheckFocused && !editingContext && unknownBarcode && <PrivateUpcFallback/,
+    'private and canonical sheets are exclusive and both respect focus/profile editing');
   assert.match(entry, /visibleProductLinkState\?\.kind === 'label_candidate'[\s\S]*<Button label="Search by name"/, 'link recovery remains contextual');
   assert.doesNotMatch(entry, /<CaptureEntry|Other ways to identify|Scan barcode/);
 });

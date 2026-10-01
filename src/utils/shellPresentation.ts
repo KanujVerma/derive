@@ -20,12 +20,17 @@ export function resolveShellPresentation(input: {
   developmentLanUrl?: string;
   developmentRuntime?: boolean;
   scannerReleaseEnabled?: boolean;
+  /** Development-only hosted testing; never an entitlement or public activation. */
+  privateUpcTestEnabled?: boolean;
 }): ShellPresentation {
   if ((input.scannerReleaseEnabled ?? publicEnvironment.scannerReleaseEnabled) === true
     && input.buildFlavor === 'production' && input.remoteEnabled
     && input.supabaseUrl === 'https://snojlbqovlawewwqbviz.supabase.co') return 'hosted_free_integration';
   if (input.buildFlavor !== 'development') return 'legacy';
   if (!input.remoteEnabled) return 'scanner_first_preview';
+  if ((input.developmentRuntime ?? (typeof __DEV__ !== 'undefined' && __DEV__)) === true
+    && (input.privateUpcTestEnabled ?? publicEnvironment.privateUpcTestEnabled) === true
+    && input.supabaseUrl === 'https://snojlbqovlawewwqbviz.supabase.co') return 'hosted_free_integration';
   if (isApprovedDevelopmentLanBackend({
     supabaseUrl: input.supabaseUrl ?? '',
     developmentLanUrl: input.developmentLanUrl ?? publicEnvironment.developmentSupabaseLanUrl,

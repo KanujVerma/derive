@@ -1,0 +1,38 @@
+begin;
+select plan(22);
+select has_table('private', 'grounded_search_reservations', 'grounded search quota is durable and global');
+select ok(not has_table_privilege('authenticated', 'private.grounded_search_reservations', 'select'), 'customer cannot read quota ledger');
+select ok(not has_function_privilege('authenticated', 'public.reserve_private_grounded_search(uuid)', 'execute'), 'customer cannot reserve directly');
+select ok(not has_table_privilege('anon', 'private.grounded_search_reservations', 'select'), 'anon cannot read quota ledger');
+select ok(not has_function_privilege('anon', 'public.reserve_private_grounded_search(uuid)', 'execute'), 'anon cannot reserve directly');
+select ok((select relrowsecurity from pg_class where oid = 'private.grounded_search_reservations'::regclass), 'quota ledger has RLS enabled');
+select is((select count(*)::int from information_schema.columns where table_schema = 'private' and table_name = 'grounded_search_reservations'), 2, 'ledger retains only reservation id and timestamp');
+insert into auth.users (id, is_anonymous, raw_user_meta_data) values
+  ('e7000000-0000-4000-8000-000000000001', true, '{}'::jsonb),
+  ('e7000000-0000-4000-8000-000000000002', true, '{}'::jsonb);
+set local role service_role;
+select lives_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000001')$$, 'service role can reserve for active owner');
+reset role;
+select throws_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000001')$$, 'P0001', 'GROUNDED_SEARCH_LIMIT', 'immediate repeat denied');
+select throws_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000002')$$, 'P0001', 'GROUNDED_SEARCH_LIMIT', 'different owner shares global spacing');
+select is((select count(*)::int from private.grounded_search_reservations), 1, 'denied attempts do not consume quota');
+update private.grounded_search_reservations set reserved_at = clock_timestamp() - interval '11 seconds';
+select lives_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000002')$$, 'spacing recovers after ten seconds');
+delete from auth.users where id = 'e7000000-0000-4000-8000-000000000001';
+select is((select count(*)::int from private.grounded_search_reservations), 2, 'account deletion cannot reset global allowance');
+select throws_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000001')$$, 'P0001', 'GROUNDED_SEARCH_OWNER_UNAVAILABLE', 'deleted owner denied');
+delete from private.grounded_search_reservations;
+insert into private.grounded_search_reservations (reserved_at) select clock_timestamp() - interval '1 hour' from generate_series(1,19);
+select lives_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000002')$$, 'twentieth attempt is allowed');
+update private.grounded_search_reservations set reserved_at = clock_timestamp() - interval '1 hour';
+select throws_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000002')$$, 'P0001', 'GROUNDED_SEARCH_LIMIT', 'twenty attempted calls exhaust rolling global day');
+select is((select count(*)::int from private.grounded_search_reservations), 20, 'daily denial preserves reserved attempts');
+update private.grounded_search_reservations set reserved_at = clock_timestamp() - interval '2 days';
+select lives_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000002')$$, 'expired allowance recovers');
+select is((select count(*)::int from private.grounded_search_reservations), 1, 'expired rows pruned');
+update public.profiles set deletion_started_at = clock_timestamp() where id = 'e7000000-0000-4000-8000-000000000002';
+select throws_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000002')$$, 'P0001', 'GROUNDED_SEARCH_OWNER_UNAVAILABLE', 'owner pending deletion cannot reserve');
+select throws_ok($$select public.reserve_private_grounded_search(null)$$, 'P0001', 'GROUNDED_SEARCH_OWNER_UNAVAILABLE', 'null owner denied');
+select throws_ok($$select public.reserve_private_grounded_search('e7000000-0000-4000-8000-000000000099')$$, 'P0001', 'GROUNDED_SEARCH_OWNER_UNAVAILABLE', 'unknown owner denied');
+select * from finish();
+rollback;

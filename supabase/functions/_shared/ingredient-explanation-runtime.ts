@@ -1,0 +1,60 @@
+import type { IngredientExplanationRequest, IngredientExplanationResult } from '../../../src/contracts/IngredientExplanation.ts';
+import { cosmeticContextFromFreeProfile } from '../../../src/domain/ingredient-context.ts';
+import type { PrivateIngredientContextSnapshot } from './private-ingredient-runtime.ts';
+import { explainIngredientContext } from './ingredient-explanation-model.ts';
+
+/** Client input is product evidence, never an owner ID or a client-authored profile. */
+export function parseIngredientExplanationRequest(value: unknown): IngredientExplanationRequest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_EXPLANATION_REQUEST');
+  const input = value as Record<string, unknown>;
+  if (Object.keys(input).sort().join(',') !== 'category,contextSharingConsent,ingredientsText,productName'
+    || typeof input.productName !== 'string' || !input.productName.trim() || input.productName.length > 180
+    || /[\u0000-\u001f\u007f]/u.test(input.productName)
+    || typeof input.ingredientsText !== 'string' || !input.ingredientsText.trim() || input.ingredientsText.length > 24_000
+    || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(input.ingredientsText)
+    || !['skincare', 'other_personal_care'].includes(input.category as string)
+    || input.contextSharingConsent !== true) throw new Error('INVALID_EXPLANATION_REQUEST');
+  return { productName: input.productName.trim(), ingredientsText: input.ingredientsText.trim(),
+    category: input.category as IngredientExplanationRequest['category'], contextSharingConsent: true };
+}
+
+/** Ephemeral cosmetic explanation. No canonical formula, numeric score or persistent AI history. */
+export async function runIngredientExplanation(request: IngredientExplanationRequest, deps: {
+  apiKey: string;
+  /** Use the same operator-selected model as ingredient retrieval. Never client supplied. */
+  model?: string;
+  /** Paid-project processing and the provider disclosure must be explicitly reviewed. */
+  personalContextApproved: boolean;
+  loadContext: () => Promise<PrivateIngredientContextSnapshot | null>;
+  reserveRequest: () => Promise<'reserved' | 'rate_limited'>;
+  fetcher?: typeof fetch;
+}): Promise<IngredientExplanationResult> {
+  const parsed = parseIngredientExplanationRequest(request);
+  if (!deps.personalContextApproved) return { status: 'personalization_disabled' };
+  if (!deps.apiKey.trim()) return { status: 'configuration_required' };
+  let snapshot: PrivateIngredientContextSnapshot | null;
+  try { snapshot = await deps.loadContext(); }
+  catch { return { status: 'context_unavailable' }; }
+  if (!snapshot) return { status: 'profile_missing' };
+  // Re-project even a trusted snapshot: extra envelope/history properties cannot reach the model.
+  const context = cosmeticContextFromFreeProfile(snapshot.context);
+  if (!context || typeof snapshot.version !== 'string' || !snapshot.version || snapshot.version.length > 128) {
+    return { status: 'context_unavailable' };
+  }
+  const contextVersion = snapshot.version;
+  try {
+    if (await deps.reserveRequest() !== 'reserved') return { status: 'rate_limited' };
+  } catch { return { status: 'unavailable' }; }
+  let result: Awaited<ReturnType<typeof explainIngredientContext>>;
+  try { result = await explainIngredientContext({ productName: parsed.productName,
+    ingredientsText: parsed.ingredientsText, category: parsed.category, context },
+  { apiKey: deps.apiKey, model: deps.model, fetch: deps.fetcher }); }
+  catch { return { status: 'unavailable' }; }
+  if (result.status !== 'answer') return result;
+  try {
+    const current = await deps.loadContext();
+    if (!current || current.version !== contextVersion) return { status: 'context_changed' };
+  } catch { return { status: 'context_unavailable' }; }
+  return { status: 'answer', sentences: result.sentences, model: result.model, retrievedAt: new Date().toISOString(),
+    contextVersion, basis: 'ai_guidance', formulaVerified: false };
+}

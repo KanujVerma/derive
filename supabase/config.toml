@@ -165,6 +165,42 @@ verify_jwt = true
 import_map = "./functions/external-product-candidates/deno.json"
 entrypoint = "./functions/external-product-candidates/index.ts"
 
+[functions.private-upc-lookup]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-upc-lookup/deno.json"
+entrypoint = "./functions/private-upc-lookup/index.ts"
+
+[functions.private-ingredient-search]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-ingredient-search/deno.json"
+entrypoint = "./functions/private-ingredient-search/index.ts"
+
+[functions.private-product-ingredients]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-product-ingredients/deno.json"
+entrypoint = "./functions/private-product-ingredients/index.ts"
+
+[functions.private-ingredient-explanation]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-ingredient-explanation/deno.json"
+entrypoint = "./functions/private-ingredient-explanation/index.ts"
+
+[functions.private-web-product-ingredients]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-web-product-ingredients/deno.json"
+entrypoint = "./functions/private-web-product-ingredients/index.ts"
+
+[functions.private-product-photo]
+enabled = true
+verify_jwt = true
+import_map = "./functions/private-product-photo/deno.json"
+entrypoint = "./functions/private-product-photo/index.ts"
+
 [functions.catalog-contribution]
 enabled = true
 verify_jwt = true
