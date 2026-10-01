@@ -8,6 +8,7 @@ export interface CameraCompanionInput {
   ownerId: string | null;
   scanId: string;
   error: string | null;
+  unknownBarcode?: string | null;
   resolution: ProductResolutionResult | null;
   catalogProduct: CatalogProductSummary | null;
 }
@@ -31,6 +32,7 @@ export function cameraCompanionSheet(input: CameraCompanionInput): SheetModel | 
   if (input.error) {
     return buildScanResultSheet({ kind: 'error', ownerId: input.ownerId, scanId: input.scanId });
   }
+  if (input.unknownBarcode) return buildScanResultSheet({ kind: 'unknown', ownerId: input.ownerId, scanId: input.scanId });
   return null;
 }
 

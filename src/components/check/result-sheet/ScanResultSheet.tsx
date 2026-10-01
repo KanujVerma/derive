@@ -91,8 +91,8 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
           {visibleModel.kind === 'result' && visibleModel.image.kind !== 'placeholder'
             && <Text style={styles.photoLabel}>{visibleModel.image.label}</Text>}
     {currentContent ? <CheckResultContent input={currentContent} section="summary" showIdentity={false} />
-      : visibleModel.kind === 'result' ? <CheckResultView showIdentity={false} section="summary"
-        facts={{ brand: visibleModel.brand ?? '', name: visibleModel.title, categoryLabel: '', formula: null, source: null }}
+      : visibleModel.kind === 'result' || visibleModel.kind === 'unknown' ? <CheckResultView showIdentity={false} section="summary"
+        facts={{ brand: visibleModel.kind === 'result' ? visibleModel.brand ?? '' : '', name: visibleModel.title, categoryLabel: '', formula: null, source: null }}
         verdict={{ state: 'unknown', label: 'Not enough information', reason: visibleModel.detail, findings: [] }} />
       : <Text style={styles.detail}>{visibleModel.detail}</Text>}
   </View>;

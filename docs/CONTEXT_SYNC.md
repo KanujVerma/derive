@@ -1,5 +1,13 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-01 — bounded product-search and scan-return implementation/QA
+
+- **Immutable predecessor:** remote main `7efb9ce446c6b7b54b3803fa85522b47da2a05ee` (PR193), reconfirmed at final validation. Local isolated branch `kanuj/ux-search-scan-qa` preserves the clean prior preview `kanuj/ux-check-profile-preview@2da7e86` and its Expo process on8083. New Development Mock preview on8084 runs from the isolated checkout with Node22.23.0; no push, merge, deploy or hosted activation authorized.
+- **Composition fixes:** host-owned retained search query/list, cancel/retry/resume, stale success/failure and duplicate request/selection fences, honest manual/no-match recovery, scan-bound unknown-barcode sheet, dismissal state cleanup/rearm, one capture handoff and local background-to-foreground deferral. Sami's camera/controller and platform truth ownership remain intact.
+- **Formula copy:** variant mismatch alone no longer asserts formula change. Retained structured IDs distinguish same recorded, different recorded and unknown formula comparisons; no cause/tolerance inference and no evaluator or red/amber/green policy change. Missing tolerated-history display IDs remain Sami's contract handoff.
+- **Evidence:**965/965 tests across111 files pass, both typechecks pass, web/iOS exports pass, final diff/boundary review and whitespace checks pass. Rendered Mock recovery/search/link returns and four verdict/Source-only layouts verified; native simulator Check entry captured. Physical optics, touch, shutter/review, torch, permission recovery and post-dismiss preview resume remain unrun; available USB/simulator tooling lacks touch. No database/Auth/RLS edits or service smoke; exact-head CI remains required before future merge.
+- **Handoff:** [dated acceptance report](acceptance/SEARCH_SCAN_RETURN_2026_10_01.md) records the exact preview URLs,13 confirmed Library screenshot identities, evidence matrix and one short physical sequence. Parent must inspect screenshots before final readiness. [Check/profile wiring](ux/CHECK_PROFILE_WIRING.md) and [camera constraints](acceptance/CAMERA_RESULT_SHEET.md) carry the remaining decisions. No analytics transmission added or broad PostHog audit duplicated.
+
 ## 2026-10-01 — combined Check/profile publication reconciliation
 
 - **Authorized source/main predecessors:** `kanuj/ux-check-profile-preview@2da7e8660cb0edb2166fcb807732d4f12f72bdd0` and remote main `575566b798dad5dd98a3cba31f992a71bdeb279a`. The user now explicitly authorizes publication and normal PR merge to main, superseding prior local-only scope for this pass. An isolated `/tmp/derive-publish-20261001` checkout preserves the original preview and its Expo process on8083.

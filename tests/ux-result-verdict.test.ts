@@ -140,3 +140,32 @@ test('fictional category sources contain only the facts supporting their finding
     assert.ok(findings.flatMap(row => row.evidence).every(source => /Fictional/.test(source.label + source.detail)), 'fictional provenance stays explicit');
   }
 });
+
+test('variant-only history mismatch never becomes a claim that the formula changed', () => {
+  const f = fixture('caution');
+  const report = f.packet.findings.find(row => row.kind === 'prior_product_reaction')!;
+  assert.equal(report.display?.kind, 'prior_reaction');
+  if (report.display?.kind === 'prior_reaction') report.display.historicalFormulaVersionId = f.binding.formulaVersionId;
+  const changed = { ...fixture('reformulation').packet.findings.find(row => row.kind === 'formula_changed')!, evidence: [...report.evidence], evidenceNeedIds: [] };
+  f.packet.findings.push(changed);
+  const view = describeDecisionVerdict(f.packet, f.binding);
+  assert.equal(view.state, 'poor', 'accepted conservative verdict policy remains unchanged');
+  const row = view.findings.find(row => row.id === changed.id)!;
+  assert.doesNotMatch(row.title + row.reason, /different formula|formula changed/i);
+  assert.match(row.reason, /same recorded formula/);
+});
+
+test('history copy distinguishes different recorded formula IDs from an unknown comparison without changing policy', () => {
+  for (const historicalId of ['earlier-formula', null]) {
+    const f = fixture('caution');
+    const report = f.packet.findings.find(row => row.kind === 'prior_product_reaction')!;
+    if (report.display?.kind === 'prior_reaction') report.display.historicalFormulaVersionId = historicalId;
+    const changed = { ...fixture('reformulation').packet.findings.find(row => row.kind === 'formula_changed')!, evidence: [...report.evidence], evidenceNeedIds: [] };
+    f.packet.findings.push(changed);
+    const view = describeDecisionVerdict(f.packet, f.binding);
+    assert.equal(view.state, 'poor');
+    const reason = view.findings.find(row => row.id === changed.id)!.reason;
+    assert.match(reason, historicalId ? /different recorded formula/ : /comparison is unknown/);
+    assert.doesNotMatch(reason, /ingredient cause|caused by|safe to use/i);
+  }
+});

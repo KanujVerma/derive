@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
-import { Modal, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, Modal, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProductEvidenceCapture } from './ProductEvidenceCapture';
 import { createCheckCaptureBridge, type CheckCaptureHandoff } from '../../../presentation/capture/checkCaptureAdapter';
 import { createLiveFreeEvidenceProcessor } from '../../../presentation/capture/liveFreeEvidenceProcessor';
-import { pendingCaptureProcessor, type CaptureProcessor, type CaptureRole } from '../../../presentation/capture/productEvidence';
+import { pendingCaptureProcessor, type CaptureHandoff, type CaptureProcessor, type CaptureRole } from '../../../presentation/capture/productEvidence';
 
 interface Props {
   onClose: () => void;
@@ -19,8 +19,32 @@ interface Props {
 }
 
 export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', live = false, detectionPaused = false, catalogSearch, onCatalogSelect, companion = null }: Props) {
+  const [appActive, setAppActive] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
+  const activeRef = useRef(appActive);
+  const delivered = useRef(false);
+  const pendingHandoff = useRef<CaptureHandoff | null>(null);
   const selectedProcessor = useMemo(() => processor ?? (live ? createLiveFreeEvidenceProcessor() : pendingCaptureProcessor), [processor, live]);
   const bridge = useMemo(() => createCheckCaptureBridge(selectedProcessor), [selectedProcessor]);
+  const handoffRef = useRef((handoff: CaptureHandoff) => onCaptureReady(bridge.handoff(handoff)));
+  handoffRef.current = handoff => onCaptureReady(bridge.handoff(handoff));
+  const deliver = (handoff: CaptureHandoff) => {
+    if (delivered.current) return;
+    if (!activeRef.current) { pendingHandoff.current ??= handoff; return; }
+    delivered.current = true;
+    pendingHandoff.current = null;
+    handoffRef.current(handoff);
+  };
+  useEffect(() => {
+    activeRef.current = AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
+    const subscription = AppState.addEventListener('change', state => {
+      activeRef.current = state === 'active';
+      setAppActive(activeRef.current);
+      // Keep completed customer evidence local until foreground; do not lose it
+      // behind a capture lock or issue a second resolver call on resume.
+      if (activeRef.current && pendingHandoff.current) deliver(pendingHandoff.current);
+    });
+    return () => { activeRef.current = false; delivered.current = true; pendingHandoff.current = null; subscription.remove(); };
+  }, []);
 
   return (
     // Capture belongs above the floating tab bar, not inside its content inset.
@@ -32,11 +56,11 @@ export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRo
             onClose={onClose}
             initialRole={initialRole}
             autoFinishBarcode
-            detectionPaused={detectionPaused}
+            detectionPaused={detectionPaused || !appActive}
             catalogSearch={catalogSearch}
-            onCatalogSelect={onCatalogSelect}
+            onCatalogSelect={product => { if (activeRef.current && !delivered.current && onCatalogSelect) { delivered.current = true; onCatalogSelect(product); } }}
             processor={bridge.processor}
-            onEvidenceReady={(handoff) => onCaptureReady(bridge.handoff(handoff))}
+            onEvidenceReady={deliver}
           />
           {companion}
         </View>

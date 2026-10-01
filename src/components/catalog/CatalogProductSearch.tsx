@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { CatalogProductSummary } from '../../contracts/ProductCatalog';
 import { searchCatalogProducts } from '../../services/productCatalog';
 import { colors, radii, spacing, typography } from '../../constants/theme';
 import { catalogImagePresentation } from '../../presentation/check/result-sheet/model';
 import { Icon } from '../ui/Icon';
-import { createCatalogSearchController } from '../../presentation/catalog/searchController';
+import { createCatalogSearchController, type CatalogSearchController } from '../../presentation/catalog/searchController';
 
 interface Props {
+  controller?: CatalogSearchController<CatalogProductSummary>;
   onSelect: (product: CatalogProductSummary) => void;
   search?: (query: string) => Promise<CatalogProductSummary[]>;
   selectedIds?: readonly string[];
@@ -24,24 +25,22 @@ interface Props {
 }
 
 export function CatalogProductSearch({
-  onSelect, selectedIds = [], actionLabel = 'Add', label = 'Add product',
+  controller: hostController, onSelect, selectedIds = [], actionLabel = 'Add', label = 'Add product',
   search = searchCatalogProducts,
   placeholder = 'Search brand or product name', keepFocusAfterSelect = true, onQueryChange,
   errorCopy = 'Search is unavailable right now. You can still add a product manually.',
   emptyCopy = 'No catalog match yet. Try another name or add it manually.',
   embedded = false, preserveSelection = false, focusKey,
 }: Props) {
-  const [state, setState] = useState({ query: '', resultQuery: '', items: [] as CatalogProductSummary[], loading: false, error: false });
-  const { query, loading, error } = state;
   const inputRef = useRef<TextInput>(null);
   const searchRef = useRef(search);
   searchRef.current = search;
-  const controllerRef = useRef<ReturnType<typeof createCatalogSearchController<CatalogProductSummary>> | null>(null);
-  const controller = () => {
-    if (!controllerRef.current) controllerRef.current = createCatalogSearchController(value => searchRef.current(value), setState);
-    return controllerRef.current;
-  };
-  useEffect(() => () => { controllerRef.current?.dispose(); controllerRef.current = null; }, []);
+  const ownedController = useRef<CatalogSearchController<CatalogProductSummary> | null>(null);
+  if (!ownedController.current) ownedController.current = createCatalogSearchController(value => searchRef.current(value));
+  const controller = hostController ?? ownedController.current;
+  const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
+  const { query, loading, error } = state;
+  useEffect(() => () => { ownedController.current?.dispose(); ownedController.current = null; }, []);
   const lastFocusKey = useRef(focusKey);
   useEffect(() => {
     if (lastFocusKey.current === focusKey) return;
@@ -51,7 +50,7 @@ export function CatalogProductSearch({
   }, [focusKey]);
 
   const select = (item: CatalogProductSummary) => {
-    controller().select(preserveSelection);
+    if (!controller.select(preserveSelection)) return;
     if (!preserveSelection) onQueryChange?.('');
     if (keepFocusAfterSelect) inputRef.current?.focus();
     else inputRef.current?.blur();
@@ -65,8 +64,8 @@ export function CatalogProductSearch({
         ref={inputRef}
         style={styles.input}
         value={query}
-        onChangeText={(value) => { controller().setQuery(value); onQueryChange?.(value); }}
-        onSubmitEditing={() => { void controller().submit(); }}
+        onChangeText={(value) => { controller.setQuery(value); onQueryChange?.(value); }}
+        onSubmitEditing={() => { void controller.submit(); }}
         placeholder={placeholder}
         placeholderTextColor={colors.inkMuted}
         autoCorrect={false}
@@ -76,7 +75,12 @@ export function CatalogProductSearch({
       />
       {query.trim().length === 1 && <Text style={styles.helper}>Type at least 2 characters.</Text>}
       {loading && <View style={styles.status}><ActivityIndicator size="small" color={colors.brand} /><Text style={styles.helper}>Searching products...</Text></View>}
-      {error && <Text style={styles.helper} accessibilityRole="alert">{errorCopy}</Text>}
+      {error && <View style={styles.status}>
+        <Text style={[styles.helper, { flex: 1 }]} accessibilityRole="alert">{errorCopy}</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry product search" style={styles.searchAction} onPress={() => void controller.submit()}><Text style={styles.action}>Retry</Text></TouchableOpacity>
+      </View>}
+      {loading && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancel product search" style={styles.searchAction} onPress={controller.cancel}><Text style={styles.action}>Cancel search</Text></TouchableOpacity>}
+      {!loading && !error && query.trim().length >= 2 && state.resultQuery !== query.trim() && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Resume product search" style={styles.searchAction} onPress={() => void controller.submit()}><Text style={styles.action}>Search again</Text></TouchableOpacity>}
       {!loading && !error && query.trim().length >= 2 && state.resultQuery === query.trim() && state.items.length === 0 && (
         <Text style={styles.helper}>{emptyCopy}</Text>
       )}
@@ -118,6 +122,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, color: colors.ink, backgroundColor: colors.canvas },
   helper: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: 19 },
   status: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  searchAction: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: spacing.xs },
   result: { minHeight: 72, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.borderSubtle, paddingVertical: spacing.sm, gap: spacing.sm },
   thumbnail: { width: 56, height: 56, borderRadius: radii.md, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   thumbnailImage: { width: 56, height: 56 },

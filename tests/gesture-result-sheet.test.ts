@@ -6,6 +6,7 @@ import { Script } from 'node:vm';
 import test from 'node:test';
 import React from 'react';
 import ts from 'typescript';
+import { createCatalogSearchController } from '../src/presentation/catalog/searchController.ts';
 import { personalDecisionFixtures } from '../src/fixtures/personal-decision/fixtures.ts';
 
 // React Native cannot execute in Node. Replace only host/native primitives;
@@ -17,6 +18,9 @@ function renderer(interactive = false) {
   const cache = new Map<string, { exports: any }>();
   const native = (tag: string) => ({ children }: any) => React.createElement(tag, {}, children);
   const sheets: any[] = [];
+  const effects: Array<() => any> = [];
+  const captures: any[] = [];
+  const appState = { currentState: 'active', listener: (_state: string) => {} };
   const pressables: any[] = [], state: any[] = [];
   let stateCursor = 0;
   const modalScopes: any[] = [], scrollScopes: any[] = [];
@@ -28,18 +32,23 @@ function renderer(interactive = false) {
     if (cache.has(file)) return cache.get(file)!.exports;
     const module = { exports: {} as any }; cache.set(file, module);
     const dependency = (name: string): any => {
-      if (name === 'react' && interactive) return { ...React, useState: (initial: any) => {
+      if (name === 'react' && interactive) return { ...React, useEffect: (effect: () => any) => { effects.push(effect); }, useSyncExternalStore: (_subscribe: any, getState: any) => getState(), useState: (initial: any) => {
         const index = stateCursor++;
         if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial;
         return [state[index], (next: any) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
       } };
       if (name === 'react-native') return { Modal: native('div'), KeyboardAvoidingView: native('div'), View: native('div'), Text: native('span'), Image: native('img'), ActivityIndicator: native('i'), ScrollView: native('div'),
+        AppState: { currentState: appState.currentState, addEventListener: (_event: string, listener: (state: string) => void) => { appState.listener = listener; return { remove: () => {} }; } },
         StyleSheet: { create: (value: unknown) => value, absoluteFill: {}, hairlineWidth: 1 }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ height: 844, width: 390, fontScale: 1 }), AccessibilityInfo: {}, findNodeHandle: () => null,
+        TextInput: native('input'), TouchableOpacity: (props: any) => { pressables.push(props); return React.createElement('button', {}, props.children); },
         Pressable: (props: any) => { pressables.push(props); return React.createElement('button', {}, props.children); } };
       if (name === 'react-native-safe-area-context') return { SafeAreaProvider: native('div'), useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }) };
       if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: (props: any) => { modalScopes.push(props); return React.createElement('div', {}, props.children); } };
       if (name === 'react-native-reanimated') return { ReduceMotion: { System: 'system' } };
       if (name === '@gorhom/bottom-sheet') return { __esModule: true, default: sheet, BottomSheetScrollView: (props: any) => { scrollScopes.push(props); return React.createElement('div', {}, props.children); }, BottomSheetBackdrop: native('div') };
+      if (name.endsWith('/ProductEvidenceCapture')) return { ProductEvidenceCapture: (props: any) => { captures.push(props); return React.createElement('div'); } };
+      if (name.endsWith('/liveFreeEvidenceProcessor')) return { createLiveFreeEvidenceProcessor: () => { throw new Error('Live capture must not run in host fixture'); } };
+      if (name.endsWith('/services/productCatalog')) return { searchCatalogProducts: async () => { throw new Error('Default lookup must not run in host fixture'); } };
       if (name.endsWith('/Icon')) return { Icon: native('i') };
       if (name.endsWith('/Button')) return { Button: ({ label }: any) => React.createElement('button', {}, label) };
       if (name.startsWith('.') || name.startsWith('@/')) return load(name.startsWith('@/') ? name.slice(2) : resolve(dirname(file), name));
@@ -49,7 +58,7 @@ function renderer(interactive = false) {
     new Script(`(function(require,module,exports){${js}\n})`, { filename: file }).runInThisContext()(dependency, module, module.exports);
     return module.exports;
   }
-  return { load, sheets, modalScopes, scrollScopes, pressables, render: (component: any, props: any) => {
+  return { load, sheets, modalScopes, scrollScopes, pressables, effects, captures, appState, render: (component: any, props: any) => {
     stateCursor = 0; pressables.length = 0;
     return renderToStaticMarkup(React.createElement(component, props));
   } };
@@ -206,4 +215,68 @@ test('compact fold contains only the complete identity and fixed four-state verd
     assert.equal(r.pressables.length, 0, 'verdict has no disclosure or tap action');
     assert.doesNotMatch(html, /Source|For your dryness|In your routine|Texture<\/span>/);
   }
+});
+
+test('an unresolved result has an honest compact summary before the recovery swipe', () => {
+  const r = renderer();
+  const { CheckResultPresentation } = r.load('src/components/check/result-sheet/CheckResultPresentation');
+  const html = r.render(CheckResultPresentation, { visible: true, input: null, presentationKey: 'unknown', onClose: () => {} });
+  assert.match(html, /Product identity is not confirmed/);
+});
+
+test('the actual search view exposes loading cancellation, retry and one selection after recovery', async () => {
+  const r = renderer(true);
+  const { CatalogProductSearch } = r.load('src/components/catalog/CatalogProductSearch');
+  let resolve!: (items: any[]) => void;
+  let calls = 0, selected = 0;
+  const item = { productId: 'sample', brand: 'Example', name: 'Exact variant', category: 'cleanser', imageUrl: null };
+  const controller = createCatalogSearchController<any>(async () => {
+    calls++;
+    if (calls === 2) throw new Error('private transport failure');
+    return await new Promise<any[]>(done => { resolve = done; });
+  });
+  const props = { controller, onSelect: () => { selected++; }, preserveSelection: true };
+  controller.setQuery('Example');
+  const pending = controller.submit();
+  assert.match(r.render(CatalogProductSearch, props), /Searching products/);
+  r.pressables.find(p => p.accessibilityLabel === 'Cancel product search').onPress();
+  resolve([item]); await pending;
+  assert.deepEqual(controller.snapshot().items, []);
+  assert.match(r.render(CatalogProductSearch, props), /Search again/);
+  await r.pressables.find(p => p.accessibilityLabel === 'Resume product search').onPress();
+  await Promise.resolve();
+  const failed = r.render(CatalogProductSearch, props);
+  assert.match(failed, /Search is unavailable/); assert.match(failed, /Retry/);
+  assert.doesNotMatch(failed, /private transport failure/);
+  r.pressables.find(p => p.accessibilityLabel === 'Retry product search').onPress();
+  resolve([item]); await Promise.resolve(); await Promise.resolve();
+  r.render(CatalogProductSearch, props);
+  const action = r.pressables.find(p => p.accessibilityLabel === 'Add Example Exact variant');
+  assert.ok(action);
+  action.onPress(); action.onPress();
+  assert.equal(selected, 1);
+  controller.releaseSelection(); action.onPress();
+  assert.equal(selected, 2);
+  controller.dispose();
+});
+
+test('the actual capture host pauses detection and delivers interrupted evidence once on foreground', () => {
+  const r = renderer(true);
+  const { CheckCaptureHost } = r.load('src/components/check/capture/CheckCaptureHost');
+  let handedOff = 0;
+  const props = { live: false, onClose: () => {}, onCaptureReady: () => { handedOff++; } };
+  r.render(CheckCaptureHost, props);
+  r.effects.forEach(effect => effect());
+  const capture = r.captures.at(-1);
+  const evidence = { evidence: [{ kind: 'barcode', role: 'barcode', value: '036000291452' }] };
+  r.appState.listener('background');
+  capture.onEvidenceReady(evidence);
+  assert.equal(handedOff, 0);
+  r.render(CheckCaptureHost, props);
+  assert.equal(r.captures.at(-1).detectionPaused, true);
+  r.appState.listener('active');
+  assert.equal(handedOff, 1, 'completed evidence resumes without another shutter or scan');
+  capture.onEvidenceReady(evidence);
+  r.appState.listener('active');
+  assert.equal(handedOff, 1, 'duplicate callbacks and foreground events cannot redeliver');
 });

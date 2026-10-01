@@ -14,6 +14,10 @@ Reconciliation preserves Sami's hosted scanner routing, indexed ingredient resol
 
 ## Remaining wiring and founder decisions
 
+The bounded search/scan return pass based on main `7efb9ce446c6b7b54b3803fa85522b47da2a05ee` now preserves Check's search query/list across camera entry, exposes cancel/retry/resume, fences stale requests and duplicate selection, and supplies honest manual/no-match recovery. Dismiss re-arms the existing capture session; an unknown barcode has a transient scan-bound sheet. Background completed evidence is held locally and delivered once on foreground. [Dated acceptance](../acceptance/SEARCH_SCAN_RETURN_2026_10_01.md) separates automated, rendered, simulator and unrun physical evidence, records Library identities and the exact8084 preview. It is local-only, with parent screenshot review and physical camera acceptance pending.
+
+Historical copy now compares retained structured formula IDs instead of treating variant mismatch as a formula change. Missing historical IDs remain unknown comparison; same/different recorded IDs do not prove package tolerance. Some tolerated historical packets lack that structured prior ID, so Sami's contract enrichment remains a handoff. No evaluator action or reformulation verdict policy changes in this pass.
+
 - Per-Check intent transport exists, but the live question/host composition still needs an approved bounded integration. A continuation into another case must explicitly carry the same attempt's intent when justified.
 - An explicit per-Check replacement target and its immutable owner/revision binding are absent.
 - Provenance-backed texture facts and general preference storage/binding are absent.
