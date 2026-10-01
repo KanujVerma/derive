@@ -9,6 +9,7 @@ import { parseWebProductIngredientLookup, requestWebProductIngredients, safeWebI
   validWebIngredientQuery, webProductIngredientKey } from '../src/presentation/external-products/webProductIngredients.ts';
 import type { WebIngredientEvidence, WebProductIngredientLookup } from '../src/contracts/WebProductIngredients.ts';
 import { colors, radii, spacing, typography } from '../src/constants/theme.ts';
+import { ingredientLookupCopy } from '../src/presentation/external-products/ingredientLookupCopy.ts';
 
 const owner = 'e6000000-0000-4000-8000-000000000001';
 const query = { barcode: '0012044038840', name: 'Fixture Deodorant', brand: 'Fixture Brand', size: '3 oz' };
@@ -133,8 +134,8 @@ test('inline display memoizes product fields, deduplicates effect replay and fen
 
 test('authored interface copy contains no colons or dash punctuation while source text is preserved', () => {
   const source = readFileSync(new URL('../src/components/check/WebProductIngredients.tsx', import.meta.url), 'utf8');
-  const messages = source.slice(source.indexOf('const messages'), source.indexOf('/** Ephemeral'));
-  const authored = [...messages.matchAll(/\w+: '([^']+)'/g),
+  const messages = readFileSync(new URL('../src/presentation/external-products/ingredientLookupCopy.ts', import.meta.url), 'utf8');
+  const authored = [...messages.matchAll(/(?:title|body): '([^']+)'/g),
     ...source.matchAll(/(?:label|accessibilityLabel)="([^"]+)"/g), ...source.matchAll(/>([^<{]+)</g)]
     .map(match => match[1].trim()).filter(Boolean);
   assert.ok(authored.length >= 10);
@@ -165,6 +166,7 @@ function renderWebIngredients(selected: RenderState, activeOwner = owner, enable
     if (name.endsWith('/supabase')) return { supabase: null };
     if (name.endsWith('/authStore')) return { useAuthStore: (select: (state: typeof authState) => unknown) => select(authState) };
     if (name.endsWith('/freeAccessStore')) return { useFreeAccessStore: (select: (state: typeof accessState) => unknown) => select(accessState) };
+    if (name.endsWith('/ingredientLookupCopy')) return { ingredientLookupCopy };
     throw Error('Unexpected render dependency ' + name);
   };
   const module = { exports: {} as { WebProductIngredients?: React.ComponentType<{ ownerId: string; query: typeof query; enabled: boolean }> } };
@@ -206,10 +208,21 @@ test('actual web display suppresses another owner, another product, disabled sta
 
 test('actual web display renders setup failure and loading with distinct conversational copy', () => {
   const unavailable = renderWebIngredients({ scope, epoch: 0, kind: 'result', result: { status: 'configuration_required' } });
-  assert.match(unavailable, /Web ingredient search is not available in this test yet/);
+  assert.match(unavailable, /Ingredient search is not set up yet/);
   assert.match(unavailable, /Try ingredient search again/);
   const loading = renderWebIngredients({ scope, epoch: 0, kind: 'loading' });
   assert.match(loading, /Finding your ingredient list/);
   assert.match(loading, /Checking published product pages for a matching list/);
-  assert.doesNotMatch(loading, /Your package can fill the gap|Try ingredient search again|Fixture Deodorant/);
+  assert.doesNotMatch(loading, /No matching ingredient list yet|Try ingredient search again|Fixture Deodorant/);
+});
+
+test('actual failure display distinguishes missing, ambiguous, paused and interrupted retrieval', () => {
+  for (const status of ['not_found', 'ambiguous', 'rate_limited', 'unavailable'] as const) {
+    const html = renderWebIngredients({ scope, epoch: 0, kind: 'result', result: { status } });
+    const copy = ingredientLookupCopy(status);
+    assert.ok(html.includes(copy.title));
+    assert.ok(html.includes(copy.body));
+    assert.match(html, /Try ingredient search again/);
+    assert.doesNotMatch(html, /Published online|Ingredient list<|safe for|unsafe for|\bscore\b/);
+  }
 });

@@ -7,6 +7,7 @@ import ts from 'typescript';
 import test from 'node:test';
 import { colors, radii, spacing, typography } from '../src/constants/theme.ts';
 import type { PublishedIngredientEvidence } from '../src/contracts/ProductIngredientLookup.ts';
+import { ingredientLookupCopy } from '../src/presentation/external-products/ingredientLookupCopy.ts';
 
 const require = createRequire(import.meta.url);
 const { renderToStaticMarkup } = require('react-dom/server');
@@ -28,6 +29,7 @@ function render(expanded = false, evidence = item) {
     if (name.endsWith('/productIngredients')) return {};
     if (name.endsWith('/PersonalIngredientNotes')) return {};
     if (name.endsWith('/WebProductIngredients')) return {};
+    if (name.endsWith('/ingredientLookupCopy')) return { ingredientLookupCopy };
     if (name.endsWith('/supabase')) return {};
     if (name.endsWith('/authStore')) return {};
     throw Error('Unexpected render dependency: ' + name);

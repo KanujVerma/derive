@@ -32,23 +32,23 @@ test('web query is bounded valid barcode identity only, not URLs, owner, photos 
   }
 });
 
-test('search prioritizes known official manufacturer, deduplicates brand and quantity without losing variant or SPF', () => {
-  assert.equal(buildWebIngredientSearchQuery(query), query.name + ' ingredients site:oldspice.com');
+test('search covers manufacturer and retailer results, deduplicates brand and quantity without losing variant or SPF', () => {
+  assert.equal(buildWebIngredientSearchQuery(query), query.name + ' ingredients');
   assert.equal(buildWebIngredientSearchQuery({ ...query, name: 'Daily Moisturizing Lotion', brand: 'Aveeno', size: '12 fl oz' }),
-    'Aveeno Daily Moisturizing Lotion 12 fl oz ingredients site:aveeno.com');
+    'Aveeno Daily Moisturizing Lotion 12 fl oz ingredients');
   assert.equal(buildWebIngredientSearchQuery({ ...query, name: 'Aveeno Daily Moisturizing Lotion 12 fl oz', brand: 'Aveeno', size: 'One 12 fl oz Bottle' }),
-    'Aveeno Daily Moisturizing Lotion 12 fl oz ingredients site:aveeno.com');
+    'Aveeno Daily Moisturizing Lotion 12 fl oz ingredients');
   assert.equal(buildWebIngredientSearchQuery({ ...query, name: 'CeraVe AM Facial Moisturizing Lotion SPF 30', brand: 'CeraVe', size: '3 oz' }),
-    'CeraVe AM Facial Moisturizing Lotion SPF 30 3 oz ingredients site:cerave.com');
+    'CeraVe AM Facial Moisturizing Lotion SPF 30 3 oz ingredients');
   assert.equal(buildWebIngredientSearchQuery({ ...query, name: 'Old Spice High Endurance Fresh Deodorant', brand: null, size: null }),
-    'Old Spice High Endurance Fresh Deodorant ingredients site:oldspice.com');
+    'Old Spice High Endurance Fresh Deodorant ingredients');
   assert.equal(buildWebIngredientSearchQuery({ ...query, name: 'Other Brand Fresh Aerosol Deodorant', brand: 'Other Brand', size: '4 oz' }),
     'Other Brand Fresh Aerosol Deodorant 4 oz ingredients');
   assert.equal(buildWebIngredientSearchQuery({ ...query, name: 'Moisturizing Cream', brand: 'https://evil.com', size: null }),
     'https://evil.com Moisturizing Cream ingredients');
 });
 
-test('only exact HTTPS official source hosts may be fetched; private hosts and redirect/proxy URLs rejected', () => {
+test('only exact HTTPS approved source hosts may be fetched; private hosts and redirect/proxy URLs rejected', () => {
   for (const host of ['aveeno.com', 'www.oldspice.com', 'cerave.com', 'www.cetaphil.com', 'neutrogena.com',
     'www.target.com', 'walgreens.com', 'www.walmart.com', 'cvs.com']) {
     assert.equal(safeIngredientPageUrl('https://' + host + '/products/example#ingredients'), 'https://' + host + '/products/example');
@@ -59,6 +59,18 @@ test('only exact HTTPS official source hosts may be fetched; private hosts and r
     'https://www.target.com/redirect/a', 'https://www.target.com/fetch/a', 'https://www.target.com/a?url=http://localhost',
     'https://www.target.com/a?next=https://evil.com', 'https://www.target.com/a\n']) {
     assert.equal(safeIngredientPageUrl(value), null, value);
+  }
+});
+
+test('explicit non-U.S. country routes on global brand sources are rejected', () => {
+  for (const host of ['www.dove.com', 'vaseline.com']) {
+    assert.equal(safeIngredientPageUrl('https://' + host + '/us/en/products/lotion'),
+      'https://' + host + '/us/en/products/lotion');
+    assert.equal(safeIngredientPageUrl('https://' + host + '/en-us/products/lotion'),
+      'https://' + host + '/en-us/products/lotion');
+    for (const route of ['/uk/en/products/lotion', '/ca/en/products/lotion', '/in/en/products/lotion', '/en-gb/products/lotion']) {
+      assert.equal(safeIngredientPageUrl('https://' + host + route), null, route);
+    }
   }
 });
 
@@ -76,12 +88,62 @@ test('variant/form guards distinguish plain deodorant, antiperspirant, sprays, s
   assert.equal(sameIngredientProduct(query, title), true);
   for (const name of ['Old Spice High Endurance Fresh Antiperspirant Deodorant',
     'Old Spice High Endurance Pure Sport Deodorant', 'Old Spice High Endurance Fresh Deodorant Dry Spray',
-    'Old Spice High Endurance Fresh Deodorant Aerosol', 'Old Spice Fresh Body Wash']) {
+    'Old Spice High Endurance Fresh Deodorant Aerosol', 'Old Spice High Endurance Fresh Gel Deodorant', 'Old Spice Fresh Body Wash']) {
     assert.equal(sameIngredientProduct(query, name), false, name);
   }
   const sunscreen = { ...query, name: 'CeraVe AM Facial Moisturizing Lotion SPF 30', brand: 'CeraVe' };
   assert.equal(sameIngredientProduct(sunscreen, 'CeraVe AM Facial Moisturizing Lotion SPF 30'), true);
   assert.equal(sameIngredientProduct(sunscreen, 'CeraVe AM Facial Moisturizing Lotion SPF 50'), false);
+  assert.equal(sameIngredientProduct(sunscreen, sunscreen.name + ' Cream'), false);
+  assert.equal(sameIngredientProduct(sunscreen, 'CeraVe AM Facial Moisturizing Lotion SPF30'), true);
+  assert.equal(sameIngredientProduct(sunscreen, sunscreen.name + ' | CeraVe AM Facial Moisturizing Lotion SPF 50'), false);
+  assert.equal(sameIngredientProduct({ ...sunscreen, name: sunscreen.name.replace('SPF 30', 'SPF30') }, sunscreen.name), true);
+  assert.equal(sameIngredientProduct(query, title + ' for Women'), false);
+  const plain = { ...query, name: 'CeraVe Facial Moisturizing Lotion', brand: 'CeraVe' };
+  assert.equal(sameIngredientProduct(plain, plain.name + ' SPF 30'), false);
+  assert.equal(sameIngredientProduct(plain, plain.name + ' Medicated'), false);
+});
+
+test('percentage strengths remain formula distinctions instead of ignored package quantities', () => {
+  const strength = { ...query, name: 'Other Brand Benzoyl Peroxide Lotion 5%', brand: 'Other Brand' };
+  assert.equal(sameIngredientProduct(strength, 'Other Brand Benzoyl Peroxide Lotion 5 percent'), true);
+  assert.equal(sameIngredientProduct(strength, 'Other Brand Benzoyl Peroxide Lotion 5.0%'), true);
+  assert.equal(sameIngredientProduct(strength, 'Other Brand Benzoyl Peroxide Lotion 10%'), false);
+  assert.equal(sameIngredientProduct(strength, 'Other Brand Benzoyl Peroxide Lotion'), false);
+  const plain = { ...strength, name: 'Other Brand Moisturizing Lotion' };
+  assert.equal(sameIngredientProduct(plain, 'Other Brand Moisturizing Lotion 5%'), false);
+});
+
+test('plain Aveeno lotion rejects extra named formula variants even when all requested words occur', () => {
+  const lotion = { ...query, name: 'Aveeno Daily Moisturizing Lotion', brand: 'Aveeno' };
+  assert.equal(sameIngredientProduct(lotion, 'Aveeno Daily Moisturizing Lotion for Dry Skin'), true);
+  for (const variant of ['Sheer Hydration', 'Skin Relief', 'Eczema Therapy']) {
+    assert.equal(sameIngredientProduct(lotion, 'Aveeno Daily Moisturizing ' + variant + ' Lotion'), false, variant);
+  }
+  const sheer = { ...lotion, name: 'Aveeno Daily Moisturizing Sheer Hydration Lotion' };
+  assert.equal(sameIngredientProduct(sheer, sheer.name), true);
+  assert.equal(sameIngredientProduct(sheer, lotion.name), false);
+  assert.equal(parseWebIngredientExtraction({ ...extracted, productName: lotion.name }, lotion,
+    [{ ...page, title: 'Aveeno Daily Moisturizing Sheer Hydration Lotion' }]).status, 'ambiguous');
+});
+
+test('contrasted formula lines are rejected across brands rather than only on Aveeno headings', () => {
+  const shampoo = { ...query, name: 'Nizoral Anti-Dandruff Shampoo', brand: 'Nizoral' };
+  assert.equal(sameIngredientProduct(shampoo, shampoo.name), true);
+  for (const variant of ['Regrowth', 'Pet', 'Psoriasis']) {
+    const heading = 'Nizoral Anti-Dandruff ' + variant + ' Shampoo';
+    assert.equal(sameIngredientProduct(shampoo, heading), false, heading);
+    assert.equal(sameIngredientProduct({ ...shampoo, name: heading }, heading), true, heading);
+    assert.equal(parseWebIngredientExtraction({ ...extracted, productName: shampoo.name }, shampoo,
+      [{ ...page, title: heading }]).status, 'ambiguous');
+  }
+  const conflictingHeading = title + ' | Old Spice High Endurance Pure Sport Deodorant';
+  assert.equal(sameIngredientProduct(query, conflictingHeading), false);
+  assert.equal(parseWebIngredientExtraction(extracted, query, [{ ...page, title: conflictingHeading }]).status, 'ambiguous');
+  const plainLotion = { ...query, name: 'Other Brand Daily Moisturizing Lotion', brand: 'Other Brand' };
+  for (const variant of ['Sheer Hydration', 'Skin Relief', 'Eczema']) {
+    assert.equal(sameIngredientProduct(plainLotion, plainLotion.name + ' ' + variant), false, variant);
+  }
 });
 
 test('model can only return a verbatim list from an indexed fetched page, not invented facts or another variant', () => {
@@ -112,7 +174,7 @@ test('one private budget precedes search, at most top five pages run concurrentl
         assert.equal(parsed.pathname, '/search.json'); assert.equal(parsed.searchParams.get('engine'), 'google_light');
         assert.equal(parsed.searchParams.has('num'), false); assert.equal(parsed.searchParams.get('gl'), 'us');
         assert.equal(parsed.searchParams.get('hl'), 'en'); assert.equal(parsed.searchParams.get('api_key'), keys.serpApiKey);
-        assert.equal(parsed.searchParams.get('q'), query.name + ' ingredients site:oldspice.com');
+        assert.equal(parsed.searchParams.get('q'), query.name + ' ingredients');
         assert.equal(init?.redirect, 'error');
         return new Response(JSON.stringify(searchPayload(Array.from({ length: 8 }, (_v, index) => ({ link: pageUrl + '?id=' + index })))));
       }
@@ -144,6 +206,56 @@ test('unsafe organic links and redirects never fetch the suggested private or un
     return new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data/' } });
   } });
   assert.equal(result.status, 'not_found'); assert.equal(fetched.length, 2); assert.equal(fetched[1], pageUrl);
+});
+
+test('a blocked manufacturer does not discard an exact allowed retailer in the first five results', async () => {
+  const fetched: string[] = [];
+  const result = await lookupWebProductIngredients(query, { ...keys, fetcher: async (url, init) => {
+    const value = String(url);
+    if (value.startsWith('https://serpapi.com/')) return new Response(JSON.stringify(searchPayload([
+      { link: 'https://oldspice.com/products/fresh' }, { link: pageUrl },
+    ])));
+    if (value.startsWith('https://generativelanguage.googleapis.com/')) {
+      const pages = JSON.parse(init!.body as string).contents[0].parts[0].text;
+      assert.equal(JSON.parse(pages).pages.length, 1);
+      assert.equal(JSON.parse(pages).pages[0].title.includes(title), true);
+      return new Response(JSON.stringify(provider()));
+    }
+    fetched.push(value);
+    return value.includes('oldspice.com') ? new Response(null, { status: 403 })
+      : new Response(html, { headers: { 'content-type': 'text/html' } });
+  } });
+  assert.equal(result.status, 'found');
+  if (result.status === 'found') assert.equal(result.evidence.sourceUrl, pageUrl);
+  assert.deepEqual(fetched, ['https://oldspice.com/products/fresh', pageUrl]);
+});
+
+test('unsafe first-five results do not cause a sixth result to be fetched', async () => {
+  let calls = 0;
+  const result = await lookupWebProductIngredients(query, { ...keys, fetcher: async (url) => {
+    calls++;
+    assert.match(String(url), /^https:\/\/serpapi\.com\//);
+    return new Response(JSON.stringify(searchPayload([
+      ...Array.from({ length: 5 }, (_value, index) => ({ link: 'https://unapproved.example/product/' + index })),
+      { link: pageUrl },
+    ])));
+  } });
+  assert.equal(result.status, 'not_found'); assert.equal(calls, 1);
+});
+
+test('wrong extra Aveeno variant is excluded before model extraction', async () => {
+  const lotion = { ...query, name: 'Aveeno Daily Moisturizing Lotion', brand: 'Aveeno', size: null };
+  let modelCalls = 0;
+  const result = await lookupWebProductIngredients(lotion, { ...keys, fetcher: async (url) => {
+    const value = String(url);
+    if (value.startsWith('https://serpapi.com/')) return new Response(JSON.stringify({
+      search_parameters: { q: buildWebIngredientSearchQuery(lotion) }, organic_results: [{ link: pageUrl }],
+    }));
+    if (value.startsWith('https://generativelanguage.googleapis.com/')) { modelCalls++; throw Error('unexpected'); }
+    return new Response('<h1>Aveeno Daily Moisturizing Sheer Hydration Lotion</h1><p>Ingredients: ' + list + '</p>',
+      { headers: { 'content-type': 'text/html' } });
+  } });
+  assert.equal(result.status, 'ambiguous'); assert.equal(modelCalls, 0);
 });
 
 test('safe manufacturer redirects retain actual final source URL', async () => {

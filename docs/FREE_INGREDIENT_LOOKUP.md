@@ -5,7 +5,7 @@
 The local private result now falls back to `private-web-product-ingredients`
 when Open Beauty Facts and DailyMed return no accepted ingredient list. The
 server searches with SerpApi Google Light, considers the first five organic
-results, searches a fixed official domain for recognized brands, and fetches
+results, searches the product name across manufacturer and retailer results, and fetches
 bounded pages from an explicit manufacturer/retailer host
 allowlist. Gemini copies a complete list from a matching fetched page. The server
 rejects text that is not present in that page or comes from a different named
@@ -47,6 +47,21 @@ results, with the only eligible retailer returning HTTP 403. The subsequent
 manufacturer-targeted Aveeno searches timed out at 12 seconds. Both full and
 simplified Old Spice queries also timed out. These are unresolved live-source
 limitations, not evidence that the completed extraction pipeline returned a list.
+
+The bounded recovery pass removes the manufacturer-only query restriction without
+expanding the source-host allowlist or searching beyond the first five results.
+The actual Aveeno search then returned HTTP 200, but its eligible CVS page returned
+403. CeraVe AM SPF 30 search returned HTTP 200 with five ineligible source hosts.
+Both remained unresolved and neither reached Gemini extraction. A separate real
+DailyMed CeraVe AM SPF 30 reference lookup returned its 461-character declaration,
+which the client parsed and local rules compared with a synthetic dryness profile.
+That name-only reference uses a synthetic barcode and is not package verification
+or physical phone acceptance. Unsupported ingredient coverage remains a live-source
+gap, not a credential success or a numerical personal-fit score.
+
+Missing, ambiguous, paused, unconfigured and interrupted retrieval now have distinct
+inline messages. None implies that the product has no ingredients or is unsuitable.
+The package-text fallback and existing product match remain available.
 
 The photo extraction endpoint is preparation only, default off and not connected
 to the phone capture UI. No supplied photos were uploaded to Google.

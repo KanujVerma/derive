@@ -9,18 +9,12 @@ import { currentCustomerOwner } from '@/src/presentation/personal-decision/custo
 import { supabase } from '@/src/services/supabase';
 import { useAuthStore } from '@/src/stores/authStore';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
+import { ingredientLookupCopy } from '@/src/presentation/external-products/ingredientLookupCopy';
 
 type Props = { ownerId: string; query: ProductIngredientQuery; enabled: boolean;
   onEvidence?: (evidence: WebIngredientEvidence | null) => void; onComplete?: () => void };
 type State = { scope: string; epoch: number } & ({ kind: 'loading' } | { kind: 'error' }
   | { kind: 'result'; result: WebProductIngredientLookup });
-const messages: Record<Exclude<WebProductIngredientLookup['status'], 'found'>, string> = {
-  not_found: 'We could not find a published ingredient list for this product. You can add the list from your package below.',
-  ambiguous: 'We found similar products, but could not match a list to this one. Use the ingredients on your package below.',
-  rate_limited: 'Ingredient search has reached its current limit. Try again later, or use the list on your package.',
-  configuration_required: 'Web ingredient search is not available in this test yet. You can still add the list from your package below.',
-  unavailable: 'We could not reach an ingredient source right now. Try again, or use the list on your package.',
-};
 
 /** Ephemeral published web evidence, kept inline and separate from package confirmation. */
 export function WebProductIngredients({ ownerId, query, enabled, onEvidence, onComplete }: Props) {
@@ -75,6 +69,7 @@ export function WebProductIngredients({ ownerId, query, enabled, onEvidence, onC
   const visible = state?.scope === scope && state.epoch === epoch ? state : null;
   const result = visible?.kind === 'result' ? visible.result : null;
   const evidence = result?.status === 'found' ? result.evidence : null;
+  const missing = ingredientLookupCopy(result && result.status !== 'found' ? result.status : 'unavailable');
   useEffect(() => { callback.current?.(enabled && scope ? evidence : null); }, [enabled, scope, epoch, evidence]);
 
   if (!enabled || !scope) return null;
@@ -98,9 +93,8 @@ export function WebProductIngredients({ ownerId, query, enabled, onEvidence, onC
       <Text style={styles.caption}>This published list may differ from your package. Compare it with the ingredients printed on your bottle.</Text>
     </View>}
     {!loading && !evidence && <View style={styles.statusCard}>
-      <Text style={styles.title}>Your package can fill the gap</Text>
-      <Text style={styles.body}>{result && result.status !== 'found' ? messages[result.status]
-        : 'Ingredient search could not finish. Your product match is still here. Try again, or add the ingredients from your package below.'}</Text>
+      <Text style={styles.title}>{missing.title}</Text>
+      <Text style={styles.body}>{missing.body}</Text>
       <Button label="Try ingredient search again" variant="ghost" size="medium" style={styles.retry}
         onPress={() => {
           if (!mounted.current || !live.current.enabled || live.current.scope !== scope || live.current.epoch !== epoch

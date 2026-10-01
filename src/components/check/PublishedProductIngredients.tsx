@@ -9,6 +9,7 @@ import { WebProductIngredients } from '@/src/components/check/WebProductIngredie
 import type { WebIngredientEvidence } from '@/src/contracts/WebProductIngredients';
 import { supabase } from '@/src/services/supabase';
 import { useAuthStore } from '@/src/stores/authStore';
+import { ingredientLookupCopy } from '@/src/presentation/external-products/ingredientLookupCopy';
 
 type State = { scope: string } & ({ kind: 'loading' } | { kind: 'result'; result: ProductIngredientLookup } | { kind: 'error' });
 
@@ -73,16 +74,12 @@ export function PublishedProductIngredients({ query, ownerId }: { query: Product
   const result = visible?.kind === 'result' ? visible.result : null;
   const searchWeb = !loading && Boolean(query.name?.trim()) && !result?.evidence.length;
   const currentWeb = web?.scope === scope ? web : null;
+  const missing = ingredientLookupCopy(result && result.status !== 'found' ? result.status : 'unavailable');
   return <View style={styles.section} accessibilityLiveRegion="polite">
     {loading && <View style={styles.statusCard}><View style={styles.row}><ActivityIndicator color={colors.brand} /><Text style={styles.title}>Finding ingredients</Text></View><Text style={styles.body}>Checking published lists for this product…</Text></View>}
     {result?.evidence.map(item => <IngredientEvidenceCard key={item.source + ':' + key} item={item} />)}
     {result && result.evidence.length > 1 && <Text style={styles.body}>Two sources returned lists. They are shown separately because versions can differ; compare them with your package.</Text>}
-    {result && result.evidence.length === 0 && !searchWeb && <View style={styles.statusCard}><Text style={styles.title}>Ingredient list unavailable</Text><Text style={styles.body}>
-      {result.status === 'rate_limited' ? 'Ingredient lookup is temporarily rate limited. Try again later.'
-        : result.status === 'unavailable' ? 'An ingredient source could not be reached. Try again, or check your package.'
-        : result.status === 'ambiguous' ? 'The source search could not confidently match a list to this exact product. Add the ingredient text from your bottle below.'
-        : 'The connected sources have no matching list. Add the ingredient text from your bottle below to get local notes.'}
-    </Text></View>}
+    {result && result.evidence.length === 0 && !searchWeb && <View style={styles.statusCard}><Text style={styles.title}>{missing.title}</Text><Text style={styles.body}>{missing.body}</Text></View>}
     {visible?.kind === 'error' && <View style={styles.statusCard}><Text style={styles.title}>Ingredient lookup interrupted</Text><Text style={styles.body}>Your product match is still here. Retry below, or add the ingredient text from your bottle.</Text></View>}
     <WebProductIngredients ownerId={ownerId} query={query} enabled={searchWeb}
       onEvidence={onWebEvidence} onComplete={onWebComplete} />

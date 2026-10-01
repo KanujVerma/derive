@@ -28,6 +28,12 @@ export function safeIngredientPageUrl(value: unknown): string | null {
     if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')
       || !allowedHosts.has(url.hostname) || /(?:^|\/)(?:redirect|proxy|fetch|login|signin|sign-in|search)(?:\/|$)/i.test(url.pathname)
       || [...url.searchParams.keys()].some(key => /^(?:url|uri|redirect|redirect_uri|redirect_url|next|return|returnurl|target)$/i.test(key))) return null;
+    // These global brand sites explicitly route product pages by country/language.
+    if (['dove.com', 'vaseline.com'].includes(url.hostname.replace(/^www\./, ''))) {
+      const country = url.pathname.match(/^\/([a-z]{2})\/[a-z]{2}(?:\/|$)/i)?.[1]
+        ?? url.pathname.match(/^\/[a-z]{2}-([a-z]{2})(?:\/|$)/i)?.[1];
+      if (country && country.toLowerCase() !== 'us') return null;
+    }
     url.hash = '';
     return url.toString();
   } catch { return null; }
@@ -44,24 +50,16 @@ function decodeEntities(value: string): string {
 }
 const normalizeWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
 const words = (value: string) => decodeEntities(value).toLowerCase().replace(/[^a-z\d]+/g, ' ').trim()
-  .replace(/\banti perspirant\b/g, 'antiperspirant');
+  .replace(/\banti perspirant\b/g, 'antiperspirant').replace(/\bspf(?=\d)/g, 'spf ');
 
-const manufacturerDomains: Readonly<Record<string, string>> = {
-  aveeno: 'aveeno.com', 'old spice': 'oldspice.com', cerave: 'cerave.com', cetaphil: 'cetaphil.com',
-  neutrogena: 'neutrogena.com', dove: 'dove.com', vaseline: 'vaseline.com', aquaphor: 'aquaphorus.com',
-  eucerin: 'eucerinus.com', 'la roche posay': 'laroche-posay.us', 'sun bum': 'sunbum.com', coppertone: 'coppertone.com',
-};
-
-/** Prioritize a fixed official domain, never a URL supplied by client input or model output. */
+/** Search the named product across sources; URL allowlisting happens before any page fetch. */
 export function buildWebIngredientSearchQuery(query: WebProductIngredientsRequest): string {
   const name = normalizeWhitespace(query.name);
   const brand = query.brand ? normalizeWhitespace(query.brand) : null;
   const normalizedName = words(name), normalizedBrand = brand ? words(brand) : null;
-  const prefixBrand = Object.keys(manufacturerDomains).find(known => normalizedName.startsWith(known + ' '));
-  const domain = normalizedBrand ? manufacturerDomains[normalizedBrand] : prefixBrand ? manufacturerDomains[prefixBrand] : undefined;
   const brandAlreadyInName = normalizedBrand && (' ' + normalizedName + ' ').includes(' ' + normalizedBrand + ' ');
   const nameHasQuantity = /\b\d+(?:\.\d+)?\s*(?:fl[.\s]*oz|oz\.?|ounces?|ml|milliliters?|g|grams?)\b/i.test(name);
-  return [brandAlreadyInName ? null : brand, name, nameHasQuantity ? null : query.size, 'ingredients', domain ? 'site:' + domain : null]
+  return [brandAlreadyInName ? null : brand, name, nameHasQuantity ? null : query.size, 'ingredients']
     .filter(Boolean).join(' ');
 }
 
@@ -87,15 +85,30 @@ export function sameIngredientProduct(query: WebProductIngredientsRequest, produ
   const actualTokens = new Set(actual.split(' '));
   if (meaningful.length < 2 || meaningful.some(token => !actualTokens.has(token))) return false;
   if (query.brand && words(query.brand).split(' ').some(token => !actualTokens.has(token))) return false;
+  const percentages = (value: string) => [...decodeEntities(value).matchAll(/\b(\d+(?:\.\d+)?)\s*(?:%|percent\b)/gi)]
+    .map(match => Number(match[1])).sort((a, b) => a - b).join(',');
+  if (percentages(query.name) !== percentages(productName)) return false;
+  if (/\bmedicated\b/.test(requested) !== /\bmedicated\b/.test(actual)) return false;
+  for (const [requestedAudience, opposingAudience] of [['men', 'women'], ['women', 'men']]) {
+    if (new RegExp('\\b' + requestedAudience + 's?\\b').test(requested)
+      && !new RegExp('\\b' + opposingAudience + 's?\\b').test(requested)
+      && new RegExp('\\b' + opposingAudience + 's?\\b').test(actual)) return false;
+  }
+  // A heading can contain every requested token while also naming a different
+  // formula line. These known contrasted variants must agree across brands.
+  for (const variant of ['sheer hydration', 'skin relief', 'eczema', 'psoriasis', 'regrowth', 'pet', 'pure sport']) {
+    const marker = new RegExp('\\b' + variant + '\\b');
+    if (marker.test(requested) !== marker.test(actual)) return false;
+  }
   const requestedAntiperspirant = /\banti ?perspirant\b/.test(requested);
   const actualAntiperspirant = /\banti ?perspirant\b/.test(actual);
   if (/\bdeodorant\b/.test(requested) && requestedAntiperspirant !== actualAntiperspirant) return false;
   for (const form of ['aerosol', 'spray', 'gel', 'lotion', 'cream', 'shampoo', 'conditioner', 'body wash']) {
-    if (new RegExp('\\b' + form + '\\b').test(requested) !== new RegExp('\\b' + form + '\\b').test(actual)
-      && (new RegExp('\\b' + form + '\\b').test(requested) || ['aerosol', 'spray'].includes(form) && /\bdeodorant\b/.test(requested))) return false;
+    if (new RegExp('\\b' + form + '\\b').test(requested) !== new RegExp('\\b' + form + '\\b').test(actual)) return false;
   }
-  const spf = requested.match(/\bspf\s*(\d+)\b/)?.[1];
-  if (spf && actual.match(/\bspf\s*(\d+)\b/)?.[1] !== spf) return false;
+  const spfs = (value: string) => [...new Set([...value.matchAll(/\bspf\s*(\d+)\b/g)].map(match => Number(match[1])))]
+    .sort((a, b) => a - b).join(',');
+  if (spfs(requested) !== spfs(actual)) return false;
   return true;
 }
 

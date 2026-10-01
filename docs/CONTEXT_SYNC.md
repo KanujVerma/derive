@@ -1,5 +1,13 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-01: bounded ingredient retrieval recovery and clear failure states
+
+- **Immutable predecessor:** local `df5427152de7d9862036ee4ae0db4fb39182d94b`; fresh upstream main remains `7efb9ce`. Existing scanner/UI composition, phone services, Auth, database and exact-tester gates are preserved. No push, deployment or provider change.
+- **Recovery:** removes the known-brand manufacturer-only search restriction while retaining first-five results, approved source hosts, bounded requests, exact variants and verbatim source evidence. Similar variants must not become ingredients for the scanned product. Unknown, unavailable and configuration failures now have distinct inline copy rather than a misleading generic package prompt.
+- **Actual public evidence:** Aveeno search returns HTTP 200 but the eligible CVS page returns 403. CeraVe web search returns HTTP 200 but no first-five host is approved. No web ingredient success is claimed. A separate DailyMed name-only CeraVe AM SPF 30 reference returns 461 characters, survives client parsing, and produces local notes for synthetic dryness context. Its barcode is a sentinel, not actual package verification. Missing synthetic products retain no list or score.
+- **Storage scope:** existing guest and permanent data paths remain owner-bound Supabase storage. Device-only guest storage changes require an explicit isolated mode and clear loss/recovery expectations; no existing data is moved or silently reassigned by this recovery pass. No personal context or photos go to the public retrieval diagnostics.
+- **Validation:** full application suite passed, including 1,185 TAP tests and the independent guest-store leaf regressions present in the working tree. Both TypeScript checks, fresh web/iOS JavaScript exports and whitespace review passed. All 90 exported files and the actual served iPhone development bundle were checked against actual local provider key values with zero matches. Metro and the iPhone bundle returned HTTP 200, and the bundle contains the updated result copy. The storage primitive is not wired into the app by this pass. Native observation remains unverified. Numerical scores and ordinary-store coverage remain unproved.
+
 ## 2026-10-01: private SerpApi ingredient search and inline local notes
 
 - **Predecessor and preservation:** local `d0f7df3` retains Kanuj's latest UI and Sami's scanner, confirmation-save and reported-history work. Fresh upstream inspection found no missing GitHub-main commits. No new camera, schema, evaluator or public deployment was introduced.
