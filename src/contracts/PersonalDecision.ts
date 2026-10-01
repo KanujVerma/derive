@@ -1,5 +1,9 @@
 import type { Goal } from '../types/schema.ts';
 
+/** Reported purpose of this Check, never a reusable profile trait. */
+export const CHECK_INTENTS = ['add', 'replace', 'check_current', 'unanswered', 'withheld'] as const;
+export type CheckIntent = typeof CHECK_INTENTS[number];
+
 /** P0-B evaluation boundary only. P0-A owns the authoritative ProductTruthSnapshot.
  * None of these types establish catalog facts, authentication or scientific review.
  */
@@ -22,6 +26,7 @@ export interface P0BProductEvaluationProjectionV1 {
 
 /** Supplied by the authenticated host and verified adapters, never by a model. */
 export interface DecisionBinding {
+  checkIntent: CheckIntent;
   ownerId: string;
   productSnapshotId: string;
   productSnapshotRevision: string;
@@ -144,6 +149,7 @@ export type PacketIntegrityIssue =
   | 'display_evidence_reference' | 'display_evidence_scope' | 'evidence_provenance_reference';
 
 const BINDING_KEYS: Array<keyof DecisionBinding> = [
+  'checkIntent',
   'ownerId', 'productSnapshotId', 'productSnapshotRevision', 'sourceBoundaryRevision',
   'productId', 'variantId', 'formulaVersionId', 'profileRevision', 'routineRevision', 'historyRevision',
 ];
@@ -157,7 +163,8 @@ export function validatePersonalDecisionPacket(
   packet: PersonalDecisionPacketV1, expectedBinding: DecisionBinding,
 ): PacketIntegrityIssue[] {
   const issues = new Set<PacketIntegrityIssue>();
-  if (BINDING_KEYS.some((key) => packet.binding[key] !== expectedBinding[key])) issues.add('binding_mismatch');
+  if (!CHECK_INTENTS.includes(packet.binding.checkIntent) || !CHECK_INTENTS.includes(expectedBinding.checkIntent)
+    || BINDING_KEYS.some((key) => packet.binding[key] !== expectedBinding[key])) issues.add('binding_mismatch');
   const ids = (rows: Array<{ id: string }>, issue: PacketIntegrityIssue): Set<string> => {
     const unique = new Set(rows.map((row) => row.id));
     if (unique.size !== rows.length || unique.has('')) issues.add(issue);

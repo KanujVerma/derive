@@ -94,7 +94,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
           </TouchableOpacity>;
         })}
       </View></QuestionGroup>
-      {collectIntent && <AnswerChoices label="What are you deciding?" support="This choice is saved with your profile and reused for future Checks. You can change it." answer={draft.intent} disabled={loading} choices={[['add', 'Add to my routine'], ['replace', 'Replace something'], ['check_current', 'Check what I use']]} onChange={value => update('intent', value)} />}
+      {collectIntent && <AnswerChoices label="What are you deciding?" support="Saved with your profile for reference. A new Check needs its own choice." answer={draft.intent} disabled={loading} choices={[['add', 'Add to my routine'], ['replace', 'Replace something'], ['check_current', 'Check what I use']]} onChange={value => update('intent', value)} />}
     </View>}
     {(editing || step === 1) && <View style={styles.questions}>
       <AnswerChoices label="How does your skin usually feel?" answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Neither dry nor oily'], ['combination', 'Oily in some areas, dry in others'], ['oily', 'Oily'], ['unsure', 'Not sure']]} onChange={value => update('behavior', value)} />

@@ -35,7 +35,7 @@ const dependencies: DecisionDependencies = {
 const controller = new CustomerController({ load: async () => context, write: async () => { throw new Error('Unused'); }, evaluate: (ownerId, request) => evaluateDecisionRequest(ownerId, request, dependencies) }, () => '99999999-9999-4999-8999-999999999999');
 controller.setOwner(owner);
 await controller.load();
-await controller.assess(snapshot);
+await controller.assess(snapshot, 'add');
 const state = controller.getState();
 assert.equal(state.decision.kind, 'ready');
 const facts = { brand: 'Mutable', name: 'Changed', categoryLabel: 'treatment', formula: null, source: null };

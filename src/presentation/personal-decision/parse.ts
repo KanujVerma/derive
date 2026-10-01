@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { GoalSchema } from '../../types/schema.ts';
 import type { DecisionBinding, PersonalDecisionPacketV1 } from '../../contracts/PersonalDecision.ts';
+import { CHECK_INTENTS } from '../../contracts/PersonalDecision.ts';
 
 const ref = z.string().min(1).max(200).refine((value) => value.trim().length > 0);
 // 50 items × role + 2 overlap terms + 6 outcome/formula-relation classes, plus bounded profile/target findings.
@@ -16,6 +17,7 @@ const evidenceNeedCode = z.enum([
   'reviewed_claim', 'supported_rule', 'clinician_review',
 ]);
 export const decisionBindingSchema: z.ZodType<DecisionBinding> = z.strictObject({
+  checkIntent: z.enum(CHECK_INTENTS),
   ownerId: ref, productSnapshotId: ref, productSnapshotRevision: ref, sourceBoundaryRevision: ref,
   productId: ref.nullable(), variantId: ref.nullable(), formulaVersionId: ref.nullable(),
   profileRevision: ref.nullable(), routineRevision: ref.nullable(), historyRevision: ref.nullable(),

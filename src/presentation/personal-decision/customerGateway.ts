@@ -10,14 +10,14 @@ import { useAuthStore } from '../../stores/authStore';
 import { useFreeAccessStore } from '../../stores/freeAccessStore';
 import { publicEnvironment } from '../../config/environment';
 import { isRemoteServiceEnabled } from '../../services/DeriveService';
-import { resolveShellPresentation } from '../../utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '../../utils/shellPresentation';
 import type { PersonalExperiencePage } from '../../contracts/PersonalContext';
 import { CustomerController, type CustomerGateway } from './customerController';
-/** Live authenticated local development only. Hosted/legacy access remains unchanged. */
+/** Live authenticated free path; access and context stay pinned to the verified owner. */
 export function currentCustomerOwner(): string | null {
   const auth = useAuthStore.getState(), access = useFreeAccessStore.getState();
   const shell = resolveShellPresentation({ buildFlavor: publicEnvironment.buildFlavor, remoteEnabled: isRemoteServiceEnabled(), supabaseUrl: publicEnvironment.supabaseUrl });
-  return shell === 'local_free_integration' && auth.status === 'SIGNED_IN' && auth.sessionUserId && access.status === 'READY' && access.userId === auth.sessionUserId && access.access?.userId === auth.sessionUserId ? auth.sessionUserId : null;
+  return isFreeIntegrationShell(shell) && auth.status === 'SIGNED_IN' && auth.sessionUserId && access.status === 'READY' && access.userId === auth.sessionUserId && access.access?.userId === auth.sessionUserId ? auth.sessionUserId : null;
 }
 function assertOwner(owner: string) { const current = currentCustomerOwner(); if (current !== owner) { customerController.setOwner(current); throw new Error('OWNER_CHANGED'); } }
 const captureClient = (owner: string) => captureCustomerFunctionClient(owner, supabase, currentCustomerOwner, changed => customerController.setOwner(changed));

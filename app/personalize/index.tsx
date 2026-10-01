@@ -23,7 +23,8 @@ import type { PersonalizationDraft } from '@/src/presentation/personalization/dr
 import { useAuthStore } from '@/src/stores/authStore';
 import { publicEnvironment } from '@/src/config/environment';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { useScannerEntryStore } from '@/src/stores/scannerEntryStore';
 import { ProductEntry } from '@/src/components/my-stuff/ProductEntry';
 import { myStuffStore } from '@/src/presentation/my-stuff/myStuffRemote';
 import { createEditorReturnGate, experienceDraftForProduct } from '@/src/presentation/personal-decision/editorEntry';
@@ -49,7 +50,7 @@ function LegacyPersonalizeScreen() {
     supabaseUrl: publicEnvironment.supabaseUrl,
   });
   const ownerId = resolvePersonalizationOwnerId(sessionUserId, shell);
-  const live = shell === 'local_free_integration';
+  const live = isFreeIntegrationShell(shell);
   return <PersonalizeEditor key={ownerId ?? 'signed-out'} ownerId={ownerId}
     gateway={live ? ownerPinnedLegacyGateway : personalizationGateway} live={live} />;
 }
@@ -125,7 +126,13 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry, experienc
   const gate = useEditorReturnGate();
   useEffect(() => { customerController.setOwner(ownerId); if (ownerId) void customerController.load(); }, [ownerId]);
   const context = state.ownerId === ownerId ? state.context : null;
-  const close = () => router.back();
+  const close = () => {
+    if (entry === '1') {
+      if (!ownerId || currentCustomerOwner() !== ownerId) return;
+      useScannerEntryStore.getState().markProfileIntroHandled(ownerId);
+      router.replace('/(tabs)/check');
+    } else router.back();
+  };
   if (!ownerId) return <Screen><Text>Personal context is unavailable in this session.</Text><Button label="Back" onPress={close} /></Screen>;
   if (!context) return <Screen><Text>{state.error ?? 'Loading your personal context...'}</Text><Button label="Try again" onPress={() => void customerController.load()} /><Button label="Back" variant="ghost" onPress={close} /></Screen>;
   const save = (input: CustomerWrite) => {

@@ -40,9 +40,9 @@ import { useScanContextStore } from '@/src/stores/scanContextStore';
 import { getCustomerErrorMessage } from '@/src/utils/customerErrors';
 import { useShopAudience } from '@/src/commerce/useShopAudience';
 import { AccountSettingsButton } from '@/src/components/account/AccountSettingsButton';
-import { getPreviewCatalogDetail, searchPreviewCatalog } from '@/src/commerce/checkPreview';
+import { getPreviewCatalogDetail, matchPreviewProductLink, searchPreviewCatalog } from '@/src/commerce/checkPreview';
 import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { CheckCaptureHost } from '@/src/components/check/capture/CheckCaptureHost';
 import { ScanResultSheet } from '@/src/components/check/result-sheet/ScanResultSheet';
@@ -68,11 +68,12 @@ import type { ProductEventSink } from '@/src/presentation/product-analytics';
 import type { DecisionNextStep } from '@/src/contracts/PersonalDecision';
 import { recordFreeCheck } from '@/src/services/remote/freeContext';
 import { supabase } from '@/src/services/supabase';
-import { resolveProductLink, ProductLinkError } from '@/src/services/productLinks';
+import { ProductLinkError } from '@/src/services/productLinks';
 import type { ProductLinkIntakeResult } from '@/src/contracts/ProductLinkIntake';
 import { captureCustomerFunctionClient, type CustomerFunctionClient } from '@/src/presentation/personal-decision/customerController';
 import { MissingProductContribution } from '@/src/components/check/contribution/MissingProductContribution';
 import { selectCheckContributionRecovery } from '@/src/presentation/catalog-contribution/checkRecovery';
+import { createProductLinkController } from '@/src/presentation/product-links/controller';
 
 export default function CheckProductScreen({ productEventSink }: { productEventSink?: ProductEventSink } = {}) {
   const router = useRouter();
@@ -85,7 +86,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     supabaseUrl: publicEnvironment.supabaseUrl,
   });
   const preview = shell === 'scanner_first_preview';
-  const integrated = shell === 'local_free_integration';
+  const integrated = isFreeIntegrationShell(shell);
   const targetShell = preview || integrated;
   const [permission, requestPermission] = useCameraPermissions();
   const sessionUserId = useAuthStore((s) => s.sessionUserId);
@@ -131,7 +132,6 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [productLink, setProductLink] = useState('');
   const [linkNote, setLinkNote] = useState<string | null>(null);
   const [linkIntake, setLinkIntake] = useState<Exclude<ProductLinkIntakeResult, { status: 'resolution' }> | null>(null);
-  const pendingLinkRef = useRef<{ url: string; requestId: string } | null>(null);
   const [isSearching, setIsSearching] = useState(!targetShell);
   const [captureRole, setCaptureRole] = useState<CaptureRole | null>(null);
   const [cameraAwaitingResult, setCameraAwaitingResult] = useState(false);
@@ -240,6 +240,31 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       accessOwnerId: access.access?.userId ?? null,
     });
   };
+  const linkOwnerGetterRef = useRef(currentLiveCheckOwner);
+  linkOwnerGetterRef.current = currentLiveCheckOwner;
+  const productLinkControllerRef = useRef<ReturnType<typeof createProductLinkController> | null>(null);
+  if (!productLinkControllerRef.current) productLinkControllerRef.current = createProductLinkController({
+    createRequestId: createCatalogRequestId,
+    getCurrentOwner: () => linkOwnerGetterRef.current(),
+  });
+  const productLinkController = productLinkControllerRef.current;
+  const productLinkState = useSyncExternalStore(productLinkController.subscribe, productLinkController.getState);
+  const visibleProductLinkState = productLinkState.ownerId === liveCheckOwner ? productLinkState : null;
+  useEffect(() => {
+    productLinkController.setOwner(liveCheckOwner);
+    setProductLink('');
+    setLinkNote(null);
+  }, [productLinkController, liveCheckOwner]);
+  useEffect(() => () => {
+    productLinkController.reset();
+    resolutionSequenceRef.current += 1;
+  }, [productLinkController]);
+  const abandonProductLink = () => {
+    productLinkController.reset();
+    setProductLink('');
+    setLinkNote(null);
+    resolutionSequenceRef.current += 1;
+  };
 
   useEffect(() => {
     let owner = currentLiveCheckOwner();
@@ -335,7 +360,6 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     setProductLink('');
     setLinkNote(null);
     setLinkIntake(null);
-    pendingLinkRef.current = null;
     setIsCheckingProduct(false);
     setIsSearching(false);
   }, [integrated, sessionUserId]);
@@ -349,7 +373,6 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       resolutionOwnerRef.current = null;
       pendingResolutionRef.current = null;
       lastResolutionRequestRef.current = null;
-      pendingLinkRef.current = null;
       setLinkIntake(null);
       setCatalogDetail(null);
       setResolution(null);
@@ -418,7 +441,6 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
 
   const openCapture = (role: CaptureRole) => {
     setLinkIntake(null);
-    pendingLinkRef.current = null;
     invalidateResult();
     setContextualResultOpen(false);
     setFullResult(false);
@@ -693,36 +715,42 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       });
   };
 
-  const checkProductLink = () => {
-    const trimmed = productLink.trim();
-    let url: URL;
-    try { url = new URL(trimmed); } catch { setLinkNote('Enter a full https link.'); return; }
-    if (url.protocol !== 'https:') { setLinkNote('Use an https link.'); return; }
-    if (!integrated) { setLinkNote('Product-link lookup is unavailable in this preview. Search by name.'); return; }
-    const owner = currentLiveCheckOwner();
-    if (!owner) { setLinkNote('Preparing product lookup for this account.'); return; }
-    if (pendingLinkRef.current?.url !== trimmed) pendingLinkRef.current = { url: trimmed, requestId: createCatalogRequestId() };
-    const requestId = pendingLinkRef.current.requestId;
-    setLinkNote(null);
-    lastResolutionRequestRef.current = null;
-    beginResult({ kind: 'link', value: productLink, scrollOffset: entryScrollOffset.current }, requestId);
-    const operation = resultOperationRef.current!;
-    void showResolution(async client => {
-      const intake = await resolveProductLink({ requestId, url: trimmed }, client);
-      if (!resultLifecycle.current.canPublish(operation, currentLiveCheckOwner())) return null;
-      if (intake.status === 'resolution') return intake.resolution;
-      if (pendingLinkRef.current?.requestId === requestId) pendingLinkRef.current = null;
-      setLinkIntake(intake);
-      return null;
-    }).then(published => {
-      if (published && pendingLinkRef.current?.requestId === requestId) pendingLinkRef.current = null;
-    });
+  const checkProductLink = async () => {
+    if (integrated) {
+      if (productLinkController.getState().kind === 'loading') return;
+      // Do not copy a prior owner's rendered input into a newly changed owner.
+      if (liveCheckOwner !== currentLiveCheckOwner()
+        || productLinkController.getState().ownerId !== liveCheckOwner) {
+        productLinkController.setOwner(currentLiveCheckOwner());
+        return;
+      }
+      productLinkController.setInput(productLink);
+      const requestSequence = ++resolutionSequenceRef.current;
+      const result = await productLinkController.submit();
+      if (!result || requestSequence !== resolutionSequenceRef.current) return;
+      // Only a validated owner-bound resolver case reaches the existing truth gate.
+      // A published label title or retailer identifier remains recovery, never truth.
+      if (result.status === 'resolution') {
+        checkFlowRef.current?.begin('unknown');
+        lastResolutionRequestRef.current = null;
+        beginResult({ kind: 'link', value: productLink, scrollOffset: entryScrollOffset.current }, productLinkController.getState().requestId ?? createCatalogRequestId());
+        await showResolution(async () => result.resolution, undefined, result.barcode);
+      }
+      return;
+    }
+    const item = matchPreviewProductLink(productLink);
+    if (item) {
+      handleSelectSearchResult(item, { kind: 'link', value: productLink, scrollOffset: entryScrollOffset.current });
+      return;
+    }
+    setLinkNote('This preview can only check the sourced sample link. Search by name or open the camera.');
   };
 
   const handleResetScan = () => {
     void Haptics.selectionAsync().catch(() => {});
     checkFlowRef.current?.abandon();
     invalidateResult();
+    abandonProductLink();
     setContextualResultOpen(false);
     setFullResult(false);
     setLinkIntake(null);
@@ -1005,18 +1033,18 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
         <RootShellHeader title="Check" />
         <ScrollView ref={entryScroll} onScroll={(event) => { entryScrollOffset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.entryContent, { paddingTop: spacing.sm, paddingBottom: insets.bottom + spacing.xl }]}>
-          <Button label="Open camera" variant="brand" onPress={() => openCapture('barcode')} style={styles.entryAction} />
+          <Button label="Open camera" variant="brand" onPress={() => { abandonProductLink(); openCapture('barcode'); }} style={styles.entryAction} />
           <View style={styles.entrySearch}>
             <CatalogProductSearch
               key={integrated ? liveCheckOwner ?? 'signed-out' : 'preview'}
               label="Search by name"
               actionLabel="Check"
               search={preview ? searchPreviewCatalog : undefined}
-              onSelect={handleSelectSearchResult}
+              onSelect={(item) => { abandonProductLink(); handleSelectSearchResult(item); }}
               keepFocusAfterSelect={false}
               preserveSelection
               focusKey={searchFocusKey}
-              onQueryChange={setSearchQuery}
+              onQueryChange={(value) => { setSearchQuery(value); if (integrated) abandonProductLink(); }}
               errorCopy="Search is unavailable right now."
               emptyCopy="No product match yet."
             />
@@ -1029,22 +1057,35 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
               <TextInput
                 ref={linkInput}
                 value={productLink}
-                onChangeText={(value) => { setProductLink(value); setLinkNote(null); }}
+                onChangeText={(value) => {
+                  setProductLink(value); setLinkNote(null);
+                  productLinkController.setInput(value);
+                  resolutionSequenceRef.current += 1;
+                }}
                 placeholder="https://"
                 placeholderTextColor={colors.inkSubtle}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
-                returnKeyType="search"
+                returnKeyType="go"
                 onSubmitEditing={checkProductLink}
                 accessibilityLabel="Product link"
                 style={styles.linkField}
               />
-              <Pressable accessibilityRole="button" accessibilityLabel="Check link" onPress={checkProductLink} style={styles.linkCheck}>
-                <Text style={styles.linkCheckText}>Check</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Check link"
+                accessibilityState={{ disabled: integrated && visibleProductLinkState?.kind === 'loading', busy: integrated && visibleProductLinkState?.kind === 'loading' }}
+                disabled={integrated && visibleProductLinkState?.kind === 'loading'} onPress={checkProductLink} style={styles.linkCheck}>
+                <Text style={styles.linkCheckText}>{integrated && visibleProductLinkState?.kind === 'loading' ? 'Checking…' : 'Check'}</Text>
               </Pressable>
             </View>
-            {linkNote && <Text style={styles.linkNote}>{linkNote}</Text>}
+            {!integrated && linkNote && <Text style={styles.linkNote}>{linkNote}</Text>}
+            {integrated && visibleProductLinkState?.kind === 'label_candidate' && (
+              <Text style={styles.linkNote}>Possible published label: {visibleProductLinkState.result.candidate.title}</Text>
+            )}
+            {integrated && visibleProductLinkState?.message && <Text accessibilityLiveRegion="polite" style={styles.linkNote}>{visibleProductLinkState.message}</Text>}
+            {integrated && (visibleProductLinkState?.kind === 'label_candidate' || visibleProductLinkState?.kind === 'needs_details' || visibleProductLinkState?.kind === 'error') && (
+              <Button label="Search by name" variant="ghost" size="medium" onPress={() => { abandonProductLink(); handleSearchNamePress(); }} />
+            )}
           </View>
         </ScrollView>
         <CheckResultPresentation visible={isCheckFocused && !editingContext && (contextualResultOpen || Boolean(catalogDetail || resolution || unknownBarcode || captureEvidence || isCheckingProduct || evaluationError))}
@@ -1340,8 +1381,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
             label={targetShell ? 'Search by name' : 'Search products'}
             actionLabel="Check"
             search={preview ? searchPreviewCatalog : undefined}
-            onSelect={handleSelectSearchResult}
-            onQueryChange={setSearchQuery}
+            onSelect={(item) => { abandonProductLink(); handleSelectSearchResult(item); }}
+            onQueryChange={(value) => { setSearchQuery(value); if (integrated) abandonProductLink(); }}
             keepFocusAfterSelect={false}
             errorCopy={targetShell ? 'Search is unavailable right now.' : 'Search is unavailable right now. You can still request founder review.'}
             emptyCopy={targetShell ? 'No product match yet.' : 'No catalog match yet. Try another name or request founder review.'}

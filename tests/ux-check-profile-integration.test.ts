@@ -19,7 +19,7 @@ function previewModules() {
     'expo-haptics': { selectionAsync: async () => {} },
     '@/src/config/environment': { publicEnvironment: { buildFlavor: 'development', supabaseUrl: '' } },
     '@/src/services/DeriveService': { isRemoteServiceEnabled: () => false },
-    '@/src/utils/shellPresentation': { resolveShellPresentation: () => 'scanner_first_preview' },
+    '@/src/utils/shellPresentation': { resolveShellPresentation: () => 'scanner_first_preview', isFreeIntegrationShell: (shell: string) => shell === 'local_free_integration' || shell === 'hosted_free_integration' },
     '@/src/stores/authStore': { useAuthStore: storeHook(auth) },
     '@/src/stores/freeAccessStore': { useFreeAccessStore: storeHook(access) },
     '@/src/stores/routineStore': { useRoutineStore: () => ({ routine: [], userProducts: [], checkIns: [] }) },

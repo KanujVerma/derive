@@ -50,7 +50,7 @@ test('K2 optional editor returns to the mounted result and My Stuff reuses it', 
 test('K2 retains Mock preview and Remote Staging legacy branches', () => {
   const check = read('../src/components/check/CheckProductScreen.tsx');
   assert.match(check, /const preview = shell === 'scanner_first_preview'/);
-  assert.match(check, /const integrated = shell === 'local_free_integration'/);
+  assert.match(check, /const integrated = isFreeIntegrationShell\(shell\)/);
   assert.match(check, /<CheckResultPresentation[\s\S]*input=\{sharedResultInput\}/);
   assert.doesNotMatch(check.slice(check.indexOf('if (catalogDetail) {'), check.indexOf('if (resolution && !catalogDetail)')), /Not available yet/);
   assert.match(check, /if \(!targetShell && audience !== 'member'\)/);

@@ -19,7 +19,7 @@ import { myStuffStore } from '@/src/presentation/my-stuff/myStuffRemote';
 import type { ProductState } from '@/src/presentation/my-stuff/myStuffPresentation';
 import { useAuthStore } from '@/src/stores/authStore';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
-import { resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
 
 /** MyStuffContent composes the shared GroupedSection rows; this route owns live free context. */
 export default function MyStuffScreen() {
@@ -44,7 +44,7 @@ export default function MyStuffScreen() {
     supabaseUrl: publicEnvironment.supabaseUrl,
   });
   const targetShell = shell !== 'legacy';
-  const liveOwner = shell === 'local_free_integration' && authStatus === 'SIGNED_IN' && accessReady
+  const liveOwner = isFreeIntegrationShell(shell) && authStatus === 'SIGNED_IN' && accessReady
     ? sessionUserId : null;
 
   useEffect(() => {
@@ -111,7 +111,7 @@ export default function MyStuffScreen() {
           {status === 'error' ? <Button label="Try again" variant="ghost" onPress={() => void myStuffStore.getState().load()} /> : null}
         </View> : null}
         <MyStuffContent key={liveOwner ?? 'preview'} model={live ? model : anonymousEmptyMyStuff}
-          liveFree={shell === 'local_free_integration'} memoryStatus={memoryStatus}
+          liveFree={isFreeIntegrationShell(shell)} memoryStatus={memoryStatus}
           profileContent={canonicalProfile}
           canonicalExperiences={liveOwner ? context ? mapCanonicalExperiences(context, customerState.displayLabels) : [] : undefined}
           experienceStatus={experienceStatus}

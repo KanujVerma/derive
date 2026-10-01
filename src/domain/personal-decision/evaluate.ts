@@ -73,6 +73,7 @@ const contains = (ingredients: string[], token: string) => ingredients.some(i =>
 /** Trusted typed boundary. Host establishes ownership, truth provenance and expected revisions. */
 export function evaluatePersonalDecision(input: EvaluationInput): PersonalDecisionPacketV1 {
     const { binding: b, product: p } = input;
+    if (input.intent !== b.checkIntent) throw new Error('Check intent binding mismatch');
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.packetId))throw new Error('Invalid packet identifier');
     if (p.snapshotId !== b.productSnapshotId || p.snapshotRevision !== b.productSnapshotRevision || p.sourceBoundaryRevision !== b.sourceBoundaryRevision)
         throw new Error('Product binding mismatch');

@@ -120,7 +120,12 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
 /** Snapshot, owner and independently loaded revisions are checked before any positive presentation. */
 export function describeCheckVerdict(input: CheckResultContentInput): VerdictPresentation {
   const model = describeCheckResultContent(input);
-  if (model.fit.kind === 'canonical') return describeDecisionVerdict(model.fit.packet, model.fit.expectedBinding);
+  if (model.fit.kind === 'canonical') {
+    const boundIntent = model.fit.expectedBinding.checkIntent;
+    return describeDecisionVerdict(model.fit.packet, model.fit.expectedBinding, {
+      intent: boundIntent === 'add' || boundIntent === 'replace' || boundIntent === 'check_current' ? boundIntent : undefined,
+    });
+  }
   const copy: Record<string, string> = {
     identity_unconfirmed: 'The exact product has not been confirmed.',
     formula_unverified: 'The ingredient list for your exact package has not been verified.',

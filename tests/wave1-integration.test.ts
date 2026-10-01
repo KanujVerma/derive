@@ -154,7 +154,7 @@ test('Wave-1 UI consumption keeps free flows apart from managed work', () => {
   assert.match(check, /resolveCatalogIdentity/);
   assert.match(check, /<CheckResultPresentation/);
   assert.match(read('src/presentation/personalization/result.ts'), /Not personalized yet/);
-  assert.match(check, /local_free_integration/);
+  assert.match(check, /isFreeIntegrationShell\(shell\)/);
   assert.doesNotMatch(check, /label="Can't find it\? Request review"/, 'free name fallback cannot promise founder review');
   assert.match(plan, /managedAccess/);
   assert.match(plan, /bootstrapReady/, 'managed routine startup waits for canonical bootstrap');

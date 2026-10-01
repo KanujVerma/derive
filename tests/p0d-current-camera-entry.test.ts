@@ -11,7 +11,7 @@ const entry = check.slice(entryStart, entryEnd);
 
 test('current Check has one plain camera entry and a visible name-search fallback', () => {
   assert.ok(entryStart > 0 && entryEnd > entryStart && searchStart > entryEnd);
-  assert.match(entry, /<Button label="Open camera" variant="brand"[^>]*onPress=\{\(\) => openCapture\('barcode'\)\}/);
+  assert.match(entry, /<Button label="Open camera" variant="brand"[^>]*onPress=\{\(\) => \{ abandonProductLink\(\); openCapture\('barcode'\); \}\}/);
   assert.match(entry, /<CatalogProductSearch[\s\S]*label="Search by name"/);
   assert.match(entry, /accessibilityLabel="Product link"/);
   assert.match(entry, /Search by product link/);
@@ -19,7 +19,7 @@ test('current Check has one plain camera entry and a visible name-search fallbac
   assert.match(entry, /preserveSelection[\s\S]*focusKey=\{searchFocusKey\}/);
   assert.match(entry, /onScroll=[\s\S]*entryScrollOffset\.current/);
   assert.match(entry, /<CheckResultPresentation visible=\{isCheckFocused/);
-  assert.doesNotMatch(entry, /<Button label="Search by name"/);
+  assert.match(entry, /visibleProductLinkState\?\.kind === 'label_candidate'[\s\S]*<Button label="Search by name"/, 'link recovery remains contextual');
   assert.doesNotMatch(entry, /<CaptureEntry|Other ways to identify|Scan barcode/);
 });
 
