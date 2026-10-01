@@ -6,6 +6,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-10-01: Physical preview recovery and safe-area correction
+
+- **Predecessor:** `kanuj/ux-check-profile-preview@0972e48c3de478636a13b6f5f237942e0d3e253a`.
+- **Observed on the physical iPhone:** Expo Go was stalled opening a project after the interactive task-owned Metro process ended. Restarted only the approved preview as a detached process, verified current LAN manifest, and opened `/check-preview` through the installed Expo Go app. Native capture now shows the current moisturizer Good fit sheet; the server receives active LAN connections.
+- **Scoped app fix:** the example route omitted the iOS top safe-area inset, visibly overlapping the status bar. Added only that route's top inset; shared sheet design and backend boundaries remain unchanged. No device permissions, trust, security or network settings changed. Gesture/camera/VoiceOver acceptance remains separate from this successful native load and capture.
+
 ## 2026-10-01: Category example content and intent-aware routine copy
 
 - **Predecessor:** local `kanuj/ux-check-profile-preview@10666fec3415401051414bfcb30e13176b5d9ac2`.
