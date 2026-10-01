@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-10-01: Category example content and intent-aware routine copy
+
+- **Predecessor:** local `kanuj/ux-check-profile-preview@10666fec3415401051414bfcb30e13176b5d9ac2`.
+- **Bounded content completion:** development-only cleanser, moisturizer and sunscreen examples now contain concrete fictional label/preference/activity facts, distinct goal/routine/category findings and individual evidence/limits. Fiction is disclosed in the preview shell; no real-brand fact, study, community report or scientific rule is added. Live result content retains the narrow validated packet/snapshot boundary.
+- **Intent boundary:** current Check packet/presenter has no Check-specific add/replace intent. Routine role alone does not produce amber without explicit adding intent. Unknown/replacing intent uses possible-replacement copy and remains neutral when the existing packet cannot establish a positive replacement. Development examples supply explicit synthetic intent; live callers do not derive it from global profile intent. Supported independent personal cautions remain unchanged.
+- **Verification:** focused tests and full `npm test` (901 TAP tests plus assertion scripts), both typechecks, web/iOS exports and browser category/intent checks pass. Existing native phone acceptance remains separate; the running combined Expo server is preserved.
+
 ## 2026-10-01: Combined compact Check and profile outcome preview
 
 - **Predecessor/worktree:** local `kanuj/ux-check-profile-preview@5da8b653b72dc7a54501ecce19689623fa0fe34a` in `derive-integrated-preview`. Preserves Check f376024 and profile 3c0423a source worktrees. No push, main merge or deployment.

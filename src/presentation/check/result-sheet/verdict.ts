@@ -2,6 +2,7 @@ import type { DecisionBinding, DecisionEvidence, Finding, PersonalDecisionPacket
 import { describePersonalDecision } from '../../personal-decision/result.ts';
 import { describeCheckResultContent, type CheckResultContentInput } from './content.ts';
 
+export type CheckPresentationIntent = 'add' | 'replace' | 'check_current';
 export type VerdictState = 'good' | 'tradeoffs' | 'poor' | 'unknown';
 export const verdictLabels: Record<VerdictState, string> = {
   good: 'Good fit', tradeoffs: 'Some tradeoffs', poor: 'Not a good fit', unknown: 'Not enough information',
@@ -27,17 +28,17 @@ const directConflict = new Set<Finding['kind']>(['reported_ingredient_sensitivit
 const tradeoffKinds = new Set<Finding['kind']>(['role_redundancy', 'active_overlap', 'reactive_active', 'routine_experience_caution']);
 
 /** Copy uses retained structured fields only. It neither evaluates ingredients nor generates a verdict. */
-function reason(finding: Finding, fallback: string): string {
+function reason(finding: Finding, fallback: string, intent?: CheckPresentationIntent): string {
   const d = finding.display;
   if (d?.kind === 'role_match') return `This ${d.category} matches your ${goals[d.goal] ?? 'skin'} goal.`;
   if (d?.kind === 'routine_relation') {
     if (finding.kind === 'role_redundancy') {
       const timing = d.timing === 'am' ? ' in the morning' : d.timing === 'pm' ? ' in the evening' : d.timing === 'both' ? ' morning and evening' : '';
       const frequency = d.frequency === 'daily' ? ' every day' : d.frequency === 'few_times_weekly' ? ' a few times a week' : d.frequency === 'weekly' ? ' once a week' : '';
-      return `You already use a ${d.role}${timing}${frequency}. This would add another product for the same role.`;
+      return `You already use a ${d.role}${timing}${frequency}. ${intent === 'add' ? 'Adding this would duplicate that step.' : 'This could replace it rather than add another step.'}`;
     }
     if (finding.kind === 'replacement_candidate') return `This could replace a ${d.role} in your routine.`;
-    return 'This overlaps with a product in your recorded routine. Review the combination before adding it.';
+    return 'This overlaps with a product in your recorded routine. Review the combination before using them together.';
   }
   if (d?.kind === 'ingredient_context') {
     if (d.context === 'reported_sensitivity') return `This formula contains ${d.ingredient}, which you reported as a sensitivity.`;
@@ -55,15 +56,16 @@ function reason(finding: Finding, fallback: string): string {
 }
 function evidence(e: DecisionEvidence): { label: string; detail: string } | null {
   if (e.kind === 'observation') return null;
-  if (e.kind === 'context_fact') return { label: 'Your report', detail: `${e.section === 'history' ? 'Product experience' : e.section === 'routine' ? 'Recorded routine' : 'Skin profile'}. A self-report does not establish an ingredient cause.` };
+  if (e.kind === 'context_fact') return { label: e.section === 'history' ? 'Product experience' : e.section === 'routine' ? 'Recorded routine' : 'Skin profile', detail: e.section === 'history' ? 'Your own report of this product experience.' : e.section === 'routine' ? 'Your recorded routine context.' : 'Your recorded skin profile answers.' };
   if (e.kind === 'reviewed_claim') return { label: 'Reviewed evidence', detail: e.limitations.length ? e.limitations.join(' ') : 'A reviewed claim record. Publication details were not supplied.' };
   return { label: e.kind === 'routine_product_fact' ? 'Current product record' : 'Product record',
-    detail: `${e.scope === 'formula' ? 'Verified package formula' : e.scope === 'category' ? 'Recorded product category' : 'Confirmed product identity'}. Product evidence does not establish your individual tolerance.` };
+    detail: e.scope === 'formula' ? 'The verified ingredient list for this package.' : e.scope === 'category' ? 'The sourced product role.' : 'The confirmed product and variant.' };
 }
 const unknown = (reasonText: string, findings: ResultFinding[] = []): VerdictPresentation => ({ state: 'unknown', label: verdictLabels.unknown, reason: reasonText, findings });
 
-/** Semantic projection of an already bound packet. Live callers must also validate its immutable snapshot. */
-export function describeDecisionVerdict(value: unknown, expectedBinding: DecisionBinding): VerdictPresentation {
+/** Semantic projection of an already bound packet. Live callers also validate the immutable snapshot.
+ * Optional intent must concern this Check; global stored profile intent is not a substitute. */
+export function describeDecisionVerdict(value: unknown, expectedBinding: DecisionBinding, options: { intent?: CheckPresentationIntent } = {}): VerdictPresentation {
   const view = describePersonalDecision(value, expectedBinding);
   if (view.kind !== 'ready') return unknown('A current personal assessment could not be verified.');
   const packet = value as PersonalDecisionPacketV1;
@@ -71,7 +73,8 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
   const known = active.filter(f => f.applicability === 'applicable' && f.confidence === 'supported');
   const conflicts = known.filter(f => directConflict.has(f.kind) && f.severity !== 'informational'
     && f.evidence.some(e => e.kind === 'context_fact' && (e.section === 'profile' || e.section === 'history')));
-  const tradeoffs = known.filter(f => tradeoffKinds.has(f.kind) && f.evidence.some(e => e.kind === 'context_fact'));
+  const routineRole = known.find(f => f.kind === 'role_redundancy' && f.display?.kind === 'routine_relation');
+  const tradeoffs = known.filter(f => tradeoffKinds.has(f.kind) && (f.kind !== 'role_redundancy' || options.intent === 'add') && f.evidence.some(e => e.kind === 'context_fact'));
   const positive = known.find(f => f.kind === 'goal_role_match' && f.display?.kind === 'role_match');
   let state: VerdictState = 'unknown';
   let deciding: Finding | undefined;
@@ -82,7 +85,7 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
   const groups = view.detailGroups;
   const findings = active.filter(f => f.kind !== 'no_supported_rule' || f.evidence.length > 0).map(f => {
     const group = groups.find(g => g.findingIds.includes(f.id));
-    return { id: f.id, title: title[f.kind], reason: reason(f, group?.reason ?? view.primaryReason),
+    return { id: f.id, title: title[f.kind], reason: reason(f, group?.reason ?? view.primaryReason, options.intent),
       evidence: f.evidence.map(evidence).filter((e): e is NonNullable<typeof e> => e !== null),
       limits: [...new Set([...f.uncertainty, ...packet.evidenceNeeds.filter(n => f.evidenceNeedIds.includes(n.id)).map(n => {
         if (n.code === 'routine_completeness') return 'An unrecorded routine does not mean you have no routine.';
@@ -94,8 +97,9 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
     const rank = (id: string) => { const kind = active.find(f => f.id === id)!.kind; return kind === 'goal_role_match' ? 0 : ['replacement_candidate', 'role_redundancy'].includes(kind) ? 1 : 2; };
     return rank(a.id) - rank(b.id);
   });
-  let summary = deciding ? reason(deciding, view.primaryReason) : view.primaryReason.replaceAll(';', '.');
+  let summary = deciding ? reason(deciding, view.primaryReason, options.intent) : view.primaryReason.replaceAll(';', '.');
   if (state === 'unknown') {
+    if (routineRole && !packet.evidenceNeeds.some(n => n.critical)) summary = reason(routineRole, view.primaryReason, options.intent);
     const gap = packet.evidenceNeeds.find(n => n.critical);
     if (gap?.code === 'verified_formula' || gap?.code === 'formula_conflict') summary = 'The ingredient list for your exact package has not been verified.';
     else if (gap?.code === 'routine_completeness') summary = 'Your routine is not fully recorded, so placement and overlap are still unknown.';
@@ -107,7 +111,7 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
   }
   if (state === 'unknown' && !deciding && tradeoffs.some(f => f.severity !== 'informational')) {
     const caution = tradeoffs.find(f => f.severity !== 'informational')!;
-    const detail = reason(caution, view.primaryReason).split('. ')[0];
+    const detail = reason(caution, view.primaryReason, options.intent).split('. ')[0];
     summary = `${summary.split('. ')[0]}. ${detail.replace(/\.$/, '')}.`;
   }
   return { state, label: verdictLabels[state], reason: summary, findings: ordered };

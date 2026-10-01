@@ -5,7 +5,7 @@ import { describeDecisionVerdict, describeCheckVerdict, verdictLabels } from '..
 import { describeResultExample } from '../src/presentation/check/result-sheet/examples.ts';
 import { resultSheetGeometry } from '../src/presentation/check/result-sheet/geometry.ts';
 const fixture = (id: string) => JSON.parse(JSON.stringify(personalDecisionFixtures.find(f => f.id === id)!)) as (typeof personalDecisionFixtures)[number];
-const states = { 'positive-role-match': 'good', redundancy: 'tradeoffs', 'routine-formula-overlap': 'tradeoffs', 'routine-experience': 'tradeoffs', caution: 'poor', 'prior-reaction': 'poor', 'missing-formula': 'unknown', 'partial-routine': 'unknown', 'unsupported-goal': 'unknown', reformulation: 'unknown' } as const;
+const states = { 'positive-role-match': 'good', redundancy: 'unknown', 'routine-formula-overlap': 'tradeoffs', 'routine-experience': 'tradeoffs', caution: 'poor', 'prior-reaction': 'poor', 'missing-formula': 'unknown', 'partial-routine': 'unknown', 'unsupported-goal': 'unknown', reformulation: 'unknown' } as const;
 for (const [id, expected] of Object.entries(states)) test(`deterministic retained facts: ${id}`, () => {
   const f = fixture(id); const view = describeDecisionVerdict(f.packet, f.binding);
   assert.equal(view.state, expected); assert.equal(view.label, verdictLabels[expected]);
@@ -52,4 +52,31 @@ test('development unfamiliar-product example with unprovided routine is affirmat
   assert.ok(example.verdict.findings.some(f => f.reason.includes('overlap is still unknown')));
   assert.ok(example.verdict.findings.flatMap(f => f.limits).some(l => l.includes('does not mean')));
   assert.equal(example.facts.formula, null, 'semantic mock does not invent verified live product truth');
+});
+
+test('routine-role finding does not assume adding intent or manufacture amber', () => {
+  const f = fixture('redundancy');
+  for (const options of [{}, { intent: 'replace' as const }, { intent: 'check_current' as const }]) {
+    const v = describeDecisionVerdict(f.packet, f.binding, options);
+    assert.equal(v.state, 'unknown'); assert.match(v.reason, /could replace it rather than add another step/);
+    assert.doesNotMatch(v.reason, /would add|Adding this/);
+  }
+  const added = describeDecisionVerdict(f.packet, f.binding, { intent: 'add' });
+  assert.equal(added.state, 'tradeoffs'); assert.match(added.reason, /Adding this would duplicate/);
+  assert.equal(describeDecisionVerdict(f.packet, { ...f.binding, ownerId: 'stale' }, { intent: 'add' }).state, 'unknown');
+});
+test('category examples have distinct concrete facts, complementary findings and individual evidence', () => {
+  for (const [id, feature] of [['cleanser', 'non-foaming cream'], ['moisturizer', 'richer texture'], ['sunscreen', '80-minute water resistance']] as const) {
+    const e = describeResultExample(id);
+    assert.equal(e.verdict.state, 'good'); assert.match(e.verdict.reason, new RegExp(feature));
+    assert.equal(e.verdict.findings.length, 3);
+    assert.ok(e.verdict.findings.every(f => f.reason !== e.verdict.reason && f.evidence.length > 0 && f.limits.length > 0));
+    assert.equal(e.facts.formula, null); assert.equal(e.facts.source, null);
+    assert.doesNotMatch(e.verdict.reason, /will (prevent|cure|protect|hydrate)|cerave|la roche|Reddit|clinical|research/i);
+  }
+  assert.match(describeResultExample('cleanser').verdict.findings[1].reason, /replace your evening gel wash/);
+  assert.match(describeResultExample('sunscreen').verdict.findings[2].reason, /not waterproof/);
+  assert.equal(describeResultExample('redundancy').verdict.state, 'tradeoffs');
+  assert.equal(describeResultExample('intent-unknown').verdict.state, 'unknown');
+  assert.equal(describeResultExample('replacement').verdict.state, 'unknown');
 });

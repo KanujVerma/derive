@@ -20,7 +20,7 @@ export default function CheckPreviewScreen() {
   const example = describeResultExample(scenario);
   return <View style={{ flex: 1, backgroundColor: colors.canvas }}>
     <Screen scrollable><Text accessibilityRole="header">Result examples</Text>
-      <Text>Fictional product and context. These examples aren’t saved or live advice.</Text>
+      <Text>Fictional products, label facts, people and routines. Nothing here is saved or live advice.</Text>
       <View style={{ gap: spacing.xs }}>{resultExamples.map(([id, label]) => <Button key={id} label={label} variant="secondary" onPress={() => { setScenario(id); setSerial(value => value + 1); setOpen(true); }} />)}</View>
       <Button label="Open result again" variant="ghost" onPress={() => { setSerial(value => value + 1); setOpen(true); }} />
       <Button label="Five-step profile" variant="ghost" onPress={() => router.push('/personalize/fixture?mode=profile&fresh=1&focused=1')} />
