@@ -5,7 +5,7 @@
 The local private result now falls back to `private-web-product-ingredients`
 when Open Beauty Facts and DailyMed return no accepted ingredient list. The
 server searches with SerpApi Google Light, considers the first five organic
-results, prioritizes a fixed official domain for recognized brands, and fetches
+results, searches a fixed official domain for recognized brands, and fetches
 bounded pages from an explicit manufacturer/retailer host
 allowlist. Gemini copies a complete list from a matching fetched page. The server
 rejects text that is not present in that page or comes from a different named
@@ -44,7 +44,7 @@ AI answer.
 
 A traced Aveeno generic search returned mismatched Sheer Hydration/older-formula
 results, with the only eligible retailer returning HTTP 403. The subsequent
-manufacturer-targeted Aveeno search timed out at 12 seconds. Both full and
+manufacturer-targeted Aveeno searches timed out at 12 seconds. Both full and
 simplified Old Spice queries also timed out. These are unresolved live-source
 limitations, not evidence that the completed extraction pipeline returned a list.
 

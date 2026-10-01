@@ -105,7 +105,7 @@ test('normal Check wires only the canonical-miss branch; external UI never creat
   assert.match(check, /privateBarcodeMiss = cameraAwaitingResult && !isCheckingProduct && Boolean\(unknownBarcode\)\s*&& privateCheckEnabled\(__DEV__, publicEnvironment.buildFlavor, process.env.EXPO_PUBLIC_PRIVATE_UPC_TEST_ENABLED\)/);
   assert.match(check, /if \(!privateBarcodeMiss && !cameraResultNeedsExistingPage/);
   assert.match(component, /checkOwnerId === sessionOwnerId \? checkOwnerId : null/);
-  assert.match(component, /Tester account ID: \{ownerId\}/);
+  assert.match(component, /Tester account \{ownerId\}/);
   assert.match(component, /Ingredients, formula and personal fit are not verified/);
   assert.match(component, /sourceBarcode/);
   assert.match(component, /retrievedAt/);

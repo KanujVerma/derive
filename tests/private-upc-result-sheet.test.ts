@@ -134,7 +134,7 @@ test('ambiguous identity remains a confirmation list and never picks one candida
     app.render(); app.flush(); await settle();
     const nodes = app.render();
     assert.equal(nodes.find(node => node.type === 'CheckResultView')!.props.facts.name, 'Confirm the matching product');
-    assert.match(textContent(nodes), /Possible match — confirm the label/);
+    assert.match(textContent(nodes), /Check that this matches your label/);
     assert.deepEqual(nodes.find(node => node.type === 'PublishedProductIngredients')!.props.query,
       { barcode, name: null, brand: null, size: null });
   });
