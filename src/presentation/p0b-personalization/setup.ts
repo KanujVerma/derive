@@ -6,16 +6,30 @@ import type { RoutineItemDraft, RoutineReference } from './draft.ts';
 /** Customer words for a product that did not agree with their skin. Not new storage kinds. */
 export type SetupNotice = 'irritated' | 'broke_out' | 'too_drying' | 'didnt_help' | 'liked';
 
+export type ProductOutcome = 'helpful' | 'not_helping' | 'too_heavy' | 'stung' | 'broke_out' | 'too_drying' | 'not_sure';
+export const productOutcomeLabels: Record<ProductOutcome, string> = {
+  helpful: 'Helping', not_helping: 'Not helping', too_heavy: 'Too heavy', stung: 'Stung',
+  broke_out: 'Broke out', too_drying: 'Too drying', not_sure: 'Not sure',
+};
+export type SetupAnswerState = 'unanswered' | 'none' | 'unknown' | 'reported';
+/** Local collection only. These extra words have no persistence/evaluator contract yet. */
+export interface SetupPreviewContext {
+  currentProducts: SetupAnswerState;
+  pastProducts: SetupAnswerState;
+  currentOutcomes: Record<string, ProductOutcome>;
+  pastReports: Array<{ id: string; reference: RoutineReference; outcome: ProductOutcome }>;
+}
 export interface SetupBundle {
   ownerId: string | null;
   products: RoutineItemDraft[];
   experiences: ExperienceDraft[];
   /** User-reported raw context. Not a profile, allergy, diagnosis, or product fact. */
   additionalNote: string | null;
+  previewOnly: SetupPreviewContext;
 }
 
 export function createSetupBundle(ownerId: string | null = null): SetupBundle {
-  return { ownerId, products: [], experiences: [], additionalNote: null };
+  return { ownerId, products: [], experiences: [], additionalNote: null, previewOnly: { currentProducts: 'unanswered', pastProducts: 'unanswered', currentOutcomes: {}, pastReports: [] } };
 }
 
 export function replaceSetupOwner(bundle: SetupBundle, ownerId: string | null): SetupBundle {
@@ -38,11 +52,13 @@ export function currentUseItem(id: string, reference: RoutineReference): Routine
 export function addCurrentProduct(bundle: SetupBundle, item: RoutineItemDraft): SetupBundle {
   if (!item.reference.label.trim() || item.status !== 'current') return bundle;
   if (bundle.products.some(product => product.id === item.id || sameReference(product.reference, item.reference))) return bundle;
-  return { ...bundle, products: [...bundle.products, item] };
+  return { ...bundle, products: [...bundle.products, item], previewOnly: { ...bundle.previewOnly, currentProducts: 'reported' } };
 }
 
 export function removeSetupProduct(bundle: SetupBundle, id: string): SetupBundle {
-  return { ...bundle, products: bundle.products.filter(product => product.id !== id) };
+  const currentOutcomes = { ...bundle.previewOnly.currentOutcomes }; delete currentOutcomes[id];
+  const products = bundle.products.filter(product => product.id !== id);
+  return { ...bundle, products, previewOnly: { ...bundle.previewOnly, currentOutcomes, currentProducts: products.length ? 'reported' : 'unanswered' } };
 }
 
 /**
@@ -80,4 +96,27 @@ function sameReference(left: RoutineReference, right: RoutineReference): boolean
   if (left.kind === 'catalog' && right.kind === 'catalog') return left.productId === right.productId;
   if (left.kind === 'manual' && right.kind === 'manual') return left.label.trim().toLowerCase() === right.label.trim().toLowerCase();
   return false;
+}
+
+export function setCurrentOutcome(bundle: SetupBundle, id: string, outcome: ProductOutcome): SetupBundle {
+  if (!bundle.products.some(item => item.id === id)) return bundle;
+  return { ...bundle, previewOnly: { ...bundle.previewOnly, currentOutcomes: { ...bundle.previewOnly.currentOutcomes, [id]: outcome } } };
+}
+export function setSetupAnswer(bundle: SetupBundle, field: 'currentProducts' | 'pastProducts', value: 'none' | 'unknown'): SetupBundle {
+  // An explicit answer cannot silently erase products or reports.
+  if (field === 'currentProducts' ? bundle.products.length : bundle.previewOnly.pastReports.length) return bundle;
+  return { ...bundle, previewOnly: { ...bundle.previewOnly, [field]: value } };
+}
+export function addPastOutcome(bundle: SetupBundle, id: string, reference: RoutineReference, outcome: ProductOutcome): SetupBundle {
+  if (!reference.label.trim() || bundle.previewOnly.pastReports.some(item => item.id === id)) return bundle;
+  // Texture dislike and uncertainty are NOT converted into adverse experience, sensitivity or ineffective treatment.
+  const notice: SetupNotice | null = outcome === 'stung' ? 'irritated' : outcome === 'broke_out' ? 'broke_out'
+    : outcome === 'too_drying' ? 'too_drying' : outcome === 'not_helping' ? 'didnt_help' : outcome === 'helpful' ? 'liked' : null;
+  const compatible = notice ? addSetupExperience(bundle, experienceFromNotice(id, reference, notice)) : bundle;
+  return { ...compatible, previewOnly: { ...compatible.previewOnly, pastProducts: 'reported',
+    pastReports: [...compatible.previewOnly.pastReports, { id, reference, outcome }] } };
+}
+export function removePastOutcome(bundle: SetupBundle, id: string): SetupBundle {
+  const pastReports = bundle.previewOnly.pastReports.filter(item => item.id !== id);
+  return { ...removeSetupExperience(bundle, id), previewOnly: { ...bundle.previewOnly, pastReports, pastProducts: pastReports.length ? 'reported' : 'unanswered' } };
 }

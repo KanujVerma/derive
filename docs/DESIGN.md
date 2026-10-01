@@ -6,7 +6,15 @@ Derive should help a person answer “Should I use this product?” before askin
 
 Keep Check home minimal: shared mark/title/Account header, Open camera, name search, separate product-link input and intentional whitespace. Current root tabs are Check, My Stuff, Plan and Shop. Account is a Back subpage. Preserve the accepted Managed Early Access offer, $25/month display hypothesis, products purchased separately and honest canonical waitlist state. Changing tabs, offers, prices or entitlements requires a product decision.
 
-Consistency means the same role follows the same rule. Primary and secondary actions intentionally differ. Brand green identifies action/selection or a restrained offer eyebrow; it does not establish a favorable skincare finding. No universal score, decorative badge, filler, emoji or customer-copy em dash.
+Consistency means the same role follows the same rule. Primary and secondary actions intentionally differ. Brand green identifies action/selection or a restrained offer eyebrow. A favorable green verdict requires supported personal relevance. No universal score, decorative badge, filler, emoji or customer-copy em dash.
+
+## Compact Check result and optional profile outcomes
+
+Current combined frontend uses a measured native result fold: product identity, a tinted verdict card, and one or two fact-bound sentences. The fixed labels are **Good fit** (green), **Some tradeoffs** (amber), **Not a good fit** (red), and **Not enough information** (neutral gray), always paired with text and an icon. Favorable fit requires supported personal relevance; missing data does not mean negative. Routine duplication is a tradeoff, not a personal conflict. The view validates the existing packet and immutable product binding before mapping a label; it does not add evaluator or clinical rules.
+
+The first upward swipe reveals substantive findings directly. There is no global Details disclosure. Each finding may expand its retained evidence and limits. Summary height follows real layout, without line clamps; unusually large text uses full-height scrolling. An unfamiliar product has no assumed use history. Product/category facts, recorded routine placement, self-reports and unknowns remain separate.
+
+The five-step fresh profile retains goals, feel/reactivity, current products, past product problems and a note. The main goal is visibly named. Optional current-product outcomes and exact past labels (Stung, Broke out, Too drying, Too heavy, Not helping) are retained in explicitly local `SetupBundle.previewOnly` fields. Texture dislike and uncertainty are not adverse experience or ingredient sensitivity. Current outcomes, none/unknown collection states and the note are not persisted or consumed by a live Check. Existing profile editing stays short. Development result examples are fictional semantic cases, not live product truth or clinical validation.
 
 ## Semantic type and color
 

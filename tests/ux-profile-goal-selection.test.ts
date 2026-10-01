@@ -21,7 +21,7 @@ test('one visible checkbox picker marks first choice primary and caps two additi
   let applied: ContextDraft | undefined;
   const flow = componentHarness(file, 'ContextFlow', { collectIntent: false, onApply(value: ContextDraft) { applied = value; }, onSkip() {} });
   let nodes = flow.render();
-  assert.equal(nodes.find(node => node.props.label === 'What would you like to improve?')?.props.support, 'Choose up to three.');
+  assert.equal(nodes.find(node => node.props.label === 'What would you like to improve?')?.props.support, 'Choose your main goal first. Add up to two more.');
   assert.ok(!nodes.some(node => node.props.children === 'Optional. You can skip and still see product facts.'));
   assert.ok(!nodes.some(node => ['Add other goals', 'Hide additional goals'].includes(node.props.label)));
   const available = goal(nodes, 'Breakouts');
@@ -31,7 +31,7 @@ test('one visible checkbox picker marks first choice primary and caps two additi
   assert.equal(chipText(available), 'Breakouts');
   press(goal(nodes, 'Dryness'));
   nodes = flow.render();
-  assert.equal(chipText(goal(nodes, 'Dryness')), 'Dryness');
+  assert.equal(chipText(goal(nodes, 'Dryness')), 'Dryness · Main');
   assert.equal(goal(nodes, 'Dryness').props.accessibilityLabel, 'Dryness, primary goal, selected');
   assert.equal(goal(nodes, 'Dryness').props.accessibilityRole, 'checkbox');
   assert.equal(goal(nodes, 'Dryness').props.accessibilityState.checked, true);
@@ -47,7 +47,8 @@ test('one visible checkbox picker marks first choice primary and caps two additi
   press(goal(nodes, 'Dark marks'));
   assert.equal(goal(flow.render(), 'Dark marks').props.accessibilityState.checked, false);
   assert.notDeepEqual(goal(nodes, 'Dryness').props.style, goal(nodes, 'Texture').props.style);
-  for (const label of ['Dryness', 'Texture', 'Breakouts', 'Dark marks']) assert.equal(chipText(goal(nodes, label)).includes('Main') || chipText(goal(nodes, label)).includes('Also'), false);
+  assert.match(chipText(goal(nodes, 'Dryness')), /Main/);
+  for (const label of ['Texture', 'Breakouts', 'Dark marks']) assert.doesNotMatch(chipText(goal(nodes, label)), /Main/);
   press(control(nodes, 'Continue'));
   press(control(flow.render(), 'Skip'));
   assert.deepEqual(applied?.primaryGoal, { state: 'answered', value: 'dryness' });

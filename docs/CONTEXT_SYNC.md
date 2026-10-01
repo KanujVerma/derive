@@ -6,6 +6,14 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-10-01: Combined compact Check and profile outcome preview
+
+- **Predecessor/worktree:** local `kanuj/ux-check-profile-preview@5da8b653b72dc7a54501ecce19689623fa0fe34a` in `derive-integrated-preview`. Preserves Check f376024 and profile 3c0423a source worktrees. No push, main merge or deployment.
+- **Frontend:** shared tinted four-state verdict projection from validated existing structured packets, measured identity/verdict fold, direct findings on first expansion, per-finding evidence/limits, and matching name-search/camera result surfaces. Owner, immutable snapshot/revision, close-generation and same-case evidence guards remain intact. No numeric score or new clinical rule.
+- **Profile:** five stages retained, main goal visible, optional current-product outcome and exact past report words kept in development-only `SetupBundle.previewOnly`. Too heavy and Not sure create no adverse/ineffective record. Note typing preserves spaces in an editing buffer. None/unknown/unanswered remain separate local states. These additions have no persistence or live evaluation adapter.
+- **Preview:** guarded `/check-preview` semantic examples use the same result view/sheet without inventing authoritative product snapshots. Real preview name search remains honestly unknown when the exact package/formula or personal assessment is unsupported. `/personalize/fixture?mode=profile&fresh=1&focused=1` remains the fresh profile entry.
+- **Acceptance:** full unit suite, application/test typechecks and web/iOS JavaScript exports pass. Browser checks cover four verdicts, repeated close/reopen, direct findings, evidence expansion, accessible handle and profile outcomes/note; they are not native gesture/camera/VoiceOver acceptance. Physical iPhone acceptance remains with the user. Backend contracts, provider/billing/security policy and scientific rules are unchanged.
+
 ## 2026-09-29: Bounded UX consistency and useful context
 
 - **Predecessor:** clean `origin/main@d96cf55777bf0fa1fbfb50eb42fcd5b9da60a85b`; both main CI jobs in `36610789141` succeeded. Dirty shared/local composition work is preserved.

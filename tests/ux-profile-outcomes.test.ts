@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { addCurrentProduct, addPastOutcome, createSetupBundle, currentUseItem, manualUnverifiedReference, removeSetupProduct, setCurrentOutcome, setSetupAnswer } from '../src/presentation/p0b-personalization/setup.ts';
+import { componentHarness, control, press, textContent } from './ux-profile-render.ts';
+import type { SetupBundle } from '../src/presentation/p0b-personalization/setup.ts';
+test('texture dislike, uncertainty, helpfulness and adverse reports retain their separate meanings', () => {
+  const ref = manualUnverifiedReference('Example cream');
+  let b = createSetupBundle('owner');
+  b = addPastOutcome(b, 'texture', ref, 'too_heavy'); b = addPastOutcome(b, 'unsure', ref, 'not_sure');
+  assert.equal(b.experiences.length, 0);
+  for (const [id, outcome] of [['sting', 'stung'], ['breakout', 'broke_out'], ['dry', 'too_drying'], ['help', 'helpful'], ['nohelp', 'not_helping']] as const) b = addPastOutcome(b, id, ref, outcome);
+  assert.deepEqual(b.experiences.map(e => e.kind), ['reacted', 'reacted', 'reacted', 'liked', 'ineffective']);
+  assert.equal(b.previewOnly.pastReports[0].outcome, 'too_heavy');
+  b = addCurrentProduct(b, currentUseItem('current', ref)); b = setCurrentOutcome(b, 'current', 'too_heavy');
+  assert.equal(b.experiences.length, 5, 'current texture report creates no adverse report');
+  assert.equal(removeSetupProduct(b, 'current').previewOnly.currentOutcomes.current, undefined);
+});
+test('none, unknown and skipped answers are distinct local states', () => {
+  const b = createSetupBundle();
+  assert.equal(b.previewOnly.currentProducts, 'unanswered');
+  assert.equal(setSetupAnswer(b, 'currentProducts', 'none').previewOnly.currentProducts, 'none');
+  assert.equal(setSetupAnswer(b, 'currentProducts', 'unknown').previewOnly.currentProducts, 'unknown');
+});
+test('five-step handlers preserve exact outcome wording and raw note typing without persistence claims', () => {
+  let result: SetupBundle | undefined; let serial = 0;
+  const flow = componentHarness('src/components/p0b-personalization/ContextFlow.tsx', 'ContextFlow', { setup: true, collectIntent: false, createId: () => `id-${++serial}`, onSetup: (b: SetupBundle) => { result = b; }, onApply() {}, onSkip() {} });
+  press(control(flow.render(), 'Dryness')); assert.match(textContent(flow.render()), /Main/);
+  press(control(flow.render(), 'Continue')); press(control(flow.render(), 'Continue'));
+  press(control(flow.render(), 'Search products')); press(control(flow.render(), 'How’s it working for you?'));
+  press(control(flow.render(), 'Too heavy')); assert.match(textContent(flow.render()), /Too heavy/);
+  press(control(flow.render(), 'Continue')); press(control(flow.render(), 'Search products'));
+  press(control(flow.render(), 'Stung')); assert.match(textContent(flow.render()), /Stung/); assert.doesNotMatch(textContent(flow.render()), /reacted/);
+  press(control(flow.render(), 'Continue'));
+  control(flow.render(), 'Anything else').props.onChangeText('I use ');
+  assert.equal(control(flow.render(), 'Anything else').props.value, 'I use ');
+  control(flow.render(), 'Anything else').props.onChangeText('I use sunscreen');
+  press(control(flow.render(), 'Save skin profile'));
+  assert.equal(result?.additionalNote, 'I use sunscreen');
+  assert.equal(result?.previewOnly.currentOutcomes['id-1'], 'too_heavy');
+  assert.equal(result?.previewOnly.pastReports[0].outcome, 'stung');
+});

@@ -1022,6 +1022,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
             />
             {integrated && searchQuery.trim().length >= 2 && <Button label="Check name as entered" variant="ghost" onPress={handleManualNameCheck} />}
           </View>
+          {__DEV__ && preview && <Button label="Result examples" variant="ghost" onPress={() => router.push('/check-preview')} />}
           <View style={styles.linkCard}>
             <Text style={styles.linkLabel}>Search by product link</Text>
             <View style={styles.linkRow}>

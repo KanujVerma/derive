@@ -62,8 +62,9 @@ test('preview product keeps unverified package formula primary and save incapabi
   const r = renderer();
   const { CheckResultContent } = r.load('src/components/check/result-sheet/CheckResultContent');
   const html = r.render(CheckResultContent, { input: { ownerId: null, snapshot: null, catalogFacts: { brand: 'CeraVe', name: 'Moisturizing Cream', categoryLabel: 'Moisturizer', formula: null, source: null }, fit: { kind: 'preview_unavailable' } }, continuous: true });
-  assert.ok(html.indexOf('Exact formula not verified') >= 0);
-  assert.ok(html.indexOf('Exact formula not verified') < html.indexOf('preview cannot save'));
+  assert.match(html, /Not enough information/);
+  assert.match(html, /ingredient list for your exact package has not been verified/);
+  assert.ok(html.indexOf('ingredient list') < html.indexOf('No personal assessment is saved'));
   assert.doesNotMatch(html, /Personal Fit unavailable in this preview/);
 });
 
@@ -76,7 +77,7 @@ test('root result mounts one scroll-connected swipe sheet with complete content 
   assert.equal(r.sheets[0].enableDynamicSizing, false);
   assert.equal(r.sheets[0].overrideReduceMotion, 'system');
   assert.ok(r.sheets[0].snapPoints.length >= 2);
-  assert.match(html, /Preserved host extras/);
+  assert.doesNotMatch(html, /Preserved host extras/, 'collapsed fold hides the next section');
   assert.doesNotMatch(html, /View full result|Hide formula details|Check result<\/span>/);
 });
 
@@ -105,7 +106,7 @@ test('camera companion preserves host extras and hides completely when the curre
   const { buildScanResultSheet } = r.load('src/presentation/check/result-sheet/model');
   const model = buildScanResultSheet({ kind: 'loading', ownerId: 'owner-a', scanId: 'scan-a' });
   const props = { model, currentOwnerId: 'owner-a', currentSnapshot: null, currentResolverResult: null, currentScanId: 'scan-a', onDismiss: () => {}, children: React.createElement('p', {}, 'Current camera extras') };
-  assert.match(r.render(ScanResultSheet, props), /Current camera extras/);
+  assert.doesNotMatch(r.render(ScanResultSheet, props), /Current camera extras/);
   assert.equal(r.sheets.length, 1);
   assert.equal(r.render(ScanResultSheet, { ...props, currentOwnerId: 'owner-b' }), '');
   assert.equal(r.sheets.length, 1, 'stale owner must not mount another gesture surface');
@@ -118,4 +119,13 @@ test('VoiceOver modal scope includes the handle and Close as well as the scroll 
   r.render(CheckResultPresentation, { visible: true, presentationKey: 'accessible-case', input: null, onClose: () => {} });
   assert.equal(r.modalScopes[0].accessibilityViewIsModal, true);
   assert.equal(r.scrollScopes[0].accessibilityViewIsModal, undefined);
+});
+
+test('first expanded detent reveals findings and host actions directly', () => {
+  const r = renderer();
+  const { ResultSheetSurface } = r.load('src/components/check/result-sheet/ResultSheetSurface');
+  const html = r.render(ResultSheetSurface, { presentationKey: 'expanded', onClose() {}, initialDetent: 1,
+    summary: React.createElement('p', {}, 'Product and verdict'), children: React.createElement('p', {}, 'Substantive finding and action') });
+  assert.match(html, /Product and verdict/); assert.match(html, /Substantive finding and action/);
+  assert.equal(r.sheets[0].index, 1);
 });

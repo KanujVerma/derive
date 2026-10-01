@@ -9,12 +9,12 @@ import { colors, layout, radii, spacing, typography } from '@/src/constants/them
 import { createContextDraft, relevantQuestions, validateContextDraft, GOALS, type Treatment, type Answer, type ContextDraft, type RoutineReference, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
 
 import { toggleProfileGoal } from '@/src/presentation/p0b-personalization/goalSelection';
-import { addCurrentProduct, addSetupExperience, catalogFamilyReference, createSetupBundle, currentUseItem, experienceFromNotice, manualUnverifiedReference, removeSetupExperience, removeSetupProduct, replaceSetupOwner, setAdditionalNote, type SetupBundle, type SetupNotice } from '@/src/presentation/p0b-personalization/setup';
+import { addCurrentProduct, addPastOutcome, setCurrentOutcome, setSetupAnswer, removePastOutcome, productOutcomeLabels, catalogFamilyReference, createSetupBundle, currentUseItem, manualUnverifiedReference, removeSetupProduct, setAdditionalNote, type SetupBundle, type ProductOutcome } from '@/src/presentation/p0b-personalization/setup';
 import { CatalogProductSearch } from '@/src/components/catalog/CatalogProductSearch';
 import type { CatalogProductSummary } from '@/src/contracts/ProductCatalog';
 
 const goals = GOALS.map(([value, label]) => [value, value === 'dryness' ? 'Dryness' : label] as const);
-const notices = [['irritated', 'Irritated my skin'], ['broke_out', 'Broke me out'], ['too_drying', 'Felt too drying'], ['didnt_help', "Didn't help"], ['liked', 'I liked it']] as const;
+const notices = [['stung', 'Stung'], ['broke_out', 'Broke out'], ['too_drying', 'Too drying'], ['too_heavy', 'Too heavy'], ['not_helping', 'Not helping']] as const;
 export interface ContextFlowProps {
   initialDraft?: ContextDraft; relevance?: SafetyRelevance;
   /** Context questions are shown only when the caller establishes relevance. */
@@ -51,6 +51,8 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   const [validation, setValidation] = useState<string | null>(null);
   const [bundle, setBundle] = useState(() => createSetupBundle(ownerId));
   const [manualName, setManualName] = useState('');
+  const [outcomeOpen, setOutcomeOpen] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
   const [pending, setPending] = useState<RoutineReference | null>(null);
   const fields = relevantQuestions(relevance);
   const hasContext = contextQuestions.length > 0 || fields.length > 0;
@@ -58,7 +60,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   const extended = setup && !editing && !hasContext;
   const last = hasContext ? 2 : extended ? 4 : 1;
   const currentBundle = bundle.ownerId === ownerId ? bundle : createSetupBundle(ownerId);
-  if (currentBundle !== bundle) setBundle(currentBundle);
+  if (currentBundle !== bundle) { setBundle(currentBundle); setNoteText(''); setOutcomeOpen(null); setPending(null); setManualName(''); }
   const update = <K extends keyof ContextDraft>(key: K, value: ContextDraft[K]) => { setValidation(null); setDraft(current => ({ ...current, [key]: value })); };
   const finish = () => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (extended) onSetup?.(currentBundle); onApply(createContextDraft(draft)); };
   const continueOrApply = () => { if (editing || step === last) finish(); else setStep(step + 1); };
@@ -68,10 +70,10 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
     setBundle(addCurrentProduct(currentBundle, currentUseItem(id, reference)));
     setManualName('');
   };
-  const addNoticedProduct = (reference: ReturnType<typeof manualUnverifiedReference> | ReturnType<typeof catalogFamilyReference>, notice: SetupNotice) => {
+  const addNoticedProduct = (reference: ReturnType<typeof manualUnverifiedReference> | ReturnType<typeof catalogFamilyReference>, notice: ProductOutcome) => {
     const id = createId?.();
     if (!id) return;
-    setBundle(addSetupExperience(currentBundle, experienceFromNotice(id, reference, notice)));
+    setBundle(addPastOutcome(currentBundle, id, reference, notice));
     setManualName('');
   };
   return <Screen scrollable><View style={styles.flow}>
@@ -80,7 +82,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       {!editing && <Text style={styles.copy}>Step {step + 1} of {last + 1}</Text>}
     </View>
     {(editing || step === 0) && <View style={styles.questions}>
-      <QuestionGroup label="What would you like to improve?" support="Choose up to three."><View style={styles.chips}>
+      <QuestionGroup label="What would you like to improve?" support="Choose your main goal first. Add up to two more."><View style={styles.chips}>
         {goals.map(([value, label]) => {
           const main = draft.primaryGoal.state === 'answered' && draft.primaryGoal.value === value;
           const also = draft.secondaryGoals.includes(value);
@@ -88,7 +90,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
           const count = (draft.primaryGoal.state === 'answered' ? 1 : 0) + draft.secondaryGoals.length;
           const disabled = loading || (!selected && count >= 3);
           return <TouchableOpacity key={value} activeOpacity={0.75} accessibilityRole="checkbox" accessibilityLabel={selected ? `${label}, ${main ? 'primary goal' : 'additional goal'}, selected` : label} accessibilityState={{ checked: selected, disabled }} disabled={disabled} style={[styles.goal, main ? styles.mainGoal : also ? styles.alsoGoal : styles.unselectedGoal, disabled && styles.disabledGoal]} onPress={() => { if (disabled) return; setValidation(null); setDraft(current => toggleProfileGoal(current, value)); }}>
-            <Text style={[styles.goalLabel, main && styles.mainGoalLabel, !main && also && styles.alsoGoalLabel]}>{label}</Text>
+            <Text style={[styles.goalLabel, main && styles.mainGoalLabel, !main && also && styles.alsoGoalLabel]}>{main ? `${label} · Main` : label}</Text>
           </TouchableOpacity>;
         })}
       </View></QuestionGroup>
@@ -102,27 +104,35 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       <QuestionGroup label="What are you using now?" support="Add the skincare products you use regularly.">
         <CatalogProductSearch embedded label="Search products" search={catalogSearch} selectedIds={currentBundle.products.flatMap(product => product.reference.kind === 'catalog' ? [product.reference.productId] : [])} onQueryChange={setManualName} onSelect={(product: CatalogProductSummary) => addNamedProduct(catalogFamilyReference(product))} />
         <Button label="Add this name" variant="secondary" disabled={loading || !manualName.trim()} onPress={() => addNamedProduct(manualUnverifiedReference(manualName))} />
-        {currentBundle.products.map(product => <View key={product.id} style={styles.chips}>
+        {currentBundle.products.map(product => <View key={product.id} style={styles.disclosure}>
           <Text>{product.reference.label}</Text>
-          <Text>Using now</Text>
+          <Text style={styles.copy}>Using now</Text>
+          <Button label="How’s it working for you?" variant="ghost" onPress={() => setOutcomeOpen(outcomeOpen === product.id ? null : product.id)} />
+          {currentBundle.previewOnly.currentOutcomes[product.id] && <Text style={styles.copy}>{productOutcomeLabels[currentBundle.previewOnly.currentOutcomes[product.id]]}</Text>}
+          {outcomeOpen === product.id && <View style={styles.chips}>{(Object.entries(productOutcomeLabels) as [ProductOutcome, string][]).map(([outcome, label]) => <ChoiceChip key={outcome} label={label} selectionType="single" selected={currentBundle.previewOnly.currentOutcomes[product.id] === outcome} disabled={loading} onSelect={() => setBundle(setCurrentOutcome(currentBundle, product.id, outcome))} />)}</View>}
           <Button label={`Remove ${product.reference.label}`} variant="ghost" onPress={() => setBundle(removeSetupProduct(currentBundle, product.id))} />
         </View>)}
+        {!currentBundle.products.length && <View style={styles.chips}>{([['none', 'No skincare products'], ['unknown', 'Not sure']] as const).map(([value, label]) => <ChoiceChip key={value} label={label} selectionType="single" selected={currentBundle.previewOnly.currentProducts === value} disabled={loading} onSelect={() => setBundle(setSetupAnswer(currentBundle, 'currentProducts', value))} />)}</View>}
+        <Text style={styles.copy}>Preview only. Products and outcomes aren’t saved.</Text>
       </QuestionGroup>
     </View>}
     {extended && step === 3 && <View style={styles.questions}>
       <QuestionGroup label="Any skincare products that didn't agree with your skin?">
         <CatalogProductSearch embedded label="Search products" search={catalogSearch} onQueryChange={value => setPending(value.trim() ? manualUnverifiedReference(value) : null)} onSelect={(product: CatalogProductSummary) => setPending(catalogFamilyReference(product))} />
         {notices.map(([notice, label]) => <Button key={notice} label={label} variant="secondary" disabled={loading || !pending?.label.trim()} onPress={() => { if (pending) addNoticedProduct(pending, notice); setPending(null); }} />)}
-        {currentBundle.experiences.map(experience => <View key={experience.id} style={styles.chips}>
+        {currentBundle.previewOnly.pastReports.map(experience => <View key={experience.id} style={styles.chips}>
           <Text>{experience.reference.label}</Text>
-          <Text>{experience.kind}</Text>
-          <Button label={`Remove ${experience.reference.label}`} variant="ghost" onPress={() => setBundle(removeSetupExperience(currentBundle, experience.id))} />
+          <Text>{productOutcomeLabels[experience.outcome]}</Text>
+          <Button label={`Remove ${experience.reference.label}`} variant="ghost" onPress={() => setBundle(removePastOutcome(currentBundle, experience.id))} />
         </View>)}
+        {!currentBundle.previewOnly.pastReports.length && <View style={styles.chips}>{([['none', 'None that I remember'], ['unknown', 'Not sure']] as const).map(([value, label]) => <ChoiceChip key={value} label={label} selectionType="single" selected={currentBundle.previewOnly.pastProducts === value} disabled={loading} onSelect={() => setBundle(setSetupAnswer(currentBundle, 'pastProducts', value))} />)}</View>}
+        <Text style={styles.copy}>Your report doesn’t identify an ingredient cause. Preview reports aren’t saved.</Text>
       </QuestionGroup>
     </View>}
     {extended && step === 4 && <View style={styles.questions}>
       <QuestionGroup label="Anything else you'd like Derive to know?">
-        <TextInput style={styles.input} accessibilityLabel="Anything else" multiline placeholder="Anything we didn't cover." value={currentBundle.additionalNote ?? ''} onChangeText={text => setBundle(setAdditionalNote(currentBundle, text))} />
+        <TextInput style={styles.input} accessibilityLabel="Anything else" multiline placeholder="Anything we didn't cover." value={noteText} onChangeText={text => { setNoteText(text); setBundle(setAdditionalNote(currentBundle, text)); }} />
+        <Text style={styles.copy}>Preview only. This note isn’t saved or used in a Check.</Text>
       </QuestionGroup>
     </View>}
     {hasContext && (editing || step === 2) && <View style={styles.questions}>

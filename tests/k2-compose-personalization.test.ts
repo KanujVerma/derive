@@ -28,10 +28,10 @@ test('K2 explicit session demo retains answers only for its gateway instance and
 test('Check shares identity and Personal Fit before supporting formula facts', () => {
   const check = read('../src/components/check/CheckProductScreen.tsx');
   const content = read('../src/components/check/result-sheet/CheckResultContent.tsx');
-  assert.ok(content.indexOf('styles.identity') < content.indexOf('<PersonalDecisionPanel'));
-  assert.ok(content.indexOf('<PersonalDecisionPanel') < content.indexOf('title="Formula details"'));
+  assert.ok(content.indexOf('styles.identityRow') < content.indexOf('PERSONAL FIT'));
+  assert.ok(content.indexOf('PERSONAL FIT') < content.indexOf('verdict.findings.map'));
   assert.match(check, /sharedResultInput = .*selectCheckContentInput/s);
-  assert.match(content, /Verified ingredients for this exact package/);
+  assert.match(content, /ingredient list has been verified for this package/);
 });
 
 test('K2 optional editor returns to the mounted result and My Stuff reuses it', () => {
@@ -84,8 +84,8 @@ test('K2 Personal Fit copy is concise and states an unavailable save once', () =
 test('shared result renders Personal Fit once and keeps context actions relevant', () => {
   const content = read('../src/components/check/result-sheet/CheckResultContent.tsx');
   const section = read('../src/components/personalization/PersonalFitSection.tsx');
-  assert.equal((content.match(/<PersonalFitSection/g) ?? []).length, 1);
-  assert.match(content, /onPersonalize=\{model\.canPersonalize \? onPersonalize : undefined\}/);
+  assert.equal((content.match(/>PERSONAL FIT</g) ?? []).length, 1);
+  assert.match(content, /model\.canPersonalize && onPersonalize/);
   assert.doesNotMatch(content, /<Text[^>]*>Not personalized yet/);
   assert.match(section, /label=\"Personalize\"/);
   assert.doesNotMatch(section, /label=\"Personalize Derive\"/);
