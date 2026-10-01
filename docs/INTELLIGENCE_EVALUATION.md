@@ -23,7 +23,7 @@ The report includes a corpus version and SHA-256 over case IDs, scenarios, prove
 
 Provider responses currently expose token usage, not an authoritative billed amount. A live record must keep `costUsd: null` until a matching account charge or invoice can support the figure. Missing usage on failed calls is likewise null; zero is reserved for an observed zero. The resulting aggregate cost or token total remains null when any constituent measurement is missing. This prevents a pricing-page estimate from posing as measured spend.
 
-## Current result
+## Historical 2026-09-28 result
 
 At corpus `decision-intelligence-v0/1`, SHA-256 `45da401dc63e8311bc1c0b4107a456a208f236695869cf7667328fd3e879b52e`, P0-B `p0b-findings/5` and `p0b-policy/3`, one offline baseline run produced:
 
@@ -47,3 +47,22 @@ The next external run may use this frozen reviewed corpus **only as exploratory 
 A separately reviewed independent-gold corpus is required **before provider selection or claims about customer-decision accuracy**. The seven current labels do not satisfy that gate, no matter how high a challenger scores on them. Provider evaluation is independent of the release path and must not delay physical acceptance, Sami integrations, TestFlight or App Store work.
 
 **Production criterion:** a challenger must show measured incremental customer value over P0-B on independently reviewed cases for a bounded job, with acceptable abstention, failures, privacy and cost. Provider outage or invalid output must leave the deterministic P0-B path available. A provider signal cannot establish identity, formula, concentration, safety, prescription change or final customer action.
+
+## 2026-09-30 private local evaluation follow-up
+
+Founder-requested evaluation only: no model selected, app integration, hosted activation, cloud customer-data processing, image upload or GitHub push. Upstream was inspected at `575566b`; the unpublished newer profile UI remains unavailable. The actual local profile contains goals, skin behavior, reactivity and conditional sensitivity/treatment/reproductive context. The external ingredient notes use only the first three; displaying saved reaction history is not ingredient comparison.
+
+The separate `benchmarks/ingredient-guidance/` corpus has 12 invented ingredient lists/enum-only profiles, fingerprint `fa5058fde1326004c37b9e58ca850c929805904c8f2e28a7944dad5432c8e09e`. It includes dry versus comfortable context, reactive versus generally tolerant context, fatty versus denatured alcohol, missing context, and non-facial category controls. Labels are narrow rule-regression expectations, not independent medical gold. The local rules and Jev are compared on three selected findings; Apple/Gemini are evaluated for generated considerations. Those are different jobs, not interchangeable accuracy scores.
+
+| Candidate / job | One-pass measured result | Latency |
+| --- | --- | --- |
+| Local rules / three findings plus templates | 12/12 defined rule scenarios agree; no provider calls | sub-millisecond computation, excluding retrieval/UI |
+| Jev `jev-1.13.0` / three Noul selections, predeclared threshold 0.5 | 12/12 vectors agree, 36/36 labels; 12 HTTP successes | p50 179 ms, p95 929 ms |
+| Apple installed `SystemLanguageModel.default` / prose | 12 nonempty answers; at least three cases contain unsupported/incorrect reasoning | Mac p50 1.65 s, p95 2.41 s; not phone latency |
+| Gemini `gemini-3.8-flash` / current prose adapter | Two HTTP 503 responses, then stopped; no usable answers | failed calls 3.24 s and 9.85 s |
+
+Apple incorrectly called cetyl/stearyl alcohol drying, invented a glycerin interaction, and inferred intended product use from its synthetic name. The current Gemini-language/structure guard accepted all 12 Apple answers in a synthetic parser replay, including those errors: parse acceptance is not accuracy. Apple used default guardrails, greedy sampling, no tools, and one new session per case. The available Mac model is not a tested iPhone module and cannot fetch a missing formula; Expo Go cannot load a new native bridge. [Apple task guidance](https://developer.apple.com/videos/play/wwdc2025/286/) and [Expo development builds](https://docs.expo.dev/develop/development-builds/introduction/).
+
+Jev selects typed results; it does not generate explanation sentences ([provider documentation](https://docs.typesafe.ai/introduction/coding-agents)). Its 12-case token-based price estimate is $0.000441504, not a measured bill. The separately executed existing seven-case routine-contribution corpus (current fingerprint `140474b9c830fc8cfe302e5f7cd1ff5e021ccc37ebca6875af62524645770a79`) yielded Jev raw contribution agreement 6/7, full four-field agreement 1/7, and 5/7 adapter-accepted responses. One rejection was rounded distribution totals and one violated the missing-context invariant. That is separate from the simpler 12-case selection result and does not justify selecting Jev as the decision authority.
+
+Reproducible local runners are `run.ts` (offline rules or explicit capped synthetic Gemini run), `jev.ts` (environment-only key), and `apple-input.ts` plus standalone `apple.swift` (native Mac benchmark, not app code). No actual reaction history or photos were sent to providers. Raw receipts reside in private temporary files and are not committed. Neither repeated-run stability nor blinded usefulness/clinical accuracy was measured. The 17-product/50-photo Target intake has barcode evidence but no independent ingredient-transcription/decision gold. Next comparison must use checked package lists and separately reviewed helpfulness labels, keeping ingredient acquisition distinct from interpretation and preserving P0-B ownership.
