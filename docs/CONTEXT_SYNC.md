@@ -6,6 +6,13 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-10-01: Claim-specific fictional Source excerpts
+
+- **Predecessor:** clean local `kanuj/ux-check-profile-preview@4b72386fdfd2383b9b678ac3e7f1c43bdf65cf67`.
+- **Scope:** only fictional category Source data is narrowed. Moisturizer dryness sources contain “Moisturizer for dry skin” and “Dry skin”; texture sources contain “Rich cream” and “Rich texture.” Fictional provenance is explicit in source labels. Cleanser separates dry-skin/current-wash facts from texture preference; sunscreen separates SPF from water resistance/activity. Swim directions and all meaningful visible limits remain intact.
+- **Preserved:** accepted layout, visible finding copy, fixed verdict, Source-only expansion, live packets/rules and current Expo session. No push, merge or deployment.
+- **Validation:** 19 projection and 10 renderer regressions, app/test typechecks and diff check pass. Device capture was attempted without navigation. Initial capture was black; later physical captures showed the previous source excerpts, even after a file-watcher notification. Updated source data is verified by host rendering, but current phone adoption is not claimed. Expo was not restarted.
+
 ## 2026-10-01: Fixed verdict, substantive findings and Source-only detail
 
 - **Predecessor:** clean local `kanuj/ux-check-profile-preview@88ba16a198e80d9ea8d1ec1ff01ee21dd38c2611`. This supersedes the preceding overcompressed example copy and verdict/finding accordions. Main freshness was fetched for inspection; no push, merge, deployment or hosted change.

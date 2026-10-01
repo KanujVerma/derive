@@ -155,7 +155,7 @@ test('fixed verdict and substantive findings stay visible while only Source togg
       assert.ok(html.includes(finding.reason));
       for (const limit of finding.limits) assert.ok(html.includes(limit), 'material limits remain visible with sources closed');
     }
-    assert.doesNotMatch(html, /Evidence &amp; limits|Why this result|Fictional profile answers|Fictional package excerpt/);
+    assert.doesNotMatch(html, /Evidence &amp; limits|Why this result|Fictional skin profile|Fictional package label/);
     assert.equal(r.pressables.length, 3, 'no verdict or finding-title expander');
     for (let i = 0; i < r.pressables.length; i++) {
       const control = r.pressables[i];
@@ -164,7 +164,7 @@ test('fixed verdict and substantive findings stay visible while only Source togg
       assert.equal(control.accessibilityLabel, `Show sources for ${props.verdict.findings[i].title}`);
     }
     r.pressables[0].onPress(); html = render();
-    assert.match(html, /Fictional package excerpt/);
+    assert.match(html, /Fictional package label/);
     assert.equal(r.pressables[0].accessibilityState.expanded, true);
     assert.equal(r.pressables[1].accessibilityState.expanded, false);
     assert.ok(html.includes(props.verdict.reason));
@@ -174,7 +174,7 @@ test('fixed verdict and substantive findings stay visible while only Source togg
     r.pressables[0].onPress(); html = render();
     assert.equal(r.pressables[0].accessibilityState.expanded, false);
     assert.equal(r.pressables[1].accessibilityState.expanded, true);
-    if (id !== 'sunscreen') { assert.doesNotMatch(html, /Fictional package excerpt/); assert.match(html, /Recorded steps/); }
+    if (id !== 'sunscreen') { assert.doesNotMatch(html, /Fictional package label/); assert.match(html, /Recorded steps/); }
   }
 });
 

@@ -6,7 +6,8 @@ import type { CustomerCheckFacts } from '../../personal-decision/customerControl
 interface CategoryExample {
   category: 'Cleanser' | 'Moisturizer' | 'Sunscreen'; name: string; summary: string;
   goalTitle: string; goalReason: string; placement: string; texture?: string;
-  labelEvidence: string; profileEvidence: string; routineEvidence: string;
+  goalEvidence: ResultFinding['evidence']; textureEvidence?: ResultFinding['evidence'];
+  swimmingEvidence?: ResultFinding['evidence']; routineEvidence: string;
 }
 const categories: Record<string, CategoryExample> = {
   cleanser: {
@@ -16,8 +17,10 @@ const categories: Record<string, CategoryExample> = {
     goalReason: 'Labelled for dry skin. Your current wash leaves your skin feeling tight.',
     placement: 'Replaces your evening gel cleanser.',
     texture: 'Non-foaming cream, your preferred cleanser type.',
-    labelEvidence: 'Fictional package excerpt: non-foaming cream cleanser for dry skin. Rinse off after cleansing.',
-    profileEvidence: 'Fictional profile answers: dry skin; current wash leaves skin feeling tight; prefers a cream cleanser.',
+    goalEvidence: [{ label: 'Fictional package label', detail: 'Cleanser for dry skin' },
+      { label: 'Fictional skin profile', detail: 'Dry skin; current wash leaves skin feeling tight' }],
+    textureEvidence: [{ label: 'Fictional package label', detail: 'Non-foaming cream' },
+      { label: 'Fictional preference', detail: 'Cream cleanser' }],
     routineEvidence: 'Fictional recorded routine: evening gel cleanser, then moisturizer. Check intent: replace the evening gel cleanser.',
   },
   moisturizer: {
@@ -26,8 +29,10 @@ const categories: Record<string, CategoryExample> = {
     goalTitle: 'For your dryness', goalReason: 'Labelled to moisturize dry skin.',
     placement: 'Adds an evening moisturizer after your cleanser.',
     texture: 'Rich cream, matching your stated preference.',
-    labelEvidence: 'Fictional package excerpt: rich, leave-on moisturizer for dry skin.',
-    profileEvidence: 'Fictional profile answers: dry skin; explicitly wants a rich texture.',
+    goalEvidence: [{ label: 'Fictional package label', detail: 'Moisturizer for dry skin' },
+      { label: 'Fictional skin profile', detail: 'Dry skin' }],
+    textureEvidence: [{ label: 'Fictional package label', detail: 'Rich cream' },
+      { label: 'Fictional preference', detail: 'Rich texture' }],
     routineEvidence: 'Fictional complete routine: evening cleanser and morning sunscreen. Check intent: add an evening moisturizer.',
   },
   sunscreen: {
@@ -35,8 +40,9 @@ const categories: Record<string, CategoryExample> = {
     summary: 'SPF 50 with water resistance for outdoor swims.',
     goalTitle: 'Protection', goalReason: 'Broad-spectrum SPF 50.',
     placement: 'Replaces your morning sunscreen on swim days.',
-    labelEvidence: 'Fictional package excerpt: broad-spectrum SPF 50. Water resistant for 80 minutes.',
-    profileEvidence: 'Fictional profile answers: outdoor swimming for about one hour; wants sunscreen for swimming.',
+    goalEvidence: [{ label: 'Fictional package label', detail: 'Broad-spectrum SPF 50' }],
+    swimmingEvidence: [{ label: 'Fictional package label', detail: 'Water resistant for 80 minutes' },
+      { label: 'Fictional activity', detail: 'Outdoor swimming for about one hour' }],
     routineEvidence: 'Fictional recorded routine: morning moisturizer and sunscreen. Check intent: replace the morning sunscreen on swim days.',
   },
 };
@@ -48,20 +54,18 @@ export const resultExamples = [
   ['long-label', 'Long product label'], ['partial-routine', 'Unknown routine'], ['reformulation', 'Changed formula'],
 ] as const;
 function categoryFindings(example: CategoryExample): ResultFinding[] {
-  const label = { label: 'Package label', detail: example.labelEvidence };
-  const profile = { label: 'Skin profile', detail: example.profileEvidence };
   const routine = { id: 'routine-placement', title: 'In your routine', reason: example.placement,
     evidence: [{ label: 'Recorded steps', detail: example.routineEvidence }], limits: [] };
   const goal = { id: 'category-goal', title: example.goalTitle, reason: example.goalReason,
-    evidence: [label, profile], limits: [] };
+    evidence: example.goalEvidence, limits: [] };
   if (example.category === 'Sunscreen') return [goal,
     { id: 'swimming', title: 'For swimming',
       reason: 'Water resistant for 80 minutes. Reapply after swimming or towel drying, following the label.',
-      evidence: [label, profile, { label: 'Package directions', detail: swimDirections }],
+      evidence: [...example.swimmingEvidence!, { label: 'Package directions', detail: swimDirections }],
       limits: ['Swimming/sweating: reapply at 80 minutes. Towel drying: reapply immediately. Also reapply at least every 2 hours. Not waterproof.'] },
     routine];
   return [goal, routine,
-    { id: 'texture', title: 'Texture', reason: example.texture!, evidence: [label, profile], limits: [] }];
+    { id: 'texture', title: 'Texture', reason: example.texture!, evidence: example.textureEvidence!, limits: [] }];
 }
 /** Only the guarded development route consumes these authored examples. Live presentation remains narrow and bound. */
 export function describeResultExample(id: string) {

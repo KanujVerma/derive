@@ -95,8 +95,8 @@ test('category examples expose specific label, profile and routine facts without
     assert.doesNotMatch(JSON.stringify(e.verdict), /will (prevent|cure|protect|hydrate)|cerave|la roche|Reddit|clinical|research|absorption|pore effects/i);
   }
   const moisturizer = describeResultExample('moisturizer').verdict;
-  assert.ok(moisturizer.findings[0].evidence.some(row => row.detail.includes('moisturizer for dry skin')));
-  assert.ok(moisturizer.findings[2].evidence.some(row => row.detail.includes('explicitly wants a rich texture')));
+  assert.deepEqual(moisturizer.findings[0].evidence.map(row => row.detail), ['Moisturizer for dry skin', 'Dry skin']);
+  assert.deepEqual(moisturizer.findings[2].evidence.map(row => row.detail), ['Rich cream', 'Rich texture']);
   assert.ok(moisturizer.findings[1].evidence.some(row => row.detail.includes('Check intent: add')));
   const swimming = describeResultExample('sunscreen').verdict.findings[1];
   assert.match(swimming.limits.join(' '), /80 minutes.*immediately.*every 2 hours.*Not waterproof/);
@@ -125,4 +125,18 @@ test('bound live goal facts, uncertainties and material cautions stay in the vis
   const cautious = describeDecisionVerdict(caution.packet, caution.binding);
   assert.ok(cautious.findings.some(row => row.title === 'Your goal'));
   assert.ok(cautious.findings.some(row => row.id === 'prior-reaction' && row.reason.includes('reported a reaction')));
+});
+
+test('fictional category sources contain only the facts supporting their finding', () => {
+  const cleanser = describeResultExample('cleanser').verdict.findings;
+  assert.deepEqual(cleanser[0].evidence.map(row => row.detail), ['Cleanser for dry skin', 'Dry skin; current wash leaves skin feeling tight']);
+  assert.deepEqual(cleanser[2].evidence.map(row => row.detail), ['Non-foaming cream', 'Cream cleanser']);
+  const sunscreen = describeResultExample('sunscreen').verdict.findings;
+  assert.deepEqual(sunscreen[0].evidence.map(row => row.detail), ['Broad-spectrum SPF 50']);
+  assert.deepEqual(sunscreen[1].evidence.slice(0, 2).map(row => row.detail), ['Water resistant for 80 minutes', 'Outdoor swimming for about one hour']);
+  assert.match(sunscreen[1].evidence[2].detail, /immediately after towel drying/);
+  for (const id of ['moisturizer', 'cleanser', 'sunscreen']) {
+    const findings = describeResultExample(id).verdict.findings;
+    assert.ok(findings.flatMap(row => row.evidence).every(source => /Fictional/.test(source.label + source.detail)), 'fictional provenance stays explicit');
+  }
 });
