@@ -41,15 +41,16 @@ test('owner or Check case changes the recovery context and cannot reuse a previo
 
 test('Check composes recovery for unknown barcode, unresolved case, and unresolved photos without a send action', () => {
   assert.match(check, /import \{ MissingProductContribution \}/);
-  assert.match(check, /reason: 'unknown_barcode'/);
+  assert.match(check, /unknownBarcode \? 'unknown_barcode'/);
   assert.match(check, /resolution\.state === 'insufficient_evidence'[\s\S]*?'unresolved_check'/);
-  assert.match(check, /reason: 'unresolved_photo'/);
-  assert.equal((check.match(/<MissingProductContribution/g) ?? []).length, 3);
+  assert.match(check, /captureEvidence\?\.localPhotos\.length[\s\S]*?'unresolved_photo'/);
+  assert.match(check, /reason: recoveryReason/);
+  assert.equal((check.match(/<MissingProductContribution/g) ?? []).length, 1);
   assert.doesNotMatch(check, /catalog-contribution['"]|submitCatalogContribution/);
 });
 
 test('embedded Check recovery retains an explicit Search by name action and other callers keep the generic default', () => {
-  assert.equal((check.match(/onTryAnotherWayLabel="Search by name"/g) ?? []).length, 3);
+  assert.equal((check.match(/onTryAnotherWayLabel="Search by name"/g) ?? []).length, 1);
   assert.match(recovery, /onTryAnotherWayLabel = 'Try another way'/);
   assert.match(recovery, /label=\{onTryAnotherWayLabel\}/);
 });

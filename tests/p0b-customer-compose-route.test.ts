@@ -5,9 +5,12 @@ const route = source('app/personalize/index.tsx'), check = source('src/component
 for (const component of ['ContextFlow', 'RoutineContext', 'ExperienceContext']) assert.ok(route.includes(component));
 assert.ok(route.includes("operation: 'append_experience'"));
 assert.ok(route.includes('supersedesRevisionId: edit.supersedesRevisionId'));
-assert.ok(route.includes('currentCustomerOwner() === ownerId'));
+assert.ok(route.includes('gate.takeReturn(token, currentCustomerOwner())'));
 assert.ok(check.includes('resolution?.truthSnapshot ?? null'));
-assert.ok(check.includes('expectedBinding={visibleDecision.expectedBinding}'));
+assert.ok(check.includes('selectCheckContentInput({'));
+assert.ok(check.includes('selectCurrentCheckDecision(customerController.getState(), owner, snapshot, visibleDecision)'));
+assert.ok(source('src/presentation/check/result-sheet/composition.ts').includes('expectedBinding: decision.expectedBinding'));
+assert.ok(check.includes('contextEditorDestination(current.packet)'));
 assert.ok(check.includes("step === 'view_product_facts'"));
 assert.ok(!check.includes('expectedBinding={customerState.decision.packet.binding}'));
 assert.ok(fixture.includes("!__DEV__ || publicEnvironment.buildFlavor !== 'development' || shell === 'legacy'"));

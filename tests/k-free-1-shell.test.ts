@@ -59,7 +59,8 @@ test('K-FREE-1: one Check component serves both target and legacy routes', () =>
   assert.doesNotMatch(shared, /FORMULA QUALITY/);
   assert.match(shared, /if \(!targetShell && !showProviderFeatures\)/, 'Remote Staging still hides Check');
   assert.match(shared, /if \(!targetShell && audience !== 'member'\)/);
-  assert.ok(shared.indexOf('if (preview) {') < shared.indexOf('await resolveCatalogIdentity'), 'preview never calls S6');
+  const resolutionPath = shared.slice(shared.indexOf('const openResolution'), shared.indexOf('const handleCaptureReady'));
+  assert.ok(resolutionPath.indexOf('if (preview) {') < resolutionPath.indexOf('await showResolution'), 'preview returns before S6 resolution');
   assert.match(shared, /setUnknownBarcode\(evidence\.barcode \?\? null\)/, 'unknown preview barcodes remain unresolved');
 });
 

@@ -54,4 +54,14 @@ Root owns these shared files until publication. Feature writers own disjoint pro
 
 ## Acceptance gates
 
+### 2026-10-01 local result copy follow-up
+
+The combined `kanuj/ux-check-profile-preview` uses complete, substantive fictional findings after swipe-up. Moisturizer has dry-skin label purpose, an added evening moisturizer after the cleanser, and a rich texture matching an explicit preference. Cleanser has dry-skin label/current tight-feeling wash, replacement of the evening gel cleanser and a cream preference. Sunscreen has broad-spectrum SPF 50, water resistance/reapplication facts and swim-day routine replacement. Fixture package/profile/intent facts stay development-only; live results retain their validated packet/snapshot boundaries and four verdict semantics.
+
+The compact fold contains product identity, a fixed colored verdict and its complete decision summary. Verdict and finding titles/bodies have no disclosure action or chevron. Findings and material limitations remain visible without opening anything. Separate, discreet Source controls (minimum 44pt target, finding-specific accessible name and expanded state) show supporting provenance inline, closed by default. No global accordion, repeated “Evidence & limits,” hidden personal reasoning or hidden caution. Reviewed-claim limitations join visible finding limits; no publication detail is invented. The preceding verdict/finding-accordion design is superseded.
+
+Each fictional Source uses only the package/profile/preference facts supporting that finding; dryness and texture do not repeat whole package/profile excerpts. Fictional provenance remains explicit.
+
+The fictional sunscreen directions distinguish reapplication after the 80-minute swimming/sweating limit from immediate reapplication after towel drying, plus the two-hour interval. Directions were checked against [sunscreen labeling directions, §201.327(e)](https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-201/subpart-G/section-201.327); this is consistency checking of invented label copy, not evidence that a real product has those characteristics.
+
 Every implementation PR: focused/full unit, app/test TypeScript, web/iOS exports, scope/secret/diff audit, independent review and both CI jobs at its exact head. No backend behavior changes are planned. Visual review covers small/large screens, long names, larger text, keyboard, scroll/drag, focus, errors and reduced transparency/motion. Physical camera/gesture/material and unassisted customer acceptance remain separate and pending until observed.

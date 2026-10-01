@@ -36,13 +36,14 @@ export type RoutineFrequency = { kind: 'unknown' } | { kind: 'qualitative'; valu
 export type RoutineReference = { kind: 'manual'; label: string; verification: 'unverified' } | { kind: 'catalog'; label: string; productId: string; variantId: string | null; formulaVersionId: string | null };
 export interface RoutineItemDraft {
   id: string; reference: RoutineReference;
-  status: 'current' | 'paused' | 'stopped' | 'occasional'; timing: 'am' | 'pm' | 'both' | 'unknown'; frequency: RoutineFrequency;
+  /** Null is a local pending choice and must never be persisted. */
+  status: 'current' | 'paused' | 'stopped' | 'occasional' | null; timing: 'am' | 'pm' | 'both' | 'unknown'; frequency: RoutineFrequency;
   startedOn?: string | null; stoppedOn?: string | null; duration?: { count: number; unit: 'days' | 'weeks' | 'months' | 'years' } | null;
 }
 export interface RoutineDraft { completeness: 'partial' | 'complete' | 'unknown'; items: RoutineItemDraft[] }
 export function createRoutineDraft(initial?: RoutineDraft): RoutineDraft { return initial ? { completeness: initial.completeness, items: initial.items.map(item => ({ ...item, reference: { ...item.reference }, frequency: { ...item.frequency }, duration: item.duration ? { ...item.duration } : item.duration })) } : { completeness: 'unknown', items: [] }; }
 export function manualRoutineItem(id: string, label: string): RoutineItemDraft {
-  return { id, reference: { kind: 'manual', label: label.trim(), verification: 'unverified' }, status: 'current', timing: 'unknown', frequency: { kind: 'unknown' }, startedOn: null, stoppedOn: null, duration: null };
+  return { id, reference: { kind: 'manual', label: label.trim(), verification: 'unverified' }, status: null, timing: 'unknown', frequency: { kind: 'unknown' }, startedOn: null, stoppedOn: null, duration: null };
 }
 export function validateRoutineDraft(draft: RoutineDraft): string | null {
   if (draft.items.length > 50) return 'Add up to 50 routine products.';
@@ -53,5 +54,6 @@ export function validateRoutineDraft(draft: RoutineDraft): string | null {
     if (item.reference.kind === 'catalog' && item.reference.formulaVersionId && !item.reference.variantId) return 'A formula reference needs its variant reference.';
     if (item.frequency.kind === 'exact' && (!Number.isInteger(item.frequency.count) || item.frequency.count < 1 || item.frequency.count > 100)) return 'Use an exact count from 1 to 100.';
   }
+  if (draft.items.some(item => item.status === null)) return 'Choose a use status for each product.';
   return null;
 }

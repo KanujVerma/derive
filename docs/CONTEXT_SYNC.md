@@ -1,11 +1,75 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-01 — combined Check/profile publication reconciliation
+
+- **Authorized source/main predecessors:** `kanuj/ux-check-profile-preview@2da7e8660cb0edb2166fcb807732d4f12f72bdd0` and remote main `575566b798dad5dd98a3cba31f992a71bdeb279a`. The user now explicitly authorizes publication and normal PR merge to main, superseding prior local-only scope for this pass. An isolated `/tmp/derive-publish-20261001` checkout preserves the original preview and its Expo process on8083.
+- **Integration:** preview fixed four-verdict/visible-finding/Source-only sheets and five-step setup are reconciled with main's hosted scanner routing, indexed ingredient resolver, owner-fenced link controller and per-Check intent request/binding/controller authority. Live renderer uses validated bound intent; preview questions stay guarded and unsaved. No new backend or hosted activation.
+- **Sami handoff:** [Check/profile wiring](ux/CHECK_PROFILE_WIRING.md) records mixed optional product feedback, product-specific texture dislike, existing intent authority, absent replacement-target/texture/current-feedback revision contracts, live Add/KEEP_CURRENT and reformulation policy decisions, demo route and physical acceptance. No external message was sent.
+- **CI integration correction:** initial PR #193 CI `36821415768` passed Verify & Build and database/truth harnesses but exposed a stale customer-acceptance fixture that saved a newly named manual item without choosing its nullable use status. The harness now asserts absent status is rejected, then explicitly selects current; no persistence guard or application policy was weakened.
+- **Verification state at reconciliation:** both TypeScript checks and web/iOS JavaScript exports pass; full final-head tests and exact-head PR CI are still required. A source preflight compares committed HEAD with working files, so it must be rerun after the integration checkpoint is committed. PR evidence will carry exact final counts and CI links. Physical phone acceptance remains open.
+
+## 2026-10-01 — optional profile coverage and per-Check development questions
+
+Local `kanuj/ux-check-profile-preview`, starting clean at `3466059272af36ceae912c0289e3794144a16c00`. Origin was fetched; branch diverges from current main (25 local / 55 main commits at inspection). This preserves the selected integrated preview and unpublished counterpart work; no merge, push or hosted action is authorized by this pass.
+
+The five-step setup now offers optional, multi-fact current-product feedback. Catalog moisturizer category enables Works well / Still feels dry / Too heavy plus specific adverse and unknown choices. Manual/unknown/sunscreen/deodorant/haircare retain general meanings. Legacy Not helping is not hydration failure; Too heavy is not a general preference; current edits do not erase historical reports. The guarded setup search supplies a clearly fictional Comfort Cream alongside the existing sourced cleanser sample.
+
+The guarded Check preview has optional per-Check intent, explicit replacement targets and evidence-backed authored texture questions. Answers update structured findings and verdict together; reopening preserves the same context, new examples clear it, and changing targets clears current target feedback. None/skipped/partial routines, several same-role products, irrelevant goals, exact variant/formula mismatch and unsupported categories have explicit demonstrations and tests. All useful findings remain visible on expansion; only Source controls disclose provenance. Questions are honestly demo-only, unsaved and unavailable to live/remote/production Check.
+
+See [P0-B context](P0_B_CONTEXT.md) for the precise Sami backend handoff and founder policy decisions: global stored intent, absent per-Check target/texture/current-feedback revision, same-family reaction caution across formula changes, Add/KEEP_CURRENT policy, and unsupported layering compatibility. No migration, live clinical rule, billing, Auth/RLS, truth promotion or analytics change.
+
+Validation: focused production handlers and edge models, full app tests, both TypeScript checks, web/iOS JavaScript exports and diff inspection. Responsive browser screenshots are review evidence; physical iPhone touch acceptance is unrun. Expo port 8083 is preserved. Exact-head CI remains required before any future merge.
+
 This repository-native ledger records meaningful cross-agent checkpoints. Current implementation/runtime/tests and the canonical docs outrank historical entries below. GitHub is the sole durable project context; Drive is limited to customer-research artifacts. Past `Drive Status` and `DRIVE_SYNC_PAYLOAD` lines document their historical checkpoints and impose no current sync requirement.
 
 **Core Rules**:
 1. A fresh agent can recover current work from `AGENTS.md`, `docs/ROADMAP.md`, `docs/OWNERSHIP.md`, relevant canonical docs, and this ledger without manual chat debriefing. Add entries for material milestones, decisions, contracts, or handoffs, not every edit.
 2. **Immutable Predecessor Ledger Rule**: Ledger entries record immutable predecessor commit SHAs, base checkpoints, and CI runs. An active working pass never attempts to self-reference or predict its own resulting commit SHA.
 
+## 2026-10-01: Claim-specific fictional Source excerpts
+
+- **Predecessor:** clean local `kanuj/ux-check-profile-preview@4b72386fdfd2383b9b678ac3e7f1c43bdf65cf67`.
+- **Scope:** only fictional category Source data is narrowed. Moisturizer dryness sources contain “Moisturizer for dry skin” and “Dry skin”; texture sources contain “Rich cream” and “Rich texture.” Fictional provenance is explicit in source labels. Cleanser separates dry-skin/current-wash facts from texture preference; sunscreen separates SPF from water resistance/activity. Swim directions and all meaningful visible limits remain intact.
+- **Preserved:** accepted layout, visible finding copy, fixed verdict, Source-only expansion, live packets/rules and current Expo session. No push, merge or deployment.
+- **Validation:** 19 projection and 10 renderer regressions, app/test typechecks and diff check pass. Device capture was attempted without navigation. Initial capture was black; later physical captures showed the previous source excerpts, even after a file-watcher notification. Updated source data is verified by host rendering, but current phone adoption is not claimed. Expo was not restarted.
+
+## 2026-10-01: Fixed verdict, substantive findings and Source-only detail
+
+- **Predecessor:** clean local `kanuj/ux-check-profile-preview@88ba16a198e80d9ea8d1ec1ff01ee21dd38c2611`. This supersedes the preceding overcompressed example copy and verdict/finding accordions. Main freshness was fetched for inspection; no push, merge, deployment or hosted change.
+- **Hierarchy:** compact fold remains identity plus fixed colored verdict and complete summary. Swipe-up exposes all findings directly. Titles/bodies have no tap action or chevron. Only separate Source controls expand inline supporting provenance, closed by default, with finding-specific accessible names/expanded state and minimum 44pt targets. Verdict states and main findings do not change when Source opens.
+- **Copy:** three fictional moisturizer findings state dry-skin label purpose, addition after the evening cleanser, and explicit rich-texture preference. Cleanser states dry-skin label/current tight-feeling wash, evening gel-cleanser replacement and cream preference. Sunscreen states broad-spectrum SPF 50, 80-minute water resistance with visible reapplication/towel-drying directions and not-waterproof limit, then morning sunscreen replacement on swim days. No fictional detail is injected into live packets or clinical rules.
+- **Visible limits:** retained live goal findings, exact-product reaction/combination cautions, formula/routine/intent unknowns and reviewed-claim limitations stay outside Source. Source contains supporting records only. Unsupported publications, efficacy/tolerance claims and ingredient-cause inference are not fabricated.
+- **Phone:** existing Expo Go session refreshed without restart, route navigation or connectivity change. Actual iPhone 17 Pro Max capture shows the expanded moisturizer sheet with all three substantive findings and every Source closed; the verdict has no chevron. Source-toggle behavior and compact/four-state rendering are exercised through host regressions. The installed device capture CLI does not supply touch input; no physical Source-open or VoiceOver/gesture acceptance claim.
+- **Validation:** red/green interaction/visibility regressions, full app suite, app/test typechecks, web/iOS JavaScript exports and final scope/whitespace review. Capture/export/logs stay outside Git. Existing Metro remains on port8083.
+
+## 2026-10-01: Fact-first Check copy and inline evidence
+
+- **Predecessor:** local `kanuj/ux-check-profile-preview@7ebe66174d800fd1da113676755f5109ce78398f`; clean starting worktree. Main freshness was fetched for inspection; no main integration, push or deployment.
+- **Approved copy:** fictional moisturizer now reads “Rich cream · Your preferred texture” and “In your routine / Evening, after cleanser.” Cleanser and sunscreen retain concrete label, replacement and reapplication facts. Redundant goal, texture and cross-category moisturizer explanations are removed; useful package facts, explicit preferences, provenance and material limits remain in their evidence.
+- **Shared result behavior:** the finding title/body is a minimum-44pt tappable row with a chevron and accessible expanded state. Evidence opens immediately underneath that row. The verdict has its own evidence disclosure. There is no global accordion; swipe-up still exposes findings directly. Only an exactly repeated supported goal row is folded into the verdict, with its evidence/uncertainties retained; distinct goal facts, cautions and unknowns stay visible. Four labels and evaluation/binding rules are unchanged; live facts do not acquire the example's texture preference.
+- **Physical observation:** the existing Expo Go session on the wired iPhone 17 Pro Max refreshed without a server restart or phone navigation. A current CoreDevice capture shows the concise moisturizer verdict and routine row, chevrons and expanded recorded-step evidence. It is fictional Development Mock evidence, not a live assessment or native gesture/VoiceOver acceptance.
+- **Validation:** focused projection/render interaction regressions, full app tests, app/test TypeScript, web/iOS JavaScript exports and final diff checks. Exports and capture are outside Git; existing Expo port/address and unrelated source work remain intact.
+
+## 2026-10-01: Physical preview recovery and safe-area correction
+
+- **Predecessor:** `kanuj/ux-check-profile-preview@0972e48c3de478636a13b6f5f237942e0d3e253a`.
+- **Observed on the physical iPhone:** Expo Go was stalled opening a project after the interactive task-owned Metro process ended. Restarted only the approved preview as a detached process, verified current LAN manifest, and opened `/check-preview` through the installed Expo Go app. Native capture now shows the current moisturizer Good fit sheet; the server receives active LAN connections.
+- **Scoped app fix:** the example route omitted the iOS top safe-area inset, visibly overlapping the status bar. Added only that route's top inset; shared sheet design and backend boundaries remain unchanged. No device permissions, trust, security or network settings changed. Gesture/camera/VoiceOver acceptance remains separate from this successful native load and capture.
+
+## 2026-10-01: Category example content and intent-aware routine copy
+
+- **Predecessor:** local `kanuj/ux-check-profile-preview@10666fec3415401051414bfcb30e13176b5d9ac2`.
+- **Bounded content completion:** development-only cleanser, moisturizer and sunscreen examples now contain concrete fictional label/preference/activity facts, distinct goal/routine/category findings and individual evidence/limits. Fiction is disclosed in the preview shell; no real-brand fact, study, community report or scientific rule is added. Live result content retains the narrow validated packet/snapshot boundary.
+- **Intent boundary:** current Check packet/presenter has no Check-specific add/replace intent. Routine role alone does not produce amber without explicit adding intent. Unknown/replacing intent uses possible-replacement copy and remains neutral when the existing packet cannot establish a positive replacement. Development examples supply explicit synthetic intent; live callers do not derive it from global profile intent. Supported independent personal cautions remain unchanged.
+- **Verification:** focused tests and full `npm test` (901 TAP tests plus assertion scripts), both typechecks, web/iOS exports and browser category/intent checks pass. Existing native phone acceptance remains separate; the running combined Expo server is preserved.
+
+## 2026-10-01: Combined compact Check and profile outcome preview
+
+- **Predecessor/worktree:** local `kanuj/ux-check-profile-preview@5da8b653b72dc7a54501ecce19689623fa0fe34a` in `derive-integrated-preview`. Preserves Check f376024 and profile 3c0423a source worktrees. No push, main merge or deployment.
+- **Frontend:** shared tinted four-state verdict projection from validated existing structured packets, measured identity/verdict fold, direct findings on first expansion, per-finding evidence/limits, and matching name-search/camera result surfaces. Owner, immutable snapshot/revision, close-generation and same-case evidence guards remain intact. No numeric score or new clinical rule.
+- **Profile:** five stages retained, main goal visible, optional current-product outcome and exact past report words kept in development-only `SetupBundle.previewOnly`. Too heavy and Not sure create no adverse/ineffective record. Note typing preserves spaces in an editing buffer. None/unknown/unanswered remain separate local states. These additions have no persistence or live evaluation adapter.
+- **Preview:** guarded `/check-preview` semantic examples use the same result view/sheet without inventing authoritative product snapshots. Real preview name search remains honestly unknown when the exact package/formula or personal assessment is unsupported. `/personalize/fixture?mode=profile&fresh=1&focused=1` remains the fresh profile entry.
+- **Acceptance:** full unit suite, application/test typechecks and web/iOS JavaScript exports pass. Browser checks cover four verdicts, repeated close/reopen, direct findings, evidence expansion, accessible handle and profile outcomes/note; they are not native gesture/camera/VoiceOver acceptance. Physical iPhone acceptance remains with the user. Backend contracts, provider/billing/security policy and scientific rules are unchanged.
 ## 2026-09-30: Lookup-first Check is a target, not a runtime
 
 - **Predecessor:** `origin/main` at `e8c0738ff185028b2db51492a4a67937d421fa14`, the merge of per-Check intent. This entry records the decision only. It does not claim a cache, enrichment job, provider call, or latency measurement.
@@ -1974,3 +2038,12 @@ This repository-native ledger records meaningful cross-agent checkpoints. Curren
 - **Scope:** PR #161 retains a default-OFF, authenticated candidate lookup and a private atomic request ledger. It is reconciled with main `d96cf55777bf0fa1fbfb50eb42fcd5b9da60a85b`; no customer source activation or canonical import occurred.
 - **Correction:** the official product-read limit checked today is 15/minute/IP. The global reservation cap is now 12/minute, leaving headroom; the previous 60/minute proposal was too high. Tests cover the permitted twelfth reservation and denied thirteenth. Per-owner and daily abuse caps remain distinct from completed-Check allowances.
 - **Open gates:** source display/storage rights, target-product hit rate, and reviewed hosted rollout remain unresolved. Candidate identity cannot become canonical formula evidence.
+
+
+## 2026-09-30 — combined local Check/profile preview
+
+Dedicated `kanuj/ux-check-profile-preview` worktree starts at Check commit `f37602425de24e1ad9c86427e7e0ec51f27f799b`. The fresh five-step ContextFlow, setup bundle and goal selection come from profile commit `3c0423a65a629a48c45d37f63b1493466d8fee3b`; existing contextual experience preselection remains intact. This is selective frontend composition, not a merge of the branches' unrelated release/backend changes. Both source worktrees are preserved.
+
+In Development Mock, Check name search and camera-host name search use the existing CheckResultPresentation. My Stuff → Skin profile opens `/personalize/fixture?mode=profile&fresh=1&focused=1`; Done/final Skip returns through the existing stack. Nonfresh profile edits do not replay setup. Both fixture product searches now receive the same local CeraVe catalog search seam as Check. The fixture remains development-only, does not write or persist answers, and does not promote product/formula truth or produce a personal decision. Existing owner/revision guards and sheet appearance are unchanged.
+
+Validation: full `npm test`, app and test typechecks, web and iOS JavaScript exports, and diff whitespace check. Focused host tests exercise entry/camera search → factual sheet → close/reopen and My Stuff → all five profile steps → Done/back; native gesture/camera acceptance remains on the iPhone. Known profile behavior outside this integration (note trimming, goal retap semantics, manual Add query state, reacted labeling) is retained.

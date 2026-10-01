@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { describeCheckVerdict } from '../src/presentation/check/result-sheet/verdict.ts';
 import { describeCheckResultContent, resultSheetRecoveryCopy } from '../src/presentation/check/result-sheet/content.ts';
 import { buildScanResultSheet } from '../src/presentation/check/result-sheet/model.ts';
 import { verifiedProductTruth, unresolvedProductTruth, formulaOnlyProductTruth } from '../src/fixtures/product-truth/snapshots.ts';
@@ -147,4 +148,16 @@ test('working bound decision action replaces fallback copy; absent action retain
   const content = describeCheckResultContent({ ownerId, snapshot: verifiedProductTruth, fit: decision('positive-role-match') });
   assert.equal(resultSheetRecoveryCopy(sheet, false, content, true), null);
   assert.equal(resultSheetRecoveryCopy(sheet, false, content, false), 'View formula details');
+});
+
+
+test('live verdict consumes only the independently bound per-Check intent', () => {
+  const fit = decision('redundancy');
+  assert.equal(fit.expectedBinding.checkIntent, 'add');
+  const input = { ownerId, snapshot: verifiedProductTruth, fit };
+  const verdict = describeCheckVerdict(input);
+  assert.equal(verdict.state, 'tradeoffs');
+  assert.match(verdict.reason, /Adding this would duplicate/);
+  assert.equal(describeCheckVerdict({ ...input, fit: { ...fit, expectedBinding: { ...fit.expectedBinding, checkIntent: 'replace' } } }).state, 'unknown', 'changed intent cannot reuse an old bound packet');
+  assert.equal(describeCheckVerdict({ ...input, ownerId: 'other-owner' }).state, 'unknown');
 });

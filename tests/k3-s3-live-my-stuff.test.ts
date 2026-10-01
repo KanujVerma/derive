@@ -47,15 +47,15 @@ test('K3/S3 describes broader profile goals without calling them skin concerns',
 
 test('K3/S3 keeps legacy My Stuff wording and dates outside live local free context', () => {
   assert.deepEqual(myStuffCopy(false), {
-    productHeader: 'Current products',
-    experienceHeader: 'Reactions & tolerance',
+    productHeader: 'Your products',
+    experienceHeader: 'Your experience',
     experienceFooter: 'Your own observations, separate from a medical diagnosis.',
   });
   assert.equal(formatMyStuffDate('Sep 21', false), 'Sep 21');
   assert.equal(formatMyStuffDate('2026-09-24T12:00:00Z', false), '2026-09-24T12:00:00Z');
   assert.deepEqual(myStuffCopy(true), {
-    productHeader: 'Saved products',
-    experienceHeader: 'Product experiences',
+    productHeader: 'Your products',
+    experienceHeader: 'Your experience',
     experienceFooter: 'Your reports, separate from a medical diagnosis.',
   });
   assert.match(formatMyStuffDate('2026-09-24T12:00:00Z', true), /2026/);
