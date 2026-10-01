@@ -20,6 +20,11 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     const index = cursor++;
     if (!(index in slots)) slots[index] = { current: initial };
     return slots[index];
+  }, useMemo(factory: () => any, dependencies: readonly unknown[]) {
+    const index = cursor++;
+    const previous = slots[index];
+    if (!previous || dependencies.some((value, at) => value !== previous.dependencies[at])) slots[index] = { dependencies, value: factory() };
+    return slots[index].value;
   }, useEffect() {}, useCallback(callback: any) { return callback; },
   useSyncExternalStore(_subscribe: any, getSnapshot: any) { return getSnapshot(); } };
   function load(path: string): any {

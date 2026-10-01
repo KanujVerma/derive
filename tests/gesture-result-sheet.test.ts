@@ -7,6 +7,7 @@ import test from 'node:test';
 import React from 'react';
 import ts from 'typescript';
 import { createCatalogSearchController } from '../src/presentation/catalog/searchController.ts';
+import { verifiedProductTruth } from '../src/fixtures/product-truth/snapshots.ts';
 import { personalDecisionFixtures } from '../src/fixtures/personal-decision/fixtures.ts';
 
 // React Native cannot execute in Node. Replace only host/native primitives;
@@ -279,4 +280,33 @@ test('the actual capture host pauses detection and delivers interrupted evidence
   capture.onEvidenceReady(evidence);
   r.appState.listener('active');
   assert.equal(handedOff, 1, 'duplicate callbacks and foreground events cannot redeliver');
+});
+
+test('compact recovery is visible before any swipe and inline search replaces the same surface', () => {
+  const r = renderer();
+  const { CheckResultPresentation } = r.load('src/components/check/result-sheet/CheckResultPresentation');
+  const props = { visible: true, input: null, presentationKey: 'retained-case', onClose() {},
+    compactActions: React.createElement('button', {}, 'Photograph package'), children: React.createElement('p', {}, 'Expanded provenance') };
+  const compact = r.render(CheckResultPresentation, props);
+  assert.match(compact, /Photograph package/); assert.doesNotMatch(compact, /Expanded provenance/);
+  const replaced = r.render(CheckResultPresentation, { ...props, replacement: React.createElement('p', {}, 'Back to result / Search by name') });
+  assert.match(replaced, /Back to result/); assert.doesNotMatch(replaced, /Product not confirmed|Photograph package|Expanded provenance/);
+  const restored = r.render(CheckResultPresentation, props);
+  assert.match(restored, /Product not confirmed/); assert.match(restored, /Photograph package/);
+});
+
+test('a bound ingredient action is immediately visible and rejects another owner before capture', () => {
+  const r = renderer();
+  const { ScanResultSheet } = r.load('src/components/check/result-sheet/ScanResultSheet');
+  const { buildScanResultSheet } = r.load('src/presentation/check/result-sheet/model');
+  const snapshot = { ...verifiedProductTruth, formula: null, catalogReferences: { ...verifiedProductTruth.catalogReferences, formulaVersionId: null }, state: 'identified_formula_unverified', nextRequiredEvidence: 'ingredients' };
+  const resolution = { caseId: snapshot.resolutionCaseId, state: snapshot.state, product: snapshot.product, candidates: [], nextAction: 'photograph_ingredients', truthSnapshot: snapshot };
+  const model = buildScanResultSheet({ kind: 'snapshot', snapshot, resolverResult: resolution, ownerId: 'owner-a' });
+  let actions = 0;
+  const props = { model, currentOwnerId: 'owner-a', currentSnapshot: snapshot, currentResolverResult: resolution,
+    currentScanId: 'scan-a', onDismiss() {}, onAddRequestedEvidence() { actions++; } };
+  assert.match(r.render(ScanResultSheet, props), /Photograph ingredients/);
+  r.pressables.find(p => p.accessibilityLabel === 'Photograph ingredients').onPress();
+  assert.equal(actions, 1);
+  assert.equal(r.render(ScanResultSheet, { ...props, currentOwnerId: 'owner-b' }), '');
 });

@@ -92,7 +92,7 @@ export function buildScanResultSheet(input: SheetInput): SheetModel {
   if (input.kind === 'loading') return { kind: 'loading', title: 'Checking product', detail: 'Checking available evidence.', ownerId: input.ownerId, scanId: input.scanId };
   if (input.kind === 'error') return { kind: 'error', title: 'Could not check', detail: 'Try again or search by name.', ownerId: input.ownerId, scanId: input.scanId };
 
-  if (input.kind === 'unknown') return { kind: 'unknown', title: 'No verified barcode match', detail: 'Product and formula are unverified. Search the exact name or photograph the package.', ownerId: input.ownerId, scanId: input.scanId };
+  if (input.kind === 'unknown') return { kind: 'unknown', title: 'No verified match for this barcode.', detail: 'Product and formula are unverified. Search the exact name or photograph the package.', ownerId: input.ownerId, scanId: input.scanId };
 
   const { snapshot } = input;
   const binding = bindingFor(input.ownerId ?? null, snapshot);

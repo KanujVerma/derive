@@ -9,6 +9,7 @@ export interface CameraCompanionInput {
   scanId: string;
   error: string | null;
   unknownBarcode?: string | null;
+  hasUnresolvedPhotos?: boolean;
   resolution: ProductResolutionResult | null;
   catalogProduct: CatalogProductSummary | null;
 }
@@ -24,15 +25,19 @@ export function cameraCompanionSheet(input: CameraCompanionInput): SheetModel | 
   }
   const snapshot = input.resolution?.truthSnapshot;
   if (snapshot) {
-    return buildScanResultSheet({
+    const model = buildScanResultSheet({
       kind: 'snapshot', snapshot, ownerId: input.ownerId,
       catalogProduct: input.catalogProduct, resolverResult: input.resolution,
     });
+    return input.unknownBarcode && snapshot.state === 'insufficient_evidence'
+      ? { ...model, title: 'No verified match for this barcode.' } : model;
   }
   if (input.error) {
     return buildScanResultSheet({ kind: 'error', ownerId: input.ownerId, scanId: input.scanId });
   }
   if (input.unknownBarcode) return buildScanResultSheet({ kind: 'unknown', ownerId: input.ownerId, scanId: input.scanId });
+  if (input.hasUnresolvedPhotos) return { ...buildScanResultSheet({ kind: 'unknown', ownerId: input.ownerId, scanId: input.scanId }),
+    title: 'Product not confirmed', detail: 'Your photos are retained. Automatic photo identification is not available yet.' };
   return null;
 }
 

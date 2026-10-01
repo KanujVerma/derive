@@ -1,5 +1,13 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-01 — approved single result and evidence-specific recovery
+
+- **Predecessor/scope:** clean `d5589a1ad04e5b69f2dad6cdaa74ca858d913b3e`, local `kanuj/ux-search-scan-qa`. Approved Check composition implementation; no push/merge/deploy/hosted activation. Expo PID18994/8084 and USB cable preserved, Development Mock scanner_first_preview with remote false.
+- **Result ownership:** Check owns one canonical product sheet; camera keeps observation and intentional photo review. Compact package/name actions, same-sheet reusable search/Back, retained evidence/query/origin mode, paused late scan fence and existing lifecycle/background guards. Empty Check static warning removed; contextual ambiguity warning and dev-only examples guards preserved. Four verdicts/findings/Source behavior and clinical policy unchanged.
+- **Bound continuation:** existing ingredient-only root/parent operation now wired via requested-evidence callback, private role-only upload, owner/cancel fences, child revision2 validation and retry reuse. No generic authoritative package-photo append or OCR exists; those recoveries use honest retained local review. Live signed continuation was not run.
+- **Evidence:**981/981 tests across114 files, app/test typechecks, web/iOS exports and final diff/boundary checks pass. Confirmed first USB duplicate capture, rendered compact/search/known-ingredient recovery and updated simulator entry saved to Library. USB after-reload/foreground captures were black; native touch/optics/resume and live acceptance remain open. No database/Auth/RLS/analytics changes; exact-head CI required before any later merge.
+- **Handoff:** [dated consolidation acceptance](acceptance/RESULT_RECOVERY_CONSOLIDATION_2026_10_01.md), [camera contract](acceptance/CAMERA_RESULT_SHEET.md) and [wiring](ux/CHECK_PROFILE_WIRING.md) record Library identities, remaining Sami contract gaps and minimum physical steps. Parent received progress and screenshot IDs for pixel review.
+
 ## 2026-10-01 — bounded product-search and scan-return implementation/QA
 
 - **Immutable predecessor:** remote main `7efb9ce446c6b7b54b3803fa85522b47da2a05ee` (PR193), reconfirmed at final validation. Local isolated branch `kanuj/ux-search-scan-qa` preserves the clean prior preview `kanuj/ux-check-profile-preview@2da7e86` and its Expo process on8083. New Development Mock preview on8084 runs from the isolated checkout with Node22.23.0; no push, merge, deploy or hosted activation authorized.

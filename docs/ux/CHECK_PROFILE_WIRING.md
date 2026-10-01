@@ -12,6 +12,10 @@ Main already implements [per-Check intent authority](../P0_B_CHECK_INTENT.md): e
 
 Reconciliation preserves Sami's hosted scanner routing, indexed ingredient resolver, and existing owner/input-fenced product-link controller. Only a validated link resolution reaches the immutable product-truth gate; published labels, retailer IDs and unsupported links remain recovery. Existing live context/routine/history and saved-product APIs retain their boundaries. No backend, database, Auth/RLS, analytics, billing or hosted activation change is part of this UI publication.
 
+## Result recovery consolidation
+
+The approved local pass from `d5589a1` suppresses duplicate capture-owned outcomes, measures direct recovery in the compact result, and reuses catalog search inside that same sheet with retained Back state. It wires existing owner/root/snapshot-bound ingredient continuation, preserves observations and origin mode, and separates service errors from evidence gaps. General package-photo continuation stays local because no generic existing-case append contract or photo recognition exists. [Consolidation acceptance](../acceptance/RESULT_RECOVERY_CONSOLIDATION_2026_10_01.md) records981 passing tests, typechecks/exports, Library pixels and unrun native/live gates. No backend or hosted activation.
+
 ## Remaining wiring and founder decisions
 
 The bounded search/scan return pass based on main `7efb9ce446c6b7b54b3803fa85522b47da2a05ee` now preserves Check's search query/list across camera entry, exposes cancel/retry/resume, fences stale requests and duplicate selection, and supplies honest manual/no-match recovery. Dismiss re-arms the existing capture session; an unknown barcode has a transient scan-bound sheet. Background completed evidence is held locally and delivered once on foreground. [Dated acceptance](../acceptance/SEARCH_SCAN_RETURN_2026_10_01.md) separates automated, rendered, simulator and unrun physical evidence, records Library identities and the exact8084 preview. It is local-only, with parent screenshot review and physical camera acceptance pending.

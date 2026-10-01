@@ -73,8 +73,9 @@ test('Auto camera remains a local leaf and asks for a part only when the photo r
   assert.match(source, /\(showCorrection \|\| !previewRole\) && <CameraGlass style=\{styles\.previewMenu\}>/);
   assert.match(source, /Which part is in this photo\?/);
   assert.match(source, /label="Add photo of ingredient list"/);
-  assert.match(source, /This photo isn't enough to identify the product\./);
-  assert.match(source, /This barcode isn't in the catalog\./);
+  assert.match(source, /Automatic photo identification is not available yet\./);
+  assert.doesNotMatch(source, /This barcode isn't in the catalog\./);
+  assert.match(source, /if \(!hostOwnsResults\) setNotice\(\{ kind: 'status', title: 'Barcode captured'/);
   assert.doesNotMatch(source, /accessibilityLabel="Change part"/);
   assert.doesNotMatch(source, /Photos do not verify the formula/);
   assert.match(source, /setRole\('barcode'\);\n\s*setIntent\('auto'\)/);

@@ -4,13 +4,14 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProductEvidenceCapture } from './ProductEvidenceCapture';
 import { createCheckCaptureBridge, type CheckCaptureHandoff } from '../../../presentation/capture/checkCaptureAdapter';
 import { createLiveFreeEvidenceProcessor } from '../../../presentation/capture/liveFreeEvidenceProcessor';
-import { pendingCaptureProcessor, type CaptureHandoff, type CaptureProcessor, type CaptureRole } from '../../../presentation/capture/productEvidence';
+import { pendingCaptureProcessor, type CaptureEvidence, type CaptureHandoff, type CaptureProcessor, type CaptureRole } from '../../../presentation/capture/productEvidence';
 
 interface Props {
   onClose: () => void;
   onCaptureReady: (handoff: CheckCaptureHandoff) => void;
   processor?: CaptureProcessor;
   initialRole?: CaptureRole;
+  initialEvidence?: readonly CaptureEvidence[];
   live?: boolean;
   detectionPaused?: boolean;
   catalogSearch?: (query: string) => Promise<import('../../../contracts/ProductCatalog').CatalogProductSummary[]>;
@@ -18,7 +19,7 @@ interface Props {
   companion?: React.ReactNode;
 }
 
-export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', live = false, detectionPaused = false, catalogSearch, onCatalogSelect, companion = null }: Props) {
+export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', initialEvidence = [], live = false, detectionPaused = false, catalogSearch, onCatalogSelect, companion = null }: Props) {
   const [appActive, setAppActive] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
   const activeRef = useRef(appActive);
   const delivered = useRef(false);
@@ -56,6 +57,8 @@ export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRo
             onClose={onClose}
             initialRole={initialRole}
             autoFinishBarcode
+            hostOwnsResults
+            initialEvidence={initialEvidence}
             detectionPaused={detectionPaused || !appActive}
             catalogSearch={catalogSearch}
             onCatalogSelect={product => { if (activeRef.current && !delivered.current && onCatalogSelect) { delivered.current = true; onCatalogSelect(product); } }}

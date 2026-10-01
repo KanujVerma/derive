@@ -13,7 +13,7 @@ import { createCaptureOperationGate } from '../../../presentation/capture/captur
 import { canObserveLiveBarcode, initialCaptureIntent, isObservedRetailBarcode, shutterPhotoRole, type CaptureIntent } from '../../../presentation/capture/autoCapture';
 import {
   captureRoles, createCaptureSession, nextPhotoRole, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
-  type CaptureAction, type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
+  type CaptureEvidence, type CaptureAction, type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
 } from '../../../presentation/capture/productEvidence';
 
 const roleLabels: Record<CaptureRole, string> = {
@@ -37,15 +37,18 @@ interface Props {
   initialRole?: CaptureRole;
   autoFinishBarcode?: boolean;
   detectionPaused?: boolean;
+  /** Check owns product outcomes; capture retains only observation and photo review. */
+  hostOwnsResults?: boolean;
+  initialEvidence?: readonly CaptureEvidence[];
   catalogSearch?: (query: string) => Promise<CatalogProductSummary[]>;
   onCatalogSelect?: (product: CatalogProductSummary) => void;
 }
 
-export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, catalogSearch, onCatalogSelect }: Props) {
+export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, hostOwnsResults = false, initialEvidence = [], catalogSearch, onCatalogSelect }: Props) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
-  const [session, setSession] = useState(createCaptureSession);
+  const [session, setSession] = useState(() => ({ ...createCaptureSession(), evidence: initialEvidence.map(item => ({ ...item })) }));
   const [role, setRole] = useState<CaptureRole>(initialRole);
   const [intent, setIntent] = useState<CaptureIntent>(() => initialCaptureIntent(initialRole));
   const [showCorrection, setShowCorrection] = useState(false);
@@ -65,6 +68,8 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const latestIntent = useRef(intent);
   latestIntent.current = intent;
   const scanLocked = useRef(false);
+  const detectionPausedRef = useRef(detectionPaused);
+  detectionPausedRef.current = detectionPaused;
   const requestSequence = useRef(0);
   const operations = useRef(createCaptureOperationGate()).current;
   const currentEvidence = intent === 'auto' ? undefined : session.evidence.find((item) => item.role === role);
@@ -168,7 +173,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const onBarcode = ({ data, type }: BarcodeScanningResult) => {
-    if (!mounted.current || currentSession.current.phase !== 'collecting'
+    if (detectionPausedRef.current || !mounted.current || currentSession.current.phase !== 'collecting'
       || !canObserveLiveBarcode(latestIntent.current, { busy: operations.isBusy(), hasPreview: previewActive.current, locked: scanLocked.current }) || !isObservedRetailBarcode(data, type)) return;
     operations.whenIdle(() => {
       scanLocked.current = true;
@@ -177,7 +182,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         onEvidenceReady(toCaptureHandoff(reduceCapture(currentSession.current, { type: 'barcode', value: data })));
       }
       dispatchCapture({ type: 'barcode', value: data });
-      setNotice({ kind: 'miss', title: 'No product match', detail: "This barcode isn't in the catalog." });
+      if (!hostOwnsResults) setNotice({ kind: 'status', title: 'Barcode captured', detail: 'Check the available product evidence.' });
     });
   };
 
@@ -229,15 +234,20 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
     await operations.run(async (isCurrent) => {
       const sequence = ++requestSequence.current;
       const evidence = currentSession.current.evidence;
-      setNotice({ kind: 'status', title: 'Checking product', detail: 'Looking at what you captured.' });
+      if (!hostOwnsResults) setNotice({ kind: 'status', title: 'Checking product', detail: 'Looking at what you captured.' });
+      setBusy(true);
       setError(null);
       setCanRetry(false);
       try {
         const result = await processor.process(evidence);
         if (!isCurrent() || sequence !== requestSequence.current) return;
+        if (hostOwnsResults) {
+          onEvidenceReady(toCaptureHandoff(currentSession.current));
+          return;
+        }
         if (result.state === 'insufficient_evidence') {
           const hasBarcode = evidence.some((item) => item.kind === 'barcode');
-          setNotice({ kind: 'miss', title: hasBarcode ? 'No product match' : 'Not identified yet', detail: hasBarcode ? "This barcode isn't in the catalog." : "This photo isn't enough to identify the product." });
+          setNotice({ kind: 'miss', title: 'Product not confirmed', detail: hasBarcode ? 'No verified match for this barcode.' : 'Automatic photo identification is not available yet.' });
           return;
         }
         setNotice(null);
@@ -248,7 +258,10 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         const recovery = captureRecovery(cause);
         setCanRetry(recovery.canRetry);
         setCanCollectMore(recovery.canCollectMore);
-        setNotice({ kind: 'status', title: 'Could not check', detail: 'Try Check product again, or search by name.' });
+        if (hostOwnsResults) setError(recovery.message);
+        else setNotice({ kind: 'status', title: 'Could not check', detail: 'Try Check product again, or search by name.' });
+      } finally {
+        if (isCurrent()) setBusy(false);
       }
     });
   };
@@ -267,7 +280,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
 
   return (
     <View style={styles.root}>
-      {permission?.granted && session.phase === 'collecting' && !currentEvidence && !previewUri ? (
+      {permission?.granted && session.phase === 'collecting' && (!currentEvidence || hostOwnsResults && currentEvidence.kind === 'barcode') && !previewUri ? (
         <CameraView
           ref={camera}
           style={StyleSheet.absoluteFill}
@@ -348,7 +361,9 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
             {!previewUri && currentEvidence && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{roleLabels[role]} saved</Text></CameraGlass>}
             {!previewUri && !currentEvidence && intent === 'auto' && capturedPhotos.length === 0 && <Text style={styles.hint}>Hold the barcode steady in the frame.</Text>}
             {!previewUri && !currentEvidence && intent !== 'auto' && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{prompts[role]}</Text></CameraGlass>}
-            {error && <Text style={styles.error}>{error}</Text>}
+            {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+            {error && canRetry && <Action label="Retry evidence review" onPress={() => void processEvidence()} />}
+            {error && !canCollectMore && <Action label="Close capture" onPress={close} />}
             <View style={styles.captureActions}>
                 {previewUri ? (
                   <View style={styles.photoActionStack}>
@@ -399,7 +414,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
                 )}
             </View>
           </View>
-            {notice && <View style={[styles.noticeWrap, { bottom: (keyboardHeight > 0 ? Math.min(keyboardHeight, Math.round(windowHeight * 0.42)) : Math.max(insets.bottom, spacing.md)) + (keyboardHeight > 0 ? spacing.sm : 0) }]} {...noticePan.panHandlers}>
+            {!hostOwnsResults && notice && <View style={[styles.noticeWrap, { bottom: (keyboardHeight > 0 ? Math.min(keyboardHeight, Math.round(windowHeight * 0.42)) : Math.max(insets.bottom, spacing.md)) + (keyboardHeight > 0 ? spacing.sm : 0) }]} {...noticePan.panHandlers}>
               <CameraGlass style={styles.notice}>
                 <Pressable accessibilityRole="button" accessibilityLabel="Dismiss result" onPress={dismissNotice} style={styles.noticeHandle}><View style={styles.noticeBar} /></Pressable>
                 <Text style={styles.noticeTitle}>{notice.title}</Text>

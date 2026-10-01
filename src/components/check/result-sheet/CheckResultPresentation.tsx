@@ -12,6 +12,7 @@ interface Props {
   presentationKey: string;
   loading?: boolean;
   error?: string | null;
+  unresolvedTitle?: string;
   unresolvedMessage?: string;
   /** Compatibility only: details now live in the same swipe sheet. */
   full?: boolean;
@@ -22,22 +23,24 @@ interface Props {
   onNextStep?: (step: DecisionNextStep) => void;
   onPersonalize?: () => void;
   onOpenSource?: (url: string) => void;
+  compactActions?: React.ReactNode;
+  replacement?: React.ReactNode;
   children?: React.ReactNode;
 }
 
 /** Presentation only. Check retains bindings, close authority, and the originating camera/search. */
-export function CheckResultPresentation({ visible, input, presentationKey, loading = false, error, unresolvedMessage,
-  inline = false, onClose, dismissLabel = 'Close result', onNextStep, onPersonalize, onOpenSource, children }: Props) {
+export function CheckResultPresentation({ visible, input, presentationKey, loading = false, error, unresolvedTitle, unresolvedMessage,
+  inline = false, onClose, dismissLabel = 'Close result', onNextStep, onPersonalize, onOpenSource, compactActions, replacement, children }: Props) {
   const summary = <View>
     {loading && <View accessibilityLiveRegion="polite" style={styles.status}><ActivityIndicator color={colors.brand} /><Text style={styles.body}>Checking product details...</Text></View>}
     {error && <Text accessibilityRole="alert" style={styles.body}>{error}</Text>}
     {input && <CheckResultContent input={input} section="summary" />}
     {!loading && !error && !input && <CheckResultView section="summary"
-      facts={{ brand: '', name: 'Product not confirmed', categoryLabel: '', formula: null, source: null }}
-      verdict={{ state: 'unknown', label: 'Not enough information', reason: unresolvedMessage ?? 'Product identity is not confirmed. Swipe up for ways to check the exact product or package.', findings: [] }} />}
+      facts={{ brand: '', name: unresolvedTitle ?? 'Product not confirmed', categoryLabel: '', formula: null, source: null }}
+      verdict={{ state: 'unknown', label: 'Not enough information', reason: unresolvedMessage ?? 'Product identity is not confirmed. Search by name or photograph the package.', findings: [] }} />}
   </View>;
   return <ResultSheetSurface visible={visible} inline={inline} presentationKey={presentationKey} onClose={onClose}
-    dismissLabel={dismissLabel} summary={summary}>
+    dismissLabel={dismissLabel} summary={summary} compactActions={compactActions} replacement={replacement}>
     {input && <CheckResultContent input={input} section="findings" onNextStep={onNextStep}
       onPersonalize={onPersonalize} onOpenSource={onOpenSource} />}
     {children}

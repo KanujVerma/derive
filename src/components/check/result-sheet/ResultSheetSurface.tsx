@@ -35,6 +35,10 @@ interface Props {
   bottomInset?: number;
   /** Only identity and verdict appear in the collapsed fold. Findings appear on the first upward swipe. */
   summary?: React.ReactNode;
+  /** Recovery is part of the measured compact fold. */
+  compactActions?: React.ReactNode;
+  /** Search replaces content within the same gesture surface. */
+  replacement?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -52,7 +56,7 @@ export function ResultSheetSurface({ visible = true, inline = false, presentatio
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, children }: Omit<Props, 'visible' | 'inline'> & {
+  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children }: Omit<Props, 'visible' | 'inline'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
@@ -113,8 +117,8 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       <BottomSheetScrollView onAccessibilityEscape={close}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        {summary && <View onLayout={event => { const measured = event.nativeEvent.layout.height; if (Math.abs(measured - summaryHeight) >= 1) setSummaryHeight(measured); }}>{summary}</View>}
-        {(!summary || index > 0) && children}
+        {(summary || replacement) && <View onLayout={event => { const measured = event.nativeEvent.layout.height; if (Math.abs(measured - summaryHeight) >= 1) setSummaryHeight(measured); }}>{replacement ?? <>{summary}{compactActions}</>}</View>}
+        {!replacement && (!summary || index > 0) && children}
       </BottomSheetScrollView>
     </BottomSheet>
   </GestureHandlerRootView>;

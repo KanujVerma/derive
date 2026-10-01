@@ -29,6 +29,8 @@ export interface ScanResultSheetProps {
   onPersonalize?: () => void;
   onOpenSource?: (url: string) => void;
   dismissLabel?: string;
+  compactActions?: React.ReactNode;
+  replacement?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -46,7 +48,7 @@ function ProductThumbnail({ image }: { image: SheetImage }) {
 /** Floating camera companion. The host must stop barcode detection while model is non-null. */
 export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, currentResolverResult, currentScanId, bottomInset = 0,
   onDetectionPausedChange, onDismiss, onAddRequestedEvidence, contentInput, onNextStep,
-  onPersonalize, onOpenSource, children, dismissLabel = 'Close result and scan another product' }: ScanResultSheetProps) {
+  onPersonalize, onOpenSource, compactActions, replacement, children, dismissLabel = 'Close result and scan another product' }: ScanResultSheetProps) {
   const onPauseRef = useRef(onDetectionPausedChange);
   onPauseRef.current = onDetectionPausedChange;
   const visibleModel = selectCurrentSheetModel(model, currentOwnerId, currentSnapshot, currentScanId);
@@ -98,19 +100,20 @@ export function ScanResultSheet({ model, currentOwnerId, currentSnapshot, curren
   </View>;
   return (
     <ResultSheetSurface inline presentationKey={sheetKey} onClose={onDismiss} dismissLabel={dismissLabel}
-      summary={summary} bottomInset={bottomInset}>
+      summary={summary} bottomInset={bottomInset} replacement={replacement}
+      compactActions={<View style={{ gap: spacing.sm, marginTop: spacing.md }}>
+        {canAddRequestedEvidence && <Pressable onPress={addRequestedEvidence} style={styles.evidenceAction} accessibilityRole="button"
+          accessibilityLabel="Photograph ingredients" accessibilityHint="Adds evidence to this same product check">
+          <Icon name="camera" size={17} color={colors.brand} /><Text style={styles.evidenceActionText}>Photograph ingredients</Text>
+        </Pressable>}
+        {compactActions}
+      </View>}>
             <View style={[styles.details, styles.detailsContent]}>
               {currentContent ? <CheckResultContent input={currentContent} section="findings" showIdentity={false}
                 onNextStep={onNextStep} onPersonalize={onPersonalize} onOpenSource={onOpenSource} />
                 : null}
               {nextAction && nextAction !== 'View formula details' && <Text style={styles.nextAction}>{nextAction}</Text>}
-              {canAddRequestedEvidence && (
-                <Pressable onPress={addRequestedEvidence} style={styles.evidenceAction} accessibilityRole="button"
-                  accessibilityLabel="Add ingredient photo" accessibilityHint="Adds evidence to this product check">
-                  <Icon name="camera" size={17} color={colors.brand} />
-                  <Text style={styles.evidenceActionText}>Add ingredient photo</Text>
-                </Pressable>
-              )}
+
             </View>
         {children}
     </ResultSheetSurface>

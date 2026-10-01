@@ -26,6 +26,7 @@ function previewModules() {
     '@/src/stores/onboardingStore': { useOnboardingStore: () => ({ productReactions: [] }) },
     '@/src/stores/scanContextStore': { useScanContextStore: { getState: denyNetwork } },
     '@/src/services/productCatalog': { createCatalogRequestId: () => 'preview-operation', getCatalogProductDetail: denyNetwork, resolveCatalogIdentity: denyNetwork },
+    '@/src/presentation/capture/liveFreeEvidenceProcessor': { createLiveIngredientContinuationProcessor: denyNetwork },
     '@/src/services/deriveClient': { evaluateProduct: denyNetwork },
     '@/src/services/remote/freeContext': { recordFreeCheck: denyNetwork },
     '@/src/services/supabase': { supabase: {} },
@@ -104,4 +105,49 @@ test('My Stuff opens fresh five-step setup, uses local searches and Done returns
   press(control(setup.render(), 'Done'));
   assert.equal(context.returns(), 1);
   assert.equal(params.fresh, '1');
+});
+
+function element(root: any, label: string): any {
+  if (!root || typeof root !== 'object') return null;
+  if (Array.isArray(root)) return root.map(item => element(item, label)).find(Boolean);
+  if (root.props?.label === label) return root;
+  return element(root.props?.children, label);
+}
+test('barcode recovery stays in one sheet, Back preserves evidence, and dismissal rearms once in the original mode', () => {
+  const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
+  flow.render(); press(control(flow.render(), 'Open camera'));
+  let capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  const evidence = [{ role: 'barcode', kind: 'barcode', value: '036000291452' }];
+  capture.props.onCaptureReady({ authority: 'customer_evidence', evidence, barcodeLookup: { barcode: '036000291452' }, localPhotos: [], review: { state: 'pending', selectedCandidateId: null } });
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal(capture.props.companion.props.model.title, 'No verified match for this barcode.');
+  assert.deepEqual(capture.props.initialEvidence, evidence);
+  element(capture.props.companion.props.compactActions, 'Search by name').props.onPress();
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.ok(capture.props.companion.props.replacement);
+  assert.doesNotMatch(JSON.stringify(capture.props.companion.props.replacement), /Choose the exact product and variant/);
+  element(capture.props.companion.props.replacement, 'Back to result').props.onPress();
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal(capture.props.companion.props.replacement, undefined);
+  assert.deepEqual(capture.props.initialEvidence, evidence);
+  const dismiss = capture.props.companion.props.onDismiss; dismiss();
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal(capture.props.initialRole, 'barcode'); assert.deepEqual(capture.props.initialEvidence, []);
+  assert.equal(capture.props.companion, null);
+});
+test('package-photo recovery suspends the result, retains the barcode, and cancellation restores it', () => {
+  const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
+  flow.render(); press(control(flow.render(), 'Open camera'));
+  let capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  const evidence = [{ role: 'barcode', kind: 'barcode', value: '036000291452' }];
+  capture.props.onCaptureReady({ authority: 'customer_evidence', evidence, barcodeLookup: { barcode: '036000291452' }, localPhotos: [], review: { state: 'pending', selectedCandidateId: null } });
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  element(capture.props.companion.props.compactActions, 'Photograph package').props.onPress();
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal(capture.props.initialRole, 'front_label'); assert.equal(capture.props.companion, null);
+  assert.deepEqual(capture.props.initialEvidence, evidence);
+  capture.props.onClose();
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal(capture.props.initialRole, 'barcode'); assert.equal(capture.props.companion.props.model.kind, 'unknown');
+  assert.deepEqual(capture.props.initialEvidence, evidence);
 });

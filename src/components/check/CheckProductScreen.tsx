@@ -46,6 +46,9 @@ import { isRemoteServiceEnabled } from '@/src/services/DeriveService';
 import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
 import { RootShellHeader } from '@/src/components/shell/RootShellHeader';
 import { CheckCaptureHost } from '@/src/components/check/capture/CheckCaptureHost';
+import { isCurrentRequestedEvidenceAction, buildScanResultSheet, type RequestedEvidenceAction } from '@/src/presentation/check/result-sheet/model';
+import { createLiveIngredientContinuationProcessor } from '@/src/presentation/capture/liveFreeEvidenceProcessor';
+import { checkRecoveryPlan } from '@/src/presentation/check/result-sheet/evidenceRecovery';
 import { ScanResultSheet } from '@/src/components/check/result-sheet/ScanResultSheet';
 import { CheckResultPresentation } from '@/src/components/check/result-sheet/CheckResultPresentation';
 import { selectCheckContentInput, selectCurrentCheckDecision, describeCheckLinkNotice } from '@/src/presentation/check/result-sheet/composition';
@@ -53,7 +56,7 @@ import { createCheckResultLifecycle, type CheckResultOperation, type CheckResult
 import { contextEditorDestination } from '@/src/presentation/personal-decision/editorEntry';
 import { cameraCompanionSheet, cameraResultNeedsExistingPage } from '@/src/presentation/check/result-sheet/cameraCompanion';
 import type { CheckCaptureHandoff } from '@/src/presentation/capture/checkCaptureAdapter';
-import type { CaptureRole } from '@/src/presentation/capture/productEvidence';
+import { pendingCaptureProcessor, type CaptureEvidence, type CaptureRole } from '@/src/presentation/capture/productEvidence';
 import { personalizationGateway, resolvePersonalizationOwnerId } from '@/src/presentation/personalization/gateway';
 import { ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
 import { selectFreeFitTarget } from '@/src/presentation/personalization/fitTarget';
@@ -140,6 +143,12 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [linkNote, setLinkNote] = useState<string | null>(null);
   const [linkIntake, setLinkIntake] = useState<Exclude<ProductLinkIntakeResult, { status: 'resolution' }> | null>(null);
   const [isSearching, setIsSearching] = useState(!targetShell);
+  const [inlineSearch, setInlineSearch] = useState(false);
+  const [recoveringPhoto, setRecoveringPhoto] = useState(false);
+  const recoveryActiveRef = useRef(false);
+  const cameraOriginRoleRef = useRef<CaptureRole>('barcode');
+  const [retainedEvidence, setRetainedEvidence] = useState<CaptureEvidence[]>([]);
+  const [ingredientRequest, setIngredientRequest] = useState<RequestedEvidenceAction | null>(null);
   const [captureRole, setCaptureRole] = useState<CaptureRole | null>(null);
   const [cameraAwaitingResult, setCameraAwaitingResult] = useState(false);
   const [cameraScanId, setCameraScanId] = useState('');
@@ -305,6 +314,11 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     resultLifecycle.current.invalidate();
     resultOperationRef.current = null;
     resolutionSequenceRef.current += 1;
+    setInlineSearch(false);
+    setRecoveringPhoto(false);
+    recoveryActiveRef.current = false;
+    setIngredientRequest(null);
+    setRetainedEvidence([]);
   };
   const beginResult = (origin: CheckResultOrigin, requestId: string) => {
     Keyboard.dismiss();
@@ -449,7 +463,30 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     setIsSearching(true);
   };
 
+  const continueCapture = (role: CaptureRole, action?: RequestedEvidenceAction) => {
+    const snapshot = liveResolutionRef.current?.truthSnapshot;
+    if (action && (!snapshot || !isCurrentRequestedEvidenceAction(action, currentLiveCheckOwner(), snapshot, liveResolutionRef.current))) return;
+    Keyboard.dismiss();
+    searchController.cancel();
+    searchController.releaseSelection();
+    setInlineSearch(false);
+    setRecoveringPhoto(true);
+    recoveryActiveRef.current = true;
+    setIngredientRequest(action ?? null);
+    setCameraAwaitingResult(false);
+    setDetectionPaused(false);
+    setCaptureRole(role);
+    setCameraSessionKey(value => value + 1);
+  };
+  const continuationProcessor = React.useMemo(() => ingredientRequest && integrated
+    ? createLiveIngredientContinuationProcessor(ingredientRequest, () => {
+      const snapshot = liveResolutionRef.current?.truthSnapshot;
+      return recoveryActiveRef.current && Boolean(snapshot && isCurrentRequestedEvidenceAction(ingredientRequest,
+        currentLiveCheckOwner(), snapshot, liveResolutionRef.current));
+    }) : undefined, [ingredientRequest, integrated]);
+
   const openCapture = (role: CaptureRole) => {
+    cameraOriginRoleRef.current = role;
     searchController.cancel();
     searchController.releaseSelection();
     setIsCheckingProduct(false);
@@ -621,8 +658,14 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   const handleCaptureReady = (handoff: CheckCaptureHandoff) => {
-    lastTypedNameRef.current = null;
-    const keepCamera = targetShell && (Boolean(handoff.barcodeLookup) || Boolean(handoff.resolvedCase?.truthSnapshot));
+    const recovering = recoveryActiveRef.current;
+    if (!recovering) lastTypedNameRef.current = null;
+    const origin = recovering ? resultOriginRef.current : null;
+    setRecoveringPhoto(false);
+    recoveryActiveRef.current = false;
+    setIngredientRequest(null);
+    setRetainedEvidence(handoff.evidence ?? handoff.localPhotos.map(photo => ({ role: photo.role, kind: 'local_photo' as const, value: photo.uri })));
+    const keepCamera = targetShell;
     if (keepCamera) {
       setCameraAwaitingResult(true);
       setCameraScanId(createCatalogRequestId());
@@ -633,16 +676,22 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     if (handoff.barcodeLookup) {
       if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('barcode');
       setCaptureEvidence(null);
-      void openResolution({ consumer: 'scan', barcode: handoff.barcodeLookup.barcode });
+      void openResolution({ consumer: 'scan', barcode: handoff.barcodeLookup.barcode }, undefined, origin ?? undefined);
       return;
     }
     if (integrated && currentLiveCheckOwner() && handoff.localPhotos.length > 0) checkFlowRef.current?.begin('photo');
     setCaptureEvidence(handoff);
     if (integrated && handoff.resolvedCase) {
       const resolvedCase = handoff.resolvedCase;
-      beginResult({ kind: 'camera', sessionId: cameraScanId || createCatalogRequestId() }, createCatalogRequestId());
+      beginResult(origin ?? { kind: 'camera', sessionId: cameraScanId || createCatalogRequestId() }, createCatalogRequestId());
       void showResolution(async () => resolvedCase);
     } else if (handoff.localPhotos.length > 0) {
+      // Preview photo review has no recognizer or new authoritative case. Preserve prior facts.
+      if (recovering) {
+        setCameraAwaitingResult(true);
+        return;
+      }
+      beginResult({ kind: 'camera', sessionId: cameraScanId || createCatalogRequestId() }, createCatalogRequestId());
       setCatalogDetail(null);
       setResolution(null);
       setCandidates([]);
@@ -670,8 +719,11 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   const handleSelectSearchResult = (item: CatalogProductSummary, origin?: CheckResultOrigin) => {
-    const selectedOrigin = origin ?? { kind: 'search' as const, query: searchQuery, scrollOffset: entryScrollOffset.current, selectedProductId: item.productId };
-    if (targetShell && captureRole) setCaptureRole(null);
+    const selectedOrigin = origin ?? (inlineSearch ? resultOriginRef.current : null) ?? { kind: 'search' as const, query: searchQuery, scrollOffset: entryScrollOffset.current, selectedProductId: item.productId };
+    const insideSheet = inlineSearch && Boolean(captureRole);
+    setInlineSearch(false);
+    if (targetShell && captureRole && !insideSheet) setCaptureRole(null);
+    if (insideSheet) setCameraAwaitingResult(true);
     void Haptics.selectionAsync().catch(() => {});
     if (preview) {
       const detail = getPreviewCatalogDetail(item.productId);
@@ -687,7 +739,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       return;
     }
     if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('search');
-    void openResolution({ consumer: 'scan', brand: item.brand, productName: item.name }, item.productId, selectedOrigin);
+    void openResolution({ consumer: 'scan', brand: item.brand, productName: item.name,
+      ...(retainedEvidence.find(item => item.kind === 'barcode') ? { barcode: retainedEvidence.find(item => item.kind === 'barcode')!.value } : {}) }, item.productId, selectedOrigin);
   };
 
   const handleSelectCandidate = (candidate: ProductResolutionCandidate) => {
@@ -696,6 +749,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     void openResolution({
       consumer: 'scan', brand: candidate.brand, productName: candidate.name,
       variantName: candidate.variantName,
+      ...(retainedEvidence.find(item => item.kind === 'barcode') ? { barcode: retainedEvidence.find(item => item.kind === 'barcode')!.value } : {}),
     }, candidate.productId, resultOriginRef.current ?? undefined);
   };
 
@@ -792,6 +846,12 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   const dismissCameraResult = () => {
+    if (resultOriginRef.current && resultOriginRef.current.kind !== 'camera') {
+      setCaptureRole(null);
+      closeContextualResult();
+      return;
+    }
+    setCaptureRole(cameraOriginRoleRef.current);
     invalidateResult();
     setFullResult(false);
     setCameraAwaitingResult(false);
@@ -930,19 +990,44 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     caseId: resolution?.caseId ?? null, reason: recoveryReason, observedBarcode: unknownBarcode,
     observedName: lastTypedNameRef.current });
   const linkNotice = linkIntake ? describeCheckLinkNotice(linkIntake) : null;
+  const openInlineSearch = () => {
+    Keyboard.dismiss();
+    searchController.releaseSelection();
+    setInlineSearch(true);
+  };
+  const recoveryPlan = checkRecoveryPlan({ loading: isCheckingProduct, error: evaluationError,
+    resolution, unknownBarcode, hasPhotos: Boolean(captureEvidence?.localPhotos.length), hasCatalogIdentity: Boolean(catalogDetail), enteredName: Boolean(lastTypedNameRef.current), linkNeedsDetails: Boolean(linkNotice) });
+  const requestedModel = resolution?.truthSnapshot ? buildScanResultSheet({ kind: 'snapshot', snapshot: resolution.truthSnapshot,
+    resolverResult: resolution, ownerId: liveCheckOwner }) : null;
+  const isIngredientChild = Boolean(resolution && 'attemptRevision' in resolution && resolution.attemptRevision === 2);
+  const requestedAction = !isIngredientChild && requestedModel?.kind === 'result' ? requestedModel.requestedEvidence : null;
+  const inlineSearchView = inlineSearch ? <View style={{ gap: spacing.sm }}>
+    <Button label="Back to result" variant="ghost" onPress={() => { Keyboard.dismiss(); searchController.cancel(); searchController.releaseSelection(); setInlineSearch(false); }} />
+    <CatalogProductSearch controller={searchController} label="Search by name" actionLabel="Check" embedded preserveSelection
+      keepFocusAfterSelect={false} onSelect={handleSelectSearchResult} onQueryChange={setSearchQuery}
+      errorCopy="Search is unavailable right now." emptyCopy="No verified match yet. Try the exact name or photograph the package." />
+    {candidates.length > 1 && <Text style={styles.linkNote}>Choose the exact product and variant. A name alone does not verify its formula.</Text>}
+  </View> : undefined;
+  const compactRecovery = <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+    {recoveryPlan.photoRole && !isIngredientChild && !(requestedAction && captureRole) && <Button
+      label={recoveryPlan.photoRole === 'ingredients' ? 'Photograph ingredients' : 'Photograph package'} variant="brand"
+      onPress={() => continueCapture(recoveryPlan.photoRole!, requestedAction ?? undefined)} />}
+    {recoveryPlan.search && <Button label="Search by name" variant="outline" onPress={openInlineSearch} />}
+    {recoveryPlan.retry && lastResolutionRequestRef.current && <Button label="Retry" variant="brand" onPress={() => {
+      const last = lastResolutionRequestRef.current;
+      if (last) void openResolution(last.evidence, last.knownProductId, last.origin);
+    }} />}
+    {recoveryPlan.retry && resultOriginRef.current?.kind === 'link' && <Button label="Retry link" variant="brand" onPress={checkProductLink} />}
+    {captureEvidence?.localPhotos.length && !captureEvidence.resolvedCase ? <Text style={styles.linkNote}>Photos retained for review. Automatic photo identification is not available here.</Text> : null}
+  </View>;
   const renderResultExtras = () => <>
     {preview && lastTypedNameRef.current && !sharedResultInput && <Text style={styles.entryBody}>A name alone cannot verify the category or support ingredient findings or Personal Fit.</Text>}
-    {targetShell && !isCheckingProduct && (evaluationError || (!sharedResultInput && (unknownBarcode || resolution || captureEvidence || lastTypedNameRef.current))) && <>
-      <Button label="Search exact product or variant" variant="outline" onPress={handleSearchNamePress} />
-      <Button label="Photograph the package" variant="outline" onPress={() => openCapture('front_label')} />
-    </>}
     {linkNotice && <View style={styles.cameraFrameContainer}>
       <Text accessibilityRole="header" style={styles.entryTitle}>{linkNotice.title}</Text>
       <Text style={styles.entryBody}>{linkNotice.detail}</Text>
       {linkNotice.source && <Pressable accessibilityRole="link" accessibilityLabel="View product link source" style={styles.sourceLink}
         onPress={() => void Linking.openURL(linkNotice.source!).catch(() => {})}><Text style={styles.sourceLinkText}>View source</Text></Pressable>}
-      <Button label="Search by name" variant="outline" onPress={handleSearchNamePress} />
-      <Button label="Open camera" variant="outline" onPress={() => openCapture('barcode')} />
+
     </View>}
     {!sharedResultInput && !isCheckingProduct && !evaluationError && (unknownBarcode || resolution || captureEvidence) &&
       <Text style={styles.entryBody}>{unknownBarcode ? 'No verified barcode match.'
@@ -959,16 +1044,9 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       && nextStepMessage?.contextRevision === customerState.context?.revision
       && <Text accessibilityLiveRegion="polite" style={styles.entryBody}>{nextStepMessage?.text}</Text>}
     {renderSaveCheckAction(resolution?.caseId)}
-    {evaluationError && resultOriginRef.current?.kind === 'link' && <Button label="Try checking link again" variant="outline" onPress={checkProductLink} />}
-    {evaluationError && lastResolutionRequestRef.current && <Button label="Try checking again" variant="outline" onPress={() => {
-      const last = lastResolutionRequestRef.current;
-      if (last) void openResolution(last.evidence, last.knownProductId, last.origin);
-    }} />}
     {contextualRecovery && <MissingProductContribution contextKey={contextualRecovery.contextKey}
       availability={contextualRecovery.availability} initial={contextualRecovery.initial} embedded
-      onTryAnotherWayLabel="Search by name" onTryAnotherWay={handleSearchNamePress} />}
-    {contextualRecovery && <Button label={captureEvidence?.localPhotos.length ? 'Take another photo' : 'Open camera'} variant="outline"
-      onPress={() => openCapture(captureEvidence?.localPhotos[0]?.role ?? 'barcode')} />}
+      onTryAnotherWayLabel="Search by name" onTryAnotherWay={openInlineSearch} />}
   </>;
 
 
@@ -1007,20 +1085,34 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
 
   if (targetShell && captureRole) {
     const companion = cameraCompanionSheet({
-      awaiting: cameraAwaitingResult, checking: isCheckingProduct, ownerId: liveCheckOwner,
-      scanId: cameraScanId, error: evaluationError, unknownBarcode, resolution, catalogProduct: catalogDetail,
+      awaiting: cameraAwaitingResult && !recoveringPhoto, checking: isCheckingProduct, ownerId: liveCheckOwner,
+      scanId: cameraScanId, error: evaluationError, unknownBarcode, hasUnresolvedPhotos: Boolean(captureEvidence?.localPhotos.length), resolution, catalogProduct: catalogDetail,
     });
     return (
       <View style={styles.container}>
         <CheckCaptureHost
           key={`${captureRole}:${cameraSessionKey}`}
           initialRole={captureRole}
+          initialEvidence={retainedEvidence}
+          processor={continuationProcessor ?? (recoveringPhoto ? pendingCaptureProcessor : undefined)}
           live={integrated}
           catalogSearch={preview ? searchPreviewCatalog : undefined}
           onCatalogSelect={handleSelectSearchResult}
           detectionPaused={detectionPaused || fullResult}
           onCaptureReady={handleCaptureReady}
           onClose={() => {
+            if (recoveryActiveRef.current) {
+              recoveryActiveRef.current = false;
+              setRecoveringPhoto(false);
+              setIngredientRequest(null);
+              if (resultOriginRef.current?.kind === 'camera') {
+                setCaptureRole(cameraOriginRoleRef.current);
+                setCameraAwaitingResult(true);
+                setDetectionPaused(true);
+                setCameraSessionKey(value => value + 1);
+              } else setCaptureRole(null);
+              return;
+            }
             invalidateResult();
             setFullResult(false);
             setCameraAwaitingResult(false);
@@ -1035,8 +1127,11 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
             setCaptureEvidence(null);
             setCaptureRole(null);
           }}
-          companion={companion && <ScanResultSheet
+          companion={companion ? <ScanResultSheet
               model={companion}
+              compactActions={compactRecovery}
+              replacement={inlineSearchView}
+              onAddRequestedEvidence={isIngredientChild ? undefined : action => continueCapture(action.role, action)}
               currentOwnerId={liveCheckOwner}
               currentSnapshot={resolution?.truthSnapshot ?? null}
               currentResolverResult={resolution}
@@ -1048,7 +1143,10 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
               onDismiss={dismissCameraResult}
             >
               {renderResultExtras()}
-            </ScanResultSheet>}
+            </ScanResultSheet> : cameraAwaitingResult && !recoveringPhoto && catalogDetail ? <CheckResultPresentation
+              visible inline input={sharedResultInput} presentationKey={resultKey} onClose={dismissCameraResult}
+              compactActions={compactRecovery} replacement={inlineSearchView} onNextStep={resultNextStep}
+              onOpenSource={url => void Linking.openURL(url).catch(() => {})}>{renderResultExtras()}</CheckResultPresentation> : null}
         />
       </View>
     );
@@ -1076,7 +1174,6 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
               errorCopy="Search is unavailable right now."
               emptyCopy="No product match yet. Try the exact name and variant, enter the name below, or photograph the package."
             />
-            <Text style={styles.linkNote}>Choose the exact product and variant. A name alone does not verify its formula.</Text>
             {searchQuery.trim().length >= 2 && <Button label="Check name as entered" variant="ghost" onPress={handleManualNameCheck} />}
           </View>
           {__DEV__ && preview && <Button label="Result examples" variant="ghost" onPress={() => router.push('/check-preview')} />}
@@ -1118,8 +1215,9 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           </View>
         </ScrollView>
         <CheckResultPresentation visible={isCheckFocused && !editingContext && (contextualResultOpen || Boolean(catalogDetail || resolution || unknownBarcode || captureEvidence || isCheckingProduct || evaluationError))}
-          input={sharedResultInput} presentationKey={resultKey} loading={isCheckingProduct} error={evaluationError}
-          unresolvedMessage={preview && lastTypedNameRef.current ? `Name entered: ${lastTypedNameRef.current}. Product and formula are unverified. Swipe up to search the exact variant or photograph the package.` : undefined}
+          input={sharedResultInput} presentationKey={resultKey} compactActions={compactRecovery} replacement={inlineSearchView} loading={isCheckingProduct} error={evaluationError}
+          unresolvedTitle={unknownBarcode ? 'No verified match for this barcode.' : undefined}
+          unresolvedMessage={preview && lastTypedNameRef.current ? `Name entered: ${lastTypedNameRef.current}. Product and formula are unverified.` : undefined}
           dismissLabel={resultOriginRef.current?.kind === 'camera' ? 'Back to Check' : 'Close result'}
           full={fullResult} onFullChange={setFullResult} onClose={closeContextualResult}
           onNextStep={resultNextStep} onOpenSource={(url) => void Linking.openURL(url).catch(() => {})}>
