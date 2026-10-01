@@ -87,3 +87,11 @@ test('provider errors are typed and network/oversized/malformed bodies are unava
     async () => new Response('x'.repeat(65537), { headers: { 'content-type': 'application/json' } }),
   ]) assert.equal((await explainIngredientContext(input, { apiKey: 'synthetic-key', fetch: fake })).status, 'unavailable');
 });
+
+test('generated customer copy uses plain sentences without colon or dash punctuation', async () => {
+  for (const sentence of ['Your skin: consider fragrance.', 'Fragrance may irritate — introduce cautiously.',
+    'Fragrance may irritate – introduce cautiously.', 'This is a skin-friendly formula.']) {
+    assert.equal((await explainIngredientContext(input, { apiKey: 'synthetic-key',
+      fetch: async () => response(envelope({ sentences: [sentence] })) })).status, 'no_answer');
+  }
+});

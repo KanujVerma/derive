@@ -1,6 +1,57 @@
 # Free-source ingredient lookup — private local test
 
-## What runs now
+## Product-only web fallback, October 1
+
+The local private result now falls back to `private-web-product-ingredients`
+when Open Beauty Facts and DailyMed return no accepted ingredient list. The
+server searches with SerpApi Google Light, considers the first five organic
+results, prioritizes a fixed official domain for recognized brands, and fetches
+bounded pages from an explicit manufacturer/retailer host
+allowlist. Gemini copies a complete list from a matching fetched page. The server
+rejects text that is not present in that page or comes from a different named
+variant. Search snippets or model memory cannot supply an ingredient list.
+
+Accepted evidence appears inline in the existing result sheet with source and
+retrieval date. The same local skin rules then produce qualified personal notes.
+No source URL is opened automatically. Web lists remain ephemeral, noncanonical,
+and unverified against the actual package. The identity-only confirmation/save
+action remains separate. This is not a universal ingredient source.
+
+`SERPAPI_API_KEY`, `GEMINI_API_KEY`, and `GEMINI_MODEL` belong in the ignored
+**server** environment. For this local phone test, run
+`scripts/start-private-ingredient-server.mjs` with the provider environment and
+the existing exact-tester environment. It creates a temporary private runtime
+file without copying credentials into the Expo bundle or Git. A future reviewed
+hosted deployment needs the same provider settings in Supabase Edge Function
+secrets and deployment of the function; merely saving a secret does not deploy
+or enable it.
+
+The web route sends only barcode, product name, brand, size and public page text.
+It rejects supplied profile/owner fields, requires local tester authentication,
+and reserves the existing shared lookup budget before provider requests. No
+customer skin context, reaction history or photos go into this extraction call.
+Personal AI processing remains disabled separately. The visible local notes are
+rule-based, not Gemini, ChatGPT or Jev personal verdicts.
+
+Actual provider diagnostics found the standard Google endpoint unreliable
+(timeouts and one unrelated result set). Google Light returned relevant Aveeno
+results, but relevant search results alone do not prove an exact ingredient hit.
+A basic public-text Gemini request returned HTTP 200. The first complete local
+Old Spice Auth/Edge/provider/client probe returned `not_found`, not ingredients.
+Its synthetic users were removed; existing phone data was unchanged. Do not
+describe these checks as proven ordinary-product coverage or a working personal
+AI answer.
+
+A traced Aveeno generic search returned mismatched Sheer Hydration/older-formula
+results, with the only eligible retailer returning HTTP 403. The subsequent
+manufacturer-targeted Aveeno search timed out at 12 seconds. Both full and
+simplified Old Spice queries also timed out. These are unresolved live-source
+limitations, not evidence that the completed extraction pipeline returned a list.
+
+The photo extraction endpoint is preparation only, default off and not connected
+to the phone capture UI. No supplied photos were uploaded to Google.
+
+## Free database lookup retained
 
 After a canonical barcode miss, the existing private UPCitemdb fallback identifies
 a possible product. The scanned-product screen then automatically requests
@@ -36,13 +87,14 @@ prove product suitability. They do not read reaction history, prescriptions or
 pregnancy answers. If sources have no list, the customer can paste their bottle's
 ingredient text and explicitly compare it locally. Pasted text is not saved.
 
-An optional, separate **Ask AI to explain with my skin profile** action requests
+An optional, separate **Get a personal explanation** action requests
 one-shot consent for Gemini wording. The new `private-ingredient-explanation`
 endpoint uses supplied ingredient text and server-read minimal skin context;
 it does **not** use Google Search. It remains exact-tester gated and blocks profile
 processing until `DERIVE_GEMINI_PERSONAL_CONTEXT_APPROVED=true` is explicitly
 approved with an appropriate paid project. The phone environment remains unapproved
-with no model key loaded. No actual customer's context has been sent to Google.
+for personal processing even though a server model key is now loaded for public
+product extraction. No actual customer's context has been sent to Google.
 No ChatGPT or Jev integration is represented by this button.
 
 A bounded live adapter test with public ingredients and synthetic context returned
@@ -79,7 +131,8 @@ that endpoint is enabled or installed.
 
 The new function reuses `DERIVE_UPC_PRIVATE_TEST_ENABLED=true` and
 `DERIVE_UPC_PRIVATE_TESTER_IDS=<approved exact Auth UUIDs>` in an ignored local
-server environment. No API key or new public mobile flag is required. JWT,
+server environment. No API key or new public mobile flag is required for the two
+free database sources. JWT,
 server-side Auth and tester allowlist precede input validation and outbound calls.
 Only four identity fields are accepted; extra profile/owner fields are rejected.
 The existing service-only external-candidate budget reserves each attempt before

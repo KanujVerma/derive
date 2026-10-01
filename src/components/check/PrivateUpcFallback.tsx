@@ -63,7 +63,7 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, chil
         name: candidate?.name ?? (result?.status === 'ambiguous' ? 'Confirm the matching product' : 'Product details unavailable'),
         categoryLabel: candidate?.size ?? '', formula: null, source: null }}
         verdict={{ state: 'unknown', label: 'Not enough information', findings: [],
-          reason: candidate ? 'Product identified by an external listing. Ingredient notes are below; this is not a verified personal-fit verdict.'
+          reason: candidate ? 'We found a matching product listing. Your ingredients and personal notes appear below when available.'
             : 'An exact product and ingredient list are needed before assessing personal fit.' }} />}
   </View>;
   const content = <View style={sheet ? styles.summary : styles.card} accessibilityLiveRegion="polite">
@@ -74,7 +74,7 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, chil
       </>}
       {result && (!sheet || result.status === 'ambiguous') && result.candidates.map((candidate, index) => (
         <View key={candidate.sourceRecordId + ':' + index} style={styles.candidate}>
-          <Text style={styles.caption}>{result.status === 'ambiguous' ? 'Possible match — confirm the label' : 'Possible product match'}</Text>
+          <Text style={styles.caption}>{result.status === 'ambiguous' ? 'Check that this matches your label' : 'Possible product match'}</Text>
           {candidate.brand && <Text style={styles.body}>{candidate.brand}</Text>}
           <Text style={styles.title}>{candidate.name}</Text>
           {candidate.size && <Text style={styles.body}>{candidate.size}</Text>}
@@ -104,7 +104,7 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, chil
         {needsTester ? 'This account is not on the private tester list.' : visible.code === 'SIGN_IN_REQUIRED'
           ? 'Your session needs to be refreshed before external lookup.' : 'External lookup is unavailable. Search by name or try again.'}
       </Text>}
-      {needsTester && <Text selectable style={styles.caption}>Tester account ID: {ownerId}</Text>}
+      {needsTester && <Text selectable style={styles.caption}>Tester account {ownerId}</Text>}
       {!loading && <Button label="Retry external lookup" variant="outline" size="medium"
         onPress={() => { void controller.current?.retry(); }} />}
       {children}

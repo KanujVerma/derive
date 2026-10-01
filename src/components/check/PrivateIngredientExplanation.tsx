@@ -13,7 +13,7 @@ type Props = { ownerId: string; productName: string; ingredientsText: string;
 type State = { scope: string; kind: 'loading' | 'error' } | { scope: string; kind: 'result'; result: IngredientExplanationResult };
 const messages: Record<Exclude<IngredientExplanationResult, { status: 'answer' }>['status'], string> = {
   configuration_required: 'AI wording is not configured on this test backend. Your local ingredient notes still work.',
-  personalization_disabled: 'AI wording needs an approved paid Gemini project before sharing your profile. Your local notes still work.',
+  personalization_disabled: 'Personal AI explanations are not enabled for this test. Your ingredient notes are still available.',
   profile_missing: 'Save a skin profile first to use this explanation.',
   context_unavailable: 'Your saved profile could not be read. No AI answer was generated.',
   context_changed: 'Your profile changed during the request. Tap again to use the updated profile.',
@@ -56,11 +56,11 @@ export function PrivateIngredientExplanation(props: Props) {
   </Text>;
   const visible = state?.scope === scope ? state : null;
   return <View style={styles.section}>
-    <Button label="Ask AI to explain with my skin profile" variant="outline" size="medium"
+    <Button label="Get a personal explanation" variant="outline" size="medium"
       disabled={visible?.kind === 'loading'} onPress={() => {
         const selectedScope = scope;
         const selectedGeneration = lifecycle.current.generation;
-        Alert.alert('Share basic skin context with Gemini?',
+        Alert.alert('Allow a personal explanation?',
           'For this explanation only, send this ingredient text, product name, and your saved skin goals, type and reactivity to Google. No identity, photos, pregnancy answers, prescriptions or reaction history. AI guidance is not a verified safety or compatibility result.',
           [{ text: 'Cancel', style: 'cancel' }, { text: 'Allow this explanation', onPress: () => {
             if (lifecycle.current.generation === selectedGeneration && current() === selectedScope) void run();
@@ -69,7 +69,7 @@ export function PrivateIngredientExplanation(props: Props) {
     {visible?.kind === 'loading' && <ActivityIndicator accessibilityLabel="Writing ingredient explanation" color={colors.brand} />}
     {visible?.kind === 'error' && <Text style={styles.body} accessibilityLiveRegion="polite">AI wording could not complete. Your local ingredient notes are still available.</Text>}
     {visible?.kind === 'result' && (visible.result.status === 'answer' ? <>
-      <Text style={styles.title}>AI explanation · unverified ingredient list</Text>
+      <Text style={styles.title}>Your personal ingredient notes</Text>
       {visible.result.sentences.map((sentence, index) => <Text key={index} selectable style={styles.body}>{sentence}</Text>)}
       <Text style={styles.caption}>Generated with {visible.result.model}. Not a diagnosis, allergy finding or proof that this product is safe for you.</Text>
     </> : <Text style={styles.body} accessibilityLiveRegion="polite">{messages[visible.result.status]}</Text>)}

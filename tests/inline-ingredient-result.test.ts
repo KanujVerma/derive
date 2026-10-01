@@ -27,6 +27,7 @@ function render(expanded = false, evidence = item) {
     if (name.endsWith('/theme')) return { colors, radii, spacing, typography };
     if (name.endsWith('/productIngredients')) return {};
     if (name.endsWith('/PersonalIngredientNotes')) return {};
+    if (name.endsWith('/WebProductIngredients')) return {};
     if (name.endsWith('/supabase')) return {};
     if (name.endsWith('/authStore')) return {};
     throw Error('Unexpected render dependency: ' + name);
@@ -51,7 +52,7 @@ test('expanded provenance remains inline and does not claim a verified formula',
   const html = render(true);
   assert.match(html, /ODbL 1.0/);
   assert.match(html, /world.openbeautyfacts.org\/product/);
-  assert.match(html, /Not a package-verified formula/);
+  assert.match(html, /has not been confirmed against your package/);
   assert.match(html, /Hide source details/);
   const dailymed = render(true, { ...item, source: 'dailymed', sourceLicense: 'DailyMed-public-label',
     matchBasis: 'name_variant', barcode: null, sourceUrl: 'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=fixture' });

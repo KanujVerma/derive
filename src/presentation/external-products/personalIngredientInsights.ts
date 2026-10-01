@@ -81,7 +81,7 @@ export function buildPersonalIngredientInsights(
     sentences.push(`${dry ? 'Because you reported dryness or tightness' : 'Because you reported that your skin reacts easily'}, alcohol denat. is worth noting in ${list}. It can feel drying or irritating for some people, but its concentration and the full formula matter.`);
   }
   if (!sentences.length) {
-    sentences.push('These limited local rules found no specific ingredient note for the skin details you saved. That is not a compatibility verdict, and it does not mean the product is irritation-free.');
+    sentences.push('These limited local rules found no specific ingredient note for the skin details you saved. That is not a compatibility verdict, and it does not mean the product cannot irritate your skin.');
   }
   sentences.push(sourceType === 'user_label'
     ? 'These notes use ingredient text you pasted, not a formula verified by Derive. Check that the text matches your exact package. They do not identify the cause of a past reaction or predict your individual tolerance.'

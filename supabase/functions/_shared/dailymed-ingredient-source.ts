@@ -13,17 +13,47 @@ export type DailyMedIngredientResult = {
 const ORIGIN = 'https://dailymed.nlm.nih.gov';
 const MAX_JSON = 65_536;
 const MAX_XML = 600_000;
-const MAX_CANDIDATES = 6;
+// Bound the name search independently of final matches. A broad first page is
+// not an ambiguity until its titles have actually been compared.
+const PAGE_SIZE = 20;
+const MAX_PAGES = 2;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clean = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
 const normalized = (s: string) => s.toLowerCase().replace(/\bspf\s*(\d+)/g, 'spf $1')
   .replace(/\bface\s*(\d+)\b/g, 'face $1')
   .replace(/\bmoistur(?:izing|ising|izer|iser)\b/g, 'moistur').replace(/[^a-z0-9]+/g, ' ').trim();
-const filler = new Set(['the', 'and', 'with', 'for', 'of', 'a', 'an', 'oz', 'ounce', 'ounces', 'fl', 'fluid', 'ml', 'g', 'gram', 'grams', 'pack', 'count', 'ct', 'size']);
+const filler = new Set(['the', 'and', 'with', 'for', 'of', 'a', 'an', 'oz', 'ounce', 'ounces', 'fl', 'fluid', 'ml', 'g', 'gram', 'grams', 'pack', 'count', 'ct', 'size', 'scent']);
 
 function nameTokens(query: DailyMedIngredientQuery): string[] {
   const withoutQuantity = query.name.replace(/\b\d+(?:\.\d+)?\s*(?:fl\.?\s*)?(?:oz\b|ounces?\b|ml\b|grams?\b|g\b)/gi, ' ');
-  return normalized(withoutQuantity).split(' ').filter(t => t && !filler.has(t));
+  const deodorant = /\bdeodorant\b/i.test(query.name);
+  return normalized(withoutQuantity).split(' ').filter(t => t && !filler.has(t)
+    && !(deodorant && (t === 'men' || t === 'women')));
+}
+
+function matchesVariant(query: DailyMedIngredientQuery, title: string, tokens: string[], brandTokens: string[]): boolean {
+  const titleName = normalized(title.split('[')[0]);
+  const titleTokens = new Set(titleName.split(' '));
+  const queryName = normalized(query.name);
+  if (/\bmen\b/.test(queryName) && /\bwomen\b/.test(titleName)
+    || /\bwomen\b/.test(queryName) && /\bmen\b/.test(titleName)) return false;
+  const spf = /\bspf\s*(\d+)/i.exec(query.name)?.[1];
+  if (spf && !new RegExp(`\\bspf\\s+${spf}\\b`).test(titleName)) return false;
+  if (/\bdeodorant\b/.test(queryName) && !/\bantiperspirant\b/.test(queryName)
+    && /\bantiperspirant\b|\baluminum\b|\baluminium\b/.test(titleName)) return false;
+  // Do not accept a spray/foam/roll-on for a plain stick-style deodorant,
+  // or silently exchange an explicitly named physical form.
+  for (const form of ['aerosol', 'spray', 'foam', 'roll on']) {
+    if (/\bdeodorant\b/.test(queryName) && new RegExp(`\\b${form}\\b`).test(titleName)
+      && !new RegExp(`\\b${form}\\b`).test(queryName)) return false;
+  }
+  const nizoralDandruff = /\bnizoral\b.*\banti\s+dandruff\b/.test(queryName);
+  if (nizoralDandruff
+    && (!titleTokens.has('ketoconazole') || /\bpet\b|\bpsoriasis\b|\bscalp itch\b/.test(titleName))) return false;
+  // DailyMed names this specific family NIZORAL (KETOCONAZOLE) SHAMPOO.
+  // It still needs shampoo + ketoconazole; separate labels remain ambiguous.
+  const requiredTokens = nizoralDandruff ? tokens.filter(t => t !== 'anti' && t !== 'dandruff') : tokens;
+  return requiredTokens.every(t => titleTokens.has(t)) && brandTokens.every(t => titleTokens.has(t));
 }
 
 async function boundedText(response: Response, max: number): Promise<string> {
@@ -156,34 +186,46 @@ export async function lookupDailyMedIngredients(query: DailyMedIngredientQuery,
     : tokens.slice(0, /^\d+$/.test(tokens[3] ?? '') ? 5 : 4);
   const url = new URL(`${ORIGIN}/dailymed/services/v2/spls.json`);
   url.searchParams.set('drug_name', searchTokens.join(' '));
-  url.searchParams.set('pagesize', String(MAX_CANDIDATES));
+  url.searchParams.set('pagesize', String(PAGE_SIZE));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6_000);
   const request = (endpoint: URL) => (options.fetch ?? fetch)(endpoint, { method: 'GET', redirect: 'error',
     // DailyMed's SPL detail endpoint rejects Accept: application/xml despite returning XML.
     credentials: 'omit', signal: controller.signal, headers: { Accept: endpoint.pathname.endsWith('.xml') ? '*/*' : 'application/json' } });
   try {
-    const response = await request(url);
-    if (response.status === 429) return { status: 'rate_limited' };
-    if (response.status === 404) return { status: 'not_found' };
-    if (!response.ok || !/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type') ?? '')) return { status: 'unavailable' };
-    const body: unknown = JSON.parse(await boundedText(response, MAX_JSON));
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return { status: 'unavailable' };
-    const record = body as Record<string, unknown>;
-    if (!Array.isArray(record.data) || record.data.length > MAX_CANDIDATES) return { status: 'unavailable' };
-    if (record.data.length === 0) return { status: 'not_found' };
-    const metadata = record.metadata as Record<string, unknown> | undefined;
-    if (!metadata || !Number.isSafeInteger(Number(metadata.total_elements))) return { status: 'ambiguous' };
-    if (Number(metadata.total_elements) < record.data.length) return { status: 'unavailable' };
-    if (Number(metadata.total_elements) > MAX_CANDIDATES) return { status: 'ambiguous' };
-    const matches = record.data.filter((r: unknown): r is Record<string, unknown> => {
+    const records: Record<string, unknown>[] = [];
+    let total: number | null = null;
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      if (page > 1) url.searchParams.set('page', String(page));
+      const response = await request(url);
+      if (response.status === 429) return { status: 'rate_limited' };
+      if (response.status === 404) return { status: page === 1 ? 'not_found' : 'ambiguous' };
+      if (!response.ok || !/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type') ?? '')) return { status: 'unavailable' };
+      const body: unknown = JSON.parse(await boundedText(response, MAX_JSON));
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return { status: 'unavailable' };
+      const record = body as Record<string, unknown>;
+      if (!Array.isArray(record.data) || record.data.length > PAGE_SIZE) return { status: 'unavailable' };
+      if (record.data.length === 0) return { status: page === 1 ? 'not_found' : 'ambiguous' };
+      const metadata = record.metadata as Record<string, unknown> | undefined;
+      if (!metadata || !Number.isSafeInteger(Number(metadata.total_elements)) || metadata.total_elements === null
+        || Number(metadata.total_elements) < 0) return { status: 'ambiguous' };
+      const pageTotal = Number(metadata.total_elements);
+      if (metadata.current_page !== undefined && Number(metadata.current_page) !== page) return { status: 'unavailable' };
+      if ((total !== null && pageTotal !== total) || pageTotal < records.length + record.data.length) return { status: 'unavailable' };
+      total = pageTotal;
+      if (total > PAGE_SIZE * MAX_PAGES) return { status: 'ambiguous' };
+      for (const item of record.data) {
+        if (item && typeof item === 'object' && !Array.isArray(item)) records.push(item as Record<string, unknown>);
+        else return { status: 'unavailable' };
+      }
+      if (records.length === total) break;
+      if (page === MAX_PAGES) return { status: 'ambiguous' };
+    }
+    const matches = records.filter((r: unknown): r is Record<string, unknown> => {
       if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
       const item = r as Record<string, unknown>;
       if (typeof item.title !== 'string' || item.title.length > 500 || typeof item.setid !== 'string' || !UUID.test(item.setid)) return false;
-      const titleTokens = new Set(normalized(item.title.split('[')[0]).split(' '));
-      const spf = /\bspf\s*(\d+)/i.exec(query.name)?.[1];
-      if (spf && !new RegExp(`\\bspf\\s+${spf}\\b`).test(normalized(item.title))) return false;
-      return tokens.every(t => titleTokens.has(t)) && brandTokens.every(t => titleTokens.has(t));
+      return matchesVariant(query, item.title, tokens, brandTokens);
     });
     if (matches.length === 0) return { status: 'not_found' };
     if (matches.length > 1) return { status: 'ambiguous' };

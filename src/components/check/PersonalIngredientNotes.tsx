@@ -8,6 +8,7 @@ import { buildPersonalIngredientInsights, type PersonalIngredientInsights } from
 import { customerController, currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
 import { useAuthStore } from '@/src/stores/authStore';
 import { PrivateIngredientExplanation } from '@/src/components/check/PrivateIngredientExplanation';
+import type { WebIngredientEvidence } from '@/src/contracts/WebProductIngredients';
 
 type PastedState = { scope: string; draft: string; compared: string | null };
 
@@ -25,14 +26,15 @@ function IngredientFindings({ notes }: { notes: PersonalIngredientInsights }) {
 }
 
 /** Local comparison is never sent or saved; optional AI uses its separate explicit action. */
-export function PersonalIngredientNotes({ ownerId, evidence, productKey, productName = 'Product from your bottle', category = 'other_personal_care' }: {
+export function PersonalIngredientNotes({ ownerId, evidence, webEvidence = null, productKey, productName = 'Product from your bottle', category = 'other_personal_care' }: {
   ownerId: string; evidence: PublishedIngredientEvidence[]; productKey?: string; productName?: string;
+  webEvidence?: WebIngredientEvidence | null;
   category?: 'skincare' | 'other_personal_care';
 }) {
   const router = useRouter();
   const sessionOwner = useAuthStore(state => state.sessionUserId);
   const state = useSyncExternalStore(customerController.subscribe, customerController.getState);
-  const identity = productKey ?? JSON.stringify(evidence.slice(0, 3).map(item => [item.barcode, item.productName, item.sourceUrl]));
+  const identity = productKey ?? JSON.stringify([evidence.slice(0, 3).map(item => [item.barcode, item.productName, item.sourceUrl]), webEvidence?.sourceUrl]);
   const scope = sessionOwner === ownerId && currentCustomerOwner() === ownerId ? JSON.stringify([ownerId, identity]) : '';
   const liveScope = useRef(scope); liveScope.current = scope;
   const [pasted, setPasted] = useState<PastedState | null>(null);
@@ -46,8 +48,10 @@ export function PersonalIngredientNotes({ ownerId, evidence, productKey, product
   const contextReady = state.ownerId === ownerId && state.status === 'ready' && state.context?.ownerId === ownerId;
   const context = contextReady ? state.context : null;
   const contextError = state.ownerId === ownerId && state.status === 'error';
-  const lists = evidence.slice(0, 3);
-  const results = contextReady ? lists.map(item => ({ item, source: item.source, sourceUrl: item.sourceUrl,
+  // Never relabel web evidence as a database source or combine competing formulas.
+  const lists: Array<PublishedIngredientEvidence | WebIngredientEvidence> = evidence.length
+    ? evidence.slice(0, 3) : webEvidence ? [webEvidence] : [];
+  const results = contextReady ? lists.map(item => ({ item, source: 'source' in item ? item.source : 'published_web', sourceUrl: item.sourceUrl,
     notes: buildPersonalIngredientInsights(context, [item], 'published', category) })) : [];
   const manual = contextReady && !lists.length && currentPasted?.compared
     ? buildPersonalIngredientInsights(context, [{ ingredientsText: currentPasted.compared }], 'user_label', category) : null;
@@ -57,7 +61,7 @@ export function PersonalIngredientNotes({ ownerId, evidence, productKey, product
     <View style={styles.heading}>
       <Text style={styles.eyebrow}>PERSONAL INGREDIENT NOTES</Text>
       <Text style={styles.title}>What this means for your skin</Text>
-      <Text style={styles.caption}>Uses your saved skin goals, skin type and reactivity. Cosmetic guidance—not a diagnosis or a personal-fit rating.</Text>
+      <Text style={styles.caption}>Based on your saved skin details and this ingredient list. Cosmetic guidance, not a diagnosis or a safety verdict.</Text>
     </View>
     {!contextReady && (contextError
       ? <><Text style={styles.body}>Your saved profile could not be loaded, so personalized ingredient notes are unavailable.</Text>
@@ -87,7 +91,7 @@ export function PersonalIngredientNotes({ ownerId, evidence, productKey, product
       {editorOpen && <View style={styles.editor}>
         <Text style={styles.caption}>Paste the ingredient panel below. This local comparison does not save the text or send it to AI. Any optional AI explanation is a separate action.</Text>
         <TextInput multiline maxLength={24_000} value={currentPasted?.draft ?? ''} style={styles.input}
-          accessibilityLabel="Ingredients from your bottle" placeholder="For example: Water, Glycerin, Parfum"
+          accessibilityLabel="Ingredients from your bottle" placeholder="Water, Glycerin, Parfum"
           placeholderTextColor={colors.inkMuted} autoCorrect={false} autoCapitalize="none" textAlignVertical="top"
           onChangeText={draft => { if (isCurrent()) setPasted({ scope, draft: draft.slice(0, 24_000), compared: null }); }} />
         <Button label="Compare with my skin" variant="secondary" size="medium"
@@ -102,7 +106,7 @@ export function PersonalIngredientNotes({ ownerId, evidence, productKey, product
           productName={productName} ingredientsText={currentPasted.compared} category={category} contextRevision={context.revision} />}
       </View>}
     </>}
-    <Text style={styles.footnote}>Local ingredient rules · no AI is used for these notes</Text>
+    <Text style={styles.footnote}>These notes are calculated on your device.</Text>
   </View>;
 }
 

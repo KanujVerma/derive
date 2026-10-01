@@ -31,7 +31,7 @@ test('DailyMed retrieves active and inactive evidence with provenance, never tre
   });
   assert.equal(f.calls.length, 2);
   assert.equal(f.calls[0].url.searchParams.get('drug_name'), 'cerave am facial moistur');
-  assert.equal(f.calls[0].url.searchParams.get('pagesize'), '6');
+  assert.equal(f.calls[0].url.searchParams.get('pagesize'), '20');
   assert.equal(f.calls[0].url.searchParams.has('ndc'), false);
   for (const call of f.calls) {
     assert.equal(call.url.origin, 'https://dailymed.nlm.nih.gov');
@@ -56,6 +56,82 @@ test('same-brand wrong product and unqualified brand searches are not accepted',
   let called = false;
   const result = await lookupDailyMedIngredients({ ...query, name: 'CeraVe' }, { fetch: async () => { called = true; throw Error(); } });
   assert.equal(result.status, 'incomplete'); assert.equal(called, false);
+});
+
+test('filters more than six complete search results before deciding ambiguity', async () => {
+  const unrelated = Array.from({ length: 8 }, (_, i) => label({ title: `CERAVE OTHER PRODUCT ${i}` }));
+  const f = fake([...unrelated, label()]);
+  assert.equal((await lookupDailyMedIngredients(query, f)).status, 'found');
+  assert.equal(f.calls.length, 2);
+});
+
+test('reads a bounded second page and does not trust provider next-page URLs', async () => {
+  const calls: URL[] = [];
+  const fetcher: typeof fetch = async input => {
+    const url = new URL(String(input)); calls.push(url);
+    if (url.pathname.endsWith('.xml')) return new Response(xml(), { headers: { 'content-type': 'application/xml' } });
+    const page = Number(url.searchParams.get('page') ?? 1);
+    return new Response(JSON.stringify({
+      data: page === 1 ? Array.from({ length: 20 }, (_, i) => label({ title: `CERAVE OTHER ${i}` })) : [label()],
+      metadata: { total_elements: 21, current_page: page, next_page_url: 'https://evil.test' },
+    }), { headers: { 'content-type': 'application/json' } });
+  };
+  assert.equal((await lookupDailyMedIngredients(query, { fetch: fetcher })).status, 'found');
+  assert.equal(calls.length, 3);
+  assert.equal(calls[1].searchParams.get('page'), '2');
+  assert.ok(calls.every(url => url.origin === 'https://dailymed.nlm.nih.gov'));
+  const tooBroad = fake([label()], xml(), 41);
+  assert.equal((await lookupDailyMedIngredients(query, tooBroad)).status, 'ambiguous');
+  assert.equal(tooBroad.calls.length, 1);
+});
+
+test('incomplete or shifting pagination never accepts a first-page match', async () => {
+  for (const second of [
+    { data: [], metadata: { total_elements: 21, current_page: 2 } },
+    { data: [label()], metadata: { total_elements: 22, current_page: 2 } },
+    { data: [label()], metadata: { total_elements: 21, current_page: 1 } },
+  ]) {
+    let calls = 0;
+    const result = await lookupDailyMedIngredients(query, { fetch: async () => {
+      calls++;
+      return new Response(JSON.stringify(calls === 1
+        ? { data: Array.from({ length: 20 }, () => label()), metadata: { total_elements: 21 } } : second),
+      { headers: { 'content-type': 'application/json' } });
+    } });
+    assert.notEqual(result.status, 'found');
+    assert.equal(calls, 2);
+  }
+});
+
+test('marketing words can be absent but deodorant cannot become antiperspirant or spray', async () => {
+  const fresh = { ...query, name: 'Old Spice High Endurance Fresh Scent Deodorant for Men 3.0 Oz', brand: 'Old Spice' };
+  const exact = 'OLD SPICE FRESH HIGH ENDURANCE DEODORANT STICK';
+  assert.equal((await lookupDailyMedIngredients(fresh, fake([label({ title: exact })]))).status, 'found');
+  for (const wrong of [
+    exact.replace('DEODORANT', 'ANTIPERSPIRANT AND DEODORANT'),
+    exact.replace('STICK', '(ALUMINUM CHLOROHYDRATE) STICK'),
+    exact.replace('STICK', 'AEROSOL, SPRAY'),
+    `${exact} FOR WOMEN`,
+    exact.replace('FRESH', 'PURE SPORT'),
+  ]) assert.equal((await lookupDailyMedIngredients(fresh, fake([label({ title: wrong })]))).status, 'not_found');
+  // Sex-labelled hair-growth treatments are not merely deodorant marketing.
+  const hair = { ...query, name: 'Nizoral Hair Regrowth Treatment for Men', brand: 'Nizoral' };
+  assert.equal((await lookupDailyMedIngredients(hair, fake([label({
+    title: 'NIZORAL HAIR REGROWTH TREATMENT FOR WOMEN (MINOXIDIL) FOAM',
+  })]))).status, 'not_found');
+});
+
+test('Nizoral dandruff naming excludes pet and other treatments without choosing duplicate labels', async () => {
+  const nizoral = { ...query, name: 'Nizoral Anti-Dandruff Shampoo', brand: 'Nizoral' };
+  const exact = 'NIZORAL (KETOCONAZOLE) SHAMPOO [KRAMER LABORATORIES]';
+  assert.equal((await lookupDailyMedIngredients(nizoral, fake([label({ title: exact })]))).status, 'found');
+  for (const wrong of ['NIZORAL PET (KETOCONAZOLE) SHAMPOO', 'NIZORAL PSORIASIS (SALICYLIC ACID) SHAMPOO']) {
+    assert.equal((await lookupDailyMedIngredients(nizoral, fake([label({ title: wrong })]))).status, 'not_found');
+  }
+  assert.equal((await lookupDailyMedIngredients(nizoral, fake([
+    label({ title: exact }), label({ title: exact, setid: '11111111-1111-1111-1111-111111111111' }),
+  ]))).status, 'ambiguous');
+  assert.equal((await lookupDailyMedIngredients({ ...nizoral, name: 'Nizoral Anti-Dandruff Shampoo 1%' }, fake([label({ title: exact })]))).status, 'not_found');
 });
 
 test('moisturizer wording is normalized without erasing lotion/cream or SPF variants', async () => {

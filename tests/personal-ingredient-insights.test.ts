@@ -63,7 +63,7 @@ test('dryness goal supports bounded notes but absent ingredient flags are never 
   assert.deepEqual(result.ingredientNames, ['Glycerin', 'Dimethicone', 'Hyaluronic acid']);
   assert.match(result.sentences[0], /reported dryness/);
   const none = buildPersonalIngredientInsights(context({ reactivity: 'reacts_easily' }), [evidence('Water, Sodium chloride')]);
-  assert.match(none.sentences[0], /does not mean the product is irritation-free/);
+  assert.match(none.sentences[0], /does not mean the product cannot irritate your skin/);
 });
 
 test('source lists are not combined into a fictional formula and input work is bounded', () => {

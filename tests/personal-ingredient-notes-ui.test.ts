@@ -10,7 +10,7 @@ test('ingredient guidance stays inline without an external browser action', () =
   assert.match(source, /<IngredientFindings notes=\{notes\} \/>/);
   assert.match(source, /notes\.sentences\.slice\(0, -1\)/);
   assert.match(source, /notes\.sentences\[notes\.sentences\.length - 1\]/);
-  assert.match(source, /Cosmetic guidance—not a diagnosis or a personal-fit rating/);
+  assert.match(source, /Cosmetic guidance, not a diagnosis or a safety verdict/);
 });
 
 test('missing ingredients offer a collapsed accessible editor scoped to the active owner and product', () => {
