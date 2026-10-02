@@ -125,7 +125,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
       onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
-      <BottomSheetScrollView onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
+      <BottomSheetScrollView testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {/* Keep search height stable as loading/helper rows disappear; explicit empty input resets it. */}

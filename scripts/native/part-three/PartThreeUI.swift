@@ -3,7 +3,8 @@ final class PartThreeUI: XCTestCase {
  let app=XCUIApplication(bundleIdentifier:"com.derive.skincare")
  func element(_ label:String)->XCUIElement {app.descendants(matching:.any).matching(NSPredicate(format:"label == %@",label)).firstMatch}
  func contains(_ label:String)->XCUIElement {app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@",label)).firstMatch}
- func tap(_ label:String){let target=element(label);if app.keyboards.firstMatch.exists && app.scrollViews.firstMatch.exists{app.scrollViews.firstMatch.swipeDown()};for _ in 0..<30{if target.exists && target.isHittable{target.tap();return};if app.scrollViews.firstMatch.exists{if target.exists && target.frame.midY < app.scrollViews.firstMatch.frame.minY+12{app.scrollViews.firstMatch.swipeDown()}else{app.scrollViews.firstMatch.swipeUp()}}};XCTFail("Unreachable: \(label)\n\(app.debugDescription)")}
+ func scroll()->XCUIElement{let sheet=app.scrollViews["result-sheet-scroll"].firstMatch;return sheet.exists ? sheet : app.scrollViews.firstMatch}
+ func tap(_ label:String){let target=element(label);if app.keyboards.firstMatch.exists && scroll().exists{scroll().swipeDown()};for _ in 0..<30{if target.exists && target.isHittable{target.tap();return};if scroll().exists{if target.exists && target.frame.midY < scroll().frame.minY+12{scroll().swipeDown()}else{scroll().swipeUp()}}};XCTFail("Unreachable: \(label)\n\(app.debugDescription)")}
  func choose(_ label:String){tap(label);XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"value CONTAINS %@ AND NOT value CONTAINS %@","checked","unchecked"),object:element(label))],timeout:10),.completed,"Choice did not select: \(label)")}
  func shot(_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
  func close(){tap("Close result");XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Close result"))],timeout:10),.completed)}
@@ -47,7 +48,7 @@ final class PartThreeUI: XCTestCase {
   tap("Moisturizing");tap("Face");tap("Leave on");tap("How’s it working for you?");tap("Works well");tap("Continue")
   XCTAssertTrue(contains("Step 4 of 5").waitForExistence(timeout:10));tap("None that I remember");tap("Continue")
   XCTAssertTrue(contains("Step 5 of 5").waitForExistence(timeout:10));tap("Add a confirmed preference");tap("An extra skincare step");tap("Firm constraint");tap("I confirm this choice and its strength");tap("Use confirmed preference")
-  let note=app.textViews.matching(NSPredicate(format:"label BEGINSWITH %@","Anything else")).firstMatch;for _ in 0..<12{if note.isHittable{break};app.scrollViews.firstMatch.swipeUp()};XCTAssertTrue(note.exists);note.tap();note.typeText("Synthetic private setup note; no hidden ingredient inference.")
+  let note=app.textViews.matching(NSPredicate(format:"label BEGINSWITH %@","Anything else")).firstMatch;for _ in 0..<12{if note.isHittable{break};scroll().swipeUp()};XCTAssertTrue(note.exists);note.tap();note.typeText("Synthetic private setup note; no hidden ingredient inference.")
   tap("Done editing note");shot("part-three-five-step-explicit-save-disclosure");tap("Save skin setup")
   XCTAssertTrue(contains("Atomic five-step setup saved and reopened from SQL").waitForExistence(timeout:25),app.debugDescription)
   let completed=DispatchSemaphore(value:0);var responseJSON:[String:Any]?;var responseStatus:Int?
@@ -70,9 +71,9 @@ final class PartThreeUI: XCTestCase {
   let read=try controlRequest("/setup-result");XCTAssertEqual(read["revision"] as? Int,2);XCTAssertEqual((read["preferences"] as? [[String:Any]])?.count,1);XCTAssertEqual((read["preferences"] as? [[String:Any]])?.first?["kind"] as? String,"no_extra_step");XCTAssertEqual((read["current"] as? [[String:Any]])?.first?["name"] as? String,"Synthetic setup current lotion");XCTAssertEqual(read["noteCount"] as? Int,1);shot("part-three-native-stale-context-draft-retained");tap("Back")
  }
  func testUsabilityLargeTextAndLongName() throws {
-  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};tap("Load long-name Part3 fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));tap("Product result")
+  continueAfterFailure=false;app.activate();XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);tap("Product result")
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription)
-  let labels=app.staticTexts.allElementsBoundByIndex.map{$0.label};let name=try XCTUnwrap(labels.firstIndex(where:{$0.contains("deliberately long multilingual product name")}));let judgment=try XCTUnwrap(labels.firstIndex(of:"Not enough info"));let reason=try XCTUnwrap(labels.firstIndex(where:{$0.contains("Purpose, application site or use form needs clarification.")}));let scope=try XCTUnwrap(labels.firstIndex(of:"Published list · Package not confirmed"));XCTAssertLessThan(name,judgment);XCTAssertLessThan(judgment,reason);XCTAssertLessThan(reason,scope)
+  let labels=app.staticTexts.allElementsBoundByIndex.map{$0.label};let name=try XCTUnwrap(labels.firstIndex(where:{$0.contains("deliberately long multilingual product name")}));let judgment=try XCTUnwrap(labels.firstIndex(of:"Not enough info"));let reason=try XCTUnwrap(labels.firstIndex(where:{$0.contains("The available evidence cannot support a judgment for this purpose.")}));let scope=try XCTUnwrap(labels.firstIndex(of:"Published list · Package not confirmed"));XCTAssertLessThan(name,judgment);XCTAssertLessThan(judgment,reason);XCTAssertLessThan(reason,scope)
   shot("part-three-large-text-long-name-first-card");tap("Compare or describe this check");choose("Moisturizing");choose("Face");choose("Leave on");XCTAssertFalse(contains("Worth considering").exists);shot("part-three-large-text-controls-reachable-without-color-authority");close()
  }
 
