@@ -1,5 +1,5 @@
 import type { CatalogProductDetail, CatalogProductSummary } from '../contracts/ProductCatalog.ts';
-import type { ProductResolutionResult, ResolveProductIdentityInput } from '../contracts/ProductIdentityResolver.ts';
+import type { ContinueProductIngredientsInput, ContinueProductIngredientsResult, ProductResolutionResult, ResolveProductIdentityInput } from '../contracts/ProductIdentityResolver.ts';
 import { ProductCategorySchema } from '../types/schema.ts';
 import { supabase } from './supabase.ts';
 import { parseProductTruthSnapshot } from '../contracts/productTruthValidation.ts';
@@ -62,10 +62,11 @@ export async function getCatalogProductDetail(productId: string, client?: any): 
 }
 
 export async function resolveCatalogIdentity(
-  input: ResolveProductIdentityInput,
+  input: ResolveProductIdentityInput | ContinueProductIngredientsInput,
   client?: any,
 ): Promise<ProductResolutionResult> {
-  if (!UUID.test(input.requestId) || (input.consumer !== 'scan' && input.consumer !== 'shelf')) {
+  if (!UUID.test(input.requestId) || ('consumer' in input ? input.consumer !== 'scan' && input.consumer !== 'shelf'
+    : !UUID.test(input.rootCaseId) || !UUID.test(input.parentSnapshotId))) {
     throw new Error('Invalid product resolution request');
   }
   const { data, error } = await catalogClient(client).functions.invoke('resolve-product-identity', {
@@ -96,4 +97,12 @@ export function createCatalogRequestId(): string {
     const random = Math.floor(Math.random() * 16);
     return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
   });
+}
+
+/** Same-root child snapshot only; a photo alone does not verify a formula. */
+export async function continueCatalogIngredients(input: ContinueProductIngredientsInput, client?: any): Promise<ContinueProductIngredientsResult> {
+  const result = await resolveCatalogIdentity(input, client) as ContinueProductIngredientsResult;
+  if (result.attemptId !== input.rootCaseId || result.attemptRevision !== 2 || result.parentSnapshotId !== input.parentSnapshotId
+    || !result.truthSnapshot || result.caseId === input.rootCaseId) throw new Error('Ingredient continuation could not be confirmed');
+  return result;
 }

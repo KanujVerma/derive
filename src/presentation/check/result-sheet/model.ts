@@ -29,12 +29,13 @@ export interface RequestedEvidenceAction {
   binding: SheetBinding;
 }
 export type SheetInput = { kind: 'loading'; ownerId: string | null; scanId: string }
-  | { kind: 'error'; ownerId: string | null; scanId: string } | {
+  | { kind: 'error'; ownerId: string | null; scanId: string }
+  | { kind: 'unknown'; ownerId: string | null; scanId: string } | {
   kind: 'snapshot'; snapshot: ProductTruthSnapshotV1; ownerId?: string | null;
   catalogProduct?: CatalogProductSummary | null; localCustomerPhoto?: LocalCustomerPhoto | null;
   resolverResult?: ProductResolutionResult | null;
 };
-export type SheetModel = { kind: 'loading' | 'error'; title: string; detail: string;
+export type SheetModel = { kind: 'loading' | 'error' | 'unknown'; title: string; detail: string;
   ownerId: string | null; scanId: string } | {
   kind: 'result'; title: string; brand: string | null; status: string; detail: string;
   nextAction: string; image: SheetImage; binding: SheetBinding;
@@ -90,6 +91,8 @@ function requestedEvidenceFor(snapshot: ProductTruthSnapshotV1, binding: SheetBi
 export function buildScanResultSheet(input: SheetInput): SheetModel {
   if (input.kind === 'loading') return { kind: 'loading', title: 'Checking product', detail: 'Checking available evidence.', ownerId: input.ownerId, scanId: input.scanId };
   if (input.kind === 'error') return { kind: 'error', title: 'Could not check', detail: 'Try again or search by name.', ownerId: input.ownerId, scanId: input.scanId };
+
+  if (input.kind === 'unknown') return { kind: 'unknown', title: 'No verified match for this barcode.', detail: 'Product and formula are unverified.', ownerId: input.ownerId, scanId: input.scanId };
 
   const { snapshot } = input;
   const binding = bindingFor(input.ownerId ?? null, snapshot);

@@ -3,6 +3,7 @@ import type { ProductResolutionResult } from '../../contracts/ProductIdentityRes
 
 export interface CheckCaptureHandoff {
   authority: 'customer_evidence';
+  evidence?: CaptureEvidence[];
   barcodeLookup: { barcode: string } | null;
   localPhotos: { role: PhotoRole; uri: string }[];
   review: {
@@ -27,6 +28,7 @@ export function mapCaptureForCheck(handoff: CaptureHandoff, outcome?: CaptureRes
 
   return {
     authority: 'customer_evidence',
+    evidence: handoff.evidence.map(item => ({ ...item })),
     // Mixed evidence must use the reviewed case, not Check's barcode-only fast path.
     barcodeLookup: !localPhotos.length && barcode && /^\d{8,14}$/.test(barcode) ? { barcode } : null,
     localPhotos,

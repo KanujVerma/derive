@@ -6,6 +6,8 @@ import { Script } from 'node:vm';
 import test from 'node:test';
 import React from 'react';
 import ts from 'typescript';
+import { createCatalogSearchController } from '../src/presentation/catalog/searchController.ts';
+import { verifiedProductTruth } from '../src/fixtures/product-truth/snapshots.ts';
 import { personalDecisionFixtures } from '../src/fixtures/personal-decision/fixtures.ts';
 
 // React Native cannot execute in Node. Replace only host/native primitives;
@@ -15,8 +17,12 @@ const { renderToStaticMarkup } = require('react-dom/server') as { renderToStatic
 const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
 function renderer(interactive = false) {
   const cache = new Map<string, { exports: any }>();
-  const native = (tag: string) => ({ children }: any) => React.createElement(tag, {}, children);
+  const views: any[] = [];
+  const native = (tag: string) => (props: any) => { views.push(props); return React.createElement(tag, {}, props.children); };
   const sheets: any[] = [];
+  const effects: Array<() => any> = [];
+  const captures: any[] = [];
+  const appState = { currentState: 'active', listener: (_state: string) => {} };
   const pressables: any[] = [], state: any[] = [];
   let stateCursor = 0;
   const modalScopes: any[] = [], scrollScopes: any[] = [];
@@ -28,18 +34,23 @@ function renderer(interactive = false) {
     if (cache.has(file)) return cache.get(file)!.exports;
     const module = { exports: {} as any }; cache.set(file, module);
     const dependency = (name: string): any => {
-      if (name === 'react' && interactive) return { ...React, useState: (initial: any) => {
+      if (name === 'react' && interactive) return { ...React, useRef: (initial: any) => { const index = stateCursor++; if (!(index in state)) state[index] = { current: initial }; return state[index]; }, useEffect: (effect: () => any) => { effects.push(effect); }, useSyncExternalStore: (_subscribe: any, getState: any) => getState(), useState: (initial: any) => {
         const index = stateCursor++;
         if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial;
         return [state[index], (next: any) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
       } };
       if (name === 'react-native') return { Modal: native('div'), KeyboardAvoidingView: native('div'), View: native('div'), Text: native('span'), Image: native('img'), ActivityIndicator: native('i'), ScrollView: native('div'),
+        Keyboard: { dismiss() {} }, AppState: { currentState: appState.currentState, addEventListener: (_event: string, listener: (state: string) => void) => { appState.listener = listener; return { remove: () => {} }; } },
         StyleSheet: { create: (value: unknown) => value, absoluteFill: {}, hairlineWidth: 1 }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ height: 844, width: 390, fontScale: 1 }), AccessibilityInfo: {}, findNodeHandle: () => null,
+        TextInput: native('input'), TouchableOpacity: (props: any) => { pressables.push(props); return React.createElement('button', {}, props.children); },
         Pressable: (props: any) => { pressables.push(props); return React.createElement('button', {}, props.children); } };
       if (name === 'react-native-safe-area-context') return { SafeAreaProvider: native('div'), useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }) };
       if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: (props: any) => { modalScopes.push(props); return React.createElement('div', {}, props.children); } };
       if (name === 'react-native-reanimated') return { ReduceMotion: { System: 'system' } };
       if (name === '@gorhom/bottom-sheet') return { __esModule: true, default: sheet, BottomSheetScrollView: (props: any) => { scrollScopes.push(props); return React.createElement('div', {}, props.children); }, BottomSheetBackdrop: native('div') };
+      if (name.endsWith('/ProductEvidenceCapture')) return { ProductEvidenceCapture: (props: any) => { captures.push(props); return React.createElement('div'); } };
+      if (name.endsWith('/liveFreeEvidenceProcessor')) return { createLiveFreeEvidenceProcessor: () => { throw new Error('Live capture must not run in host fixture'); } };
+      if (name.endsWith('/services/productCatalog')) return { searchCatalogProducts: async () => { throw new Error('Default lookup must not run in host fixture'); } };
       if (name.endsWith('/Icon')) return { Icon: native('i') };
       if (name.endsWith('/Button')) return { Button: ({ label }: any) => React.createElement('button', {}, label) };
       if (name.startsWith('.') || name.startsWith('@/')) return load(name.startsWith('@/') ? name.slice(2) : resolve(dirname(file), name));
@@ -49,8 +60,8 @@ function renderer(interactive = false) {
     new Script(`(function(require,module,exports){${js}\n})`, { filename: file }).runInThisContext()(dependency, module, module.exports);
     return module.exports;
   }
-  return { load, sheets, modalScopes, scrollScopes, pressables, render: (component: any, props: any) => {
-    stateCursor = 0; pressables.length = 0;
+  return { load, views, sheets, modalScopes, scrollScopes, pressables, effects, captures, appState, render: (component: any, props: any) => {
+    stateCursor = 0; pressables.length = 0; views.length = 0;
     return renderToStaticMarkup(React.createElement(component, props));
   } };
 }
@@ -206,4 +217,141 @@ test('compact fold contains only the complete identity and fixed four-state verd
     assert.equal(r.pressables.length, 0, 'verdict has no disclosure or tap action');
     assert.doesNotMatch(html, /Source|For your dryness|In your routine|Texture<\/span>/);
   }
+});
+
+test('an unresolved result has an honest compact summary before the recovery swipe', () => {
+  const r = renderer();
+  const { CheckResultPresentation } = r.load('src/components/check/result-sheet/CheckResultPresentation');
+  const html = r.render(CheckResultPresentation, { visible: true, input: null, presentationKey: 'unknown', onClose: () => {} });
+  assert.match(html, /Product and formula are unverified/);
+});
+
+test('the actual search view exposes loading cancellation, retry and one selection after recovery', async () => {
+  const r = renderer(true);
+  const { CatalogProductSearch } = r.load('src/components/catalog/CatalogProductSearch');
+  let resolve!: (items: any[]) => void;
+  let calls = 0, selected = 0;
+  const item = { productId: 'sample', brand: 'Example', name: 'Exact variant', category: 'cleanser', imageUrl: null };
+  const controller = createCatalogSearchController<any>(async () => {
+    calls++;
+    if (calls === 2) throw new Error('private transport failure');
+    return await new Promise<any[]>(done => { resolve = done; });
+  });
+  const props = { controller, onSelect: () => { selected++; }, preserveSelection: true };
+  controller.setQuery('Example');
+  const pending = controller.submit();
+  assert.match(r.render(CatalogProductSearch, props), /Searching products/);
+  r.pressables.find(p => p.accessibilityLabel === 'Cancel product search').onPress();
+  resolve([item]); await pending;
+  assert.deepEqual(controller.snapshot().items, []);
+  assert.match(r.render(CatalogProductSearch, props), /Search again/);
+  await r.pressables.find(p => p.accessibilityLabel === 'Resume product search').onPress();
+  await Promise.resolve();
+  const failed = r.render(CatalogProductSearch, props);
+  assert.match(failed, /Search is unavailable/); assert.match(failed, /Retry/);
+  assert.doesNotMatch(failed, /private transport failure/);
+  r.pressables.find(p => p.accessibilityLabel === 'Retry product search').onPress();
+  resolve([item]); await Promise.resolve(); await Promise.resolve();
+  r.render(CatalogProductSearch, props);
+  const action = r.pressables.find(p => p.accessibilityLabel === 'Add Example Exact variant');
+  assert.ok(action);
+  action.onPress(); action.onPress();
+  assert.equal(selected, 1);
+  controller.releaseSelection(); action.onPress();
+  assert.equal(selected, 2);
+  controller.dispose();
+});
+
+test('the actual capture host pauses detection and delivers interrupted evidence once on foreground', () => {
+  const r = renderer(true);
+  const { CheckCaptureHost } = r.load('src/components/check/capture/CheckCaptureHost');
+  let handedOff = 0;
+  const props = { live: false, onClose: () => {}, onCaptureReady: () => { handedOff++; } };
+  r.render(CheckCaptureHost, props);
+  r.effects.forEach(effect => effect());
+  const capture = r.captures.at(-1);
+  const evidence = { evidence: [{ kind: 'barcode', role: 'barcode', value: '036000291452' }] };
+  r.appState.listener('background');
+  capture.onEvidenceReady(evidence);
+  assert.equal(handedOff, 0);
+  r.render(CheckCaptureHost, props);
+  assert.equal(r.captures.at(-1).detectionPaused, true);
+  r.appState.listener('active');
+  assert.equal(handedOff, 1, 'completed evidence resumes without another shutter or scan');
+  capture.onEvidenceReady(evidence);
+  r.appState.listener('active');
+  assert.equal(handedOff, 1, 'duplicate callbacks and foreground events cannot redeliver');
+});
+
+test('compact recovery is visible before any swipe and inline search replaces the same surface', () => {
+  const r = renderer();
+  const { CheckResultPresentation } = r.load('src/components/check/result-sheet/CheckResultPresentation');
+  const props = { visible: true, input: null, presentationKey: 'retained-case', onClose() {},
+    compactActions: React.createElement('button', {}, 'Photograph package'), children: React.createElement('p', {}, 'Expanded provenance') };
+  const compact = r.render(CheckResultPresentation, props);
+  assert.match(compact, /Photograph package/); assert.doesNotMatch(compact, /Expanded provenance/);
+  const replaced = r.render(CheckResultPresentation, { ...props, replacement: React.createElement('p', {}, 'Back to result / Search by name') });
+  assert.match(replaced, /Back to result/); assert.doesNotMatch(replaced, /Product not confirmed|Photograph package|Expanded provenance/);
+  const restored = r.render(CheckResultPresentation, props);
+  assert.match(restored, /Product not confirmed/); assert.match(restored, /Photograph package/);
+});
+
+test('a bound ingredient action is immediately visible and rejects another owner before capture', () => {
+  const r = renderer();
+  const { ScanResultSheet } = r.load('src/components/check/result-sheet/ScanResultSheet');
+  const { buildScanResultSheet } = r.load('src/presentation/check/result-sheet/model');
+  const snapshot = { ...verifiedProductTruth, formula: null, catalogReferences: { ...verifiedProductTruth.catalogReferences, formulaVersionId: null }, state: 'identified_formula_unverified', nextRequiredEvidence: 'ingredients' };
+  const resolution = { caseId: snapshot.resolutionCaseId, state: snapshot.state, product: snapshot.product, candidates: [], nextAction: 'photograph_ingredients', truthSnapshot: snapshot };
+  const model = buildScanResultSheet({ kind: 'snapshot', snapshot, resolverResult: resolution, ownerId: 'owner-a' });
+  let actions = 0;
+  const props = { model, currentOwnerId: 'owner-a', currentSnapshot: snapshot, currentResolverResult: resolution,
+    currentScanId: 'scan-a', onDismiss() {}, onAddRequestedEvidence() { actions++; } };
+  assert.match(r.render(ScanResultSheet, props), /Photograph ingredients/);
+  r.pressables.find(p => p.accessibilityLabel === 'Photograph ingredients').onPress();
+  assert.equal(actions, 1);
+  assert.equal(r.render(ScanResultSheet, { ...props, currentOwnerId: 'owner-b' }), '');
+});
+
+test('native result surface uses registered keyboard interaction and keeps dismiss/restore guards', () => {
+  const r = renderer(); const { CheckResultPresentation } = r.load('src/components/check/result-sheet/CheckResultPresentation');
+  r.render(CheckResultPresentation, { visible: true, input: null, presentationKey: 'keyboard', onClose() {}, compactActions: React.createElement('input') });
+  const sheet = r.sheets.at(-1);
+  assert.equal(sheet.keyboardBehavior, 'interactive'); assert.equal(sheet.keyboardBlurBehavior, 'restore');
+  assert.equal(sheet.enableBlurKeyboardOnGesture, true);
+});
+test('host rearms one handoff per explicit resume without remounting or delivering old background evidence', () => {
+  const r = renderer(true); const { CheckCaptureHost } = r.load('src/components/check/capture/CheckCaptureHost');
+  let count = 0; const props = { live: false, onClose() {}, onCaptureReady() { count++; }, resumeKey: 0 };
+  r.render(CheckCaptureHost, props); r.effects.forEach(effect => effect());
+  const evidence = { evidence: [{ kind: 'barcode', role: 'barcode', value: '036000291452' }] };
+  r.captures.at(-1).onEvidenceReady(evidence); assert.equal(count, 1);
+  r.render(CheckCaptureHost, { ...props, resumeKey: 1 });
+  r.appState.listener('background'); r.captures.at(-1).onEvidenceReady(evidence);
+  r.render(CheckCaptureHost, { ...props, resumeKey: 2 }); r.appState.listener('active'); assert.equal(count, 1);
+  r.captures.at(-1).onEvidenceReady(evidence); r.captures.at(-1).onEvidenceReady(evidence); assert.equal(count, 2);
+});
+
+
+test('direct Search has one content detent, no empty details, and stable height through typing status changes', () => {
+  const r = renderer(true);
+  const { ScanResultSheet } = r.load('src/components/check/result-sheet/ScanResultSheet');
+  const { buildScanResultSheet } = r.load('src/presentation/check/result-sheet/model');
+  const props = { model: buildScanResultSheet({ kind: 'unknown', ownerId: 'owner-a', scanId: 'search-a' }),
+    currentOwnerId: 'owner-a', currentSnapshot: null, currentResolverResult: null, currentScanId: 'search-a',
+    searchOnly: true, searchEmpty: false, onDismiss() {}, compactActions: React.createElement('input'),
+    children: React.createElement('p', {}, 'Not a product result yet') };
+  let html = r.render(ScanResultSheet, props);
+  assert.doesNotMatch(html, /Not enough information|Not a product result yet/);
+  assert.equal(r.sheets.at(-1).snapPoints.length, 1, 'interactive keyboard cannot lift to a full-result detent');
+  assert.ok(r.sheets.at(-1).snapPoints[0] <= 200, 'empty search occupies its compact content');
+  const measure = (height: number) => r.views.find(p => p.onLayout && String(p.onLayout).includes('setSummaryHeight')).onLayout({ nativeEvent: { layout: { height } } });
+  measure(280); r.render(ScanResultSheet, props);
+  const withResults = r.sheets.at(-1).snapPoints[0];
+  assert.ok(withResults > 300, 'results grow the same search surface');
+  measure(90); r.render(ScanResultSheet, props);
+  assert.equal(r.sheets.at(-1).snapPoints[0], withResults, 'typing/loading rows cannot shrink and bounce the sheet');
+  const handle = r.sheets.at(-1).handleComponent({});
+  assert.equal(handle.props.style.paddingTop, handle.props.style.paddingHorizontal, 'X center has equal top/right inset');
+  const close = handle.props.children[1];
+  assert.equal(close.props.style.width, 44); assert.equal(close.props.style.height, 44);
 });

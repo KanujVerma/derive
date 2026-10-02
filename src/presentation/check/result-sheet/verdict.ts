@@ -22,13 +22,29 @@ const title: Record<Finding['kind'], string> = {
   active_overlap: 'A combination to review', reactive_active: 'Your skin reactivity',
   reported_ingredient_sensitivity: 'A reported sensitivity', prior_product_reaction: 'A past product report',
   reproductive_context_caution: 'Relevant personal context', routine_experience_caution: 'A current product report',
-  formula_changed: 'A different formula', missing_evidence: 'What is still unknown', no_supported_rule: 'Evidence limits',
+  formula_changed: 'Earlier product experience', missing_evidence: 'What is still unknown', no_supported_rule: 'Evidence limits',
 };
 const directConflict = new Set<Finding['kind']>(['reported_ingredient_sensitivity', 'prior_product_reaction', 'reproductive_context_caution']);
 const tradeoffKinds = new Set<Finding['kind']>(['role_redundancy', 'active_overlap', 'reactive_active', 'routine_experience_caution']);
 
+/** A variant mismatch is not proof of a changed formula. Compare retained IDs only. */
+function historicalFormulaCopy(finding: Finding, packet: PersonalDecisionPacketV1): string {
+  const historyIds = finding.evidence.flatMap(e => e.kind === 'context_fact' && e.section === 'history' ? [e.recordId] : []);
+  const reports = packet.findings.filter(f => f.display?.kind === 'prior_reaction'
+    && historyIds.includes(f.display.historyEventId));
+  const currentId = packet.binding.formulaVersionId;
+  const recordedIds = reports.map(f => f.display?.kind === 'prior_reaction' ? f.display.historicalFormulaVersionId : null);
+  if (currentId && recordedIds.length > 0 && recordedIds.every(id => id === currentId)) {
+    return 'Your earlier report names the same recorded formula. A different package or variant may be involved. Tolerance of this package is still unknown.';
+  }
+  if (currentId && recordedIds.length > 0 && recordedIds.every(id => id && id !== currentId)) {
+    return 'Your earlier report concerns a different recorded formula. It does not establish tolerance of this package formula.';
+  }
+  return 'The historical formula comparison is unknown. Earlier product experience does not establish tolerance of this package formula.';
+}
+
 /** Copy uses retained structured fields only. It neither evaluates ingredients nor generates a verdict. */
-function reason(finding: Finding, fallback: string, intent?: CheckPresentationIntent): string {
+function reason(finding: Finding, fallback: string, intent?: CheckPresentationIntent, packet?: PersonalDecisionPacketV1): string {
   const d = finding.display;
   if (d?.kind === 'role_match') return `This ${d.category} matches your ${goals[d.goal] ?? 'skin'} goal.`;
   if (d?.kind === 'routine_relation') {
@@ -50,7 +66,7 @@ function reason(finding: Finding, fallback: string, intent?: CheckPresentationIn
   if (d?.kind === 'routine_experience') return d.outcome === 'reaction'
     ? 'You reported a reaction to a product already in your routine. That does not establish a reaction to this new product.'
     : 'You said a current product was not helping. That does not establish that this replacement will work better.';
-  if (finding.kind === 'formula_changed') return 'Your earlier report concerns a different formula. Tolerance of this formula is still unknown.';
+  if (finding.kind === 'formula_changed' && packet) return historicalFormulaCopy(finding, packet);
   if (d?.kind === 'evidence_gap' && d.code === 'routine_completeness') return 'Your routine is not fully recorded, so overlap is still unknown.';
   return fallback.replaceAll(';', '.');
 }
@@ -85,7 +101,7 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
   const groups = view.detailGroups;
   const findings = active.filter(f => f.kind !== 'no_supported_rule' || f.evidence.length > 0).map(f => {
     const group = groups.find(g => g.findingIds.includes(f.id));
-    return { id: f.id, title: title[f.kind], reason: reason(f, group?.reason ?? view.primaryReason, options.intent),
+    return { id: f.id, title: title[f.kind], reason: reason(f, group?.reason ?? view.primaryReason, options.intent, packet),
       evidence: f.evidence.map(evidence).filter((e): e is NonNullable<typeof e> => e !== null),
       limits: [...new Set([...f.uncertainty, ...f.evidence.flatMap(e => e.kind === 'reviewed_claim' ? e.limitations : []), ...packet.evidenceNeeds.filter(n => f.evidenceNeedIds.includes(n.id)).map(n => {
         if (n.code === 'routine_completeness') return 'An unrecorded routine does not mean you have no routine.';
@@ -97,14 +113,17 @@ export function describeDecisionVerdict(value: unknown, expectedBinding: Decisio
     const rank = (id: string) => { const kind = active.find(f => f.id === id)!.kind; return kind === 'goal_role_match' ? 0 : ['replacement_candidate', 'role_redundancy'].includes(kind) ? 1 : 2; };
     return rank(a.id) - rank(b.id);
   });
-  let summary = deciding ? reason(deciding, view.primaryReason, options.intent) : view.primaryReason.replaceAll(';', '.');
+  let summary = deciding ? reason(deciding, view.primaryReason, options.intent, packet) : view.primaryReason.replaceAll(';', '.');
   if (state === 'unknown') {
     if (routineRole && !packet.evidenceNeeds.some(n => n.critical)) summary = reason(routineRole, view.primaryReason, options.intent);
     const gap = packet.evidenceNeeds.find(n => n.critical);
     if (gap?.code === 'verified_formula' || gap?.code === 'formula_conflict') summary = 'The ingredient list for your exact package has not been verified.';
     else if (gap?.code === 'routine_completeness') summary = 'Your routine is not fully recorded, so placement and overlap are still unknown.';
     else if (gap?.code === 'supported_rule' || gap?.code === 'reviewed_claim') summary = 'There is not enough supported evidence to assess this product for your goal.';
-    else if (gap?.code === 'current_formula_experience') summary = 'Your earlier report concerns a different formula. Tolerance of this formula is still unknown.';
+    else if (gap?.code === 'current_formula_experience') {
+      const historical = active.find(f => f.kind === 'formula_changed');
+      summary = historical ? historicalFormulaCopy(historical, packet) : 'The historical formula comparison is unknown. Tolerance of this package formula is still unknown.';
+    }
   }
   if (state === 'poor' && packet.evidenceNeeds.some(n => n.critical && n.code === 'verified_formula')) {
     summary = 'You reported a reaction to this product. Its current package formula is also unverified.';

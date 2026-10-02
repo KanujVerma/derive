@@ -12,7 +12,15 @@ Main already implements [per-Check intent authority](../P0_B_CHECK_INTENT.md): e
 
 Reconciliation preserves Sami's hosted scanner routing, indexed ingredient resolver, and existing owner/input-fenced product-link controller. Only a validated link resolution reaches the immutable product-truth gate; published labels, retailer IDs and unsupported links remain recovery. Existing live context/routine/history and saved-product APIs retain their boundaries. No backend, database, Auth/RLS, analytics, billing or hosted activation change is part of this UI publication.
 
+## Result recovery consolidation
+
+The current [UX-only publication](../acceptance/UX_ONLY_PUBLICATION_2026_10_02.md) consolidates capture outcomes into one compact result and direct catalog search, preserves query/candidates and origin, and separates service errors from evidence gaps. Camera Search uses one measured keyboard detent; raw-name fallback and the normal examples link are absent. Barcode-only MVP sets photo capability false. Existing owner/root/snapshot-bound ingredient continuation and local package review remain dormant; no generic existing-case append contract or photo recognition exists. The isolated suite passes990 tests, both typechecks and web/iOS exports. Prior phone evidence and unrun native optical/live gates are distinguished. Analytics work remains separate; no backend or hosted activation.
+
 ## Remaining wiring and founder decisions
+
+The bounded search/scan return pass based on main `7efb9ce446c6b7b54b3803fa85522b47da2a05ee` now preserves Check's search query/list across camera entry, exposes cancel/retry/resume, fences stale requests and duplicate selection, and supplies honest manual/no-match recovery. Dismiss re-arms the existing capture session; an unknown barcode has a transient scan-bound sheet. Background completed evidence is held locally and delivered once on foreground. [Dated acceptance](../acceptance/SEARCH_SCAN_RETURN_2026_10_01.md) separates automated, rendered, simulator and unrun physical evidence, records Library identities and the exact8084 preview. It is local-only, with parent screenshot review and physical camera acceptance pending.
+
+Historical copy now compares retained structured formula IDs instead of treating variant mismatch as a formula change. Missing historical IDs remain unknown comparison; same/different recorded IDs do not prove package tolerance. Some tolerated historical packets lack that structured prior ID, so Sami's contract enrichment remains a handoff. No evaluator action or reformulation verdict policy changes in this pass.
 
 - Per-Check intent transport exists, but the live question/host composition still needs an approved bounded integration. A continuation into another case must explicitly carry the same attempt's intent when justified.
 - An explicit per-Check replacement target and its immutable owner/revision binding are absent.
