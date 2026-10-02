@@ -17,7 +17,8 @@ const { renderToStaticMarkup } = require('react-dom/server') as { renderToStatic
 const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
 function renderer(interactive = false) {
   const cache = new Map<string, { exports: any }>();
-  const native = (tag: string) => ({ children }: any) => React.createElement(tag, {}, children);
+  const views: any[] = [];
+  const native = (tag: string) => (props: any) => { views.push(props); return React.createElement(tag, {}, props.children); };
   const sheets: any[] = [];
   const effects: Array<() => any> = [];
   const captures: any[] = [];
@@ -33,13 +34,13 @@ function renderer(interactive = false) {
     if (cache.has(file)) return cache.get(file)!.exports;
     const module = { exports: {} as any }; cache.set(file, module);
     const dependency = (name: string): any => {
-      if (name === 'react' && interactive) return { ...React, useEffect: (effect: () => any) => { effects.push(effect); }, useSyncExternalStore: (_subscribe: any, getState: any) => getState(), useState: (initial: any) => {
+      if (name === 'react' && interactive) return { ...React, useRef: (initial: any) => { const index = stateCursor++; if (!(index in state)) state[index] = { current: initial }; return state[index]; }, useEffect: (effect: () => any) => { effects.push(effect); }, useSyncExternalStore: (_subscribe: any, getState: any) => getState(), useState: (initial: any) => {
         const index = stateCursor++;
         if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial;
         return [state[index], (next: any) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
       } };
       if (name === 'react-native') return { Modal: native('div'), KeyboardAvoidingView: native('div'), View: native('div'), Text: native('span'), Image: native('img'), ActivityIndicator: native('i'), ScrollView: native('div'),
-        AppState: { currentState: appState.currentState, addEventListener: (_event: string, listener: (state: string) => void) => { appState.listener = listener; return { remove: () => {} }; } },
+        Keyboard: { dismiss() {} }, AppState: { currentState: appState.currentState, addEventListener: (_event: string, listener: (state: string) => void) => { appState.listener = listener; return { remove: () => {} }; } },
         StyleSheet: { create: (value: unknown) => value, absoluteFill: {}, hairlineWidth: 1 }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ height: 844, width: 390, fontScale: 1 }), AccessibilityInfo: {}, findNodeHandle: () => null,
         TextInput: native('input'), TouchableOpacity: (props: any) => { pressables.push(props); return React.createElement('button', {}, props.children); },
         Pressable: (props: any) => { pressables.push(props); return React.createElement('button', {}, props.children); } };
@@ -59,8 +60,8 @@ function renderer(interactive = false) {
     new Script(`(function(require,module,exports){${js}\n})`, { filename: file }).runInThisContext()(dependency, module, module.exports);
     return module.exports;
   }
-  return { load, sheets, modalScopes, scrollScopes, pressables, effects, captures, appState, render: (component: any, props: any) => {
-    stateCursor = 0; pressables.length = 0;
+  return { load, views, sheets, modalScopes, scrollScopes, pressables, effects, captures, appState, render: (component: any, props: any) => {
+    stateCursor = 0; pressables.length = 0; views.length = 0;
     return renderToStaticMarkup(React.createElement(component, props));
   } };
 }
@@ -222,7 +223,7 @@ test('an unresolved result has an honest compact summary before the recovery swi
   const r = renderer();
   const { CheckResultPresentation } = r.load('src/components/check/result-sheet/CheckResultPresentation');
   const html = r.render(CheckResultPresentation, { visible: true, input: null, presentationKey: 'unknown', onClose: () => {} });
-  assert.match(html, /Product identity is not confirmed/);
+  assert.match(html, /Product and formula are unverified/);
 });
 
 test('the actual search view exposes loading cancellation, retry and one selection after recovery', async () => {
@@ -309,4 +310,48 @@ test('a bound ingredient action is immediately visible and rejects another owner
   r.pressables.find(p => p.accessibilityLabel === 'Photograph ingredients').onPress();
   assert.equal(actions, 1);
   assert.equal(r.render(ScanResultSheet, { ...props, currentOwnerId: 'owner-b' }), '');
+});
+
+test('native result surface uses registered keyboard interaction and keeps dismiss/restore guards', () => {
+  const r = renderer(); const { CheckResultPresentation } = r.load('src/components/check/result-sheet/CheckResultPresentation');
+  r.render(CheckResultPresentation, { visible: true, input: null, presentationKey: 'keyboard', onClose() {}, compactActions: React.createElement('input') });
+  const sheet = r.sheets.at(-1);
+  assert.equal(sheet.keyboardBehavior, 'interactive'); assert.equal(sheet.keyboardBlurBehavior, 'restore');
+  assert.equal(sheet.enableBlurKeyboardOnGesture, true);
+});
+test('host rearms one handoff per explicit resume without remounting or delivering old background evidence', () => {
+  const r = renderer(true); const { CheckCaptureHost } = r.load('src/components/check/capture/CheckCaptureHost');
+  let count = 0; const props = { live: false, onClose() {}, onCaptureReady() { count++; }, resumeKey: 0 };
+  r.render(CheckCaptureHost, props); r.effects.forEach(effect => effect());
+  const evidence = { evidence: [{ kind: 'barcode', role: 'barcode', value: '036000291452' }] };
+  r.captures.at(-1).onEvidenceReady(evidence); assert.equal(count, 1);
+  r.render(CheckCaptureHost, { ...props, resumeKey: 1 });
+  r.appState.listener('background'); r.captures.at(-1).onEvidenceReady(evidence);
+  r.render(CheckCaptureHost, { ...props, resumeKey: 2 }); r.appState.listener('active'); assert.equal(count, 1);
+  r.captures.at(-1).onEvidenceReady(evidence); r.captures.at(-1).onEvidenceReady(evidence); assert.equal(count, 2);
+});
+
+
+test('direct Search has one content detent, no empty details, and stable height through typing status changes', () => {
+  const r = renderer(true);
+  const { ScanResultSheet } = r.load('src/components/check/result-sheet/ScanResultSheet');
+  const { buildScanResultSheet } = r.load('src/presentation/check/result-sheet/model');
+  const props = { model: buildScanResultSheet({ kind: 'unknown', ownerId: 'owner-a', scanId: 'search-a' }),
+    currentOwnerId: 'owner-a', currentSnapshot: null, currentResolverResult: null, currentScanId: 'search-a',
+    searchOnly: true, searchEmpty: false, onDismiss() {}, compactActions: React.createElement('input'),
+    children: React.createElement('p', {}, 'Not a product result yet') };
+  let html = r.render(ScanResultSheet, props);
+  assert.doesNotMatch(html, /Not enough information|Not a product result yet/);
+  assert.equal(r.sheets.at(-1).snapPoints.length, 1, 'interactive keyboard cannot lift to a full-result detent');
+  assert.ok(r.sheets.at(-1).snapPoints[0] <= 200, 'empty search occupies its compact content');
+  const measure = (height: number) => r.views.find(p => p.onLayout && String(p.onLayout).includes('setSummaryHeight')).onLayout({ nativeEvent: { layout: { height } } });
+  measure(280); r.render(ScanResultSheet, props);
+  const withResults = r.sheets.at(-1).snapPoints[0];
+  assert.ok(withResults > 300, 'results grow the same search surface');
+  measure(90); r.render(ScanResultSheet, props);
+  assert.equal(r.sheets.at(-1).snapPoints[0], withResults, 'typing/loading rows cannot shrink and bounce the sheet');
+  const handle = r.sheets.at(-1).handleComponent({});
+  assert.equal(handle.props.style.paddingTop, handle.props.style.paddingHorizontal, 'X center has equal top/right inset');
+  const close = handle.props.children[1];
+  assert.equal(close.props.style.width, 44); assert.equal(close.props.style.height, 44);
 });

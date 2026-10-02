@@ -14,7 +14,7 @@ Reconciliation preserves Sami's hosted scanner routing, indexed ingredient resol
 
 ## Result recovery consolidation
 
-The approved local pass from `d5589a1` suppresses duplicate capture-owned outcomes, measures direct recovery in the compact result, and reuses catalog search inside that same sheet with retained Back state. It wires existing owner/root/snapshot-bound ingredient continuation, preserves observations and origin mode, and separates service errors from evidence gaps. General package-photo continuation stays local because no generic existing-case append contract or photo recognition exists. [Consolidation acceptance](../acceptance/RESULT_RECOVERY_CONSOLIDATION_2026_10_01.md) records981 passing tests, typechecks/exports, Library pixels and unrun native/live gates. No backend or hosted activation.
+The current [UX-only publication](../acceptance/UX_ONLY_PUBLICATION_2026_10_02.md) consolidates capture outcomes into one compact result and direct catalog search, preserves query/candidates and origin, and separates service errors from evidence gaps. Camera Search uses one measured keyboard detent; raw-name fallback and the normal examples link are absent. Barcode-only MVP sets photo capability false. Existing owner/root/snapshot-bound ingredient continuation and local package review remain dormant; no generic existing-case append contract or photo recognition exists. The isolated suite passes990 tests, both typechecks and web/iOS exports. Prior phone evidence and unrun native optical/live gates are distinguished. Analytics work remains separate; no backend or hosted activation.
 
 ## Remaining wiring and founder decisions
 

@@ -37,7 +37,7 @@ export function CheckResultPresentation({ visible, input, presentationKey, loadi
     {input && <CheckResultContent input={input} section="summary" />}
     {!loading && !error && !input && <CheckResultView section="summary"
       facts={{ brand: '', name: unresolvedTitle ?? 'Product not confirmed', categoryLabel: '', formula: null, source: null }}
-      verdict={{ state: 'unknown', label: 'Not enough information', reason: unresolvedMessage ?? 'Product identity is not confirmed. Search by name or photograph the package.', findings: [] }} />}
+      verdict={{ state: 'unknown', label: 'Not enough information', reason: unresolvedMessage ?? 'Product and formula are unverified.', findings: [] }} />}
   </View>;
   return <ResultSheetSurface visible={visible} inline={inline} presentationKey={presentationKey} onClose={onClose}
     dismissLabel={dismissLabel} summary={summary} compactActions={compactActions} replacement={replacement}>

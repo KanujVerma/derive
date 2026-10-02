@@ -29,7 +29,7 @@ test('barcode guide is visual-only and the camera/shutter retain existing safety
   assert.match(capture, /const liveBarcode = !detectionPaused && !notice && !currentEvidence && !previewUri/);
   assert.match(capture, /intent === 'barcode' \|\| \(intent === 'auto' && capturedPhotos\.length === 0\)/);
   assert.match(capture, /\{liveBarcode \? \(/);
-  assert.match(capture, /onBarcodeScanned=\{liveBarcode \? onBarcode : undefined\}/);
+  assert.match(capture, /onBarcodeScanned=\{!photoCaptureEnabled \|\| liveBarcode \? onBarcode : undefined\}/);
   assert.match(capture, /accessibilityState=\{\{ disabled: busy, busy \}\}/);
   assert.match(capture, /disabled=\{busy\} onPress=\{\(\) => void capturePhoto\(\)\}/);
   assert.match(capture, /operations\.cancel\(\)/);

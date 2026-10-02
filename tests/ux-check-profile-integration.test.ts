@@ -15,6 +15,7 @@ function previewModules() {
   const denyNetwork = () => { throw new Error('Preview attempted live I/O'); };
   const modules: Record<string, any> = {
     'expo-router': { useRouter: () => ({ push: (value: any) => destinations.push(value), back: () => returns++, canGoBack: () => true }), useLocalSearchParams: () => ({}), useFocusEffect: (effect: any) => effect() },
+    '@gorhom/bottom-sheet': { BottomSheetTextInput: 'BottomSheetTextInput' },
     'expo-camera': { CameraView: 'CameraView', useCameraPermissions: () => [{ granted: true }, denyNetwork] },
     'expo-haptics': { selectionAsync: async () => {} },
     '@/src/config/environment': { publicEnvironment: { buildFlavor: 'development', supabaseUrl: '' } },
@@ -52,33 +53,15 @@ function previewModules() {
   return { modules, destinations, returns: () => returns };
 }
 
-for (const input of ['entry search', 'camera search']) test(`${input} opens the same factual sheet and can close and reopen`, async () => {
-  const context = previewModules();
-  const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
-  flow.render();
-  let nodes = flow.render();
-  const [sample] = await searchPreviewCatalog('CeraVe');
+test('entry search opens the factual sheet and can close and reopen', async () => {
+  const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
+  flow.render(); const [sample] = await searchPreviewCatalog('CeraVe');
   for (let repeat = 0; repeat < 2; repeat++) {
-    if (input === 'camera search') {
-      press(control(nodes, 'Open camera'));
-      const capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
-      assert.equal(capture.props.catalogSearch, searchPreviewCatalog);
-      capture.props.onCatalogSelect(sample);
-    } else {
-      const search = nodes.find(node => node.type === 'CatalogProductSearch')!;
-      assert.equal(search.props.search, searchPreviewCatalog);
-      search.props.onSelect(sample);
-    }
-    nodes = flow.render();
-    assert.ok(!nodes.some(node => node.type === 'CheckCaptureHost'));
-    const sheet = nodes.find(node => node.type === 'CheckResultPresentation')!;
-    assert.equal(sheet.props.visible, true);
-    assert.equal(sheet.props.input.catalogFacts.name, 'Renewing SA Cleanser');
-    assert.equal(sheet.props.input.snapshot, null);
-    assert.equal(sheet.props.input.fit.kind, 'preview_unavailable');
-    sheet.props.onClose();
-    nodes = flow.render();
-    assert.equal(nodes.find(node => node.type === 'CheckResultPresentation')!.props.visible, false);
+    flow.render().find(node => node.type === 'CatalogProductSearch')!.props.onSelect(sample);
+    let sheet = flow.render().find(node => node.type === 'CheckResultPresentation')!;
+    assert.equal(sheet.props.visible, true); assert.equal(sheet.props.input.catalogFacts.name, 'Renewing SA Cleanser');
+    sheet.props.onClose(); sheet = flow.render().find(node => node.type === 'CheckResultPresentation')!;
+    assert.equal(sheet.props.visible, false);
   }
 });
 
@@ -113,41 +96,85 @@ function element(root: any, label: string): any {
   if (root.props?.label === label) return root;
   return element(root.props?.children, label);
 }
-test('barcode recovery stays in one sheet, Back preserves evidence, and dismissal rearms once in the original mode', () => {
+test('barcode miss embeds registered search directly and dismissal rearms the same camera mount', () => {
   const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
   flow.render(); press(control(flow.render(), 'Open camera'));
   let capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  const key = (capture as any).key;
   const evidence = [{ role: 'barcode', kind: 'barcode', value: '036000291452' }];
   capture.props.onCaptureReady({ authority: 'customer_evidence', evidence, barcodeLookup: { barcode: '036000291452' }, localPhotos: [], review: { state: 'pending', selectedCandidateId: null } });
   capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
   assert.equal(capture.props.companion.props.model.title, 'No verified match for this barcode.');
-  assert.deepEqual(capture.props.initialEvidence, evidence);
-  element(capture.props.companion.props.compactActions, 'Search by name').props.onPress();
-  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
-  assert.ok(capture.props.companion.props.replacement);
-  assert.doesNotMatch(JSON.stringify(capture.props.companion.props.replacement), /Choose the exact product and variant/);
-  element(capture.props.companion.props.replacement, 'Back to result').props.onPress();
-  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  const search = element(capture.props.companion.props.compactActions, 'Search by name');
+  assert.equal(search.props.InputComponent, 'BottomSheetTextInput'); assert.equal(search.props.focusKey, undefined);
   assert.equal(capture.props.companion.props.replacement, undefined);
-  assert.deepEqual(capture.props.initialEvidence, evidence);
-  const dismiss = capture.props.companion.props.onDismiss; dismiss();
-  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
-  assert.equal(capture.props.initialRole, 'barcode'); assert.deepEqual(capture.props.initialEvidence, []);
-  assert.equal(capture.props.companion, null);
+  assert.ok(!element(capture.props.companion.props.compactActions, 'Photograph package'));
+  assert.equal(capture.props.companion.props.onAddRequestedEvidence, undefined);
+  search.props.onQueryChange('CeraVe');
+  capture.props.companion.props.onDismiss(); capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal((capture as any).key, key); assert.equal(capture.props.resumeKey, 1);
+  assert.equal(capture.props.initialRole, 'barcode'); assert.equal(capture.props.companion, null);
+  assert.equal(capture.props.photoCaptureEnabled, false);
 });
-test('package-photo recovery suspends the result, retains the barcode, and cancellation restores it', () => {
+test('camera Search uses the same direct field and catalog selection keeps camera mounted without photo dead ends', async () => {
   const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
   flow.render(); press(control(flow.render(), 'Open camera'));
   let capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
-  const evidence = [{ role: 'barcode', kind: 'barcode', value: '036000291452' }];
-  capture.props.onCaptureReady({ authority: 'customer_evidence', evidence, barcodeLookup: { barcode: '036000291452' }, localPhotos: [], review: { state: 'pending', selectedCandidateId: null } });
+  const key = (capture as any).key; capture.props.onSearch();
   capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
-  element(capture.props.companion.props.compactActions, 'Photograph package').props.onPress();
+  assert.equal(capture.props.companion.props.searchOnly, true);
+  assert.equal(capture.props.companion.props.searchEmpty, true);
+  const search = element(capture.props.companion.props.compactActions, 'Search by name');
+  search.props.onSelect((await searchPreviewCatalog('CeraVe'))[0]);
   capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
-  assert.equal(capture.props.initialRole, 'front_label'); assert.equal(capture.props.companion, null);
-  assert.deepEqual(capture.props.initialEvidence, evidence);
-  capture.props.onClose();
-  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
-  assert.equal(capture.props.initialRole, 'barcode'); assert.equal(capture.props.companion.props.model.kind, 'unknown');
-  assert.deepEqual(capture.props.initialEvidence, evidence);
+  assert.equal((capture as any).key, key);
+  const sheet = capture.props.companion;
+  assert.equal(sheet.props.input.catalogFacts.name, 'Renewing SA Cleanser');
+  assert.ok(!element(sheet.props.compactActions, 'Photograph ingredients'));
+  sheet.props.onClose(); capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal((capture as any).key, key); assert.equal(capture.props.companion, null);
 });
+
+
+test('normal Check has no example entry; examples remain on their guarded developer route', () => {
+  const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
+  assert.doesNotMatch(textContent(flow.render()), /Result examples/);
+});
+
+
+for (const surface of ['entry', 'camera'] as const) {
+  test(`${surface} search accepts partial catalog matches and has only concise empty copy for no match`, async () => {
+    const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
+    flow.render();
+    if (surface === 'camera') {
+      press(control(flow.render(), 'Open camera'));
+      flow.render().find(node => node.type === 'CheckCaptureHost')!.props.onSearch();
+    }
+    const hostSearch = () => surface === 'entry'
+      ? flow.render().find(node => node.type === 'CatalogProductSearch')!
+      : element(flow.render().find(node => node.type === 'CheckCaptureHost')!.props.companion.props.compactActions, 'Search by name');
+    const searchProps = hostSearch().props;
+    const search = componentHarness('src/components/catalog/CatalogProductSearch.tsx', 'CatalogProductSearch', searchProps,
+      { modules: { '../../services/productCatalog': { searchCatalogProducts: () => { throw new Error('Unexpected live search'); } }, '../ui/Icon': { Icon: 'Icon' } } });
+    const query = async (value: string) => {
+      control(search.render(), 'Search catalog products').props.onChangeText(value);
+      await searchProps.controller.submit();
+      return search.render();
+    };
+    let view = await query('cer');
+    assert.match(textContent(view), /CeraVe.*Renewing SA Cleanser/);
+    assert.doesNotMatch(textContent(flow.render()), /Check name as entered/);
+    assert.ok(!flow.render().some(node => node.props.label === 'Check name as entered'));
+    view = await query('zzzz no matching product');
+    assert.equal(textContent(view), 'Search by name No products found');
+    assert.ok(!view.some(node => node.type === 'TouchableOpacity'), 'settled no match adds no fallback action');
+    assert.ok(!flow.render().some(node => node.props.label === 'Check name as entered'));
+    view = await query('cer');
+    press(control(view, 'Check CeraVe Renewing SA Cleanser'));
+    const result = surface === 'entry'
+      ? flow.render().find(node => node.type === 'CheckResultPresentation')!
+      : flow.render().find(node => node.type === 'CheckCaptureHost')!.props.companion;
+    assert.equal(result.props.input.catalogFacts.name, 'Renewing SA Cleanser', 'selecting the actual matched product remains supported');
+    searchProps.controller.dispose();
+  });
+}

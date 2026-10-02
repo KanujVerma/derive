@@ -6,6 +6,8 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, radii, spacing, typography } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
+import { createBarcodeObservationGate } from '../../../presentation/capture/barcodeObservationGate';
+import { CHECK_PHOTO_CAPTURE_ENABLED } from '../../../presentation/capture/capabilities';
 import { CatalogProductSearch } from '../../catalog/CatalogProductSearch';
 import type { CatalogProductSummary } from '../../../contracts/ProductCatalog';
 import { captureRecovery } from '../../../presentation/capture/captureRecovery';
@@ -40,11 +42,14 @@ interface Props {
   /** Check owns product outcomes; capture retains only observation and photo review. */
   hostOwnsResults?: boolean;
   initialEvidence?: readonly CaptureEvidence[];
+  photoCaptureEnabled?: boolean;
+  resumeKey?: number;
+  onSearch?: () => void;
   catalogSearch?: (query: string) => Promise<CatalogProductSummary[]>;
   onCatalogSelect?: (product: CatalogProductSummary) => void;
 }
 
-export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, hostOwnsResults = false, initialEvidence = [], catalogSearch, onCatalogSelect }: Props) {
+export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, hostOwnsResults = false, initialEvidence = [], photoCaptureEnabled = CHECK_PHOTO_CAPTURE_ENABLED, resumeKey = 0, onSearch, catalogSearch, onCatalogSelect }: Props) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
@@ -68,6 +73,13 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const latestIntent = useRef(intent);
   latestIntent.current = intent;
   const scanLocked = useRef(false);
+  const barcodeGate = useRef(createBarcodeObservationGate()).current;
+  const lastResumeKey = useRef(resumeKey);
+  if (lastResumeKey.current !== resumeKey) {
+    lastResumeKey.current = resumeKey;
+    barcodeGate.resume();
+    scanLocked.current = false;
+  }
   const detectionPausedRef = useRef(detectionPaused);
   detectionPausedRef.current = detectionPaused;
   const requestSequence = useRef(0);
@@ -173,7 +185,9 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const onBarcode = ({ data, type }: BarcodeScanningResult) => {
-    if (detectionPausedRef.current || !mounted.current || currentSession.current.phase !== 'collecting'
+    if (!photoCaptureEnabled) {
+      if (!mounted.current || !isObservedRetailBarcode(data, type) || !barcodeGate.observe(data, detectionPausedRef.current || operations.isBusy())) return;
+    } else if (detectionPausedRef.current || !mounted.current || currentSession.current.phase !== 'collecting'
       || !canObserveLiveBarcode(latestIntent.current, { busy: operations.isBusy(), hasPreview: previewActive.current, locked: scanLocked.current }) || !isObservedRetailBarcode(data, type)) return;
     operations.whenIdle(() => {
       scanLocked.current = true;
@@ -287,7 +301,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
           facing="back"
           enableTorch={torch}
           barcodeScannerSettings={{ barcodeTypes: ['upc_a', 'ean13', 'ean8'] }}
-          onBarcodeScanned={liveBarcode ? onBarcode : undefined}
+          onBarcodeScanned={!photoCaptureEnabled || liveBarcode ? onBarcode : undefined}
         />
       ) : previewUri ? (
         <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -315,6 +329,20 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
             if (permission?.canAskAgain === false) void Linking.openSettings();
             else void requestPermission();
           }} />
+        </View>
+      ) : !photoCaptureEnabled ? (
+        <View style={styles.collecting}>
+          <View pointerEvents="none" style={styles.guideArea}><View testID="barcode-alignment-guide" style={styles.barcodeGuide}>
+            <View style={[styles.guideCorner, styles.guideTopLeft]} /><View style={[styles.guideCorner, styles.guideTopRight]} />
+            <View style={[styles.guideCorner, styles.guideBottomLeft]} /><View style={[styles.guideCorner, styles.guideBottomRight]} />
+          </View></View>
+          <View style={[styles.searchFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+            {onSearch && !detectionPaused ? <CameraGlass style={styles.searchControl}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Search" onPress={onSearch} style={styles.searchButton}>
+                <Text style={styles.actionText}>Search</Text>
+              </Pressable>
+            </CameraGlass> : <View style={{ height: layout.ctaHeight }} />}
+          </View>
         </View>
       ) : session.phase === 'collecting' ? (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.collecting}>
@@ -477,6 +505,9 @@ const styles = StyleSheet.create({
   topControl: { width: layout.minTouchTarget + spacing.xs, height: layout.minTouchTarget + spacing.xs, borderRadius: radii.full },
   iconButton: { minWidth: layout.minTouchTarget, minHeight: layout.minTouchTarget, width: layout.minTouchTarget + spacing.xs, height: layout.minTouchTarget + spacing.xs, alignItems: 'center', justifyContent: 'center' },
   collecting: { flex: 1 },
+  searchFooter: { alignItems: 'center' },
+  searchControl: { borderRadius: radii.full },
+  searchButton: { minHeight: layout.ctaHeight, minWidth: 116, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
   modeMenu: { position: 'absolute', right: spacing.md, bottom: 126, zIndex: 2, width: 210, maxHeight: 260, padding: spacing.xs, borderRadius: radii.lg },
   previewMenu: { width: 240, maxWidth: '100%', padding: spacing.xs, borderRadius: radii.lg },
   modeTitle: { color: colors.inkInverse, fontSize: typography.sizes.bodyRegular, fontWeight: typography.weights.semibold, textAlign: 'center' },

@@ -10,6 +10,7 @@ export interface CameraCompanionInput {
   error: string | null;
   unknownBarcode?: string | null;
   hasUnresolvedPhotos?: boolean;
+  searchOpen?: boolean;
   resolution: ProductResolutionResult | null;
   catalogProduct: CatalogProductSummary | null;
 }
@@ -36,6 +37,7 @@ export function cameraCompanionSheet(input: CameraCompanionInput): SheetModel | 
     return buildScanResultSheet({ kind: 'error', ownerId: input.ownerId, scanId: input.scanId });
   }
   if (input.unknownBarcode) return buildScanResultSheet({ kind: 'unknown', ownerId: input.ownerId, scanId: input.scanId });
+  if (input.searchOpen) return buildScanResultSheet({ kind: 'unknown', ownerId: input.ownerId, scanId: input.scanId });
   if (input.hasUnresolvedPhotos) return { ...buildScanResultSheet({ kind: 'unknown', ownerId: input.ownerId, scanId: input.scanId }),
     title: 'Product not confirmed', detail: 'Your photos are retained. Automatic photo identification is not available yet.' };
   return null;

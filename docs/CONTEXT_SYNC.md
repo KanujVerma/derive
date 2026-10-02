@@ -1,5 +1,13 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-02 — separate UX-only publication
+
+- **Authorization/base:** the user approved a separate UX-only PR, CI and normal merge from fresh `origin/main@7efb9ce446c6b7b54b3803fa85522b47da2a05ee`. Isolated branch `kanuj/ux-only-camera-search` preserves the original combined preview and the PostHog checkout/services. Sami PR194 remains separate.
+- **Extraction:** approved `d5589a1`/`b4d0e31` UX plus source/tests from `9fd5c92`, `a919920` and `b2384b3`; analytics contexts removed during bounded reconciliation. No PostHog foundation, measurement fixes/deletion work, dependencies, configuration, root layout, backend/Auth/RLS or clinical changes. Existing main analytics stays intact.
+- **Behavior:** one result sheet; barcode-only camera with centered frame/X/torch/Search; direct compact catalog recovery; measured keyboard search height/growth/clear; stable capture resume; no raw-name fallback; exact “No products found” empty copy; normal Check examples control removed. Photo capability is false; existing bound ingredient continuation remains dormant.
+- **Evidence:** isolated full suite990/990 across115 TAP files, zero-error app/test types and web/iOS exports pass. Prior real phone layout/touch sequence and user confirmation are recorded separately from browser/component and unrun optical/live acceptance. Exact-head CI remains the merge gate.
+- **Handoff:** [UX-only acceptance](acceptance/UX_ONLY_PUBLICATION_2026_10_02.md) records extraction boundaries, confirmed Library identities, preview mode and remaining backend/hardware limits. Earlier local-only entries below describe historical passes, not the current publication authorization.
+
 ## 2026-10-01 — approved single result and evidence-specific recovery
 
 - **Predecessor/scope:** clean `d5589a1ad04e5b69f2dad6cdaa74ca858d913b3e`, local `kanuj/ux-search-scan-qa`. Approved Check composition implementation; no push/merge/deploy/hosted activation. Expo PID18994/8084 and USB cable preserved, Development Mock scanner_first_preview with remote false.

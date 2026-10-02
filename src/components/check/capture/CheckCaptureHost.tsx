@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Modal, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { CHECK_PHOTO_CAPTURE_ENABLED } from '../../../presentation/capture/capabilities';
 import { ProductEvidenceCapture } from './ProductEvidenceCapture';
 import { createCheckCaptureBridge, type CheckCaptureHandoff } from '../../../presentation/capture/checkCaptureAdapter';
 import { createLiveFreeEvidenceProcessor } from '../../../presentation/capture/liveFreeEvidenceProcessor';
@@ -12,6 +13,9 @@ interface Props {
   processor?: CaptureProcessor;
   initialRole?: CaptureRole;
   initialEvidence?: readonly CaptureEvidence[];
+  photoCaptureEnabled?: boolean;
+  resumeKey?: number;
+  onSearch?: () => void;
   live?: boolean;
   detectionPaused?: boolean;
   catalogSearch?: (query: string) => Promise<import('../../../contracts/ProductCatalog').CatalogProductSummary[]>;
@@ -19,11 +23,17 @@ interface Props {
   companion?: React.ReactNode;
 }
 
-export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', initialEvidence = [], live = false, detectionPaused = false, catalogSearch, onCatalogSelect, companion = null }: Props) {
+export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', initialEvidence = [], photoCaptureEnabled = CHECK_PHOTO_CAPTURE_ENABLED, resumeKey = 0, onSearch, live = false, detectionPaused = false, catalogSearch, onCatalogSelect, companion = null }: Props) {
   const [appActive, setAppActive] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
   const activeRef = useRef(appActive);
   const delivered = useRef(false);
   const pendingHandoff = useRef<CaptureHandoff | null>(null);
+  const lastResumeKey = useRef(resumeKey);
+  if (lastResumeKey.current !== resumeKey) {
+    lastResumeKey.current = resumeKey;
+    delivered.current = false;
+    pendingHandoff.current = null;
+  }
   const selectedProcessor = useMemo(() => processor ?? (live ? createLiveFreeEvidenceProcessor() : pendingCaptureProcessor), [processor, live]);
   const bridge = useMemo(() => createCheckCaptureBridge(selectedProcessor), [selectedProcessor]);
   const handoffRef = useRef((handoff: CaptureHandoff) => onCaptureReady(bridge.handoff(handoff)));
@@ -59,6 +69,9 @@ export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRo
             autoFinishBarcode
             hostOwnsResults
             initialEvidence={initialEvidence}
+            photoCaptureEnabled={photoCaptureEnabled}
+            resumeKey={resumeKey}
+            onSearch={onSearch}
             detectionPaused={detectionPaused || !appActive}
             catalogSearch={catalogSearch}
             onCatalogSelect={product => { if (activeRef.current && !delivered.current && onCatalogSelect) { delivered.current = true; onCatalogSelect(product); } }}

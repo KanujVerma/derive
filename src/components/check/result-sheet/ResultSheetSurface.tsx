@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions, type View as NativeView } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Keyboard, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions, type View as NativeView } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ReduceMotion } from 'react-native-reanimated';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, type BottomSheetBackdropProps, type BottomSheetHandleProps } from '@gorhom/bottom-sheet';
@@ -39,6 +39,9 @@ interface Props {
   compactActions?: React.ReactNode;
   /** Search replaces content within the same gesture surface. */
   replacement?: React.ReactNode;
+  /** Search has one measured detent; keyboard lift must not select a full-result detent. */
+  contentSized?: boolean;
+  contentSizeResetKey?: string;
   children: React.ReactNode;
 }
 
@@ -56,13 +59,14 @@ export function ResultSheetSurface({ visible = true, inline = false, presentatio
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children }: Omit<Props, 'visible' | 'inline'> & {
+  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey }: Omit<Props, 'visible' | 'inline'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const [summaryHeight, setSummaryHeight] = useState(0);
-  const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight });
+  useLayoutEffect(() => { if (contentSized) setSummaryHeight(0); }, [contentSized, contentSizeResetKey]);
+  const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight, contentSized });
   const sheet = useRef<BottomSheet>(null);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
@@ -70,12 +74,13 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   const [guard] = useState(() => createSheetDismissGuard(presentationKey, onClose, readCurrentKey));
   const close = useCallback(() => {
     if (!guard.isCurrent()) return;
+    Keyboard.dismiss();
     if (sheet.current) sheet.current.close(); else guard.dismiss();
   }, [guard]);
   requestClose.current = close;
   useEffect(() => {
-    if (summary && summaryHeight && geometry.needsFullHeight && guard.isCurrent()) sheet.current?.snapToIndex(2);
-  }, [summaryHeight, geometry.needsFullHeight, guard, summary]);
+    if ((summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent()) sheet.current?.snapToIndex(2);
+  }, [summaryHeight, geometry.needsFullHeight, guard, summary, compactActions, contentSized]);
   useLayoutEffect(() => {
     guard.activate();
     return () => guard.deactivate();
@@ -92,32 +97,33 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.18} pressBehavior="close" />, []);
   const renderHandle = useCallback((_props: BottomSheetHandleProps) => <View style={styles.handleRow}>
     <Pressable ref={handle} style={styles.dragTarget} accessibilityRole="adjustable" accessibilityLabel="Product result"
-      accessibilityHint="Swipe up for findings. Swipe down to return. Double tap to expand or collapse."
-      accessibilityValue={{ min: 0, max: 2, now: Math.max(index, 0), text: index === 0 ? 'Compact' : 'Expanded' }}
+      accessibilityHint={contentSized ? 'Swipe down to return. Search results expand this sheet.' : 'Swipe up for findings. Swipe down to return. Double tap to expand or collapse.'}
+      accessibilityValue={{ min: 0, max: contentSized ? 0 : 2, now: Math.max(index, 0), text: index === 0 ? 'Compact' : 'Expanded' }}
       accessibilityActions={[{ name: 'increment', label: 'Expand result' }, { name: 'decrement', label: 'Collapse result' }, { name: 'escape', label: dismissLabel }]}
       onAccessibilityEscape={close}
       onAccessibilityAction={({ nativeEvent }) => {
         if (!guard.isCurrent()) return;
-        if (nativeEvent.actionName === 'increment') sheet.current?.snapToIndex(Math.min(index + 1, 2));
+        if (nativeEvent.actionName === 'increment') sheet.current?.snapToIndex(Math.min(index + 1, contentSized ? 0 : 2));
         if (nativeEvent.actionName === 'decrement') { if (index > 0) sheet.current?.snapToIndex(index - 1); else close(); }
         if (nativeEvent.actionName === 'escape') close();
       }}
-      onPress={() => { if (guard.isCurrent()) sheet.current?.snapToIndex(index === 0 ? 1 : 0); }}>
+      onPress={() => { if (guard.isCurrent()) sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); }}>
       <View style={styles.indicator} />
     </Pressable>
     <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel={dismissLabel}>
       <Icon name="close" size={20} color={colors.inkMuted} />
     </Pressable>
-  </View>, [close, dismissLabel, guard, index]);
+  </View>, [close, dismissLabel, guard, index, contentSized]);
   return <GestureHandlerRootView style={styles.root} pointerEvents="box-none" accessibilityViewIsModal>
-    <BottomSheet ref={sheet} index={initialDetent} snapPoints={summary ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
-      topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose overrideReduceMotion={ReduceMotion.System}
-      onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={guard.dismiss}
+    <BottomSheet ref={sheet} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
+      topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
+      onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
       <BottomSheetScrollView onAccessibilityEscape={close}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        {(summary || replacement) && <View onLayout={event => { const measured = event.nativeEvent.layout.height; if (Math.abs(measured - summaryHeight) >= 1) setSummaryHeight(measured); }}>{replacement ?? <>{summary}{compactActions}</>}</View>}
+        {/* Keep search height stable as loading/helper rows disappear; explicit empty input resets it. */}
+        {(summary || compactActions || replacement) && <View onLayout={event => { const measured = event.nativeEvent.layout.height; if (contentSized ? measured > summaryHeight : Math.abs(measured - summaryHeight) >= 1) setSummaryHeight(previous => contentSized ? Math.max(previous, measured) : measured); }}>{replacement ?? <>{summary}{compactActions}</>}</View>}
         {!replacement && (!summary || index > 0) && children}
       </BottomSheetScrollView>
     </BottomSheet>
@@ -127,7 +133,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFill, flex: 1, zIndex: 30 },
   background: { backgroundColor: colors.surface, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
-  handleRow: { minHeight: layout.minTouchTarget, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md },
+  handleRow: { minHeight: layout.minTouchTarget, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md },
   dragTarget: { flex: 1, minHeight: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center', marginLeft: layout.minTouchTarget },
   indicator: { width: 36, height: 5, borderRadius: radii.full, backgroundColor: colors.borderStrong },
   close: { width: layout.minTouchTarget, height: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center' },

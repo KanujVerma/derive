@@ -22,6 +22,8 @@ interface Props {
   embedded?: boolean;
   preserveSelection?: boolean;
   focusKey?: string | number;
+  /** Sheet hosts supply their registered input; ordinary entry keeps the native input. */
+  InputComponent?: React.ElementType;
 }
 
 export function CatalogProductSearch({
@@ -30,7 +32,7 @@ export function CatalogProductSearch({
   placeholder = 'Search brand or product name', keepFocusAfterSelect = true, onQueryChange,
   errorCopy = 'Search is unavailable right now. You can still add a product manually.',
   emptyCopy = 'No catalog match yet. Try another name or add it manually.',
-  embedded = false, preserveSelection = false, focusKey,
+  embedded = false, preserveSelection = false, focusKey, InputComponent = TextInput,
 }: Props) {
   const inputRef = useRef<TextInput>(null);
   const searchRef = useRef(search);
@@ -60,11 +62,11 @@ export function CatalogProductSearch({
   return (
     <View style={[styles.container, embedded && styles.embedded]}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
+      <InputComponent
         ref={inputRef}
         style={styles.input}
         value={query}
-        onChangeText={(value) => { controller.setQuery(value); onQueryChange?.(value); }}
+        onChangeText={(value: string) => { controller.setQuery(value); onQueryChange?.(value); }}
         onSubmitEditing={() => { void controller.submit(); }}
         placeholder={placeholder}
         placeholderTextColor={colors.inkMuted}
