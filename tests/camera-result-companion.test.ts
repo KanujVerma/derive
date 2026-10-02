@@ -27,7 +27,7 @@ test('Check keeps the camera mounted and does not pretend a follow-up photo cont
   const host = readFileSync(new URL('../src/components/check/capture/CheckCaptureHost.tsx', import.meta.url), 'utf8');
   const capture = readFileSync(new URL('../src/components/check/capture/ProductEvidenceCapture.tsx', import.meta.url), 'utf8');
   assert.match(check, /cameraCompanionSheet\(/);
-  assert.match(check, /detectionPaused=\{detectionPaused \|\| fullResult\}/);
+  assert.match(check, /detectionPaused=\{detectionPaused \|\| fullResult \|\| partOneVisible\}/);
   assert.match(check, /onAddRequestedEvidence=\{!CHECK_PHOTO_CAPTURE_ENABLED \|\| isIngredientChild \? undefined : action => continueCapture\(action.role, action\)\}/);
   assert.match(check, /isCurrentRequestedEvidenceAction\(action, currentLiveCheckOwner\(\), snapshot, liveResolutionRef.current\)/);
   assert.match(host, /detectionPaused=\{detectionPaused \|\| !appActive\}/);
