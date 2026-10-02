@@ -39,7 +39,7 @@ export async function deletePartOneSave(id: string): Promise<void> { await call(
 export async function commitPartOneCapture(id: string, request: CaptureCommitRequest): Promise<CaptureCommitResult> {
   const expected=PartOneIdSchema.parse(id).toLowerCase();
   const result=CaptureCommitResultSchema.parse(await call(`/captures/${expected}/observations`, 'POST', CaptureCommitRequestSchema.parse(request)));
-  if (result.capture.captureSessionId!==expected || result.capture.packageObservationId!==request.packageObservationId)
+  if (result.capture.captureSessionId!==expected || result.capture.packageObservationId!==request.packageObservationId.toLowerCase())
     throw new Error('Private capture commit binding changed');
   return result;
 }
@@ -50,7 +50,7 @@ export async function readPartOneCapture(id: string) {
   return result;
 }
 export async function deletePartOneCapture(id: string): Promise<void> {
-  const expected = PartOneIdSchema.parse(id);
+  const expected = PartOneIdSchema.parse(id).toLowerCase();
   const result = z.strictObject({ deleted: z.literal(true), id: PartOneIdSchema }).parse(await call(`/captures/${expected}`, 'DELETE'));
   if (result.id !== expected) throw new Error('Private capture deletion binding changed');
 }

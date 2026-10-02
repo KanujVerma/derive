@@ -1,3 +1,9 @@
+## 2026-10-02 — corrected Part 1 checkpoint, private workflow continuation
+
+Predecessor `cc742baae6ed285a1d8eacf29195b30f01bb5df7`, base accepted UX `fea1a214dd174deccffbdb08fb2aa48c1e8fd0e0`. Local fixes prevent revoked-image resurrection during selection, retain unresolved capture/picker context during same-generation identity enrichment, and reject case-equivalent duplicate private asset IDs. Isolated migration replay and all 846 DB assertions (182 Part 1), 36 actual local worker integration checks with six in-memory requests, 32 HTTP boundary tests, and both TypeScript checks pass. Corrected source is preserved separately before continuation.
+
+The user explicitly authorized completing sanitized upload/attestation, accepted private package evidence, actual Storage byte deletion, restored private read and UI save/reopen/removal locally with synthetic fixtures. These are implementation gaps, not policy blockers. Real-user retention/source activation stays disabled; A07/A25 remain incomplete until the full local path is demonstrated. No push, PR, merge, deployment or production activation is authorized.
+
 # Derive Cross-Agent Context Sync Ledger
 
 ## 2026-10-02 — approved Part 1 local implementation

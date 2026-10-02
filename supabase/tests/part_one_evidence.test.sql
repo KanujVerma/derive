@@ -348,6 +348,10 @@ select is(public.part_one_operation('selection',(select jsonb_build_object('scan
  'e6700000-0000-4000-8000-000000000004','A19 selection binds displayed snapshot rather than unseen latest same-item revision');
 set local role postgres;
 
+set local role authenticated;
+insert into part_one_test_state values('candidate-selection-source',public.part_one_operation('scans/create',
+ '{"idempotencyKey":"candidate-selection-source","reasonCodes":[],"request":{"schemaVersion":1,"requestId":"e6300000-0000-4000-8000-000000000036","clientScanId":"e6300000-0000-4000-8000-000000000037","idempotencyKey":"candidate-selection-source","generation":0,"code":{"raw":"036000291452","symbology":"upca","namespace":"gtin","retailerId":null},"requestedMarket":null,"categoryHint":null}}'));
+set local role postgres;
 select public.part_one_worker('revoke','{"recordId":"e6700000-0000-4000-8000-000000000003","status":"revoked","reason":"Synthetic image permission revoked"}');
 set local role authenticated;
 insert into part_one_test_state values('candidate-image-revoked',public.part_one_operation('scans/read',
@@ -356,6 +360,21 @@ select is((select c->'image' from part_one_test_state,jsonb_array_elements(value
  where key='candidate-image-revoked' and c->>'name'='Candidate A'),'null'::jsonb,'A26 candidate image revocation purges image independently');
 select is((select jsonb_array_length(value->'display'->'candidates') from part_one_test_state where key='candidate-image-revoked'),2,
  'A26 image revocation keeps independently permitted candidate identity');
+-- Selection rebuilds an identity from immutable source payload, so it must
+-- filter current image rights before returning or storing that reconstruction.
+insert into part_one_test_state values('candidate-selection-read',public.part_one_operation('scans/read',
+ (select jsonb_build_object('scanId',value->'scanId') from part_one_test_state where key='candidate-selection-source')));
+insert into part_one_test_state values('candidate-selection-result',public.part_one_operation('selection',
+ (select jsonb_build_object('scanId',value->'scanId','candidateId','e6700000-0000-4000-8000-000000000006',
+ 'expectedGeneration',value->'generation','expectedResultRevision',value->'resultRevision') from part_one_test_state where key='candidate-selection-read')));
+select is((select value->'display'->'selectedIdentity'->'image' from part_one_test_state where key='candidate-selection-result'),
+ 'null'::jsonb,'A26 revoke then read then select cannot restore immutable revoked image URL');
+select is((select value->>'itemId' from part_one_test_state where key='candidate-selection-result'),
+ 'e6700000-0000-4000-8000-000000000006','A26 image revocation preserves selected independently permitted identity');
+set local role postgres;
+select is((select result->'display'->'selectedIdentity'->'image' from private.part_one_scans where id=(select (value->>'scanId')::uuid from part_one_test_state where key='candidate-selection-result')),
+ 'null'::jsonb,'A26 selection persists only currently permitted image projection');
+set local role authenticated;
 set local role postgres;
 select public.part_one_worker('revoke_policy','{"policyId":"candidate_fixture"}');
 set local role authenticated;
@@ -530,6 +549,11 @@ select set_config('request.jwt.claim.sub','e7100000-0000-4000-8000-000000000001'
 select throws_ok($$select public.part_one_operation('captures/observations',(select value || jsonb_build_object('idempotencyKey','private-duplicate-assets',
  'assets',jsonb_build_array(value->'assets'->0,value->'assets'->0)) from part_one_test_state where key='private-request-a'))$$,
  'P0001','PART_ONE_INVALID_PAYLOAD','A25 direct RPC duplicate asset IDs rejected before commit');
+select throws_ok($$select public.part_one_operation('captures/observations',(select value || jsonb_build_object('idempotencyKey','private-duplicate-asset-casing',
+ 'assets',jsonb_build_array(value->'assets'->0,(value->'assets'->0) || jsonb_build_object(
+ 'evidenceId',upper(value->'assets'->0->>'evidenceId'),'storageObjectId',upper(value->'assets'->0->>'storageObjectId'))))
+ from part_one_test_state where key='private-request-a'))$$,
+ 'P0001','PART_ONE_INVALID_PAYLOAD','A25 UUID case variants cannot bypass direct RPC duplicate asset guard');
 set local role postgres;
 select is((select count(*)::integer from private.part_one_records where owner_id='e7100000-0000-4000-8000-000000000001'),0,
  'A25 duplicate asset request has no durable payload side effects');
@@ -604,6 +628,31 @@ insert into part_one_test_state values('private-save-a',public.part_one_operatio
 select is((public.part_one_operation('saves/read',(select jsonb_build_object('id',value->'saveId') from part_one_test_state where key='private-save-a'))->'result')->>'declarationState',
  'partial','A28 private partial save survives authoritative reopen');
 
+-- Expiry is a consumer lifecycle action even before a commit creates assets.
+insert into part_one_test_state values('expired-before-commit',public.part_one_operation('captures/create',(select jsonb_build_object('scanId',value->'result'->'scanId',
+ 'expectedGeneration',0,'expectedResultRevision',value->'result'->'resultRevision') from part_one_test_state where key='private-edit-a')));
+set local role postgres;
+insert into storage.objects(id,bucket_id,name,owner,owner_id,version) values
+ ('e7500000-0000-4000-8000-000000000012','part-one-private-fixture','owner-a/expired-before-commit.png','e7100000-0000-4000-8000-000000000001','e7100000-0000-4000-8000-000000000001','synthetic-version-1');
+insert into private.part_one_asset_attestations(id,owner_id,capture_id,package_observation_id,generation,deletion_epoch,storage_object_id,object_version,
+ content_hash,width,height,sanitizer_version,verification_evidence,metadata_stripped,observed_at,expires_at)
+ select 'e7500000-0000-4000-8000-000000000112','e7100000-0000-4000-8000-000000000001',(value->>'captureSessionId')::uuid,
+ (value->>'packageObservationId')::uuid,0,0,'e7500000-0000-4000-8000-000000000012','synthetic-version-1','fixture-hash-expired',400,300,
+ 'synthetic-sanitizer-1','Synthetic expiry fixture only',true,now()-interval '1 hour',now()-interval '1 second'
+ from part_one_test_state where key='expired-before-commit';
+select public.part_one_worker('purge_private','{}');
+select is((select count(*)::integer from private.part_one_private_cleanup where object_id='e7500000-0000-4000-8000-000000000012'),1,
+ 'A27 expired precommit attestation enters durable cleanup');
+select is((select count(*)::integer from private.part_one_asset_attestations where id='e7500000-0000-4000-8000-000000000112'),0,
+ 'A26 expired precommit attestation erased after cleanup queued');
+insert into part_one_test_state values('expired-precommit-revision',(select to_jsonb(capture_revision) from private.part_one_captures
+ where id=(select (value->>'captureSessionId')::uuid from part_one_test_state where key='expired-before-commit')));
+select public.part_one_worker('purge_private','{}');
+select is((select count(*)::integer from private.part_one_private_cleanup where object_id='e7500000-0000-4000-8000-000000000012'),1,
+ 'A27 repeated precommit expiry sweep has one cleanup locator');
+select is((select to_jsonb(capture_revision) from private.part_one_captures where id=(select (value->>'captureSessionId')::uuid from part_one_test_state where key='expired-before-commit')),
+ (select value from part_one_test_state where key='expired-precommit-revision'),'A26 repeated precommit expiry leaves revision stable');
+set local role authenticated;
 -- A server-attested upload may be canceled before any commit creates the asset
 -- ledger. It still must enter Storage cleanup before its receipt is erased.
 insert into part_one_test_state values('cancel-before-commit',public.part_one_operation('captures/create',(select jsonb_build_object('scanId',value->'result'->'scanId',

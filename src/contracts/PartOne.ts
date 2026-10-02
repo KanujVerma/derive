@@ -32,7 +32,7 @@ export const SanitizedAssetSchema = z.strictObject({ evidenceId: PartOneIdSchema
 export const AttributedEditSchema = z.strictObject({ observationId: PartOneIdSchema, supersedesId: PartOneIdSchema, revision: revision, text: z.string(), reason: z.string().min(1) });
 export const CaptureCommitRequestSchema = z.strictObject({ idempotencyKey: z.string().min(1).max(200), expectedGeneration: revision, expectedResultRevision: revision, expectedCaptureRevision: revision, expectedDeletionEpoch: revision, packageObservationId: PartOneIdSchema, assets: z.array(SanitizedAssetSchema).max(6), observations: z.array(OcrObservationSchema), edits: z.array(AttributedEditSchema) }).superRefine((request, context) => {
   for (const field of ['evidenceId', 'storageObjectId'] as const)
-    if (new Set(request.assets.map(asset => asset[field])).size !== request.assets.length)
+    if (new Set(request.assets.map(asset => asset[field].toLowerCase())).size !== request.assets.length)
       context.addIssue({ code: 'custom', path: ['assets'], message: 'Duplicate private asset reference' });
 });
 
@@ -60,7 +60,7 @@ export const CaptureCommitResultSchema = z.strictObject({ schemaVersion: z.liter
   if (value.capture.scanId !== value.result.scanId || value.capture.generation !== value.result.generation || value.capture.itemId !== value.result.itemId)
     context.addIssue({ code: 'custom', message: 'Private commit binding mismatch' });
   for (const field of ['observationIds', 'declarationIds', 'assetIds'] as const)
-    if (new Set(value[field]).size !== value[field].length) context.addIssue({ code: 'custom', message: 'Duplicate private receipt ids', path: [field] });
+    if (new Set(value[field].map(id => id.toLowerCase())).size !== value[field].length) context.addIssue({ code: 'custom', message: 'Duplicate private receipt ids', path: [field] });
 });
 export type CaptureCommitResult = z.infer<typeof CaptureCommitResultSchema>;
 

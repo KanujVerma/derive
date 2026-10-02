@@ -258,3 +258,19 @@ test('A25 UUID path casing cannot invalidate a successful owner capture response
   assert.equal((await handlePartOneRequest(request(`/captures/${id.toUpperCase()}`,'GET'),p)).status,200);
   assert.deepEqual(p.calls,[{action:'captures/read',payload:{id}}]);
 });
+test('A25 private asset and receipt UUID uniqueness is case insensitive', async () => {
+  const asset={evidenceId:id,storageObjectId:other,contentHash:'synthetic-content-hash',width:100,height:100,metadataStripped:true};
+  const body={idempotencyKey:'uuid-case-assets',expectedGeneration:0,expectedResultRevision:1,expectedCaptureRevision:0,expectedDeletionEpoch:0,packageObservationId:other,assets:[asset,{...asset,evidenceId:id.toUpperCase(),storageObjectId:other.toUpperCase()}],observations:[],edits:[]};
+  const p=ports();
+  assert.equal((await handlePartOneRequest(request(`/captures/${id}/observations`,'POST',body),p)).status,400);
+  assert.equal(p.calls.length,0);
+  const capture={schemaVersion:1,captureSessionId:id,packageObservationId:other,scanId:other,generation:0,captureRevision:1,deletionEpoch:0,itemId:null,candidateId:null};
+  const receipt={schemaVersion:1,capture,observationIds:[id,id.toUpperCase()],declarationIds:[],assetIds:[],result:fixture()};
+  assert.equal((await handlePartOneRequest(request(`/captures/${id}/observations`,'POST',{...body,assets:[]}),ports(receipt))).status,500);
+});
+test('A25 equivalent package UUID casing cannot turn a successful private commit into a projection error',async()=>{
+  const capture={schemaVersion:1,captureSessionId:id,packageObservationId:other,scanId:other,generation:0,captureRevision:1,deletionEpoch:0,itemId:null,candidateId:null};
+  const receipt={schemaVersion:1,capture,observationIds:[],declarationIds:[],assetIds:[],result:fixture()};
+  const body={idempotencyKey:'package-uuid-case',expectedGeneration:0,expectedResultRevision:1,expectedCaptureRevision:0,expectedDeletionEpoch:0,packageObservationId:other.toUpperCase(),assets:[],observations:[],edits:[]};
+  assert.equal((await handlePartOneRequest(request(`/captures/${id}/observations`,'POST',body),ports(receipt))).status,200);
+});

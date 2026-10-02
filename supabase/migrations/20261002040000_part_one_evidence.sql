@@ -291,8 +291,23 @@ end $$;
 create function private.part_one_purge_expired_private() returns void
 language plpgsql security definer set search_path='' as $$
 declare cid uuid; begin
- for cid in select distinct (rr.payload->>'captureSessionId')::uuid from private.part_one_records rr
-   where rr.scope='private_package' and rr.payload->>'privateKind'='sanitized_image' and not private.part_one_record_allowed(rr.id,rr.owner_id)
+ for cid in
+   select distinct (rr.payload->>'captureSessionId')::uuid from private.part_one_records rr
+     where rr.scope='private_package' and rr.payload->>'privateKind'='sanitized_image' and not private.part_one_record_allowed(rr.id,rr.owner_id)
+   union
+   -- Trusted uploads can expire before any OCR commit creates a record. A
+   -- committed historical package is independent of the capture-sheet TTL;
+   -- an uncommitted upload also follows session expiry/cancel and current rights.
+   select aa.capture_id from private.part_one_asset_attestations aa
+     join private.part_one_captures c on c.id=aa.capture_id and c.owner_id=aa.owner_id
+     cross join private.part_one_private_config cfg
+     join private.part_one_policies pp on pp.id='private_capture'
+     where aa.expires_at<=now()
+       or exists(select 1 from private.part_one_asset_status ast where ast.attestation_id=aa.id and ast.revoked_at is not null)
+       or (not exists(select 1 from private.part_one_capture_commits cm where cm.capture_id=c.id and cm.deleted_at is null)
+         and (c.expires_at<=now() or c.removed_at is not null or not cfg.enabled or cfg.expires_at<=now()
+           or cfg.policy_version<>pp.version or not pp.retain_allowed or not pp.display_allowed
+           or (pp.expires_at is not null and pp.expires_at<=now())))
  loop perform private.part_one_purge_capture(cid,'private_evidence_expired_or_revoked'); end loop;
 end $$;
 
@@ -657,8 +672,8 @@ begin
    or jsonb_array_length(p_payload->'assets')>6 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
  -- Validate uniqueness independently of HTTP DTO validation: duplicate aliases
  -- must never produce a committed receipt rejected by the strict response DTO.
- if exists(select 1 from jsonb_array_elements(p_payload->'assets') a group by a->>'evidenceId' having count(*)>1)
-   or exists(select 1 from jsonb_array_elements(p_payload->'assets') a group by a->>'storageObjectId' having count(*)>1) then
+ if exists(select 1 from jsonb_array_elements(p_payload->'assets') a group by (a->>'evidenceId')::uuid having count(*)>1)
+   or exists(select 1 from jsonb_array_elements(p_payload->'assets') a group by (a->>'storageObjectId')::uuid having count(*)>1) then
    raise exception 'PART_ONE_INVALID_PAYLOAD';
  end if;
  request_hash:=encode(extensions.digest(p_payload::text,'sha256'),'hex');
@@ -1007,6 +1022,9 @@ begin
      'brand',snap.payload->'brand','variantText',snap.payload->'variantText','image',snap.payload->'image','expiresAt',private.part_one_identity_expiry(snap.id)),
      'candidates','[]'::jsonb,'sections','[]'::jsonb,'sources','[]'::jsonb,'limitations',jsonb_build_array('Ingredients not verified yet')));
    r := jsonb_set(r,'{display,resultRevision}',r->'resultRevision');
+   -- Immutable payload may contain an asset whose independent rights changed
+   -- after candidate display. Refilter the newly selected projection atomically.
+   r := private.part_one_filter_result(r,u);
    update private.part_one_scans set generation=s.generation,result_revision=s.result_revision,binding_revision=binding_revision+1,result=r,deletion_epoch=deletion_epoch+1 where id=s.id;
    update private.part_one_subscriptions set ended_at=now() where scan_id=s.id and ended_at is null;
    -- Uncommitted derivatives have no historical package to preserve; purge

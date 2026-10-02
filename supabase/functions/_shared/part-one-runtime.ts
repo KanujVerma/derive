@@ -116,7 +116,7 @@ export async function handlePartOneRequest(request: Request, ports: PartOneHttpP
       const normalized=object(normalizeDatabaseDates(raw));
       if (action==='captures/observations' && normalized.conflict!==true) {
         const committed=CaptureCommitResultSchema.parse(normalized);
-        if (committed.capture.captureSessionId!==id || committed.capture.packageObservationId!==payload.packageObservationId)
+        if (committed.capture.captureSessionId!==id || committed.capture.packageObservationId!==String(payload.packageObservationId).toLowerCase())
           throw new Error('private_commit_binding');
         result=object(committed);
       } else if (action==='captures/read') {
