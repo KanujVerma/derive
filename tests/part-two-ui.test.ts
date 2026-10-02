@@ -124,3 +124,23 @@ test('A20/A29 actual private interpretation button sends the viewed capture revi
   const resolve=finish as unknown as (value:any)=>void;resolve({error:null,data:{state:'saved',interpretationId:p2metadata.snapshotId,bindingKey:v.result!.bindingKey,resultRevision:1}});
   await new Promise(resolve=>setImmediate(resolve));assert(!textContent(h.render()).includes('Ingredient interpretation saved'));
 });
+
+test('printed header kind transitions and may-contain reset render in order within one source section',()=>{
+  const v=view('Active ingredients: Retinol\nInactive ingredients: Water');
+  assert.equal(v.result?.state,'ready');if(v.result?.state!=='ready')throw Error('ready required');
+  assert.equal(new Set(v.result.output.reading.occurrences.map(o=>o.sectionId)).size,1,'printed headers share retained source section identity');
+  assert.deepEqual(v.result.output.reading.occurrences.map(o=>o.sectionKind),['active','inactive']);
+  const h=componentHarness(modulePath,'PartTwoInlineView',{view:v,now:Date.parse(p2metadata.createdAt)});
+  const nodes=h.render();
+  assert.deepEqual(nodes.filter(n=>n.type==='Text'&&n.props.accessibilityRole==='header').map(n=>n.props.children),['Ingredient details','Active ingredients','Inactive ingredients']);
+  assert.deepEqual(nodes.filter(n=>n.type==='Pressable'&&String(n.props.accessibilityLabel).startsWith('Ingredient details:')).map(n=>n.props.accessibilityLabel),['Ingredient details: Retinol','Ingredient details: Water']);
+  press(control(nodes,'Ingredient details: Water'));const expanded=h.render();assert.match(textContent(expanded),/Inactive ingredients Water.*Listed as: Water/);h.dispose();
+  const input=sourceReading('CI 77491, CI 77492\nIngredients: Glycerin');input.sections[0].kind='may_contain';
+  const reset={...v,result:normalize(input,LOCAL_DICTIONARY_RELEASE,p2metadata)};assert.equal(reset.result.state,'ready');if(reset.result.state!=='ready')throw Error('ready reset required');assert.deepEqual(reset.result.output.reading.occurrences.map(o=>o.sectionKind),['may_contain','may_contain','ingredients']);
+  const resetNodes=componentHarness(modulePath,'PartTwoInlineView',{view:reset,now:Date.parse(p2metadata.createdAt)}).render();
+  assert.deepEqual(resetNodes.filter(n=>n.type==='Text'&&n.props.accessibilityRole==='header').map(n=>n.props.children),['Ingredient details','May contain','Ingredients']);
+  assert.deepEqual(resetNodes.filter(n=>n.type==='Pressable'&&String(n.props.accessibilityLabel).startsWith('Ingredient details:')).map(n=>n.props.accessibilityLabel),['Ingredient details: CI 77491','Ingredient details: CI 77492','Ingredient details: Glycerin']);
+  const separate=sourceReading('Water\nGlycerin');separate.sections=[{...separate.sections[0],rawText:'Water'},{...separate.sections[0],sectionId:'second-retained-section',rawText:'Glycerin',sourceOffset:6}];
+  const separateNodes=componentHarness(modulePath,'PartTwoInlineView',{view:{...v,result:normalize(separate,LOCAL_DICTIONARY_RELEASE,p2metadata)},now:Date.parse(p2metadata.createdAt)}).render();
+  assert.deepEqual(separateNodes.filter(n=>n.type==='Text'&&n.props.accessibilityRole==='header').map(n=>n.props.children),['Ingredient details','Ingredients','Ingredients'],'same kind in a distinct retained section still receives its own heading');
+});

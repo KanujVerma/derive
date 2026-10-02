@@ -55,7 +55,7 @@ Deno.serve(async (request: Request) => {
           const work=normalizeAuthorized({schemaVersion:1,requestId:crypto.randomUUID(),scanId:result.scanId,captureSessionId:body.capture?.captureSessionId??null,expectedGeneration:result.generation,expectedEvidenceRevision:result.resultRevision},ownerId,{
             authorize:async()=>ownerId!,
             localFixtureApproved:Deno.env.get('PART_TWO_LOCAL_FIXTURE')==='1'&&/^http:\/\/(?:127\.0\.0\.1|localhost|kong)(?::[0-9]+)?(?:\/|$)/.test(url),
-            operation:async(action,payload)=>{const {data,error}=await client.rpc('part_two_operation',{p_action:action,p_payload:payload});if(error)throw new PartTwoHttpError('precompute_unavailable',503);return data;},
+            operation:async(action,payload)=>{if(action!=='resolve')throw new PartTwoHttpError('precompute_unavailable',503);const {data,error}=await admin.rpc('part_two_resolve',{p_owner:ownerId,p_payload:payload});if(error)throw new PartTwoHttpError('precompute_unavailable',503);return data;},
             worker:async(action,payload)=>{const {data,error}=await admin.rpc('part_two_worker',{p_action:action,p_payload:payload});if(error)throw new PartTwoHttpError('precompute_unavailable',503);return data;},
           }).catch(()=>undefined);
           EdgeRuntime.waitUntil(work);

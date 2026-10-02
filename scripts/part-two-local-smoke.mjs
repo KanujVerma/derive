@@ -18,6 +18,7 @@ const admin=createClient(endpoint,service,{auth:{persistSession:false,autoRefres
 const users=[];let checks=0;
 const check=(actual,expected,message)=>{assert.deepEqual(actual,expected,message);checks++;};
 async function rpc(client,name,action,payload){const {data,error}=await client.rpc(name,{p_action:action,p_payload:payload});if(error)throw new Error(`Synthetic ${name}/${action} failed (${error.code}, ${error.message.match(/PART_[A-Z0-9_]+/)?.[0]??'database'}); payload omitted`);return data;}
+async function resolveOwner(ownerId,payload){const {data,error}=await admin.rpc('part_two_resolve',{p_owner:ownerId,p_payload:payload});if(error)throw new Error(`Synthetic service resolver failed (${error.code}); payload omitted`);return data;}
 async function edge(client,path,body){const {data:{session}}=await client.auth.getSession();const response=await fetch(new URL(`/functions/v1/part-two/${path}`,target),{method:'POST',headers:{apikey:anon,authorization:`Bearer ${session.access_token}`,'content-type':'application/json'},body:JSON.stringify(body)});const result=await response.json();return {response,result};}
 // Deterministic recall/read overlap: hold the actual SQL recall fence, start
 // authenticated history read, observe its advisory wait, then commit recall.
@@ -64,7 +65,7 @@ try{
  check(admittedResponse.status,200,'Part 1 actual Edge admission remains available');const admitted=await admittedResponse.json();
  // Read-only joins; the admission hook owns the compute ticket, not this poll.
  await new Promise(resolve=>setTimeout(resolve,250));let precomputed;
- for(let i=0;i<20;i++){precomputed=await rpc(clients[0],'part_two_operation','resolve',{schemaVersion:1,requestId:randomUUID(),scanId:admitted.scanId,captureSessionId:null,expectedGeneration:admitted.generation,expectedEvidenceRevision:admitted.resultRevision});if(precomputed.cached)break;await new Promise(resolve=>setTimeout(resolve,100));}
+ for(let i=0;i<20;i++){precomputed=await resolveOwner(users[0],{schemaVersion:1,requestId:randomUUID(),scanId:admitted.scanId,captureSessionId:null,expectedGeneration:admitted.generation,expectedEvidenceRevision:admitted.resultRevision});if(precomputed.cached)break;await new Promise(resolve=>setTimeout(resolve,100));}
  check(precomputed.state,'ready','actual Part 1 admission hook precomputes normalization');check(precomputed.cached.state,'ready','precomputed immutable snapshot exists before explicit Part 2 request');
 
  const request={schemaVersion:1,requestId:randomUUID(),scanId:scan.scanId,captureSessionId:null,expectedGeneration:scan.generation,expectedEvidenceRevision:scan.resultRevision};
@@ -95,7 +96,7 @@ try{
   await rpc(admin,'part_two_worker','release/select',{releaseId:PART_TWO_RELEASE_ID});
   const rolled=await edge(clients[0],'normalize',request);check(rolled.result.output.reading.facts.some(f=>f.kind==='reference_function'),false,'release pointer rollback never resurrects durable known recall');
   await rpc(admin,'part_two_worker','release/select',{releaseId:PART_TWO_RELEASE_ID});
-  const lease=await rpc(clients[0],'part_two_operation','resolve',request);
+  const lease=await resolveOwner(users[0],request);
   await assert.rejects(()=>rpc(admin,'part_two_worker','publish',{...lease.ticket,result:ready.result}),/PART_TWO_RECALLED_EXPLANATION/);checks++;
  }
  if(process.argv.includes('--ui')){
