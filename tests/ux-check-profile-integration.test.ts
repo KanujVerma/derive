@@ -30,6 +30,8 @@ function previewModules() {
     '@/src/presentation/capture/liveFreeEvidenceProcessor': { createLiveIngredientContinuationProcessor: denyNetwork },
     '@/src/services/deriveClient': { evaluateProduct: denyNetwork },
     '@/src/services/remote/freeContext': { recordFreeCheck: denyNetwork },
+    '@/src/services/partOnePrivate': { PART_ONE_PRIVATE_ENABLED: false, partOnePrivateTransport: {} },
+    '../../../modules/derive-label-ocr': { preparePrivateLabelUpload: denyNetwork },
     '@/src/services/supabase': { supabase: {} },
     '@/src/services/productLinks': { resolveProductLink: denyNetwork, ProductLinkError: Error },
     '@/src/services/analytics': { analytics: { track() {} } },

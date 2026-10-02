@@ -2,12 +2,16 @@ import {
   ScanRequestSchema, ScanResultSchema, SelectionRequestSchema, SaveRequestSchema,
   CaptureSessionSchema, CaptureCommitRequestSchema, CaptureCommitResultSchema, PartOneIdSchema,
 } from '../../../src/contracts/PartOne.ts';
+import { CapturePrivateCommitRequestSchema, CaptureRecoverySchema, CaptureUploadReceiptSchema, PrivateCaptureCapabilitySchema, PrivateCaptureListSchema, parsePrivateUploadHeaders, type CapturePrivateCommitRequest, type CaptureUploadBinding } from '../../../src/contracts/PartOnePrivate.ts';
 import { normalizeBarcode } from '../../../src/domain/part-one/barcode.ts';
 
 /** RPC executes with the verified user's JWT, never a client-supplied owner or
  * a service-role shortcut. The consumer has a separate service-only RPC. */
 export interface PartOneHttpPorts {
   authorize(request: Request): Promise<void>;
+  privateUpload?(request: Request, id: string, binding: CaptureUploadBinding): Promise<unknown>;
+  privateCommit?(id: string, payload: CapturePrivateCommitRequest, request: Request): Promise<unknown>;
+  privateRecover?(id: string, request: Request): Promise<unknown>;
   operation(action: string, payload: Record<string, unknown>, request: Request): Promise<unknown>;
 }
 export class PartOneHttpError extends Error {
@@ -18,7 +22,7 @@ export class PartOneHttpError extends Error {
 const headers = {
   'Content-Type': 'application/json', 'Cache-Control': 'private, no-store, max-age=0',
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-part-one-idempotency-key, x-part-one-evidence-id, x-part-one-package-observation-id, x-part-one-generation, x-part-one-result-revision, x-part-one-capture-revision, x-part-one-deletion-epoch',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
 };
 function response(body: unknown, status = 200): Response {
@@ -28,11 +32,11 @@ function response(body: unknown, status = 200): Response {
 export function normalizeDatabaseDates(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(normalizeDatabaseDates);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, v]) => [key,
-    typeof v === 'string' && ['observedAt','expiresAt','sourceUpdatedAt','nextCheckAfter','createdAt'].includes(key)
+    typeof v === 'string' && ['observedAt','expiresAt','sourceUpdatedAt','nextCheckAfter','createdAt','reviewedAt','now'].includes(key)
       && Number.isFinite(Date.parse(v)) ? new Date(v).toISOString() : normalizeDatabaseDates(v)]));
   return value;
 }
-async function boundedJson(request: Request): Promise<Record<string, unknown>> {
+async function boundedJson(request: Request, maximumBytes = 64 * 1024): Promise<Record<string, unknown>> {
   // Read streams with an actual byte limit: Content-Length is not trusted.
   const reader = request.body?.getReader();
   if (!reader) throw new PartOneHttpError('invalid_payload',400);
@@ -41,7 +45,7 @@ async function boundedJson(request: Request): Promise<Record<string, unknown>> {
     const { value, done } = await reader.read();
     if (done) break;
     bytes += value.byteLength;
-    if (bytes > 64 * 1024) { await reader.cancel(); throw new PartOneHttpError('payload_too_large',413); }
+    if (bytes > maximumBytes) { await reader.cancel(); throw new PartOneHttpError('payload_too_large',413); }
     chunks.push(value);
   }
   const data = new Uint8Array(bytes); let offset = 0;
@@ -76,6 +80,24 @@ export async function handlePartOneRequest(request: Request, ports: PartOneHttpP
     const [resource,rawId,child] = parts;
     const id=rawId?.toLowerCase();
     if (parts.length>3 || id && !PartOneIdSchema.safeParse(id).success) throw new PartOneHttpError('invalid_path',400);
+    if(resource==='captures' && id && child==='assets' && request.method==='POST') {
+      const binding=parsePrivateUploadHeaders(request.headers);
+      if(!ports.privateUpload) throw new PartOneHttpError('private_retention_disabled',423);
+      const raw=await ports.privateUpload(request,id,binding);
+      try {
+        const receipt=CaptureUploadReceiptSchema.parse(normalizeDatabaseDates(raw));
+        if(receipt.capture.captureSessionId!==id || receipt.capture.packageObservationId!==binding.packageObservationId.toLowerCase() || receipt.asset.evidenceId!==binding.evidenceId.toLowerCase()) throw new Error('upload_binding');
+        return response(receipt);
+      } catch { throw new PartOneHttpError('invalid_server_projection',500); }
+    }
+    if(resource==='captures' && id && child==='evidence' && request.method==='GET') {
+      if(!ports.privateRecover) throw new PartOneHttpError('private_retention_disabled',423);
+      const raw=await ports.privateRecover(id,request);
+      try { const recovered=CaptureRecoverySchema.parse(normalizeDatabaseDates(raw));
+        if(recovered.capture.captureSessionId!==id) throw new Error('recovery_binding');
+        return response(recovered);
+      } catch { throw new PartOneHttpError('invalid_server_projection',500); }
+    }
     let action: string; let payload: Record<string, unknown>;
     if (resource==='scans' && !id && request.method==='POST') {
       const scan = ScanRequestSchema.parse(await boundedJson(request));
@@ -96,11 +118,27 @@ export async function handlePartOneRequest(request: Request, ports: PartOneHttpP
       if (Object.keys(body).some(k=>!validKeys.includes(k)) || validKeys.some(k=>!Number.isInteger(body[k]) || Number(body[k])<0)) throw new PartOneHttpError('invalid_payload',400);
       action='captures/create'; payload={scanId:id,...body};
     } else if (resource==='captures' && id && child==='observations' && request.method==='POST') {
-      action='captures/observations'; payload={captureSessionId:id,...CaptureCommitRequestSchema.parse(await boundedJson(request))};
+      const input=await boundedJson(request,512*1024);
+      if(input.schemaVersion===2) {
+        const parsed=CapturePrivateCommitRequestSchema.parse(input);
+        if(!ports.privateCommit) throw new PartOneHttpError('private_retention_disabled',423);
+        const raw=await ports.privateCommit(id,parsed,request);
+        try { const normalized=object(normalizeDatabaseDates(raw));
+          if(normalized.conflict===true) return response({...normalized,result:ScanResultSchema.parse(normalized.result)},409);
+          const committed=CaptureCommitResultSchema.parse(normalized);
+          if(committed.capture.captureSessionId!==id || committed.capture.packageObservationId!==parsed.packageObservationId.toLowerCase()) throw new Error('private_binding');
+          return response(committed);
+        } catch { throw new PartOneHttpError('invalid_server_projection',500); }
+      }
+      action='captures/observations'; payload={captureSessionId:id,...CaptureCommitRequestSchema.parse(input)};
     } else if (resource==='captures' && id && !child && request.method==='GET') {
       action='captures/read'; payload={id};
     } else if (resource==='captures' && id && !child && request.method==='DELETE') {
       action='captures/delete'; payload={id};
+    } else if (resource==='captures' && !id && request.method==='GET') {
+      action='captures/list'; payload={};
+    } else if (resource==='private-capability' && !id && request.method==='GET') {
+      action='private/capability'; payload={};
     } else if (resource==='saves' && !id && request.method==='GET') {
       action='saves/list'; payload={};
     } else if (resource==='saves' && !id && request.method==='POST') {
@@ -114,7 +152,9 @@ export async function handlePartOneRequest(request: Request, ports: PartOneHttpP
     let result: Record<string, unknown>;
     try {
       const normalized=object(normalizeDatabaseDates(raw));
-      if (action==='captures/observations' && normalized.conflict!==true) {
+      if(action==='captures/list') { result=object(PrivateCaptureListSchema.parse(normalized));
+      } else if(action==='private/capability') { result=object(PrivateCaptureCapabilitySchema.parse(normalized));
+      } else if (action==='captures/observations' && normalized.conflict!==true) {
         const committed=CaptureCommitResultSchema.parse(normalized);
         if (committed.capture.captureSessionId!==id || committed.capture.packageObservationId!==String(payload.packageObservationId).toLowerCase())
           throw new Error('private_commit_binding');

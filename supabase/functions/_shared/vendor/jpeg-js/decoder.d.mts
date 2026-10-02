@@ -1,0 +1,1 @@
+export default function decode(bytes: Uint8Array, options: {useTArray: true; formatAsRGBA?: boolean; tolerantDecoding?: boolean; maxResolutionInMP: number; maxMemoryUsageInMB: number}): {width: number; height: number; data: Uint8Array; exifBuffer?: Uint8Array; comments?: string[]};

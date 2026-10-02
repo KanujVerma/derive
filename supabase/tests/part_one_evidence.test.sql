@@ -12,6 +12,18 @@ select ok(has_function_privilege('authenticated','public.part_one_operation(text
   'authenticated operation RPC is installed');
 select is((select count(*)::int from private.part_one_policies where id<>'derive_catalog' and
   (lookup_allowed or retain_allowed or display_allowed)),0,'all unresolved external/private source policies stay disabled');
+select has_table('private','part_one_upload_tickets','private upload dispatch has durable opaque tickets');
+select has_table('private','part_one_private_cleanup','private bytes removal has durable version-fenced outbox');
+select has_table('private','part_one_review_authorities','review authorities are independently registered');
+select is((select count(*)::integer from private.part_one_review_authorities where enabled),0,'no private review authority is enabled by migration');
+select ok(not has_function_privilege('authenticated','public.part_one_private_service(text,jsonb)','execute') and not has_function_privilege('anon','public.part_one_private_service(text,jsonb)','execute'),'private upload attestation/review/cleanup RPC is service only');
+select ok(not has_table_privilege('authenticated','private.part_one_upload_tickets','select') and not has_table_privilege('authenticated','private.part_one_review_authorities','insert'),'customer cannot hydrate upload tickets or register authority');
+select ok(not private.part_one_private_enabled(true),'private capability disabled with no retention approval or consumer');
+select throws_ok($$select public.part_one_private_service('review/prepare','{}')$$,'P0001','PART_ONE_PRIVATE_RETENTION_DISABLED','default review cannot persist or accept private evidence');
+select is(private.part_one_js_slice('A😀B',1,3),'😀','trusted source proof slices use JS UTF16 units');
+select is(private.part_one_js_slice('A😀B',2,3),null,'trusted source proof cannot split an astral code point');
+select is(private.part_one_canonical_json('{"z":1.00,"a":[0.10,true,null,"é"]}'),'{"a":[0.1,true,null,"é"],"z":1}','private observation canonical hash uses stable sorted keys/numeric values');
+
 
 insert into auth.users(id,email,is_anonymous,raw_user_meta_data) values
   ('e6000000-0000-4000-8000-000000000001',null,true,'{}'),
@@ -686,6 +698,72 @@ insert into private.part_one_asset_attestations(id,owner_id,capture_id,package_o
  'synthetic-sanitizer-1','Synthetic upload identity only',true,now(),now()+interval '1 hour' from part_one_test_state where key='selection-before-commit';
 set local role authenticated;
 set local role postgres;
+-- Actual service preparation is bound to the latest source commit; no typed
+-- client checkbox supplies an authority and stale apply cannot change rows.
+update private.part_one_private_config set reviewed_at=now();
+insert into part_one_test_state values('private-service-prepared',public.part_one_private_service('review/prepare',
+ (select jsonb_build_object('ownerId',cm.owner_id,'captureSessionId',cm.capture_id,'idempotencyKey',cm.idempotency_key,'reviewId',null)
+ from private.part_one_capture_commits cm where cm.owner_id='e7100000-0000-4000-8000-000000000001' order by cm.created_at desc,cm.capture_revision desc limit 1)));
+select is((select value->'context'->'policy'->'retainedFields' @> '["ingredients"]' from part_one_test_state where key='private-service-prepared'),true,
+ 'reviewed private retention explicitly includes ingredient transcript evidence');
+select is((select value->'context'->'ownerId' from part_one_test_state where key='private-service-prepared'),'"e7100000-0000-4000-8000-000000000001"'::jsonb,
+ 'actual prepared context is owner-bound');
+select is(public.part_one_private_service('review/apply',(select jsonb_build_object('ownerId','e7100000-0000-4000-8000-000000000001',
+ 'captureSessionId',value->'context'->'capture'->'captureSessionId','idempotencyKey',cm.idempotency_key,'reviewId',null,'sourceCommitId',value->'sourceCommitId',
+ 'expectedCaptureRevision',-1,'expectedResultRevision',value->'resultRevision','evaluation','{}'::jsonb,'authorityPolicy',null)
+ from part_one_test_state ps join private.part_one_capture_commits cm on cm.source_commit_id=(ps.value->>'sourceCommitId')::uuid where ps.key='private-service-prepared'))->>'conflict','true',
+ 'stale reviewed apply is rejected before any private graph admission');
+select throws_ok($$select public.part_one_private_service('review/apply',(select jsonb_build_object('ownerId','e7100000-0000-4000-8000-000000000001',
+ 'captureSessionId',value->'context'->'capture'->'captureSessionId','idempotencyKey',cm.idempotency_key,'reviewId',null,'sourceCommitId',value->'sourceCommitId',
+ 'expectedCaptureRevision',value->'captureRevision','expectedResultRevision',value->'resultRevision','evaluation',jsonb_build_object('persistable',false),'authorityPolicy',null)
+ from part_one_test_state ps join private.part_one_capture_commits cm on cm.source_commit_id=(ps.value->>'sourceCommitId')::uuid where ps.key='private-service-prepared'))$$,
+ 'P0001','PART_ONE_INVALID_PRIVATE_REVIEW','malformed/unpermitted private graph admission fails atomically');
+-- Bounded private upload ownership and quota. These are reservations only;
+-- no SQL fixture asserts that metadata insertion proves actual Storage bytes.
+insert into part_one_test_state values('private-upload-binding',(select jsonb_build_object('captureSessionId',cc.id,'packageObservationId',cc.package_observation_id,
+ 'expectedGeneration',cc.generation,'expectedResultRevision',ss.result_revision,'expectedCaptureRevision',cc.capture_revision,'expectedDeletionEpoch',cc.deletion_epoch,
+ 'contentHash',repeat('a',64),'byteLength',100,'width',160,'height',64) from private.part_one_captures cc join private.part_one_scans ss on ss.id=cc.scan_id
+ where cc.id=(select (value->>'captureSessionId')::uuid from part_one_test_state where key='private-capture-a')));
+set local role authenticated;
+select is(public.part_one_operation('captures/upload-authorize',(select value from part_one_test_state where key='private-upload-binding'))->>'code',
+ 'private_cleanup_worker_unavailable','private upload refuses dispatch without real fresh cleanup consumer');
+set local role postgres;
+select public.part_one_private_service('cleanup/heartbeat','{"consumerVersion":"synthetic-pgtap-consumer"}');
+set local role authenticated;
+select is(public.part_one_operation('captures/upload-authorize',(select value-'packageObservationId' from part_one_test_state where key='private-upload-binding'))->>'code',
+ 'stale_capture','direct RPC cannot omit exact package binding');
+insert into part_one_test_state values('private-reservations',(select jsonb_agg(public.part_one_operation('captures/upload-reserve',ps.value||
+ jsonb_build_object('idempotencyKey','synthetic-private-reservation-'||i,'evidenceId','e7800000-0000-4000-8000-'||lpad(i::text,12,'0'))))
+ from part_one_test_state ps,generate_series(1,6) i where ps.key='private-upload-binding'));
+select is(public.part_one_operation('captures/upload-reserve',(select value||jsonb_build_object('idempotencyKey','synthetic-private-reservation-7',
+ 'evidenceId','e7800000-0000-4000-8000-000000000007') from part_one_test_state where key='private-upload-binding'))->>'code',
+ 'private_upload_quota','seventh private capture reservation is deferred without Storage dispatch');
+set local role postgres;
+select is((select count(*)::integer from private.part_one_upload_tickets where capture_id=(select (value->>'captureSessionId')::uuid from part_one_test_state where key='private-capture-a')),6,
+ 'private quota refusal creates no seventh durable reservation');
+select is((select count(distinct object_name)::integer from private.part_one_upload_tickets where capture_id=(select (value->>'captureSessionId')::uuid from part_one_test_state where key='private-capture-a')
+ and object_name~'^part-one/[a-f0-9-]{36}\.jpg$'),6,'all reserved destinations are unique opaque server names');
+-- Deletion fault fixture: a saved private snapshot owns an FK to a graph
+-- record. The byte/source removal must erase the graph and all copied private
+-- variant fields while retaining only original snapshot ID + public identity.
+insert into private.part_one_records(id,kind,item_id,revision,policy_id,policy_version,owner_id,scope,payload,identity_dependencies,observed_at,expires_at)
+ select 'e7600000-0000-4000-8000-000000000001','snapshot','e7100000-0000-4000-8000-000000000004',2,'private_capture',cfg.policy_version,
+ 'e7100000-0000-4000-8000-000000000001','private_package',jsonb_build_object('privateKind','package_snapshot','captureSessionId',pc.value->'captureSessionId',
+ 'packageObservationId',pc.value->'packageObservationId','name','Synthetic private package','brand','Fixture','variantText','Sensitive private variant',
+ 'image',null,'declarationIds','[]'::jsonb,'publicSnapshotId','e7100000-0000-4000-8000-000000000003'),array['e7100000-0000-4000-8000-000000000003'::uuid],now(),now()+interval '1 hour'
+ from private.part_one_private_config cfg,part_one_test_state pc where pc.key='private-capture-a';
+insert into private.part_one_saves(id,owner_id,idempotency_key,scan_id,snapshot_at_save_id,declaration_id,saved_result,saved_request)
+ select 'e7600000-0000-4000-8000-000000000002',sv.owner_id,'synthetic-private-snapshot-save',sv.scan_id,'e7600000-0000-4000-8000-000000000001',sv.declaration_id,
+ jsonb_set(jsonb_set(sv.saved_result,'{snapshotId}','"e7600000-0000-4000-8000-000000000001"'),'{display,selectedIdentity,variantText}','"Sensitive private variant"'),sv.saved_request
+ from private.part_one_saves sv where sv.id=(select (value->>'saveId')::uuid from part_one_test_state where key='private-save-a');
+select ok(exists(select 1 from private.part_one_saves where id='e7600000-0000-4000-8000-000000000002'),'private snapshot FK deletion regression fixture has a saved row');
+insert into private.part_one_record_status(record_id,status,reason) values('e7600000-0000-4000-8000-000000000001','revoked','Synthetic private variant withdrawal');
+select is((select private.part_one_filter_result(saved_result,owner_id)->>'snapshotId' from private.part_one_saves where id='e7600000-0000-4000-8000-000000000002'),
+ 'e7100000-0000-4000-8000-000000000003','A26 private snapshot withdrawal returns only original independently permitted public identity');
+select ok((select private.part_one_filter_result(saved_result,owner_id)->>'identity'='exact' and not private.part_one_filter_result(saved_result,owner_id)::text like '%Sensitive private variant%'
+ and private.part_one_filter_result(saved_result,owner_id)->'display'->'sections'='[]'::jsonb from private.part_one_saves where id='e7600000-0000-4000-8000-000000000002'),
+ 'A26 private withdrawal preserves public identity while purging private variant/ingredient projection');
+
 -- Synthetic composition supplies an eligible selected-package candidate binding;
 -- selection itself runs the real authenticated lifecycle transaction.
 insert into private.part_one_candidate_bindings(scan_id,generation,owner_id,item_id,snapshot_id)
@@ -725,13 +803,39 @@ select is(public.part_one_operation('scans/read',(select jsonb_build_object('sca
  'exact','A26 independently permitted public identity survives private removal');
 set local role postgres;
 select is((select count(*)::integer from private.part_one_records where owner_id='e7100000-0000-4000-8000-000000000001'),0,'A25 private removal erases original/edit/derived payloads');
+select is((select snapshot_at_save_id from private.part_one_saves where id='e7600000-0000-4000-8000-000000000002'),
+ 'e7100000-0000-4000-8000-000000000003'::uuid,'A25 removal internal FK redirects only to stored original public identity');
+select is((select original_snapshot_at_save_id from private.part_one_saves where id='e7600000-0000-4000-8000-000000000002'),
+ 'e7600000-0000-4000-8000-000000000001'::uuid,'A28 original saved private snapshot UUID remains opaque immutable tombstone');
+select ok((select not saved_result::text like '%Sensitive private variant%' and saved_result->'display'->'sections'='[]'::jsonb and declaration_id is null
+ from private.part_one_saves where id='e7600000-0000-4000-8000-000000000002'),'A26 private removal erases copied private variant and declaration readiness');
+set local role authenticated;
+select is(public.part_one_operation('saves/read','{"id":"e7600000-0000-4000-8000-000000000002"}')->>'snapshotAtSaveId',
+ 'e7600000-0000-4000-8000-000000000001','A28 tombstone reopen preserves external original snapshot-at-save ID');
+set local role postgres;
+
 select is((select count(*)::integer from private.part_one_private_cleanup where object_id='e7200000-0000-4000-8000-000000000001'),1,'A27 private bytes deletion durably queued through Storage API boundary');
+insert into part_one_test_state values('private-cleanup-claim',public.part_one_private_service('cleanup/claim','{}'));
+select ok((select value->'claim'<>'null'::jsonb from part_one_test_state where key='private-cleanup-claim'),'private cleanup consumer obtains durable bounded lease');
+select is(public.part_one_private_service('cleanup/ack',(select jsonb_build_object('objectId',value->'claim'->'objectId','leaseToken','e7900000-0000-4000-8000-000000000001')
+ from part_one_test_state where key='private-cleanup-claim'))->>'deleted','false','stale cleanup lease cannot acknowledge erasure');
+select is(public.part_one_private_service('cleanup/ack',(select jsonb_build_object('objectId',value->'claim'->'objectId','leaseToken',value->'claim'->'leaseToken')
+ from part_one_test_state where key='private-cleanup-claim'))->>'deleted','false','SQL never acknowledges byte erasure while Storage object still exists');
+select is((select count(*)::integer from private.part_one_upload_tickets where capture_id=(select (value->>'captureSessionId')::uuid from part_one_test_state where key='private-capture-a')
+ and state='cancelled'),6,'removed capture fences every uncommitted upload ticket');
+
 select set_config('request.jwt.claim.sub','e7100000-0000-4000-8000-000000000002',true);
 set local role authenticated;
 select is((public.part_one_operation('scans/read',(select jsonb_build_object('scanId',value->'scanId') from part_one_test_state where key='private-b'))->'display')->'sections'->0->>'text',
  E'Water, 1,2-Hexanediol\nGlycerin 0.1% w/w','A25 owner A removal leaves B transcript intact');
 set local role postgres;
 insert into private.part_one_asset_status(attestation_id,revoked_at,reason) values('e7200000-0000-4000-8000-000000000005',now(),'Synthetic private asset permission revoked');
+set local role authenticated;
+select is(public.part_one_operation('scans/read',(select jsonb_build_object('scanId',value->'scanId') from part_one_test_state where key='private-b'))->>'identity',
+ 'exact','A26 read-time source revocation preserves independent public identity');
+set local role postgres;
+select is((select count(*)::integer from private.part_one_records where owner_id='e7100000-0000-4000-8000-000000000002'),0,
+ 'A26 ordinary read purges affected private sources and derivatives before consumer sweep');
 select public.part_one_worker('purge_private','{}');
 select is((select count(*)::integer from private.part_one_records where owner_id='e7100000-0000-4000-8000-000000000002'),0,'A26 private asset revocation erases dependent transcripts on consumer sweep');
 select is((select count(*)::integer from private.part_one_private_cleanup where object_id='e7200000-0000-4000-8000-000000000002'),1,'A26 revoked private asset schedules byte cleanup');
@@ -752,7 +856,7 @@ insert into private.part_one_asset_attestations(id,owner_id,capture_id,package_o
  'synthetic-sanitizer-1','Synthetic metadata fixture only',true,now(),now()+interval '1 hour' from part_one_test_state where key='private-unresolved-cap';
 insert into part_one_test_state values('private-unresolved-request',(select
  jsonb_set(jsonb_set(a.value,'{observations,0,captureSessionId}',b.value->'captureSessionId'),'{observations,0,evidenceId}',
- '"e7400000-0000-4000-8000-000000000005"') || jsonb_build_object('captureSessionId',b.value->'captureSessionId',
+ '"e7400000-0000-4000-8000-000000000006"') || jsonb_build_object('captureSessionId',b.value->'captureSessionId',
  'packageObservationId',b.value->'packageObservationId','idempotencyKey','private-unresolved-commit',
  'assets',jsonb_build_array(jsonb_build_object('evidenceId','e7400000-0000-4000-8000-000000000006','storageObjectId','e7400000-0000-4000-8000-000000000003',
  'contentHash','fixture-hash-b','width',400,'height',300,'metadataStripped',true)))
@@ -763,6 +867,65 @@ select is((select value->'result'->>'itemId' from part_one_test_state where key=
 select is((select value->'result'->>'snapshotId' from part_one_test_state where key='private-unresolved-commit'),null,'A07 no guessed private product snapshot');
 select is((select value->'result'->>'declarationState' from part_one_test_state where key='private-unresolved-commit'),'partial','unresolved identity text stays explicit partial');
 select is((select jsonb_array_length(value->'result'->'display'->'sections') from part_one_test_state where key='private-unresolved-commit'),1,'unresolved partial retains owner display and rights-bound date');
+set local role postgres;
+-- Reopen commits include the unchanged immutable originals. Only exact same
+-- owner/package/role/metadata reuses an ID; a changed source under it is rejected.
+insert into part_one_test_state values('private-v2-reuse-request',(select (rq.value-'observations')||jsonb_build_object('schemaVersion',2,
+ 'idempotencyKey','private-v2-reuse','expectedResultRevision',ss.result_revision,'expectedCaptureRevision',cc.capture_revision,
+ 'sourceObservations',jsonb_build_array(jsonb_build_object('observationId',rq.value->'observations'->0->'evidenceId','revision',1,'role','ingredients','observation',rq.value->'observations'->0)),
+ 'review',null,'reviewId',null) from part_one_test_state rq join private.part_one_captures cc on cc.id=(rq.value->>'captureSessionId')::uuid
+ join private.part_one_scans ss on ss.id=cc.scan_id where rq.key='private-unresolved-request'));
+set local role authenticated;
+insert into part_one_test_state values('private-v2-reuse',public.part_one_operation('captures/observations',(select value from part_one_test_state where key='private-v2-reuse-request')));
+select is((select value->'observationIds' from part_one_test_state where key='private-v2-reuse'),
+ (select value->'observationIds' from part_one_test_state where key='private-unresolved-commit'),'A28 reopened v2 commit reuses exact immutable original evidence IDs');
+set local role postgres;
+select is((select count(*)::integer from private.part_one_records where owner_id='e7100000-0000-4000-8000-000000000002' and payload->>'privateKind'='ocr'),1,
+ 'A28 exact original replay creates no duplicate OCR source');
+insert into part_one_test_state values('private-v2-changed-id',(select jsonb_set(rq.value,'{sourceObservations,0,observation,lines,0,text}','"Contradictory replacement under old ID"')||
+ jsonb_build_object('idempotencyKey','private-v2-contradiction','expectedResultRevision',ss.result_revision,'expectedCaptureRevision',cc.capture_revision)
+ from part_one_test_state rq join private.part_one_captures cc on cc.id=(rq.value->>'captureSessionId')::uuid join private.part_one_scans ss on ss.id=cc.scan_id where rq.key='private-v2-reuse-request'));
+set local role authenticated;
+select throws_ok($$select public.part_one_operation('captures/observations',(select value from part_one_test_state where key='private-v2-changed-id'))$$,
+ 'P0001','PART_ONE_IDEMPOTENCY_CONFLICT','A28 changed metadata cannot reuse immutable original ID');
+set local role postgres;
+select is((select count(*)::integer from private.part_one_capture_commits where idempotency_key='private-v2-contradiction'),0,
+ 'A28 rejected changed-ID request commits no durable receipt');
+-- Stable original pass order and ancestry order across same-transaction
+-- commits. IDs deliberately sort opposite to source/edited revision order.
+insert into part_one_test_state values('private-v2-pass-two-request',(select jsonb_build_object('captureSessionId',cc.id,'packageObservationId',cc.package_observation_id,
+ 'schemaVersion',2,'idempotencyKey','private-pass-two','expectedGeneration',cc.generation,'expectedResultRevision',ss.result_revision,'expectedCaptureRevision',cc.capture_revision,
+ 'expectedDeletionEpoch',cc.deletion_epoch,'assets',rq.value->'assets','sourceObservations',jsonb_build_array(jsonb_build_object('observationId','e7000000-0000-4000-8000-000000000009',
+ 'revision',1,'role','ingredients','observation',jsonb_set(rq.value->'observations'->0,'{recognizerVersion}','"synthetic-second-pass"'))),'edits','[]'::jsonb,'review',null,'reviewId',null)
+ from part_one_test_state rq join private.part_one_captures cc on cc.id=(rq.value->>'captureSessionId')::uuid join private.part_one_scans ss on ss.id=cc.scan_id where rq.key='private-unresolved-request'));
+set local role authenticated;
+insert into part_one_test_state values('private-v2-pass-two',public.part_one_operation('captures/observations',(select value from part_one_test_state where key='private-v2-pass-two-request')));
+insert into part_one_test_state values('private-pass-recovery',public.part_one_operation('captures/evidence',(select jsonb_build_object('captureSessionId',value->'capture'->'captureSessionId')
+ from part_one_test_state where key='private-v2-pass-two')));
+select is((select value->'sourceObservations'->0->>'observationId' from part_one_test_state where key='private-pass-recovery'),
+ 'e7400000-0000-4000-8000-000000000006','A28 recovered original pass remains first despite UUID/timestamp tie');
+select is((select value->'sourceObservations'->1->>'observationId' from part_one_test_state where key='private-pass-recovery'),
+ 'e7000000-0000-4000-8000-000000000009','A28 later OCR pass appends to stable original source order');
+set local role postgres;
+select is((select (payload->>'sourceOrdinal')::integer from private.part_one_records where id='e7000000-0000-4000-8000-000000000009'),1,
+ 'A28 immutable later source retains admission ordinal');
+insert into part_one_test_state values('private-v2-multiple-edits-request',(select jsonb_build_object('captureSessionId',cc.id,'packageObservationId',cc.package_observation_id,
+ 'schemaVersion',2,'idempotencyKey','private-multiple-edits','expectedGeneration',cc.generation,'expectedResultRevision',ss.result_revision,'expectedCaptureRevision',cc.capture_revision,
+ 'expectedDeletionEpoch',cc.deletion_epoch,'assets','[]'::jsonb,'sourceObservations','[]'::jsonb,'review',null,'reviewId',null,
+ 'edits',jsonb_build_array(jsonb_build_object('observationId','f7a00000-0000-4000-8000-000000000003','supersedesId','e7400000-0000-4000-8000-000000000006',
+ 'revision',2,'text','Synthetic original correction two','reason','Synthetic correction','sourceRef',jsonb_build_object('evidenceId','e7400000-0000-4000-8000-000000000006','observationIndex',0,'lineIndex',0),
+ 'replacementText','Synthetic original correction two'),jsonb_build_object('observationId','e7a00000-0000-4000-8000-000000000002','supersedesId','f7a00000-0000-4000-8000-000000000003',
+ 'revision',3,'text','Synthetic original correction three','reason','Synthetic correction','sourceRef',jsonb_build_object('evidenceId','e7400000-0000-4000-8000-000000000006','observationIndex',0,'lineIndex',0),
+ 'replacementText','Synthetic original correction three')))
+ from private.part_one_captures cc join private.part_one_scans ss on ss.id=cc.scan_id where cc.id=(select (value->>'captureSessionId')::uuid from part_one_test_state where key='private-unresolved-cap')));
+set local role authenticated;
+insert into part_one_test_state values('private-v2-multiple-edits',public.part_one_operation('captures/observations',(select value from part_one_test_state where key='private-v2-multiple-edits-request')));
+insert into part_one_test_state values('private-edit-order-recovery',public.part_one_operation('captures/evidence',(select jsonb_build_object('captureSessionId',value->'capture'->'captureSessionId')
+ from part_one_test_state where key='private-v2-multiple-edits')));
+select is((select value->'edits'->0->>'revision' from part_one_test_state where key='private-edit-order-recovery'),'2','A28 edit recovery preserves first supersedes revision despite UUID sort');
+select is((select value->'edits'->1->>'revision' from part_one_test_state where key='private-edit-order-recovery'),'3','A28 latest recovered edit is actual latest chain revision');
+select is((select value->'boundResult'->>'resultRevision' from part_one_test_state where key='private-edit-order-recovery'),
+ (select value->'result'->>'resultRevision' from part_one_test_state where key='private-v2-multiple-edits'),'A28 latest bound commit uses capture revision rather than random UUID tie');
 set local role postgres;
 select public.begin_customer_account_deletion('e7100000-0000-4000-8000-000000000002');
 delete from auth.users where id='e7100000-0000-4000-8000-000000000002';

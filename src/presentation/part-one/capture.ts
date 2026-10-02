@@ -56,6 +56,7 @@ export class MemoryLabelDraft {
     // The controller may await flushCleanup for evidence; no raw URI/error is logged.
     this.cleanupInFlight.catch(() => {});
   }
+  hasPendingRecognition() { return this.recognizing; }
   flushCleanup() { return this.cleanupInFlight; }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private emit() {

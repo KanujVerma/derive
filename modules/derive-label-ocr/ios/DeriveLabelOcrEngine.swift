@@ -41,7 +41,7 @@ enum DeriveLabelOcrEngine {
   static func sanitizedJpeg(_ image: CGImage) -> Data? {
     let data = NSMutableData()
     guard let destination = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
-    CGImageDestinationAddImage(destination, image, [kCGImageDestinationEmbedThumbnail: false] as CFDictionary)
+    CGImageDestinationAddImage(destination, image, [kCGImageDestinationEmbedThumbnail: false, kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
     // ImageIO can synthesize EXIF even with an empty metadata object. Strip encoder-created
     // JPEG application/comment segments and verify the resulting derivative by decoding it.
     guard CGImageDestinationFinalize(destination), let stripped = stripJpegMetadata(data as Data),
@@ -73,6 +73,33 @@ enum DeriveLabelOcrEngine {
       cursor += length
     }
     return nil
+  }
+  /// Returns only a verified JPEG derivative in memory. Raw originals never cross this bridge.
+  static func prepareUpload(_ uri: String, cropRegion: [Double]) -> [String: Any] {
+    guard cropRegion.count == 4, cropRegion.allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 1 }),
+      cropRegion[2] > 0, cropRegion[3] > 0, cropRegion[0] + cropRegion[2] <= 1, cropRegion[1] + cropRegion[3] <= 1,
+      let (image, sourceWidth, sourceHeight, transform) = localImage(uri) else { return ["status": "failed"] }
+    let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+    let rectangle = CGRect(x: cropRegion[0] * Double(image.width), y: cropRegion[1] * Double(image.height),
+      width: cropRegion[2] * Double(image.width), height: cropRegion[3] * Double(image.height)).integral.intersection(bounds)
+    guard rectangle.width > 0, rectangle.height > 0, let cropped = image.cropping(to: rectangle) else { return ["status": "failed"] }
+    let actualCrop = [rectangle.minX / Double(image.width), rectangle.minY / Double(image.height),
+      rectangle.width / Double(image.width), rectangle.height / Double(image.height)]
+    var derivative = cropped
+    for _ in 0..<7 {
+      guard let jpeg = sanitizedJpeg(derivative) else { return ["status": "failed"] }
+      if jpeg.count <= 2 * 1024 * 1024 {
+        return ["status": "prepared", "base64": jpeg.base64EncodedString(), "mimeType": "image/jpeg",
+          "width": derivative.width, "height": derivative.height, "sourceWidth": sourceWidth, "sourceHeight": sourceHeight,
+          "orientationTransform": transform, "cropRegion": actualCrop, "recipeVersion": "derive-private-jpeg-v1"]
+      }
+      let width = max(1, Int(Double(derivative.width) * 0.75)), height = max(1, Int(Double(derivative.height) * 0.75))
+      guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return ["status": "failed"] }
+      context.interpolationQuality = .high; context.draw(derivative, in: CGRect(x: 0, y: 0, width: width, height: height))
+      guard let scaled = context.makeImage() else { return ["status": "failed"] }; derivative = scaled
+    }
+    return ["status": "failed"]
   }
   static func recognitionErrorStatus(_ error: Error) -> String {
     let failure = error as NSError

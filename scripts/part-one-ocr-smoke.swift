@@ -68,6 +68,19 @@ import Vision
     // ImageIO may generate a thumbnail even with creation flags false. Inspect the actual
     // JPEG segments instead: JFIF/EXIF/IPTC thumbnails cannot remain without APP segments.
     try require(!hasJpegApplicationOrCommentSegments(sanitized), "No embedded metadata or thumbnail segments")
+    let upload = DeriveLabelOcrEngine.prepareUpload(sourceUrl.absoluteString, cropRegion: [0, 0, 1, 1])
+    try require(upload["status"] as? String == "prepared", "Native upload derivative prepared")
+    let uploadBytes = Data(base64Encoded: upload["base64"] as! String)!
+    try require(uploadBytes.count <= 2 * 1024 * 1024, "Upload derivative byte cap")
+    try require(!hasJpegApplicationOrCommentSegments(uploadBytes), "Upload derivative metadata stripped")
+    let uploadImage = CGImageSourceCreateWithData(uploadBytes as CFData, nil)!
+    try require(CGImageSourceCreateImageAtIndex(uploadImage, 0, nil) != nil, "Actual upload JPEG decodes")
+    let uploadProperties = CGImageSourceCopyPropertiesAtIndex(uploadImage, 0, nil)! as NSDictionary
+    try require(uploadProperties[kCGImagePropertyGPSDictionary] == nil && uploadProperties[kCGImagePropertyExifDictionary] == nil, "Upload GPS and EXIF removed")
+    try require(upload["width"] as? Int == 4096 && upload["height"] as? Int == 1024, "Upload actual dimensions retained")
+    let croppedUpload = DeriveLabelOcrEngine.prepareUpload(sourceUrl.absoluteString, cropRegion: [0.1, 0.1, 0.8, 0.8])
+    try require(croppedUpload["status"] as? String == "prepared" && (croppedUpload["width"] as! Int) < 4096, "Explicit crop applied locally")
+    try require(DeriveLabelOcrEngine.prepareUpload("https://example.com/never-fetched.jpg", cropRegion: [0, 0, 1, 1])["status"] as? String == "failed", "Upload refuses remote original")
     let input: [String: Any] = ["uri": sourceUrl.absoluteString, "evidenceId": "00000000-0000-4000-8000-000000000001",
       "captureSessionId": "00000000-0000-4000-8000-000000000002", "generation": Double(1),
       "languages": ["en-US"], "correctionEnabled": false]
@@ -91,7 +104,7 @@ import Vision
     let receipt: [String: Any] = ["suite": "Part1-local-native-OCR", "fixtureVersion": "synthetic-heic-v1",
       "platform": platform, "osVersion": ProcessInfo.processInfo.operatingSystemVersionString,
       "visionRequestRevision": VNRecognizeTextRequest.currentRevision, "syntheticOnly": true,
-      "recognized": true, "nonzeroGenerationRetained": true, "gpsRemoved": true, "exifRemoved": true, "thumbnailRemoved": true,
+      "recognized": true, "uploadJpegDecoded": true, "uploadDerivativeMetadataRemoved": true, "uploadByteCap": true, "explicitCropApplied": true, "nonzeroGenerationRetained": true, "gpsRemoved": true, "exifRemoved": true, "thumbnailRemoved": true,
       "longEdge": max(derivative.width, derivative.height), "elapsedMs": Int(Date().timeIntervalSince(start) * 1000),
       "timingScope": "single synthetic core run; no camera or device cohort", "physicalDeviceAcceptance": "unrun",
       "expoBridgeBuild": "separate-gate"]

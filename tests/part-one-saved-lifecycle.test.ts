@@ -9,6 +9,8 @@ test('A24 late pre-delete read cannot reopen a tombstoned saved record', async (
   const h = componentHarness('src/components/my-stuff/PartOneSavedProducts.tsx', 'PartOneSavedProducts', { ownerId: 'owner' }, { modules: {
     'expo-router': { useFocusEffect: (callback: () => () => void) => { focus = callback; } },
     '../ui/Button': { Button: 'Button' },
+    '../../services/partOnePrivate': { PART_ONE_PRIVATE_ENABLED: false, partOnePrivateTransport: {} },
+    '../../../modules/derive-label-ocr': { preparePrivateLabelUpload: async () => { throw new Error('Native unavailable in saved-row fixture'); } },
     '../../stores/authStore': { useAuthStore: { getState: () => ({ sessionUserId: 'owner' }) } },
     '../../services/partOne': { listPartOneSaves: async () => deleted ? [] : [record],
       readPartOneSave: () => new Promise(resolve => { finishRead = resolve; }), deletePartOneSave: async () => { deleted = true; } },
@@ -30,6 +32,8 @@ test('A26 offline saved rows withdraw expired names and accepted-evidence labels
   const record = { saveId: 'saved', result: { declarationState: 'accepted', freshness: { state: 'fresh', expiresAt: '2024-01-01T00:00:00Z' }, display: { selectedIdentity: { name: 'EXPIRED PRODUCT NAME', expiresAt: '2024-01-01T00:00:00Z' } } } };
   const h = componentHarness('src/components/my-stuff/PartOneSavedProducts.tsx', 'PartOneSavedProducts', { ownerId: 'owner' }, { modules: {
     'expo-router': { useFocusEffect: (callback: () => () => void) => { focus = callback; } }, '../ui/Button': { Button: 'Button' },
+    '../../services/partOnePrivate': { PART_ONE_PRIVATE_ENABLED: false, partOnePrivateTransport: {} },
+    '../../../modules/derive-label-ocr': { preparePrivateLabelUpload: async () => { throw new Error('Native unavailable in saved-row fixture'); } },
     '../../stores/authStore': { useAuthStore: { getState: () => ({ sessionUserId: 'owner' }) } },
     '../../services/partOne': { listPartOneSaves: async () => [record], readPartOneSave: async () => record, deletePartOneSave: async () => {} },
   } });

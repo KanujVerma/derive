@@ -26,7 +26,7 @@ export const partOneTransport: PartOneTransport = {
   capture: async (id, generation, revision) => CaptureSessionSchema.parse(await call(`/scans/${id}/captures`, 'POST', { expectedGeneration: generation, expectedResultRevision: revision })),
 };
 
-const SavedProductSchema = z.strictObject({ saveId: z.string().uuid(), snapshotAtSaveId: z.string().uuid(), createdAt: z.iso.datetime(), result: ScanResultSchema });
+const SavedProductSchema = z.strictObject({ captureSessionId: PartOneIdSchema.nullable(), saveId: z.string().uuid(), snapshotAtSaveId: z.string().uuid(), createdAt: z.iso.datetime(), result: ScanResultSchema });
 export type PartOneSavedProduct = z.infer<typeof SavedProductSchema>;
 export async function listPartOneSaves(): Promise<PartOneSavedProduct[]> {
   return z.strictObject({ saves: z.array(SavedProductSchema) }).parse(await call('/saves', 'GET')).saves;

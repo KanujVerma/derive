@@ -14,10 +14,19 @@ struct DeriveLabelOcrInput: Record {
   }
 }
 
+struct DeriveLabelUploadInput: Record {
+  @Field var uri: String = ""
+  @Field var cropRegion: [Double] = [0, 0, 1, 1]
+}
+
 public class DeriveLabelOcrModule: Module {
   private let recognitionQueue = DispatchQueue(label: "skin.derive.label-ocr", qos: .userInitiated)
   public func definition() -> ModuleDefinition {
     Name("DeriveLabelOcr")
+    AsyncFunction("prepareUpload") { (input: DeriveLabelUploadInput, promise: Promise) in
+      let uri = input.uri, cropRegion = input.cropRegion
+      self.recognitionQueue.async { promise.resolve(DeriveLabelOcrEngine.prepareUpload(uri, cropRegion: cropRegion)) }
+    }
     AsyncFunction("recognize") { (input: DeriveLabelOcrInput, promise: Promise) in
       let engineInput = input.engineInput
       self.recognitionQueue.async {

@@ -11,6 +11,7 @@ import { createCatalogRequestId } from '../../../services/productCatalog';
 import { captureBindingsEqual, draftReadiness } from '../../../presentation/part-one/capture';
 import type { CaptureBinding, MemoryLabelDraft } from '../../../presentation/part-one/capture';
 import { createCapturePhotoHandlers, createCaptureReviewHandlers } from '../../../presentation/part-one/captureReview';
+import { PartOneLocalDraftSummary } from './PartOneLocalDraftSummary';
 import { PartOneCaptureReview } from './PartOneCaptureReview';
 
 const draftCache = Platform.OS === 'ios' ? createDraftCacheLifecycle({
@@ -36,8 +37,8 @@ export async function purgeLocalCaptureFile(uri: string) {
 }
 
 type Props = { draft: MemoryLabelDraft; binding: CaptureBinding; onClose: () => void; onChange: () => void;
-  productLabel?: string };
-export function PartOneLabelCapture({ draft, binding, onClose, onChange, productLabel = 'Selected product' }: Props) {
+  productLabel?: string; privatePanel?: React.ReactNode; interactionLocked?: boolean; onPackagePhotoAdded?: (evidenceId: string) => void };
+export function PartOneLabelCapture({ draft, binding, onClose, onChange, productLabel = 'Selected product', privatePanel, interactionLocked = false, onPackagePhotoAdded }: Props) {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraActive, setCameraActive] = useState(false);
@@ -80,8 +81,8 @@ export function PartOneLabelCapture({ draft, binding, onClose, onChange, product
         'Review the source photo, label coverage and overlapping views below. Corrections remain attributed and unsaved.');
     }
   };
-  const pick = async () => {
-    if (busy || capReached || !current || !validRender()) return;
+  const pick = async (role: 'ingredients' | 'package' = 'ingredients') => {
+    if (busy || interactionLocked || capReached || !current || !validRender()) return;
     const operations = photoHandlers();
     setBusy(true); setCameraActive(false);
     try {
@@ -89,12 +90,13 @@ export function PartOneLabelCapture({ draft, binding, onClose, onChange, product
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false,
         quality: 1, exif: false, allowsMultipleSelection: false });
       if (result.canceled) { if (mounted.current && operations.isCurrent()) setMessage(LOCAL_OCR_MESSAGES.picker_cancelled); }
-      else if (result.assets[0]) reportPhotoResult(operations, await operations.importPhoto(result.assets[0].uri));
+      else if (result.assets[0]) { const outcome = await operations.importPhoto(result.assets[0].uri); reportPhotoResult(operations, outcome);
+        const evidenceId = operations.getImportedEvidenceId(); if (role === 'package' && evidenceId && operations.isCurrent() && mounted.current) onPackagePhotoAdded?.(evidenceId); }
     } catch { if (mounted.current && operations.isCurrent()) setMessage(LOCAL_OCR_MESSAGES.failed); }
     finally { if (mounted.current && operations.isCurrent()) setBusy(false); }
   };
   const openCamera = async () => {
-    if (busy || capReached || !current || !validRender()) return;
+    if (busy || interactionLocked || capReached || !current || !validRender()) return;
     const operations = photoHandlers();
     try {
       const allowed = permission?.granted || (await requestPermission()).granted;
@@ -103,7 +105,7 @@ export function PartOneLabelCapture({ draft, binding, onClose, onChange, product
     } catch { if (mounted.current && operations.isCurrent()) setMessage(LOCAL_OCR_MESSAGES.failed); }
   };
   const takePhoto = async () => {
-    if (busy || capReached || !camera.current || !current || !validRender()) return;
+    if (busy || interactionLocked || capReached || !camera.current || !current || !validRender()) return;
     const operations = photoHandlers();
     setBusy(true);
     try {
@@ -114,9 +116,9 @@ export function PartOneLabelCapture({ draft, binding, onClose, onChange, product
     finally { if (mounted.current && operations.isCurrent()) setBusy(false); }
   };
   const reviewHandlers = createCaptureReviewHandlers(draft, () => currentBinding.current, update);
-  const remove = () => { if (!validRender()) return; draft.remove(); onChange(); onClose(); };
+  const remove = () => { if (interactionLocked || !validRender()) return; draft.remove(); onChange(); onClose(); };
   const retryPhoto = async (evidenceId: string) => {
-    if (busy || !current || !validRender()) return;
+    if (busy || interactionLocked || !current || !validRender()) return;
     const operations = photoHandlers();
     setBusy(true);
     try {
@@ -140,30 +142,33 @@ export function PartOneLabelCapture({ draft, binding, onClose, onChange, product
         {cameraActive && permission?.granted && <View style={styles.cameraBox}>
           <CameraView ref={camera} facing="back" style={StyleSheet.absoluteFill} active={!busy} />
         </View>}
-        {cameraActive ? <Pressable accessibilityRole="button" accessibilityLabel="Capture ingredient panel" disabled={busy || capReached}
+        {cameraActive ? <Pressable accessibilityRole="button" accessibilityLabel="Capture ingredient panel" disabled={busy || interactionLocked || capReached}
           onPress={() => void takePhoto()} style={styles.action}><Text style={styles.actionText}>Capture ingredient panel</Text></Pressable> :
-          <Pressable accessibilityRole="button" accessibilityLabel="Use camera for ingredient panel" disabled={busy || capReached || !current || !PART_ONE_LOCAL_CAPTURE_AVAILABLE}
+          <Pressable accessibilityRole="button" accessibilityLabel="Use camera for ingredient panel" disabled={busy || interactionLocked || capReached || !current || !PART_ONE_LOCAL_CAPTURE_AVAILABLE}
             onPress={() => void openCamera()} style={styles.action}><Text style={styles.actionText}>Use camera</Text></Pressable>}
         <Pressable accessibilityRole="button" accessibilityLabel={current?.shots.length ? 'Add overlapping ingredient photo from selected photos' : 'Choose ingredient photo'}
-          disabled={busy || capReached || !current || !PART_ONE_LOCAL_CAPTURE_AVAILABLE} onPress={() => void pick()} style={styles.action}>
+          disabled={busy || interactionLocked || capReached || !current || !PART_ONE_LOCAL_CAPTURE_AVAILABLE} onPress={() => void pick()} style={styles.action}>
           <Text style={styles.actionText}>{current?.shots.length ? 'Add photo' : 'Choose photo'}</Text>
         </Pressable>
+        {onPackagePhotoAdded && <Pressable accessibilityRole="button" accessibilityLabel="Add package or barcode photo from selected photos" disabled={busy || interactionLocked || capReached || !current || !PART_ONE_LOCAL_CAPTURE_AVAILABLE}
+          onPress={() => void pick('package')} style={styles.action}><Text style={styles.actionText}>Add package view</Text></Pressable>}
         {capReached && <Text style={styles.status}>{LOCAL_OCR_MESSAGES.cap_reached}</Text>}
         {current?.shots.map((shot, index) => <View key={shot.evidenceId} style={styles.preview}>
           <Text accessibilityRole="header" style={styles.product}>Photo {index + 1} · local preview</Text>
           {!shot.observation && <Text style={styles.body}>Text has not been recognized.</Text>}
           {shot.observation?.status !== 'recognized' && <Pressable accessibilityRole="button" accessibilityLabel={`Retry local text recognition for photo ${index + 1}`}
-            disabled={busy || !PART_ONE_LOCAL_CAPTURE_AVAILABLE} onPress={() => void retryPhoto(shot.evidenceId)} style={styles.action}>
+            disabled={busy || interactionLocked || !PART_ONE_LOCAL_CAPTURE_AVAILABLE} onPress={() => void retryPhoto(shot.evidenceId)} style={styles.action}>
             <Text style={styles.actionText}>Read photo {index + 1} again</Text>
           </Pressable>}
-          <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${index + 1}`} onPress={() => { reviewHandlers.removePhoto(shot.evidenceId); }} style={styles.action}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${index + 1}`} disabled={interactionLocked} onPress={() => { if (!interactionLocked) reviewHandlers.removePhoto(shot.evidenceId); }} style={styles.action}>
             <Text style={styles.actionText}>Remove photo {index + 1}</Text>
           </Pressable>
         </View>)}
-        {current && current.shots.length > 0 && <PartOneCaptureReview key={current.captureEpoch} draft={draft} binding={binding} onChange={onChange} />}
+        {current && current.shots.length > 0 && (interactionLocked ? <PartOneLocalDraftSummary draft={draft} binding={binding} /> : <PartOneCaptureReview key={current.captureEpoch} draft={draft} binding={binding} onChange={onChange} />)}
+        {privatePanel}
         {readiness?.state === 'partial' && <Text style={styles.body}>This draft remains partial. Confirmation cannot fill hidden text or missing sections.</Text>}
         <Text style={styles.body}>{LOCAL_OCR_MESSAGES.unsaved} It expires after 30 minutes without activity and is removed when this sheet session ends.</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Remove temporary ingredient draft" onPress={remove} style={styles.action}><Text style={styles.actionText}>Remove draft</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Remove temporary ingredient draft" disabled={interactionLocked} onPress={remove} style={styles.action}><Text style={styles.actionText}>Remove draft</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Cancel ingredient capture and return to product" onPress={close} style={styles.action}><Text style={styles.actionText}>Cancel</Text></Pressable>
       </ScrollView>
     </View>
