@@ -17,6 +17,13 @@ struct DeriveLabelOcrInput: Record {
 struct DeriveLabelUploadInput: Record {
   @Field var uri: String = ""
   @Field var cropRegion: [Double] = [0, 0, 1, 1]
+  @Field var evidenceId: String = ""
+  @Field var captureSessionId: String = ""
+  @Field var generation: Int = 0
+  @Field var languages: [String] = []
+  @Field var correctionEnabled: Bool = false
+  var recognitionInput: [String: Any]? { evidenceId.isEmpty ? nil : ["evidenceId": evidenceId, "captureSessionId": captureSessionId,
+    "generation": generation, "languages": languages, "correctionEnabled": false] }
 }
 
 public class DeriveLabelOcrModule: Module {
@@ -24,8 +31,8 @@ public class DeriveLabelOcrModule: Module {
   public func definition() -> ModuleDefinition {
     Name("DeriveLabelOcr")
     AsyncFunction("prepareUpload") { (input: DeriveLabelUploadInput, promise: Promise) in
-      let uri = input.uri, cropRegion = input.cropRegion
-      self.recognitionQueue.async { promise.resolve(DeriveLabelOcrEngine.prepareUpload(uri, cropRegion: cropRegion)) }
+      let uri = input.uri, cropRegion = input.cropRegion, recognitionInput = input.recognitionInput
+      self.recognitionQueue.async { promise.resolve(DeriveLabelOcrEngine.prepareUpload(uri, cropRegion: cropRegion, recognitionInput: recognitionInput)) }
     }
     AsyncFunction("recognize") { (input: DeriveLabelOcrInput, promise: Promise) in
       let engineInput = input.engineInput

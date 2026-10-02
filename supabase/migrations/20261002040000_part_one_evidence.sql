@@ -761,7 +761,7 @@ declare cfg private.part_one_private_config; policy private.part_one_policies; r
   deps uuid[]; previous_declaration uuid; uncertainty jsonb; predicate jsonb; sections jsonb; entries jsonb;
   r jsonb:=p_scan.result; next_capture_revision integer; request_hash text; offset_value integer; line_order integer;
   selected_decl jsonb; selected_sources jsonb; source_image uuid; known_asset boolean; assoc boolean;
-  input_entry record; source_entries jsonb; wrapper_role text; transcription_uncertainty jsonb; original_id uuid; owned_review jsonb; assembly jsonb; owned_assemblies jsonb:='[]'; owned_lines jsonb; base_snapshot uuid;
+  input_entry record; source_entries jsonb; wrapper_role text; coordinate_space text; derived_refs jsonb; derived_id uuid; transcription_uncertainty jsonb; original_id uuid; owned_review jsonb; assembly jsonb; owned_assemblies jsonb:='[]'; owned_lines jsonb; base_snapshot uuid;
 begin
  select * into cfg from private.part_one_private_config where id=true;
  select * into policy from private.part_one_policies where id='private_capture';
@@ -803,14 +803,14 @@ begin
  end if;
  if p_payload->>'schemaVersion'='2' then
    source_entries:=p_payload->'sourceObservations';
-   if jsonb_array_length(source_entries)>36 or jsonb_array_length(p_payload->'edits')>100
+   if jsonb_array_length(source_entries)>42 or jsonb_array_length(p_payload->'edits')>100
     or exists(select 1 from jsonb_array_elements(source_entries) e where e->>'revision' is distinct from '1' or (e->>'role' is distinct from 'ingredients' and e->>'role' is distinct from 'package')
-      or exists(select 1 from jsonb_object_keys(e) k where k<>all(array['observationId','revision','role','observation']))) then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+      or exists(select 1 from jsonb_object_keys(e) k where k<>all(array['observationId','revision','role','observation','coordinateSpace','derivedFromObservationIds']))) then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
  else
    select coalesce(jsonb_agg(jsonb_build_object('observationId',e->'evidenceId','revision',1,'role','ingredients','observation',e)),'[]') into source_entries
     from jsonb_array_elements(p_payload->'observations') e;
  end if;
- if (select count(*) from private.part_one_records rr where rr.owner_id=p_owner and rr.payload->>'captureSessionId'=p_capture.id::text and rr.payload->>'privateKind'='ocr')+(select count(*) from jsonb_array_elements(source_entries) e where not exists(select 1 from private.part_one_records rr where rr.id=(e->>'observationId')::uuid))>36
+ if (select count(*) from private.part_one_records rr where rr.owner_id=p_owner and rr.payload->>'captureSessionId'=p_capture.id::text and rr.payload->>'privateKind'='ocr')+(select count(*) from jsonb_array_elements(source_entries) e where not exists(select 1 from private.part_one_records rr where rr.id=(e->>'observationId')::uuid))>42
   or (select count(*) from private.part_one_records rr where rr.owner_id=p_owner and rr.payload->>'captureSessionId'=p_capture.id::text and rr.payload->>'privateKind'='edit')+(select count(*) from jsonb_array_elements(p_payload->'edits') e where not exists(select 1 from private.part_one_records rr where rr.id=(e->>'observationId')::uuid))>100 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
  if p_payload->>'schemaVersion'='2' and jsonb_array_length(source_entries)=0 and jsonb_array_length(p_payload->'edits')=0
   and not exists(select 1 from private.part_one_records rr where rr.owner_id=p_owner and rr.payload->>'captureSessionId'=p_capture.id::text and rr.payload->>'privateKind' in ('ocr','edit')) then
@@ -877,6 +877,11 @@ begin
    union all select value,true,1,ordinality from jsonb_array_elements(p_payload->'edits') with ordinality) rows order by group_order,ordinality loop
    observation:=case when input_entry.is_edit then input_entry.entry else input_entry.entry->'observation' end;
    wrapper_role:=case when input_entry.is_edit then null else input_entry.entry->>'role' end;
+   coordinate_space:=coalesce(input_entry.entry->>'coordinateSpace','source_original');
+   derived_refs:=coalesce(input_entry.entry->'derivedFromObservationIds','[]'::jsonb);
+   if not input_entry.is_edit and (coordinate_space not in ('source_original','sanitized_derivative') or jsonb_typeof(derived_refs) is distinct from 'array'
+     or jsonb_array_length(derived_refs)>36 or (coordinate_space='source_original' and jsonb_array_length(derived_refs)>0)
+     or exists(select 1 from jsonb_array_elements_text(derived_refs) x group by x::uuid having count(*)>1)) then raise exception 'PART_ONE_INVALID_PAYLOAD';end if;
    -- A reopened v2 package submits its originals/edit lineage along with the
    -- delta. Reuse only the exact immutable same-owner row; never overwrite it or
    -- accept a changed payload under an existing evidence ID.
@@ -886,7 +891,9 @@ begin
      if prior.owner_id is distinct from p_owner or prior.kind<>'observation' or prior.scope<>'private_package'
       or prior.payload->>'captureSessionId' is distinct from p_capture.id::text or prior.payload->>'packageObservationId' is distinct from p_capture.package_observation_id::text
       or prior.payload->'observation' is distinct from observation
-      or (not input_entry.is_edit and (prior.revision<>1 or prior.payload->>'role' is distinct from wrapper_role or prior.payload->>'privateKind'<>'ocr'))
+      or (not input_entry.is_edit and (prior.revision<>1 or prior.payload->>'role' is distinct from wrapper_role or prior.payload->>'privateKind'<>'ocr'
+        or coalesce(prior.payload->>'coordinateSpace','source_original') is distinct from coordinate_space
+        or coalesce(prior.payload->'derivedFromObservationIds','[]'::jsonb) is distinct from derived_refs))
       or (input_entry.is_edit and (prior.revision is distinct from (observation->>'revision')::integer or prior.payload->>'privateKind'<>'edit'))
       or not private.part_one_record_allowed(prior.id,p_owner) then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT';end if;
      observation_ids:=array_append(observation_ids,prior.id);continue;
@@ -897,20 +904,23 @@ begin
      observation_id:=(input_entry.entry->>'observationId')::uuid; source_revision:=1;original_id:=observation_id;
      if observation->>'captureSessionId' is distinct from p_capture.id::text or (observation->>'generation')::integer is distinct from p_capture.generation
        or jsonb_typeof(observation->'lines')<>'array' or jsonb_typeof(observation->'languageConfig')<>'array'
-       or jsonb_array_length(observation->'orientationTransform')<>9
+       or jsonb_typeof(observation->'orientationTransform') is distinct from 'array' or jsonb_array_length(observation->'orientationTransform') is distinct from 9
+       or exists(select 1 from jsonb_array_elements(observation->'orientationTransform') v where jsonb_typeof(v) is distinct from 'number' or abs((v#>>'{}')::numeric)>1.7976931348623157e308)
        or observation->>'recognizer' is null or observation->>'recognizerVersion' is null
        or observation->>'status' not in ('recognized','no_text','unsupported_script','model_unavailable','cancelled','failed')
        or exists(select 1 from jsonb_object_keys(observation) k where k<>all(array['evidenceId','captureSessionId','generation','recognizer','recognizerVersion','languageConfig','correctionEnabled','sourceWidth','sourceHeight','orientationTransform','lines','status'])) then
        raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
-     if observation->>'status'='recognized' and ((observation->>'sourceWidth')::integer not between 1 and 4096 or (observation->>'sourceHeight')::integer not between 1 and 4096)
+     if observation->>'status'='recognized' and (jsonb_typeof(observation->'sourceWidth') is distinct from 'number' or jsonb_typeof(observation->'sourceHeight') is distinct from 'number'
+       or (observation->>'sourceWidth')::bigint not between 1 and 40000000 or (observation->>'sourceHeight')::bigint not between 1 and 40000000
+       or (observation->>'sourceWidth')::bigint*(observation->>'sourceHeight')::bigint>40000000)
        then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
      if p_payload->>'schemaVersion'='2' then
        select coalesce(array_agg(pa.record_id),'{}') into deps from private.part_one_private_assets pa where pa.capture_id=p_capture.id
         and pa.client_evidence_id=(observation->>'evidenceId')::uuid;
        if cardinality(deps)<>1 then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
-       if not exists(select 1 from private.part_one_records rr join private.part_one_private_assets pa on pa.record_id=rr.id
+       if coordinate_space='sanitized_derivative' and (observation->'orientationTransform' is distinct from '[1,0,0,0,1,0,0,0,1]'::jsonb or not exists(select 1 from private.part_one_records rr join private.part_one_private_assets pa on pa.record_id=rr.id
          join private.part_one_asset_attestations aa on aa.id=pa.attestation_id where rr.id=deps[1]
-          and aa.width=(observation->>'sourceWidth')::integer and aa.height=(observation->>'sourceHeight')::integer) then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+          and aa.width=(observation->>'sourceWidth')::integer and aa.height=(observation->>'sourceHeight')::integer)) then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
      else deps:=image_ids; end if;
      if cardinality(deps)=0 then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
      for line in select value from jsonb_array_elements(observation->'lines') loop
@@ -921,6 +931,14 @@ begin
      select string_agg(value->>'text',E'\n' order by ordinality) into raw_text from jsonb_array_elements(observation->'lines') with ordinality;
      raw_text:=coalesce(raw_text,'');
      if cardinality(deps)=1 then source_image:=deps[1]; else uncertainty:=uncertainty || '["image_region_mapping_unresolved"]';transcription_uncertainty:=transcription_uncertainty || '["image_region_mapping_unresolved"]'; end if;
+     for derived_id in select value::uuid from jsonb_array_elements_text(derived_refs) loop
+       if not exists(select 1 from private.part_one_records rr where rr.id=derived_id and rr.kind='observation' and rr.scope='private_package'
+         and rr.owner_id=p_owner and rr.payload->>'captureSessionId'=p_capture.id::text and rr.payload->>'packageObservationId'=p_capture.package_observation_id::text
+         and rr.payload->>'privateKind'='ocr' and coalesce(rr.payload->>'coordinateSpace','source_original')='source_original'
+         and (rr.payload->'observation'->>'evidenceId')::uuid=(observation->>'evidenceId')::uuid
+         and private.part_one_record_allowed(rr.id,p_owner)) then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501';end if;
+       deps:=array_append(deps,derived_id);
+     end loop;
    else
      if exists(select 1 from jsonb_object_keys(observation) k where k<>all(array['observationId','supersedesId','revision','text','reason','sourceRef','replacementText']))
        or jsonb_typeof(observation->'text')<>'string' or length(observation->>'reason')=0 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
@@ -932,6 +950,7 @@ begin
      if source_revision<>prior.revision+1 or exists(select 1 from private.part_one_records where owner_id=p_owner and supersedes_id=prior.id and kind='observation')
        then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT'; end if;
      deps:=array_append(prior.dependencies,prior.id);raw_text:=observation->>'text';
+     coordinate_space:=coalesce(prior.payload->>'coordinateSpace','source_original');derived_refs:=coalesce(prior.payload->'derivedFromObservationIds','[]'::jsonb);
      wrapper_role:=coalesce(prior.payload->>'role','ingredients');original_id:=coalesce(nullif(prior.payload->>'originalObservationId','')::uuid,prior.id);
      uncertainty:=uncertainty || '["user_edit_does_not_establish_missing_coverage"]';
    end if;
@@ -948,7 +967,7 @@ begin
      values(observation_id,'observation',p_capture.item_id,source_revision,private.part_one_code_key(p_scan.request->'code'),'private_capture',policy.version,p_owner,'private_package',
        jsonb_build_object('privateKind',case when observation ? 'evidenceId' then 'ocr' else 'edit' end,'captureSessionId',p_capture.id,
          'packageObservationId',p_capture.package_observation_id,'generation',p_capture.generation,'deletionEpoch',p_capture.deletion_epoch,
-         'policyId',cfg.source_policy_id,'rawText',raw_text,'observation',observation,'role',wrapper_role,'originalObservationId',original_id,'sourceOrdinal',source_ordinal,
+         'policyId',cfg.source_policy_id,'rawText',raw_text,'observation',observation,'role',wrapper_role,'coordinateSpace',coordinate_space,'derivedFromObservationIds',derived_refs,'originalObservationId',original_id,'sourceOrdinal',source_ordinal,
          'uncertaintyReasons',case when p_payload->>'schemaVersion'='2' then transcription_uncertainty else uncertainty end),deps,
        case when observation ? 'evidenceId' then null else (observation->>'supersedesId')::uuid end,now(),expiry);
    insert into private.part_one_record_status(record_id) values(observation_id);observation_ids:=array_append(observation_ids,observation_id);
@@ -1107,16 +1126,19 @@ create function private.part_one_observation_projection(p_record private.part_on
 language plpgsql stable security definer set search_path='' as $$
 declare images uuid[]; original uuid; state text;
 begin
- with recursive deps as (select r.*,0 depth from private.part_one_records r where r.id=any(p_record.dependencies)
-  union all select r.*,d.depth+1 from deps d join private.part_one_records r on r.id=any(d.dependencies) where d.depth<50)
+ -- Edits retain every immutable ancestor. Deduplicate at each recursive step,
+ -- rather than expanding every path through that DAG before the final aggregate.
+ -- No depth column: it would make the same evidence row distinct at every depth.
+ with recursive deps as (select r.* from private.part_one_records r where r.id=any(p_record.dependencies)
+  union select r.* from deps d join private.part_one_records r on r.id=any(d.dependencies))
  select coalesce(array_agg(distinct id),'{}') into images from deps where payload->>'privateKind'='sanitized_image';
- with recursive lineage as (select r.*,0 depth from private.part_one_records r where r.id=p_record.id
-  union all select r.*,d.depth+1 from lineage d join private.part_one_records r on r.id=d.supersedes_id where d.depth<50)
- select id into original from lineage where payload->>'privateKind'='ocr' order by depth desc limit 1;
+ with recursive lineage as (select r.* from private.part_one_records r where r.id=p_record.id
+  union select r.* from lineage d join private.part_one_records r on r.id=d.supersedes_id)
+ select id into original from lineage where payload->>'privateKind'='ocr' order by revision,id limit 1;
  select case when status='active' then 'active' else 'revoked' end into state from private.part_one_record_status where record_id=p_record.id;
  return jsonb_build_object('ownerId',p_record.owner_id,'captureSessionId',p_record.payload->'captureSessionId','packageObservationId',p_record.payload->'packageObservationId',
   'generation',p_record.payload->'generation','deletionEpoch',p_record.payload->'deletionEpoch','observationId',p_record.id,'revision',p_record.revision,
-  'role',coalesce(p_record.payload->>'role','ingredients'),'kind',p_record.payload->'privateKind','rawText',p_record.payload->'rawText','assetEvidenceIds',to_jsonb(images),
+  'role',coalesce(p_record.payload->>'role','ingredients'),'coordinateSpace',coalesce(p_record.payload->>'coordinateSpace','source_original'),'derivedFromObservationIds',coalesce(p_record.payload->'derivedFromObservationIds','[]'::jsonb),'kind',p_record.payload->'privateKind','rawText',p_record.payload->'rawText','assetEvidenceIds',to_jsonb(images),
   'originalObservationId',coalesce(original,p_record.id),'supersedesId',p_record.supersedes_id,'uncertaintyReasons',coalesce(p_record.payload->'uncertaintyReasons','[]'),
   'ocr',case when p_record.payload->>'privateKind'='ocr' then p_record.payload->'observation' else null end,
   'edit',case when p_record.payload->>'privateKind'='edit' then (p_record.payload->'observation')-'sourceRef'-'replacementText' else null end,
@@ -1149,7 +1171,7 @@ begin
     (pa.record_id is null and editable and ut.object_id=o.id and ut.object_version=o.version and ut.content_hash=aa.content_hash
       and ut.package_observation_id=c.package_observation_id and ut.generation=c.generation and ut.deletion_epoch=c.deletion_epoch and o.owner_id is null));
  select coalesce(jsonb_agg(jsonb_build_object('observationId',rr.id,'revision',rr.revision,'role',coalesce(rr.payload->>'role','ingredients'),
-  'observation',rr.payload->'observation') order by coalesce((rr.payload->>'sourceOrdinal')::integer,0),rr.created_at,rr.id),'[]') into observations from private.part_one_records rr
+  'coordinateSpace',coalesce(rr.payload->>'coordinateSpace','source_original'),'derivedFromObservationIds',coalesce(rr.payload->'derivedFromObservationIds','[]'::jsonb),'observation',rr.payload->'observation') order by coalesce((rr.payload->>'sourceOrdinal')::integer,0),rr.created_at,rr.id),'[]') into observations from private.part_one_records rr
  where rr.owner_id=p_owner and rr.scope='private_package' and rr.payload->>'captureSessionId'=c.id::text and rr.payload->>'privateKind'='ocr' and private.part_one_record_allowed(rr.id,p_owner);
  select coalesce(jsonb_agg((rr.payload->'observation')||jsonb_build_object('actorOwnerId',p_owner) order by coalesce((original.payload->>'sourceOrdinal')::integer,0),rr.revision,rr.created_at,rr.id),'[]') into edits from private.part_one_records rr
  left join private.part_one_records original on original.id=nullif(rr.payload->>'originalObservationId','')::uuid
@@ -1158,7 +1180,7 @@ begin
  where rr.owner_id=p_owner and rr.scope='private_package' and rr.payload->>'captureSessionId'=c.id::text and rr.kind='declaration' and private.part_one_record_allowed(rr.id,p_owner);
  return jsonb_build_object('schemaVersion',1,'capture',private.part_one_capture_projection(c),'editable',editable,
   'result',private.part_one_filter_result(s.result,p_owner),'boundResult',case when cm.bound_result is null then null else private.part_one_filter_result(cm.bound_result,p_owner) end,
-  'assets',assets,'sourceObservations',observations,'edits',edits,'declarationIds',declarations,'review',cm.review_state,'reviewReceiptId',cm.review_receipt_id);
+  'assets',assets,'sourceObservations',observations,'edits',edits,'declarationIds',declarations,'review',cm.review_state,'reviewReceiptId',cm.review_receipt_id,'capturedSource',(select rr.payload->'capturedSource' from private.part_one_records rr where rr.id=any(cm.declaration_ids) and rr.owner_id=p_owner and private.part_one_record_allowed(rr.id,p_owner) order by rr.revision desc,rr.id limit 1));
 end $$;
 
 create function public.part_one_operation(p_action text, p_payload jsonb) returns jsonb
@@ -1793,6 +1815,135 @@ begin
  end loop;
  if p_end>cursor then return null;end if;return result;
 end $$;
+-- Literal proof regions can describe only the sanitized pixels whose hash and
+-- geometry were attested. Original-camera OCR remains retained provenance.
+create function private.part_one_review_ref_allowed(p_observation jsonb,p_ref jsonb) returns boolean
+language sql immutable set search_path='' as $$
+ select coalesce(p_observation->>'coordinateSpace'='sanitized_derivative'
+  and p_observation->>'observationId'=p_ref->>'observationId' and p_observation->>'revision'=p_ref->>'revision'
+  and private.part_one_js_slice(p_observation->>'rawText',(p_ref->>'start')::integer,(p_ref->>'end')::integer)=p_ref->>'text'
+  and p_observation->'assetEvidenceIds' @> jsonb_build_array(p_ref->>'assetEvidenceId'),false);
+$$;
+-- Captured label extraction is attributable owner-private context, not an
+-- acceptance authority. Service admission independently checks current literals.
+create function private.part_one_validate_captured_sections(p_context jsonb,p_candidate jsonb,p_sections jsonb) returns void
+language plpgsql stable security definer set search_path='' as $$
+declare section jsonb;source jsonb;obs jsonb;entry jsonb;span jsonb;start_at integer;end_at integer;begin
+ for section in select value from jsonb_array_elements(p_sections) loop
+  source:=null;obs:=null;
+  select cs.value,o.value into source,obs from jsonb_array_elements(p_candidate->'sections') cs,
+    lateral jsonb_array_elements(p_context->'observations') o where o.value->>'observationId'=cs.value->>'observationId'
+    and o.value->>'revision'=cs.value->>'revision' and cs.value->>'kind'=section->>'kind'
+    and (jsonb_array_length(section->'entries')=0 or o.value->>'observationId'=section->'entries'->0->'sourceSpans'->0->>'observationId')
+    and private.part_one_js_slice(o.value->>'rawText',(cs.value->>'start')::integer,(cs.value->>'end')::integer)=section->>'rawText' limit 1;
+  if not found or section->>'lineCoverageComplete' is distinct from 'false' or section->'startCovered' is distinct from source->'startCovered'
+   or section->'endCovered' is distinct from source->'endCovered' then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  for entry in select value from jsonb_array_elements(section->'entries') loop
+   start_at:=null;end_at:=null;
+   if jsonb_array_length(entry->'sourceSpans')=0 then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+   for span in select value from jsonb_array_elements(entry->'sourceSpans') loop
+    if span->>'observationId' is distinct from obs->>'observationId' or span->>'sourceRevision' is distinct from obs->>'revision'
+     or (span->>'start')::integer<(source->>'start')::integer or (span->>'end')::integer>(source->>'end')::integer or (span->>'end')::integer<=(span->>'start')::integer
+     or not obs->'assetEvidenceIds' @> jsonb_build_array(span->>'imageId') then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+    start_at:=least(start_at,(span->>'start')::integer);end_at:=greatest(end_at,(span->>'end')::integer);
+   end loop;
+   if private.part_one_js_slice(obs->>'rawText',start_at,end_at) is distinct from entry->>'rawToken' then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  end loop;
+ end loop;
+end $$;
+create function private.part_one_validate_captured_source(p_context jsonb,p_outcome jsonb) returns void
+language plpgsql stable security definer set search_path='' as $$
+declare candidate jsonb:=p_outcome->'candidate';obs jsonb;binding jsonb;ref jsonb;section jsonb;field record;all_observations jsonb:=(p_context->'observations')||(p_context->'priorObservations');
+ seen integer;key text;expected text;deadline timestamptz;
+begin
+ if p_outcome->>'schemaVersion' is distinct from '1' or p_outcome->>'sourceKind' is distinct from 'captured_label_extractor'
+  or p_outcome->>'state' not in ('partial','conflict','blocked') or p_outcome->>'absenceClaimsAllowed' is distinct from 'false'
+  or p_outcome->>'catalogVerified' is distinct from 'false' or p_outcome->>'acceptanceEligible' is distinct from 'false'
+  or jsonb_typeof(p_outcome->'facts'->'sections') is distinct from 'array' or jsonb_typeof(p_outcome->'facts'->'capturedText') is distinct from 'array'
+  or jsonb_typeof(p_outcome->'reasonCodes') is distinct from 'array'
+  or exists(select 1 from jsonb_object_keys(p_outcome) k where k<>all(array['schemaVersion','sourceKind','state','candidate','facts','reasonCodes','absenceClaimsAllowed','catalogVerified','acceptanceEligible'])) then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+ if jsonb_typeof(candidate)='object' then
+  if candidate->>'schemaVersion' is distinct from '1' or candidate->>'sourceKind' is distinct from 'captured_label_extractor'
+   or candidate->>'extractorVersion' is distinct from 'part-one-private-source-1'
+   or candidate->>'ownerId' is distinct from p_context->>'ownerId' or candidate->>'captureSessionId' is distinct from p_context->'capture'->>'captureSessionId'
+   or candidate->>'packageObservationId' is distinct from p_context->'capture'->>'packageObservationId'
+   or candidate->>'generation' is distinct from p_context->'capture'->>'generation' or candidate->>'deletionEpoch' is distinct from p_context->'capture'->>'deletionEpoch'
+   or candidate->>'captureRevision' is distinct from p_context->'capture'->>'captureRevision' or candidate->>'resultRevision' is distinct from p_context->'result'->>'resultRevision'
+   or candidate->>'selectedItemId' is distinct from p_context->'result'->>'itemId' or candidate->>'selectedSnapshotId' is distinct from p_context->'result'->>'snapshotId'
+   or candidate->>'targetDeclarationId' is distinct from p_context->'ids'->>'declarationId'
+   or candidate->>'targetSnapshotId' is distinct from (case when jsonb_typeof(p_context->'item')='object' then p_context->'ids'->>'snapshotId' else null end)
+   or (candidate->>'observedAt')::timestamptz is distinct from (select min((x->>'observedAt')::timestamptz) from jsonb_array_elements(all_observations) x) or nullif(candidate->>'candidateId','')::uuid is null
+   or jsonb_typeof(candidate->'assetBindings') is distinct from 'array' or jsonb_typeof(candidate->'observationBindings') is distinct from 'array'
+   or jsonb_typeof(candidate->'sections') is distinct from 'array' or jsonb_typeof(candidate->'variantRefs') is distinct from 'object'
+   or jsonb_typeof(candidate->'contradictions') is distinct from 'array' or jsonb_typeof(candidate->'gaps') is distinct from 'array'
+   or candidate->>'association' not in ('unknown','candidate','barcode_matches_catalog_same_asset','barcode_matches_catalog_unlinked_assets','contradiction')
+   or candidate->>'category' not in ('unknown','cosmetic','drug') then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  deadline:=least((p_context->'policy'->>'expiresAt')::timestamptz,(p_context->>'now')::timestamptz+interval '24 hours');
+  for obs in select value from jsonb_array_elements((p_context->'assets')||all_observations) loop deadline:=least(deadline,(obs->>'expiresAt')::timestamptz);end loop;
+  if (candidate->>'expiresAt')::timestamptz<=now() or (candidate->>'expiresAt')::timestamptz>deadline
+   or jsonb_array_length(candidate->'assetBindings')<>jsonb_array_length(p_context->'assets')
+   or jsonb_array_length(candidate->'observationBindings')<>jsonb_array_length(all_observations)
+   or exists(select 1 from jsonb_array_elements(candidate->'assetBindings') x group by (x->>'evidenceId')::uuid having count(*)>1)
+   or exists(select 1 from jsonb_array_elements(candidate->'observationBindings') x group by (x->>'observationId')::uuid having count(*)>1)
+   or (jsonb_array_length(candidate->'contradictions')>0 or candidate->>'association'='contradiction') and p_outcome->>'state'<>'conflict' then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  for binding in select value from jsonb_array_elements(candidate->'assetBindings') loop
+   select value into obs from jsonb_array_elements(p_context->'assets') where value->>'evidenceId'=binding->>'evidenceId';
+   if not found or obs->>'attestationId' is distinct from binding->>'attestationId' or obs->>'storageObjectId' is distinct from binding->>'storageObjectId'
+    or obs->>'contentHash' is distinct from binding->>'contentHash' or obs->>'objectVersion' is distinct from binding->>'objectVersion' then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  end loop;
+  for binding in select value from jsonb_array_elements(candidate->'observationBindings') loop
+   select value into obs from jsonb_array_elements(all_observations) where value->>'observationId'=binding->>'observationId' and value->>'revision'=binding->>'revision';
+   if not found or encode(extensions.digest(obs->>'rawText','sha256'),'hex') is distinct from binding->>'textHash'
+    or encode(extensions.digest(private.part_one_canonical_json(obs),'sha256'),'hex') is distinct from binding->>'recordHash'
+    or (binding->>'current')::boolean is distinct from exists(select 1 from jsonb_array_elements(p_context->'observations') x where x->>'observationId'=binding->>'observationId') then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  end loop;
+  for ref in select value from jsonb_array_elements(coalesce(candidate->'packageIdentity'->'evidenceRefs','[]')||coalesce(candidate->'name'->'refs','[]')||candidate->'categoryRefs'||candidate->'marketRefs')
+   union all select x.value from jsonb_each(candidate->'variantRefs') f,lateral jsonb_array_elements(f.value) x
+   union all select x.value from jsonb_array_elements(candidate->'sections') s,lateral jsonb_array_elements(s->'lineRefs'||s->'headerRefs'||s->'endRefs') x
+   union all select x.value from jsonb_array_elements(candidate->'contradictions') s,lateral jsonb_array_elements(s->'refs') x loop
+   select value into obs from jsonb_array_elements(p_context->'observations') where value->>'observationId'=ref->>'observationId' and value->>'revision'=ref->>'revision';
+   if not found or not private.part_one_review_ref_allowed(obs,ref) or jsonb_array_length(ref->'region')<>4
+    or exists(select 1 from jsonb_array_elements_text(ref->'region') v where v::numeric<0 or v::numeric>1.000001)
+    or (ref->'region'->>2)::numeric<=0 or (ref->'region'->>3)::numeric<=0
+    or (ref->'region'->>0)::numeric+(ref->'region'->>2)::numeric>1.000001 or (ref->'region'->>1)::numeric+(ref->'region'->>3)::numeric>1.000001 then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  end loop;
+  for section in select value from jsonb_array_elements(candidate->'sections') loop
+   select value into obs from jsonb_array_elements(p_context->'observations') where value->>'observationId'=section->>'observationId' and value->>'revision'=section->>'revision';
+   if not found or obs->>'role'<>'ingredients' or obs->>'coordinateSpace'<>'sanitized_derivative'
+    or section->>'lineCoverageComplete' is distinct from 'false' or (section->>'start')::integer<0 or (section->>'end')::integer<=(section->>'start')::integer
+    or private.part_one_js_slice(obs->>'rawText',(section->>'start')::integer,(section->>'end')::integer) is null then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  end loop;
+  if candidate->>'association'='barcode_matches_catalog_same_asset' and (jsonb_array_length(candidate->'sections')=0
+   or exists(select 1 from jsonb_array_elements(candidate->'sections') sec where jsonb_array_length(sec->'lineRefs')=0)
+   or exists(select 1 from jsonb_array_elements(candidate->'sections') sec,lateral jsonb_array_elements(sec->'lineRefs') rr
+    where not exists(select 1 from jsonb_array_elements(candidate->'packageIdentity'->'evidenceRefs') code where code->>'assetEvidenceId'=rr->>'assetEvidenceId'))) then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  for field in select k,v from jsonb_each_text(candidate->'variant') pair(k,v) where v is not null loop
+   if not exists(select 1 from jsonb_array_elements(coalesce(candidate->'variantRefs'->field.k,'[]')) vr
+    where lower(regexp_replace(btrim(vr->>'text'),'\s+',' ','g'))=lower(regexp_replace(btrim(field.v),'\s+',' ','g'))) then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  end loop;
+  if candidate->>'packageMarket' is not null and not exists(select 1 from jsonb_array_elements(candidate->'marketRefs') mr where lower(btrim(mr->>'text'))=lower(candidate->>'packageMarket'))
+   or candidate->>'category'<>'unknown' and jsonb_array_length(candidate->'categoryRefs')=0
+   or jsonb_typeof(candidate->'name')='object' and not exists(select 1 from jsonb_array_elements(candidate->'name'->'refs') nr where btrim(nr->>'text')=candidate->'name'->>'value') then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  if jsonb_typeof(candidate->'packageIdentity')='object' then
+   key:=private.part_one_code_key(candidate->'packageIdentity'->'code');
+   if key is null or key is distinct from 'gtin:'||(candidate->'packageIdentity'->>'canonicalGtin14')
+    or not exists(select 1 from jsonb_array_elements(candidate->'packageIdentity'->'evidenceRefs') x where regexp_replace(x->>'text','\s','','g')=candidate->'packageIdentity'->'code'->>'raw') then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+   if candidate->>'association' in ('barcode_matches_catalog_same_asset','barcode_matches_catalog_unlinked_assets') and
+    not exists(select 1 from jsonb_array_elements(p_context->'item'->'barcodeAssertions') x where 'gtin:'||(x->>'canonical')=key and x->>'namespace'='gtin') then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  elsif candidate->>'association' in ('barcode_matches_catalog_same_asset','barcode_matches_catalog_unlinked_assets') then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+ else
+  if candidate is distinct from 'null'::jsonb or p_outcome->>'state'<>'blocked' then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+ end if;
+ for binding in select value from jsonb_array_elements(p_outcome->'facts'->'capturedText') loop
+  select value into obs from jsonb_array_elements(p_context->'observations') where value->>'observationId'=binding->>'observationId' and value->>'revision'=binding->>'revision';
+  if not found or obs->>'coordinateSpace'<>'sanitized_derivative' or obs->>'rawText' is distinct from binding->>'rawText'
+   or (binding->>'attributedEdit')::boolean is distinct from (obs->>'kind'='edit') then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  for ref in select value from jsonb_array_elements(binding->'sourceRefs') loop
+   if not private.part_one_review_ref_allowed(obs,ref) then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  end loop;
+ end loop;
+ perform private.part_one_validate_captured_sections(p_context,candidate,p_outcome->'facts'->'sections');
+end $$;
 create function private.part_one_review_operation(p_action text,p_payload jsonb) returns jsonb
 language plpgsql security definer set search_path='' as $$
 #variable_conflict use_column
@@ -1821,7 +1972,7 @@ begin
  -- rights-filtered result; a timeout does not create another immutable graph.
  if cm.evaluated_hash is not null then
   if cm.evaluated_review_id is distinct from review_id then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT';end if;
-  if p_action='review/apply' and cm.evaluated_hash<>encode(extensions.digest(private.part_one_canonical_json(p_payload->'evaluation'),'sha256'),'hex') then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT';end if;
+  if p_action in ('review/apply','source/apply') and cm.evaluated_hash<>encode(extensions.digest(private.part_one_canonical_json(p_payload->'evaluation'),'sha256'),'hex') then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT';end if;
   projection:=private.part_one_commit_receipt(cm,c,s);
   if p_action='review/prepare' then return jsonb_build_object('replay',projection);end if;return projection;
  end if;
@@ -1831,12 +1982,26 @@ begin
   update private.part_one_capture_commits set review_context=context where owner_id=owner and idempotency_key=cm.idempotency_key;
   return jsonb_build_object('context',context,'sourceCommitId',cm.source_commit_id,'captureRevision',c.capture_revision,'resultRevision',s.result_revision);
  end if;
- if p_action<>'review/apply' then raise exception 'PART_ONE_UNSUPPORTED_OPERATION';end if;
+ if p_action not in ('review/apply','source/apply') then raise exception 'PART_ONE_UNSUPPORTED_OPERATION';end if;
  if cm.source_commit_id is distinct from (p_payload->>'sourceCommitId')::uuid or c.capture_revision is distinct from (p_payload->>'expectedCaptureRevision')::integer
   or s.result_revision is distinct from (p_payload->>'expectedResultRevision')::integer or cm.review_context is null then
   return jsonb_build_object('conflict',true,'code','stale_capture','result',r);end if;
  context:=cm.review_context;ev:=p_payload->'evaluation';decl:=ev->'declaration';snap:=ev->'packageSnapshot';receipt:=ev->'reviewReceipt';ap:=p_payload->'authorityPolicy';
  select * into cfg from private.part_one_private_config where id=true;
+ if p_action='source/apply' then
+  if review_id is not null or receipt is distinct from 'null'::jsonb or ap is distinct from 'null'::jsonb
+   or ev->'selection'->>'accepted' is distinct from 'false' or ev->'selection'->>'state' not in ('partial','uncertain','conflict')
+   or ev->'selection'->'predicate'->'completeness'->>'passed' is distinct from 'false' then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  perform private.part_one_validate_captured_source(context,ev->'capturedSource');
+  perform private.part_one_validate_captured_sections(context,ev->'capturedSource'->'candidate',decl->'sections');
+  if jsonb_typeof(ev->'capturedSource'->'candidate')='object' and
+   (decl->'variant' is distinct from ev->'capturedSource'->'candidate'->'variant'
+    or decl->'category' is distinct from ev->'capturedSource'->'candidate'->'category'
+    or decl->'packageMarket' is distinct from ev->'capturedSource'->'candidate'->'packageMarket'
+    or jsonb_typeof(snap)='object' and (snap->'variant' is distinct from ev->'capturedSource'->'candidate'->'variant'
+      or snap->'packageMarket' is distinct from ev->'capturedSource'->'candidate'->'packageMarket')) then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+  if ev->'capturedSource'->>'state'='conflict' and ev->'selection'->>'state'<>'conflict' then raise exception 'PART_ONE_INVALID_CAPTURED_SOURCE';end if;
+ end if;
  if ev->>'persistable' is distinct from 'true' or ev->>'acceptancePolicyVersion' is distinct from 'part-one-private-dec-1'
   or jsonb_typeof(decl)<>'object' or jsonb_typeof(ev->'dependencies')<>'array'
   or context->'result'->>'resultRevision' is distinct from r->>'resultRevision' or context->'policy'->>'version' is distinct from cfg.policy_version
@@ -1897,8 +2062,7 @@ begin
     union all select x.value from jsonb_each(receipt->'variantRefs') f,lateral jsonb_array_elements(f.value) x
     union all select x.value from jsonb_array_elements(receipt->'sections') sec,lateral jsonb_array_elements(sec->'lineRefs') x loop
    select value into obs from jsonb_array_elements(context->'observations') where value->>'observationId'=ref->>'observationId' and value->>'revision'=ref->>'revision';
-   if not found or private.part_one_js_slice(obs->>'rawText',(ref->>'start')::integer,(ref->>'end')::integer) is distinct from ref->>'text'
-    or not obs->'assetEvidenceIds' @> jsonb_build_array(ref->>'assetEvidenceId') then raise exception 'PART_ONE_INVALID_PRIVATE_REVIEW';end if;
+   if not found or not private.part_one_review_ref_allowed(obs,ref) then raise exception 'PART_ONE_INVALID_PRIVATE_REVIEW';end if;
   end loop;
   if accepted and (receipt->>'category'='unknown' or receipt->>'packageMarket' is null or private.part_one_code_key(receipt->'packageIdentity'->'code') is distinct from private.part_one_code_key(s.request->'code')
    or jsonb_array_length(receipt->'sections')=0 or exists(select 1 from jsonb_array_elements(receipt->'sections') sec where sec->>'startCovered' is distinct from 'true' or sec->>'endCovered' is distinct from 'true' or sec->>'lineCoverageComplete' is distinct from 'true')) then raise exception 'PART_ONE_INVALID_PRIVATE_REVIEW';end if;
@@ -1919,7 +2083,7 @@ begin
   projection:=jsonb_build_object('itemId',c.item_id,'name',snap->'name','brand',snap->'variant'->'brand','variantText',pub.payload->'variantText','image',null,
     'declarationIds',jsonb_build_array(did),'fullItem',snap,'fieldEvidence',snap->'fieldEvidence','barcodeAssertions',snap->'barcodeAssertions',
     'requestedMarket',snap->'requestedMarket','packageMarket',snap->'packageMarket','sourceMarkets',snap->'sourceMarkets','privateKind','package_snapshot',
-    'captureSessionId',c.id,'packageObservationId',c.package_observation_id,'generation',c.generation,'deletionEpoch',c.deletion_epoch,'publicSnapshotId',pk);
+    'captureSessionId',c.id,'packageObservationId',c.package_observation_id,'generation',c.generation,'deletionEpoch',c.deletion_epoch,'publicSnapshotId',pk,'capturedSource',case when p_action='source/apply' then ev->'capturedSource' else null end);
   insert into private.part_one_records(id,kind,item_id,revision,canonical_key,policy_id,policy_version,owner_id,scope,payload,dependencies,identity_dependencies,supersedes_id,observed_at,expires_at)
    values(sid,'snapshot',c.item_id,rev,private.part_one_code_key(s.request->'code'),'private_capture',cfg.policy_version,owner,'private_package',projection,
     array_append(normal_deps,did),identity_deps,selected_snapshot,now(),expiry);
@@ -1936,7 +2100,7 @@ begin
  insert into private.part_one_records(id,kind,item_id,revision,canonical_key,policy_id,policy_version,owner_id,scope,payload,dependencies,identity_dependencies,supersedes_id,observed_at,expires_at)
   values(did,'declaration',c.item_id,(decl->>'revision')::integer,private.part_one_code_key(s.request->'code'),'private_capture',cfg.policy_version,owner,'private_package',
    decl||jsonb_build_object('structuredSections',decl->'sections','sections',sections,'sources',sources,'predicate',ev->'selection'->'predicate','state',declstate,
-    'privateKind','declaration','captureSessionId',c.id,'generation',c.generation,'deletionEpoch',c.deletion_epoch),normal_deps,identity_deps,
+    'privateKind','declaration','captureSessionId',c.id,'generation',c.generation,'deletionEpoch',c.deletion_epoch,'capturedSource',case when p_action='source/apply' then ev->'capturedSource' else null end),normal_deps,identity_deps,
     nullif(decl->>'supersedesId','')::uuid,(decl->>'observedAt')::timestamptz,expiry);
  insert into private.part_one_record_status(record_id) values(did);
  r:=r||jsonb_build_object('snapshotId',coalesce(sid,selected_snapshot),'declarationId',did,'declarationState',declstate,'scope','private_package',
@@ -1944,7 +2108,7 @@ begin
   'allowedActions',case when accepted then jsonb_build_array('save','add_photo','rescan','remove_draft') when c.item_id is null then jsonb_build_array('add_photo','rescan','remove_draft') else jsonb_build_array('save_partial','add_photo','rescan','remove_draft') end,
   'resultRevision',s.result_revision+1,'freshness',jsonb_build_object('observedAt',decl->'observedAt','expiresAt',decl->'expiresAt','state','fresh'));
  r:=jsonb_set(r,'{display,sections}',sections);r:=jsonb_set(r,'{display,sources}',sources);r:=jsonb_set(r,'{display,resultRevision}',r->'resultRevision');
- r:=jsonb_set(r,'{display,limitations}',case when accepted then '[]'::jsonb else jsonb_build_array('Private reviewed source remains incomplete or uncertain') end);
+ r:=jsonb_set(r,'{display,limitations}',case when accepted then '[]'::jsonb else jsonb_build_array(case when p_action='source/apply' then 'Private label text remains incomplete or uncertain; it does not verify the catalog formula' else 'Private reviewed source remains incomplete or uncertain' end) end);
  r:=private.part_one_filter_result(r,owner);
  update private.part_one_scans set result=r,result_revision=s.result_revision+1,binding_revision=binding_revision+1 where id=s.id returning * into s;
  update private.part_one_captures set capture_revision=capture_revision+1 where id=c.id returning * into c;
@@ -1957,7 +2121,7 @@ begin
  end if;
  return private.part_one_commit_receipt(cm,c,s);
 end $$;
-revoke all on function private.part_one_commit_receipt(private.part_one_capture_commits,private.part_one_captures,private.part_one_scans),private.part_one_js_slice(text,integer,integer),private.part_one_review_operation(text,jsonb) from public,anon,authenticated;
+revoke all on function private.part_one_commit_receipt(private.part_one_capture_commits,private.part_one_captures,private.part_one_scans),private.part_one_js_slice(text,integer,integer),private.part_one_review_ref_allowed(jsonb,jsonb),private.part_one_validate_captured_source(jsonb,jsonb),private.part_one_validate_captured_sections(jsonb,jsonb,jsonb),private.part_one_review_operation(text,jsonb) from public,anon,authenticated;
 
 create function public.part_one_private_service(p_action text,p_payload jsonb) returns jsonb
 language plpgsql security definer set search_path='' as $$
@@ -1967,7 +2131,7 @@ declare ut private.part_one_upload_tickets; c private.part_one_captures; s priva
 begin
  perform pg_catalog.pg_advisory_xact_lock(40203);
  if jsonb_typeof(p_payload)<>'object' or octet_length(p_payload::text)>524288 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
- if p_action in ('review/prepare','review/apply') then return private.part_one_review_operation(p_action,p_payload);end if;
+ if p_action in ('review/prepare','review/apply','source/apply') then return private.part_one_review_operation(p_action,p_payload);end if;
  if p_action='cleanup/heartbeat' then
   if length(p_payload->>'consumerVersion') not between 1 and 200 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
   insert into private.part_one_private_consumer(id,consumer_version,heartbeat_at) values(true,p_payload->>'consumerVersion',now())

@@ -15,8 +15,17 @@ export function privateService(client:PrivateStorageClient){return async(action:
 };}
 /** Service-only Storage access. No customer bucket grants, path reuse/upsert,
  * public URLs or direct SQL Storage ownership edits are used. */
-export function createPrivateStoragePorts(client:PrivateStorageClient):PrivateStoragePorts{
+export function createPrivateStoragePorts(client:PrivateStorageClient, configuration:{publicApiOrigin?:string}={}):PrivateStoragePorts{
  const service=privateService(client);
+ // The local Edge SDK talks to Docker's internal gateway; device clients need
+ // the independently configured public API origin. Never trust request headers.
+ let publicOrigin:URL|null=null;
+ if(configuration.publicApiOrigin){
+  try{publicOrigin=new URL(configuration.publicApiOrigin);}catch{throw new PartOneHttpError('invalid_private_public_origin',503);}
+  if(publicOrigin.username||publicOrigin.password||publicOrigin.pathname!=='/'||publicOrigin.search||publicOrigin.hash||
+    !(publicOrigin.protocol==='https:'||publicOrigin.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(publicOrigin.hostname)))
+   throw new PartOneHttpError('invalid_private_public_origin',503);
+ }
  return {
   async upload(bucket,name,bytes,options){
    if(options.signal.aborted)throw new PartOneHttpError('upload_cancelled',409);
@@ -44,7 +53,13 @@ export function createPrivateStoragePorts(client:PrivateStorageClient):PrivateSt
    const ttl=Math.min(seconds,Number(value.maxSeconds),60);
    if(!Number.isInteger(ttl)||ttl<1)throw new PartOneHttpError('private_asset_unavailable',409);
    const {data,error}=await client.storage.from(bucket).createSignedUrl(name,ttl);
-   if(error||!data?.signedUrl)throw new PartOneHttpError('private_asset_unavailable',503);return data.signedUrl;
+   if(error||!data?.signedUrl)throw new PartOneHttpError('private_asset_unavailable',503);
+   if(!publicOrigin)return data.signedUrl;
+   const signed=new URL(data.signedUrl);
+   if(signed.username||signed.password||signed.hash||!signed.pathname.startsWith('/storage/v1/object/sign/'))throw new PartOneHttpError('invalid_private_asset_url',503);
+   // Preserve the exact encoded object path and signed token; only the trusted
+   // transport origin changes, never the owner grant or signature lifetime.
+   return `${publicOrigin.origin}${signed.pathname}${signed.search}`;
   },
  };
 }

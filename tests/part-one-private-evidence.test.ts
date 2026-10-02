@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import { createReviewedFixtureAuthority, evaluatePrivateEvidence, hashPrivateObservation, producePrivateReviewedReceipt, PrivateEvidenceContextSchema, PrivateReviewedReceiptSchema } from '../supabase/functions/_shared/part-one-private-evidence.ts';
 import type { PrivateEvidenceContext, PrivateReviewedReceipt, PrivateReviewAuthorityPolicy, PrivateObservationRecord } from '../supabase/functions/_shared/part-one-private-evidence.ts';
 import type { Variant } from '../src/contracts/PartOne.ts';
-import { canClaimFullListAbsence, selectDeclaration } from '../src/domain/part-one/evidence.ts';
+import { canClaimFullListAbsence, factBundleClaimLimits, selectDeclaration } from '../src/domain/part-one/evidence.ts';
+import { commitPrivateCapture } from '../supabase/functions/_shared/part-one-private-commit.ts';
 
 const id = (n: number) => `20000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const now = '2026-10-02T12:00:00.000Z', future = '2026-10-03T12:00:00.000Z';
@@ -14,7 +15,7 @@ const authorityPolicy: PrivateReviewAuthorityPolicy = { policyId: id(40), versio
 const rawIngredients = 'Ingredients: 1,2-Hexanediol, Aqua (Water, Eau), PPG-6-Decyltetradeceth-30, PEG-240/HDI Copolymer';
 function context(ownerId = id(1)): PrivateEvidenceContext {
   const binding = { ownerId, captureSessionId: id(2), packageObservationId: id(3), generation: 4, deletionEpoch: 2 };
-  const observation = (observationId: string, rawText: string, role: 'ingredients' | 'package'): PrivateObservationRecord => ({ ...binding, observationId, revision: 1, kind: 'ocr', role, rawText, assetEvidenceIds: [id(5)], originalObservationId: observationId, supersedesId: null, uncertaintyReasons: [], ocr: { evidenceId: id(6), captureSessionId: id(2), generation: 4, recognizer: 'fixture-vision', recognizerVersion: '1', languageConfig: ['en'], correctionEnabled: false, sourceWidth: 1200, sourceHeight: 1600, orientationTransform: [1,0,0,0,1,0,0,0,1], lines: rawText.split('\n').map((text, i) => ({ text, alternatives: [], region: [0.1, i / 20, 0.8, 0.04], confidence: 0.99 })), status: 'recognized' }, edit: null, observedAt: now, expiresAt: future, status: 'active' });
+  const observation = (observationId: string, rawText: string, role: 'ingredients' | 'package'): PrivateObservationRecord => ({ ...binding, observationId, revision: 1, kind: 'ocr', role, coordinateSpace:'sanitized_derivative', derivedFromObservationIds:[], rawText, assetEvidenceIds: [id(5)], originalObservationId: observationId, supersedesId: null, uncertaintyReasons: [], ocr: { evidenceId: id(6), captureSessionId: id(2), generation: 4, recognizer: 'fixture-vision', recognizerVersion: '1', languageConfig: ['en'], correctionEnabled: false, sourceWidth: 1200, sourceHeight: 1600, orientationTransform: [1,0,0,0,1,0,0,0,1], lines: rawText.split('\n').map((text, i) => ({ text, alternatives: [], region: [0.1, i / 20, 0.8, 0.04], confidence: 0.99 })), status: 'recognized' }, edit: null, observedAt: now, expiresAt: future, status: 'active' });
   const item = { snapshotId: id(8), itemId: id(9), revision: 1, name: 'Example Daily toner', variant: structuredClone(variant), fieldEvidence: { name: [id(10)] }, barcodeAssertions: [{ raw: '3606000537538', symbology: 'ean13', namespace: 'gtin' as const, canonical: '03606000537538', evidenceId: id(10) }], requestedMarket: 'US', sourceMarkets: ['US'], packageMarket: null, declarationIds: [id(11)], conflictIds: [], scope: 'public' as const, supersedesId: null };
   return { ownerId, capture: { schemaVersion: 1, captureSessionId: id(2), packageObservationId: id(3), scanId: id(12), generation: 4, captureRevision: 1, deletionEpoch: 2, itemId: id(9), candidateId: null }, result: { schemaVersion: 1, requestId: id(13), scanId: id(12), generation: 4, resultRevision: 1, identity: 'exact', itemId: id(9), candidateIds: [], snapshotId: id(8), declarationId: id(11), declarationState: 'conflict', scope: 'public', packageConfirmation: 'user_bound', work: 'complete', jobId: null, subscriptionId: null, nextCheckAfter: null, display: { resultRevision: 1, selectedIdentity: null, candidates: [], sections: [], sources: [], limitations: [] }, reasonCodes: ['public_ingredient_source_wrong'], conflictIds: [id(99)], evidenceIds: [id(10)], allowedActions: ['add_photo'], freshness: { observedAt: now, expiresAt: future, state: 'fresh' } }, item, assets: [{ ...binding, evidenceId: id(5), clientEvidenceId: id(6), attestationId: id(7), storageObjectId: id(14), contentHash: 'sha256:synthetic-sanitized-image', objectVersion: 'synthetic-storage-version-1', width: 1200, height: 1600, metadataStripped: true, sanitizerVersion: 'synthetic-sanitizer-1', verificationEvidence: 'Synthetic locally decoded JPEG', observedAt: now, expiresAt: future, status: 'active' }], observations: [observation(id(15), rawIngredients, 'ingredients'), observation(id(16), [...Object.values(variant).map(String), 'US', 'Cosmetic', '3606000537538'].join('\n'), 'package')], priorObservations: [], supersedesDeclarationId: null, reviewRequest: { reviewId: id(17) }, policy: { policyId: id(18), provider: 'private_capture', version: 'synthetic-private-1', permissionEvidence: 'Synthetic local fixture: private retention/display only', reviewedAt: now, expiresAt: future, revokedAt: null, operations: { lookup: false, process: true, retain: true, privateDisplay: true, sharedDisplay: false, ocr: true, cropThumbnail: false, rehost: false, hotlink: false, export: false }, retainedFields: ['identity', 'ingredients', 'private_photo'], attribution: null, purgeObligations: ['delete all derivatives'] }, now, ids: { snapshotId: id(19), declarationId: id(20) } };
 }
@@ -37,9 +38,35 @@ test('A11 private evidence retains chemical punctuation and exact image/text spa
   assert.deepEqual(out.declaration.sections[0].entries.map(e => e.rawToken), ['1,2-Hexanediol', 'Aqua (Water, Eau)', 'PPG-6-Decyltetradeceth-30', 'PEG-240/HDI Copolymer']);
   for (const entry of out.declaration.sections[0].entries) { const span = entry.sourceSpans[0]; assert.equal(rawIngredients.slice(span.start!, span.end!), entry.rawToken); assert.equal(span.observationId, id(15)); assert.equal(span.imageId, id(5)); assert.ok(span.region); assert.equal(entry.canonicalIngredientId, null); }
 });
+test('Private facts retain scope in downstream presence and full-list claim limits', async () => {
+  const accepted=await evaluate(context()), acceptedLimits=factBundleClaimLimits(accepted.factBundle!,now);
+  assert.equal(acceptedLimits.evidenceBasis,'private_label'); assert.equal(acceptedLimits.globalCatalogVerification,false);
+  assert.equal(acceptedLimits.fullListAbsence,true); assert.equal(acceptedLimits.inferUnobservedIngredients,false);
+  const partial=await evaluatePrivateEvidence(context(),{hash}), limits=factBundleClaimLimits(partial.factBundle!,now);
+  assert.equal(limits.fullListAbsence,false); assert.equal(limits.globalCatalogVerification,false);
+  assert.equal(limits.inferUnobservedIngredients,false); assert.equal(limits.formulaEquivalence,'unknown');
+  const revoked=factBundleClaimLimits(accepted.factBundle!,now,[accepted.declaration.declarationId]);
+  assert.deepEqual(revoked.readableEntryIds,[]); assert.equal(revoked.selectedPackagePresence,false); assert.equal(revoked.fullListAbsence,false);
+});
 test('A07 default absent adjudication authority and client confirmation/high OCR confidence stay partial', async () => {
   const input = context(), output = await evaluatePrivateEvidence(input, { hash }); assert.equal(output.selection.accepted, false); assert.ok(output.reasonCodes.includes('private_review_unavailable')); assert.equal(output.declaration.sections[0].lineCoverageComplete, false);
   assert.equal(PrivateEvidenceContextSchema.safeParse({ ...input, complete: true }).success, false); assert.equal(PrivateReviewedReceiptSchema.safeParse({ ...await reviewed(input), clientConfirmed: true }).success, false);
+});
+test('Ordinary private commit extracts its current source without a fixture review authority', async () => {
+  const input=context();input.reviewRequest=null;
+  const receipt={schemaVersion:1 as const,capture:input.capture,result:input.result,observationIds:input.observations.map(o=>o.observationId),declarationIds:[],assetIds:input.assets.map(a=>a.evidenceId)};
+  const actions:string[]=[];let applied:any;
+  const result=await commitPrivateCapture(input.capture.captureSessionId,{schemaVersion:2,idempotencyKey:'ordinary-source',expectedGeneration:4,expectedResultRevision:1,expectedCaptureRevision:1,expectedDeletionEpoch:2,packageObservationId:input.capture.packageObservationId,assets:[],sourceObservations:[],edits:[],review:null,reviewId:null},{ownerId:input.ownerId,
+    operation:async(action)=>{actions.push(action);return receipt;},
+    service:async(action,payload)=>{actions.push(action);if(action==='review/prepare')return{context:input,sourceCommitId:id(90),captureRevision:1,resultRevision:1};applied=payload;return receipt;},
+  });
+  assert.deepEqual(actions,['captures/observations','review/prepare','source/apply']);assert.deepEqual(result,receipt);
+  assert.equal(applied.authorityPolicy,null);assert.equal(applied.reviewId,null);assert.equal(applied.evaluation.reviewReceipt,null);
+  assert.equal(applied.evaluation.selection.accepted,false);assert.equal(applied.evaluation.capturedSource.acceptanceEligible,false);
+  assert.equal(applied.evaluation.capturedSource.catalogVerified,false);assert.equal(applied.evaluation.capturedSource.absenceClaimsAllowed,false);
+  assert.ok(applied.evaluation.declaration.sections[0].rawText.includes('1,2-Hexanediol'));
+  const limits=factBundleClaimLimits(applied.evaluation.factBundle,now);
+  assert.equal(limits.readableEntryIds.length,4);assert.equal(limits.selectedPackagePresence,false);assert.equal(limits.fullListAbsence,false);
 });
 test('A07 reviewed fixture producer rejects changed image/hash/Storage version/text/region/recognizer/revision without independent review', async () => {
   const initial = context(), receipt = await reviewed(initial);
@@ -141,4 +168,40 @@ test('Actual pinned JPEG review rejects Water/Glycerin formula replacement and a
   await assert.rejects(build(input),/gold_transcript_mismatch/);
   input.observations[0].rawText=SYNTHETIC_PRIVATE_EDIT_TEXT;input.observations[0].edit!.text=SYNTHETIC_PRIVATE_EDIT_TEXT;
   const output=await evaluate(input,await build(input));assert.equal(output.selection.accepted,true);assert.equal(output.declaration.sections[0].entries[0].rawToken,'1,2-Hexanediol');
+});
+
+
+test('Original rotated/large OCR remains attributed provenance while exact JPEG OCR supplies derivative coordinates', async()=>{
+ const input=context(),derivative=input.observations[0],original=structuredClone(derivative);
+ original.observationId=id(90);original.originalObservationId=original.observationId;original.coordinateSpace='source_original';
+ original.ocr!.sourceWidth=6000;original.ocr!.sourceHeight=3000;original.ocr!.orientationTransform=[0,-1,1,1,0,0,0,0,1];
+ derivative.derivedFromObservationIds=[original.observationId];input.observations.push(original);
+ const out=await evaluate(input);assert.equal(out.reasonCodes.includes('invalid_ocr_geometry'),false);assert.equal(out.selection.accepted,true);
+ assert.equal(out.declaration.rawText,rawIngredients);assert.ok(out.dependencies.includes(original.observationId));
+ assert.equal(input.observations.at(-1)!.ocr!.sourceWidth,6000);
+ const absent=structuredClone(input);absent.observations[0].derivedFromObservationIds=[id(99)];
+ assert.ok((await evaluate(absent)).reasonCodes.includes('invalid_derivative_lineage'));
+ const rotated=structuredClone(input);rotated.observations[0].ocr!.orientationTransform=original.ocr!.orientationTransform;
+ assert.ok((await evaluate(rotated)).reasonCodes.includes('invalid_ocr_geometry'));
+ const wrong=structuredClone(input);wrong.observations[0].ocr!.sourceWidth=6000;
+ assert.ok((await evaluate(wrong)).reasonCodes.includes('invalid_ocr_geometry'));
+});
+
+test('Source-original coordinate records cannot supply accepted derivative source references',async()=>{
+ const input=context();for(const o of input.observations)o.coordinateSpace='source_original';
+ const out=await evaluate(input);assert.equal(out.selection.accepted,false);assert.ok(out.reasonCodes.includes('review_source_ref_mismatch'));
+ const partial=await evaluatePrivateEvidence(input,{hash});assert.equal(partial.declaration.rawText,rawIngredients);assert.equal(partial.selection.accepted,false);
+});
+
+test('Original attributed chemical correction cannot be ignored in favor of a fresh JPEG OCR reading',async()=>{
+ const input=context(),proof=input.observations[0],original=structuredClone(proof);
+ original.observationId=id(92);original.originalObservationId=original.observationId;original.coordinateSpace='source_original';
+ proof.derivedFromObservationIds=[original.observationId];input.priorObservations.push(original);
+ const corrected={...structuredClone(original),observationId:id(93),kind:'edit' as const,revision:2,supersedesId:original.observationId,
+  rawText:'Water, Glycerin',ocr:null,edit:{observationId:id(93),supersedesId:original.observationId,revision:2,text:'Water, Glycerin',reason:'Owner correction'}};
+ input.observations.push(corrected);
+ const out=await evaluate(input);assert.equal(out.selection.accepted,false);assert.ok(out.reasonCodes.includes('source_derivative_text_disagreement'));
+ corrected.rawText=rawIngredients.replace(/^Ingredients: /,'');corrected.edit.text=corrected.rawText;
+ const headerOnly=await evaluate(input);assert.equal(headerOnly.reasonCodes.includes('source_derivative_text_disagreement'),false);
+ assert.equal(headerOnly.selection.accepted,true);
 });

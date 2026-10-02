@@ -3,7 +3,7 @@ import type { CaptureSession, ScanResult, SaveRequest } from '../../contracts/Pa
 import { CapturePrivateCommitRequestSchema, CaptureRecoverySchema, PrivateCaptureCapabilitySchema } from '../../contracts/PartOnePrivate.ts';
 import type { CapturePrivateCommitRequest, CaptureRecovery, PrivateCaptureCapability } from '../../contracts/PartOnePrivate.ts';
 import type { PartOnePrivateTransport } from '../../services/partOnePrivateClient.ts';
-import type { PreparedLabelUpload } from '../../services/partOneUpload.ts';
+import type { PreparedLabelUpload, LabelDerivativeOcrBinding } from '../../services/partOneUpload.ts';
 import type { CaptureDraft, CaptureBinding } from './capture.ts';
 import type { DraftLineRef } from './captureReview.ts';
 
@@ -27,18 +27,38 @@ function savedStage(recovery: CaptureRecovery): 'saved_partial' | 'saved_accepte
 }
 /** No persistent outbox/cache. Every action is explicit, owner-bound and fenced by its operation epoch. */
 export function createPrivateCaptureController(options: { enabled: boolean; transport: PartOnePrivateTransport;
-  sanitize: (uri: string, cropRegion: number[]) => Promise<PreparedLabelUpload>; currentOwner: () => string | null;
+  sanitize: (uri: string, cropRegion: number[], binding?: LabelDerivativeOcrBinding) => Promise<PreparedLabelUpload>; currentOwner: () => string | null;
   currentDraft?: () => CaptureDraft | null; createId: () => string; now?: () => number;
   reviewId?: string | (() => string | null); onSaved?: (recovery: CaptureRecovery, saveId: string | null) => void; onRemoved?: (id: string) => void }) {
-  const now = options.now ?? Date.now; let epoch = 0, active: AbortController | null = null, intent: Intent | null = null;
+  const now = options.now ?? Date.now; let retentionTimer: ReturnType<typeof setTimeout> | null = null; let expiryNotificationPending = false; let epoch = 0, active: AbortController | null = null, intent: Intent | null = null;
   let state: PrivateCaptureState = { ownerId: null, stage: options.enabled ? 'temporary' : 'disabled', capture: null, result: null,
     recovery: null, capability: null, error: null, saveId: null, pendingEdits: [], photoRoles: {}, disclosureAccepted: false };
   const listeners = new Set<() => void>();
-  const update = (next: Partial<PrivateCaptureState>) => { state = { ...state, ...next }; for (const listener of [...listeners]) listener(); };
+  const update = (next: Partial<PrivateCaptureState>, defer = false) => {
+    if ('recovery' in next && next.recovery !== state.recovery && retentionTimer) { clearTimeout(retentionTimer); retentionTimer = null; }
+    state = { ...state, ...next };
+    if (!defer) { for (const listener of [...listeners]) listener(); }
+    else if (!expiryNotificationPending) { expiryNotificationPending = true; void Promise.resolve().then(() => {
+      expiryNotificationPending = false; for (const listener of [...listeners]) listener();
+    }); }
+  };
   const stop = () => { epoch++; active?.abort(); active = null; };
   const begin = () => { stop(); active = new AbortController(); return { token: epoch, signal: active.signal, owner: state.ownerId }; };
   const current = (operation: { token: number; owner: string | null; signal: AbortSignal }) => operation.token === epoch && !operation.signal.aborted &&
     operation.owner !== null && operation.owner === state.ownerId && operation.owner === options.currentOwner();
+  const expireRecoveryIfNeeded = () => {
+    if (!state.recovery || privateRecoveryRetentionDeadline(state.recovery) > now()) return false;
+    stop(); intent = null; update({ stage: 'conflict', recovery: null, result: null, pendingEdits: [], photoRoles: {}, disclosureAccepted: false,
+      error: 'Private evidence retention expired. Reopen to request currently permitted evidence.' }, true); return true;
+  };
+  const scheduleRecoveryExpiry = () => {
+    if (retentionTimer) clearTimeout(retentionTimer);
+    const deadline = state.recovery ? privateRecoveryRetentionDeadline(state.recovery) : Infinity;
+    if (!Number.isFinite(deadline)) return;
+    if (expireRecoveryIfNeeded()) return;
+    retentionTimer = setTimeout(scheduleRecoveryExpiry, Math.min(60000, Math.max(1, deadline - now())));
+    if (typeof retentionTimer === 'object' && 'unref' in retentionTimer) retentionTimer.unref();
+  };
   const policyCurrent = () => Boolean(options.enabled && state.capability?.enabled && state.capability.expiresAt && Date.parse(state.capability.expiresAt) > now());
   const fail = (operation: ReturnType<typeof begin>, error: unknown) => {
     if (!current(operation)) return;
@@ -50,6 +70,7 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
         'Private evidence could not be saved or read. Nothing is queued on this device. Retry when connected.', disclosureAccepted: false });
   };
   const verify = (operation: ReturnType<typeof begin>, expected: CaptureSession, response?: CaptureSession) => {
+    expireRecoveryIfNeeded();
     if (!current(operation)) throw new Error('private_capture_cancelled');
     if (response && !sameCapture(expected, response)) throw new Error('private_binding_changed');
     if (intent?.draft && options.currentDraft) {
@@ -60,7 +81,7 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
     if (draft && (draft.binding.ownerId !== state.ownerId || draft.binding.captureSessionId !== capture.captureSessionId ||
       draft.binding.packageObservationId !== capture.packageObservationId || draft.binding.generation !== capture.generation ||
       draft.binding.scanId !== capture.scanId || draft.binding.itemId !== capture.itemId || draft.binding.deletionEpoch !== capture.deletionEpoch)) throw new Error('private_binding_changed');
-    const sourceObservations = draft ? draft.shots.flatMap(shot => shot.observations.map(observation => ({ observationId: options.createId(), revision: 1 as const, role: state.photoRoles[shot.evidenceId] ?? 'ingredients', observation: clone(observation) }))) : clone(state.recovery?.sourceObservations ?? []);
+    const sourceObservations = draft ? draft.shots.flatMap(shot => shot.observations.map(observation => ({ observationId: options.createId(), revision: 1 as const, role: state.photoRoles[shot.evidenceId] ?? 'ingredients', coordinateSpace: 'source_original' as const, derivedFromObservationIds: [], observation: clone(observation) }))) : clone(state.recovery?.sourceObservations ?? []);
     const edits: CapturePrivateCommitRequest['edits'] = draft ? [] : [...clone(state.recovery?.edits ?? []).map(({ actorOwnerId: _owner, ...edit }) => edit), ...clone(state.pendingEdits)];
     if (draft) {
       const sourceIds = new Map<string,string>(); let at = 0;
@@ -101,7 +122,9 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
       for (const shot of transaction.draft?.shots ?? []) {
         if (transaction.assets.some(asset => asset.evidenceId === shot.evidenceId)) continue;
         update({ stage: 'uploading' });
-        const prepared = await options.sanitize(shot.uri, [0, 0, 1, 1]);
+        const derivativeBinding = { evidenceId: shot.evidenceId, captureSessionId: transaction.capture.captureSessionId, generation: transaction.capture.generation,
+          languages: shot.observations.at(-1)?.languageConfig ?? ['en-US'], correctionEnabled: false };
+        const prepared = await options.sanitize(shot.uri, [0, 0, 1, 1], derivativeBinding);
         try {
           verify(operation, transaction.capture);
           const receipt = await options.transport.upload(transaction.capture.captureSessionId, { idempotencyKey: `${transaction.idempotencyKey}:${shot.evidenceId}`,
@@ -109,6 +132,11 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
             expectedResultRevision: transaction.result.resultRevision, expectedCaptureRevision: transaction.capture.captureRevision, expectedDeletionEpoch: transaction.capture.deletionEpoch }, prepared, operation.signal);
           transaction.uploaded = true; verify(operation, transaction.capture, receipt.capture); transaction.capture = clone(receipt.capture); transaction.result = clone(receipt.result);
           transaction.assets.push(clone(receipt.asset));
+          if (prepared.derivativeObservation) {
+            const originalIds = transaction.sourceObservations.filter(entry => entry.coordinateSpace === 'source_original' && entry.observation.evidenceId === shot.evidenceId).map(entry => entry.observationId);
+            transaction.sourceObservations.push({ observationId: options.createId(), revision: 1, role: state.photoRoles[shot.evidenceId] ?? 'ingredients',
+              coordinateSpace: 'sanitized_derivative', derivedFromObservationIds: originalIds, observation: clone(prepared.derivativeObservation) });
+          }
         } finally { prepared.bytes.fill(0); }
       }
       verify(operation, transaction.capture); update({ stage: 'committing' });
@@ -129,7 +157,8 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
       const recovery = CaptureRecoverySchema.parse(await options.transport.recover(transaction.capture.captureSessionId, operation.signal));
       verify(operation, transaction.capture, recovery.capture); intent = null;
       update({ stage: savedStage(recovery), recovery, result: recovery.boundResult ?? recovery.result, capture: recovery.capture, saveId,
-        pendingEdits: [], photoRoles: Object.fromEntries(recovery.sourceObservations.map(entry => [entry.observation.evidenceId, entry.role])), disclosureAccepted: false }); options.onSaved?.(recovery, saveId); return true;
+        pendingEdits: [], photoRoles: Object.fromEntries(recovery.sourceObservations.map(entry => [entry.observation.evidenceId, entry.role])), disclosureAccepted: false }); scheduleRecoveryExpiry();
+      if (!state.recovery) return false; options.onSaved?.(recovery, saveId); return true;
     } catch (error) {
       if (error instanceof Error && error.message === 'private_draft_changed' && transaction.uploaded && !transaction.cleanupStarted && current(operation)) {
         transaction.cleanupStarted = true;
@@ -147,7 +176,7 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
       const value = CaptureRecoverySchema.parse(await options.transport.recover(id, operation.signal));
       if (!current(operation)) return false;
       if (value.capture.captureSessionId !== id) throw new Error('private_binding_changed');
-      update({ stage: savedStage(value), recovery: value, capture: value.capture, result: value.boundResult ?? value.result, photoRoles: Object.fromEntries(value.sourceObservations.map(entry => [entry.observation.evidenceId, entry.role])) }); return true;
+      update({ stage: savedStage(value), recovery: value, capture: value.capture, result: value.boundResult ?? value.result, photoRoles: Object.fromEntries(value.sourceObservations.map(entry => [entry.observation.evidenceId, entry.role])) }); scheduleRecoveryExpiry(); return state.recovery !== null;
     } catch (error) { fail(operation, error); return false; }
   }
   async function remove() {
@@ -160,7 +189,7 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
     } catch (error) { fail(operation, error); if (current(operation)) update({ error: 'Private evidence could not be removed. It remains saved until deletion succeeds. Retry when connected.' }); return false; }
   }
   return {
-    getState: () => state,
+    getState: () => { expireRecoveryIfNeeded(); return state; },
     isCurrentOwner: () => state.ownerId !== null && state.ownerId === options.currentOwner(),
     subscribe(listener: () => void) { listeners.add(listener); return () => listeners.delete(listener); },
     setOwner(owner: string | null) { if (state.ownerId === owner) return; stop(); intent = null; update({ ownerId: owner, stage: options.enabled ? 'temporary' : 'disabled',
@@ -174,7 +203,7 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
         stage: options.enabled ? 'temporary' : 'disabled', disclosureAccepted: false }); return true;
     },
     discloseDraft(draft: CaptureDraft) { return state.capture && state.result ? disclose(draft, state.capture, state.result) : Promise.resolve(false); },
-    discloseChanges() { return state.recovery?.editable && state.capture && state.pendingEdits.length ? disclose(null, state.capture, state.recovery.result) : Promise.resolve(false); },
+    discloseChanges() { expireRecoveryIfNeeded(); return state.recovery?.editable && state.capture && state.pendingEdits.length ? disclose(null, state.capture, state.recovery.result) : Promise.resolve(false); },
     acceptDisclosure(accepted: boolean) { if (state.stage === 'disclosure') update({ disclosureAccepted: accepted }); },
     confirmSave,
     cancelDisclosure() { if (state.stage === 'disclosure' || state.stage === 'checking_policy') { stop(); intent = null; update({ stage: state.recovery ? savedStage(state.recovery) : 'temporary', disclosureAccepted: false, error: null }); } },
@@ -187,6 +216,7 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
       intent = null; update({ photoRoles: { ...state.photoRoles, [evidenceId]: role }, disclosureAccepted: false }); return true;
     },
     correctLine(ref: DraftLineRef, text: string, originalObservationId?: string) {
+      expireRecoveryIfNeeded();
       const recovery = state.recovery; if (!recovery?.editable || busy(state.stage) || state.stage === 'disclosure' || state.ownerId !== options.currentOwner() || !text.trim() || text.length > 4000) return false;
       const source = originalObservationId ? recovery.sourceObservations.find(value => value.observationId === originalObservationId) :
         recovery.sourceObservations.filter(value => value.observation.evidenceId === ref.evidenceId)[ref.observationIndex];
@@ -206,6 +236,36 @@ export function createPrivateCaptureController(options: { enabled: boolean; tran
   };
 }
 export type PrivateCaptureController = ReturnType<typeof createPrivateCaptureController>;
+
+/** Permission-filtered label readings remain private and partial, even when their barcode matches a catalog item. */
+export function privateCapturedLabelProjection(state: PrivateCaptureState, ownerId: string, now = Date.now()) {
+  const recovery = state.recovery, result = recovery?.boundResult ?? recovery?.result;
+  if (state.ownerId !== ownerId || !recovery || !result || result.scope !== 'private_package' ||
+    !['saved_partial','saved_accepted','disclosure','checking_policy'].includes(state.stage) ||
+    privateRecoveryRetentionDeadline(recovery) <= now || result.freshness.state !== 'fresh' ||
+    !result.freshness.expiresAt || Date.parse(result.freshness.expiresAt) <= now ||
+    result.scanId !== recovery.capture.scanId || result.generation !== recovery.capture.generation) return null;
+  const outcome = recovery.capturedSource, candidate = outcome?.candidate;
+  if (outcome) {
+    if (!candidate || candidate.ownerId !== ownerId || candidate.captureSessionId !== recovery.capture.captureSessionId ||
+      candidate.packageObservationId !== recovery.capture.packageObservationId || candidate.generation !== recovery.capture.generation ||
+      candidate.deletionEpoch !== recovery.capture.deletionEpoch || candidate.captureRevision + 1 !== recovery.capture.captureRevision ||
+      candidate.resultRevision + 1 !== result.resultRevision || candidate.selectedItemId !== result.itemId ||
+      candidate.targetSnapshotId !== result.snapshotId || candidate.targetDeclarationId !== result.declarationId ||
+      Date.parse(candidate.expiresAt) <= now || outcome.state === 'blocked') return null;
+    return { kind: 'partial' as const, conflict: outcome.state === 'conflict' || candidate.contradictions.length > 0,
+      sections: outcome.facts.sections.map(section => ({ id: section.sectionId, kind: section.kind, text: section.rawText })),
+      capturedText: outcome.facts.capturedText.map(entry => ({ id: entry.observationId, text: entry.rawText, attributedEdit: entry.attributedEdit })),
+      association: candidate.association, name: candidate.name?.value ?? null, gaps: [...new Set([...candidate.gaps.map(gap => gap.code), ...candidate.reasonCodes, ...outcome.reasonCodes])],
+      contradictions: candidate.contradictions.map(entry => ({ kind: entry.kind, values: entry.values })), limitations: result.display.limitations };
+  }
+  const sections = result.display.sections.filter(section => Date.parse(section.expiresAt) > now)
+    .map(section => ({ id: section.sectionId, kind: section.kind, text: section.text }));
+  if (!sections.length) return null;
+  return { kind: state.stage === 'saved_accepted' && result.declarationState === 'accepted' && !result.conflictIds.length ? 'accepted' as const : 'partial' as const,
+    conflict: result.declarationState === 'conflict' || result.conflictIds.length > 0, sections,
+    capturedText: [], association: null, name: null, gaps: [], contradictions: [], limitations: result.display.limitations };
+}
 
 export function privateEditReplacement(edit: CapturePrivateCommitRequest['edits'][number]): string {
   if ('replacementText' in edit && typeof edit.replacementText === 'string') return edit.replacementText;
@@ -234,4 +294,22 @@ export function privateCaptureProjectionBlocked(state: PrivateCaptureState,
     !['conflict','unavailable','disabled'].includes(state.stage)) return false;
   const context = state.capture ?? (binding?.ownerId === ownerId ? binding : null);
   return Boolean(context && context.scanId === result.scanId && context.generation === result.generation);
+}
+
+/** The recovery DTO has no independent history permission deadline. All cached history therefore expires with its asset dependencies. */
+export function privateRecoveryRetentionDeadline(recovery: CaptureRecovery): number {
+  const hasHistory = recovery.sourceObservations.length > 0 || recovery.edits.length > 0 || recovery.review !== null ||
+    recovery.capturedSource !== null && recovery.capturedSource !== undefined ||
+    (recovery.boundResult ?? recovery.result).scope === 'private_package' && (recovery.boundResult ?? recovery.result).display.sections.length > 0;
+  if (hasHistory && recovery.assets.length === 0) return 0;
+  const assets = new Map(recovery.assets.map(entry => [entry.asset.evidenceId, Date.parse(entry.expiresAt)]));
+  // Local OCR/review uses the client photo ID; immutable extractor references
+  // use the server record ID. Keep each namespace bound to its recovered asset.
+  const records = new Set(recovery.assets.flatMap(entry => entry.recordId ? [entry.recordId] : [entry.asset.evidenceId]));
+  if (recovery.sourceObservations.some(entry => !assets.has(entry.observation.evidenceId)) ||
+    recovery.review?.reviewState.assemblies.some(assembly => assembly.lines.some(line => line.sources.some(source => !assets.has(source.evidenceId)))) ||
+    recovery.capturedSource?.candidate?.assetBindings.some(binding => !records.has(binding.evidenceId)) ||
+    recovery.capturedSource?.facts.capturedText.some(entry => entry.sourceRefs.some(ref => !records.has(ref.assetEvidenceId)))) return 0;
+  const values = [...assets.values()]; if (values.some(value => !Number.isFinite(value))) return 0;
+  return values.length ? Math.min(...values) : Infinity;
 }

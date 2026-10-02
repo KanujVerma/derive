@@ -1,11 +1,23 @@
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { CaptureBinding, MemoryLabelDraft } from '../../../presentation/part-one/capture';
-import { privateEditReplacement, privateSourceEditChain } from '../../../presentation/part-one/privateCaptureController';
+import { privateEditReplacement, privateSourceEditChain, privateRecoveryRetentionDeadline, privateCapturedLabelProjection } from '../../../presentation/part-one/privateCaptureController';
 import type { PrivateCaptureController } from '../../../presentation/part-one/privateCaptureController';
 import type { CaptureRecovery } from '../../../contracts/PartOnePrivate';
 import type { DraftLineRef } from '../../../presentation/part-one/captureReview';
 const processing = (stage: string) => ['checking_policy','uploading','committing','saving','recovering','removing'].includes(stage);
+const sectionLabels = { ingredients: 'Ingredients read from label', active: 'Active ingredients read from label', inactive: 'Inactive ingredients read from label', may_contain: 'May contain · read from label' };
+const associations = { unknown: 'This label has not been associated with a catalog product.', candidate: 'Possible product association · needs review.',
+  barcode_matches_catalog_same_asset: 'The barcode matches the selected catalog product in this photo. Ingredient coverage remains partial.',
+  barcode_matches_catalog_unlinked_assets: 'The barcode matches the selected catalog product. The ingredient photos are not linked to that package.',
+  contradiction: 'The package and product readings disagree.' };
+const gapMessages: Record<string,string> = { ocr_panel_coverage_unverified: 'Text recognition cannot establish that the whole label panel was captured.',
+  full_panel_not_established: 'Coverage of the full label panel has not been established.', section_tail_not_observed: 'The end of this label section has not been observed.',
+  recognition_alternatives_unresolved: 'The recognition has unresolved alternative readings.', edited_layout_unresolved: 'The layout of corrected text needs review.',
+  unresolved_column_layout: 'The order of label columns is uncertain.', same_package_photo_link_unestablished: 'The ingredient photos have not been linked to the barcode package.',
+  package_barcode_unknown: 'A package barcode has not been established from these photos.', package_market_unknown: 'The package market is unknown.',
+  package_category_unknown: 'The package category is unknown.', package_variant_incomplete: 'The exact package variant is not established.',
+  ingredient_header_not_observed: 'An ingredient section heading has not been observed.', glare: 'Glare may obscure label text.', missing_region: 'A label region is missing.' };
 function Action({ label, action, disabled = false, checked }: { label: string; action: () => void; disabled?: boolean; checked?: boolean }) {
   return <Pressable accessibilityLabel={label} accessibilityRole={checked === undefined ? 'button' : 'checkbox'} disabled={disabled}
     accessibilityState={{ disabled, ...(checked === undefined ? {} : { checked }) }} onPress={action} style={styles.action}><Text style={styles.body}>{checked ? 'Selected: ' : ''}{label}</Text></Pressable>;
@@ -34,15 +46,18 @@ export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const [, refreshDraft] = useState(0), [clock, setClock] = useState(Date.now);
   useEffect(() => draft?.subscribe(() => refreshDraft(value => value + 1)), [draft]);
-  const recovery = state.recovery;
+  const recovery = state.recovery && privateRecoveryRetentionDeadline(state.recovery) > Math.max(clock, Date.now()) ? state.recovery : null;
   const photoNumbers = new Map(Array.from(new Set([...(recovery?.sourceObservations.map(entry => entry.observation.evidenceId) ?? []),
     ...(recovery?.assets.map(entry => entry.asset.evidenceId) ?? [])])).map((evidenceId, index) => [evidenceId, index + 1]));
-  const nextExpiry = [...(recovery?.assets.map(entry => entry.signedAccess?.expiresAt) ?? []), (recovery?.boundResult ?? recovery?.result)?.freshness.expiresAt].filter((value): value is string => Boolean(value)).map(Date.parse)
+  const projectedResult = recovery?.boundResult ?? recovery?.result;
+  const nextExpiry = [...(recovery?.assets.flatMap(entry => [entry.signedAccess?.expiresAt, entry.expiresAt]) ?? []), projectedResult?.freshness.expiresAt,
+    recovery?.capturedSource?.candidate?.expiresAt, ...(projectedResult?.display.sections.map(section => section.expiresAt) ?? [])].filter((value): value is string => Boolean(value)).map(Date.parse)
     .filter(value => value > Math.max(clock, Date.now())).sort((a,b) => a-b)[0];
   useEffect(() => { if (!nextExpiry) return; const timer = setTimeout(() => setClock(Date.now()), Math.min(60000, Math.max(1,nextExpiry-Date.now()))); return () => clearTimeout(timer); }, [nextExpiry,clock]);
   if ((state.stage === 'disabled' && !state.error) || state.ownerId !== ownerId || !controller.isCurrentOwner()) return null;
   const local = draft && binding ? draft.read(binding) : null, working = processing(state.stage), locked = working || state.stage === 'disclosure', now = Math.max(clock,Date.now());
-  const acceptedCurrent = state.stage === 'saved_accepted' && Boolean((recovery?.boundResult ?? recovery?.result)?.freshness.expiresAt && Date.parse((recovery?.boundResult ?? recovery?.result)!.freshness.expiresAt!) > now);
+  const labelFacts = privateCapturedLabelProjection(state, ownerId, now);
+  const acceptedCurrent = !recovery?.capturedSource && state.stage === 'saved_accepted' && Boolean(projectedResult?.freshness.expiresAt && Date.parse(projectedResult.freshness.expiresAt) > now);
   const status = acceptedCurrent ? 'Saved private package evidence · accepted by server review' :
     state.stage === 'saved_partial' || state.stage === 'saved_accepted' ? 'Saved private label note · partial or uncertain' : state.stage === 'removed' ? 'Private evidence removed' :
     state.stage === 'uploading' ? 'Uploading sanitized label photos privately…' : state.stage === 'committing' || state.stage === 'saving' ? 'Saving private label evidence…' :
@@ -52,6 +67,22 @@ export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding
     <Text accessibilityLiveRegion="polite" style={styles.body}>{status}</Text>
     <Text style={styles.body}>Private photos, originals and corrections belong to this account. They do not verify the shared catalog. Coverage marks and OCR confidence do not establish acceptance.</Text>
     {state.error && <Text accessibilityRole="alert" style={styles.body}>{state.error}</Text>}
+    {labelFacts && <View style={styles.group}>
+      <Text accessibilityRole="header" style={styles.heading}>{labelFacts.kind === 'accepted' ? 'Accepted declaration for this private package' : 'Read from this private label · partial or uncertain'}</Text>
+      <Text style={styles.body}>{labelFacts.kind === 'accepted' ? 'These facts apply to this saved package and its reviewed declaration. They do not establish a timeless formula for every product with this barcode.' :
+        'Only text seen in these private label photos is shown. This is not a complete ingredient list; unlisted ingredients cannot be ruled out. These readings do not verify the shared catalog.'}</Text>
+      {labelFacts.name && <Text selectable style={styles.body}>Name read from label: {labelFacts.name}</Text>}
+      {labelFacts.association && <Text style={styles.body}>{associations[labelFacts.association]}</Text>}
+      {labelFacts.sections.map(section => <View key={section.id} style={styles.group}><Text accessibilityRole="header" style={styles.heading}>{sectionLabels[section.kind]}</Text>
+        <Text selectable accessibilityLabel={`Private label reading: ${sectionLabels[section.kind]}`} style={styles.body}>{section.text}</Text></View>)}
+      {labelFacts.capturedText.map(entry => <View key={entry.id} style={styles.group}><Text style={styles.body}>{entry.attributedEdit ? 'Your private correction · extracted text' : 'Text recognized from the uploaded label'}</Text>
+        <Text selectable style={styles.body}>{entry.text}</Text></View>)}
+      {labelFacts.gaps.length > 0 && <Text style={styles.body}>Additional label coverage or package association evidence is needed. Missing regions and unobserved text remain unknown.</Text>}
+      {Array.from(new Set(labelFacts.gaps.map(code => gapMessages[code]).filter(Boolean))).map(message => <Text key={message} style={styles.body}>{message}</Text>)}
+      {labelFacts.conflict && <Text accessibilityRole="alert" style={styles.body}>Some label readings disagree. Review the originals and corrections before relying on these partial facts.</Text>}
+      {labelFacts.contradictions.map((entry,index) => <Text selectable key={index} style={styles.body}>Conflicting {entry.kind === 'source_reading' ? 'label text' : entry.kind} readings: {entry.values.join(' / ')}</Text>)}
+      {labelFacts.limitations.map((limitation,index) => <Text key={index} style={styles.body}>{limitation}</Text>)}
+    </View>}
     {local && local.shots.map((shot,index) => <View key={shot.evidenceId} style={styles.group}>
       <Text style={styles.body}>Photo {index+1} role · your observation</Text>
       <Action label={`Photo ${index+1} is an ingredient declaration`} checked={(state.photoRoles[shot.evidenceId] ?? 'ingredients') === 'ingredients'} disabled={locked}

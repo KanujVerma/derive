@@ -16,8 +16,9 @@ export function createSyntheticPrivateReviewBuilder(gold: { sanitizedAssetHash: 
   if (!gold.sanitizedAssetHash || !gold.authorityPolicy.permissionEvidence.startsWith('Synthetic local fixture:')) throw new Error('fixed_synthetic_gold_required');
   const pinned = Object.freeze({ ...gold, authorityPolicy: Object.freeze({ ...gold.authorityPolicy }) });
   return async (input: PrivateEvidenceContext): Promise<PrivateReviewedReceipt> => {
-    if ((input.assets.length !== 1 && input.assets.length !== 2) || input.observations.length !== 2 || !input.item || !input.reviewRequest) throw new Error('synthetic_gold_evidence_set_mismatch');
-    const ingredients = input.observations.find(o => o.role === 'ingredients'), pkg = input.observations.find(o => o.role === 'package');
+    const derivativeHeads = input.observations.filter(o => o.coordinateSpace === 'sanitized_derivative');
+    if ((input.assets.length !== 1 && input.assets.length !== 2) || derivativeHeads.length !== 2 || input.observations.length > 4 || !input.item || !input.reviewRequest) throw new Error('synthetic_gold_evidence_set_mismatch');
+    const ingredients = derivativeHeads.find(o => o.role === 'ingredients'), pkg = derivativeHeads.find(o => o.role === 'package');
     if (!ingredients || !pkg || pkg.kind !== 'ocr' || pkg.rawText !== SYNTHETIC_PRIVATE_PACKAGE_TEXT || ingredients.rawText !== (ingredients.kind === 'edit' ? SYNTHETIC_PRIVATE_EDIT_TEXT : SYNTHETIC_PRIVATE_INGREDIENT_TEXT)) throw new Error('synthetic_gold_transcript_mismatch');
     if (input.item.name !== 'Example Daily toner' || JSON.stringify(input.item.variant) !== JSON.stringify(SYNTHETIC_PRIVATE_VARIANT) || input.item.conflictIds.length || !input.item.barcodeAssertions.some(a => a.namespace === 'gtin' && a.canonical === '03606000537538')) throw new Error('synthetic_gold_identity_mismatch');
     const roleAsset = (observation: PrivateObservationRecord) => {
@@ -30,11 +31,13 @@ export function createSyntheticPrivateReviewBuilder(gold: { sanitizedAssetHash: 
     for (const observation of [...input.observations,...input.priorObservations]) {
       const asset = roleAsset(observation);
       if (observation.uncertaintyReasons.length || observation.status !== 'active') throw new Error('synthetic_gold_lineage_mismatch');
+      if (observation.coordinateSpace === 'source_original' && (observation.kind !== 'ocr' || observation.derivedFromObservationIds.length)) throw new Error('synthetic_gold_original_lineage_mismatch');
+      if (observation.coordinateSpace === 'sanitized_derivative' && observation.derivedFromObservationIds.some(id => ![...input.observations,...input.priorObservations].some(original => original.observationId === id && original.kind === 'ocr' && original.coordinateSpace === 'source_original' && original.role === observation.role && JSON.stringify(original.assetEvidenceIds) === JSON.stringify(observation.assetEvidenceIds)))) throw new Error('synthetic_gold_derivative_lineage_mismatch');
       if (observation.kind === 'ocr') {
         const text = observation.role === 'package' ? SYNTHETIC_PRIVATE_PACKAGE_TEXT : SYNTHETIC_PRIVATE_INGREDIENT_TEXT;
         const ocr = observation.ocr;
         if (observation.rawText !== text || observation.revision !== 1 || !ocr || ocr.evidenceId !== asset.clientEvidenceId || ocr.recognizer !== pinned.recognizer || ocr.recognizerVersion !== pinned.recognizerVersion || ocr.status !== 'recognized' || ocr.sourceWidth !== asset.width || ocr.sourceHeight !== asset.height || ocr.correctionEnabled || JSON.stringify(ocr.languageConfig) !== '["en"]' || JSON.stringify(ocr.orientationTransform) !== '[1,0,0,0,1,0,0,0,1]' || JSON.stringify(ocr.lines) !== JSON.stringify(syntheticPrivateLines(text))) throw new Error('synthetic_gold_ocr_mismatch');
-      } else if (observation.rawText !== SYNTHETIC_PRIVATE_EDIT_TEXT || observation.revision !== 2 || !observation.edit || observation.edit.text !== SYNTHETIC_PRIVATE_EDIT_TEXT || !input.priorObservations.some(p => p.observationId === observation.supersedesId && p.kind === 'ocr' && p.rawText === SYNTHETIC_PRIVATE_INGREDIENT_TEXT)) throw new Error('synthetic_gold_edit_mismatch');
+      } else if (observation.coordinateSpace !== 'sanitized_derivative' || observation.rawText !== SYNTHETIC_PRIVATE_EDIT_TEXT || observation.revision !== 2 || !observation.edit || observation.edit.text !== SYNTHETIC_PRIVATE_EDIT_TEXT || !input.priorObservations.some(p => p.observationId === observation.supersedesId && p.kind === 'ocr' && p.coordinateSpace === 'sanitized_derivative' && p.rawText === SYNTHETIC_PRIVATE_INGREDIENT_TEXT)) throw new Error('synthetic_gold_edit_mismatch');
     }
     const ref = (observation: PrivateObservationRecord, text: string) => {
       const start = observation.rawText.indexOf(text); if (start < 0) throw new Error('synthetic_gold_literal_missing');

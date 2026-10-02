@@ -3,6 +3,7 @@ import { AttributedEditSchema, CaptureSessionSchema, DeclarationSchema, ItemSnap
 import type { Declaration, EvidenceSpan, ItemSnapshot, SourcePolicy, Variant } from '../../../src/contracts/PartOne.ts';
 import { normalizeBarcode } from '../../../src/domain/part-one/barcode.ts';
 import { compareVariant, policyAllows, selectDeclaration, toFactBundle } from '../../../src/domain/part-one/evidence.ts';
+import { extractPrivateCapturedSource } from './part-one-private-source.ts';
 import { DECLARATION_ALIAS_VERSION, DECLARATION_PARSER_VERSION, parseDeclarationSection } from '../../../src/domain/part-one/parser.ts';
 
 export const PRIVATE_ACCEPTANCE_POLICY_VERSION = 'part-one-private-dec-1';
@@ -10,7 +11,9 @@ const id = PartOneIdSchema.transform(value => value.toLowerCase()), ids = z.arra
 const region = z.array(z.number().finite().min(0).max(1)).length(4).refine(r => r[2] > 0 && r[3] > 0 && r[0] + r[2] <= 1.000001 && r[1] + r[3] <= 1.000001, 'Invalid normalized image region');
 const binding = { ownerId: id, captureSessionId: id, packageObservationId: id, generation: revision, deletionEpoch: revision };
 export const PrivateAssetAttestationSchema = z.strictObject({ ...binding, evidenceId: id, clientEvidenceId: id, attestationId: id, storageObjectId: id, contentHash: z.string().min(1), objectVersion: z.string().min(1), width: z.number().int().positive().max(4096), height: z.number().int().positive().max(4096), metadataStripped: z.literal(true), sanitizerVersion: z.string().min(1), verificationEvidence: z.string().min(1), observedAt: date, expiresAt: date, status: z.enum(['active', 'revoked', 'deleted']) });
-export const PrivateObservationRecordSchema = z.strictObject({ ...binding, observationId: id, revision: z.number().int().positive(), kind: z.enum(['ocr', 'edit']), role: z.enum(['ingredients', 'package']), rawText: z.string(), assetEvidenceIds: ids.min(1), originalObservationId: id, supersedesId: id.nullable(), uncertaintyReasons: z.array(z.string()), ocr: OcrObservationSchema.nullable(), edit: AttributedEditSchema.nullable(), observedAt: date, expiresAt: date, status: z.enum(['active', 'revoked', 'deleted']) });
+export const PrivateObservationRecordSchema = z.strictObject({ ...binding, observationId: id, revision: z.number().int().positive(), kind: z.enum(['ocr', 'edit']), role: z.enum(['ingredients', 'package']),
+ coordinateSpace:z.enum(['source_original','sanitized_derivative']).default('source_original'), derivedFromObservationIds:ids.max(36).default([]),
+ rawText: z.string(), assetEvidenceIds: ids.min(1), originalObservationId: id, supersedesId: id.nullable(), uncertaintyReasons: z.array(z.string()), ocr: OcrObservationSchema.nullable(), edit: AttributedEditSchema.nullable(), observedAt: date, expiresAt: date, status: z.enum(['active', 'revoked', 'deleted']) });
 export type PrivateAssetAttestation = z.infer<typeof PrivateAssetAttestationSchema>;
 export type PrivateObservationRecord = z.infer<typeof PrivateObservationRecordSchema>;
 const assetBinding = z.strictObject({ evidenceId: id, attestationId: id, storageObjectId: id, contentHash: z.string().min(1), objectVersion: z.string().min(1) });
@@ -54,9 +57,13 @@ function inputBindings(input: PrivateEvidenceContext) {
   for (const record of [...input.assets, ...input.observations, ...input.priorObservations]) if (!sameBinding(record, input)) throw new Error('private_owner_or_package_mismatch');
   if (new Set(input.assets.map(a => a.evidenceId)).size !== input.assets.length || new Set(input.assets.map(a => a.storageObjectId)).size !== input.assets.length || new Set([...input.observations, ...input.priorObservations].map(o => o.observationId)).size !== input.observations.length + input.priorObservations.length) throw new Error('duplicate_private_evidence_id');
 }
+function derivativeProof(observation:PrivateObservationRecord, input:PrivateEvidenceContext) {
+ const root=observation.kind==='ocr'?observation:[...input.observations,...input.priorObservations].find(o=>o.observationId===observation.originalObservationId);
+ return root?.coordinateSpace==='sanitized_derivative';
+}
 function validRef(ref: z.infer<typeof sourceRef>, input: PrivateEvidenceContext) {
   const observation = input.observations.find(o => o.observationId === ref.observationId && o.revision === ref.revision);
-  return !!observation && observation.assetEvidenceIds.includes(ref.assetEvidenceId) && input.assets.some(a => a.evidenceId === ref.assetEvidenceId && current(a, input.now)) && ref.start < ref.end && ref.end <= observation.rawText.length && observation.rawText.slice(ref.start, ref.end) === ref.text;
+  return !!observation && derivativeProof(observation,input) && observation.assetEvidenceIds.includes(ref.assetEvidenceId) && input.assets.some(a => a.evidenceId === ref.assetEvidenceId && current(a, input.now)) && ref.start < ref.end && ref.end <= observation.rawText.length && observation.rawText.slice(ref.start, ref.end) === ref.text;
 }
 function lineCoverage(section: PrivateReviewedReceipt['sections'][number], input: PrivateEvidenceContext) {
   if (!section.startCovered || !section.endCovered || !section.lineCoverageComplete || !section.lineRefs.length) return false;
@@ -72,7 +79,7 @@ function lineCoverage(section: PrivateReviewedReceipt['sections'][number], input
   return observation.rawText.slice(cursor, section.end).trim() === '';
 }
 function fullFieldCoverage(receipt: PrivateReviewedReceipt, input: PrivateEvidenceContext) {
-  return input.observations.filter(o => o.role === 'ingredients').every(o => {
+  return input.observations.filter(o => o.role === 'ingredients' && derivativeProof(o,input)).every(o => {
     let cursor = 0;
     for (const section of receipt.sections.filter(s => s.observationId === o.observationId).sort((a, b) => a.start - b.start)) {
       if (section.start < cursor || section.end > o.rawText.length) return false;
@@ -84,7 +91,8 @@ function fullFieldCoverage(receipt: PrivateReviewedReceipt, input: PrivateEviden
   });
 }
 
-/** Producer resolves only frozen independently reviewed manifests, then validates
+/** Synthetic manifest resolver validates frozen receipts against current records.
+ * This is admission validation, not a general producer for newly captured labels.
  * the ACTUAL current records. A client reviewId, confirmation or confidence has
  * no authority to change a hash, crop, transcript, market, variant or coverage. */
 export async function producePrivateReviewedReceipt(contextInput: PrivateEvidenceContext, ports: PrivateEvidencePorts): Promise<{ receipt: PrivateReviewedReceipt | null; reasons: string[] }> {
@@ -130,7 +138,14 @@ export async function evaluatePrivateEvidence(contextInput: PrivateEvidenceConte
     if (o.kind === 'ocr') {
       if (!o.ocr || o.edit || o.revision !== 1 || o.supersedesId !== null || o.originalObservationId !== o.observationId || !input.assets.some(a => o.assetEvidenceIds.includes(a.evidenceId) && a.clientEvidenceId === o.ocr!.evidenceId) || o.ocr.captureSessionId !== input.capture.captureSessionId || o.ocr.generation !== input.capture.generation || o.ocr.lines.map(l => l.text).join('\n') !== o.rawText) reasons.push('invalid_ocr_lineage');
       if (o.ocr?.status !== 'recognized') reasons.push('ocr_not_recognized');
-      if (o.ocr && (!input.assets.some(a => o.assetEvidenceIds.includes(a.evidenceId) && a.width === o.ocr!.sourceWidth && a.height === o.ocr!.sourceHeight) || o.ocr.lines.some(l => !region.safeParse(l.region).success))) reasons.push('invalid_ocr_geometry');
+      if (o.ocr) {
+        const boundedOriginal=o.ocr.sourceWidth>0 && o.ocr.sourceHeight>0 && o.ocr.sourceWidth*o.ocr.sourceHeight<=40_000_000;
+        const exactDerivative=input.assets.some(a => o.assetEvidenceIds.includes(a.evidenceId) && a.width===o.ocr!.sourceWidth && a.height===o.ocr!.sourceHeight) &&
+          canonical(o.ocr.orientationTransform)===canonical([1,0,0,0,1,0,0,0,1]);
+        if (!(o.coordinateSpace==='source_original'?boundedOriginal:exactDerivative) || o.ocr.lines.some(l => !region.safeParse(l.region).success)) reasons.push('invalid_ocr_geometry');
+        if(o.coordinateSpace==='source_original' && o.derivedFromObservationIds.length || new Set(o.derivedFromObservationIds).size!==o.derivedFromObservationIds.length ||
+          o.derivedFromObservationIds.some(ref=>!all.some(parent=>parent.observationId===ref && parent.kind==='ocr' && parent.coordinateSpace==='source_original' && current(parent,input.now) && canonical([...parent.assetEvidenceIds].sort())===canonical([...o.assetEvidenceIds].sort())))) reasons.push('invalid_derivative_lineage');
+      }
       if (input.observations.includes(o) && o.ocr?.lines.some(l => l.alternatives.length)) reasons.push('recognition_alternatives_unresolved');
     } else {
       const prior = all.find(p => p.observationId === o.supersedesId);
@@ -140,17 +155,31 @@ export async function evaluatePrivateEvidence(contextInput: PrivateEvidenceConte
   }
   if (input.observations.some(o => all.some(next => next.supersedesId === o.observationId))) reasons.push('superseded_observation_selected');
   if (input.priorObservations.some(prior => !all.some(next => next.supersedesId === prior.observationId))) reasons.push('unreferenced_prior_observation');
+  // These are distinct readings of the same photograph, not replacement text.
+  // A new exact-JPEG pass cannot silently overrule an original reading or edit.
+  const readingText=(value:string)=>value.replace(/^\s*ingredients\s*:\s*/i,'').replace(/\s+/g,' ').trim();
+  for(const proof of input.observations.filter(o=>o.kind==='ocr' && o.coordinateSpace==='sanitized_derivative')) {
+    for(const originalId of proof.derivedFromObservationIds) {
+      const heads=input.observations.filter(o=>o.originalObservationId===originalId);
+      if(heads.some(head=>readingText(head.rawText)!==readingText(proof.rawText))) reasons.push('source_derivative_text_disagreement');
+    }
+  }
   if (!input.observations.some(o => o.role === 'ingredients')) reasons.push('missing_ingredient_observation');
   // No reviewed column-layout contract is available in this private boundary.
   // A tabular transcript cannot be promoted by flattening explanation cells.
   if (input.observations.some(o => o.role === 'ingredients' && o.rawText.includes('\t'))) reasons.push('unreviewed_table_layout');
   const produced = await producePrivateReviewedReceipt(input, ports), receipt = produced.receipt;
-  reasons.push(...produced.reasons);
+  // The ordinary path extracts the current captured source; it never resolves a
+  // fixture receipt or creates an authority from a client's review controls.
+  const capturedSource = !input.reviewRequest ? await extractPrivateCapturedSource(input, { hash: ports.hash }) : null;
+  const candidate = capturedSource?.candidate ?? null;
+  reasons.push(...capturedSource ? capturedSource.reasonCodes : produced.reasons);
   const unknown: Variant = { brand: null, line: null, form: null, scent: null, shade: null, spf: null, strength: null, size: null, unit: null, packCount: null, packagingLevel: null };
-  const privateVariant = receipt?.variant ?? unknown;
+  const privateVariant = receipt?.variant ?? candidate?.variant ?? unknown;
+  const packageMarket = receipt?.packageMarket ?? candidate?.packageMarket ?? null;
   // A wrong public declaration is independent of this private package proof.
   // Item identity contradictions and package conflicts still block acceptance.
-  const conflicts = [...input.item?.conflictIds ?? [], ...receipt?.conflictIds ?? []];
+  const conflicts = [...input.item?.conflictIds ?? [], ...receipt?.conflictIds ?? [], ...candidate?.contradictions.length ? [input.capture.packageObservationId] : []];
   if (input.item && compareVariant(input.item.variant, privateVariant).contradictions.length) conflicts.push(receipt?.reviewId ?? input.capture.packageObservationId);
   if (receipt) {
     if (input.item?.packageMarket && receipt.packageMarket && input.item.packageMarket !== receipt.packageMarket) conflicts.push(receipt.reviewId);
@@ -164,30 +193,33 @@ export async function evaluatePrivateEvidence(contextInput: PrivateEvidenceConte
     if (!receipt.sections.length || !receipt.sections.every(s => lineCoverage(s, input)) || !fullFieldCoverage(receipt, input)) reasons.push('full_panel_not_established');
     reasons.push(...receipt.uncertaintyReasons, ...receipt.sections.flatMap(s => s.uncertaintyReasons));
   }
+  if (candidate && input.item?.packageMarket && packageMarket && input.item.packageMarket !== packageMarket) conflicts.push(input.capture.packageObservationId);
   if (input.result.packageConfirmation === 'conflict') conflicts.push(input.capture.packageObservationId);
-  const rawText = input.observations.filter(o => o.role === 'ingredients').map(o => o.rawText).join('\n');
+  const ingredientProof=input.observations.filter(o=>o.role==='ingredients' && derivativeProof(o,input));
+  const ingredientSources=ingredientProof.length?ingredientProof:input.observations.filter(o=>o.role==='ingredients');
+  const rawText = ingredientSources.map(o => o.rawText).join('\n');
   const minExpiry = Math.min(Date.parse(input.now) + 86400000, ...input.assets.map(a => Date.parse(a.expiresAt)), ...all.map(o => Date.parse(o.expiresAt)), ...input.policy.expiresAt ? [Date.parse(input.policy.expiresAt)] : [], ...receipt ? [Date.parse(receipt.expiresAt), Date.parse(ports.authority!.policy.expiresAt)] : []);
   const expiresAt = new Date(minExpiry).toISOString();
   const dependencies = [...new Set([...input.assets.map(a => a.evidenceId), ...all.map(o => o.observationId), ...input.item ? [input.item.snapshotId, ...input.item.barcodeAssertions.map(a => a.evidenceId), ...Object.values(input.item.fieldEvidence).flat()] : [], ...receipt ? [receipt.reviewId] : []])];
-  const packageSnapshot: ItemSnapshot | null = input.item ? { ...input.item, snapshotId: input.ids.snapshotId, revision: input.item.revision + 1, variant: privateVariant, scope: 'private_package', packageMarket: receipt?.packageMarket ?? null, sourceMarkets: [], fieldEvidence: { ...input.item.fieldEvidence, ...Object.fromEntries(Object.keys(privateVariant).map(k => [k, receipt ? [receipt.reviewId] : []])) }, declarationIds: [input.ids.declarationId], conflictIds: [...new Set(conflicts)], supersedesId: input.item.snapshotId } : null;
-  const selectedSections = receipt?.sections ?? input.observations.filter(o => o.role === 'ingredients').map(o => ({ kind: 'ingredients' as const, observationId: o.observationId, revision: o.revision, start: 0, end: o.rawText.length, startCovered: false, endCovered: false, lineCoverageComplete: false, lineRefs: [], uncertaintyReasons: [] }));
-  const sections: Declaration['sections'] = [];
+  const packageSnapshot: ItemSnapshot | null = input.item ? { ...input.item, snapshotId: input.ids.snapshotId, revision: input.item.revision + 1, variant: privateVariant, scope: 'private_package', packageMarket, sourceMarkets: [], fieldEvidence: { ...input.item.fieldEvidence, ...Object.fromEntries(Object.keys(privateVariant).map(k => [k, receipt ? [receipt.reviewId] : [...new Set(candidate?.variantRefs[k]?.map(ref => ref.observationId) ?? [])]])) }, declarationIds: [input.ids.declarationId], conflictIds: [...new Set(conflicts)], supersedesId: input.item.snapshotId } : null;
+  const selectedSections = capturedSource ? [] : receipt?.sections ?? (ingredientSources.map(o => ({ kind: 'ingredients' as const, observationId: o.observationId, revision: o.revision, start: 0, end: o.rawText.length, startCovered: false, endCovered: false, lineCoverageComplete: false, lineRefs: [], uncertaintyReasons: [] })));
+  const sections: Declaration['sections'] = capturedSource ? structuredClone(capturedSource.facts.sections) : [];
   for (let index = 0; index < selectedSections.length; index++) {
     const s = selectedSections[index], o = input.observations.find(o => o.observationId === s.observationId)!;
     if (!o || s.start < 0 || s.end > o.rawText.length || s.start >= s.end) { reasons.push('invalid_section_span'); continue; }
     const sectionId = await derivedId(`${input.ids.declarationId}:section:${index}`, ports.hash);
     const probe = parseDeclarationSection({ sectionId, observationId: o.observationId, imageId: null, sourceRevision: o.revision, rawText: o.rawText.slice(s.start, s.end), sourceOffset: s.start, kind: s.kind, startCovered: false, endCovered: false, lineCoverageComplete: false, entryId: () => sectionId });
     const entryIds = await Promise.all(probe.entries.map((_, n) => derivedId(`${sectionId}:entry:${n}`, ports.hash)));
-    const parsed = parseDeclarationSection({ sectionId, observationId: o.observationId, imageId: null, sourceRevision: o.revision, rawText: o.rawText.slice(s.start, s.end), sourceOffset: s.start, kind: s.kind, startCovered: s.startCovered, endCovered: s.endCovered, lineCoverageComplete: s.lineCoverageComplete, entryId: n => entryIds[n], uncertaintyReasons: s.uncertaintyReasons });
+    const parsed = parseDeclarationSection({ sectionId, observationId: o.observationId, imageId: null, sourceRevision: o.revision, rawText: o.rawText.slice(s.start, s.end), sourceOffset: s.start, kind: s.kind, startCovered: s.startCovered, endCovered: s.endCovered, lineCoverageComplete: s.lineCoverageComplete, entryId: n => entryIds[n], uncertaintyReasons: capturedSource ? s.uncertaintyReasons.filter(reason => !['ocr_panel_coverage_unverified','section_tail_not_observed'].includes(reason)).concat(o.uncertaintyReasons, o.ocr?.lines.some(line => line.alternatives.length) ? ['recognition_alternatives_unresolved'] : []) : s.uncertaintyReasons });
     for (const entry of parsed.entries) {
       const spans: EvidenceSpan[] = s.lineRefs.filter(r => r.start < entry.sourceSpans[0].end! && r.end > entry.sourceSpans[0].start!).map(r => ({ observationId: o.observationId, imageId: r.assetEvidenceId, sourceRevision: o.revision, start: Math.max(r.start, entry.sourceSpans[0].start!), end: Math.min(r.end, entry.sourceSpans[0].end!), region: r.region, transformation: entry.sourceSpans[0].transformation.filter(t => t.sourceStart >= Math.max(r.start, entry.sourceSpans[0].start!) && t.sourceEnd <= Math.min(r.end, entry.sourceSpans[0].end!)) }));
       if (spans.length) entry.sourceSpans = spans;
     }
     sections.push(parsed);
   }
-  const declaration: Declaration = DeclarationSchema.parse({ declarationId: input.ids.declarationId, revision: Math.max(1, ...input.observations.map(o => o.revision)), itemId: input.item?.itemId ?? null, snapshotId: packageSnapshot?.snapshotId ?? null, observationIds: input.observations.map(o => o.observationId), dependencyIds: dependencies, rawText, textStructureHash: await ports.hash(canonical({ rawText, sections })), sections, category: receipt?.category ?? 'unknown', completenessReasons: [...new Set(reasons)], transcriptionUncertainty: [...new Set(input.observations.flatMap(o => o.uncertaintyReasons))], parserVersion: DECLARATION_PARSER_VERSION, aliasVersion: DECLARATION_ALIAS_VERSION, sourceRevision: Math.max(1, ...input.observations.map(o => o.revision)), sourceUpdatedAt: null, observedAt: input.now, expiresAt, policyId: input.policy.policyId, scope: 'private_package', ownerId: input.ownerId, packageObservationId: input.capture.packageObservationId, associationEvidenceIds: receipt && packageSnapshot ? [receipt.reviewId, ...receipt.packageIdentity.evidenceRefs.map(r => r.observationId)] : [], variant: privateVariant, sourceMarkets: [], packageMarket: receipt?.packageMarket ?? null, conflictIds: [...new Set(conflicts)], supersedesId: input.supersedesDeclarationId, formulaEquivalence: 'unknown' });
+  const declaration: Declaration = DeclarationSchema.parse({ declarationId: input.ids.declarationId, revision: Math.max(1, ...input.observations.map(o => o.revision)), itemId: input.item?.itemId ?? null, snapshotId: packageSnapshot?.snapshotId ?? null, observationIds: input.observations.map(o => o.observationId), dependencyIds: dependencies, rawText, textStructureHash: await ports.hash(canonical({ rawText, sections })), sections, category: receipt?.category ?? candidate?.category ?? 'unknown', completenessReasons: [...new Set(reasons)], transcriptionUncertainty: [...new Set(input.observations.flatMap(o => o.uncertaintyReasons))], parserVersion: DECLARATION_PARSER_VERSION, aliasVersion: DECLARATION_ALIAS_VERSION, sourceRevision: Math.max(1, ...input.observations.map(o => o.revision)), sourceUpdatedAt: null, observedAt: input.now, expiresAt, policyId: input.policy.policyId, scope: 'private_package', ownerId: input.ownerId, packageObservationId: input.capture.packageObservationId, associationEvidenceIds: receipt && packageSnapshot ? [receipt.reviewId, ...receipt.packageIdentity.evidenceRefs.map(r => r.observationId)] : candidate?.association === 'barcode_matches_catalog_same_asset' && packageSnapshot ? [...new Set(candidate.packageIdentity?.evidenceRefs.map(ref => ref.observationId) ?? [])] : [], variant: privateVariant, sourceMarkets: [], packageMarket, conflictIds: [...new Set(conflicts)], supersedesId: input.supersedesDeclarationId, formulaEquivalence: 'unknown' });
   const evaluationItem = packageSnapshot ?? { snapshotId: input.ids.snapshotId, itemId: input.ids.snapshotId, revision: 1, name: '', variant: unknown, fieldEvidence: {}, barcodeAssertions: [], requestedMarket: null, sourceMarkets: [], packageMarket: null, declarationIds: [], conflictIds: [], scope: 'private_package' as const, supersedesId: null };
   const selection = selectDeclaration(declaration, evaluationItem, 'private_package', input.policy, input.now, { ownerId: input.ownerId, packageObservationId: input.capture.packageObservationId });
   const sources = input.observations.map(o => ({ observationId: o.observationId, policyId: input.policy.policyId, label: o.kind === 'ocr' ? 'Private on-device OCR' : 'Private attributed correction', url: null, observedAt: o.observedAt, sourceUpdatedAt: null, expiresAt }));
-  return frozen({ packageSnapshot, declaration, selection, factBundle: packageSnapshot ? toFactBundle(declaration, packageSnapshot, selection, sources, receipt ? 'photo_supported' : input.result.packageConfirmation) : null, reviewReceipt: receipt, dependencies, reasonCodes: [...new Set([...reasons, ...selection.reasons])], acceptancePolicyVersion: PRIVATE_ACCEPTANCE_POLICY_VERSION, persistable: ['ocr', 'process', 'retain', 'privateDisplay'].every(op => policyAllows(input.policy, op as keyof SourcePolicy['operations'], input.now)) });
+  return frozen({ packageSnapshot, declaration, selection, factBundle: packageSnapshot ? toFactBundle(declaration, packageSnapshot, selection, sources, receipt || candidate?.association === 'barcode_matches_catalog_same_asset' ? 'photo_supported' : input.result.packageConfirmation) : null, reviewReceipt: receipt, capturedSource, dependencies, reasonCodes: [...new Set([...reasons, ...selection.reasons])], acceptancePolicyVersion: PRIVATE_ACCEPTANCE_POLICY_VERSION, persistable: ['ocr', 'process', 'retain', 'privateDisplay'].every(op => policyAllows(input.policy, op as keyof SourcePolicy['operations'], input.now)) });
 }

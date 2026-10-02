@@ -75,7 +75,7 @@ enum DeriveLabelOcrEngine {
     return nil
   }
   /// Returns only a verified JPEG derivative in memory. Raw originals never cross this bridge.
-  static func prepareUpload(_ uri: String, cropRegion: [Double]) -> [String: Any] {
+  static func prepareUpload(_ uri: String, cropRegion: [Double], recognitionInput: [String: Any]? = nil) -> [String: Any] {
     guard cropRegion.count == 4, cropRegion.allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 1 }),
       cropRegion[2] > 0, cropRegion[3] > 0, cropRegion[0] + cropRegion[2] <= 1, cropRegion[1] + cropRegion[3] <= 1,
       let (image, sourceWidth, sourceHeight, transform) = localImage(uri) else { return ["status": "failed"] }
@@ -89,9 +89,14 @@ enum DeriveLabelOcrEngine {
     for _ in 0..<7 {
       guard let jpeg = sanitizedJpeg(derivative) else { return ["status": "failed"] }
       if jpeg.count <= 2 * 1024 * 1024 {
-        return ["status": "prepared", "base64": jpeg.base64EncodedString(), "mimeType": "image/jpeg",
+        var prepared: [String: Any] = ["status": "prepared", "base64": jpeg.base64EncodedString(), "mimeType": "image/jpeg",
           "width": derivative.width, "height": derivative.height, "sourceWidth": sourceWidth, "sourceHeight": sourceHeight,
           "orientationTransform": transform, "cropRegion": actualCrop, "recipeVersion": "derive-private-jpeg-v1"]
+        if let input = recognitionInput {
+          guard let source = CGImageSourceCreateWithData(jpeg as CFData, nil), let decoded = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return ["status": "failed"] }
+          prepared["derivativeObservation"] = recognizeImage(input, image: decoded, width: decoded.width, height: decoded.height, transform: orientationTransform(1))
+        }
+        return prepared
       }
       let width = max(1, Int(Double(derivative.width) * 0.75)), height = max(1, Int(Double(derivative.height) * 0.75))
       guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
@@ -110,6 +115,12 @@ enum DeriveLabelOcrEngine {
     return "failed"
   }
   static func recognize(_ input: [String: Any]) -> [String: Any] {
+    guard let uri = input["uri"] as? String, let (image, width, height, transform) = localImage(uri) else {
+      return recognizeImage(input, image: nil, width: 0, height: 0, transform: orientationTransform(1))
+    }
+    return recognizeImage(input, image: image, width: width, height: height, transform: transform)
+  }
+  static func recognizeImage(_ input: [String: Any], image: CGImage?, width: Int, height: Int, transform: [Int]) -> [String: Any] {
     let languages = input["languages"] as? [String] ?? []
     let correction = input["correctionEnabled"] as? Bool ?? false
     var result: [String: Any] = [
@@ -119,7 +130,7 @@ enum DeriveLabelOcrEngine {
       "languageConfig": languages, "correctionEnabled": correction,
       "sourceWidth": 0, "sourceHeight": 0, "orientationTransform": orientationTransform(1), "lines": [], "status": "failed"
     ]
-    guard let uri = input["uri"] as? String, let (image, width, height, transform) = localImage(uri) else { return result }
+    guard let image = image else { return result }
     result["sourceWidth"] = width; result["sourceHeight"] = height; result["orientationTransform"] = transform
     let request = VNRecognizeTextRequest()
     request.revision = VNRecognizeTextRequest.currentRevision

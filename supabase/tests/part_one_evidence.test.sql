@@ -22,6 +22,15 @@ select ok(not private.part_one_private_enabled(true),'private capability disable
 select throws_ok($$select public.part_one_private_service('review/prepare','{}')$$,'P0001','PART_ONE_PRIVATE_RETENTION_DISABLED','default review cannot persist or accept private evidence');
 select is(private.part_one_js_slice('A😀B',1,3),'😀','trusted source proof slices use JS UTF16 units');
 select is(private.part_one_js_slice('A😀B',2,3),null,'trusted source proof cannot split an astral code point');
+select ok(not private.part_one_review_ref_allowed('{"observationId":"ec000000-0000-4000-8000-000000000002","revision":1,"coordinateSpace":"source_original","rawText":"Water","assetEvidenceIds":["ec000000-0000-4000-8000-000000000001"]}',
+ '{"observationId":"ec000000-0000-4000-8000-000000000002","revision":1,"start":0,"end":5,"text":"Water","assetEvidenceId":"ec000000-0000-4000-8000-000000000001"}'),
+ 'A25 original-camera coordinates cannot become literal sanitized-image proof');
+select ok(private.part_one_review_ref_allowed('{"observationId":"ec000000-0000-4000-8000-000000000002","revision":1,"coordinateSpace":"sanitized_derivative","rawText":"Water","assetEvidenceIds":["ec000000-0000-4000-8000-000000000001"]}',
+ '{"observationId":"ec000000-0000-4000-8000-000000000002","revision":1,"start":0,"end":5,"text":"Water","assetEvidenceId":"ec000000-0000-4000-8000-000000000001"}'),
+ 'A25 exact sanitized derivative literal proof retains geometry-bound acceptance path');
+select ok(not has_function_privilege('authenticated','private.part_one_review_ref_allowed(jsonb,jsonb)','execute'),
+ 'private literal proof predicate has no customer-callable admission path');
+
 select is(private.part_one_canonical_json('{"z":1.00,"a":[0.10,true,null,"é"]}'),'{"a":[0.1,true,null,"é"],"z":1}','private observation canonical hash uses stable sorted keys/numeric values');
 
 
@@ -927,6 +936,168 @@ select is((select value->'edits'->1->>'revision' from part_one_test_state where 
 select is((select value->'boundResult'->>'resultRevision' from part_one_test_state where key='private-edit-order-recovery'),
  (select value->'result'->>'resultRevision' from part_one_test_state where key='private-v2-multiple-edits'),'A28 latest bound commit uses capture revision rather than random UUID tie');
 set local role postgres;
+-- Original camera coordinates remain immutable provenance even when the private
+-- JPEG has been orientation-normalized/resized. Only a separate derivative pass
+-- can claim the attested pixels' geometry, and its ancestors remain rights-bound.
+insert into part_one_test_state values('private-original-geometry-request',(select jsonb_build_object('captureSessionId',cc.id,'packageObservationId',cc.package_observation_id,
+ 'schemaVersion',2,'idempotencyKey','private-original-geometry','expectedGeneration',cc.generation,'expectedResultRevision',ss.result_revision,'expectedCaptureRevision',cc.capture_revision,
+ 'expectedDeletionEpoch',cc.deletion_epoch,'assets','[]'::jsonb,'sourceObservations',jsonb_build_array(jsonb_build_object('observationId','e7f00000-0000-4000-8000-000000000001',
+ 'revision',1,'role','ingredients','coordinateSpace','source_original','derivedFromObservationIds','[]'::jsonb,
+ 'observation',jsonb_set(jsonb_set(jsonb_set(rq.value->'observations'->0,'{sourceWidth}','6000'),'{sourceHeight}','4000'),'{orientationTransform}','[0,-1,1,1,0,0,0,0,1]'))),
+ 'edits','[]'::jsonb,'review',null,'reviewId',null) from part_one_test_state rq join private.part_one_captures cc on cc.id=(rq.value->>'captureSessionId')::uuid
+ join private.part_one_scans ss on ss.id=cc.scan_id where rq.key='private-unresolved-request'));
+set local role authenticated;
+select lives_ok($$insert into part_one_test_state values('private-original-geometry',public.part_one_operation('captures/observations',
+ (select value from part_one_test_state where key='private-original-geometry-request')))$$,'A25 original high-resolution rotated OCR persists without pretending to use derivative coordinates');
+set local role postgres;
+select is((select payload->'observation'->>'sourceWidth' from private.part_one_records where id='e7f00000-0000-4000-8000-000000000001'),'6000','A25 original pixel dimensions remain exact');
+insert into part_one_test_state values('private-derivative-geometry-request',(select jsonb_build_object('captureSessionId',cc.id,'packageObservationId',cc.package_observation_id,
+ 'schemaVersion',2,'idempotencyKey','private-derivative-geometry','expectedGeneration',cc.generation,'expectedResultRevision',ss.result_revision,'expectedCaptureRevision',cc.capture_revision,
+ 'expectedDeletionEpoch',cc.deletion_epoch,'assets','[]'::jsonb,'sourceObservations',jsonb_build_array(jsonb_build_object('observationId','e7f00000-0000-4000-8000-000000000002',
+ 'revision',1,'role','ingredients','coordinateSpace','sanitized_derivative','derivedFromObservationIds',jsonb_build_array('e7f00000-0000-4000-8000-000000000001'),
+ 'observation',rq.value->'observations'->0)),'edits','[]'::jsonb,'review',null,'reviewId',null)
+ from part_one_test_state rq join private.part_one_captures cc on cc.id=(rq.value->>'captureSessionId')::uuid join private.part_one_scans ss on ss.id=cc.scan_id where rq.key='private-unresolved-request'));
+set local role authenticated;
+select throws_ok($$select public.part_one_operation('captures/observations',(select jsonb_set(value,'{sourceObservations,0,observation,sourceWidth}','6000')
+ from part_one_test_state where key='private-derivative-geometry-request'))$$,'P0001','PART_ONE_INVALID_PAYLOAD','A25 derivative OCR dimensions must match actual sanitized asset');
+select throws_ok($$select public.part_one_operation('captures/observations',(select jsonb_set(value,'{sourceObservations,0,observation,orientationTransform}','[0,-1,1,1,0,0,0,0,1]')
+ from part_one_test_state where key='private-derivative-geometry-request'))$$,'P0001','PART_ONE_INVALID_PAYLOAD','A25 derivative OCR requires orientation-normalized identity transform');
+select throws_ok($$select public.part_one_operation('captures/observations',(select jsonb_set(value,'{sourceObservations,0,derivedFromObservationIds}','["e7f00000-0000-4000-8000-000000000099"]')
+ from part_one_test_state where key='private-derivative-geometry-request'))$$,'42501','PART_ONE_NOT_FOUND','A25 derivative cannot reference nonexistent or foreign original provenance');
+select lives_ok($$insert into part_one_test_state values('private-derivative-geometry',public.part_one_operation('captures/observations',
+ (select value from part_one_test_state where key='private-derivative-geometry-request')))$$,'A25 separate derivative OCR commits with exact pixel geometry and immutable original linkage');
+insert into part_one_test_state values('private-geometry-recovery',public.part_one_operation('captures/evidence',
+ (select jsonb_build_object('captureSessionId',value->'capture'->'captureSessionId') from part_one_test_state where key='private-derivative-geometry')));
+select is((select e->>'coordinateSpace' from part_one_test_state,lateral jsonb_array_elements(value->'sourceObservations') e
+ where key='private-geometry-recovery' and e->>'observationId'='e7f00000-0000-4000-8000-000000000002'),'sanitized_derivative','A28 recovery retains derivative coordinate identity');
+select is((select e->'derivedFromObservationIds'->>0 from part_one_test_state,lateral jsonb_array_elements(value->'sourceObservations') e
+ where key='private-geometry-recovery' and e->>'observationId'='e7f00000-0000-4000-8000-000000000002'),'e7f00000-0000-4000-8000-000000000001','A28 recovery preserves original OCR provenance linkage');
+set local role postgres;
+select ok((select dependencies @> array['e7f00000-0000-4000-8000-000000000001'::uuid] from private.part_one_records where id='e7f00000-0000-4000-8000-000000000002'),
+ 'A26 derivative rights depend on immutable original evidence');
+-- Generic captured source admission uses no synthetic authority. These rows
+-- validate transaction/contracts; physical OCR accuracy is independently gated.
+insert into part_one_test_state values('generic-source-prepared',public.part_one_private_service('review/prepare',
+ (select jsonb_build_object('ownerId',cm.owner_id,'captureSessionId',cm.capture_id,'idempotencyKey',cm.idempotency_key,'reviewId',null)
+ from private.part_one_capture_commits cm where cm.idempotency_key='private-derivative-geometry')));
+insert into part_one_test_state values('generic-source-outcome',(with ctx as (select value->'context' c from part_one_test_state where key='generic-source-prepared'),
+ candidate as (select jsonb_build_object('schemaVersion',1,'sourceKind','captured_label_extractor','extractorVersion','part-one-private-source-1',
+ 'candidateId','e7f00000-0000-4000-8000-000000000010','ownerId',c->'ownerId','captureSessionId',c->'capture'->'captureSessionId','packageObservationId',c->'capture'->'packageObservationId',
+ 'generation',c->'capture'->'generation','deletionEpoch',c->'capture'->'deletionEpoch','captureRevision',c->'capture'->'captureRevision','resultRevision',c->'result'->'resultRevision',
+ 'selectedItemId',c->'result'->'itemId','selectedSnapshotId',c->'result'->'snapshotId','targetSnapshotId',null,'targetDeclarationId',c->'ids'->'declarationId','observedAt',c->'now',
+ 'expiresAt',private.part_one_utc((select min((x->>'expiresAt')::timestamptz) from jsonb_array_elements((c->'assets')||(c->'observations')||(c->'priorObservations')) x)),
+ 'assetBindings',(select jsonb_agg(jsonb_build_object('evidenceId',x->'evidenceId','attestationId',x->'attestationId','storageObjectId',x->'storageObjectId','contentHash',x->'contentHash','objectVersion',x->'objectVersion')) from jsonb_array_elements(c->'assets') x),
+ 'observationBindings',(select jsonb_agg(jsonb_build_object('observationId',x->'observationId','revision',x->'revision',
+ 'textHash',encode(extensions.digest(x->>'rawText','sha256'),'hex'),'recordHash',encode(extensions.digest(private.part_one_canonical_json(x),'sha256'),'hex'),
+ 'current',exists(select 1 from jsonb_array_elements(c->'observations') head where head->>'observationId'=x->>'observationId'))) from jsonb_array_elements((c->'observations')||(c->'priorObservations')) x),
+ 'packageIdentity',null,'name',null,'variant','{"brand":null,"line":null,"form":null,"scent":null,"shade":null,"spf":null,"strength":null,"size":null,"unit":null,"packCount":null,"packagingLevel":null}'::jsonb,
+ 'variantRefs','{}'::jsonb,'category','unknown','categoryRefs','[]'::jsonb,'packageMarket',null,'marketRefs','[]'::jsonb,'sections','[]'::jsonb,
+ 'gaps',jsonb_build_array(jsonb_build_object('code','full_panel_not_established','observationIds',jsonb_build_array('e7f00000-0000-4000-8000-000000000002'),'details',null)),
+ 'contradictions','[]'::jsonb,'association','unknown','reasonCodes',jsonb_build_array('full_panel_not_established')) candidate,c from ctx)
+ select jsonb_build_object('schemaVersion',1,'sourceKind','captured_label_extractor','state','partial','candidate',candidate,
+ 'facts',jsonb_build_object('sections','[]'::jsonb,'capturedText',(select jsonb_build_array(jsonb_build_object('observationId',x->'observationId','revision',x->'revision','rawText',x->'rawText','attributedEdit',false,
+ 'sourceRefs',jsonb_build_array(jsonb_build_object('observationId',x->'observationId','revision',x->'revision','start',0,'end',length(x->>'rawText'),
+ 'assetEvidenceId',x->'assetEvidenceIds'->0,'text',x->'rawText','region',jsonb_build_array(0,0,1,1))))) from jsonb_array_elements(c->'observations') x where x->>'observationId'='e7f00000-0000-4000-8000-000000000002')),
+ 'reasonCodes',jsonb_build_array('full_panel_not_established'),'absenceClaimsAllowed',false,'catalogVerified',false,'acceptanceEligible',false) from candidate));
+insert into part_one_test_state values('generic-source-apply-request',(select jsonb_build_object('ownerId',c->'ownerId','captureSessionId',c->'capture'->'captureSessionId',
+ 'idempotencyKey','private-derivative-geometry','reviewId',null,'sourceCommitId',p.value->'sourceCommitId','expectedCaptureRevision',p.value->'captureRevision','expectedResultRevision',p.value->'resultRevision','authorityPolicy',null,
+ 'evaluation',jsonb_build_object('packageSnapshot',null,'declaration',d.payload||jsonb_build_object('declarationId',c->'ids'->'declarationId','snapshotId',null,
+ 'observedAt',c->'now','expiresAt',o.value->'candidate'->'expiresAt','dependencyIds',deps,'sections','[]'::jsonb,'formulaEquivalence','unknown'),
+ 'selection',jsonb_build_object('accepted',false,'state','partial','predicate',d.payload->'predicate'),'reviewReceipt',null,'factBundle',null,
+ 'dependencies',deps,'reasonCodes',jsonb_build_array('full_panel_not_established'),'acceptancePolicyVersion','part-one-private-dec-1','persistable',true,'capturedSource',o.value))
+ from part_one_test_state p cross join lateral(select p.value->'context' c) ctx
+ join private.part_one_capture_commits cm on cm.source_commit_id=(p.value->>'sourceCommitId')::uuid
+ join private.part_one_records d on d.id=cm.declaration_ids[1] cross join part_one_test_state o
+ cross join lateral(select jsonb_agg(id) deps from (select x->'evidenceId' id from jsonb_array_elements(c->'assets') x
+ union select x->'observationId' from jsonb_array_elements((c->'observations')||(c->'priorObservations')) x) ids) dependencies
+ where p.key='generic-source-prepared' and o.key='generic-source-outcome'));
+select is(public.part_one_private_service('source/apply',(select jsonb_set(value,'{expectedCaptureRevision}','-1') from part_one_test_state where key='generic-source-apply-request'))->>'conflict','true',
+ 'generic source stale CAS cannot persist captured context');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,selection,accepted}','true') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','generic captured source cannot upgrade declaration readiness');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,capturedSource,absenceClaimsAllowed}','true') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','generic captured source cannot claim whole-list absence');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,capturedSource,candidate,ownerId}','"e7100000-0000-4000-8000-000000000001"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source candidate must bind exact owning source commit');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,capturedSource,facts,capturedText,0,sourceRefs,0,text}','"Wrong source text"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source rejects contradictory literal from another source');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,capturedSource,candidate,observationBindings,0,recordHash}','"Wrong immutable hash"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source verifies immutable observation hashes independently');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,capturedSource,candidate,targetDeclarationId}','"e7f00000-0000-4000-8000-000000000099"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source cannot target another graph declaration');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,declaration,variant,brand}','"Other source brand"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source declaration variant must match exact validated candidate');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,declaration,category}','"drug"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source declaration category must match exact validated candidate');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,declaration,packageMarket}','"Other source market"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source declaration market must match exact validated candidate');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,packageSnapshot}','{"variant":{"brand":"Other source snapshot brand"},"packageMarket":null}') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source snapshot variant must match exact validated candidate');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,packageSnapshot}','{"variant":{"brand":null,"line":null,"form":null,"scent":null,"shade":null,"spf":null,"strength":null,"size":null,"unit":null,"packCount":null,"packagingLevel":null},"packageMarket":"Other source market"}') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source snapshot market must match exact validated candidate');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,capturedSource,facts,sections}',jsonb_build_array(jsonb_build_object('kind','ingredients','rawText','Wrong other-source ingredient text','lineCoverageComplete',false,'entries','[]'::jsonb))) from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source cannot attach forged displayed ingredient section');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,declaration,sections}',jsonb_build_array(jsonb_build_object('kind','ingredients','rawText','Wrong copied ingredient text','lineCoverageComplete',false,'entries','[]'::jsonb))) from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source declaration cannot copy another source beside valid facts');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(jsonb_set(value,'{evaluation,capturedSource,candidate,association}','"contradiction"'),'{evaluation,capturedSource,candidate,contradictions}',jsonb_build_array(jsonb_build_object('kind','selection','field',null,'values',jsonb_build_array('Different package'),'refs','[]'::jsonb))) from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source contradictions cannot be concealed behind partial state');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,capturedSource,candidate,variant,brand}','"Unsupported other brand"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source variant cannot invent unsupported label field');
+select throws_ok($$select public.part_one_private_service('source/apply',(select jsonb_set(value,'{evaluation,capturedSource,candidate,association}','"barcode_matches_catalog_same_asset"') from part_one_test_state where key='generic-source-apply-request'))$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured source cannot assert same-asset association without its barcode and panel');
+insert into part_one_test_state values('generic-token-proof',jsonb_build_object('context','{"observations":[{"observationId":"e7f00000-0000-4000-8000-000000000002","revision":1,"rawText":"Cetyl\nAlcohol","assetEvidenceIds":["e7f00000-0000-4000-8000-000000000001"]}]}'::jsonb,
+ 'candidate','{"sections":[{"kind":"ingredients","observationId":"e7f00000-0000-4000-8000-000000000002","revision":1,"start":0,"end":13,"startCovered":true,"endCovered":false}]}'::jsonb,
+ 'sections','[{"kind":"ingredients","rawText":"Cetyl\nAlcohol","startCovered":true,"endCovered":false,"lineCoverageComplete":false,"entries":[{"rawToken":"Cetyl\nAlcohol","sourceSpans":[{"observationId":"e7f00000-0000-4000-8000-000000000002","imageId":"e7f00000-0000-4000-8000-000000000001","sourceRevision":1,"start":0,"end":5},{"observationId":"e7f00000-0000-4000-8000-000000000002","imageId":"e7f00000-0000-4000-8000-000000000001","sourceRevision":1,"start":6,"end":13}]}]}]'::jsonb));
+select lives_ok($$select private.part_one_validate_captured_sections(value->'context',value->'candidate',value->'sections') from part_one_test_state where key='generic-token-proof'$$,
+ 'captured token proof preserves complete literal newline across bounded line spans');
+insert into part_one_test_state values('generic-identical-text-proof','{"context":{"observations":[{"observationId":"e7f00000-0000-4000-8000-000000000020","revision":1,"rawText":"Water","assetEvidenceIds":["e7f00000-0000-4000-8000-000000000022"]},{"observationId":"e7f00000-0000-4000-8000-000000000021","revision":1,"rawText":"Water","assetEvidenceIds":["e7f00000-0000-4000-8000-000000000023"]}]},"candidate":{"sections":[{"kind":"ingredients","observationId":"e7f00000-0000-4000-8000-000000000020","revision":1,"start":0,"end":5,"startCovered":true,"endCovered":false},{"kind":"ingredients","observationId":"e7f00000-0000-4000-8000-000000000021","revision":1,"start":0,"end":5,"startCovered":true,"endCovered":false}]},"sections":[{"kind":"ingredients","rawText":"Water","startCovered":true,"endCovered":false,"lineCoverageComplete":false,"entries":[{"rawToken":"Water","sourceSpans":[{"observationId":"e7f00000-0000-4000-8000-000000000020","imageId":"e7f00000-0000-4000-8000-000000000022","sourceRevision":1,"start":0,"end":5}]}]},{"kind":"ingredients","rawText":"Water","startCovered":true,"endCovered":false,"lineCoverageComplete":false,"entries":[{"rawToken":"Water","sourceSpans":[{"observationId":"e7f00000-0000-4000-8000-000000000021","imageId":"e7f00000-0000-4000-8000-000000000023","sourceRevision":1,"start":0,"end":5}]}]}]}'::jsonb);
+select lives_ok($$select private.part_one_validate_captured_sections(value->'context',value->'candidate',value->'sections') from part_one_test_state where key='generic-identical-text-proof'$$,
+ 'identical ingredient strings from different JPEGs retain their exact independent observation and image provenance');
+select throws_ok($$select private.part_one_validate_captured_sections(value->'context',value->'candidate',jsonb_set(value->'sections','{1,entries,0,sourceSpans,0,imageId}','"e7f00000-0000-4000-8000-000000000022"')) from part_one_test_state where key='generic-identical-text-proof'$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','identical text does not authorize borrowing another JPEG asset');
+
+select throws_ok($$select private.part_one_validate_captured_sections(value->'context',value->'candidate',jsonb_set(value->'sections','{0,entries,0,rawToken}','"Wrong other-source chemical"')) from part_one_test_state where key='generic-token-proof'$$,
+ 'P0001','PART_ONE_INVALID_CAPTURED_SOURCE','captured token cannot substitute another chemical inside valid source spans');
+
+
+select lives_ok($$insert into part_one_test_state values('generic-source-applied',public.part_one_private_service('source/apply',(select value from part_one_test_state where key='generic-source-apply-request')))$$,
+ 'generic source persists independently validated partial context without an authority');
+select is((select value->'result'->>'declarationState' from part_one_test_state where key='generic-source-applied'),'partial','captured source readiness remains partial');
+select is((select count(*)::integer from private.part_one_private_reviews where capture_id=(select (value->>'captureSessionId')::uuid from part_one_test_state where key='generic-source-apply-request')),0,
+ 'generic source creates no synthetic reviewed receipt');
+select is((select (outcome.value->'candidate'->>'captureRevision')::integer+1 from part_one_test_state outcome where outcome.key='generic-source-outcome'),
+ (select (value->'capture'->>'captureRevision')::integer from part_one_test_state where key='generic-source-applied'),'captured source immutable predecessor capture revision binds exact admitted next revision');
+select is((select (outcome.value->'candidate'->>'resultRevision')::integer+1 from part_one_test_state outcome where outcome.key='generic-source-outcome'),
+ (select (value->'result'->>'resultRevision')::integer from part_one_test_state where key='generic-source-applied'),'captured source immutable predecessor result revision binds exact admitted next revision');
+select is((select value->'candidate'->>'targetDeclarationId' from part_one_test_state where key='generic-source-outcome'),
+ (select value->'result'->>'declarationId' from part_one_test_state where key='generic-source-applied'),'captured source explicitly binds the admitted declaration target');
+
+select is(public.part_one_private_service('source/apply',(select value from part_one_test_state where key='generic-source-apply-request')),
+ (select value from part_one_test_state where key='generic-source-applied'),'captured source replay is exact without new immutable revision');
+set local role authenticated;
+insert into part_one_test_state values('generic-source-recovery',public.part_one_operation('captures/evidence',
+ (select jsonb_build_object('captureSessionId',value->>'captureSessionId') from part_one_test_state where key='generic-source-apply-request')));
+select is((select value->'capturedSource' from part_one_test_state where key='generic-source-recovery'),
+ (select value from part_one_test_state where key='generic-source-outcome'),'owner recovery restores exact attributable captured source context');
+select throws_ok($$select public.part_one_private_service('source/apply',(select value from part_one_test_state where key='generic-source-apply-request'))$$,
+ '42501','permission denied for function part_one_private_service','customer cannot call captured-source server admission');
+set local role postgres;
+insert into part_one_test_state values('generic-source-next-request',(select jsonb_build_object('captureSessionId',cc.id,'packageObservationId',cc.package_observation_id,
+ 'schemaVersion',2,'idempotencyKey','generic-source-next','expectedGeneration',cc.generation,'expectedResultRevision',ss.result_revision,'expectedCaptureRevision',cc.capture_revision,
+ 'expectedDeletionEpoch',cc.deletion_epoch,'assets','[]'::jsonb,'sourceObservations',jsonb_build_array(jsonb_build_object('observationId','e7f00000-0000-4000-8000-000000000011',
+ 'revision',1,'role','ingredients','coordinateSpace','source_original','derivedFromObservationIds','[]'::jsonb,'observation',rq.value->'observations'->0)),
+ 'edits','[]'::jsonb,'review',null,'reviewId',null) from part_one_test_state rq join private.part_one_captures cc on cc.id=(rq.value->>'captureSessionId')::uuid
+ join private.part_one_scans ss on ss.id=cc.scan_id where rq.key='private-unresolved-request'));
+set local role authenticated;
+insert into part_one_test_state values('generic-source-next',public.part_one_operation('captures/observations',(select value from part_one_test_state where key='generic-source-next-request')));
+insert into part_one_test_state values('generic-source-next-recovery',public.part_one_operation('captures/evidence',
+ (select jsonb_build_object('captureSessionId',value->'capture'->'captureSessionId') from part_one_test_state where key='generic-source-next')));
+select is((select value->'capturedSource' from part_one_test_state where key='generic-source-next-recovery'),'null'::jsonb,
+ 'new source commit does not leak a captured outcome from the older commit');
+select is((select value->'boundResult'->>'declarationId' from part_one_test_state where key='generic-source-next-recovery'),
+ (select value->'result'->>'declarationId' from part_one_test_state where key='generic-source-next'),'recovery binds exact newest source declaration before extraction');
+set local role postgres;
+
 select public.begin_customer_account_deletion('e7100000-0000-4000-8000-000000000002');
 delete from auth.users where id='e7100000-0000-4000-8000-000000000002';
 select is((select count(*)::integer from private.part_one_records where owner_id='e7100000-0000-4000-8000-000000000002'),0,'A24 account erasure removes all private source/derived payloads');
@@ -950,5 +1121,36 @@ select public.part_one_worker('finish',(select jsonb_build_object('jobId',j.id,'
 select is((select result_revision from private.part_one_scans where id=(select (value->>'scanId')::uuid from part_one_test_state where key='late-a')),
  (select (value->>'result_revision')::integer from part_one_test_state where key='before-worker-fence'),
  'A24 worker terminal publication leaves account-deletion-fenced owner result untouched');
+-- Maximum supported edit chain, mirroring immutable all-ancestor dependencies.
+-- These public synthetic rows exercise graph traversal only, without enabling
+-- private ingestion, a review authority, Storage, or any provider operation.
+insert into private.part_one_records(id,kind,policy_id,policy_version,payload,dependencies,observed_at,expires_at) values
+ ('ec000000-0000-4000-8000-000000000001','observation','derive_catalog','1','{"privateKind":"sanitized_image"}','{}',now(),now()+interval '20 minutes'),
+ ('ec000000-0000-4000-8000-000000000003','observation','derive_catalog','1','{"privateKind":"sanitized_image"}','{}',now(),now()+interval '1 day'),
+ ('ec000000-0000-4000-8000-000000000002','observation','derive_catalog','1','{"privateKind":"ocr","rawText":"Synthetic original"}',
+   array['ec000000-0000-4000-8000-000000000001'::uuid,'ec000000-0000-4000-8000-000000000003'::uuid],now(),now()+interval '1 day');
+do $$ declare previous_id uuid:='ec000000-0000-4000-8000-000000000002'; next_id uuid;
+ ancestor_ids uuid[]:=array['ec000000-0000-4000-8000-000000000001'::uuid,'ec000000-0000-4000-8000-000000000003'::uuid,previous_id]; begin
+ for i in 1..100 loop
+  next_id:=('ec000000-0000-4000-8000-'||lpad((i+3)::text,12,'0'))::uuid;
+  insert into private.part_one_records(id,kind,revision,policy_id,policy_version,payload,dependencies,supersedes_id,observed_at,expires_at)
+   values(next_id,'observation',i+1,'derive_catalog','1','{"privateKind":"edit","rawText":"Synthetic correction"}',ancestor_ids,previous_id,now(),now()+interval '1 day');
+  ancestor_ids:=array_append(ancestor_ids,next_id);previous_id:=next_id;
+ end loop; end $$;
+set local statement_timeout='2s';
+select lives_ok($$insert into part_one_test_state values('max-chain-projection',
+ (select private.part_one_observation_projection(r) from private.part_one_records r where r.id='ec000000-0000-4000-8000-000000000103'))$$,
+ 'A28 maximum 100-edit ancestor DAG projection completes within bounded statement work');
+select is((select jsonb_array_length(value->'assetEvidenceIds') from part_one_test_state where key='max-chain-projection'),2,
+ 'A28 repeated ancestor paths project each original image exactly once');
+select is((select value->>'originalObservationId' from part_one_test_state where key='max-chain-projection'),'ec000000-0000-4000-8000-000000000002',
+ 'A28 maximum edit chain retains the actual original beyond 50 revisions');
+select ok(private.part_one_record_allowed('ec000000-0000-4000-8000-000000000103',null),'A28 maximum-chain rights closure remains valid');
+select is(private.part_one_record_expiry('ec000000-0000-4000-8000-000000000103'),now()+interval '20 minutes',
+ 'A28 maximum-chain freshness includes earliest original image deadline');
+insert into private.part_one_record_status(record_id,status,reason) values('ec000000-0000-4000-8000-000000000001','revoked','Synthetic original source withdrawal');
+select ok(not private.part_one_record_allowed('ec000000-0000-4000-8000-000000000103',null),
+ 'A26 deduplicated maximum-chain traversal preserves original source withdrawal');
+set local statement_timeout=0;
 select * from finish();
 rollback;

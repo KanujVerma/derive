@@ -28,7 +28,7 @@ export async function commitPrivateCapture(captureSessionId:string,requestInput:
  if(context.ownerId!==ports.ownerId || context.capture.captureSessionId!==captureSessionId.toLowerCase() || context.capture.packageObservationId!==request.packageObservationId.toLowerCase())throw new PartOneHttpError('private_review_binding_changed',409);
  const evidence=ports.evidencePorts?await ports.evidencePorts(context):{hash:privateTextHash};
  const evaluation=await evaluatePrivateEvidence(context,evidence);
- const applied=object(normalizeDatabaseDates(await ports.service('review/apply',{ownerId:ports.ownerId,captureSessionId,idempotencyKey:request.idempotencyKey,
+ const applied=object(normalizeDatabaseDates(await ports.service(evaluation.capturedSource ? 'source/apply' : 'review/apply',{ownerId:ports.ownerId,captureSessionId,idempotencyKey:request.idempotencyKey,
   reviewId:request.reviewId,sourceCommitId:prepared.sourceCommitId,expectedCaptureRevision:prepared.captureRevision,expectedResultRevision:prepared.resultRevision,
   evaluation,authorityPolicy:evidence.authority?.policy??null})));
  if(applied.conflict===true)return applied;

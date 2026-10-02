@@ -69,3 +69,21 @@ export function toFactBundle(d: Declaration, item: ItemSnapshot, selection: Decl
   return FactBundleV1Schema.parse({ schemaVersion: 1, itemId: item.itemId, snapshotId: item.snapshotId, snapshotRevision: item.revision, declarationId: d.declarationId, declarationRevision: d.revision, scope: d.scope, ownerId: d.ownerId, packageConfirmation: confirmation, requestedMarket: item.requestedMarket, sourceMarkets: d.sourceMarkets, packageMarket: d.packageMarket, sections: d.sections, predicate: selection.predicate, state: selection.state, completenessReasons: d.completenessReasons, uncertaintyReasons: d.transcriptionUncertainty, conflictIds: [...new Set([...d.conflictIds, ...item.conflictIds])], observedAt: d.observedAt, expiresAt: selection.expiresAt, sources, parserVersion: d.parserVersion, aliasVersion: d.aliasVersion, dependencyIds: [...new Set([item.snapshotId, d.declarationId, d.policyId, ...d.observationIds, ...d.dependencyIds])] });
 }
 export function canClaimFullListAbsence(bundle: FactBundleV1, now = new Date().toISOString(), invalidatedIds: readonly string[] = []): boolean { return FactBundleV1Schema.safeParse(bundle).success && bundle.state === 'accepted' && Object.values(bundle.predicate).every(c => c.passed) && bundle.conflictIds.length === 0 && Number.isFinite(Date.parse(now)) && Date.parse(bundle.observedAt) <= Date.parse(now) && Date.parse(bundle.expiresAt) > Date.parse(now) && !invalidatedIds.some(id => bundle.dependencyIds.includes(id)); }
+
+/** Downstream consumers must preserve what was read and which package it supports.
+ * A readable private token is never a globally verified formula or an absent token. */
+export function factBundleClaimLimits(bundle: FactBundleV1, now = new Date().toISOString(), invalidatedIds: readonly string[] = []) {
+  const valid = FactBundleV1Schema.safeParse(bundle).success;
+  const current = valid && Number.isFinite(Date.parse(now)) && Date.parse(bundle.observedAt) <= Date.parse(now) && Date.parse(bundle.expiresAt) > Date.parse(now) && !invalidatedIds.some(id => bundle.dependencyIds.includes(id));
+  const permitted = current && bundle.predicate.rightsFreshness.passed;
+  const readableEntryIds = permitted ? bundle.sections.flatMap(section => section.entries.filter(entry => entry.rawToken.trim() && entry.uncertaintyReasons.length === 0).map(entry => entry.entryId)) : [];
+  return {
+    evidenceBasis: bundle.scope === 'private_package' ? 'private_label' as const : 'catalog_source' as const,
+    readableEntryIds,
+    selectedPackagePresence: readableEntryIds.length > 0 && bundle.predicate.association.passed && bundle.predicate.noContradiction.passed && bundle.predicate.variantMarket.passed && bundle.conflictIds.length === 0 && bundle.uncertaintyReasons.length === 0,
+    fullListAbsence: canClaimFullListAbsence(bundle, now, invalidatedIds),
+    globalCatalogVerification: bundle.scope === 'public' && canClaimFullListAbsence(bundle, now, invalidatedIds),
+    inferUnobservedIngredients: false as const,
+    formulaEquivalence: 'unknown' as const,
+  };
+}

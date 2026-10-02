@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AttributedEditSchema, CaptureSessionSchema, OcrObservationSchema, PartOneIdSchema,
   SanitizedAssetSchema, ScanResultSchema, CaptureCommitResultSchema } from './PartOne.ts';
+import { GenericCapturedSourceOutcomeSchema } from './PartOneCapturedSource.ts';
 const version = z.number().int().nonnegative();
 const date = z.iso.datetime({ offset: false });
 const text = z.string().max(50000);
@@ -23,12 +24,19 @@ export const CaptureReviewStateSchema = z.strictObject({ active: z.boolean(), re
 export const CaptureCoverageSchema = z.strictObject({ startSeen: z.boolean(), endSeen: z.boolean(), missingRegions: z.array(z.string().max(100)).max(50),
   requiredSections: z.array(z.string().max(100)).max(10), observedSections: z.array(z.string().max(100)).max(10), associationContradictions: z.array(z.string().max(500)).max(50) });
 export const CaptureLocalReviewSchema = z.strictObject({ reviewState: CaptureReviewStateSchema, coverage: CaptureCoverageSchema });
-export const CaptureSourceObservationSchema = z.strictObject({ observationId: PartOneIdSchema, revision: z.literal(1), role:z.enum(['ingredients','package']).default('ingredients'), observation: OcrObservationSchema });
+export const CaptureSourceObservationSchema = z.strictObject({ observationId: PartOneIdSchema, revision: z.literal(1), role:z.enum(['ingredients','package']).default('ingredients'),
+  coordinateSpace:z.enum(['source_original','sanitized_derivative']).default('source_original'),
+  derivedFromObservationIds:z.array(PartOneIdSchema).max(36).default([]), observation: OcrObservationSchema }).superRefine((value,context)=>{
+  if(new Set(value.derivedFromObservationIds.map(id=>id.toLowerCase())).size!==value.derivedFromObservationIds.length ||
+    value.derivedFromObservationIds.some(id=>id.toLowerCase()===value.observationId.toLowerCase()) ||
+    value.coordinateSpace==='source_original' && value.derivedFromObservationIds.length>0)
+    context.addIssue({code:'custom',message:'Invalid derivative observation ancestry'});
+});
 export const CaptureSourceEditSchema = AttributedEditSchema.safeExtend({ sourceRef: lineRef.nullable().optional(), replacementText:text.optional() });
 export const CapturePrivateCommitRequestSchema = z.strictObject({ schemaVersion: z.literal(2), idempotencyKey: z.string().min(1).max(200),
   expectedGeneration: version, expectedResultRevision: version, expectedCaptureRevision: version, expectedDeletionEpoch: version,
   packageObservationId: PartOneIdSchema, assets: z.array(SanitizedAssetSchema).max(6),
-  sourceObservations: z.array(CaptureSourceObservationSchema).max(36), edits: z.array(CaptureSourceEditSchema).max(100),
+  sourceObservations: z.array(CaptureSourceObservationSchema).max(42), edits: z.array(CaptureSourceEditSchema).max(100),
   review: CaptureLocalReviewSchema.nullable(), reviewId: PartOneIdSchema.nullable(),
 }).superRefine((request, context) => {
   for (const field of ['evidenceId','storageObjectId'] as const)
@@ -66,9 +74,10 @@ const recoveredAsset = z.strictObject({recordId:PartOneIdSchema.nullable(),asset
   signedAccess:z.strictObject({url:z.url(),expiresAt:date}).nullable()});
 export const CaptureRecoverySchema = z.strictObject({schemaVersion:z.literal(1),capture:CaptureSessionSchema,editable:z.boolean(),
   result:ScanResultSchema,boundResult:ScanResultSchema.nullable(),assets:z.array(recoveredAsset).max(6),
-  sourceObservations:z.array(CaptureSourceObservationSchema).max(36),
+  sourceObservations:z.array(CaptureSourceObservationSchema).max(42),
   edits:z.array(CaptureSourceEditSchema.safeExtend({actorOwnerId:PartOneIdSchema})).max(100),
   declarationIds:ids,review:CaptureLocalReviewSchema.nullable(),reviewReceiptId:PartOneIdSchema.nullable(),
+  capturedSource:GenericCapturedSourceOutcomeSchema.nullable().default(null),
 }).superRefine((value,context)=>{
   const bound=value.boundResult;
   if(bound && (bound.scanId.toLowerCase()!==value.capture.scanId.toLowerCase() || bound.generation!==value.capture.generation || bound.itemId!==value.capture.itemId))

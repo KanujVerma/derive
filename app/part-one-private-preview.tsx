@@ -38,10 +38,15 @@ export default function PartOnePrivatePreview(){
      headers:{...options.headers,authorization:`Bearer ${fixture.token}`}});
     if(!reply.ok)return{data:null,error:{context:reply}};return{data:await reply.json(),error:null};
    }});
-   const sanitize=createPrivateLabelSanitizer({prepareUpload:async({uri,cropRegion})=>{
+   const sanitize=createPrivateLabelSanitizer({prepareUpload:async(input)=>{
+    const {uri,cropRegion}=input;
     const photo=fixture.photos.find(item=>uri===`file:///synthetic-gold/${item.evidenceId}.jpg`);if(!photo)throw Error();
     return{status:'prepared',base64:photo.base64,mimeType:'image/jpeg',width:photo.width,height:photo.height,sourceWidth:photo.width,sourceHeight:photo.height,
-     orientationTransform:[1,0,0,0,1,0,0,0,1],cropRegion,recipeVersion:'derive-private-jpeg-v1'};
+     orientationTransform:[1,0,0,0,1,0,0,0,1],cropRegion,recipeVersion:'derive-private-jpeg-v1',
+     derivativeObservation:{evidenceId:input.evidenceId,captureSessionId:input.captureSessionId,generation:input.generation,
+      recognizer:'synthetic_fixture',recognizerVersion:'private-gold-v1',languageConfig:['en'],correctionEnabled:false,
+      sourceWidth:photo.width,sourceHeight:photo.height,orientationTransform:[1,0,0,0,1,0,0,0,1],status:'recognized',
+      lines:photo.text.split('\n').map((text,index)=>({text,region:[.1,index/20,.8,.04],confidence:.99,alternatives:[]}))}};
    }});
    const next=createPrivateCaptureController({enabled,transport,sanitize,currentOwner:()=>ownerRef.current,currentDraft:()=>bindingRef.current?draft.read(bindingRef.current):null,
     createId:createCatalogRequestId,reviewId:()=>fixtureReviewId.current,onSaved:()=>{draft.endSheet();bindingRef.current=null;setBinding(null);}});
@@ -68,6 +73,7 @@ export default function PartOnePrivatePreview(){
   <Button size="small" style={{width:'48%'}} label="Hide private fixture panel" onPress={()=>setShow(false)}/>
   <Button size="small" style={{width:'48%'}} label="Reopen isolated saved evidence" onPress={()=>void load(true)}/>
   <Button size="small" style={{width:'48%'}} label="Prepare isolated corrected review" onPress={()=>void (async()=>{try{const response=await fetch(`${LOCAL_FIXTURE_ORIGIN}/review-id?owner=0`);if(!response.ok)throw Error();fixtureReviewId.current=PartOneIdSchema.parse((await response.json()).reviewId);}catch{setError('Synthetic review unavailable');}})()}/>
+  <Button size="small" style={{width:'48%'}} label="Use captured-source validation" onPress={()=>{fixtureReviewId.current=null;setError('Next synthetic save uses ordinary captured-source validation.');}}/>
   <Button size="small" style={{width:'48%'}} label="Delay isolated private commit" onPress={()=>void (async()=>{try{const response=await fetch(`${LOCAL_FIXTURE_ORIGIN}/delay-next-commit`);if(!response.ok)throw Error();setError('Next synthetic commit delayed for cancellation test');}catch{setError('Synthetic delay unavailable');}})()}/>
   <Button size="small" style={{width:'48%'}} label="Switch private fixture account" onPress={()=>{draft.accountChanged();bindingRef.current=null;setBinding(null);ownerRef.current='ff000000-0000-4000-8000-000000000999';setOwner(ownerRef.current);controller?.setOwner(ownerRef.current);setShow(true);}}/>
   <Button size="small" style={{width:'48%'}} label="Back from private fixture" onPress={()=>{controller?.close();draft.endSheet();router.replace('/(tabs)/check');}}/>

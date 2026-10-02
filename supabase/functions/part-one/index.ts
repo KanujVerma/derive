@@ -25,7 +25,7 @@ Deno.serve(async (request: Request) => {
     const serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if(!serviceKey)throw new PartOneHttpError('private_capture_configuration_required',503);
     const admin=createClient(url,serviceKey,{global:{fetch:boundedFetch},auth:{persistSession:false,autoRefreshToken:false}});
-    return{ownerId,operation,service:privateService(admin),storage:createPrivateStoragePorts(admin)};
+    return{ownerId,operation,service:privateService(admin),storage:createPrivateStoragePorts(admin,{publicApiOrigin:Deno.env.get('PART_ONE_PRIVATE_PUBLIC_API_ORIGIN')})};
   };
   return handlePartOneRequest(request,{
     async authorize() {
