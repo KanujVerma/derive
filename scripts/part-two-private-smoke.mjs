@@ -23,7 +23,7 @@ const endpoint=process.env.SUPABASE_URL,anon=process.env.SUPABASE_ANON_KEY,servi
 if(!endpoint||!anon||!serviceKey)throw new Error('Explicit isolated local stack environment required');
 const target=new URL(endpoint);
 if(target.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(target.hostname)||target.username||target.password||target.pathname!=='/'||target.search||target.hash)throw new Error('Hosted or ambiguous stack URL refused');
-if(process.env.PART_ONE_DB_CONTAINER!=='supabase_db_derive-part-two-task'||process.env.DOCKER_HOST!=='unix:///Users/kanuj/.colima/default/docker.sock'||!process.env.PART_ONE_DOCKER_CONFIG)throw new Error('Explicit task-isolated database and Docker engine required');
+if(!['supabase_db_derive-part-two-task','supabase_db_derive-part-three-task'].includes(process.env.PART_ONE_DB_CONTAINER)||process.env.DOCKER_HOST!=='unix:///Users/kanuj/.colima/default/docker.sock'||!process.env.PART_ONE_DOCKER_CONFIG)throw new Error('Explicit task-isolated database and Docker engine required');
 const docker=process.env.PART_ONE_DOCKER_BIN||'/opt/homebrew/bin/docker';
 const serve=process.argv.includes('--serve-fixture'),genericSource=process.argv.includes('--generic-source'),edgeHttp=process.argv.includes('--edge-http'),fixture=randomUUID(),bucket=`part-one-private-${fixture}`,policyId=randomUUID();
 const pub={observation:randomUUID(),declaration:randomUUID(),snapshot:randomUUID(),item:randomUUID()};

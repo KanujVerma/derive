@@ -24,7 +24,7 @@ async function edge(client,path,body){const {data:{session}}=await client.auth.g
 // authenticated history read, observe its advisory wait, then commit recall.
 async function recallDuringPinnedRead(policy,saveId){
  if(process.env.DOCKER_HOST!=='unix:///Users/kanuj/.colima/default/docker.sock'||!process.env.PART_ONE_DOCKER_CONFIG)throw new Error('Isolated Docker required for recall race');
- const args=['--config',process.env.PART_ONE_DOCKER_CONFIG,'exec','-i','supabase_db_derive-part-two-task','psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-Atq'];
+ const args=['--config',process.env.PART_ONE_DOCKER_CONFIG,'exec','-i',process.env.PART_ONE_DB_CONTAINER||'supabase_db_derive-part-two-task','psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-Atq'];
  const run=(query)=>new Promise((resolve,reject)=>{const c=spawn('/opt/homebrew/bin/docker',args,{stdio:['pipe','pipe','pipe']});let out='';c.stdout.on('data',v=>out+=v);c.stderr.resume();c.once('error',reject);c.once('close',code=>code===0?resolve(out.trim()):reject(new Error('Synthetic recall SQL unavailable')));c.stdin.end(query);});
  const holder=spawn('/opt/homebrew/bin/docker',args,{stdio:['pipe','pipe','pipe']});holder.stderr.resume();
  const ended=new Promise((resolve,reject)=>{holder.once('error',reject);holder.once('close',code=>code===0?resolve():reject(new Error('Synthetic recall transaction failed')));});

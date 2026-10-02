@@ -27,8 +27,8 @@ export function validReportedDate(value: string | null): boolean {
 export function validateReportedUse(use: ReportedUseDraft): string | null {
   if (!validReportedDate(use.startedOn) || !validReportedDate(use.stoppedOn)) return 'Enter a real date as YYYY-MM-DD, or leave it blank.';
   if (use.startedOn && use.stoppedOn && use.startedOn > use.stoppedOn) return 'The end date must be on or after the start date.';
-  if (use.frequency.kind === 'exact' && (!Number.isInteger(use.frequency.count) || use.frequency.count < 1 || use.frequency.count > 100)) return 'Use an exact count from 1 to 100.';
-  if (use.duration && (!Number.isInteger(use.duration.count) || use.duration.count < 1 || use.duration.count > 1000)) return 'Use a duration count from 1 to 1000.';
+  if (use.frequency.kind === 'exact' && (!Number.isFinite(use.frequency.count) || use.frequency.count <= 0 || use.frequency.count > 100)) return 'Use an exact count from 1 to 100.';
+  if (use.duration && (!Number.isFinite(use.duration.count) || use.duration.count <= 0 || use.duration.count > 1000)) return 'Use a duration count from 1 to 1000.';
   return null;
 }
 export function validateExperienceDraft(draft: ExperienceDraft): string | null {

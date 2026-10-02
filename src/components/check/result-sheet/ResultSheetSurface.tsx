@@ -32,6 +32,8 @@ interface Props {
   onClose: () => void;
   onExpandedChange?: (expanded: boolean) => void;
   onScrollOffset?: (offset: number) => void;
+  /** User touch/drag/accessibility interaction, excluding programmatic layout scroll. */
+  onInteraction?: () => void;
   dismissLabel?: string;
   initialDetent?: 0 | 1;
   bottomInset?: number;
@@ -61,7 +63,7 @@ export function ResultSheetSurface({ visible = true, inline = false, presentatio
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset }: Omit<Props, 'visible' | 'inline'> & {
+  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset, onInteraction }: Omit<Props, 'visible' | 'inline'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
@@ -106,23 +108,24 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       onAccessibilityEscape={close}
       onAccessibilityAction={({ nativeEvent }) => {
         if (!guard.isCurrent()) return;
+        onInteraction?.();
         if (nativeEvent.actionName === 'increment') sheet.current?.snapToIndex(Math.min(index + 1, contentSized ? 0 : 2));
         if (nativeEvent.actionName === 'decrement') { if (index > 0) sheet.current?.snapToIndex(index - 1); else close(); }
         if (nativeEvent.actionName === 'escape') close();
       }}
-      onPress={() => { if (guard.isCurrent()) sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); }}>
+      onPress={() => { onInteraction?.();if (guard.isCurrent()) sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); }}>
       <View style={styles.indicator} />
     </Pressable>
     <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel={dismissLabel}>
       <Icon name="close" size={20} color={colors.inkMuted} />
     </Pressable>
-  </View>, [close, dismissLabel, guard, index, contentSized]);
-  return <GestureHandlerRootView style={styles.root} pointerEvents="box-none" accessibilityViewIsModal>
+  </View>, [close, dismissLabel, guard, index, contentSized, onInteraction]);
+  return <GestureHandlerRootView style={styles.root} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
     <BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
       onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
-      <BottomSheetScrollView onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
+      <BottomSheetScrollView onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {/* Keep search height stable as loading/helper rows disappear; explicit empty input resets it. */}

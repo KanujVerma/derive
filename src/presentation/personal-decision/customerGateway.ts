@@ -20,7 +20,7 @@ export function currentCustomerOwner(): string | null {
   return isFreeIntegrationShell(shell) && auth.status === 'SIGNED_IN' && auth.sessionUserId && access.status === 'READY' && access.userId === auth.sessionUserId && access.access?.userId === auth.sessionUserId ? auth.sessionUserId : null;
 }
 function assertOwner(owner: string) { const current = currentCustomerOwner(); if (current !== owner) { customerController.setOwner(current); throw new Error('OWNER_CHANGED'); } }
-const captureClient = (owner: string) => captureCustomerFunctionClient(owner, supabase, currentCustomerOwner, changed => customerController.setOwner(changed));
+export const captureCustomerContextClient = (owner: string) => captureCustomerFunctionClient(owner, supabase, currentCustomerOwner, changed => customerController.setOwner(changed));
 export const customerGateway: CustomerGateway = {
   async labels(owner, references) {
     assertOwner(owner); const ids = [...new Set(references.map(reference => reference.productId))].slice(0, 50);
@@ -30,11 +30,11 @@ export const customerGateway: CustomerGateway = {
     for (const reference of references) { const product = products.get(reference.productId); if (!product) continue; const variant = reference.variantId ? product.variants.find(item => item.variantId === reference.variantId) : null; labels[catalogReferenceKey(reference)] = 'Current name: ' + [product.brand, product.name, variant?.name, variant?.packageSize].filter(Boolean).join(' '); }
     return labels;
   },
-  async load(owner) { assertOwner(owner); const result = await getPersonalContext(await captureClient(owner)); assertOwner(owner); if (result.ownerId !== owner) throw new Error('OWNER_MISMATCH'); return result; },
-  async write(owner, request) { assertOwner(owner); const result = await writePersonalContext(request, await captureClient(owner)); assertOwner(owner); return result; },
-  async history(owner, request) { assertOwner(owner); const value = await requestPersonalContext(request, await captureClient(owner)); assertOwner(owner); if (!('items' in value) || !Array.isArray(value.items) || !('atRevision' in value) || value.atRevision !== request.atRevision || !('nextCursor' in value) || (value.nextCursor !== null && typeof value.nextCursor !== 'string')) throw new Error('INVALID_HISTORY'); const page = value as unknown as PersonalExperiencePage; if (page.items.some(item => item.ownerId !== owner)) throw new Error('OWNER_MISMATCH'); return page; },
-  async evaluate(owner, request) { assertOwner(owner); const result = await requestPersonalDecision(request, await captureClient(owner)); assertOwner(owner); return result; },
+  async load(owner) { assertOwner(owner); const result = await getPersonalContext(await captureCustomerContextClient(owner)); assertOwner(owner); if (result.ownerId !== owner) throw new Error('OWNER_MISMATCH'); return result; },
+  async write(owner, request) { assertOwner(owner); const result = await writePersonalContext(request, await captureCustomerContextClient(owner)); assertOwner(owner); return result; },
+  async history(owner, request) { assertOwner(owner); const value = await requestPersonalContext(request, await captureCustomerContextClient(owner)); assertOwner(owner); if (!('items' in value) || !Array.isArray(value.items) || !('atRevision' in value) || value.atRevision !== request.atRevision || !('nextCursor' in value) || (value.nextCursor !== null && typeof value.nextCursor !== 'string')) throw new Error('INVALID_HISTORY'); const page = value as unknown as PersonalExperiencePage; if (page.items.some(item => item.ownerId !== owner)) throw new Error('OWNER_MISMATCH'); return page; },
+  async evaluate(owner, request) { assertOwner(owner); const result = await requestPersonalDecision(request, await captureCustomerContextClient(owner)); assertOwner(owner); return result; },
 };
 export const customerController = new CustomerController(customerGateway, createCatalogRequestId);
 
-export const ownerPinnedLegacyGateway = createOwnerPinnedLegacyGateway({ getFreeSkinProfile, saveFreeSkinProfile, getPersonalFit }, captureClient, currentCustomerOwner);
+export const ownerPinnedLegacyGateway = createOwnerPinnedLegacyGateway({ getFreeSkinProfile, saveFreeSkinProfile, getPersonalFit }, captureCustomerContextClient, currentCustomerOwner);

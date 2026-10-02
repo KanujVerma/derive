@@ -21,11 +21,11 @@ export const referenceSchema = z.discriminatedUnion('kind', [
 export const frequencySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('unknown') }),
   z.strictObject({ kind: z.literal('qualitative'), value: z.enum(['daily','most_days','few_times_week','weekly','less_often','as_needed']) }),
-  z.strictObject({ kind: z.literal('exact'), count: z.number().int().min(1).max(100), unit: z.enum(['day','week','month']) }),
+  z.strictObject({ kind: z.literal('exact'), count: z.number().finite().positive().max(100), unit: z.enum(['day','week','month']) }),
 ]);
 const useFields = {
   timing: z.enum(['am','pm','both','unknown']), frequency: frequencySchema, startedOn: date.nullable(), stoppedOn: date.nullable(),
-  duration: z.strictObject({ count: z.number().int().min(1).max(1000), unit: z.enum(['days','weeks','months','years']) }).nullable(),
+  duration: z.strictObject({ count: z.number().finite().positive().max(1000), unit: z.enum(['days','weeks','months','years']) }).nullable(),
 };
 const chronological = (v: { startedOn: string | null; stoppedOn: string | null }) => !v.startedOn || !v.stoppedOn || v.startedOn <= v.stoppedOn;
 export const useContextSchema = z.strictObject(useFields).refine(chronological);

@@ -34,7 +34,10 @@ export interface SetupPreviewContext {
 export interface SetupBundle {
   ownerId: string | null;
   products: RoutineItemDraft[];
+  reportedUse?: Record<string, Pick<import('../../contracts/PersonalContextV2.ts').ReportedUseContextV2, 'reportedPurpose' | 'applicationSite' | 'useForm'>>;
   experiences: ExperienceDraft[];
+  /** Explicitly confirmed choices; never inferred from feedback or raw notes. */
+  preferences?: import('../../contracts/PersonalContextV2.ts').ConfirmedPreference[];
   /** User-reported raw context. Not a profile, allergy, diagnosis, or product fact. */
   additionalNote: string | null;
   previewOnly: SetupPreviewContext;

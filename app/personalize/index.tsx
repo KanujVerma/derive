@@ -4,7 +4,7 @@ import { GroupedSection } from '@/src/components/ui/GroupedSection';
 import { ContextFlow } from '@/src/components/p0b-personalization/ContextFlow';
 import { RoutineContext } from '@/src/components/p0b-personalization/RoutineContext';
 import { ExperienceContext } from '@/src/components/p0b-personalization/ExperienceContext';
-import { customerController, currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
+import { customerController, currentCustomerOwner, captureCustomerContextClient } from '@/src/presentation/personal-decision/customerGateway';
 import { deriveJitReproductiveQuestions, deriveProfileEditQuestions } from '@/src/presentation/personal-decision/customerController';
 import type { CustomerWrite } from '@/src/presentation/personal-decision/customerController';
 import { profileFromStorage, profileToStorage, routineFromStorage, routineToStorage, experienceFromStorage, experienceToStorage, catalogReferenceKey, contextProductLabel } from '@/src/presentation/p0b-personalization/storageAdapter';
@@ -28,6 +28,13 @@ import { useScannerEntryStore } from '@/src/stores/scannerEntryStore';
 import { ProductEntry } from '@/src/components/my-stuff/ProductEntry';
 import { myStuffStore } from '@/src/presentation/my-stuff/myStuffRemote';
 import { createEditorReturnGate, experienceDraftForProduct } from '@/src/presentation/personal-decision/editorEntry';
+import { getPersonalContextV2, writePersonalContextV2, PersonalContextRemoteError } from '@/src/services/remote/personalContext';
+import { setupToStorageV2 } from '@/src/presentation/p0b-personalization/setupStorageV2';
+import type { SetupBundle } from '@/src/presentation/p0b-personalization/setup';
+import type { ContextDraft } from '@/src/presentation/p0b-personalization/draft';
+import type { PersonalContextV2Request } from '@/src/contracts/PersonalContextV2';
+import { PreferenceContext } from '@/src/components/p0b-personalization/PreferenceContext';
+import type { PreferencePorts } from '@/src/presentation/p0b-personalization/preferenceController';
 import { createExperienceDraft, selectExperienceCatalogProduct } from '@/src/presentation/p0b-personalization/experience';
 
 function useEditorReturnGate() {
@@ -116,6 +123,10 @@ export default function PersonalizeScreen() {
 
 function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry, experienceId, productRecordId }: { ownerId: string | null; mode?: string; decisionSnapshotId?: string; entry?: string; experienceId?: string; productRecordId?: string }) {
   const insets = useSafeAreaInsets();
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const setupAttempt = useRef<{ signature: string; request: Extract<PersonalContextV2Request, {operation:'save_setup'}> } | null>(null);
+  const setupBusy = useRef(false);
   const router = useRouter();
   const state = useSyncExternalStore(customerController.subscribe, customerController.getState);
   const [section] = useState<'profile' | 'routine' | 'history'>(mode === 'routine' || mode === 'history' ? mode : 'profile');
@@ -133,13 +144,29 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry, experienc
       router.replace('/(tabs)/check');
     } else router.back();
   };
+  const preferencePorts:PreferencePorts={owner:currentCustomerOwner,createId:createCatalogRequestId,read:async owner=>getPersonalContextV2(await captureCustomerContextClient(owner)),write:async(owner,request)=>writePersonalContextV2(request,await captureCustomerContextClient(owner))};
+  if (ownerId && mode === 'preferences') return <PreferenceContext key={'preferences:' + ownerId} ownerId={ownerId} productLabels={state.ownerId===ownerId?state.displayLabels:{}} ports={preferencePorts} onClose={close} onSaved={()=>{void customerController.load();close();}}/>;
   if (!ownerId) return <Screen><Text>Personal context is unavailable in this session.</Text><Button label="Back" onPress={close} /></Screen>;
   if (!context) return <Screen><Text>{state.error ?? 'Loading your personal context...'}</Text><Button label="Try again" onPress={() => void customerController.load()} /><Button label="Back" variant="ghost" onPress={close} /></Screen>;
   const save = (input: CustomerWrite) => {
     const token = gate.begin(ownerId);
     void customerController.save(input).then(saved => { if (saved && gate.takeReturn(token, currentCustomerOwner())) close(); });
   };
-  const loading = state.status === 'saving' || state.status === 'loading';
+  const saveSetup = (bundle: SetupBundle, draft: ContextDraft) => {
+    if(setupBusy.current || currentCustomerOwner()!==ownerId || bundle.ownerId!==ownerId)return;
+    const token=gate.begin(ownerId);
+    try {
+      const signature=JSON.stringify({bundle,draft});
+      if(setupAttempt.current?.signature!==signature)setupAttempt.current={signature,request:{operation:'save_setup',requestId:createCatalogRequestId(),baseContextRevision:context.revision,setup:setupToStorageV2(draft,bundle,createCatalogRequestId,new Date().toISOString())}};
+      const request=setupAttempt.current.request;setupBusy.current=true;setSetupSaving(true);setSetupError(null);
+      void captureCustomerContextClient(ownerId).then(client=>writePersonalContextV2(request,client)).then(async()=>{
+        if(!gate.isCurrent(token,currentCustomerOwner()))return;
+        await customerController.load();
+        if(gate.takeReturn(token,currentCustomerOwner()))close();
+      }).catch(error=>{if(gate.isCurrent(token,currentCustomerOwner()))setSetupError(error instanceof PersonalContextRemoteError&&error.code==='STALE_CONTEXT'?'Your saved context changed. Your entries remain here. Review the latest context before saving again.':'Your setup was not saved. Your entries remain here; try again.');}).finally(()=>{setupBusy.current=false;if(gate.isCurrent(token,currentCustomerOwner()))setSetupSaving(false);});
+    } catch(error){setSetupError(error instanceof Error?error.message:'Review your entries before saving.');}
+  };
+  const loading = setupSaving || state.status === 'saving' || state.status === 'loading';
   const existing = editingExperience && editingExperience !== 'new' ? context.experiences.find(item => item.data.id === editingExperience) : null;
   const displayLabels = state.originReference ? { ...state.displayLabels, [catalogReferenceKey(state.originReference)]: state.originReference.label } : state.displayLabels;
   const historyRefs = context.experiences.flatMap(item => item.data.reference.kind === 'catalog' ? [item.data.reference] : []);
@@ -166,7 +193,8 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry, experienc
     <View style={{ paddingHorizontal: 24, paddingTop: insets.top, alignItems: 'flex-start' }}>
       <Button label="Back" size="medium" variant="ghost" disabled={loading} onPress={close} />
     </View>
-    {section === 'profile' && <ContextFlow key={'profile:' + context.revision} initialDraft={context.profile ? profileFromStorage(context.profile.data) : undefined} contextQuestions={questions} relevance={reproductive.length ? { fields: reproductive, evidenceReason: jitReproductive.length ? 'These answers can change the caution shown for this product. You can leave them unanswered.' : 'Review the answers you have already shared. You can change them or leave them unanswered.' } : undefined} loading={loading} error={state.error} onApply={draft => save({ operation: 'save_profile', profile: profileToStorage(draft) })} onSkip={close} />}
+    {section === 'profile' && mode !== 'preferences' && <Button label="Edit confirmed preferences" variant="outline" disabled={loading} onPress={()=>router.push('/personalize?mode=preferences&p0b=1')}/>}
+    {section === 'profile' && <ContextFlow key={'profile:' + context.revision} initialDraft={context.profile ? profileFromStorage(context.profile.data) : undefined} setup={!context.profile && context.revision === 0} durableSetup ownerId={ownerId} createId={createCatalogRequestId} collectIntent={false} completionLabel={!context.profile && context.revision === 0 ? 'Save skin setup' : 'Save skin profile'} onSetup={saveSetup} contextQuestions={questions} relevance={reproductive.length ? { fields: reproductive, evidenceReason: jitReproductive.length ? 'These answers can change the caution shown for this product. You can leave them unanswered.' : 'Review the answers you have already shared. You can change them or leave them unanswered.' } : undefined} loading={loading} error={setupError ?? state.error} onApply={draft => save({ operation: 'save_profile', profile: profileToStorage(draft) })} onSkip={close} />}
     {section === 'routine' && <RoutineContext key={'routine:' + context.revision} initialDraft={context.routine ? routineFromStorage(context.routine.data, presentationLabels) : undefined} createItemId={createCatalogRequestId} availableProducts={refs} loading={loading} error={state.error} onApply={draft => save({ operation: 'save_routine', routine: routineToStorage(draft) })} onSkip={close} />}
     {section === 'history' && selectedMissing && <Screen><Text>This report is not in the loaded history. Load the latest history before correcting it.</Text><Button label="Back" onPress={directExperience ? close : () => setEditingExperience(null)} /></Screen>}
     {section === 'history' && editingExperience === 'new' && productRecordId && !initialExperience && <Screen><Text>This saved product could not be loaded for this account.</Text><Button label="Back to My Stuff" onPress={close} /></Screen>}

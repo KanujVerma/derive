@@ -1,5 +1,5 @@
 /** Node-only component harness. Native hosts are inert; production choice/save handlers run unchanged. */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -38,23 +38,27 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     if (cache.has(path)) return cache.get(path);
     const module = { exports: {} as any }; cache.set(path, module.exports);
     const source = readFileSync(path, 'utf8');
-    const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const output = ts.transpileModule(source, { fileName: path, compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
     function requireModule(id: string): any {
       if (id === 'react') return { ...react, ...options.modules?.react };
       if (options.modules && id in options.modules) return options.modules[id];
+      if (id === 'expo-network') return {useNetworkState:()=>({isConnected:true,isInternetReachable:true})};
+      if (id === 'expo-symbols') return {SymbolView:'SymbolView'};
+      if (id === '@expo/vector-icons') return {Ionicons:'Ionicons',MaterialCommunityIcons:'MaterialCommunityIcons'};
       if (id === 'expo-haptics') return { impactAsync: async () => {}, notificationAsync: async () => {}, selectionAsync: async () => {}, ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' }, NotificationFeedbackType: { Success: 'Success', Error: 'Error' } };
       if (id.endsWith('/services/partOne')) return { PART_ONE_ENABLED: false, partOneTransport: {} };
+      if (id.endsWith('/services/partThree')) return { PART_THREE_ENABLED: false,partThreeTransport:{},partThreeEncounter:()=>null,subscribePartThreeSession:()=>()=>{} };
       if (id.endsWith('/services/partTwo')) return { PART_TWO_ENABLED: false, partTwoTransport: {} };
       if (id.endsWith('/PartOneLabelCapture')) return { PartOneLabelCapture: 'PartOneLabelCapture', PART_ONE_LOCAL_CAPTURE_AVAILABLE: false, purgeLocalCaptureFile() {} };
       if (id.endsWith('/PartOneResultSheet')) return { PartOneResultSheet: 'PartOneResultSheet' };
       if (id.endsWith('/PartOneSavedProducts')) return { PartOneSavedProducts: 'PartOneSavedProducts' };
-      if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: { addEventListener: () => ({ remove() {} }) }, Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
+      if (id === 'react-native') return { InputAccessoryView:'InputAccessoryView',Platform:{OS:'ios'},View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', useWindowDimensions:()=>({width:402,height:874}), AccessibilityInfo:{isScreenReaderEnabled:async()=>false,announceForAccessibility(){}}, AppState: {currentState:'active', addEventListener: () => ({ remove() {} }) }, Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
       if (id.startsWith('@/src/components/ui/')) { const component = id.slice(id.lastIndexOf('/') + 1); return { [component]: component }; }
       if (id.endsWith('/CatalogProductSearch')) return { CatalogProductSearch: ({ label, onSelect, onQueryChange }: { label?: string; onSelect: (product: { productId: string; brand: string; name: string }) => void; onQueryChange?: (query: string) => void }) => React.createElement('button', { label, onPress: () => onSelect({ productId: 'catalog-product', brand: 'CeraVe', name: 'Moisturizer' }), onQueryChange }) };
       if (id.startsWith('@/') || id.startsWith('.')) {
         const target = id.startsWith('@/') ? resolve(root, id.slice(2)) : resolve(dirname(path), id);
-        const full = /\.(tsx?|js)$/.test(target) ? target : target + (target.includes('/components/') ? '.tsx' : '.ts');
+        const full = /\.(tsx?|js)$/.test(target) ? target : ['.ts','.tsx'].map(extension=>target+extension).find(existsSync) ?? target+'.ts';
         return load(full);
       }
       return nativeRequire(id);

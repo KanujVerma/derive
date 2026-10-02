@@ -211,3 +211,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/part-two/deno.json"
 entrypoint = "./functions/part-two/index.ts"
+
+[functions.part-three]
+enabled = true
+verify_jwt = false
+import_map = "./functions/part-three/deno.json"
+entrypoint = "./functions/part-three/index.ts"

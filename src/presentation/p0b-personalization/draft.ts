@@ -8,7 +8,7 @@ export type Intent = 'add' | 'replace' | 'check_current';
 export type SafetyField = 'pregnancy' | 'trying' | 'nursing';
 export interface SafetyRelevance { fields: readonly SafetyField[]; evidenceReason: string }
 export interface ContextDraft {
-  intent: Answer<Intent>; primaryGoal: Answer<Goal>; secondaryGoals: Goal[];
+  intent: Answer<Intent>; primaryGoal: Answer<Goal> | { state: 'unsure' }; secondaryGoals: Goal[];
   behavior: Answer<'dry_tight' | 'balanced' | 'combination' | 'oily' | 'unsure'>;
   reactivity: Answer<'reacts_easily' | 'generally_tolerates' | 'unsure'>;
   treatments: ListAnswer<Treatment>; sensitivities: ListAnswer<string>;
@@ -52,7 +52,7 @@ export function validateRoutineDraft(draft: RoutineDraft): string | null {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id)) return 'Each routine item needs a valid UUID.';
     if (!item.reference.label.trim()) return 'Enter a product name.';
     if (item.reference.kind === 'catalog' && item.reference.formulaVersionId && !item.reference.variantId) return 'A formula reference needs its variant reference.';
-    if (item.frequency.kind === 'exact' && (!Number.isInteger(item.frequency.count) || item.frequency.count < 1 || item.frequency.count > 100)) return 'Use an exact count from 1 to 100.';
+    if (item.frequency.kind === 'exact' && (!Number.isFinite(item.frequency.count) || item.frequency.count <= 0 || item.frequency.count > 100)) return 'Use an exact count from 1 to 100.';
   }
   if (draft.items.some(item => item.status === null)) return 'Choose a use status for each product.';
   return null;

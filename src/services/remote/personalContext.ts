@@ -31,3 +31,23 @@ export async function writePersonalContext(request:Exclude<PersonalContextReques
   if (!('replayed' in value) || typeof value.replayed !== 'boolean' || !('revision' in value) || !value.revision || typeof value.revision !== 'object') throw new PersonalContextRemoteError('INVALID_CONTEXT_RESPONSE');
   return value as PersonalContextWriteResult;
 }
+
+/** V2 writes use the same owner-authenticated Edge entry point; retain IDs for retry. */
+export async function getPersonalContextV2(client:FunctionClient = supabase as FunctionClient):Promise<import('../../contracts/PersonalContextV2.ts').PersonalContextV2> {
+  const {data,error}=await client.functions.invoke('personal-context',{body:{operation:'read_context_v2'}});
+  if(error)throw new PersonalContextRemoteError('CONTEXT_UNAVAILABLE');
+  const {personalContextV2Schema}=await import('../../contracts/PersonalContextV2Schema.ts');
+  const parsed=personalContextV2Schema.safeParse(data);if(!parsed.success)throw new PersonalContextRemoteError('INVALID_CONTEXT_RESPONSE');return parsed.data;
+}
+export async function writePersonalContextV2(request:Exclude<import('../../contracts/PersonalContextV2.ts').PersonalContextV2Request,{operation:'read_context_v2'}>,client:FunctionClient = supabase as FunctionClient):Promise<import('../../contracts/PersonalContextV2.ts').SetupWriteResult | import('../../contracts/PersonalContextV2.ts').ContextDeleteResult> {
+  const {data,error}=await client.functions.invoke('personal-context',{body:request});
+  if(error){let code='CONTEXT_UNAVAILABLE';try{const response=(error as {context?:Response}).context;if(response){const body=await response.clone().json();if(typeof body?.code==='string')code=body.code;}}catch{}throw new PersonalContextRemoteError(code);}
+  const {setupWriteResultSchema,contextDeleteResultSchema}=await import('../../contracts/PersonalContextV2Schema.ts');
+  const parsed=request.operation==='save_setup'?setupWriteResultSchema.safeParse(data):contextDeleteResultSchema.safeParse(data);
+  if(!parsed.success)throw new PersonalContextRemoteError('INVALID_CONTEXT_RESPONSE');
+  if(request.operation==='save_setup' && 'revisionReferences' in parsed.data){
+    const refs=parsed.data.revisionReferences;
+    for(const field of ['experiences','preferences','assessments','notes'] as const){const expected=request.setup[field].map(item=>item.id).sort(),actual=Object.keys(refs[field]).sort();if(JSON.stringify(expected)!==JSON.stringify(actual))throw new PersonalContextRemoteError('INVALID_CONTEXT_RESPONSE');}
+  }
+  return parsed.data;
+}

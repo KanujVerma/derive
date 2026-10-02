@@ -6,6 +6,10 @@ import { colors, spacing, typography } from '../../../constants/theme';
 import type { PartOneView } from '../../../presentation/part-one/resultController';
 import { PartTwoIngredients, PartTwoSavedIngredients } from '../part-two/PartTwoIngredients';
 import type { PartTwoSaveGuard } from '../../../services/partTwoClient';
+import { usePartThreeCheck, type PartThreePorts } from '../part-three/usePartThreeCheck';
+import { PartThreeSummary } from '../part-three/PartThreeSummary';
+import { PartThreeDetails } from '../part-three/PartThreeDetails';
+import { PartThreeControls } from '../part-three/PartThreeControls';
 import type { PartTwoView, PartTwoTransport } from '../../../presentation/part-two/controller';
 
 export function partOneStatus(view: PartOneView, now = Date.now()): string {
@@ -21,7 +25,7 @@ export function partOneStatus(view: PartOneView, now = Date.now()): string {
 }
 
 /** Uses the existing sheet. Revision updates keep its mounted scroll and detent. */
-export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave, onCapture, onSearch, onFullChange, onScroll, localDraft, inline = true, savedInterpretationId, interpretationCaptureSessionId = null, ingredientEnabled, ingredientTransport }: {
+export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave, onCapture, onSearch, onFullChange, onScroll, localDraft, inline = true, savedInterpretationId, interpretationCaptureSessionId = null, ingredientEnabled, ingredientTransport, personalEnabled, personalPorts, savedAssessmentId }: {
   view: PartOneView; onClose: () => void; onRefresh: () => void;
   onSelect: (id: string) => void; onSave: (details?: PartTwoSaveGuard) => void; onCapture?: () => void;
   onSearch: () => void; onFullChange: (full: boolean) => void;
@@ -32,6 +36,9 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   interpretationCaptureSessionId?: string | null;
   ingredientEnabled?: boolean;
   ingredientTransport?: PartTwoTransport;
+  personalEnabled?: boolean;
+  personalPorts?: PartThreePorts;
+  savedAssessmentId?: string | null;
 }) {
   const r = view.result;
   const [now, setNow] = useState(Date.now);
@@ -77,11 +84,13 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   const status = currentRefusal || currentDetails?.result?.state === 'pending' && sourceUnavailable
     ? 'Ingredient evidence unavailable'
     : currentDetails?.result?.state === 'parse_limit' ? currentDetails.result.permittedText?.sections.length ? 'Ingredient wording remains available. Details need review.' : 'Ingredient details need review.' : partOneSummary;
+  const personal = usePartThreeCheck({ ownerId: view.owner, details: currentDetails, enabled: personalEnabled, ports: personalPorts, savedAssessmentId });
   const originalSections = !expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
     <Text accessibilityRole="header">{({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[section.kind]}</Text><Text selectable>{section.text}</Text>
   </View>);
   return <ResultSheetSurface inline={inline} presentationKey={`part-one:${r?.scanId ?? 'pending'}`}
-    onClose={onClose} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
+    onClose={onClose} onInteraction={personal.interact} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
+      {personal.enabled && <PartThreeSummary view={personal.view} />}
       {view.loading && <ActivityIndicator color={colors.brand} />}
       {identity?.image && current(identity.image.expiresAt) && <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 64, height: 80 }} resizeMode="contain" />}
       {identity && <><Text>{identity.brand}</Text><Text accessibilityRole="header" style={{ fontSize: typography.sizes.sectionTitle, color: colors.ink }}>{identity.name}</Text><Text>{identity.variantText}</Text></>}
@@ -91,6 +100,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       {r && ['queued', 'running'].includes(r.work) && <Text>Lookup is pending. You can close and reopen this result.</Text>}
       {view.error && <Text accessibilityRole="alert">{view.error}</Text>}
     </View>} compactActions={<View style={{ gap: spacing.sm }}>
+      <PartThreeControls check={personal} />
       {r?.allowedActions.includes('choose_candidate') && candidates.map(candidate => <View key={candidate.id} style={{ gap: spacing.xs }}>
         <Text>Is this the product?</Text><Text>{candidate.brand} {candidate.name} {candidate.variantText}</Text>
         <Button label="Yes, this product" accessibilityHint={`Select ${candidate.name}. This confirms identity only.`} variant="outline" onPress={() => onSelect(candidate.id)} />
@@ -118,6 +128,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
         const url = source.url; if (url && new URL(url).protocol === 'https:') void Linking.openURL(url).catch(() => {});
       }} />}
     </View>)}
+    {personal.enabled && <PartThreeDetails view={personal.view} />}
     {r?.display.limitations.map((limitation, i) => <Text key={i}>{limitation}</Text>)}
   </ResultSheetSurface>;
 }
