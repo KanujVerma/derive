@@ -70,6 +70,18 @@ test('saved reopen uses pinned saved_basis and current context, restores intent 
   f.logout();nodes=f.sheet.render();assert(!textContent(nodes).includes('Synthetic face lotion'));
  }finally{f.sheet.dispose();}
 });
+test('choice changes hide former authority while retaining measured summary space above touch targets',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true);try{
+  for(let i=0;i<6;i++){f.sheet.render();await settle();}
+  const before=f.sheet.render();const summary=before.find(n=>n.type==='Surface')!.props.summary;
+  summary.props.onLayout({nativeEvent:{layout:{height:300}}});
+  press(control(before,'Compare or describe this check'));press(control(f.sheet.render(),'Cleansing'));
+  const changed=f.sheet.render();assert(!textContent(changed).split('Current assessment')[1].includes('Worth considering'));
+  assert.equal(changed.find(n=>n.type==='Surface')!.props.summary.props.style.minHeight,300);
+  for(let i=0;i<4;i++){f.sheet.render();await settle();}
+  assert.equal(f.sheet.render().find(n=>n.type==='Surface')!.props.summary.props.style.minHeight,300);
+ }finally{f.sheet.dispose();}
+});
 test('persistent saved index reaches product-linked and standalone assessments after restart using owned scan only',async()=>{
  const owner=p2id(3),savedAt=p3input().now;const record={saveId:p2id(44),captureSessionId:null,result:{scanId:p2id(1),resultRevision:1,declarationState:'partial',freshness:{state:'fresh',expiresAt:'2099-01-01T00:00:00Z'},display:{selectedIdentity:{name:'Synthetic saved product',expiresAt:'2099-01-01T00:00:00Z'}}}};
  const items=[{savedAssessmentId:p2id(88),scanId:p2id(1),savedAt},{savedAssessmentId:p2id(89),scanId:p2id(99),savedAt:'2026-10-01T10:00:00Z'}];

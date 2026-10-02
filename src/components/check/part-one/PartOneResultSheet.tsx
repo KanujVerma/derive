@@ -89,7 +89,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
     <Text accessibilityRole="header">{({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[section.kind]}</Text><Text selectable>{section.text}</Text>
   </View>);
   return <ResultSheetSurface inline={inline} presentationKey={`part-one:${r?.scanId ?? 'pending'}`}
-    onClose={onClose} onInteraction={personal.interact} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
+    onClose={onClose} onInteraction={personal.interact} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: personal.enabled || currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
       {personal.enabled && <PartThreeSummary view={personal.view} />}
       {view.loading && <ActivityIndicator color={colors.brand} />}
       {identity?.image && current(identity.image.expiresAt) && <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 64, height: 80 }} resizeMode="contain" />}
