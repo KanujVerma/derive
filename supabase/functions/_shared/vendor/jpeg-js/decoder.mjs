@@ -794,7 +794,7 @@ var JpegImage = (function jpegImage() {
             readUint16() // skip data length
             readUint16() // Ignore this data since it represents the image height
             break;
-            
+
           case 0xFFDA: // SOS (Start of Scan)
             var scanLength = readUint16();
             var selectorsCount = data[offset++];
@@ -1129,8 +1129,8 @@ function decode(jpegData, userOpts = {}) {
     if (err instanceof RangeError) {
       throw new Error("Could not allocate enough memory for the image. " +
                       "Required: " + bytesNeeded);
-    } 
-    
+    }
+
     if (err instanceof ReferenceError) {
       if (err.message === "Buffer is not defined") {
         throw new Error("Buffer is not globally defined in this environment. " +
