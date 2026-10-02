@@ -64,13 +64,13 @@ export function PartOneSavedProducts({ ownerId }: { ownerId: string }) {
       <Button label="Open saved private label note" variant="outline" onPress={() => { setSelected(null); void privateController.recover(ownerId, note.capture.captureSessionId); }} />
       <Text>Saved private package context · {note.boundResult?.declarationState === 'accepted' ? 'server review recorded; reopen for current rights and freshness' : 'partial or uncertain'}</Text>
     </View>)}
-    {PART_ONE_PRIVATE_ENABLED && !selected && privateState.ownerId === ownerId && privateState.result && <PartOneResultSheet inline={false}
+    {PART_ONE_PRIVATE_ENABLED && !selected && privateState.ownerId === ownerId && privateState.result && <PartOneResultSheet inline={false} interpretationCaptureSessionId={privateState.capture?.captureSessionId}
       view={{ owner: ownerId, result: privateState.result, loading: false, error: null, saved: true, scrollOffset: 0 }}
       localDraft={<PartOnePrivateCapturePanel controller={privateController} ownerId={ownerId} />}
       onClose={() => privateController.close()} onRefresh={() => { if (privateState.capture) void privateController.recover(ownerId, privateState.capture.captureSessionId); }}
       onSelect={() => {}} onSave={() => {}} onSearch={() => privateController.close()} onFullChange={() => {}} />}
     {PART_ONE_PRIVATE_ENABLED && !selected && !privateState.result && privateState.stage !== 'temporary' && <PartOnePrivateCapturePanel controller={privateController} ownerId={ownerId} />}
-    {selected && <PartOneResultSheet inline={false} view={{ owner: ownerId, result: privateState.stage === 'removing' || privateReadBlocked ? null : selected.result, loading: privateState.stage === 'removing', error: privateReadBlocked ? privateState.error : null, saved: true, scrollOffset: 0 }}
+    {selected && <PartOneResultSheet inline={false} savedInterpretationId={selected.saveId} interpretationCaptureSessionId={selected.captureSessionId} view={{ owner: ownerId, result: privateState.stage === 'removing' || privateReadBlocked ? null : selected.result, loading: privateState.stage === 'removing', error: privateReadBlocked ? privateState.error : null, saved: true, scrollOffset: 0 }}
       localDraft={PART_ONE_PRIVATE_ENABLED && selected.captureSessionId ? <PartOnePrivateCapturePanel controller={privateController} ownerId={ownerId} /> : undefined}
       onClose={() => { epoch.current++; setSelected(null); privateController.close(); }} onRefresh={() => void open(selected.saveId)} onSelect={() => {}}
       onSave={() => {}} onSearch={() => { setSelected(null); privateController.close(); }} onFullChange={() => {}} />}

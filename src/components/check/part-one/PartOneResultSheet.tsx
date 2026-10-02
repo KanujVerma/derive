@@ -4,6 +4,9 @@ import { ResultSheetSurface } from '../result-sheet/ResultSheetSurface';
 import { Button } from '../../ui/Button';
 import { colors, spacing, typography } from '../../../constants/theme';
 import type { PartOneView } from '../../../presentation/part-one/resultController';
+import { PartTwoIngredients, PartTwoSavedIngredients } from '../part-two/PartTwoIngredients';
+import type { PartTwoSaveGuard } from '../../../services/partTwoClient';
+import type { PartTwoView } from '../../../presentation/part-two/controller';
 
 export function partOneStatus(view: PartOneView, now = Date.now()): string {
   const r = view.result;
@@ -18,16 +21,19 @@ export function partOneStatus(view: PartOneView, now = Date.now()): string {
 }
 
 /** Uses the existing sheet. Revision updates keep its mounted scroll and detent. */
-export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave, onCapture, onSearch, onFullChange, onScroll, localDraft, inline = true }: {
+export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave, onCapture, onSearch, onFullChange, onScroll, localDraft, inline = true, savedInterpretationId, interpretationCaptureSessionId = null }: {
   view: PartOneView; onClose: () => void; onRefresh: () => void;
-  onSelect: (id: string) => void; onSave: () => void; onCapture?: () => void;
+  onSelect: (id: string) => void; onSave: (details?: PartTwoSaveGuard) => void; onCapture?: () => void;
   onSearch: () => void; onFullChange: (full: boolean) => void;
   onScroll?: (offset: number) => void;
   inline?: boolean;
   localDraft?: React.ReactNode;
+  savedInterpretationId?: string;
+  interpretationCaptureSessionId?: string | null;
 }) {
   const r = view.result;
   const [now, setNow] = useState(Date.now);
+  const [details, setDetails] = useState<PartTwoView | null>(null);
   const clock = Math.max(now, Date.now());
   const expiresAt = r?.freshness.expiresAt;
   // Every visible field owns its expiry; readiness never extends display rights.
@@ -70,7 +76,12 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       </View>)}
       {!expiredIdentity && !expired && !(expiredFields && r?.declarationState === 'accepted') && r?.snapshotId && r.allowedActions.some(action => action === 'save' || action === 'save_partial') && <Button
         label={view.saved ? 'Saved' : r.declarationState === 'accepted' ? 'Save product and evidence' : 'Save product without verified ingredients'}
-        disabled={view.saved} variant="outline" onPress={onSave} />}
+        disabled={view.saved} variant="outline" onPress={() => {
+          const d = details?.result, t = details?.target;
+          const guard = d?.state === 'ready' && t && t.ownerId === view.owner && t.scanId === r.scanId && t.captureSessionId === interpretationCaptureSessionId && t.generation === r.generation && t.evidenceRevision === r.resultRevision && Date.parse(d.expiresAt) > Date.now() ? { bindingKey: d.bindingKey, expectedPartTwoRevision: d.resultRevision } : undefined;
+          onSave(guard);
+        }} />}
+      {r?.snapshotId && !r.declarationId && <Text>Saves the product only; this photo reading is not saved.</Text>}
       {onCapture && r && (expired || expiredFields || r.declarationState !== 'accepted') && <Button label="Scan ingredients" variant="outline" onPress={onCapture} />}
       {r?.allowedActions.includes('retry') && <Button label="Check lookup status" variant="ghost" onPress={onRefresh} />}
       {r?.allowedActions.includes('rescan') && <Button label="Rescan" variant="ghost" onPress={onClose} />}
@@ -80,6 +91,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
     {!expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
       <Text accessibilityRole="header">{section.kind === 'may_contain' ? 'May contain' : section.kind}</Text><Text selectable>{section.text}</Text>
     </View>)}
+    {view.owner && r && !expired && (savedInterpretationId ? <PartTwoSavedIngredients saveId={savedInterpretationId} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: interpretationCaptureSessionId, generation: r.generation, evidenceRevision: r.resultRevision }} /> : !interpretationCaptureSessionId && <PartTwoIngredients onView={setDetails} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: null, generation: r.generation, evidenceRevision: r.resultRevision }} />)}
     {!expired && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
       <Text>{source.label} · Observed {source.observedAt.slice(0, 10)}</Text>
       {source.url && <Button label={`View source: ${source.label}`} variant="ghost" onPress={() => {

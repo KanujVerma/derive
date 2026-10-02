@@ -35,7 +35,9 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     function requireModule(id: string): any {
       if (options.modules && id in options.modules) return options.modules[id];
       if (id === 'react') return react;
+      if (id === 'expo-haptics') return { impactAsync: async () => {}, notificationAsync: async () => {}, selectionAsync: async () => {}, ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' }, NotificationFeedbackType: { Success: 'Success', Error: 'Error' } };
       if (id.endsWith('/services/partOne')) return { PART_ONE_ENABLED: false, partOneTransport: {} };
+      if (id.endsWith('/services/partTwo')) return { PART_TWO_ENABLED: false, partTwoTransport: {} };
       if (id.endsWith('/PartOneLabelCapture')) return { PartOneLabelCapture: 'PartOneLabelCapture', PART_ONE_LOCAL_CAPTURE_AVAILABLE: false, purgeLocalCaptureFile() {} };
       if (id.endsWith('/PartOneResultSheet')) return { PartOneResultSheet: 'PartOneResultSheet' };
       if (id.endsWith('/PartOneSavedProducts')) return { PartOneSavedProducts: 'PartOneSavedProducts' };

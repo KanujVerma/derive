@@ -3,6 +3,7 @@ import type { PartOneTransport } from '../presentation/part-one/resultController
 import { supabase } from './supabase';
 import { publicEnvironment } from '../config/environment';
 import { z } from 'zod';
+import { savePartTwoInterpretation } from './partTwoClient';
 
 // Source activation is local-only. Hosted source/retention gates have not been approved.
 export const PART_ONE_ENABLED = typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PART_ONE_ENABLED === 'true'
@@ -22,7 +23,10 @@ export const partOneTransport: PartOneTransport = {
   subscribe: async id => ScanResultSchema.parse(await call(`/scans/${id}/subscriptions`, 'POST', {})),
   unsubscribe: async id => { await call(`/subscriptions/${id}`, 'DELETE'); },
   select: async (id: string, request: SelectionRequest) => ScanResultSchema.parse(await call(`/scans/${id}/selection`, 'POST', request)),
-  save: async (request: SaveRequest) => { const result = await call('/saves', 'POST', request); return { saveId: result.saveId }; },
+  save: async (request: SaveRequest, details) => {
+    if (details && PART_ONE_ENABLED && process.env.EXPO_PUBLIC_PART_TWO_ENABLED === 'true' && supabase) return savePartTwoInterpretation(request, details, (path, body) => supabase!.functions.invoke(path, { method: 'POST', body, headers: { 'Content-Type': 'application/json' } }));
+    const result = await call('/saves', 'POST', request); return { saveId: result.saveId };
+  },
   capture: async (id, generation, revision) => CaptureSessionSchema.parse(await call(`/scans/${id}/captures`, 'POST', { expectedGeneration: generation, expectedResultRevision: revision })),
 };
 

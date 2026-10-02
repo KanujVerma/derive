@@ -204,3 +204,10 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/part-one/deno.json"
 entrypoint = "./functions/part-one/index.ts"
+
+# Part 2 checks Auth bearer and resolves every binding with that user's JWT.
+[functions.part-two]
+enabled = true
+verify_jwt = false
+import_map = "./functions/part-two/deno.json"
+entrypoint = "./functions/part-two/index.ts"

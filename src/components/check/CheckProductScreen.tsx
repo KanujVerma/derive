@@ -1145,7 +1145,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     const partOneVisible = PART_ONE_ENABLED && Boolean(partOneView.owner === liveCheckOwner && (partOneView.loading || partOneView.result || partOneView.error));
     const privateEvidenceBlocked = privateCaptureProjectionBlocked(privateState, partOneView.result, liveCheckOwner, labelBinding);
     const privateReadId = privateState.capture?.captureSessionId ?? (labelBinding?.ownerId === liveCheckOwner ? labelBinding?.captureSessionId : null);
-    const partOneSheet = partOneVisible ? <PartOneResultSheet view={(['removing','removed'].includes(privateState.stage) || privateEvidenceBlocked) && partOneView.result?.scope === 'private_package' ? { ...partOneView, result: null, loading: privateState.stage === 'removing', error: privateState.stage === 'removed' ? 'Private label evidence was removed. Refresh product evidence.' : privateState.error } : partOneView} onClose={dismissCameraResult}
+    const partOneSheet = partOneVisible ? <PartOneResultSheet interpretationCaptureSessionId={partOneView.result?.scope === 'private_package' ? privateReadId : null} view={(['removing','removed'].includes(privateState.stage) || privateEvidenceBlocked) && partOneView.result?.scope === 'private_package' ? { ...partOneView, result: null, loading: privateState.stage === 'removing', error: privateState.stage === 'removed' ? 'Private label evidence was removed. Refresh product evidence.' : privateState.error } : partOneView} onClose={dismissCameraResult}
       localDraft={labelBinding && <><PartOneLocalDraftSummary draft={labelDraft} binding={labelBinding}
         onReview={() => { if (labelDraft.read(labelBinding)) setLabelCaptureOpen(true); }}
         onRemove={privateWorking ? undefined : () => { privateCapture.close(); labelDraft.remove(); setLabelBinding(null); setLabelCaptureOpen(false); }} />
@@ -1154,7 +1154,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
         if (privateEvidenceBlocked && privateReadId && currentLiveCheckOwner() === liveCheckOwner) void privateCapture.recover(liveCheckOwner, privateReadId);
       }); }}
       onSelect={id => { privateCapture.close(); labelDraft.endSheet(); setLabelBinding(null); if (liveCheckOwner) void partOneController.select(liveCheckOwner, id); }}
-      onSave={() => { if (liveCheckOwner && partOneView.result) void partOneController.save(liveCheckOwner, `save:${partOneView.result.scanId}:${partOneView.result.generation}:${partOneView.result.resultRevision}`); }}
+      onSave={details => { if (liveCheckOwner && partOneView.result) void partOneController.save(liveCheckOwner, `save:${partOneView.result.scanId}:${partOneView.result.generation}:${partOneView.result.resultRevision}${details ? `:details:${details.expectedPartTwoRevision}` : ''}`, details); }}
       onSearch={() => { partOneController.close(); privateCapture.close(); labelDraft.endSheet(); openCameraSearch(); }} onFullChange={setFullResult} onScroll={offset => partOneController.setScroll(offset)}
       onCapture={PART_ONE_LOCAL_CAPTURE_AVAILABLE ? () => {
         const owner = currentLiveCheckOwner(); const result = partOneController.getView().result;

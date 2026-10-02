@@ -1,4 +1,5 @@
 import { ScanResultSchema, type ScanRequest, type ScanResult, type SaveRequest, type SelectionRequest, type CaptureSession } from '../../contracts/PartOne.ts';
+import type { PartTwoSaveGuard } from '../../services/partTwoClient.ts';
 
 export interface PartOneTransport {
   scan(request: ScanRequest): Promise<ScanResult>;
@@ -6,7 +7,7 @@ export interface PartOneTransport {
   subscribe(scanId: string): Promise<ScanResult>;
   unsubscribe(id: string): Promise<void>;
   select(scanId: string, request: SelectionRequest): Promise<ScanResult>;
-  save(request: SaveRequest): Promise<{ saveId: string }>;
+  save(request: SaveRequest, details?: PartTwoSaveGuard): Promise<{ saveId: string }>;
   capture(scanId: string, generation: number, revision: number): Promise<CaptureSession>;
 }
 export type PartOneView = { owner: string | null; result: ScanResult | null; loading: boolean; error: string | null; saved: boolean; scrollOffset: number };
@@ -42,14 +43,14 @@ export function createPartOneResultController(transport: PartOneTransport, chang
       const r = view.result; if (!r || owner !== view.owner || !r.candidateIds.includes(candidateId)) return Promise.resolve(false);
       return run(owner, () => transport.select(r.scanId, { candidateId, expectedGeneration: r.generation, expectedResultRevision: r.resultRevision }), false);
     },
-    async save(owner: string, idempotencyKey: string) {
+    async save(owner: string, idempotencyKey: string, details?: PartTwoSaveGuard) {
       const r = view.result; const token = epoch;
       if (!r?.snapshotId || owner !== view.owner || !r.allowedActions.some(x => x === 'save' || x === 'save_partial')) return false;
       try {
-        await transport.save({ idempotencyKey, scanId: r.scanId, expectedGeneration: r.generation, expectedResultRevision: r.resultRevision, selectedSnapshotId: r.snapshotId, selectedDeclarationId: r.declarationId });
+        await transport.save({ idempotencyKey, scanId: r.scanId, expectedGeneration: r.generation, expectedResultRevision: r.resultRevision, selectedSnapshotId: r.snapshotId, selectedDeclarationId: r.declarationId }, details);
         if (token !== epoch || owner !== view.owner || view.result?.resultRevision !== r.resultRevision) return false;
         view = { ...view, saved: true, error: null }; emit(); return true;
-      } catch { if (token === epoch && owner === view.owner) { view = { ...view, error: 'This result changed or could not be saved. Review the current evidence and try again.' }; emit(); await this.refresh(owner); } return false; }
+      } catch { if (token === epoch && owner === view.owner) { view = { ...view, error: details ? 'Details changed. Review and save again.' : 'This result changed or could not be saved. Review the current evidence and try again.' }; emit(); await this.refresh(owner); } return false; }
     },
     capture(owner: string) { const r = view.result; if (!r || owner !== view.owner) throw new Error('Capture binding unavailable'); return transport.capture(r.scanId, r.generation, r.resultRevision); },
     setScroll(offset: number) { view = { ...view, scrollOffset: Math.max(0, offset) }; },

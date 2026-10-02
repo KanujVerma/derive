@@ -5,6 +5,7 @@ import { privateEditReplacement, privateSourceEditChain, privateRecoveryRetentio
 import type { PrivateCaptureController } from '../../../presentation/part-one/privateCaptureController';
 import type { CaptureRecovery } from '../../../contracts/PartOnePrivate';
 import type { DraftLineRef } from '../../../presentation/part-one/captureReview';
+import { PartTwoPrivateInterpretation } from '../part-two/PartTwoPrivateInterpretation';
 const processing = (stage: string) => ['checking_policy','uploading','committing','saving','recovering','removing'].includes(stage);
 const sectionLabels = { ingredients: 'Ingredients read from label', active: 'Active ingredients read from label', inactive: 'Inactive ingredients read from label', may_contain: 'May contain · read from label' };
 const associations = { unknown: 'This label has not been associated with a catalog product.', candidate: 'Possible product association · needs review.',
@@ -75,6 +76,7 @@ export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding
       {labelFacts.association && <Text style={styles.body}>{associations[labelFacts.association]}</Text>}
       {labelFacts.sections.map(section => <View key={section.id} style={styles.group}><Text accessibilityRole="header" style={styles.heading}>{sectionLabels[section.kind]}</Text>
         <Text selectable accessibilityLabel={`Private label reading: ${sectionLabels[section.kind]}`} style={styles.body}>{section.text}</Text></View>)}
+      {recovery && projectedResult && <PartTwoPrivateInterpretation result={projectedResult} target={{ ownerId, scanId: recovery.capture.scanId, captureSessionId: recovery.capture.captureSessionId, generation: recovery.capture.generation, evidenceRevision: projectedResult.resultRevision }} />}
       {labelFacts.capturedText.map(entry => <View key={entry.id} style={styles.group}><Text style={styles.body}>{entry.attributedEdit ? 'Your private correction · extracted text' : 'Text recognized from the uploaded label'}</Text>
         <Text selectable style={styles.body}>{entry.text}</Text></View>)}
       {labelFacts.gaps.length > 0 && <Text style={styles.body}>Additional label coverage or package association evidence is needed. Missing regions and unobserved text remain unknown.</Text>}
