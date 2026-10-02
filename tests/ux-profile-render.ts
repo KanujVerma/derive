@@ -51,6 +51,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       if (id.endsWith('/services/partTwo')) return { PART_TWO_ENABLED: false, partTwoTransport: {} };
       if (id.endsWith('/PartOneLabelCapture')) return { PartOneLabelCapture: 'PartOneLabelCapture', PART_ONE_LOCAL_CAPTURE_AVAILABLE: false, purgeLocalCaptureFile() {} };
       if (id.endsWith('/PartOneResultSheet')) return { PartOneResultSheet: 'PartOneResultSheet' };
+      if (id.endsWith('/PartThreeSavedAssessmentSheet')) return { PartThreeSavedAssessmentSheet: 'PartThreeSavedAssessmentSheet' };
       if (id.endsWith('/PartOneSavedProducts')) return { PartOneSavedProducts: 'PartOneSavedProducts' };
       if (id === 'react-native') return { InputAccessoryView:'InputAccessoryView',Platform:{OS:'ios'},View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', useWindowDimensions:()=>({width:402,height:874}), AccessibilityInfo:{isScreenReaderEnabled:async()=>false,announceForAccessibility(){}}, AppState: {currentState:'active', addEventListener: () => ({ remove() {} }) }, Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
