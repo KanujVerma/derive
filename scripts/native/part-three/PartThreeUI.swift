@@ -3,8 +3,9 @@ final class PartThreeUI: XCTestCase {
  let app=XCUIApplication(bundleIdentifier:"com.derive.skincare")
  func element(_ label:String)->XCUIElement {app.descendants(matching:.any).matching(NSPredicate(format:"label == %@",label)).firstMatch}
  func contains(_ label:String)->XCUIElement {app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@",label)).firstMatch}
- func scroll()->XCUIElement{let sheet=app.scrollViews["result-sheet-scroll"].firstMatch;return sheet.exists ? sheet : app.scrollViews.firstMatch}
+ func scroll()->XCUIElement{let region=app.otherElements["result-sheet-scroll"].firstMatch;let sheet=region.scrollViews.firstMatch;if sheet.exists{return sheet};let views=app.scrollViews;return views.count>1 ? views.element(boundBy:views.count-1) : views.firstMatch}
  func tap(_ label:String){let target=element(label);if app.keyboards.firstMatch.exists && scroll().exists{scroll().swipeDown()};for _ in 0..<30{if target.exists && target.isHittable{target.tap();return};if scroll().exists{if target.exists && target.frame.midY < scroll().frame.minY+12{scroll().swipeDown()}else{scroll().swipeUp()}}};XCTFail("Unreachable: \(label)\n\(app.debugDescription)")}
+ func expand(){let handle=element("Product result");let ready=XCTNSPredicateExpectation(predicate:NSPredicate{_,_ in let f=handle.frame;return !f.isEmpty && !f.isInfinite && f.intersects(self.app.frame)},object:handle);XCTAssertEqual(XCTWaiter.wait(for:[ready],timeout:15),.completed,"Sheet handle must have an on-screen frame: \(app.debugDescription)");print("SHEET_GEOMETRY \(handle.frame) \(handle.value ?? "none")");if (handle.value as? String) != "Expanded"{tap("Product result")};XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"value == %@","Expanded"),object:handle)],timeout:10),.completed)}
  func choose(_ label:String){tap(label);XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"value CONTAINS %@ AND NOT value CONTAINS %@","checked","unchecked"),object:element(label))],timeout:10),.completed,"Choice did not select: \(label)")}
  func shot(_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
  func close(){tap("Close result");XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Close result"))],timeout:10),.completed)}
@@ -12,7 +13,7 @@ final class PartThreeUI: XCTestCase {
   continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
   if element("Close result").exists{close()}
   XCTAssertTrue(element("Load Part3 local fixture").waitForExistence(timeout:20),app.debugDescription);tap("Load Part3 local fixture")
-  XCTAssertTrue(element("Product result").waitForExistence(timeout:30));tap("Product result")
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:30));expand()
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:35),app.debugDescription);shot("part-three-first-card-bounded-insufficiency")
   tap("Compare or describe this check");tap("Original synthetic current cream")
   XCTAssertTrue(element("Replace this item").waitForExistence(timeout:30),app.debugDescription);shot("part-three-one-material-intent-question")
@@ -23,7 +24,7 @@ final class PartThreeUI: XCTestCase {
   tap("Close comparison choices");tap("Save this assessment")
   XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription);shot("part-three-exact-assessment-save")
   tap("Ingredient details: Glycerin");XCTAssertTrue(contains("reference humectant role").waitForExistence(timeout:15),app.debugDescription);shot("part-three-unaffected-ingredient-detail");tap("Close ingredient detail")
-  close();tap("Reopen Part3 saved assessment");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));tap("Product result")
+  close();tap("Reopen Part3 saved assessment");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand()
   XCTAssertTrue(contains("Assessment when saved").waitForExistence(timeout:20),app.debugDescription)
   XCTAssertTrue(contains("Current assessment").exists);XCTAssertTrue(contains("Worth considering").exists);XCTAssertFalse(element("Replace this item").exists);shot("part-three-reopened-history-versus-current")
   close();tap("Take synthetic client offline");tap("Reopen Part3 saved assessment")
@@ -31,7 +32,7 @@ final class PartThreeUI: XCTestCase {
   // removed by closing; no current green or saved prose may return offline.
   XCTAssertFalse(contains("Worth considering").exists);shot("part-three-native-offline-no-current-authority")
   tap("Withdraw Part3 purpose field");XCTAssertTrue(contains("Synthetic purpose field withdrawn").waitForExistence(timeout:15));tap("Reconnect synthetic client");tap("Reopen Part3 saved assessment")
-  XCTAssertTrue(element("Product result").waitForExistence(timeout:20));tap("Product result")
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand()
   XCTAssertTrue(contains("The earlier personal assessment is no longer available.").waitForExistence(timeout:30),app.debugDescription)
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertFalse(contains("Worth considering").exists);XCTAssertFalse(contains("Its label matches the step").exists)
   tap("Ingredient details: Glycerin");XCTAssertTrue(contains("reference humectant role").waitForExistence(timeout:20),app.debugDescription);shot("part-three-withdrawn-purpose-safe-ingredient-survival");tap("Close ingredient detail")
@@ -71,7 +72,7 @@ final class PartThreeUI: XCTestCase {
   let read=try controlRequest("/setup-result");XCTAssertEqual(read["revision"] as? Int,2);XCTAssertEqual((read["preferences"] as? [[String:Any]])?.count,1);XCTAssertEqual((read["preferences"] as? [[String:Any]])?.first?["kind"] as? String,"no_extra_step");XCTAssertEqual((read["current"] as? [[String:Any]])?.first?["name"] as? String,"Synthetic setup current lotion");XCTAssertEqual(read["noteCount"] as? Int,1);shot("part-three-native-stale-context-draft-retained");tap("Back")
  }
  func testUsabilityLargeTextAndLongName() throws {
-  continueAfterFailure=false;app.activate();XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);tap("Product result")
+  continueAfterFailure=false;app.activate();XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);expand()
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription)
   let labels=app.staticTexts.allElementsBoundByIndex.map{$0.label};let name=try XCTUnwrap(labels.firstIndex(where:{$0.contains("deliberately long multilingual product name")}));let judgment=try XCTUnwrap(labels.firstIndex(of:"Not enough info"));let reason=try XCTUnwrap(labels.firstIndex(where:{$0.contains("The available evidence cannot support a judgment for this purpose.")}));let scope=try XCTUnwrap(labels.firstIndex(of:"Published list · Package not confirmed"));XCTAssertLessThan(name,judgment);XCTAssertLessThan(judgment,reason);XCTAssertLessThan(reason,scope)
   shot("part-three-large-text-long-name-first-card");tap("Compare or describe this check");choose("Moisturizing");choose("Face");choose("Leave on");XCTAssertFalse(contains("Worth considering").exists);shot("part-three-large-text-controls-reachable-without-color-authority");close()
