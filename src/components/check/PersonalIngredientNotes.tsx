@@ -9,6 +9,9 @@ import { customerController, currentCustomerOwner } from '@/src/presentation/per
 import { useAuthStore } from '@/src/stores/authStore';
 import { PrivateIngredientExplanation } from '@/src/components/check/PrivateIngredientExplanation';
 import type { WebIngredientEvidence } from '@/src/contracts/WebProductIngredients';
+import type { ProductIngredientQuery } from '@/src/contracts/ProductIngredientLookup';
+import { buildSourceLimitedAnalysis, classifySourceLimitedProduct, type SourceLimitedAnalysis } from '@/src/presentation/personal-decision/sourceLimitedAnalysis';
+import { useReactionIngredientComparison } from '@/src/components/check/useReactionIngredientComparison';
 
 type PastedState = { scope: string; draft: string; compared: string | null };
 
@@ -25,11 +28,12 @@ function IngredientFindings({ notes }: { notes: PersonalIngredientInsights }) {
   </View>;
 }
 
-/** Local comparison is never sent or saved; optional AI uses its separate explicit action. */
-export function PersonalIngredientNotes({ ownerId, evidence, webEvidence = null, productKey, productName = 'Product from your bottle', category = 'other_personal_care' }: {
+/** Uses saved owner context locally. Pasted comparison text is not saved; AI remains an explicit action. */
+export function PersonalIngredientNotes({ ownerId, evidence, webEvidence = null, productKey, productName = 'Product from your bottle', query, onAnalysis }: {
   ownerId: string; evidence: PublishedIngredientEvidence[]; productKey?: string; productName?: string;
   webEvidence?: WebIngredientEvidence | null;
-  category?: 'skincare' | 'other_personal_care';
+  query?: ProductIngredientQuery;
+  onAnalysis?: (analysis: SourceLimitedAnalysis | null) => void;
 }) {
   const router = useRouter();
   const sessionOwner = useAuthStore(state => state.sessionUserId);
@@ -43,27 +47,41 @@ export function PersonalIngredientNotes({ ownerId, evidence, webEvidence = null,
   useEffect(() => { setEditorScope(null); }, [scope]);
   const isCurrent = () => Boolean(scope) && liveScope.current === scope
     && useAuthStore.getState().sessionUserId === ownerId && currentCustomerOwner() === ownerId;
-  if (!scope) return null;
   const currentPasted = pasted?.scope === scope ? pasted : null;
   const contextReady = state.ownerId === ownerId && state.status === 'ready' && state.context?.ownerId === ownerId;
   const context = contextReady ? state.context : null;
   const contextError = state.ownerId === ownerId && state.status === 'error';
+  const category = classifySourceLimitedProduct(query?.name ?? productName);
   // Never relabel web evidence as a database source or combine competing formulas.
   const lists: Array<PublishedIngredientEvidence | WebIngredientEvidence> = evidence.length
     ? evidence.slice(0, 3) : webEvidence ? [webEvidence] : [];
-  const results = contextReady ? lists.map(item => ({ item, source: 'source' in item ? item.source : 'published_web', sourceUrl: item.sourceUrl,
+  const results = contextReady && category !== 'unsupported' ? lists.map(item => ({ item, source: 'source' in item ? item.source : 'published_web', sourceUrl: item.sourceUrl,
     notes: buildPersonalIngredientInsights(context, [item], 'published', category) })) : [];
-  const manual = contextReady && !lists.length && currentPasted?.compared
+  const manual = contextReady && category !== 'unsupported' && !lists.length && currentPasted?.compared
     ? buildPersonalIngredientInsights(context, [{ ingredientsText: currentPasted.compared }], 'user_label', category) : null;
-  const missingProfile = contextReady && (!context?.profile || context.profile.ownerId !== ownerId
+  const reactionIngredients = useReactionIngredientComparison(ownerId, context, query,
+    contextReady && category !== 'unsupported' && Boolean(lists.length || currentPasted?.compared));
+  const analysis = contextReady && query ? buildSourceLimitedAnalysis({ ownerId, query, context,
+    lists: lists.length ? lists : currentPasted?.compared ? [{ ingredientsText: currentPasted.compared }] : [],
+    sourceType: lists.length ? 'published' : 'user_label', reactionIngredients }) : null;
+  const analysisKey = analysis?.scopeKey ?? null;
+  useEffect(() => {
+    if (!onAnalysis) return;
+    if (isCurrent()) onAnalysis(analysis);
+    else onAnalysis(null);
+    return () => { onAnalysis(null); };
+  }, [scope, analysisKey, onAnalysis]);
+  const missingProfile = category !== 'unsupported' && contextReady && (!context?.profile || context.profile.ownerId !== ownerId
     || results.some(result => result.notes.status === 'profile_missing') || manual?.status === 'profile_missing');
   const editorOpen = editorScope === scope;
-  return <View style={styles.card}>
-    <View style={styles.heading}>
+  if (!scope) return null;
+  return <View style={onAnalysis ? styles.analysisActions : styles.card}>
+    {!onAnalysis && category !== 'unsupported' && <View style={styles.heading}>
       <Text style={styles.eyebrow}>PERSONAL INGREDIENT NOTES</Text>
       <Text style={styles.title}>What this means for your skin</Text>
       <Text style={styles.caption}>Based on your saved skin details and this ingredient list. Cosmetic guidance, not a diagnosis or a safety verdict.</Text>
-    </View>
+    </View>}
+    {!onAnalysis && category === 'unsupported' && <Text style={styles.body}>This product type is outside our skin comparison. Its listing and available ingredients can still be shown, but we do not apply your facial skin goals or offer AI skin guidance.</Text>}
     {!contextReady && (contextError
       ? <><Text style={styles.body}>Your saved profile could not be loaded, so personalized ingredient notes are unavailable.</Text>
         <Button label="Reload saved profile" variant="outline" size="medium" onPress={() => { if (isCurrent()) void customerController.load(); }} /></>
@@ -72,14 +90,15 @@ export function PersonalIngredientNotes({ ownerId, evidence, webEvidence = null,
       <Button label="Add skin context" variant="outline" size="medium" onPress={() => {
         if (isCurrent()) router.push({ pathname: '/personalize', params: { p0b: '1', mode: 'profile' } });
       }} /></>}
-    {!missingProfile && results.map(({ item, source, sourceUrl, notes }) => <View key={source + ':' + sourceUrl} style={styles.result} accessibilityLiveRegion="polite">
+    {category !== 'unsupported' && !missingProfile && results.map(({ item, source, sourceUrl, notes }) => <View key={source + ':' + sourceUrl} style={styles.result} accessibilityLiveRegion="polite">
       {results.length > 1 && <Text style={styles.caption}>{source === 'open_beauty_facts' ? 'Open Beauty Facts list' : 'DailyMed list'} · compared separately</Text>}
-      <IngredientFindings notes={notes} />
+      {!onAnalysis && <IngredientFindings notes={notes} />}
       {notes.status === 'ready' && context && <PrivateIngredientExplanation ownerId={ownerId}
-        productName={item.productName} ingredientsText={item.ingredientsText} category={category} contextRevision={context.revision} />}
+        productName={item.productName} ingredientsText={item.ingredientsText} category={category} contextRevision={context.revision}
+        localContext={context.profile?.data ?? null} />}
     </View>)}
-    {!lists.length && <>
-      <Text style={styles.body}>We need an ingredient list before we can explain how this product relates to your skin.</Text>
+    {!lists.length && category !== 'unsupported' && <>
+      {!onAnalysis && <Text style={styles.body}>We need an ingredient list before we can explain how this product relates to your skin.</Text>}
       <Pressable accessibilityRole="button" accessibilityLabel="Add label ingredients"
         accessibilityState={{ expanded: editorOpen }} style={styles.editorToggle}
         onPress={() => { if (isCurrent()) setEditorScope(editorOpen ? null : scope); }}>
@@ -102,9 +121,10 @@ export function PersonalIngredientNotes({ ownerId, evidence, webEvidence = null,
       </View>}
       {manual && !missingProfile && <View style={styles.result} accessibilityLiveRegion="polite">
         <Text style={styles.caption}>From the label text you added</Text>
-        <IngredientFindings notes={manual} />
+        {!onAnalysis && <IngredientFindings notes={manual} />}
         {manual.status === 'ready' && context && currentPasted?.compared && <PrivateIngredientExplanation ownerId={ownerId}
-          productName={productName} ingredientsText={currentPasted.compared} category={category} contextRevision={context.revision} />}
+          productName={productName} ingredientsText={currentPasted.compared} category={category} contextRevision={context.revision}
+          localContext={context.profile?.data ?? null} />}
       </View>}
     </>}
     <Text style={styles.footnote}>These notes are calculated on your device.</Text>
@@ -112,6 +132,7 @@ export function PersonalIngredientNotes({ ownerId, evidence, webEvidence = null,
 }
 
 const styles = StyleSheet.create({
+  analysisActions: { gap: spacing.md, marginTop: spacing.sm },
   card: { gap: spacing.md, marginTop: spacing.sm, padding: spacing.lg, borderRadius: radii.lg,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   heading: { gap: spacing.xs },

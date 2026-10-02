@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { colors, radii, spacing, typography } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
@@ -12,8 +12,10 @@ import { useAuthStore } from '@/src/stores/authStore';
 import { requestPrivateUpcLookup, validPrivateBarcode } from '@/src/presentation/external-products/privateLookup';
 import { createPrivateCheckFallback, createPrivateCheckRequestMemo, privateCheckEnabled, visiblePrivateCheckState,
   type PrivateCheckState } from '@/src/presentation/external-products/checkFallback';
+import { sourceLimitedProductKey, type SourceLimitedAnalysis } from '@/src/presentation/personal-decision/sourceLimitedAnalysis';
+import { customerController } from '@/src/presentation/personal-decision/customerGateway';
 
-/** Private identity evidence after a canonical barcode miss; never a formula or personal decision. */
+/** Private identity evidence and source limited local findings, never a canonical formula or packet. */
 export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, children }: {
   barcode: string; ownerId: string | null;
   sheet?: { presentationKey: string; onClose: () => void };
@@ -28,9 +30,18 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, chil
   const [state, setState] = useState<PrivateCheckState | null>(null);
   const controller = useRef<ReturnType<typeof createPrivateCheckFallback> | null>(null);
   const requestMemo = useRef(createPrivateCheckRequestMemo());
+  const [analysis, setAnalysis] = useState<SourceLimitedAnalysis | null>(null);
+  const personalState = useSyncExternalStore(customerController.subscribe, customerController.getState);
+  const liveProductKey = useRef<string | null>(null);
+  const onAnalysis = useCallback((value: SourceLimitedAnalysis | null) => {
+    if (liveOwner.current !== ownerId || useAuthStore.getState().sessionUserId !== ownerId) return;
+    if (value && (value.ownerId !== ownerId || value.productKey !== liveProductKey.current)) return;
+    setAnalysis(value);
+  }, [ownerId]);
 
   useEffect(() => {
     setState(null);
+    setAnalysis(null);
     if (!enabled || !ownerId || !supabase) return;
     const client = supabase;
     const current = createPrivateCheckFallback({ ownerId, barcode,
@@ -55,6 +66,15 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, chil
   const needsTester = visible?.kind === 'error' && visible.code === 'PRIVATE_TESTER_REQUIRED';
   const loading = !visible || visible.kind === 'loading';
   const candidate = result?.status === 'found' ? result.candidates[0] : null;
+  const query = { barcode, name: candidate?.name ?? null, brand: candidate?.brand ?? null, size: candidate?.size ?? null };
+  const candidateKey = candidate ? sourceLimitedProductKey(query) : null;
+  liveProductKey.current = candidateKey;
+  const currentAnalysis = analysis && analysis.ownerId === ownerId && analysis.productKey === candidateKey
+    && personalState.ownerId === ownerId && personalState.status === 'ready'
+    && personalState.context?.revision === analysis.contextRevision ? analysis : null;
+  const verdict = currentAnalysis?.verdict ?? { state: 'unknown' as const, label: 'Not enough information', findings: [],
+    reason: candidate ? 'Finding ingredients and comparing them with your saved skin details and product experiences.'
+      : 'An exact product and ingredient list are needed before assessing personal fit.' };
   const summary = <View style={styles.summary}>
     <Text style={styles.caption}>PRODUCT LOOKUP · PRIVATE TEST</Text>
     {loading ? <View style={styles.loading}><ActivityIndicator color={colors.brand} />
@@ -62,9 +82,7 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, chil
       : <CheckResultView section="summary" facts={{ brand: candidate?.brand ?? '',
         name: candidate?.name ?? (result?.status === 'ambiguous' ? 'Confirm the matching product' : 'Product details unavailable'),
         categoryLabel: candidate?.size ?? '', formula: null, source: null }}
-        verdict={{ state: 'unknown', label: 'Not enough information', findings: [],
-          reason: candidate ? 'We found a matching product listing. Your ingredients and personal notes appear below when available.'
-            : 'An exact product and ingredient list are needed before assessing personal fit.' }} />}
+        verdict={verdict} />}
   </View>;
   const content = <View style={sheet ? styles.summary : styles.card} accessibilityLiveRegion="polite">
       {!sheet && <>
@@ -83,15 +101,14 @@ export function PrivateUpcFallback({ barcode, ownerId: checkOwnerId, sheet, chil
         </View>
       ))}
       {sheet && candidate && <Text style={styles.caption}>UPCitemdb · retrieved {new Date(candidate.retrievedAt).toLocaleDateString()} · Barcode {candidate.sourceBarcode}</Text>}
-      {result && <PublishedProductIngredients ownerId={ownerId} query={{ barcode,
-        name: result.status === 'found' ? result.candidates[0].name : null,
-        brand: result.status === 'found' ? result.candidates[0].brand : null,
-        size: result.status === 'found' ? result.candidates[0].size : null }} />}
+      {currentAnalysis && <CheckResultView section="findings" showIdentity={false}
+        facts={{ brand: candidate?.brand ?? '', name: candidate?.name ?? '', categoryLabel: '', formula: null, source: null }} verdict={verdict} />}
+      {result && <PublishedProductIngredients ownerId={ownerId} query={query} onAnalysis={onAnalysis} />}
       {result?.candidates.map((candidate, index) => <ExternalProductActions key={candidate.sourceRecordId + ':' + index}
         ownerId={ownerId} query={{ barcode: candidate.observedBarcode,
           name: candidate.name, brand: candidate.brand, size: candidate.size }} />)}
       {result && result.candidates.length > 0 && <Text style={styles.body}>
-        This identifies a possible product only. Ingredients, formula and personal fit are not verified. Save only after confirming the label matches your bottle.
+        Confirm the listing matches your bottle before saving. Published ingredients and local findings do not verify its package formula or predict your individual tolerance.
       </Text>}
       {result?.truncated && <Text style={styles.body}>More possible matches exist; this list is incomplete.</Text>}
       {limited && <Text style={styles.body}>The shared free lookup allowance is temporarily full. Wait at least 11 seconds before trying again; the daily allowance may also be exhausted.</Text>}

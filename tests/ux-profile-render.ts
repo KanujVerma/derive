@@ -29,6 +29,12 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
     function requireModule(id: string): any {
       if (options.modules && id in options.modules) return options.modules[id];
+      // Native transport and authenticated ownership are injected separately from the live form handlers.
+      if (id.endsWith('/reactionIngredientResearch')) return { reactionResearch: {
+        subscribe: () => () => {}, getSnapshot: () => 0, record: () => undefined,
+        research: async () => ({ status: 'unavailable' }),
+      } };
+      if (id.endsWith('/customerGateway')) return { currentCustomerOwner: () => initialProps.ownerId ?? null };
       if (id === 'react') return react;
       if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };

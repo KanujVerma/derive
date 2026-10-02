@@ -1,4 +1,5 @@
 import { customerController, currentCustomerOwner, ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
+import { bindReactionResearchLifecycle } from '@/src/services/reactionIngredientResearch';
 import { bindCustomerOwnerLifecycle } from '@/src/presentation/personal-decision/customerController';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Stack, useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
@@ -26,6 +27,7 @@ import { resolveAuthRoute, getAuthRedirectRoute } from '@/src/utils/authRouting'
 
 export default function RootLayout() {
   useEffect(() => bindCustomerOwnerLifecycle(customerController, currentCustomerOwner, listener => useAuthStore.subscribe(listener), listener => useFreeAccessStore.subscribe(listener), () => ownerPinnedLegacyGateway.clear()), []);
+  useEffect(() => bindReactionResearchLifecycle(), []);
   const router = useRouter();
   const segments = useSegments();
   const entryParams = useGlobalSearchParams<{ p0b?: string; entry?: string; mode?: string }>();
@@ -86,9 +88,19 @@ export default function RootLayout() {
       if (freeIntegration) {
         const auth = useAuthStore.getState();
         const projection = useFreeAccessStore.getState();
-        if (auth.status === 'SIGNED_IN' && projection.status === 'READY' && projection.userId === auth.sessionUserId) {
-          projection.reset();
-        }
+        if (auth.status !== 'SIGNED_IN' || !auth.sessionUserId) return;
+        const ownerId = auth.sessionUserId;
+        const now = Date.now();
+        if (now - lastForegroundRefreshAt < 1500) return;
+        const attempt = projection.refresh(ownerId);
+        if (attempt === null) return;
+        lastForegroundRefreshAt = now;
+        void getFreeAccessState().then((state) => {
+          const currentAuth = useAuthStore.getState();
+          if (currentAuth.status !== 'SIGNED_IN' || currentAuth.sessionUserId !== ownerId
+            || state.userId !== ownerId) throw new Error('Access refresh belongs to another session');
+          useFreeAccessStore.getState().ready(state, attempt);
+        }).catch(() => useFreeAccessStore.getState().fail(ownerId, attempt));
         return;
       }
       const auth = useAuthStore.getState();

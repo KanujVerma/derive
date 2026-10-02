@@ -89,6 +89,34 @@ test('other personal care cannot transmit facial goals or facial skin type', asy
   assert.equal(result.status, 'answer');
 });
 
+test('explicit Jev consent routes to TypeSafe with only the minimum stored projection', async () => {
+  let reads = 0, calls = 0;
+  const result = await runIngredientExplanation({ ...request, provider: 'jev' }, { ...deps(),
+    provider: 'jev', model: 'jev-latest', loadContext: async () => { reads++; return snapshot; },
+    fetcher: async (url, init) => {
+      calls++; assert.equal(String(url), 'https://api.typesafe.ai/v1/systemone');
+      const input = JSON.parse(String(init!.body));
+      assert.deepEqual(input.state.reportedCosmeticContext, snapshot.context);
+      assert.doesNotMatch(String(init!.body), /Synthetic gentle cleanser|owner|history|prescription|photo|version/);
+      return new Response(JSON.stringify({ model: 'jev-1.13.0',
+        answers: {
+          moisture: { type: 'noul', noul: 0.9 }, fragrance: { type: 'noul', noul: 0.95 },
+          priority: { type: 'choice', choice: 'fragrance', confidence: 0.9,
+            probabilities: { moisture: 0.1, fragrance: 0.85, none: 0.05 } },
+        }, usage: { input_tokens: 200, output_tokens: 12 },
+      }), { headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(result.status, 'answer'); assert.equal(reads, 2); assert.equal(calls, 1);
+  if (result.status === 'answer') {
+    assert.match(result.sentences.join(' '), /Fragrance/);
+    assert.equal(result.formulaVerified, false); assert.equal(result.contextVersion, snapshot.version);
+  }
+  assert.deepEqual(await runIngredientExplanation({ ...request, provider: 'jev' }, {
+    ...deps(), provider: 'gemini', loadContext: unused, reserveRequest: unused, fetcher: unused,
+  }), { status: 'configuration_required' }, 'Jev consent cannot authorize sending context to Google');
+});
+
 test('explanation uses the server-selected model rather than a hardcoded model', async () => {
   const result = await runIngredientExplanation(request, { ...deps(), model: 'gemini-configured-test',
     fetcher: async (url) => {

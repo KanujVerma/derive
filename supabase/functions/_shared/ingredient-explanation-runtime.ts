@@ -2,20 +2,25 @@ import type { IngredientExplanationRequest, IngredientExplanationResult } from '
 import { cosmeticContextFromFreeProfile } from '../../../src/domain/ingredient-context.ts';
 import type { PrivateIngredientContextSnapshot } from './private-ingredient-runtime.ts';
 import { explainIngredientContext } from './ingredient-explanation-model.ts';
+import { judgeIngredientContextWithJev } from './jev-ingredient-judgment.ts';
 
 /** Client input is product evidence, never an owner ID or a client-authored profile. */
 export function parseIngredientExplanationRequest(value: unknown): IngredientExplanationRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_EXPLANATION_REQUEST');
   const input = value as Record<string, unknown>;
-  if (Object.keys(input).sort().join(',') !== 'category,contextSharingConsent,ingredientsText,productName'
+  const keys = Object.keys(input).sort().join(',');
+  if (!['category,contextSharingConsent,ingredientsText,productName',
+    'category,contextSharingConsent,ingredientsText,productName,provider'].includes(keys)
     || typeof input.productName !== 'string' || !input.productName.trim() || input.productName.length > 180
     || /[\u0000-\u001f\u007f]/u.test(input.productName)
     || typeof input.ingredientsText !== 'string' || !input.ingredientsText.trim() || input.ingredientsText.length > 24_000
     || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(input.ingredientsText)
     || !['skincare', 'other_personal_care'].includes(input.category as string)
-    || input.contextSharingConsent !== true) throw new Error('INVALID_EXPLANATION_REQUEST');
+    || input.contextSharingConsent !== true
+    || ('provider' in input && !['jev', 'gemini'].includes(input.provider as string))) throw new Error('INVALID_EXPLANATION_REQUEST');
   return { productName: input.productName.trim(), ingredientsText: input.ingredientsText.trim(),
-    category: input.category as IngredientExplanationRequest['category'], contextSharingConsent: true };
+    category: input.category as IngredientExplanationRequest['category'], contextSharingConsent: true,
+    ...('provider' in input ? { provider: input.provider as 'jev' | 'gemini' } : {}) };
 }
 
 /** Ephemeral cosmetic explanation. No canonical formula, numeric score or persistent AI history. */
@@ -23,14 +28,17 @@ export async function runIngredientExplanation(request: IngredientExplanationReq
   apiKey: string;
   /** Use the same operator-selected model as ingredient retrieval. Never client supplied. */
   model?: string;
+  provider?: 'gemini' | 'jev';
   /** Paid-project processing and the provider disclosure must be explicitly reviewed. */
   personalContextApproved: boolean;
   loadContext: () => Promise<PrivateIngredientContextSnapshot | null>;
   reserveRequest: () => Promise<'reserved' | 'rate_limited'>;
   fetcher?: typeof fetch;
+  report?: (event: { stage: 'eligibility' | 'provider' | 'validation'; status: string }) => void;
 }): Promise<IngredientExplanationResult> {
   const parsed = parseIngredientExplanationRequest(request);
   if (!deps.personalContextApproved) return { status: 'personalization_disabled' };
+  if (parsed.provider && parsed.provider !== (deps.provider ?? 'gemini')) return { status: 'configuration_required' };
   if (!deps.apiKey.trim()) return { status: 'configuration_required' };
   let snapshot: PrivateIngredientContextSnapshot | null;
   try { snapshot = await deps.loadContext(); }
@@ -45,10 +53,15 @@ export async function runIngredientExplanation(request: IngredientExplanationReq
   try {
     if (await deps.reserveRequest() !== 'reserved') return { status: 'rate_limited' };
   } catch { return { status: 'unavailable' }; }
-  let result: Awaited<ReturnType<typeof explainIngredientContext>>;
-  try { result = await explainIngredientContext({ productName: parsed.productName,
-    ingredientsText: parsed.ingredientsText, category: parsed.category, context },
-  { apiKey: deps.apiKey, model: deps.model, fetch: deps.fetcher }); }
+  let result: { status: 'answer'; sentences: string[]; model: string } | {
+    status: 'configuration_required' | 'rate_limited' | 'unavailable' | 'no_answer';
+  };
+  try { result = deps.provider === 'jev'
+    ? await judgeIngredientContextWithJev({ ingredientsText: parsed.ingredientsText,
+      category: parsed.category, context }, { apiKey: deps.apiKey, model: deps.model ?? 'jev-latest', fetcher: deps.fetcher, report: deps.report })
+    : await explainIngredientContext({ productName: parsed.productName,
+      ingredientsText: parsed.ingredientsText, category: parsed.category, context },
+      { apiKey: deps.apiKey, model: deps.model, fetch: deps.fetcher }); }
   catch { return { status: 'unavailable' }; }
   if (result.status !== 'answer') return result;
   try {

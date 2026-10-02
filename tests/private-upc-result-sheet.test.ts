@@ -3,6 +3,8 @@ import test from 'node:test';
 import * as React from 'react';
 import type { PrivateUpcCandidate, PrivateUpcLookup } from '../src/contracts/PrivateUpcLookup.ts';
 import { componentHarness, control, press, textContent } from './ux-profile-render.ts';
+import type { PersonalContextSnapshot } from '../src/contracts/PersonalContext.ts';
+import { buildSourceLimitedAnalysis } from '../src/presentation/personal-decision/sourceLimitedAnalysis.ts';
 
 /** Component execution with explicit effect flushing; native hosts/network are inert. */
 function hooks() {
@@ -29,6 +31,7 @@ function hooks() {
       effects.push(() => { previous?.cleanup?.(); next.cleanup = effect(); });
     },
     useLayoutEffect() {},
+    useSyncExternalStore(_subscribe: unknown, getSnapshot: () => unknown) { return getSnapshot(); },
     useCallback(callback: any) { return callback; },
   };
   return { runtime, reset: () => { cursor = 0; }, flush: () => { effects.splice(0).forEach(effect => effect()); } };
@@ -50,6 +53,7 @@ function fallbackHarness(request: () => Promise<PrivateUpcLookup>) {
   const lifecycle = hooks();
   let sessionOwner: string | null = owner;
   let calls = 0, closes = 0;
+  let personalContext: PersonalContextSnapshot | null = null;
   const authStore = Object.assign((selector: any) => selector({ sessionUserId: sessionOwner }), {
     getState: () => ({ sessionUserId: sessionOwner }),
   });
@@ -61,6 +65,7 @@ function fallbackHarness(request: () => Promise<PrivateUpcLookup>) {
     '@/src/config/environment': { publicEnvironment: { buildFlavor: 'development' } },
     '@/src/services/supabase': { supabase: { functions: { invoke: async () => { calls++; return { data: await request(), error: null }; } } } },
     '@/src/stores/authStore': { useAuthStore: authStore },
+    '@/src/presentation/personal-decision/customerGateway': { customerController: { subscribe: () => () => {}, getState: () => ({ ownerId: owner, status: personalContext ? 'ready' : 'loading', context: personalContext }) } },
     '@/src/components/check/PublishedProductIngredients': { PublishedProductIngredients: 'PublishedProductIngredients' },
     '@/src/components/check/ExternalProductActions': { ExternalProductActions: 'ExternalProductActions' },
     '@/src/components/check/result-sheet/CheckResultContent': { CheckResultView: 'CheckResultView' },
@@ -70,6 +75,7 @@ function fallbackHarness(request: () => Promise<PrivateUpcLookup>) {
     render(props?: Record<string, any>) { lifecycle.reset(); return harness.render(props); },
     flush: lifecycle.flush,
     switchOwner: (next: string | null) => { sessionOwner = next; },
+    setContext: (next: PersonalContextSnapshot | null) => { personalContext = next; },
     calls: () => calls, closes: () => closes,
   };
 }
@@ -103,7 +109,7 @@ test('external match uses Kanuj sheet with real candidate identity and existing 
     assert.equal(ingredients.props.ownerId, owner);
     assert.equal(nodes.filter(node => node.type === 'ExternalProductActions').length, 1);
     assert.ok(nodes.some(node => node.type === 'RecoveryAction'));
-    assert.match(textContent(nodes), /Ingredients, formula and personal fit are not verified/);
+    assert.match(textContent(nodes), /Published ingredients and local findings do not verify its package formula/);
     app.flush(); await settle(); app.render();
     assert.equal(app.calls(), 1, 'rendering the sheet must not start a second lookup');
     surface.props.onClose(); assert.equal(app.closes(), 1);
@@ -137,6 +143,29 @@ test('ambiguous identity remains a confirmation list and never picks one candida
     assert.match(textContent(nodes), /Check that this matches your label/);
     assert.deepEqual(nodes.find(node => node.type === 'PublishedProductIngredients')!.props.query,
       { barcode, name: null, brand: null, size: null });
+  });
+});
+
+test('automatic findings update the same sheet and clear when context revision or ingredient retry changes', async () => {
+  await withPrivateFlag(async () => {
+    const saved: PersonalContextSnapshot = { version: 'personal-context-v1', ownerId: owner, revision: 2, profile: null,
+      routine: null, experiences: [], historyRevision: null, historyTruncated: false,
+      legacy: { source: 'legacy_free_context', profile: null, products: [], truncated: false,
+        experiences: [{ productName: 'Old Spice Aqua Reef', brand: 'Old Spice', kind: 'reacted', note: 'pit burns' }] } };
+    const app = fallbackHarness(async () => found); app.setContext(saved);
+    app.render(); app.flush(); await settle();
+    let nodes = app.render(); const ingredients = nodes.find(n => n.type === 'PublishedProductIngredients')!;
+    const analysis = buildSourceLimitedAnalysis({ ownerId: owner, query: ingredients.props.query, context: saved, lists: [{ ingredientsText: 'Water, Fragrance' }] })!;
+    ingredients.props.onAnalysis(analysis); nodes = app.render();
+    assert.match(nodes.find(n => n.type === 'CheckResultView')!.props.verdict.reason, /Aqua Reef.*different product/);
+    assert.equal(nodes.filter(n => n.type === 'ResultSheetSurface').length, 1);
+    assert.ok(nodes.some(n => n.type === 'CheckResultView' && n.props.section === 'findings'));
+    app.setContext({ ...saved, revision: 3 }); nodes = app.render();
+    assert.doesNotMatch(nodes.find(n => n.type === 'CheckResultView')!.props.verdict.reason, /Aqua Reef/);
+    app.setContext(saved); ingredients.props.onAnalysis(null); nodes = app.render();
+    assert.equal(nodes.some(n => n.type === 'CheckResultView' && n.props.section === 'findings'), false);
+    ingredients.props.onAnalysis({ ...analysis, ownerId: 'other-owner' }); nodes = app.render();
+    assert.equal(nodes.some(n => n.type === 'CheckResultView' && n.props.section === 'findings'), false);
   });
 });
 

@@ -11,11 +11,13 @@ Deno.serve((req: Request) => handlePrivateWebProductIngredients(req, {
   failure: (code, message, status) => new ServiceError(code, message, status),
   lookup: (query, { admin, userId }) => lookupWebProductIngredients(query, {
     serpApiKey: Deno.env.get('SERPAPI_API_KEY') ?? '', geminiApiKey: Deno.env.get('GEMINI_API_KEY') ?? '',
-    model: Deno.env.get('GEMINI_MODEL'), reserveRequest: async () => {
+    model: Deno.env.get('GEMINI_MODEL'), preferManufacturerSearch: true, reserveRequest: async () => {
       const { error } = await admin.rpc('reserve_private_grounded_search', { p_user_id: userId });
       if (!error) return 'reserved';
       if (error.message?.includes('GROUNDED_SEARCH_LIMIT')) return 'rate_limited';
       throw new ServiceError('OWNER_OR_BUDGET_UNAVAILABLE', 'Web ingredient lookup is unavailable', 503);
     },
+    // Operational enums/counts/timing only. No product, profile, owner, URLs or credentials.
+    report: event => console.info('[private-ingredient-lookup]', JSON.stringify(event)),
   }),
 }));

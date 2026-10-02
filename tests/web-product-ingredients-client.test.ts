@@ -42,6 +42,16 @@ test('client fails closed for missing fields, malformed dates, excessive content
   }
 });
 
+test('ambiguity preserves bounded product choices while stripping URLs and recommendation fields', () => {
+  const candidate = { name: 'Old Spice Aqua Reef Deodorant', brand: 'Old Spice' };
+  assert.deepEqual(parseWebProductIngredientLookup({ status: 'ambiguous', candidates: [{ ...candidate,
+    sourceUrl: 'https://evil.test/', score: 100, formulaVerified: true }] }), { status: 'ambiguous', candidates: [candidate] });
+  for (const candidates of [[], Array(6).fill(candidate), [{ ...candidate, brand: null }],
+    [{ ...candidate, name: 'Old Spice' }], [{ ...candidate, name: 'x'.repeat(181) }], [{ ...candidate, name: candidate.name + '\n' }]]) {
+    assert.throws(() => parseWebProductIngredientLookup({ status: 'ambiguous', candidates }), /INVALID_WEB_INGREDIENT_RESPONSE/);
+  }
+});
+
 test('citations accept public HTTPS pages and reject credentials, local hosts and secret parameters', () => {
   assert.equal(safeWebIngredientSourceUrl(evidence.sourceUrl), true);
   for (const value of ['https://user:password@example.com/product', 'https://example.com:8443/product',
@@ -79,6 +89,27 @@ test('one identity only request is sent, with no profile, owner or history field
     } } });
   assert.deepEqual(result, found);
   assert.equal(calls, 1);
+});
+
+test('named comparison sends an explicit empty barcode and no reaction history or personal data', async () => {
+  const named = { barcode: '', name: 'Old Spice Aqua Reef Deodorant', brand: 'Old Spice', size: null };
+  const namedScope = owner + ':' + webProductIngredientKey(named);
+  assert.equal(validWebIngredientQuery(named), true);
+  assert.notEqual(webProductIngredientKey(named), webProductIngredientKey({ ...named, barcode: query.barcode }));
+  let calls = 0;
+  const untrusted = { ...named, reaction: 'private symptom', ownerId: owner };
+  await requestWebProductIngredients(untrusted, owner, () => namedScope,
+    { functions: { invoke: async (_name, options) => {
+      calls++; assert.deepEqual(options.body, named); return { data: found, error: null };
+    } } });
+  assert.equal(calls, 1);
+  const { barcode: _barcode, ...missing } = named;
+  for (const value of [missing, { ...named, barcode: null }, { ...named, barcode: ' ' },
+    { ...named, barcode: '12345678' }, { ...named, brand: null }, { ...named, name: 'Old Spice' },
+    { ...named, name: 'Old Spice Deodorant' }]) {
+    assert.equal(validWebIngredientQuery(value), false);
+  }
+  assert.equal(validWebIngredientQuery({ ...named, name: 'Old Spice Aqua Reef' }), true);
 });
 
 test('owner or product changes suppress an in flight response without retrying', async () => {

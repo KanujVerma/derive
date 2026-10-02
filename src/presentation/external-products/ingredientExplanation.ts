@@ -8,6 +8,7 @@ const statuses = new Set(['configuration_required', 'personalization_disabled', 
   'context_changed', 'rate_limited', 'unavailable', 'no_answer']);
 export const ingredientExplanationKey = (request: IngredientExplanationRequest) => JSON.stringify([
   request.productName, request.ingredientsText, request.category,
+  request.provider ?? 'gemini',
 ]);
 
 export function parseIngredientExplanation(value: unknown): IngredientExplanationResult {
@@ -26,11 +27,13 @@ export async function requestIngredientExplanation(request: IngredientExplanatio
   currentScope: () => string, client: PrivateLookupClient): Promise<IngredientExplanationResult> {
   if (request.contextSharingConsent !== true || !scope || currentScope() !== scope
     || !text(request.productName, 180) || !text(request.ingredientsText, 24000)
-    || !['skincare', 'other_personal_care'].includes(request.category)) throw Error('INVALID_EXPLANATION_REQUEST');
+    || !['skincare', 'other_personal_care'].includes(request.category)
+    || (request.provider !== undefined && !['jev', 'gemini'].includes(request.provider))) throw Error('INVALID_EXPLANATION_REQUEST');
   // Saved context is loaded on the authenticated server; the phone sends no profile/history/owner.
   const { data, error } = await client.functions.invoke('private-ingredient-explanation', { body: {
     productName: request.productName, ingredientsText: request.ingredientsText, category: request.category,
     contextSharingConsent: true,
+    ...(request.provider ? { provider: request.provider } : {}),
   } });
   if (currentScope() !== scope) throw Error('EXPLANATION_SCOPE_CHANGED');
   let payload: unknown = data;

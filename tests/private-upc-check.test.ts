@@ -106,7 +106,7 @@ test('normal Check wires only the canonical-miss branch; external UI never creat
   assert.match(check, /if \(!privateBarcodeMiss && !cameraResultNeedsExistingPage/);
   assert.match(component, /checkOwnerId === sessionOwnerId \? checkOwnerId : null/);
   assert.match(component, /Tester account \{ownerId\}/);
-  assert.match(component, /Ingredients, formula and personal fit are not verified/);
+  assert.match(component, /Published ingredients and local findings do not verify its package formula/);
   assert.match(component, /sourceBarcode/);
   assert.match(component, /retrievedAt/);
   assert.doesNotMatch(component, /evaluateProduct|recordFreeCheck|resolveCatalogIdentity|PersonalDecisionPanel|\.insert\(|\.upsert\(/);
@@ -123,10 +123,14 @@ test('private match uses the new result sheet while preserving ingredient and ex
   const harness = componentHarness('src/components/check/PrivateUpcFallback.tsx', 'PrivateUpcFallback',
     { ownerId, barcode, sheet: { presentationKey: 'scan-generation-7', onClose: () => { closed++; } } }, {
       modules: {
-        react: { ...React, useState: () => [state, () => {}], useRef: (current: unknown) => ({ current }), useEffect() {} },
+        react: { ...React, useState: (() => { let index = 0; return () => [index++ === 0 ? state : null, () => {}]; })(),
+          useRef: (current: unknown) => ({ current }), useEffect() {}, useCallback: (callback: unknown) => callback,
+          useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot() },
         '@/src/config/environment': { publicEnvironment: { buildFlavor: 'development' } },
         '@/src/services/supabase': { supabase: {} },
         '@/src/stores/authStore': { useAuthStore: auth },
+        '@/src/presentation/personal-decision/customerGateway': { customerController: {
+          subscribe: () => () => {}, getState: () => ({ ownerId, status: 'loading', context: null }) } },
         '@/src/components/check/PublishedProductIngredients': { PublishedProductIngredients: 'PublishedProductIngredients' },
         '@/src/components/check/ExternalProductActions': { ExternalProductActions: 'ExternalProductActions' },
         '@/src/components/check/result-sheet/ResultSheetSurface': { ResultSheetSurface: 'ResultSheetSurface' },
@@ -151,7 +155,7 @@ test('private match uses the new result sheet while preserving ingredient and ex
     assert.deepEqual(nodes.find(node => node.type === 'PublishedProductIngredients')?.props.query,
       { barcode, name: candidate.name, brand: candidate.brand, size: candidate.size });
     assert.equal(nodes.find(node => node.type === 'ExternalProductActions')?.props.ownerId, ownerId);
-    assert.match(textContent(nodes), /Save only after confirming the label/);
+    assert.match(textContent(nodes), /Confirm the listing matches your bottle before saving/);
     surface.props.onClose();
     assert.equal(closed, 1);
     const changedOwner = harness.render({ ownerId: 'another-owner' });

@@ -4,6 +4,8 @@ export interface IngredientExplanationRequest {
   ingredientsText: string;
   category: 'skincare' | 'other_personal_care';
   contextSharingConsent: true;
+  /** Consent is provider-specific. Older internal fixtures omit this field. */
+  provider?: 'jev' | 'gemini';
 }
 export type IngredientExplanationResult = {
   status: 'answer'; sentences: string[]; model: string; retrievedAt: string;

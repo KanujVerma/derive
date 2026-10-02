@@ -1,5 +1,8 @@
 import type { WebProductIngredientsRequest, WebProductIngredientsResult } from '../../../src/contracts/WebProductIngredients.ts';
+import { distinctiveNamedIngredientIdentity, researchableNamedIngredientIdentity } from '../../../src/contracts/WebProductIngredients.ts';
+import type { IngredientProductCandidate } from '../../../src/contracts/WebProductIngredients.ts';
 import { isValidGtin } from './product-identity.ts';
+import { embeddedProductIngredientText } from './embedded-product-ingredients.ts';
 
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value)
   && typeof value === 'object' && !Array.isArray(value);
@@ -7,8 +10,10 @@ const label = (value: unknown, max: number): value is string => typeof value ===
   && Boolean(value.trim()) && value.length <= max && !/[\x00-\x1f\x7f]/.test(value);
 export function parseWebProductIngredientsRequest(value: unknown): WebProductIngredientsRequest {
   if (!object(value) || Object.keys(value).sort().join(',') !== 'barcode,brand,name,size'
-    || typeof value.barcode !== 'string' || !isValidGtin(value.barcode) || !label(value.name, 180)
-    || !(value.brand === null || label(value.brand, 100)) || !(value.size === null || label(value.size, 80))) {
+    || typeof value.barcode !== 'string' || !label(value.name, 180)
+    || !(value.brand === null || label(value.brand, 100)) || !(value.size === null || label(value.size, 80))
+    || !(isValidGtin(value.barcode) || (value.barcode === ''
+      && researchableNamedIngredientIdentity(value.name, value.brand as string | null)))) {
     throw Error('INVALID_WEB_INGREDIENT_QUERY');
   }
   return { barcode: value.barcode, name: value.name, brand: value.brand, size: value.size };
@@ -49,7 +54,10 @@ function decodeEntities(value: string): string {
   });
 }
 const normalizeWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
-const words = (value: string) => decodeEntities(value).toLowerCase().replace(/[^a-z\d]+/g, ' ').trim()
+const words = (value: string) => decodeEntities(value).toLowerCase()
+  .replace(/\b(men|women)['’]s\b/g, '$1')
+  .replace(/(\d)(oz|ml|g)\b/g, '$1 $2')
+  .replace(/[^a-z\d]+/g, ' ').trim()
   .replace(/\banti perspirant\b/g, 'antiperspirant').replace(/\bspf(?=\d)/g, 'spf ');
 
 /** Search the named product across sources; URL allowlisting happens before any page fetch. */
@@ -63,7 +71,47 @@ export function buildWebIngredientSearchQuery(query: WebProductIngredientsReques
     .filter(Boolean).join(' ');
 }
 
-export interface IngredientWebPage { url: string; title: string; text: string }
+/** A second, bounded search removes package quantities, never scent/form/SPF. */
+export function buildWebIngredientFallbackQuery(query: WebProductIngredientsRequest): string | null {
+  const domains: Record<string, string> = { aveeno: 'aveeno.com', oldspice: 'oldspice.com', cerave: 'cerave.com',
+    cetaphil: 'cetaphil.com', neutrogena: 'neutrogena.com', dove: 'dove.com', eucerin: 'eucerinus.com',
+    aquaphor: 'aquaphorus.com', vaseline: 'vaseline.com', larocheposay: 'laroche-posay.us',
+    sunbum: 'sunbum.com', coppertone: 'coppertone.com' };
+  const domain = domains[words(query.brand ?? '').replace(/\s/g, '')];
+  if (!domain) return null;
+  const name = normalizeWhitespace(query.name.replace(/\b\d+(?:\.\d+)?\s*(?:fl[.\s]*oz|oz\.?|ounces?|ml|milliliters?|g|grams?)\b/gi, ' '));
+  return `site:${domain} ${name} ingredients`;
+}
+
+export interface IngredientWebPage { url: string; title: string; text: string; explicitLists?: string[]; smartLabelGtins?: string[] }
+
+/** Resolve missing product role from fetched product headings, never model memory or symptom text.
+ * Repeated pages/known title aliases count once. Distinct forms/scents remain choices.
+ */
+export function rememberedIngredientCandidates(query: WebProductIngredientsRequest,
+  pages: readonly IngredientWebPage[]): IngredientProductCandidate[] {
+  if (!query.brand) return [];
+  const requested = words(query.name).split(' ').filter(token => !['for', 'and', 'with', 'the', 'a', 'of', 'by', 'scent'].includes(token));
+  const candidates: IngredientProductCandidate[] = [];
+  for (const page of pages) {
+    if (!safeIngredientPageUrl(page.url)) continue;
+    if (/(?:^|\/)(?:blog|articles?|category|collections?)(?:\/|$)/i.test(new URL(page.url).pathname)) continue;
+    // ingredientPageText places the visible product heading before document metadata.
+    let name = page.title.split(' | ')[0].trim();
+    const titleTokens = new Set(words(page.title).split(' '));
+    const headingTokens = new Set(words(name).split(' '));
+    const brandTokens = new Set(words(query.brand).split(' '));
+    if (requested.some(token => !titleTokens.has(token))
+      || requested.some(token => !brandTokens.has(token) && !headingTokens.has(token))
+      || [...brandTokens].some(token => !titleTokens.has(token))) continue;
+    if (words(query.brand).split(' ').some(token => !words(name).split(' ').includes(token))) name = query.brand + ' ' + name;
+    if (!label(name, 180) || !distinctiveNamedIngredientIdentity(name, query.brand)) continue;
+    if (candidates.some(candidate => sameIngredientProduct({ ...query, name: candidate.name }, name)
+      && sameIngredientProduct({ ...query, name }, candidate.name))) continue;
+    candidates.push({ name, brand: query.brand });
+  }
+  return candidates;
+}
 
 /** Read structured product facts as data, never execute scripts or use unrelated page metadata. */
 function structuredIngredientText(html: string, pageTitle: string): string {
@@ -118,14 +166,27 @@ export function ingredientPageText(html: string): { title: string; text: string 
   const toText = (value: string) => normalizeWhitespace(decodeEntities(value.replace(/<[^>]*>/g, ' ')));
   // Manufacturers often put the brand only in <title>, and the variant only in <h1>.
   const title = normalizeWhitespace([toText(heading), toText(documentTitle)].filter(Boolean).join(' | ')).slice(0, 500);
-  const structured = structuredIngredientText(html, title);
+  const structured = [structuredIngredientText(html, title), embeddedProductIngredientText(html, title)].filter(Boolean).join('\n');
   return { title, text: normalizeWhitespace([structured, toText(cleaned)].filter(Boolean).join('\n')).slice(0, 60000) };
 }
 
 /** Size and marketing tokens don't establish formula. Named variant/form/SPF do. */
 export function sameIngredientProduct(query: WebProductIngredientsRequest, productName: string): boolean {
-  const actual = words(productName);
-  const requested = words(query.name);
+  const originalActual = words(productName);
+  const originalRequested = words(query.name);
+  // Old Spice's Aqua Reef manufacturer page uses Red Collection in its H1 and
+  // Aluminum-Free in its document title and linked SmartLabel record. These are
+  // documented aliases for that page, not permission to collapse other lines,
+  // scents, antiperspirants or delivery forms. Keep formula/form checks below.
+  const aquaReefDeodorant = (value: string) => /\bold spice\b/.test(value)
+    && /\baqua reef\b/.test(value) && /\bdeodorant\b/.test(value);
+  const aquaReefAlias = aquaReefDeodorant(originalRequested)
+    && aquaReefDeodorant(originalActual);
+  const normalizeAlias = (value: string) => aquaReefAlias
+    ? value.replace(/\bred collection\b/g, ' ').replace(/\balumin(?:um|ium) free\b/g, ' ').replace(/\s+/g, ' ').trim()
+    : value;
+  const actual = normalizeAlias(originalActual);
+  const requested = normalizeAlias(originalRequested);
   // UPC titles sometimes append a use description absent from the manufacturer's
   // heading. Strip only these narrow phrases, never named formula lines or claims
   // such as sensitive skin, fragrance free, SPF, strength, or medicated.
@@ -161,6 +222,18 @@ export function sameIngredientProduct(query: WebProductIngredientsRequest, produ
   const spfs = (value: string) => [...new Set([...value.matchAll(/\bspf\s*(\d+)\b/g)].map(match => Number(match[1])))]
     .sort((a, b) => a - b).join(',');
   if (spfs(requested) !== spfs(actual)) return false;
+  if (query.barcode === '' && query.brand !== null) {
+    // Name-only comparison has no exact identifier to disambiguate an extra line
+    // or scent. Restrict it to the provided named variant, not a broader family.
+    if (!distinctiveNamedIngredientIdentity(query.name, query.brand)) return false;
+    const requestedTokens = new Set([...identityWords(requested).split(' '), ...words(query.brand).split(' ')]);
+    if (identityWords(actual).split(' ').some(token => token && !ignored.has(token)
+      && !/^\d+$/.test(token) && !requestedTokens.has(token))) return false;
+    for (const form of ['roll on', 'soft solid']) {
+      const marker = new RegExp('\\b' + form + '\\b');
+      if (marker.test(requested) !== marker.test(actual)) return false;
+    }
+  }
   return true;
 }
 
@@ -222,9 +295,64 @@ async function fetchIngredientPage(url: string, fetcher: typeof fetch, timeoutMs
       const html = await readBoundedResponse(response, 1048576, controller.signal);
       const extracted = ingredientPageText(html);
       if (!extracted.title || !extracted.text || !/ingredients?/i.test(extracted.text)) return null;
-      return { url: current, ...extracted };
+      const structured = [structuredIngredientText(html, extracted.title), embeddedProductIngredientText(html, extracted.title)]
+        .filter(Boolean).join('\n');
+      const explicitLists = [...new Set(structured.split('\n').flatMap(passage => {
+        const marker = passage.lastIndexOf(' Ingredients ');
+        const list = marker >= 0 ? normalizeWhitespace(passage.slice(marker + ' Ingredients '.length)) : '';
+        return list.length >= 8 && list.length <= 16000 ? [list] : [];
+      }))];
+      // A manufacturer's public SmartLabel link can supply the missing identifier.
+      // Extract only a literal exact-GTIN P&G link, never follow its URL or accept
+      // links from retailers, reviews, model output, or arbitrary client input.
+      const smartLabelGtins = new URL(current).hostname.replace(/^www\./, '') === 'oldspice.com'
+        ? [...new Set([...html.matchAll(/\bhref\s*=\s*["']https?:\/\/smartlabel\.pg\.com\/(\d{14})\.html(?:\?[^"']*)?["']/gi)]
+          .map(match => match[1]).filter(isValidGtin))].slice(0, 3) : [];
+      return { url: current, ...extracted, explicitLists, smartLabelGtins };
     }
     return null;
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+
+/** Exact-GTIN, public P&G SmartLabel record linked by Old Spice's U.S. product page.
+ * This is transient published evidence, never a canonical or package-verified formula.
+ * Do not follow a client URL, retailer link, redirect, or nested fragrance disclosure.
+ */
+async function lookupOldSpiceSmartLabel(query: WebProductIngredientsRequest, fetcher: typeof fetch,
+  now: () => Date, confirmedGtin = query.barcode): Promise<WebProductIngredientsResult | null> {
+  if (!isValidGtin(confirmedGtin)) return null;
+  const brand = words(query.brand ?? '');
+  if (brand !== 'old spice' && !words(query.name).startsWith('old spice ')) return null;
+  const gtin14 = confirmedGtin.padStart(14, '0');
+  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 7000);
+  try {
+    const url = new URL('https://az-na-smartlabel-prod-functionapp-api.pgcloud.com/api/getproductdetails');
+    url.searchParams.set('gtin', gtin14);
+    const response = await fetcher(url.toString(), { redirect: 'error', signal: controller.signal,
+      headers: { accept: 'application/json,text/plain;q=0.9' } });
+    if (!response.ok || !/^(?:application\/json|text\/plain)(?:;|$)/i.test(response.headers.get('content-type') ?? '')) {
+      await response.body?.cancel(); return null;
+    }
+    const payload: unknown = JSON.parse(await readBoundedResponse(response, 131072, controller.signal));
+    if (!object(payload) || !object(payload.fields)) return null;
+    const { fields } = payload;
+    if (fields.gtin !== gtin14 || fields.brandName !== 'Old Spice'
+      || !label(fields.productName, 240) || !sameIngredientProduct(query, fields.productName)
+      || !Array.isArray(fields.ingredientList) || fields.ingredientList.length < 2
+      || fields.ingredientList.length > 160) return null;
+    const names: string[] = [];
+    for (const entry of fields.ingredientList) {
+      if (!object(entry) || entry.ingredientType !== 'INGREDIENTS'
+        || !label(entry.ingredientName, 160) || /[<>]/.test(entry.ingredientName)) return null;
+      names.push(entry.ingredientName.trim());
+    }
+    // Only the top-level published list. SmartLabel's separate nested fragrance
+    // disclosure is not a substitute for (or part of) the label-order list.
+    const ingredientsText = names.join(', ');
+    if (ingredientsText.length > 16000) return null;
+    return { status: 'found', evidence: { productName: fields.productName,
+      ingredientsText, sourceUrl: `https://smartlabel.pg.com/${gtin14}.html`, sourceName: 'smartlabel.pg.com',
+      retrievedAt: now().toISOString(), basis: 'published_web', formulaVerified: false } };
   } catch { return null; } finally { clearTimeout(timer); }
 }
 
@@ -232,22 +360,35 @@ export async function lookupWebProductIngredients(query: WebProductIngredientsRe
   serpApiKey: string; geminiApiKey: string; model?: string;
   reserveRequest: () => Promise<'reserved' | 'rate_limited'>;
   fetcher?: typeof fetch; searchTimeoutMs?: number; pageTimeoutMs?: number; modelTimeoutMs?: number; now?: () => Date;
+  preferManufacturerSearch?: boolean;
+  report?: (event: { stage: 'search' | 'pages' | 'extraction'; status: string; milliseconds: number; count?: number }) => void;
 }): Promise<WebProductIngredientsResult> {
-  const parsed = parseWebProductIngredientsRequest(query);
+  let parsed = parseWebProductIngredientsRequest(query);
+  const resolveRememberedName = parsed.barcode === '' && !distinctiveNamedIngredientIdentity(parsed.name, parsed.brand);
   if (!options.serpApiKey.trim() || !options.geminiApiKey.trim()) return { status: 'configuration_required' };
   const model = options.model?.trim() || 'gemini-3.8-flash';
   if (!/^[a-z0-9][a-z0-9._-]{0,79}$/.test(model)) return { status: 'configuration_required' };
   try { if (await options.reserveRequest() !== 'reserved') return { status: 'rate_limited' }; }
   catch { return { status: 'unavailable' }; }
   const fetcher = options.fetcher ?? fetch;
-  let links: string[];
-  const searchQuery = buildWebIngredientSearchQuery(parsed);
-  const searchController = new AbortController(); const searchTimer = setTimeout(() => searchController.abort(), options.searchTimeoutMs ?? 12000);
+  const report: NonNullable<typeof options.report> = event => { try { options.report?.(event); } catch { /* Diagnostics cannot affect lookup. */ } };
+  // The private manufacturer-preferred flow is the only caller that uses this
+  // exact-GTIN source. Preserve the generic search contract for other callers.
+  const smartLabel = options.preferManufacturerSearch
+    ? await lookupOldSpiceSmartLabel(parsed, fetcher, options.now ?? (() => new Date())) : null;
+  if (smartLabel) {
+    report({ stage: 'extraction', status: 'smartlabel_found', milliseconds: 0, count: 1 });
+    return smartLabel;
+  }
+  const search = async (searchQuery: string): Promise<{ links: string[] } | WebProductIngredientsResult> => {
+  const started = Date.now();
+  const searchController = new AbortController(); const searchTimer = setTimeout(() => searchController.abort(), options.searchTimeoutMs ?? 15000);
   try {
     const url = new URL('https://serpapi.com/search.json');
     url.search = new URLSearchParams({ engine: 'google_light', q: searchQuery,
       gl: 'us', hl: 'en', api_key: options.serpApiKey }).toString();
     const response = await fetcher(url.toString(), { redirect: 'error', signal: searchController.signal });
+    report({ stage: 'search', status: String(response.status), milliseconds: Date.now() - started });
     if (response.status === 429) return { status: 'rate_limited' };
     if ([400, 401, 403].includes(response.status)) return { status: 'configuration_required' };
     if (!response.ok) return { status: 'unavailable' };
@@ -257,18 +398,77 @@ export async function lookupWebProductIngredients(query: WebProductIngredientsRe
     // HTTP 200 alone is not proof this response belongs to the requested product search.
     if (!object(result.search_parameters) || typeof result.search_parameters.q !== 'string'
       || normalizeWhitespace(result.search_parameters.q) !== normalizeWhitespace(searchQuery)) return { status: 'unavailable' };
-    if (!Array.isArray(result.organic_results)) return { status: 'not_found' };
-    links = [...new Set(result.organic_results.slice(0, 5).flatMap(result => {
+    if (!Array.isArray(result.organic_results)) return { links: [] };
+    const links = [...new Set(result.organic_results.slice(0, 10).flatMap(result => {
       const url = object(result) ? safeIngredientPageUrl(result.link) : null; return url ? [url] : [];
     }))];
-  } catch { return { status: 'unavailable' }; } finally { clearTimeout(searchTimer); }
-  if (!links.length) return { status: 'not_found' };
-  const pages = (await Promise.all(links.map(link => fetchIngredientPage(link, fetcher, options.pageTimeoutMs ?? 7000))))
+    report({ stage: 'search', status: 'filtered', milliseconds: Date.now() - started, count: links.length });
+    return { links };
+  } catch { report({ stage: 'search', status: searchController.signal.aborted ? 'timeout' : 'failed', milliseconds: Date.now() - started });
+    return { status: 'unavailable' }; } finally { clearTimeout(searchTimer); }
+  };
+  const broadQuery = buildWebIngredientSearchQuery(parsed);
+  const manufacturerQuery = buildWebIngredientFallbackQuery(parsed);
+  // Private phone tests have a strict per-provider cooldown. Prefer the focused
+  // query there so a useful brand page normally needs only one reservation.
+  const primaryQuery = options.preferManufacturerSearch && manufacturerQuery ? manufacturerQuery : broadQuery;
+  const primary = await search(primaryQuery);
+  if ('status' in primary) return primary;
+  let links = primary.links;
+  const pagesStarted = Date.now();
+  let pages = (await Promise.all(links.map(link => fetchIngredientPage(link, fetcher, options.pageTimeoutMs ?? 7000))))
     .filter((page): page is IngredientWebPage => Boolean(page));
+  // Search again only when no exact page was usable, and reserve another provider request first.
+  const fallbackQuery = primaryQuery === broadQuery ? manufacturerQuery : broadQuery;
+  const usableNamedPages = () => resolveRememberedName ? rememberedIngredientCandidates(parsed, pages).length > 0
+    : pages.some(page => sameIngredientProduct(parsed, page.title));
+  if (!usableNamedPages() && fallbackQuery) {
+    try { if (await options.reserveRequest() !== 'reserved') return { status: 'rate_limited' }; }
+    catch { return { status: 'unavailable' }; }
+    const fallback = await search(fallbackQuery);
+    if ('status' in fallback) return fallback;
+    const unseen = fallback.links.filter(link => !links.includes(link));
+    pages = pages.concat((await Promise.all(unseen.map(link => fetchIngredientPage(link, fetcher, options.pageTimeoutMs ?? 7000))))
+      .filter((page): page is IngredientWebPage => Boolean(page)));
+    links = links.concat(unseen);
+  }
+  report({ stage: 'pages', status: 'read', milliseconds: Date.now() - pagesStarted, count: pages.length });
   if (!pages.length) return { status: 'not_found' };
+  if (resolveRememberedName) {
+    const candidates = rememberedIngredientCandidates(parsed, pages);
+    if (!candidates.length) return { status: 'not_found' };
+    if (candidates.length !== 1) return { status: 'ambiguous', candidates: candidates.slice(0, 5) };
+    parsed = { ...parsed, name: candidates[0].name, brand: candidates[0].brand };
+    report({ stage: 'pages', status: 'remembered_name_resolved', milliseconds: 0, count: 1 });
+  }
   // Exclude unrelated/form-mismatched product pages before asking the model to copy a list.
-  const matching = pages.filter(page => sameIngredientProduct(parsed, page.title));
+  const matching = pages.filter(page => sameIngredientProduct(parsed, page.title)).slice(0, 10);
   if (!matching.length) return { status: 'ambiguous' };
+  if (parsed.barcode === '' && options.preferManufacturerSearch) {
+    const publishedGtins = [...new Set(matching.flatMap(page => page.smartLabelGtins ?? []))];
+    if (publishedGtins.length > 1) return { status: 'ambiguous' };
+    if (publishedGtins.length === 1) {
+      const linked = await lookupOldSpiceSmartLabel(parsed, fetcher, options.now ?? (() => new Date()), publishedGtins[0]);
+      if (linked) {
+        report({ stage: 'extraction', status: 'smartlabel_found', milliseconds: 0, count: 1 });
+        return linked;
+      }
+    }
+  }
+  // Explicit named product data is already attributable. Do not require a model
+  // to copy it, or let a transient model outage hide a published ingredient list.
+  const explicitPages = matching.filter(page => page.explicitLists?.length);
+  const explicitLists = [...new Set(explicitPages.flatMap(page => page.explicitLists ?? []))];
+  if (explicitLists.length > 1) return { status: 'ambiguous' };
+  if (explicitLists.length === 1) {
+    const page = explicitPages[0];
+    report({ stage: 'extraction', status: 'structured_found', milliseconds: 0, count: 1 });
+    return { status: 'found', evidence: { productName: page.title.length <= 240 ? page.title : parsed.name,
+      ingredientsText: explicitLists[0], sourceUrl: page.url,
+      sourceName: new URL(page.url).hostname.replace(/^www\./, ''),
+      retrievedAt: (options.now?.() ?? new Date()).toISOString(), basis: 'published_web', formulaVerified: false } };
+  }
+  const modelStarted = Date.now();
   const modelController = new AbortController(); const modelTimer = setTimeout(() => modelController.abort(), options.modelTimeoutMs ?? 15000);
   try {
     const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -285,6 +485,7 @@ export async function lookupWebProductIngredients(query: WebProductIngredientsRe
         } },
       }),
     });
+    report({ stage: 'extraction', status: String(response.status), milliseconds: Date.now() - modelStarted });
     if (response.status === 429) return { status: 'rate_limited' };
     if ([400, 401, 403, 404].includes(response.status)) return { status: 'configuration_required' };
     if (!response.ok) return { status: 'unavailable' };
@@ -294,6 +495,9 @@ export async function lookupWebProductIngredients(query: WebProductIngredientsRe
     if (!object(candidate) || candidate.finishReason !== 'STOP' || !object(candidate.content) || !Array.isArray(candidate.content.parts)) return { status: 'unavailable' };
     const parts = candidate.content.parts.filter(part => object(part) && part.thought !== true);
     if (!parts.length || parts.some(part => !object(part) || typeof part.text !== 'string')) return { status: 'unavailable' };
-    return parseWebIngredientExtraction(JSON.parse(parts.map(part => (part as { text: string }).text).join('')), parsed, matching, options.now?.());
-  } catch { return { status: 'unavailable' }; } finally { clearTimeout(modelTimer); }
+    const extracted = parseWebIngredientExtraction(JSON.parse(parts.map(part => (part as { text: string }).text).join('')), parsed, matching, options.now?.());
+    report({ stage: 'extraction', status: extracted.status, milliseconds: Date.now() - modelStarted });
+    return extracted;
+  } catch { report({ stage: 'extraction', status: modelController.signal.aborted ? 'timeout' : 'failed', milliseconds: Date.now() - modelStarted });
+    return { status: 'unavailable' }; } finally { clearTimeout(modelTimer); }
 }

@@ -7,9 +7,12 @@ import { requestIngredientExplanation, ingredientExplanationKey } from '@/src/pr
 import { useAuthStore } from '@/src/stores/authStore';
 import { currentCustomerOwner } from '@/src/presentation/personal-decision/customerGateway';
 import { supabase } from '@/src/services/supabase';
+import type { PersonalProfileInput } from '@/src/contracts/PersonalContext';
+import { cosmeticContextFromPersonalProfile } from '@/src/domain/ingredient-context';
+import { hasSupportedExplanationCue } from '@/src/domain/ingredient-explanation-eligibility';
 
 type Props = { ownerId: string; productName: string; ingredientsText: string;
-  category: IngredientExplanationRequest['category']; contextRevision: number };
+  category: IngredientExplanationRequest['category']; contextRevision: number; localContext?: PersonalProfileInput | null };
 type State = { scope: string; kind: 'loading' | 'error' } | { scope: string; kind: 'result'; result: IngredientExplanationResult };
 const messages: Record<Exclude<IngredientExplanationResult, { status: 'answer' }>['status'], string> = {
   configuration_required: 'AI wording is not configured on this test backend. Your local ingredient notes still work.',
@@ -17,16 +20,16 @@ const messages: Record<Exclude<IngredientExplanationResult, { status: 'answer' }
   profile_missing: 'Save a skin profile first to use this explanation.',
   context_unavailable: 'Your saved profile could not be read. No AI answer was generated.',
   context_changed: 'Your profile changed during the request. Tap again to use the updated profile.',
-  rate_limited: 'The model allowance is temporarily full. Your local ingredient notes still work.',
+  rate_limited: 'Please wait at least 11 seconds before trying again. The private test allowance may also be full. Your local analysis remains available.',
   unavailable: 'The model could not be reached. Your local ingredient notes still work.',
-  no_answer: 'The model did not return a usable explanation. Your local ingredient notes still work.',
+  no_answer: 'The extra AI check did not add a supported finding. Your personal analysis is shown above.',
 };
 
-/** Optional consented AI wording, independent of the locally computed notes. */
+/** Optional consented source-limited wording. It does not replace the Personal Fit verdict. */
 export function PrivateIngredientExplanation(props: Props) {
   const owner = useAuthStore(s => s.sessionUserId);
   const request: IngredientExplanationRequest = { productName: props.productName, ingredientsText: props.ingredientsText,
-    category: props.category, contextSharingConsent: true };
+    category: props.category, contextSharingConsent: true, provider: 'jev' };
   const scope = owner === props.ownerId && currentCustomerOwner() === props.ownerId
     ? props.ownerId + ':' + props.contextRevision + ':' + ingredientExplanationKey(request) : '';
   const live = useRef(scope); live.current = scope;
@@ -51,17 +54,22 @@ export function PrivateIngredientExplanation(props: Props) {
     finally { if (busy.current === scope) busy.current = null; }
   };
   if (!scope || !supabase) return null;
+  // The core explanation is already calculated locally. Do not offer a model
+  // action that has no supported cue, then mislabel its abstention as a failure.
+  if (props.localContext !== undefined && !hasSupportedExplanationCue(props.ingredientsText, props.category,
+    cosmeticContextFromPersonalProfile(props.localContext))) return null;
   if (!props.productName.trim() || props.productName.length > 180) return <Text style={styles.caption}>
     This product name is too long for the AI test. The local ingredient notes remain available.
   </Text>;
   const visible = state?.scope === scope ? state : null;
   return <View style={styles.section}>
-    <Button label="Get a personal explanation" variant="outline" size="medium"
+    <Text style={styles.caption}>Your personal analysis above is automatic. This optional check sends only the disclosed context to AI.</Text>
+    <Button label="More detail with AI" variant="outline" size="medium"
       disabled={visible?.kind === 'loading'} onPress={() => {
         const selectedScope = scope;
         const selectedGeneration = lifecycle.current.generation;
         Alert.alert('Allow a personal explanation?',
-          'For this explanation only, send this ingredient text, product name, and your saved skin goals, type and reactivity to Google. No identity, photos, pregnancy answers, prescriptions or reaction history. AI guidance is not a verified safety or compatibility result.',
+          'For this explanation only, send the ingredients and your saved skin goals, type and reactivity to TypeSafe. No identity, photos, pregnancy answers, prescriptions or reaction history. AI guidance is not a verified safety or compatibility result.',
           [{ text: 'Cancel', style: 'cancel' }, { text: 'Allow this explanation', onPress: () => {
             if (lifecycle.current.generation === selectedGeneration && current() === selectedScope) void run();
           } }]);
@@ -71,7 +79,7 @@ export function PrivateIngredientExplanation(props: Props) {
     {visible?.kind === 'result' && (visible.result.status === 'answer' ? <>
       <Text style={styles.title}>Your personal ingredient notes</Text>
       {visible.result.sentences.map((sentence, index) => <Text key={index} selectable style={styles.body}>{sentence}</Text>)}
-      <Text style={styles.caption}>Generated with {visible.result.model}. Not a diagnosis, allergy finding or proof that this product is safe for you.</Text>
+      <Text style={styles.caption}>Assessed with {visible.result.model}. Not a diagnosis, allergy finding or proof that this product is safe for you.</Text>
     </> : <Text style={styles.body} accessibilityLiveRegion="polite">{messages[visible.result.status]}</Text>)}
   </View>;
 }

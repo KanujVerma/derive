@@ -10,6 +10,7 @@ import type { WebIngredientEvidence } from '@/src/contracts/WebProductIngredient
 import { supabase } from '@/src/services/supabase';
 import { useAuthStore } from '@/src/stores/authStore';
 import { ingredientLookupCopy } from '@/src/presentation/external-products/ingredientLookupCopy';
+import type { SourceLimitedAnalysis } from '@/src/presentation/personal-decision/sourceLimitedAnalysis';
 
 type State = { scope: string } & ({ kind: 'loading' } | { kind: 'result'; result: ProductIngredientLookup } | { kind: 'error' });
 
@@ -38,7 +39,8 @@ export function IngredientEvidenceCard({ item }: { item: PublishedIngredientEvid
   </View>;
 }
 /** Private source lookup with a product-only web fallback. No automatic persistence. */
-export function PublishedProductIngredients({ query, ownerId }: { query: ProductIngredientQuery; ownerId: string }) {
+export function PublishedProductIngredients({ query, ownerId, onAnalysis }: { query: ProductIngredientQuery; ownerId: string;
+  onAnalysis?: (analysis: SourceLimitedAnalysis | null) => void }) {
   const sessionOwner = useAuthStore(s => s.sessionUserId);
   const key = productIngredientKey(query);
   const scope = sessionOwner === ownerId ? ownerId + ':' + key : '';
@@ -47,6 +49,13 @@ export function PublishedProductIngredients({ query, ownerId }: { query: Product
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State | null>(null);
   const [web, setWeb] = useState<{ scope: string; evidence: WebIngredientEvidence | null; complete: boolean } | null>(null);
+  const analysisScope = scope + ':' + attempt;
+  const liveAnalysis = useRef(analysisScope); liveAnalysis.current = analysisScope;
+  const forwardAnalysis = useCallback((analysis: SourceLimitedAnalysis | null) => {
+    if (liveAnalysis.current !== analysisScope || useAuthStore.getState().sessionUserId !== ownerId) return;
+    onAnalysis?.(analysis);
+  }, [analysisScope, ownerId, onAnalysis]);
+  useEffect(() => { onAnalysis?.(null); }, [analysisScope, onAnalysis]);
   const onWebEvidence = useCallback((evidence: WebIngredientEvidence | null) => {
     if (live.current !== scope || useAuthStore.getState().sessionUserId !== ownerId) return;
     setWeb(previous => ({ scope, evidence, complete: previous?.scope === scope && previous.complete }));
@@ -85,8 +94,8 @@ export function PublishedProductIngredients({ query, ownerId }: { query: Product
       onEvidence={onWebEvidence} onComplete={onWebComplete} />
     {!loading && (!searchWeb || currentWeb?.complete || currentWeb?.evidence) && <PersonalIngredientNotes ownerId={ownerId}
       evidence={result?.evidence ?? []} webEvidence={currentWeb?.evidence ?? null} productKey={key}
-      productName={query.name ?? 'Unidentified product'}
-      category={/\b(deodorant|antiperspirant|shampoo|conditioner|hair)\b/i.test(query.name ?? '') ? 'other_personal_care' : 'skincare'} />}
+      productName={query.name ?? 'Unidentified product'} query={query} onAnalysis={onAnalysis ? forwardAnalysis : undefined}
+      />}
     {!loading && <Button label="Refresh ingredient lookup" variant="ghost" size="medium" onPress={() => {
       if (live.current !== scope || useAuthStore.getState().sessionUserId !== ownerId) return;
       memo.current = null; setWeb(null); setAttempt(n => n + 1);

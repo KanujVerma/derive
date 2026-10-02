@@ -1,5 +1,6 @@
 import type { ProductIngredientQuery } from '../../contracts/ProductIngredientLookup.ts';
 import type { WebProductIngredientLookup, WebIngredientEvidence } from '../../contracts/WebProductIngredients.ts';
+import { distinctiveNamedIngredientIdentity, researchableNamedIngredientIdentity } from '../../contracts/WebProductIngredients.ts';
 import { validPrivateBarcode, type PrivateLookupClient } from './privateLookup.ts';
 
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -12,8 +13,10 @@ const failureStatuses = new Set(['not_found', 'ambiguous', 'rate_limited', 'conf
 export const webProductIngredientKey = (query: ProductIngredientQuery): string => JSON.stringify([query.barcode, query.name, query.brand, query.size]);
 
 export function validWebIngredientQuery(value: unknown): value is ProductIngredientQuery & { name: string } {
-  return record(value) && typeof value.barcode === 'string' && validPrivateBarcode(value.barcode)
-    && label(value.name, 180) && optional(value.brand, 100) && optional(value.size, 80);
+  return record(value) && typeof value.barcode === 'string'
+    && label(value.name, 180) && optional(value.brand, 100) && optional(value.size, 80)
+    && (validPrivateBarcode(value.barcode) || (value.barcode === ''
+      && researchableNamedIngredientIdentity(value.name, value.brand as string | null)));
 }
 
 /** A displayable citation cannot carry credentials, local addresses or secret query parameters. */
@@ -43,6 +46,16 @@ export function parseWebProductIngredientLookup(value: unknown): WebProductIngre
   if (!record(value)) throw Error('INVALID_WEB_INGREDIENT_RESPONSE');
   if (typeof value.status === 'string' && failureStatuses.has(value.status)) {
     if ('evidence' in value) throw Error('INVALID_WEB_INGREDIENT_RESPONSE');
+    if (value.status === 'ambiguous' && 'candidates' in value) {
+      if (!Array.isArray(value.candidates) || value.candidates.length < 1 || value.candidates.length > 5)
+        throw Error('INVALID_WEB_INGREDIENT_RESPONSE');
+      const candidates = value.candidates.map(candidate => {
+        if (!record(candidate) || !label(candidate.name, 180) || !label(candidate.brand, 100)
+          || !distinctiveNamedIngredientIdentity(candidate.name, candidate.brand)) throw Error('INVALID_WEB_INGREDIENT_RESPONSE');
+        return { name: candidate.name, brand: candidate.brand };
+      });
+      return { status: 'ambiguous', candidates };
+    }
     return { status: value.status } as WebProductIngredientLookup;
   }
   const item = value.evidence;

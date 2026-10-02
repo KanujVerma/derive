@@ -157,7 +157,8 @@ test('historical search keeps isolated native display; current screen uses free 
   assert.match(native, /Allow this search/);
   assert.match(native, /No identity, photos, pregnancy answers, prescriptions or reaction history/);
   assert.doesNotMatch(parent, /<PrivateIngredientSearch/);
-  assert.match(parent, /<PublishedProductIngredients ownerId=\{ownerId\} query=\{\{ barcode/);
+  assert.match(parent, /const query = \{ barcode, name: candidate\?\.name/);
+  assert.match(parent, /<PublishedProductIngredients ownerId=\{ownerId\} query=\{query\} onAnalysis=\{onAnalysis\}/);
   assert.doesNotMatch(native, /from ['"][^'"]*analytics|analytics\.(?:track|capture)|recordFreeCheck|evaluateProduct|\.insert\(|\.upsert\(/);
   assert.doesNotMatch(web, /requestPrivateIngredientSearch|WebView|dangerouslySetInnerHTML/);
 });

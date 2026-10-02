@@ -33,6 +33,11 @@ if (!/^DERIVE_UPC_PRIVATE_TEST_ENABLED=true$/m.test(base)
 const updates = {
   GEMINI_API_KEY: value('GEMINI_API_KEY'), GEMINI_MODEL: value('GEMINI_MODEL'),
   SERPAPI_API_KEY: value('SERPAPI_API_KEY'), DERIVE_WEB_INGREDIENT_TEST_ENABLED: 'true',
+  JEV_API_KEY: value('JEV_API_KEY'), JEV_MODEL: 'jev-latest',
+  DERIVE_INGREDIENT_MODEL_PROVIDER: 'jev', DERIVE_JEV_INGREDIENT_TEST_ENABLED: 'true',
+  // Founder approved minimal goals/type/reactivity on the existing explicit tap.
+  // This does not enable automatic cloud analysis or sharing reaction history.
+  DERIVE_JEV_PERSONAL_CONTEXT_APPROVED: 'true',
 };
 const retained = base.split(/\r?\n/).filter(line => !Object.keys(updates).some(name => line.startsWith(name + '=')));
 const folder = mkdtempSync(join(tmpdir(), 'derive-private-ingredient-runtime-'));
@@ -41,7 +46,7 @@ writeFileSync(file, retained.concat(Object.entries(updates).map(([key, setting])
 const child = spawn('supabase', ['functions', 'serve', '--env-file', file], {
   cwd: root, stdio: 'inherit', env: { ...process.env, DO_NOT_TRACK: '1' },
 });
-console.log('Starting the local private ingredient server. Provider values are not displayed. Personal context and photo approval settings are unchanged.');
+console.log('Starting the local private ingredient server. Provider values are not displayed. Jev receives minimal skin context only on the approved explicit action. Photos and reaction history are not enabled for cloud processing.');
 const cleanup = () => { rmSync(file, { force: true }); rmdirSync(folder); };
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => child.kill(signal));
 child.once('error', () => { cleanup(); console.error('The local server could not start.'); process.exitCode = 1; });

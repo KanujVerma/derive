@@ -8,17 +8,19 @@ import { QuestionGroup } from '@/src/components/ui/QuestionGroup';
 import type { RoutineReference } from '@/src/presentation/p0b-personalization/draft';
 import { createExperienceDraft, selectExperienceCatalogProduct, confirmExperiencePackage, unambiguousExperiencePackage, prepareExperienceEdit, unknownUseContext, validateExperienceDraft, type ExperienceDraft, type ExperienceEdit, type ExperienceKind } from '@/src/presentation/p0b-personalization/experience';
 import { ReportedUseFields } from './ReportedUseFields';
+import { ReactionProductResearch } from './ReactionProductResearch';
 import { styles } from './ContextFlow';
 export interface ExperienceContextProps {
   /** New reports use the host UUID. Corrections retain the existing report ID and revision. */
   createRecordId: () => string; existing?: { draft: ExperienceDraft; revisionId: string };
   initialDraft?: ExperienceDraft;
+  ownerId?: string;
   availableProducts?: readonly Extract<RoutineReference, { kind: 'catalog' }>[];
   onApply: (edit: ExperienceEdit) => void; onSkip: () => void; loading?: boolean; error?: string | null;
 }
 const kinds: readonly [ExperienceKind, string][] = [['reacted', 'I reacted to it'], ['tolerated', 'I tolerated it'], ['no_reaction_reported', 'No reaction to report'], ['liked', 'I liked it'], ['finished', 'I finished it'], ['ineffective', 'It did not help my goal']];
 /** User reports remain reports. The host owns record revisions and persistence. */
-export function ExperienceContext({ createRecordId, existing, initialDraft, availableProducts = [], onApply, onSkip, loading = false, error }: ExperienceContextProps) {
+export function ExperienceContext({ createRecordId, existing, initialDraft, ownerId, availableProducts = [], onApply, onSkip, loading = false, error }: ExperienceContextProps) {
   const [edit, setEdit] = useState<ExperienceEdit>(() => existing ? prepareExperienceEdit(existing.draft, existing.revisionId) : { draft: createExperienceDraft(initialDraft?.id ?? createRecordId(), initialDraft), supersedesRevisionId: null });
   const [symptomsText, setSymptomsText] = useState(() => existing?.draft.symptoms.join('\n') ?? '');
   const [validation, setValidation] = useState<string | null>(null);
@@ -41,6 +43,8 @@ export function ExperienceContext({ createRecordId, existing, initialDraft, avai
     </View></QuestionGroup>
     <QuestionGroup label="What did you notice?"><View style={styles.chips}>{kinds.map(([kind, label]) => <ChoiceChip key={kind} label={label} selectionType="single" selected={draft.kind === kind} disabled={loading} onSelect={() => update({ kind })} />)}</View></QuestionGroup>
     <Text style={styles.copy}>No reaction to report does not mean you confirmed tolerance.</Text>
+    {ownerId && draft.kind === 'reacted' && draft.reference.kind === 'manual' && draft.reference.label.trim() &&
+      <ReactionProductResearch ownerId={ownerId} name={draft.reference.label} auto={Boolean(existing)} />}
     <Button label={detailsVisible ? 'Hide optional details' : 'Add optional details'} variant="ghost" disabled={loading} onPress={() => setDetailsVisible(!detailsVisible)} />
     {detailsVisible && <View style={styles.questions}><QuestionGroup label="When, if known" support="Leave dates blank when unknown. An approximate interval is kept as an interval."><View style={styles.disclosure}>{(['start', 'end'] as const).map(field => <TextInput key={field} accessibilityLabel={field === 'start' ? 'Experience date or interval start' : 'Experience interval end'} style={styles.input} editable={!loading} placeholder={field === 'start' ? 'Date or start YYYY-MM-DD' : 'Interval end YYYY-MM-DD, if known'} value={draft.occurred[field] ?? ''} onChangeText={text => update({ occurred: { ...draft.occurred, [field]: text.trim() || null } })} />)}</View></QuestionGroup>
     <QuestionGroup label="What else did you notice?"><View style={styles.disclosure}>

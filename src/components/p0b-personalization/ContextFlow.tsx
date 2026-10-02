@@ -12,6 +12,7 @@ import { toggleProfileGoal } from '@/src/presentation/p0b-personalization/goalSe
 import { addCurrentProduct, addPastOutcome, currentProductFeedback, currentFeedbackChoices, currentFeedbackLabels, toggleCurrentFeedback, clearCurrentFeedback, setSetupAnswer, removePastOutcome, productOutcomeLabels, catalogFamilyReference, createSetupBundle, currentUseItem, manualUnverifiedReference, removeSetupProduct, setAdditionalNote, type SetupBundle, type ProductOutcome } from '@/src/presentation/p0b-personalization/setup';
 import { CatalogProductSearch } from '@/src/components/catalog/CatalogProductSearch';
 import type { CatalogProductSummary } from '@/src/contracts/ProductCatalog';
+import { ReactionProductResearch } from './ReactionProductResearch';
 
 const goals = GOALS.map(([value, label]) => [value, value === 'dryness' ? 'Dryness' : label] as const);
 const notices = [['stung', 'Stung'], ['broke_out', 'Broke out'], ['too_drying', 'Too drying'], ['too_heavy', 'Too heavy'], ['not_helping', 'Not helping']] as const;
@@ -25,6 +26,9 @@ export interface ContextFlowProps {
   completionLabel?: string;
   /** Fresh setup may also record current products, product experiences, and a raw note. Profile editing does not replay those stages. */
   setup?: boolean;
+  /** Live host persists supported profile, routine and report fields through existing APIs. */
+  persistentSetup?: boolean;
+  initialSetup?: SetupBundle;
   ownerId?: string | null;
   createId?: () => string;
   /** Fixture hosts inject local product examples; live editors keep the catalog service. */
@@ -44,21 +48,21 @@ function AnswerChoices<T extends string>({ label, support, answer, choices, onCh
   </View></QuestionGroup>;
 }
 /** Local optional collection. The host acknowledges saving and refreshes the originating Check. */
-export function ContextFlow({ initialDraft, relevance, contextQuestions = [], collectIntent = true, completionLabel = 'Save skin profile', setup = false, ownerId = null, createId, catalogSearch, onSetup, onApply, onSkip, loading = false, error }: ContextFlowProps) {
+export function ContextFlow({ initialDraft, relevance, contextQuestions = [], collectIntent = true, completionLabel = 'Save skin profile', setup = false, persistentSetup = false, initialSetup, ownerId = null, createId, catalogSearch, onSetup, onApply, onSkip, loading = false, error }: ContextFlowProps) {
   const [draft, setDraft] = useState(() => createContextDraft(initialDraft));
   const [sensitivityText, setSensitivityText] = useState(() => initialDraft?.sensitivities.state === 'answered' ? initialDraft.sensitivities.value.join('\n') : '');
   const [step, setStep] = useState(0);
   const [validation, setValidation] = useState<string | null>(null);
-  const [bundle, setBundle] = useState(() => createSetupBundle(ownerId));
+  const [bundle, setBundle] = useState(() => initialSetup?.ownerId === ownerId ? initialSetup : createSetupBundle(ownerId));
   const [manualName, setManualName] = useState('');
   const [outcomeOpen, setOutcomeOpen] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   const [pending, setPending] = useState<RoutineReference | null>(null);
   const fields = relevantQuestions(relevance);
   const hasContext = contextQuestions.length > 0 || fields.length > 0;
-  const editing = Boolean(initialDraft);
+  const editing = Boolean(initialDraft) && !(setup && persistentSetup);
   const extended = setup && !editing && !hasContext;
-  const last = hasContext ? 2 : extended ? 4 : 1;
+  const last = hasContext ? 2 : extended ? persistentSetup ? 3 : 4 : 1;
   const currentBundle = bundle.ownerId === ownerId ? bundle : createSetupBundle(ownerId);
   if (currentBundle !== bundle) { setBundle(currentBundle); setNoteText(''); setOutcomeOpen(null); setPending(null); setManualName(''); }
   const update = <K extends keyof ContextDraft>(key: K, value: ContextDraft[K]) => { setValidation(null); setDraft(current => ({ ...current, [key]: value })); };
@@ -111,29 +115,33 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
           {currentProductFeedback(currentBundle, product.id).length > 0 && <Text style={styles.copy}>{currentProductFeedback(currentBundle, product.id).map(value => currentFeedbackLabels[value]).join(' · ')}</Text>}
           {outcomeOpen === product.id && <View style={styles.disclosure}>
             <Text style={styles.copy}>Optional. Choose all that apply to this product.</Text>
-            <View style={styles.chips}>{currentFeedbackChoices(currentBundle.previewOnly.catalogCategories?.[product.id]).map(([outcome, label]) => <ChoiceChip key={outcome} label={label} selectionType="multiple" selected={currentProductFeedback(currentBundle, product.id).includes(outcome)} disabled={loading} onSelect={() => setBundle(toggleCurrentFeedback(currentBundle, product.id, outcome))} />)}</View>
+            <View style={styles.chips}>{currentFeedbackChoices(currentBundle.previewOnly.catalogCategories?.[product.id]).filter(([outcome]) => !persistentSetup || outcome !== 'too_heavy').map(([outcome, label]) => <ChoiceChip key={outcome} label={label} selectionType="multiple" selected={currentProductFeedback(currentBundle, product.id).includes(outcome)} disabled={loading} onSelect={() => setBundle(toggleCurrentFeedback(currentBundle, product.id, outcome))} />)}</View>
             <Button label="Clear feedback" variant="ghost" disabled={loading} onPress={() => setBundle(clearCurrentFeedback(currentBundle, product.id))} />
           </View>}
-          <Button label={`Remove ${product.reference.label}`} variant="ghost" onPress={() => setBundle(removeSetupProduct(currentBundle, product.id))} />
+          {persistentSetup && initialSetup?.products.some(item => item.id === product.id)
+            ? <Text style={styles.copy}>Saved routine product. You can remove it in your routine editor.</Text>
+            : <Button label={`Remove ${product.reference.label}`} variant="ghost" disabled={loading} onPress={() => setBundle(removeSetupProduct(currentBundle, product.id))} />}
         </View>)}
         {!currentBundle.products.length && <View style={styles.chips}>{([['none', 'No skincare products'], ['unknown', 'Not sure']] as const).map(([value, label]) => <ChoiceChip key={value} label={label} selectionType="single" selected={currentBundle.previewOnly.currentProducts === value} disabled={loading} onSelect={() => setBundle(setSetupAnswer(currentBundle, 'currentProducts', value))} />)}</View>}
-        <Text style={styles.copy}>Preview only. Products and outcomes aren’t saved.</Text>
+        <Text style={styles.copy}>{persistentSetup ? 'We save these as your reported routine and product experiences. Names you add are not verified product matches. Not sure does not establish tolerance.' : 'Preview only. Products and outcomes aren’t saved.'}</Text>
       </QuestionGroup>
     </View>}
     {extended && step === 3 && <View style={styles.questions}>
       <QuestionGroup label="Any skincare products that didn't agree with your skin?">
         <CatalogProductSearch embedded label="Search products" search={catalogSearch} onQueryChange={value => setPending(value.trim() ? manualUnverifiedReference(value) : null)} onSelect={(product: CatalogProductSummary) => setPending(catalogFamilyReference(product))} />
-        {notices.map(([notice, label]) => <Button key={notice} label={label} variant="secondary" disabled={loading || !pending?.label.trim()} onPress={() => { if (pending) addNoticedProduct(pending, notice); setPending(null); }} />)}
+        {notices.filter(([notice]) => !persistentSetup || notice !== 'too_heavy').map(([notice, label]) => <Button key={notice} label={label} variant="secondary" disabled={loading || !pending?.label.trim()} onPress={() => { if (pending) addNoticedProduct(pending, notice); setPending(null); }} />)}
         {currentBundle.previewOnly.pastReports.map(experience => <View key={experience.id} style={styles.chips}>
           <Text>{experience.reference.label}</Text>
           <Text>{productOutcomeLabels[experience.outcome]}</Text>
-          <Button label={`Remove ${experience.reference.label}`} variant="ghost" onPress={() => setBundle(removePastOutcome(currentBundle, experience.id))} />
+          {persistentSetup && ownerId && experience.reference.kind === 'manual' && ['stung', 'broke_out', 'too_drying'].includes(experience.outcome) &&
+            <ReactionProductResearch ownerId={ownerId} name={experience.reference.label} />}
+          <Button label={`Remove ${experience.reference.label}`} variant="ghost" disabled={loading} onPress={() => setBundle(removePastOutcome(currentBundle, experience.id))} />
         </View>)}
         {!currentBundle.previewOnly.pastReports.length && <View style={styles.chips}>{([['none', 'None that I remember'], ['unknown', 'Not sure']] as const).map(([value, label]) => <ChoiceChip key={value} label={label} selectionType="single" selected={currentBundle.previewOnly.pastProducts === value} disabled={loading} onSelect={() => setBundle(setSetupAnswer(currentBundle, 'pastProducts', value))} />)}</View>}
-        <Text style={styles.copy}>Your report doesn’t identify an ingredient cause. Preview reports aren’t saved.</Text>
+        <Text style={styles.copy}>{persistentSetup ? 'Previous reports are kept. We save each new product experience you add. Your report does not identify an ingredient cause. None or not sure adds no report.' : 'Your report doesn’t identify an ingredient cause. Preview reports aren’t saved.'}</Text>
       </QuestionGroup>
     </View>}
-    {extended && step === 4 && <View style={styles.questions}>
+    {extended && !persistentSetup && step === 4 && <View style={styles.questions}>
       <QuestionGroup label="Anything else you'd like Derive to know?">
         <TextInput style={styles.input} accessibilityLabel="Anything else" multiline placeholder="Anything we didn't cover." value={noteText} onChangeText={text => { setNoteText(text); setBundle(setAdditionalNote(currentBundle, text)); }} />
         <Text style={styles.copy}>Preview only. This note isn’t saved or used in a Check.</Text>
