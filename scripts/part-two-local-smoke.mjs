@@ -9,6 +9,8 @@ import { LOCAL_DICTIONARY_RELEASE, PART_TWO_VERSIONS, PART_TWO_RELEASE_ID } from
 import { parseDeclarationSection } from '../src/domain/part-one/parser.ts';
 import { projectExplanationWithdrawals } from '../src/domain/part-two/index.ts';
 import { NormalizationResultSchema } from '../src/contracts/PartTwo.ts';
+import { ScanResultSchema } from '../src/contracts/PartOne.ts';
+import { normalizeDatabaseDates } from '../supabase/functions/_shared/part-one-runtime.ts';
 const endpoint=process.env.SUPABASE_URL,anon=process.env.SUPABASE_ANON_KEY,service=process.env.SUPABASE_SERVICE_ROLE_KEY;
 if(!endpoint||!anon||!service)throw new Error('Isolated local environment required');
 const target=new URL(endpoint);if(target.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(target.hostname)||target.username||target.password||target.pathname!=='/'||target.search||target.hash)throw new Error('Hosted/ambiguous stack refused');
@@ -97,7 +99,7 @@ try{
  }
  if(process.argv.includes('--ui')){
   const {data:{session}}=await clients[0].auth.getSession();
-  await writeFile(new URL('../../part-two-ui-bootstrap.json',import.meta.url),JSON.stringify({ownerId:users[0],token:session.access_token,apiKey:anon,result:scan,apiOrigin:endpoint,observationId:observation}),{mode:0o600});
+  await writeFile(new URL('../../part-two-ui-bootstrap.json',import.meta.url),JSON.stringify({ownerId:users[0],token:session.access_token,apiKey:anon,result:ScanResultSchema.parse(normalizeDatabaseDates(scan)),apiOrigin:endpoint,observationId:observation}),{mode:0o600});
   console.log(JSON.stringify({suite:'part-two-ui-fixture',status:'ready',synthetic:true}));
   const hold=setInterval(()=>{},1000);try{await new Promise(resolve=>{process.once('SIGINT',resolve);process.once('SIGTERM',resolve);});}finally{clearInterval(hold);}
  }
