@@ -8,9 +8,10 @@ import * as React from 'react';
 const nativeRequire = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 type Element = { type: string | ((props: any) => unknown); props: Record<string, any> };
-export function componentHarness(file: string, name: string, initialProps: Record<string, any>, options: { modules?: Record<string, any>; developmentRuntime?: boolean } = {}) {
+export function componentHarness(file: string, name: string, initialProps: Record<string, any>, options: { modules?: Record<string, any>; developmentRuntime?: boolean; effects?: boolean } = {}) {
   const slots: any[] = [];
   let cursor = 0;
+  let pendingEffects: (() => void)[] = [];
   const cache = new Map<string, any>();
   const react = { ...React, useState(initial: any) {
     const index = cursor++;
@@ -25,7 +26,13 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     const previous = slots[index];
     if (!previous || dependencies.some((value, at) => value !== previous.dependencies[at])) slots[index] = { dependencies, value: factory() };
     return slots[index].value;
-  }, useEffect() {}, useCallback(callback: any) { return callback; },
+  }, useEffect(callback: () => (() => void) | void, dependencies?: readonly unknown[]) {
+    if (!options.effects) return;
+    const index = cursor++, previous = slots[index];
+    if (!previous || !dependencies || dependencies.some((value, at) => value !== previous.dependencies[at])) pendingEffects.push(() => {
+      previous?.cleanup?.(); slots[index] = { dependencies, cleanup: callback() };
+    });
+  }, useCallback(callback: any) { return callback; },
   useSyncExternalStore(_subscribe: any, getSnapshot: any) { return getSnapshot(); } };
   function load(path: string): any {
     if (cache.has(path)) return cache.get(path);
@@ -41,7 +48,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       if (id.endsWith('/PartOneLabelCapture')) return { PartOneLabelCapture: 'PartOneLabelCapture', PART_ONE_LOCAL_CAPTURE_AVAILABLE: false, purgeLocalCaptureFile() {} };
       if (id.endsWith('/PartOneResultSheet')) return { PartOneResultSheet: 'PartOneResultSheet' };
       if (id.endsWith('/PartOneSavedProducts')) return { PartOneSavedProducts: 'PartOneSavedProducts' };
-      if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
+      if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: { addEventListener: () => ({ remove() {} }) }, Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
       if (id.startsWith('@/src/components/ui/')) { const component = id.slice(id.lastIndexOf('/') + 1); return { [component]: component }; }
       if (id.endsWith('/CatalogProductSearch')) return { CatalogProductSearch: ({ label, onSelect, onQueryChange }: { label?: string; onSelect: (product: { productId: string; brand: string; name: string }) => void; onQueryChange?: (query: string) => void }) => React.createElement('button', { label, onPress: () => onSelect({ productId: 'catalog-product', brand: 'CeraVe', name: 'Moisturizer' }), onQueryChange }) };
@@ -67,9 +74,9 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       if (typeof value.type === 'function') { visit(value.type(value.props)); return; }
       nodes.push(value); visit(value.props.children);
     }
-    visit(Component(props)); return nodes;
+    visit(Component(props)); const effects = pendingEffects; pendingEffects = []; effects.forEach(effect => effect()); return nodes;
   }
-  return { render };
+  return { render, dispose() { for (const value of slots) value?.cleanup?.(); } };
 }
 export function control(nodes: Element[], label: string): Element {
   const found = nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label || (typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith(`${label}, `)));

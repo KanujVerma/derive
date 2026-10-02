@@ -25,11 +25,32 @@ test('A20 every pending/terminal state rejects stale binding, owner and request 
   }
 });
 test('A20 delayed pending/error cannot overwrite a newer terminal revision or cross account', async () => {
-  const f = fixture(), old = f.controller.refresh(), next = f.controller.refresh();
+  const f = fixture(), old = f.controller.refresh(); f.controller.invalidate(); const next = f.controller.refresh();
   f.waits[1].resolve(result(f.waits[1].request, 6)); assert.equal(await next, true);
   f.waits[0].resolve(result(f.waits[0].request, 5,'pending')); assert.equal(await old, false); assert.equal(f.controller.getView().result?.resultRevision, 6);
   const delayed = f.controller.refresh(); f.controller.bind({ ...target, ownerId:'owner-b' }); f.waits[2].reject(new Error('late network failure'));
   assert.equal(await delayed,false); assert.equal(f.controller.getView().target?.ownerId,'owner-b'); assert.equal(f.controller.getView().error,null);
+});
+test('review a 20-second successful response survives the 15-second poll by joining in-flight work', async t => {
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=fixture(),first=f.controller.refresh();t.mock.timers.tick(15000);const poll=f.controller.refresh();
+ assert.equal(f.waits.length,1,'poll must join, not supersede the current request');
+ t.mock.timers.tick(5000);f.waits[0].resolve(result(f.waits[0].request,12));
+ assert.equal(await first,true);assert.equal(await poll,true);assert.equal(f.controller.getView().result?.resultRevision,12);assert.equal(f.controller.getView().loading,false);
+});
+test('review slow failure settles all joiners and permits a later retry', async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=fixture(),first=f.controller.refresh();t.mock.timers.tick(15000);const poll=f.controller.refresh();assert.equal(f.waits.length,1);
+ t.mock.timers.tick(5000);f.waits[0].reject(Error('slow failure'));assert.equal(await first,false);assert.equal(await poll,false);assert.equal(f.controller.getView().loading,false);
+ const retry=f.controller.refresh();assert.equal(f.waits.length,2);f.waits[1].resolve(result(f.waits[1].request,13));assert.equal(await retry,true);
+});
+test('review timeout releases a stuck flight and a late old result cannot supersede retry or account switch', async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=fixture(),old=f.controller.refresh();t.mock.timers.tick(30000);assert.equal(await old,false);assert.equal(f.controller.getView().loading,false);
+ const retry=f.controller.refresh();f.waits[1].resolve(result(f.waits[1].request,15));assert.equal(await retry,true);
+ f.waits[0].resolve(result(f.waits[0].request,99));await Promise.resolve();assert.equal(f.controller.getView().result?.resultRevision,15);
+ const delayed=f.controller.refresh();f.controller.bind({...target,ownerId:'owner-b'});assert.equal(await delayed,false);
+ f.waits[2].resolve(result(f.waits[2].request,100));await Promise.resolve();assert.equal(f.controller.getView().result,null);assert.equal(f.controller.getView().target?.ownerId,'owner-b');
 });
 test('A22 revisions stay monotonic across binding/release changes; equal revisions only replay identical content', async () => {
   const f = fixture();

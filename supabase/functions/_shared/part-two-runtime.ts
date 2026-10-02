@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { DeclarationSchema, FactBundleV1Schema, SaveRequestSchema, ScanResultSchema } from '../../../src/contracts/PartOne.ts';
-import { NormalizationInputSchema, NormalizationRequestSchema, NormalizationResultSchema, type NormalizationInput, type NormalizationRequest, type NormalizationResult } from '../../../src/contracts/PartTwo.ts';
+import { PartTwoLabelAssertionSchema, NormalizationInputSchema, NormalizationRequestSchema, NormalizationResultSchema, type NormalizationInput, type NormalizationRequest, type NormalizationResult } from '../../../src/contracts/PartTwo.ts';
 import { normalize, PART_TWO_VERSIONS } from '../../../src/domain/part-two/index.ts';
 import { LOCAL_DICTIONARY_RELEASE } from '../../../src/domain/part-two/dictionary.ts';
 import { normalizeDatabaseDates } from './part-one-runtime.ts';
@@ -11,7 +11,7 @@ const date=z.string().refine(s=>Number.isFinite(Date.parse(s)));
 const id=z.string().min(1).max(200), revision=z.number().int().nonnegative();
 const rawRecord=z.strictObject({id,kind:z.enum(['observation','snapshot','declaration']),item_id:id.nullable(),revision,canonical_key:z.string().nullable(),policy_id:id,policy_version:id,owner_id:id.nullable(),scope:z.enum(['public','private_package']),payload:z.record(z.string(),z.unknown()),dependencies:z.array(id),identity_dependencies:z.array(id),supersedes_id:id.nullable(),observed_at:date,expires_at:date,created_at:date});
 const dependency=z.strictObject({id,kind:z.enum(['observation','snapshot','declaration']),revision,policyId:id,policyVersion:id,ownerId:id.nullable(),scope:z.enum(['public','private_package']),payload:z.record(z.string(),z.unknown()),dependencies:z.array(id),identityDependencies:z.array(id),observedAt:date,expiresAt:date,status:z.enum(['active','revoked','retracted','superseded']),statusRevision:revision});
-const contextSchema=z.strictObject({ownerId:id,scanId:id,capture:z.strictObject({captureSessionId:id,packageObservationId:id,captureRevision:revision,generation:revision,deletionEpoch:revision,removed:z.boolean()}).nullable(),generation:revision,evidenceRevision:revision,bindingRevision:revision,policyEpoch:revision,withdrawnExplanationDependencies:z.array(id).max(1000),deletionEpoch:revision,result:z.record(z.string(),z.unknown()),declaration:rawRecord.nullable(),snapshot:rawRecord.nullable(),dependencies:z.array(dependency).max(512),observations:z.array(dependency).max(512),policies:z.array(z.strictObject({id,version:id,retainAllowed:z.boolean(),displayAllowed:z.boolean(),exportAllowed:z.boolean(),epoch:revision,expiresAt:date.nullable()})).max(512),expiresAt:date.nullable(),state:z.enum(['pending','no_declaration','blocked','parse_limit']),releaseId:id.nullable(),releaseHash:z.string().nullable(),versions:z.record(z.string(),z.unknown()).nullable(),releaseEpoch:revision,contextDigest:z.string().regex(/^[a-f0-9]{64}$/),dependencyDigest:z.string().regex(/^[a-f0-9]{64}$/),bindingKey:id});
+const contextSchema=z.strictObject({ownerId:id,scanId:id,capture:z.strictObject({captureSessionId:id,packageObservationId:id,captureRevision:revision,generation:revision,deletionEpoch:revision,removed:z.boolean()}).nullable(),generation:revision,evidenceRevision:revision,bindingRevision:revision,policyEpoch:revision,withdrawnExplanationDependencies:z.array(id).max(1000),deletionEpoch:revision,result:z.record(z.string(),z.unknown()),declaration:rawRecord.nullable(),snapshot:rawRecord.nullable(),dependencies:z.array(dependency).max(512),observations:z.array(dependency).max(512),policies:z.array(z.strictObject({id,version:id,retainAllowed:z.boolean(),displayAllowed:z.boolean(),exportAllowed:z.boolean(),epoch:revision,labelAssertionKinds:z.array(z.enum(['category','usage','purpose','claim'])).max(4).optional(),labelAssertionEpoch:revision.optional(),expiresAt:date.nullable()})).max(512),expiresAt:date.nullable(),state:z.enum(['pending','no_declaration','blocked','parse_limit']),releaseId:id.nullable(),releaseHash:z.string().nullable(),versions:z.record(z.string(),z.unknown()).nullable(),releaseEpoch:revision,contextDigest:z.string().regex(/^[a-f0-9]{64}$/),dependencyDigest:z.string().regex(/^[a-f0-9]{64}$/),bindingKey:id});
 const resolvedSchema=z.strictObject({context:contextSchema,resultRevision:revision,state:z.enum(['ready','pending','no_declaration','blocked','expired','parse_limit','failed']),reasonCodes:z.array(z.string()),cached:z.unknown().nullable(),ticket:z.strictObject({bindingKey:id,leaseToken:id,contextDigest:id,expectedResultRevision:revision}).nullable()});
 type Context=z.infer<typeof contextSchema>;
 type Dependency=z.infer<typeof dependency>;
@@ -42,8 +42,34 @@ function sourceRefs(ctx:Context,ids:string[]) {
  return ids.map(observationId=>{
   const o=ctx.observations.find(o=>o.id===observationId);if(!o||o.status==='revoked'||o.status==='retracted'||!ctx.policies.some(p=>p.id===o.policyId&&p.version===o.policyVersion&&p.retainAllowed&&p.displayAllowed))throw new Error('source_unavailable');
   const raw=sourceText(o);if(raw===null)throw new Error('source_text_unavailable');
-  const p=o.payload;return {observationId:o.id,sourceRevision:o.revision,contentHash:typeof p.contentHash==='string'&&/^[a-f0-9]{64}$/.test(p.contentHash)?p.contentHash:sha256(raw),policyId:o.policyId,policyVersion:o.policyVersion,evidenceBasis:o.scope==='public'?'public_source' as const:'private_package' as const,observedAt:utc(o.observedAt),sourceUpdatedAt:typeof p.sourceUpdatedAt==='string'?utc(p.sourceUpdatedAt):null,expiresAt:utc(o.expiresAt),permitted:true as const,sourceUrl:typeof p.sourceUrl==='string'?p.sourceUrl:null,attribution:typeof p.provider==='string'?p.provider:o.scope==='private_package'?'Your private label':null};
+  const p=o.payload;return {observationId:o.id,sourceRevision:o.revision,sourceTextHash:sha256(raw),contentHash:typeof p.contentHash==='string'&&/^[a-f0-9]{64}$/.test(p.contentHash)?p.contentHash:sha256(raw),policyId:o.policyId,policyVersion:o.policyVersion,evidenceBasis:o.scope==='public'?'public_source' as const:'private_package' as const,observedAt:utc(o.observedAt),sourceUpdatedAt:typeof p.sourceUpdatedAt==='string'?utc(p.sourceUpdatedAt):null,expiresAt:utc(o.expiresAt),permitted:true as const,sourceUrl:typeof p.sourceUrl==='string'?p.sourceUrl:null,attribution:typeof p.provider==='string'?p.provider:o.scope==='private_package'?'Your private label':null};
  });
+}
+class AuthoritativeParseLimit extends Error {}
+const labelAnnotation=z.strictObject({assertionId:id,assertionKind:z.enum(['category','usage','purpose','claim']),text:z.string().min(1).max(2000),start:revision,end:revision,transcription:z.enum(['clear','uncertain','conflict']),conditional:z.string().max(1000).nullable()});
+/** Only immutable, service-admitted annotations plus live field grants qualify.
+ * Stored fieldPermission flags/category metadata are never copied as authority. */
+function qualifiedLabelAssertions(ctx:Context,observationIds:string[]) {
+ const assertions:z.infer<typeof PartTwoLabelAssertionSchema>[]=[];let annotatedCount=0;
+ for(const observationId of observationIds){
+  const source=ctx.observations.find(o=>o.id===observationId);if(!source)continue;
+  const text=sourceText(source),policy=ctx.policies.find(p=>p.id===source.policyId&&p.version===source.policyVersion);
+  if(text===null||!policy||!policy.retainAllowed||!policy.displayAllowed||typeof policy.labelAssertionEpoch!=='number'||source.status!=='active'||source.scope==='private_package'&&source.ownerId!==ctx.ownerId)continue;
+  const annotations=source.payload.labelAssertions;
+  if(!Array.isArray(annotations))continue;annotatedCount+=annotations.length;if(annotatedCount>100)throw new AuthoritativeParseLimit('label_annotation_limit');
+  for(const annotation of annotations){
+   const parsed=labelAnnotation.safeParse(annotation);if(!parsed.success)continue;const a=parsed.data;
+   if(!(policy.labelAssertionKinds??[]).includes(a.assertionKind)||a.end<=a.start||a.end>text.length||text.slice(a.start,a.end)!==a.text)continue;
+   const deadline=Math.min(Date.parse(source.expiresAt),Date.parse(ctx.expiresAt!),policy.expiresAt?Date.parse(policy.expiresAt):Infinity);
+   if(!Number.isFinite(deadline)||deadline<Date.parse(ctx.expiresAt!))continue;
+   const candidate=PartTwoLabelAssertionSchema.safeParse({assertionId:a.assertionId,assertionKind:a.assertionKind,text:a.text,sourceText:text,
+    span:{observationId:source.id,sourceRevision:source.revision,sectionId:`label:${source.id}`,entryId:a.assertionId,start:a.start,end:a.end,raw:a.text},
+    transcription:a.transcription,conditional:a.conditional,fieldPermission:{policyId:policy.id,policyVersion:policy.version,assertionKind:a.assertionKind,policyEpoch:policy.labelAssertionEpoch,expiresAt:new Date(deadline).toISOString(),permitted:true}});
+   if(candidate.success&&!assertions.some(existing=>existing.assertionId===candidate.data.assertionId))assertions.push(candidate.data);
+
+  }
+ }
+ return assertions;
 }
 /** Materialize only fields persisted by Part 1, never client authority flags. */
 export function authoritativeInput(ctx:Context,request:NormalizationRequest):NormalizationInput {
@@ -67,7 +93,7 @@ export function authoritativeInput(ctx:Context,request:NormalizationRequest):Nor
   const attributedEdits=ctx.observations.filter(o=>observations.some(ref=>ref.observationId===o.id)&&o.payload.privateKind==='edit').map(o=>({observationId:o.id,supersedesId:String(object(o.payload.observation).supersedesId),revision:o.revision}));
   const binding={...common,kind:'declaration' as const,captureSessionId:ctx.capture?.captureSessionId??null,itemId:d!.item_id!,snapshotId:snap!.id,snapshotRevision:snap!.revision,declarationId:d!.id,declarationRevision:d!.revision,scope:d!.scope,ownerId:d!.owner_id,packageObservationId:declaration.packageObservationId,packageConfirmation:ctx.result.packageConfirmation,requestedMarket:snap!.payload.requestedMarket??null,sourceMarkets:declaration.sourceMarkets,packageMarket:declaration.packageMarket,observations,attributedEdits};
   const bundle=FactBundleV1Schema.parse({schemaVersion:1,itemId:d!.item_id,snapshotId:snap!.id,snapshotRevision:snap!.revision,declarationId:d!.id,declarationRevision:d!.revision,scope:d!.scope,ownerId:d!.owner_id,packageConfirmation:ctx.result.packageConfirmation,requestedMarket:snap!.payload.requestedMarket??null,sourceMarkets:declaration.sourceMarkets,packageMarket:declaration.packageMarket,sections:declaration.sections,predicate:p.predicate,state:p.state,completenessReasons:declaration.completenessReasons,uncertaintyReasons:declaration.transcriptionUncertainty,conflictIds:declaration.conflictIds,observedAt:declaration.observedAt,expiresAt:utc(ctx.expiresAt!),sources:p.sources??[],parserVersion:declaration.parserVersion,aliasVersion:declaration.aliasVersion,dependencyIds:ctx.dependencies.map(d=>d.id)});
-  return NormalizationInputSchema.parse({kind:'bound_declaration',binding,bundle,declaration,sourceRefs:refs});
+  return NormalizationInputSchema.parse({kind:'bound_declaration',binding,bundle,declaration,sourceRefs:refs,labelAssertions:qualifiedLabelAssertions(ctx,declaration.observationIds)});
  }
  if(!ctx.capture)throw new Error('bound_declaration_unavailable');
  const current=ctx.observations.filter(o=>['ocr','edit'].includes(String(o.payload.privateKind))&&o.payload.role!=='package'&&!ctx.observations.some(child=>object(child.payload.observation).supersedesId===o.id));
@@ -94,6 +120,13 @@ export function authoritativeInput(ctx:Context,request:NormalizationRequest):Nor
  return NormalizationInputSchema.parse({kind:'source_reading',scope:'private_package',binding,sections,sourceRefs:refs,evidenceOutcome:p.state==='conflict'?'conflict':'partial',claimLimits:{productPresenceAllowed:false,declarationCompleteness:'unestablished',negativeClaimsAllowed:false}});
 }
 async function jsonBody(request:Request){const reader=request.body?.getReader();if(!reader)throw new PartTwoHttpError('invalid_request',400);let length=0;const chunks:Uint8Array[]=[];while(true){const {done,value}=await reader.read();if(done)break;length+=value.byteLength;if(length>16384){await reader.cancel();throw new PartTwoHttpError('payload_too_large',413);}chunks.push(value);}const bytes=new Uint8Array(length);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}try{return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{throw new PartTwoHttpError('invalid_request',400);}}
+/** Context strips all dependencies only after source/capture authorization fails.
+ * A valid source graph survives a release refusal; ancestry overflow is separate. */
+function terminalReasonCodes(ctx:Context,state:string,reasons:string[]):string[] {
+ return state==='blocked'&&ctx.state==='blocked'&&ctx.dependencies.length===0
+  ?['source_evidence_unavailable',...reasons.filter(code=>code!=='source_evidence_unavailable')]
+  :reasons;
+}
 export async function normalizeAuthorized(request:NormalizationRequest,ownerId:string,ports:PartTwoPorts):Promise<NormalizationResult>{
  const now=ports.now?.()??new Date().toISOString();
  const resolved=resolvedSchema.parse(await ports.operation('resolve',request));
@@ -101,14 +134,14 @@ export async function normalizeAuthorized(request:NormalizationRequest,ownerId:s
  if(ctx.ownerId!==ownerId||ctx.scanId!==request.scanId||(ctx.capture?.captureSessionId??null)!==request.captureSessionId)throw new PartTwoHttpError('invalid_server_binding',503);
  const initial=base(ctx,request,resolved.resultRevision,now);
  if(resolved.cached!==null)return overlayRequest(resolved.cached,request);
- if(resolved.state!=='pending'||!resolved.ticket)return NormalizationResultSchema.parse({...initial,state:resolved.state==='ready'?'failed':resolved.state,...(resolved.state==='pending'?{}:{reasonCodes:resolved.reasonCodes}),permittedText:literal(ctx)});
+ if(resolved.state!=='pending'||!resolved.ticket)return NormalizationResultSchema.parse({...initial,state:resolved.state==='ready'?'failed':resolved.state,...(resolved.state==='pending'?{}:{reasonCodes:terminalReasonCodes(ctx,resolved.state,resolved.reasonCodes)}),permittedText:literal(ctx)});
  let result:NormalizationResult;
  try{
   if(LOCAL_DICTIONARY_RELEASE.releaseGate==='local_only'&&!ports.localFixtureApproved)throw new Error('dictionary_release_not_approved');
   if(ctx.releaseId!==PART_TWO_RELEASE_ID||ctx.releaseHash!==LOCAL_DICTIONARY_RELEASE.contentHash||canonicalJson(ctx.versions)!==canonicalJson(PART_TWO_VERSIONS))throw new Error('release_unavailable');
   const input=authoritativeInput(ctx,request);
   result=normalize(input,LOCAL_DICTIONARY_RELEASE,{snapshotId:globalThis.crypto.randomUUID(),createdAt:now,resultRevision:resolved.resultRevision,withdrawnExplanationDependencies:ctx.withdrawnExplanationDependencies});
- }catch(error){const policy=error instanceof Error&&error.message==='dictionary_release_not_approved';result=NormalizationResultSchema.parse({...initial,state:policy?'blocked':'failed',reasonCodes:[policy?'dictionary_release_not_approved':'authoritative_normalization_unavailable'],permittedText:literal(ctx)});}
+ }catch(error){const policy=error instanceof Error&&error.message==='dictionary_release_not_approved',limit=error instanceof AuthoritativeParseLimit;result=NormalizationResultSchema.parse({...initial,state:policy?'blocked':limit?'parse_limit':'failed',reasonCodes:[policy?'dictionary_release_not_approved':limit?'label_annotation_limit':'authoritative_normalization_unavailable'],permittedText:literal(ctx)});}
  let published:Record<string,unknown>;
  try{published=object(await ports.worker('publish',{...resolved.ticket,result}));}
  catch{published={published:false};}
@@ -118,7 +151,7 @@ export async function normalizeAuthorized(request:NormalizationRequest,ownerId:s
  const fresh=resolvedSchema.parse(await ports.operation('resolve',request));
  if(fresh.context.ownerId!==ownerId||fresh.context.scanId!==request.scanId||(fresh.context.capture?.captureSessionId??null)!==request.captureSessionId)throw new PartTwoHttpError('invalid_server_binding',503);
  if(fresh.cached!==null)return overlayRequest(fresh.cached,request);
- return NormalizationResultSchema.parse({...base(fresh.context,request,fresh.resultRevision,now),state:fresh.state==='ready'?'failed':fresh.state,...(fresh.state==='pending'?{}:{reasonCodes:fresh.reasonCodes}),permittedText:literal(fresh.context)});
+ return NormalizationResultSchema.parse({...base(fresh.context,request,fresh.resultRevision,now),state:fresh.state==='ready'?'failed':fresh.state,...(fresh.state==='pending'?{}:{reasonCodes:terminalReasonCodes(fresh.context,fresh.state,fresh.reasonCodes)}),permittedText:literal(fresh.context)});
 }
 export async function handlePartTwoRequest(request:Request,ports:PartTwoPorts):Promise<Response>{
  if(request.method==='OPTIONS')return new Response(null,{status:204,headers});

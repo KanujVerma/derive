@@ -122,8 +122,15 @@ async function cleanup(){if(cleaned)return;cleaned=true;clearTimeout(heartbeat);
  }catch{console.error('Synthetic private cleanup failed; reset isolated stack before reuse.');process.exitCode=1;}}
 async function p2(owner,result,captureId){
  const request={schemaVersion:1,requestId:randomUUID(),scanId:result.scanId,captureSessionId:captureId??null,expectedGeneration:result.generation,expectedEvidenceRevision:result.resultRevision};
- const response=await fetch(new URL('/functions/v1/part-two/normalize',target),{method:'POST',headers:{apikey:anon,authorization:`Bearer ${owner.token}`,'content-type':'application/json'},body:JSON.stringify(request)});
- const body=await response.json();if(response.status!==200)throw new Error(`Synthetic private Part 2 Edge failed (${response.status}); payload omitted`);return NormalizationResultSchema.parse(body);
+ // The admission hook can already own the live precompute lease. Join its
+ // bounded pending state instead of treating a legitimate HTTP202 as failure.
+ for(let attempt=0;attempt<100;attempt++) {
+  const response=await fetch(new URL('/functions/v1/part-two/normalize',target),{method:'POST',headers:{apikey:anon,authorization:`Bearer ${owner.token}`,'content-type':'application/json'},body:JSON.stringify(request)});
+  const body=await response.json();if(![200,202].includes(response.status))throw new Error(`Synthetic private Part 2 Edge failed (${response.status}); payload omitted`);
+  const value=NormalizationResultSchema.parse(body);if(value.state!=='pending')return value;
+  await new Promise(resolve=>setTimeout(resolve,100));
+ }
+ throw Error('Synthetic private precompute did not settle within bounded polling');
 }
 async function p2Save(owner,captureId,normalized){
  const response=await fetch(new URL('/functions/v1/part-two/capture-interpretations',target),{method:'POST',headers:{apikey:anon,authorization:`Bearer ${owner.token}`,'content-type':'application/json'},body:JSON.stringify({captureSessionId:captureId,bindingKey:normalized.bindingKey,expectedPartTwoRevision:normalized.resultRevision})});
@@ -140,6 +147,10 @@ async function sourceOnlySuite(){
  const originalId=randomUUID(),derivativeId=randomUUID();const observation={evidenceId:photo.evidenceId,captureSessionId:seed.capture.captureSessionId,generation:seed.result.generation,recognizer:'synthetic_fixture',recognizerVersion:'private-gold-v1',languageConfig:['en'],correctionEnabled:false,sourceWidth:1280,sourceHeight:1440,orientationTransform:[1,0,0,0,1,0,0,0,1],lines:syntheticPrivateLines(photo.text),status:'recognized'};
  const committed=await transport.commit(seed.capture.captureSessionId,{schemaVersion:2,idempotencyKey:randomUUID(),expectedGeneration:receipt.result.generation,expectedResultRevision:receipt.result.resultRevision,expectedCaptureRevision:receipt.capture.captureRevision,expectedDeletionEpoch:receipt.capture.deletionEpoch,packageObservationId:receipt.capture.packageObservationId,assets:[receipt.asset],sourceObservations:[{observationId:originalId,revision:1,role:'ingredients',coordinateSpace:'source_original',derivedFromObservationIds:[],observation},{observationId:derivativeId,revision:1,role:'ingredients',coordinateSpace:'sanitized_derivative',derivedFromObservationIds:[originalId],observation}],edits:[],review:null,reviewId:null});
  const normalized=await p2(owner,committed.result,seed.capture.captureSessionId);
+ if(normalized.state!=='ready') {
+  const diagnostic=await sql(`with context as(select private.part_two_context('${owner.id}','${committed.result.scanId}','${seed.capture.captureSessionId}') value) select jsonb_build_object('state',value->>'state','dependencyCount',jsonb_array_length(value->'dependencies'),'releaseId',value->>'releaseId','captureRemoved',value->'capture'->'removed','captureDeletionEpoch',value->'capture'->'deletionEpoch','scanDeletionEpoch',value->'deletionEpoch','evidenceRevision',value->'evidenceRevision') from context;`);
+  console.error(JSON.stringify({stage:'synthetic_private_initial_normalization',state:normalized.state,reasonCodes:normalized.state==='pending'?[]:normalized.reasonCodes,context:JSON.parse(diagnostic)}));
+ }
  check(normalized.state,'ready','A01 actual unbound private source reading normalized');
  check(normalized.output.kind,'reading_only','A01 no invented selected product facts');
  check(normalized.output.reading.binding.kind,'capture','source-only immutable owner/capture binding');

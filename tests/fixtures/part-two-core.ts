@@ -1,4 +1,5 @@
 import type { NormalizationInput } from '../../src/contracts/PartTwo.ts';
+import { sha256 } from '../../src/domain/part-two/hash.ts';
 import { parseDeclarationSection } from '../../src/domain/part-one/parser.ts';
 export const p2id = (n: number) => `92000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 export const p2now = '2026-10-02T10:00:00Z', p2expiry = '2026-10-03T10:00:00Z';
@@ -15,4 +16,13 @@ export function boundDeclaration(text = 'Niacinamide', scope: 'public' | 'privat
   const declaration = { declarationId: p2id(10), revision: 1, itemId: p2id(11), snapshotId: p2id(12), observationIds: [p2id(7)], dependencyIds: [p2id(7)], rawText: text, textStructureHash: 'fixture-immutable', sections, category: 'cosmetic' as const, completenessReasons: ['missing_tail'], transcriptionUncertainty: [], parserVersion: 'part-one-spans-1', aliasVersion: 'observed-only-1', sourceRevision: 1, sourceUpdatedAt: null, observedAt: p2now, expiresAt: p2expiry, policyId: p2id(9), scope, ownerId: scope === 'public' ? null : p2id(3), packageObservationId: scope === 'public' ? null : packageObservationId, associationEvidenceIds: [p2id(7)], variant, sourceMarkets: ['US'], packageMarket: null, conflictIds: [], supersedesId: null, formulaEquivalence: 'unknown' as const };
   const bundle = { schemaVersion: 1 as const, itemId: p2id(11), snapshotId: p2id(12), snapshotRevision: 1, declarationId: p2id(10), declarationRevision: 1, scope, ownerId: declaration.ownerId, packageConfirmation: scope === 'public' ? 'unconfirmed' as const : 'user_bound' as const, requestedMarket: 'US', sourceMarkets: ['US'], packageMarket: null, sections, predicate: { association: passed, noContradiction: passed, variantMarket: passed, completeness: { passed: false, evidenceIds: [p2id(7)], reasons: ['missing_tail'] }, rightsFreshness: passed }, state: 'partial' as const, completenessReasons: ['missing_tail'], uncertaintyReasons: [], conflictIds: [], observedAt: p2now, expiresAt: p2expiry, sources: [{ observationId: p2id(7), policyId: p2id(9), label: 'Synthetic source', url: null, observedAt: p2now, sourceUpdatedAt: null, expiresAt: p2expiry }], parserVersion: declaration.parserVersion, aliasVersion: declaration.aliasVersion, dependencyIds: [p2id(7)] };
   return { kind: 'bound_declaration', binding: { ...common, kind: 'declaration', captureSessionId: scope === 'public' ? null : captureSessionId, itemId: bundle.itemId, snapshotId: bundle.snapshotId, snapshotRevision: 1, declarationId: bundle.declarationId, declarationRevision: 1, scope, ownerId: declaration.ownerId, packageObservationId: declaration.packageObservationId, packageConfirmation: bundle.packageConfirmation, requestedMarket: 'US', sourceMarkets: ['US'], packageMarket: null }, bundle, declaration, sourceRefs: r.sourceRefs.map(ref => ({ ...ref, evidenceBasis: scope === 'public' ? 'public_source' : 'private_package' })) };
+}
+
+/** Synthetic service-admitted annotation, not an OCR/heading inference. */
+export function boundLabelDeclaration(text = 'fragrance-free', assertionKind: 'category' | 'usage' | 'purpose' | 'claim' = 'claim', scope: 'public' | 'private_package' = 'private_package'): Extract<NormalizationInput, { kind: 'bound_declaration' }> {
+  const input = boundDeclaration('Glycerin', scope), source = input.sourceRefs[0];
+  const sourceText = `Glycerin\n${assertionKind}: ${text}`, start = sourceText.length - text.length;
+  source.sourceTextHash = sha256(sourceText);
+  input.labelAssertions = [{ assertionId: p2id(140), assertionKind, text, span: { observationId: source.observationId, sourceRevision: source.sourceRevision, sectionId: `label:${source.observationId}`, entryId: null, start, end: start + text.length, raw: text }, sourceText, transcription: 'clear', conditional: null, fieldPermission: { policyId: source.policyId, policyVersion: source.policyVersion, assertionKind, policyEpoch: 1, expiresAt: source.expiresAt, permitted: true } }];
+  return input;
 }

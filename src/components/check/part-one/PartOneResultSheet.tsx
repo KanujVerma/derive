@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Text, View } from 'react-native';
 import { ResultSheetSurface } from '../result-sheet/ResultSheetSurface';
 import { Button } from '../../ui/Button';
@@ -6,7 +6,7 @@ import { colors, spacing, typography } from '../../../constants/theme';
 import type { PartOneView } from '../../../presentation/part-one/resultController';
 import { PartTwoIngredients, PartTwoSavedIngredients } from '../part-two/PartTwoIngredients';
 import type { PartTwoSaveGuard } from '../../../services/partTwoClient';
-import type { PartTwoView } from '../../../presentation/part-two/controller';
+import type { PartTwoView, PartTwoTransport } from '../../../presentation/part-two/controller';
 
 export function partOneStatus(view: PartOneView, now = Date.now()): string {
   const r = view.result;
@@ -21,19 +21,26 @@ export function partOneStatus(view: PartOneView, now = Date.now()): string {
 }
 
 /** Uses the existing sheet. Revision updates keep its mounted scroll and detent. */
-export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave, onCapture, onSearch, onFullChange, onScroll, localDraft, inline = true, savedInterpretationId, interpretationCaptureSessionId = null }: {
+export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave, onCapture, onSearch, onFullChange, onScroll, localDraft, inline = true, savedInterpretationId, interpretationCaptureSessionId = null, ingredientEnabled, ingredientTransport }: {
   view: PartOneView; onClose: () => void; onRefresh: () => void;
   onSelect: (id: string) => void; onSave: (details?: PartTwoSaveGuard) => void; onCapture?: () => void;
   onSearch: () => void; onFullChange: (full: boolean) => void;
   onScroll?: (offset: number) => void;
   inline?: boolean;
-  localDraft?: React.ReactNode;
+  localDraft?: React.ReactNode | ((sourceDenied: boolean, onIngredientView: (view: PartTwoView) => void) => React.ReactNode);
   savedInterpretationId?: string;
   interpretationCaptureSessionId?: string | null;
+  ingredientEnabled?: boolean;
+  ingredientTransport?: PartTwoTransport;
 }) {
   const r = view.result;
   const [now, setNow] = useState(Date.now);
   const [details, setDetails] = useState<PartTwoView | null>(null);
+  const sourceKey = JSON.stringify([view.owner, r?.scanId, interpretationCaptureSessionId, r?.generation, r?.resultRevision]);
+  const sourceAccess = useRef({ key: sourceKey, denied: false, privateDenied: false });
+  if (sourceAccess.current.key !== sourceKey) sourceAccess.current = { key: sourceKey, denied: false, privateDenied: false };
+  const summaryLayout = useRef({ key: sourceKey, height: 0 });
+  if (summaryLayout.current.key !== sourceKey) summaryLayout.current = { key: sourceKey, height: 0 };
   const clock = Math.max(now, Date.now());
   const expiresAt = r?.freshness.expiresAt;
   // Every visible field owns its expiry; readiness never extends display rights.
@@ -58,9 +65,23 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   const sources = r?.display.sources.filter(source => current(source.expiresAt)) ?? [];
   const expiredFields = Boolean(r && (sections.length !== r.display.sections.length || sources.length !== r.display.sources.length));
   const expired = r?.declarationState === 'accepted' && (r.freshness.state !== 'fresh' || !expiresAt || Date.parse(expiresAt) <= clock);
-  const status = expiredIdentity ? 'Product evidence expired. Check the current source before relying on it.' : expiredFields && r?.declarationState !== 'conflict' ? 'Some ingredient evidence expired. Check the current source before relying on it.' : partOneStatus(view, clock);
+  const partOneSummary = expiredIdentity ? 'Product evidence expired. Check the current source before relying on it.' : expiredFields && r?.declarationState !== 'conflict' ? 'Some ingredient evidence expired. Check the current source before relying on it.' : partOneStatus(view, clock);
+  const detailTarget = details?.target;
+  const currentDetails = detailTarget && r && detailTarget.ownerId === view.owner && detailTarget.scanId === r.scanId && detailTarget.captureSessionId === interpretationCaptureSessionId && detailTarget.generation === r.generation && detailTarget.evidenceRevision === r.resultRevision ? details : null;
+  if (currentDetails?.error || currentDetails?.result && currentDetails.result.state !== 'pending') sourceAccess.current.denied = true;
+  if (currentDetails?.result && currentDetails.result.state !== 'ready' && currentDetails.result.state !== 'pending' && currentDetails.result.reasonCodes.some(code => code === 'source_evidence_unavailable' || code === 'source_withdrawn')) sourceAccess.current.privateDenied = true;
+  // Ready details own fresh source attribution in their disclosure. A later
+  // pending retry cannot restore a cached Part 1 source after a refusal.
+  const sourceUnavailable = sourceAccess.current.denied;
+  const currentRefusal = currentDetails?.error || currentDetails?.result && !['ready', 'pending', 'parse_limit'].includes(currentDetails.result.state);
+  const status = currentRefusal || currentDetails?.result?.state === 'pending' && sourceUnavailable
+    ? 'Ingredient evidence unavailable'
+    : currentDetails?.result?.state === 'parse_limit' ? currentDetails.result.permittedText?.sections.length ? 'Ingredient wording remains available. Details need review.' : 'Ingredient details need review.' : partOneSummary;
+  const originalSections = !expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
+    <Text accessibilityRole="header">{({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[section.kind]}</Text><Text selectable>{section.text}</Text>
+  </View>);
   return <ResultSheetSurface inline={inline} presentationKey={`part-one:${r?.scanId ?? 'pending'}`}
-    onClose={onClose} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm }}>
+    onClose={onClose} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
       {view.loading && <ActivityIndicator color={colors.brand} />}
       {identity?.image && current(identity.image.expiresAt) && <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 64, height: 80 }} resizeMode="contain" />}
       {identity && <><Text>{identity.brand}</Text><Text accessibilityRole="header" style={{ fontSize: typography.sizes.sectionTitle, color: colors.ink }}>{identity.name}</Text><Text>{identity.variantText}</Text></>}
@@ -87,12 +108,11 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       {r?.allowedActions.includes('rescan') && <Button label="Rescan" variant="ghost" onPress={onClose} />}
       {r && r.identity !== 'exact' && <Button label="Search by name" variant="ghost" onPress={onSearch} />}
     </View>}>
-    {localDraft}
-    {!expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
-      <Text accessibilityRole="header">{section.kind === 'may_contain' ? 'May contain' : section.kind}</Text><Text selectable>{section.text}</Text>
-    </View>)}
-    {view.owner && r && !expired && (savedInterpretationId ? <PartTwoSavedIngredients saveId={savedInterpretationId} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: interpretationCaptureSessionId, generation: r.generation, evidenceRevision: r.resultRevision }} /> : !interpretationCaptureSessionId && <PartTwoIngredients onView={setDetails} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: null, generation: r.generation, evidenceRevision: r.resultRevision }} />)}
-    {!expired && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
+    {typeof localDraft === 'function' ? localDraft(sourceAccess.current.privateDenied, setDetails) : !sourceAccess.current.privateDenied && localDraft}
+    {view.owner && r && !expired && (savedInterpretationId || !interpretationCaptureSessionId) ?
+      savedInterpretationId ? <PartTwoSavedIngredients saveId={savedInterpretationId} onView={setDetails} enabled={ingredientEnabled} transport={ingredientTransport} fallback={originalSections} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: interpretationCaptureSessionId, generation: r.generation, evidenceRevision: r.resultRevision }} /> :
+        <PartTwoIngredients onView={setDetails} enabled={ingredientEnabled} transport={ingredientTransport} fallback={originalSections} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: null, generation: r.generation, evidenceRevision: r.resultRevision }} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
+    {!expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
       <Text>{source.label} · Observed {source.observedAt.slice(0, 10)}</Text>
       {source.url && <Button label={`View source: ${source.label}`} variant="ghost" onPress={() => {
         const url = source.url; if (url && new URL(url).protocol === 'https:') void Linking.openURL(url).catch(() => {});

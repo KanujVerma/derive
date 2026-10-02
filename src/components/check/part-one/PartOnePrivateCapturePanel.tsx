@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { CaptureBinding, MemoryLabelDraft } from '../../../presentation/part-one/capture';
 import { privateEditReplacement, privateSourceEditChain, privateRecoveryRetentionDeadline, privateCapturedLabelProjection } from '../../../presentation/part-one/privateCaptureController';
@@ -6,6 +6,7 @@ import type { PrivateCaptureController } from '../../../presentation/part-one/pr
 import type { CaptureRecovery } from '../../../contracts/PartOnePrivate';
 import type { DraftLineRef } from '../../../presentation/part-one/captureReview';
 import { PartTwoPrivateInterpretation } from '../part-two/PartTwoPrivateInterpretation';
+import type { PartTwoView } from '../../../presentation/part-two/controller';
 const processing = (stage: string) => ['checking_policy','uploading','committing','saving','recovering','removing'].includes(stage);
 const sectionLabels = { ingredients: 'Ingredients read from label', active: 'Active ingredients read from label', inactive: 'Inactive ingredients read from label', may_contain: 'May contain · read from label' };
 const associations = { unknown: 'This label has not been associated with a catalog product.', candidate: 'Possible product association · needs review.',
@@ -42,7 +43,11 @@ function SavedLine({ controller, recovery, refValue, original, editable, role, p
   </View>;
 }
 /** The real Check and My Stuff use this same handler surface. Production retention stays independently gated. */
-export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding }: { controller: PrivateCaptureController; ownerId: string;
+export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding, ingredientDetailsManagedBySheet = false, sourceDenied: externallyDenied = false, onIngredientView }: { controller: PrivateCaptureController; ownerId: string;
+  ingredientDetailsManagedBySheet?: boolean;
+  /** The containing saved sheet qualifies this denial against its exact target. */
+  sourceDenied?: boolean;
+  onIngredientView?: (view: PartTwoView) => void;
   draft?: MemoryLabelDraft; binding?: CaptureBinding | null }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const [, refreshDraft] = useState(0), [clock, setClock] = useState(Date.now);
@@ -51,6 +56,24 @@ export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding
   const photoNumbers = new Map(Array.from(new Set([...(recovery?.sourceObservations.map(entry => entry.observation.evidenceId) ?? []),
     ...(recovery?.assets.map(entry => entry.asset.evidenceId) ?? [])])).map((evidenceId, index) => [evidenceId, index + 1]));
   const projectedResult = recovery?.boundResult ?? recovery?.result;
+  const interpretationTarget = recovery && projectedResult ? { ownerId, scanId: recovery.capture.scanId, captureSessionId: recovery.capture.captureSessionId, generation: recovery.capture.generation, evidenceRevision: projectedResult.resultRevision } : null;
+  const sourceKey = JSON.stringify(interpretationTarget);
+  const sourceAccess = useRef({ key: sourceKey, denied: false });
+  const [, refreshSourceAccess] = useState(0);
+  if (sourceAccess.current.key !== sourceKey) sourceAccess.current = { key: sourceKey, denied: false };
+  const receiveInterpretation = useMemo(() => (view: PartTwoView) => {
+    onIngredientView?.(view);
+    const result = view.result;
+    if (sourceAccess.current.key !== sourceKey || JSON.stringify(view.target) !== sourceKey || !interpretationTarget || !result || result.state === 'ready' || result.state === 'pending' ||
+      result.authenticatedOwnerId !== interpretationTarget.ownerId || result.scanId !== interpretationTarget.scanId || result.captureSessionId !== interpretationTarget.captureSessionId ||
+      result.generation !== interpretationTarget.generation || result.evidenceRevision !== interpretationTarget.evidenceRevision) return;
+    if (result.reasonCodes.some(code => code === 'source_evidence_unavailable' || code === 'source_withdrawn') && !sourceAccess.current.denied) {
+      sourceAccess.current.denied = true; refreshSourceAccess(value => value + 1);
+    }
+  }, [sourceKey, onIngredientView]);
+  const sourceDenied = externallyDenied || sourceAccess.current.denied;
+  const introLayout = useRef({ key: sourceKey, height: 0 });
+  if (introLayout.current.key !== sourceKey) introLayout.current = { key: sourceKey, height: 0 };
   const nextExpiry = [...(recovery?.assets.flatMap(entry => [entry.signedAccess?.expiresAt, entry.expiresAt]) ?? []), projectedResult?.freshness.expiresAt,
     recovery?.capturedSource?.candidate?.expiresAt, ...(projectedResult?.display.sections.map(section => section.expiresAt) ?? [])].filter((value): value is string => Boolean(value)).map(Date.parse)
     .filter(value => value > Math.max(clock, Date.now())).sort((a,b) => a-b)[0];
@@ -59,24 +82,26 @@ export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding
   const local = draft && binding ? draft.read(binding) : null, working = processing(state.stage), locked = working || state.stage === 'disclosure', now = Math.max(clock,Date.now());
   const labelFacts = privateCapturedLabelProjection(state, ownerId, now);
   const acceptedCurrent = !recovery?.capturedSource && state.stage === 'saved_accepted' && Boolean(projectedResult?.freshness.expiresAt && Date.parse(projectedResult.freshness.expiresAt) > now);
-  const status = acceptedCurrent ? 'Saved private package evidence · accepted by server review' :
+  const status = sourceDenied ? 'Private label evidence unavailable' : acceptedCurrent ? 'Saved private package evidence · accepted by server review' :
     state.stage === 'saved_partial' || state.stage === 'saved_accepted' ? 'Saved private label note · partial or uncertain' : state.stage === 'removed' ? 'Private evidence removed' :
     state.stage === 'uploading' ? 'Uploading sanitized label photos privately…' : state.stage === 'committing' || state.stage === 'saving' ? 'Saving private label evidence…' :
     state.stage === 'recovering' ? 'Opening saved private evidence…' : state.stage === 'removing' ? 'Removing private evidence…' : 'Temporary label draft · unsaved';
   return <View style={styles.panel}>
+    <View style={{ minHeight: sourceDenied ? introLayout.current.height || undefined : undefined, gap: 12 }} onLayout={event => { introLayout.current.height = Math.max(introLayout.current.height, event.nativeEvent.layout.height); }}>
     <Text accessibilityRole="header" style={styles.heading}>Private label evidence</Text>
     <Text accessibilityLiveRegion="polite" style={styles.body}>{status}</Text>
     <Text style={styles.body}>Private photos, originals and corrections belong to this account. They do not verify the shared catalog. Coverage marks and OCR confidence do not establish acceptance.</Text>
+    </View>
     {state.error && <Text accessibilityRole="alert" style={styles.body}>{state.error}</Text>}
-    {labelFacts && <View style={styles.group}>
+    {!ingredientDetailsManagedBySheet && recovery && projectedResult && interpretationTarget && <PartTwoPrivateInterpretation result={projectedResult} onView={receiveInterpretation}
+      fallback={!sourceDenied && labelFacts?.sections.map(section => <View key={section.id} style={styles.group}><Text accessibilityRole="header" style={styles.heading}>{sectionLabels[section.kind]}</Text>
+        <Text selectable accessibilityLabel={`Private label reading: ${sectionLabels[section.kind]}`} style={styles.body}>{section.text}</Text></View>)} target={interpretationTarget} />}
+    {!sourceDenied && labelFacts && <View style={styles.group}>
       <Text accessibilityRole="header" style={styles.heading}>{labelFacts.kind === 'accepted' ? 'Accepted declaration for this private package' : 'Read from this private label · partial or uncertain'}</Text>
       <Text style={styles.body}>{labelFacts.kind === 'accepted' ? 'These facts apply to this saved package and its reviewed declaration. They do not establish a timeless formula for every product with this barcode.' :
         'Only text seen in these private label photos is shown. This is not a complete ingredient list; unlisted ingredients cannot be ruled out. These readings do not verify the shared catalog.'}</Text>
       {labelFacts.name && <Text selectable style={styles.body}>Name read from label: {labelFacts.name}</Text>}
       {labelFacts.association && <Text style={styles.body}>{associations[labelFacts.association]}</Text>}
-      {labelFacts.sections.map(section => <View key={section.id} style={styles.group}><Text accessibilityRole="header" style={styles.heading}>{sectionLabels[section.kind]}</Text>
-        <Text selectable accessibilityLabel={`Private label reading: ${sectionLabels[section.kind]}`} style={styles.body}>{section.text}</Text></View>)}
-      {recovery && projectedResult && <PartTwoPrivateInterpretation result={projectedResult} target={{ ownerId, scanId: recovery.capture.scanId, captureSessionId: recovery.capture.captureSessionId, generation: recovery.capture.generation, evidenceRevision: projectedResult.resultRevision }} />}
       {labelFacts.capturedText.map(entry => <View key={entry.id} style={styles.group}><Text style={styles.body}>{entry.attributedEdit ? 'Your private correction · extracted text' : 'Text recognized from the uploaded label'}</Text>
         <Text selectable style={styles.body}>{entry.text}</Text></View>)}
       {labelFacts.gaps.length > 0 && <Text style={styles.body}>Additional label coverage or package association evidence is needed. Missing regions and unobserved text remain unknown.</Text>}
@@ -106,6 +131,7 @@ export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding
     {state.stage === 'unavailable' && !working && <Action label="Retry private save with disclosure" action={() => void controller.retry()} />}
     {['conflict','unavailable','disabled'].includes(state.stage) && state.capture && !recovery && state.error && <Action label="Reopen private evidence after conflict" action={() => void controller.recover(ownerId,state.capture!.captureSessionId)} />}
     {recovery && <View style={styles.group}>
+      {!sourceDenied && <>
       {!recovery.editable && <Text style={styles.body}>The current product binding changed. This saved package evidence is read only and keeps its original context.</Text>}
       {recovery.assets.map(entry => <View key={entry.attestationId} style={styles.group}>
         <Text style={styles.body}>Saved photo {photoNumbers.get(entry.asset.evidenceId)} · expires {entry.expiresAt}</Text>
@@ -126,6 +152,7 @@ export function PartOnePrivateCapturePanel({ controller, ownerId, draft, binding
           {assembly.lines.map((line,index) => <Text key={index} selectable style={styles.body}>{line.text}</Text>)}</View>)}
       </>}
       {state.pendingEdits.length>0 && <><Text style={styles.body}>Your new corrections are unsaved. Saving them requires new server review and may retract accepted evidence.</Text><Action label="Review private correction save" disabled={working} action={() => void controller.discloseChanges()} /></>}
+      </>}
       <Action label="Reopen saved private label evidence" disabled={working} action={() => void controller.recover(ownerId,recovery.capture.captureSessionId)} />
     </View>}
     {state.capture && !working && <Action label="Remove saved private label evidence" action={() => void controller.remove()} />}

@@ -66,12 +66,12 @@ export function PartOneSavedProducts({ ownerId }: { ownerId: string }) {
     </View>)}
     {PART_ONE_PRIVATE_ENABLED && !selected && privateState.ownerId === ownerId && privateState.result && <PartOneResultSheet inline={false} interpretationCaptureSessionId={privateState.capture?.captureSessionId}
       view={{ owner: ownerId, result: privateState.result, loading: false, error: null, saved: true, scrollOffset: 0 }}
-      localDraft={<PartOnePrivateCapturePanel controller={privateController} ownerId={ownerId} />}
+      localDraft={(_sourceDenied, onIngredientView) => <PartOnePrivateCapturePanel controller={privateController} ownerId={ownerId} onIngredientView={onIngredientView} />}
       onClose={() => privateController.close()} onRefresh={() => { if (privateState.capture) void privateController.recover(ownerId, privateState.capture.captureSessionId); }}
       onSelect={() => {}} onSave={() => {}} onSearch={() => privateController.close()} onFullChange={() => {}} />}
     {PART_ONE_PRIVATE_ENABLED && !selected && !privateState.result && privateState.stage !== 'temporary' && <PartOnePrivateCapturePanel controller={privateController} ownerId={ownerId} />}
     {selected && <PartOneResultSheet inline={false} savedInterpretationId={selected.saveId} interpretationCaptureSessionId={selected.captureSessionId} view={{ owner: ownerId, result: privateState.stage === 'removing' || privateReadBlocked ? null : selected.result, loading: privateState.stage === 'removing', error: privateReadBlocked ? privateState.error : null, saved: true, scrollOffset: 0 }}
-      localDraft={PART_ONE_PRIVATE_ENABLED && selected.captureSessionId ? <PartOnePrivateCapturePanel controller={privateController} ownerId={ownerId} /> : undefined}
+      localDraft={PART_ONE_PRIVATE_ENABLED && selected.captureSessionId ? sourceDenied => <PartOnePrivateCapturePanel controller={privateController} ownerId={ownerId} ingredientDetailsManagedBySheet sourceDenied={sourceDenied} /> : undefined}
       onClose={() => { epoch.current++; setSelected(null); privateController.close(); }} onRefresh={() => void open(selected.saveId)} onSelect={() => {}}
       onSave={() => {}} onSearch={() => { setSelected(null); privateController.close(); }} onFullChange={() => {}} />}
   </View>;

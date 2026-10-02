@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import type { ScanResult } from '../../../contracts/PartOne';
 import type { NormalizationRequest } from '../../../contracts/PartTwo';
 import type { PartTwoTarget, PartTwoView } from '../../../presentation/part-two/controller';
@@ -16,6 +16,7 @@ export function PartTwoCapturedIngredients({ target, refreshKey = 0, enabled = P
   const key = JSON.stringify(target), current = useRef(key); current.current = key;
   const [pin, setPin] = useState<{ key: string; id: string; target: PartTwoTarget } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   useEffect(() => {
     let alive = true; setPin(null); setStatus(null);
     if (!enabled || !target.captureSessionId) return;
@@ -42,15 +43,16 @@ export function PartTwoCapturedIngredients({ target, refreshKey = 0, enabled = P
     } };
   }, [pin, target.captureSessionId, invoke]);
   if (!enabled) return null;
-  return <View>{status && <Text accessibilityLiveRegion="polite">{status}</Text>}{pin?.key === key && <><Text accessibilityRole="header">Saved ingredient interpretation</Text><Text>This keeps the interpretation you explicitly saved. The current label reading may differ.</Text><PartTwoIngredients key={pin.id} enabled target={pin.target} transport={transport} /></>}</View>;
+  return <View>{status && <Text accessibilityLiveRegion="polite">{status}</Text>}{pin?.key === key && <><Pressable accessibilityRole="button" accessibilityLabel="Saved ingredient interpretation" accessibilityState={{ expanded: expanded === key }} onPress={() => setExpanded(expanded === key ? null : key)} style={{ paddingVertical: 12 }}><Text>Saved ingredient interpretation</Text></Pressable>{expanded === key && <><Text>This keeps the interpretation you explicitly saved. The current label reading may differ.</Text><PartTwoIngredients key={pin.id} enabled target={pin.target} transport={transport} /></>}</>}</View>;
 }
 
-export function PartTwoPrivateInterpretation({ target, result, enabled = PART_TWO_ENABLED, invoke = invokePartTwo }: { target: PartTwoTarget; result: ScanResult; enabled?: boolean; invoke?: PartTwoInvoke }) {
+export function PartTwoPrivateInterpretation({ target, result, fallback, onView, enabled = PART_TWO_ENABLED, invoke = invokePartTwo }: { target: PartTwoTarget; result: ScanResult; fallback?: React.ReactNode; onView?: (view: PartTwoView) => void; enabled?: boolean; invoke?: PartTwoInvoke }) {
   const [details, setDetails] = useState<PartTwoView | null>(null), [status, setStatus] = useState<string | null>(null), [saving, setSaving] = useState(false), [refreshKey, refresh] = useState(0);
   const key = JSON.stringify(target), current = useRef(key), epoch = useRef(0), busy = useRef(false);
   if (current.current !== key) { current.current = key; epoch.current++; busy.current = false; }
   useEffect(() => () => { epoch.current++; busy.current = false; }, []);
   const transport = useMemo(() => createPartTwoTransport({ enabled: () => enabled, invoke }), [enabled, invoke]);
+  const receiveView = useMemo(() => (value: PartTwoView) => { setDetails(value); onView?.(value); }, [onView]);
   useEffect(() => { setDetails(null); setStatus(null); setSaving(false); }, [key]);
   const d = details?.result, t = details?.target;
   const ready = d?.state === 'ready' && t && JSON.stringify(t) === key && Date.parse(d.expiresAt) > Date.now();
@@ -67,8 +69,8 @@ export function PartTwoPrivateInterpretation({ target, result, enabled = PART_TW
     } catch { if (current.current === operationKey && epoch.current === operationEpoch) setStatus('Details changed or the interpretation could not be saved. Review and save again.'); }
     finally { if (current.current === operationKey && epoch.current === operationEpoch) { busy.current = false; setSaving(false); } }
   }
-  if (!enabled) return null;
-  return <View><PartTwoIngredients target={target} enabled transport={transport} onView={setDetails} />
+  if (!enabled) return <>{fallback}</>;
+  return <View><PartTwoIngredients target={target} enabled transport={transport} onView={receiveView} fallback={fallback} />
     <Button label={saving ? 'Saving ingredient interpretation' : 'Save ingredient interpretation'} disabled={!ready || saving} variant="outline" onPress={() => void save()} />
     {status && <Text accessibilityLiveRegion="polite">{status}</Text>}
     <PartTwoCapturedIngredients target={target} enabled refreshKey={refreshKey} invoke={invoke} />

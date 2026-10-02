@@ -2,7 +2,7 @@ import { NormalizationRequestSchema, NormalizationResultSchema, type Normalizati
 
 export type PartTwoTarget = { ownerId: string; scanId: string; captureSessionId: string | null; generation: number; evidenceRevision: number };
 export type PartTwoView = { target: PartTwoTarget | null; result: NormalizationResult | null; loading: boolean; error: string | null };
-export interface PartTwoTransport { normalize(request: NormalizationRequest): Promise<unknown> }
+export interface PartTwoTransport { normalize(request: NormalizationRequest, signal?: AbortSignal): Promise<unknown> }
 const targetKey = (target: PartTwoTarget) => JSON.stringify(target);
 /** Request correlation is transport metadata; equal result revisions require identical content. */
 function content(value: unknown): string {
@@ -15,6 +15,8 @@ function content(value: unknown): string {
 }
 export function createPartTwoController(transport: PartTwoTransport, createId: () => string, changed: (view: PartTwoView) => void, now = Date.now) {
   let epoch = 0, sequence = 0;
+  let flight: { promise: Promise<boolean>; abort: AbortController } | null = null;
+  const cancelFlight = () => { const previous = flight; flight = null; previous?.abort.abort(); };
   let view: PartTwoView = { target: null, result: null, loading: false, error: null };
   const highest = new Map<string, { revision: number; content: string }>();
   const emit = () => changed({ ...view });
@@ -35,24 +37,38 @@ export function createPartTwoController(transport: PartTwoTransport, createId: (
     getView: () => ({ ...view }),
     bind(target: PartTwoTarget | null) {
       if (target && view.target && targetKey(target) === targetKey(view.target)) return;
-      epoch++; sequence++; highest.clear(); view = { target, result: null, loading: false, error: null }; emit();
+      epoch++; sequence++; cancelFlight(); highest.clear(); view = { target, result: null, loading: false, error: null }; emit();
     },
-    async refresh() {
-      const target = view.target; if (!target) return false;
+    refresh(): Promise<boolean> {
+      const target = view.target; if (!target) return Promise.resolve(false);
+      if (flight) return flight.promise;
       const token = epoch, attempt = ++sequence, requestId = createId();
       const request = NormalizationRequestSchema.parse({ schemaVersion: 1, requestId, scanId: target.scanId, captureSessionId: target.captureSessionId, expectedGeneration: target.generation, expectedEvidenceRevision: target.evidenceRevision });
+      let complete!: (accepted: boolean) => void;
+      const current = { promise: new Promise<boolean>(resolve => { complete = resolve; }), abort: new AbortController() };
+      flight = current;
       view = { ...view, loading: true, error: null }; emit();
-      try {
-        const accepted = publish(await transport.normalize(request), target, requestId, token, attempt);
-        if (!accepted && epoch === token && attempt === sequence) { view = { ...view, result: null, loading: false, error: 'Ingredient details changed. Reopen the current evidence.' }; emit(); }
-        return accepted;
-      } catch {
-        if (epoch === token && attempt === sequence) { view = { ...view, result: null, loading: false, error: 'Ingredient details unavailable' }; emit(); }
-        return false;
-      }
+      const timeout = setTimeout(() => current.abort.abort(), 30000);
+      let rejectAbort!: () => void;
+      const cancelled = new Promise<never>((_resolve, reject) => { rejectAbort = () => reject(Error('Ingredient request cancelled or timed out')); current.abort.signal.addEventListener('abort', rejectAbort, { once: true }); });
+      void (async () => {
+        try {
+          const raw = await Promise.race([transport.normalize(request, current.abort.signal), cancelled]);
+          const accepted = publish(raw, target, requestId, token, attempt);
+          if (!accepted && epoch === token && attempt === sequence) { view = { ...view, result: null, loading: false, error: 'Ingredient details changed. Reopen the current evidence.' }; emit(); }
+          return accepted;
+        } catch {
+          if (epoch === token && attempt === sequence) { view = { ...view, result: null, loading: false, error: 'Ingredient details unavailable' }; emit(); }
+          return false;
+        } finally {
+          clearTimeout(timeout); current.abort.signal.removeEventListener('abort', rejectAbort);
+          if (flight === current) flight = null;
+        }
+      })().then(complete);
+      return current.promise;
     },
     expire() { if (view.result && Date.parse(view.result.expiresAt) <= now()) { view = { ...view, result: null, loading: false, error: 'Ingredient evidence unavailable' }; emit(); } },
-    invalidate() { epoch++; sequence++; view = { ...view, result: null, loading: false, error: 'Ingredient evidence unavailable' }; emit(); },
-    close() { epoch++; sequence++; highest.clear(); view = { target: null, result: null, loading: false, error: null }; emit(); },
+    invalidate() { epoch++; sequence++; cancelFlight(); view = { ...view, result: null, loading: false, error: 'Ingredient evidence unavailable' }; emit(); },
+    close() { epoch++; sequence++; cancelFlight(); highest.clear(); view = { target: null, result: null, loading: false, error: null }; emit(); },
   };
 }

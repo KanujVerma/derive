@@ -29,9 +29,9 @@ async function recallDuringPinnedRead(policy,saveId){
  const ended=new Promise((resolve,reject)=>{holder.once('error',reject);holder.once('close',code=>code===0?resolve():reject(new Error('Synthetic recall transaction failed')));});
  try{
   const locked=new Promise(resolve=>{let out='';holder.stdout.on('data',v=>{out+=v;if(out.includes('RECALL_LOCKED'))resolve();});});
-  holder.stdin.write("begin; select pg_advisory_xact_lock(40204); select 'RECALL_LOCKED';\n");await locked;
+  holder.stdin.write("begin; select pg_advisory_xact_lock(40203); select pg_advisory_xact_lock(40204); select 'RECALL_LOCKED';\n");await locked;
   const pending=edge(clients[0],'saved-details',{saveId,requestId:randomUUID()});let waiting=false;
-  for(let i=0;i<60;i++){if(await run("select count(*) from pg_locks where locktype='advisory' and objid=40204 and not granted;\n")!=='0'){waiting=true;break;}await new Promise(resolve=>setTimeout(resolve,20));}
+  for(let i=0;i<60;i++){if(await run("select count(*) from pg_locks where locktype='advisory' and objid=40203 and not granted;\n")!=='0'){waiting=true;break;}await new Promise(resolve=>setTimeout(resolve,20));}
   check(waiting,true,'authenticated saved read actually overlaps held recall transaction');
   const payload=JSON.stringify({recordId:policy,reason:'Synthetic local deterministic recall/read race'}).replaceAll("'","''");
   holder.stdin.end(`select public.part_two_worker('explanations/withdraw','${payload}'::jsonb); commit;\n`);await ended;
@@ -40,7 +40,8 @@ async function recallDuringPinnedRead(policy,saveId){
 }
 const fixture=randomUUID(),observedAt=new Date().toISOString(),expiresAt=new Date(Date.now()+3600000).toISOString();
 const observation=randomUUID(),declaration=randomUUID(),snapshot=randomUUID(),item=randomUUID(),policyId=randomUUID(),sectionId=randomUUID();
-const rawText='Water, Glycerin, Mystery Name';
+const longList=process.argv.includes('--long-list');
+const rawText=longList?['Glycerin','Water','Mystery Name',...Array.from({length:37},(_,i)=>`Unknown ingredient ${i+1}`)].join(', '):'Water, Glycerin, Mystery Name';
 const variant={brand:'Synthetic',line:null,form:'lotion',scent:null,shade:null,spf:null,strength:null,size:null,unit:null,packCount:null,packagingLevel:null};
 const predicate=Object.fromEntries(['association','noContradiction','variantMarket','completeness','rightsFreshness'].map(k=>[k,{passed:true,evidenceIds:[observation],reasons:[]}]));
 const section=parseDeclarationSection({sectionId,observationId:observation,imageId:null,sourceRevision:1,rawText,sourceOffset:0,kind:'ingredients',startCovered:true,endCovered:true,lineCoverageComplete:true,entryId:()=>randomUUID()});
@@ -67,7 +68,7 @@ try{
  check(precomputed.state,'ready','actual Part 1 admission hook precomputes normalization');check(precomputed.cached.state,'ready','precomputed immutable snapshot exists before explicit Part 2 request');
 
  const request={schemaVersion:1,requestId:randomUUID(),scanId:scan.scanId,captureSessionId:null,expectedGeneration:scan.generation,expectedEvidenceRevision:scan.resultRevision};
- const ready=await edge(clients[0],'normalize',request);check(ready.response.status,200,'deployed authenticated Edge normalization');NormalizationResultSchema.parse(ready.result);check(ready.result.state,'ready','actual Edge+SQL publishes ready');check(ready.result.output.kind,'bound','public declaration yields bound output');check(ready.result.output.reading.occurrences.length,3,'literal source occurrences preserved');check(ready.result.output.reading.occurrences[2].mapping.state,'unresolved','unknown remains visible');
+ const ready=await edge(clients[0],'normalize',request);check(ready.response.status,200,'deployed authenticated Edge normalization');NormalizationResultSchema.parse(ready.result);check(ready.result.state,'ready','actual Edge+SQL publishes ready');check(ready.result.output.kind,'bound','public declaration yields bound output');check(ready.result.output.reading.occurrences.length,longList?40:3,'literal source occurrences preserved');check(ready.result.output.reading.occurrences[2].mapping.state,'unresolved','unknown remains visible');
  const replay=await edge(clients[0],'normalize',{...request,requestId:randomUUID()});check(replay.result.resultRevision,ready.result.resultRevision,'reopen reuses existing snapshot without revision bump');check(replay.result.output.reading.snapshotId,ready.result.output.reading.snapshotId,'immutable interpretation reuse');
  const foreign=await edge(clients[1],'normalize',request);check(foreign.response.status,403,'foreign authenticated user cannot read cache');
  const forged=await edge(clients[0],'normalize',{...request,productPresenceAllowed:true});check(forged.response.status,400,'authority flags rejected at deployed boundary');

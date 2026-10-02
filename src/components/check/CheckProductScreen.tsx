@@ -1146,10 +1146,10 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     const privateEvidenceBlocked = privateCaptureProjectionBlocked(privateState, partOneView.result, liveCheckOwner, labelBinding);
     const privateReadId = privateState.capture?.captureSessionId ?? (labelBinding?.ownerId === liveCheckOwner ? labelBinding?.captureSessionId : null);
     const partOneSheet = partOneVisible ? <PartOneResultSheet interpretationCaptureSessionId={partOneView.result?.scope === 'private_package' ? privateReadId : null} view={(['removing','removed'].includes(privateState.stage) || privateEvidenceBlocked) && partOneView.result?.scope === 'private_package' ? { ...partOneView, result: null, loading: privateState.stage === 'removing', error: privateState.stage === 'removed' ? 'Private label evidence was removed. Refresh product evidence.' : privateState.error } : partOneView} onClose={dismissCameraResult}
-      localDraft={labelBinding && <><PartOneLocalDraftSummary draft={labelDraft} binding={labelBinding}
+      localDraft={labelBinding ? (sourceDenied, onIngredientView) => <>{!sourceDenied && <PartOneLocalDraftSummary draft={labelDraft} binding={labelBinding}
         onReview={() => { if (labelDraft.read(labelBinding)) setLabelCaptureOpen(true); }}
-        onRemove={privateWorking ? undefined : () => { privateCapture.close(); labelDraft.remove(); setLabelBinding(null); setLabelCaptureOpen(false); }} />
-        {PART_ONE_PRIVATE_ENABLED && liveCheckOwner && <PartOnePrivateCapturePanel controller={privateCapture} ownerId={liveCheckOwner} draft={labelDraft} binding={labelBinding} />}</>}
+        onRemove={privateWorking ? undefined : () => { privateCapture.close(); labelDraft.remove(); setLabelBinding(null); setLabelCaptureOpen(false); }} />}
+        {PART_ONE_PRIVATE_ENABLED && liveCheckOwner && <PartOnePrivateCapturePanel controller={privateCapture} ownerId={liveCheckOwner} draft={labelDraft} binding={labelBinding} onIngredientView={onIngredientView} />}</> : undefined}
       onRefresh={() => { if (liveCheckOwner) void partOneController.refresh(liveCheckOwner).then(() => {
         if (privateEvidenceBlocked && privateReadId && currentLiveCheckOwner() === liveCheckOwner) void privateCapture.recover(liveCheckOwner, privateReadId);
       }); }}

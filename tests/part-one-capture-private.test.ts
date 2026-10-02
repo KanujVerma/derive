@@ -118,7 +118,7 @@ test('A17 My Stuff actual list and open handlers recover saved private notes and
   '../../presentation/part-one/privateCaptureController':controllerRuntime,'../../../presentation/part-one/privateCaptureController':controllerRuntime,
   'react-native':{View:'View',Text:'Text',TextInput:'TextInput',Image:'Image',Pressable:'Pressable',StyleSheet:{create:(v:unknown)=>v}},
  }});
- try{ui.render();await tick();assert.equal(listCalls,1);press(control(ui.render(),'Open saved private label note'));await tick();assert.equal(recoverCalls,1);const sheet=ui.render().find(node=>node.type==='PartOneResultSheet');assert(sheet);assert.equal(sheet.props.view.result.itemId,capture.itemId);assert.equal(sheet.props.localDraft.props.ownerId,owner);sheet.props.onClose();assert(!ui.render().some(node=>node.type==='PartOneResultSheet'));}finally{cleanup?.();f.draft.remove();}
+ try{ui.render();await tick();assert.equal(listCalls,1);press(control(ui.render(),'Open saved private label note'));await tick();assert.equal(recoverCalls,1);const sheet=ui.render().find(node=>node.type==='PartOneResultSheet');assert(sheet);assert.equal(sheet.props.view.result.itemId,capture.itemId);const localDraft=typeof sheet.props.localDraft==='function'?sheet.props.localDraft(false,()=>{}):sheet.props.localDraft;assert.equal(localDraft.props.ownerId,owner);assert.equal(typeof localDraft.props.onIngredientView,'function');sheet.props.onClose();assert(!ui.render().some(node=>node.type==='PartOneResultSheet'));}finally{cleanup?.();f.draft.remove();}
 });
 test('A16 reordered repeated OCR passes and same-transaction edits follow immutable source ancestry and chain tip',async()=>{
  const f=await setup();try{

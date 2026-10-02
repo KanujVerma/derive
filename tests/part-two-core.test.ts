@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import fc from 'fast-check';
-import { NormalizationInputSchema, NormalizationResultSchema } from '../src/contracts/PartTwo.ts';
+import { NormalizationInputSchema, NormalizationResultSchema, type NormalizationInput } from '../src/contracts/PartTwo.ts';
 import { normalize, normalizationKey, normalizationReplayContent, LOCAL_DICTIONARY_RELEASE, validateDictionaryRelease, dictionaryReleaseHash, lookupName, sha256, canonicalJson, decodePartTwoText, projectExplanationWithdrawals, NormalizationMetadataSchema } from '../src/domain/part-two/index.ts';
-import { sourceReading, boundDeclaration, p2metadata, p2id } from './fixtures/part-two-core.ts';
-const ready = (input = sourceReading()) => { const result = normalize(input, LOCAL_DICTIONARY_RELEASE, p2metadata); assert.equal(result.state, 'ready'); if (result.state !== 'ready') throw new Error(JSON.stringify(result)); return result; };
+import { sourceReading, boundDeclaration, boundLabelDeclaration, p2metadata, p2id } from './fixtures/part-two-core.ts';
+const ready = (input: NormalizationInput = sourceReading()) => { const result = normalize(input, LOCAL_DICTIONARY_RELEASE, p2metadata); assert.equal(result.state, 'ready'); if (result.state !== 'ready') throw new Error(JSON.stringify(result)); return result; };
 const occurrences = (text: string) => ready(sourceReading(text)).output.reading.occurrences;
 
 test('A01 source-only is private attributed reading; strict boundary forbids product IDs and forged presence', () => {
@@ -28,6 +28,45 @@ test('A06-A08 whole polymer, botanical and unsupported blend retain names; hard 
 });
 test('A09 alternatives and may-contain scopes never become definite union and reset at next section', () => {
  const input=sourceReading('May contain (+/-): CI 77491, CI 77492'); input.sections.push({...input.sections[0],sectionId:p2id(20),rawText:'Niacinamide'}); const list=ready(input).output.reading.occurrences; assert.deepEqual(list.map(o=>o.modality),['may_contain','may_contain','unconditional']); assert.ok(occurrences('Retinol or Retinyl Palmitate').every(o=>o.modality==='alternative')); assert.ok(occurrences('Retinol OR Retinyl Palmitate').every(o=>o.modality==='alternative')); assert.ok(ready(input).output.reading.facts.filter(f=>f.kind==='declared_ingredient').slice(0,2).every(f=>f.limitations.includes('conditional_not_definite_presence')));
+});
+test('review wrapped alternatives never emit definite presence in source or authoritative row paths', () => {
+ for (const text of ['Retinol or\nRetinyl Palmitate', 'Retinol\nor Retinyl Palmitate', 'Retinol\nOR\nRetinyl Palmitate', 'Retinol or\r\nRetinyl Palmitate']) {
+  for (const factory of [sourceReading, boundDeclaration]) {
+   const result=ready(factory(text));
+   assert.ok(result.output.reading.occurrences.every(o=>o.modality!=='unconditional'), `${factory.name}: ${text}`);
+   assert.ok(result.output.reading.facts.every(f=>f.limitations.includes('conditional_not_definite_presence')), `${factory.name}: definite fact`);
+   if(result.output.kind==='bound') assert.equal(result.output.productFacts.claimLimits.productPresenceAllowed,false);
+   for(const o of result.output.reading.occurrences) assert.equal(text.slice(o.nameSpan.start,o.nameSpan.end),o.observedName);
+  }
+ }
+});
+test('review alternative wrap scope stops at a section header or independent list separator', () => {
+ for (const text of ['Retinol or\nRetinyl Palmitate, Water', 'Retinol\nor Retinyl Palmitate; Water', 'Retinol or\nRetinyl Palmitate\nInactive ingredients: Water']) {
+  const list=occurrences(text);assert.ok(list.filter(o=>o.observedName.includes('Retin')).every(o=>o.modality!=='unconditional'));assert.equal(list.at(-1)?.observedName,'Water');assert.equal(list.at(-1)?.modality,'unconditional');
+ }
+ const header=occurrences('Retinol or\nInactive ingredients: Water');assert.notEqual(header[0].modality,'unconditional');assert.equal(header.at(-1)?.modality,'unconditional');
+ const input=sourceReading('Retinol or');input.sections.push({...input.sections[0],sectionId:p2id(21),rawText:'Water'});assert.equal(ready(input).output.reading.occurrences.at(-1)?.modality,'unconditional');
+});
+test('property review whitespace wrapping cannot strengthen an alternative to unconditional facts', () => {
+ fc.assert(fc.property(fc.constantFrom('Retinol','Glycerin','Niacinamide'),fc.constantFrom('Retinyl Palmitate','Water','Salicylic Acid'),fc.constantFrom(' ','\n','\r\n','\n  '),fc.constantFrom(' ','\n','\r\n','  \n'),fc.constantFrom('or','OR','Or'),(left,right,before,after,or)=>{
+  const text=`${left}${before}${or}${after}${right}`;
+  for(const factory of [sourceReading,boundDeclaration]) {const r=ready(factory(text));assert.ok(r.output.reading.occurrences.every(o=>o.modality!=='unconditional'));assert.ok(r.output.reading.facts.every(f=>f.limitations.includes('conditional_not_definite_presence')));}
+ }),{seed:20261002,numRuns:200});
+});
+test('review layout wraps cannot drop chemical modifiers or invent a shorter reviewed identity', () => {
+ for(const text of ['Hydrolyzed\nHyaluronic Acid','Sodium Hyaluronate\nCrosspolymer','Unknown prefix\nRetinol'])for(const factory of [sourceReading,boundDeclaration]){
+  const r=ready(factory(text));assert.ok(r.output.reading.occurrences.every(o=>o.mapping.state!=='resolved'));assert.equal(r.output.reading.facts.filter(f=>f.kind==='resolved_ingredient_identity').length,0);
+  for(const o of r.output.reading.occurrences)assert.equal(text.slice(o.nameSpan.start,o.nameSpan.end),o.observedName);
+ }
+ const full=occurrences('Sodium\nHyaluronate');assert.equal(full.length,1);assert.equal(full[0].observedName,'Sodium\nHyaluronate');assert.equal(full[0].mapping.state,'resolved');
+ const structured=ready(boundDeclaration('Retinol\nGlycerin'));assert.deepEqual(structured.output.reading.occurrences.map(o=>o.mapping.state),['resolved','resolved']);
+ const boundary=occurrences('Unknown prefix\nInactive ingredients: Hyaluronic Acid');assert.equal(boundary.at(-1)?.mapping.state,'resolved');assert.equal(boundary.at(-1)?.observedName,'Hyaluronic Acid');
+});
+test('review printed plus/minus scopes cover every following pigment and stop at explicit section boundaries',()=>{
+ for(const sign of ['(+/-)','±','+/-']) {
+  const r=ready(sourceReading(`${sign}: CI 77491, CI 77492\nInactive ingredients: Water`));assert.deepEqual(r.output.reading.occurrences.map(o=>o.modality),['may_contain','may_contain','unconditional']);
+  assert.ok(r.output.reading.facts.filter(f=>f.occurrenceId!==r.output.reading.occurrences.at(-1)?.occurrenceId).every(f=>f.limitations.includes('conditional_not_definite_presence')));
+ }
 });
 test('A10-A12 quantities attach exact spans/subjects; density and blend composition never guessed', () => {
  for(const text of ['Salicylic Acid 2%','2% Salicylic Acid','Salicylic Acid (2% w/w)']) { const o=occurrences(text)[0]; assert.equal(o.observedName,'Salicylic Acid'); assert.equal(o.quantities[0].value,'2'); assert.equal(text.slice(o.quantities[0].span.start,o.quantities[0].span.end),o.quantities[0].span.raw); }
@@ -172,4 +211,85 @@ test('saved explanation withdrawal produces new authorized projection while pres
 });
 test('shared ready boundary rejects stale reference cards when its withdrawal manifest says recalled', () => {
  const stale:any=JSON.parse(JSON.stringify(ready(sourceReading('Glycerin'))));stale.output.reading.dependencyManifest.withdrawnExplanationDependencies=['cosing-entry-34040'];assert.equal(NormalizationResultSchema.safeParse(stale).success,false);
+});
+
+
+test('review group amounts preserve whole subjects and never attach an ambiguous alternative amount to one ingredient', () => {
+ for (const text of ['2% (Glycerin + Water)', 'Glycerin + Water 2% w/w', 'Retinol and Glycerin 2%']) for(const factory of [sourceReading,boundDeclaration]) {
+  const r=ready(factory(text));assert.equal(r.output.reading.occurrences.length,1);const o=r.output.reading.occurrences[0];assert.equal(o.quantities[0].subject,'group');assert.equal(o.mapping.state,'unresolved');assert.ok(r.output.reading.facts.filter(f=>f.kind==='declared_quantity').every(f=>f.value.subject==='group'&&f.limitations.includes('group_amount_not_constituent_amount')));assert.equal(o.nameSpan.raw,text.slice(o.nameSpan.start,o.nameSpan.end));
+ }
+ for (const text of ['2% (Retinol or Retinyl Palmitate)','Retinol or Retinyl Palmitate 2%', '2% Retinol or Retinyl Palmitate']) for(const factory of [sourceReading,boundDeclaration]) {
+  const r=ready(factory(text));assert.ok(r.output.reading.facts.every(f=>f.kind!=='declared_quantity'));for(const o of r.output.reading.occurrences){assert.ok(o.quantities.every(q=>q.subject!=='ingredient'&&q.convertedPercentWw===null));assert.equal(o.nameSpan.raw,text.slice(o.nameSpan.start,o.nameSpan.end));}
+ }
+});
+test('review any overlapping entry uncertainty or condition taints the complete resulting name and printed amount', () => {
+ for(const raw of ['Glycerin 2%', 'Glycerin 20 mg/g']) {
+  const input=sourceReading(raw);input.sections[0].entryRefs=[{entryId:p2id(150),start:0,end:8,uncertaintyReasons:['ocr_dispute'],conditional:null}];const o=ready(input).output.reading.occurrences[0];assert.equal(o.transcription,'uncertain');assert.equal(o.mapping.state,'unresolved');assert.ok(o.quantities.every(q=>!['parsed','validated'].includes(q.status)&&q.convertedPercentWw===null));assert.equal(ready(input).output.reading.facts.length,0);
+  const digit=sourceReading(raw);const start=raw.indexOf('2');digit.sections[0].entryRefs=[{entryId:p2id(151),start,end:start+1,uncertaintyReasons:['printed_digit_disputed'],conditional:null}];const quantity=ready(digit).output.reading.occurrences[0].quantities[0];assert.equal(quantity.status,'conflict');assert.equal(quantity.convertedPercentWw,null);
+  const qualified=sourceReading(raw);qualified.sections[0].entryRefs=[{entryId:p2id(152),start:1,end:2,uncertaintyReasons:[],conditional:'may contain'}];assert.equal(ready(qualified).output.reading.occurrences[0].modality,'may_contain');assert.ok(ready(qualified).output.reading.facts.every(f=>f.limitations.includes('conditional_not_definite_presence')));
+  const bound=boundDeclaration(raw);bound.declaration.sections[0].entries[0].uncertaintyReasons=['printed_digit_disputed'];const r=ready(bound);assert.equal(r.output.reading.occurrences[0].quantities[0].status,'conflict');if(r.output.kind==='bound')assert.equal(r.output.productFacts.facts.length,0);
+ }
+ const rows=sourceReading('Retinol\nGlycerin');rows.sections[0].entryRefs=[{entryId:p2id(153),start:0,end:7,uncertaintyReasons:['ocr_dispute'],conditional:null},{entryId:p2id(154),start:8,end:16,uncertaintyReasons:[],conditional:null}];assert.deepEqual(ready(rows).output.reading.occurrences.map(o=>o.transcription),['uncertain','clear']);
+});
+test('review preferred names are exact dictionary names and old immutable mappings remain parseable', () => {
+ const r=ready(sourceReading('Eau'));const mapping=r.output.reading.occurrences[0].mapping;assert.equal(mapping.state,'resolved');if(mapping.state==='resolved')assert.equal(mapping.preferredName,'Aqua');
+ const old:any=structuredClone(r);delete old.output.reading.occurrences[0].mapping.preferredName;assert.equal(NormalizationResultSchema.safeParse(old).success,true);
+});
+test('review printed active/inactive headings preserve attributed section kind without regulatory inference', () => {
+ const r=ready(sourceReading('Active ingredients: Retinol\nInactive ingredients: Water'));assert.deepEqual(r.output.reading.occurrences.map(o=>o.sectionKind),['active','inactive']);assert.ok(r.output.reading.facts.every(f=>f.limitations.includes('printed_section_heading_not_regulatory_verification')));assert.equal(r.output.reading.claimLimits.declarationCompleteness,'unestablished');
+});
+test('property review wrapped chemical modifiers retain exact whole-name scope (seed 20261006)', () => {
+ fc.assert(fc.property(fc.constantFrom(['Hydrolyzed','Hyaluronic Acid'],['Sodium Hyaluronate','Crosspolymer'],['Unknown prefix','Retinol']),fc.constantFrom('\n','\r\n','  \n  '),(parts,wrap)=>{const raw=parts.join(wrap);for(const factory of [sourceReading,boundDeclaration]){const r=ready(factory(raw));assert.ok(r.output.reading.occurrences.every(o=>o.mapping.state!=='resolved'));assert.ok(r.output.reading.facts.every(f=>f.kind!=='resolved_ingredient_identity'));for(const o of r.output.reading.occurrences)assert.equal(o.nameSpan.raw,raw.slice(o.nameSpan.start,o.nameSpan.end));}}),{seed:20261006,numRuns:100});
+});
+test('property review every positive overlapping disputed span suppresses interpreted identity and quantities (seed 20261007)', () => {
+ fc.assert(fc.property(fc.integer({min:0,max:15}),fc.integer({min:1,max:16}),(start,width)=>{const raw='Glycerin 20 mg/g',end=Math.min(raw.length,start+width);if(start>=end)return;const input=sourceReading(raw);input.sections[0].entryRefs=[{entryId:p2id(155),start,end,uncertaintyReasons:['disputed_literal'],conditional:null}];const r=ready(input);assert.equal(r.output.reading.facts.length,0);for(const o of r.output.reading.occurrences){assert.equal(o.transcription,'uncertain');assert.ok(o.quantities.every(q=>!['parsed','validated'].includes(q.status)&&q.convertedPercentWw===null));}}),{seed:20261007,numRuns:200});
+});
+test('property review group and alternative amount placement cannot become a constituent concentration (seed 20261008)', () => {
+ fc.assert(fc.property(fc.constantFrom('Glycerin','Retinol','Niacinamide'),fc.constantFrom('Water','Retinyl Palmitate'),fc.constantFrom('+','and','or'),fc.constantFrom(true,false),fc.integer({min:1,max:100}),(left,right,connector,prefix,value)=>{const name=`${left} ${connector} ${right}`,raw=prefix?`${value}% (${name})`:`${name} ${value}% w/w`;for(const factory of [sourceReading,boundDeclaration]){const r=ready(factory(raw));for(const o of r.output.reading.occurrences){assert.ok(o.quantities.every(q=>q.subject!=='ingredient'));assert.equal(o.nameSpan.raw,raw.slice(o.nameSpan.start,o.nameSpan.end));}assert.ok(r.output.reading.facts.filter(f=>f.kind==='declared_quantity').every(f=>f.value.subject==='group'));}}),{seed:20261008,numRuns:100});
+});
+test('review adversarial newline streams hit a bounded whole-token work refusal without truncation', () => {
+ const raw='x\n'.repeat(25000);const result=normalize(sourceReading(raw),LOCAL_DICTIONARY_RELEASE,p2metadata);assert.equal(result.state,'parse_limit');if(result.state==='parse_limit'){assert.ok(result.reasonCodes.includes('occurrence_codepoint_limit'));assert.equal(result.permittedText?.sections[0].text,raw);}
+});
+test('A15 authoritative exact label assertions emit only attributed bound product facts with separate roots', () => {
+ for(const scope of ['private_package','public'] as const)for(const kind of ['category','usage','purpose','claim'] as const){const input=boundLabelDeclaration(kind==='claim'?'fragrance-free':'Exact declared '+kind,kind,scope),r=ready(input);assert.equal(r.output.kind,'bound');assert.ok(r.output.reading.facts.every(f=>f.kind!=='product_label_assertion'));if(r.output.kind!=='bound')throw Error('missing bound');const labels=r.output.productFacts.facts.filter(f=>f.kind==='product_label_assertion');assert.equal(labels.length,1);const label=labels[0];if(label.kind!=='product_label_assertion')throw Error('missing label');assert.equal(label.value.text,input.labelAssertions![0].text);assert.equal(label.value.attribution,'label_says');assert.equal(label.value.assertionKind,kind);assert.equal(label.subject.assertionId,input.labelAssertions![0].assertionId);assert.deepEqual(label.spans,[input.labelAssertions![0].span]);assert.ok(label.limitations.includes('label_claim_not_verified'));assert.ok(label.limitations.includes('no_ingredient_absence_inference'));assert.equal(r.output.productFacts.claimLimits.negativeClaimsAllowed,false);assert.equal(r.output.reading.occurrences.length,1);assert.equal(r.output.reading.occurrences[0].observedName,'Glycerin');assert.deepEqual(r.output.reading.labelAssertions,input.labelAssertions);assert.deepEqual(r.output.reading.dependencyManifest.labelAssertionPermissions,input.labelAssertions!.map(a=>({assertionId:a.assertionId,...a.fieldPermission})));}
+ const noInput=ready(boundDeclaration('fragrance-free'));if(noInput.output.kind==='bound')assert.ok(noInput.output.productFacts.facts.every(f=>f.kind!=='product_label_assertion'));
+ const source=sourceReading('fragrance-free');assert.ok(ready(source).output.reading.facts.every(f=>f.kind!=='product_label_assertion'));assert.equal(NormalizationInputSchema.safeParse({...source,labelAssertions:boundLabelDeclaration().labelAssertions}).success,false);
+});
+test('label assertions refuse wrong permissions/source spans/bindings and abstain on uncertain, conditional or failed association', () => {
+ const original=boundLabelDeclaration();for(const change of [(a:any)=>a.fieldPermission.permitted=false,(a:any)=>a.fieldPermission.policyId='foreign',(a:any)=>a.fieldPermission.policyVersion='wrong',(a:any)=>a.fieldPermission.assertionKind='usage',(a:any)=>a.fieldPermission.expiresAt='2026-10-02T09:00:00Z',(a:any)=>a.span.observationId='foreign',(a:any)=>a.span.sourceRevision=99,(a:any)=>a.span.start++,(a:any)=>a.text='contains no fragrance',(a:any)=>a.sourceText='x'.repeat(a.sourceText.length)]){const bad=structuredClone(original);change(bad.labelAssertions![0]);assert.equal(NormalizationInputSchema.safeParse(bad).success,false);}
+ for(const state of ['uncertain','conflict','conditional','association'] as const){const input=boundLabelDeclaration();if(state==='uncertain'||state==='conflict')input.labelAssertions![0].transcription=state;if(state==='conditional')input.labelAssertions![0].conditional='if diluted';if(state==='association')input.bundle.predicate.association={passed:false,evidenceIds:[],reasons:['unassociated_label']};const r=ready(input);if(r.output.kind!=='bound')throw Error('missing bound');assert.ok(r.output.productFacts.facts.every(f=>f.kind!=='product_label_assertion'));}
+ const old:any=structuredClone(ready(boundDeclaration()));delete old.output.reading.labelAssertions;delete old.output.reading.dependencyManifest.labelAssertionPermissions;if(old.output.kind==='bound'){delete old.output.productFacts.labelAssertions;delete old.output.productFacts.dependencyManifest.labelAssertionPermissions;}assert.equal(NormalizationResultSchema.safeParse(old).success,true);
+});
+test('strict saved output rejects fabricated or strengthened label assertions independently of ingredient occurrences', () => {
+ const original=ready(boundLabelDeclaration());for(const change of [(f:any)=>f.subject.assertionId='foreign',(f:any)=>f.subject.declarationId='foreign',(f:any)=>f.subject.declarationRevision=99,(f:any)=>f.occurrenceId='foreign',(f:any)=>f.value.text='Fragrance absent',(f:any)=>f.value.assertionKind='purpose',(f:any)=>f.value.attribution='verified',(f:any)=>f.spans[0].start++,(f:any)=>f.spans[0].observationId='foreign',(f:any)=>f.sourceDependencies=['foreign'],(f:any)=>f.limitations=[],(f:any)=>f.dictionaryDependencies=['glycerin']]){const r:any=structuredClone(original);const f=r.output.productFacts.facts.find((f:any)=>f.kind==='product_label_assertion');change(f);assert.equal(NormalizationResultSchema.safeParse(r).success,false);}
+ for(const field of ['policyId','policyVersion','policyEpoch','expiresAt']){const r:any=structuredClone(original);r.output.productFacts.labelAssertions[0].fieldPermission[field]=field==='policyEpoch'?99:field==='expiresAt'?'2026-10-02T09:00:00Z':'foreign';assert.equal(NormalizationResultSchema.safeParse(r).success,false);}
+});
+
+test('review assertion contexts obey original-source and duplicated-root bounds with typed refusal', () => {
+ const wide=boundLabelDeclaration();wide.labelAssertions![0].sourceText+='💧'.repeat(50001);wide.sourceRefs[0].sourceTextHash=sha256(wide.labelAssertions![0].sourceText);const unicode=normalize(wide,LOCAL_DICTIONARY_RELEASE,p2metadata);assert.equal(unicode.state,'parse_limit');if(unicode.state==='parse_limit')assert.ok(unicode.reasonCodes.includes('label_assertion_source_limit'));
+ const bytes=boundLabelDeclaration();bytes.labelAssertions![0].sourceText+='💧'.repeat(65536);bytes.sourceRefs[0].sourceTextHash=sha256(bytes.labelAssertions![0].sourceText);const large=normalize(bytes,LOCAL_DICTIONARY_RELEASE,p2metadata);assert.equal(large.state,'parse_limit');
+ const duplicated=boundLabelDeclaration();duplicated.labelAssertions![0].sourceText+='x'.repeat(4000);duplicated.sourceRefs[0].sourceTextHash=sha256(duplicated.labelAssertions![0].sourceText);duplicated.labelAssertions=Array.from({length:70},(_,n)=>({...duplicated.labelAssertions![0],assertionId:p2id(200+n)}));const repeated=normalize(duplicated,LOCAL_DICTIONARY_RELEASE,p2metadata);assert.equal(repeated.state,'parse_limit');if(repeated.state==='parse_limit')assert.ok(repeated.reasonCodes.includes('label_assertion_root_copy_limit'));
+ const forged:any=structuredClone(ready(boundLabelDeclaration()));for(const snapshot of [forged.output.reading,forged.output.productFacts])snapshot.labelAssertions[0].sourceText+='x'.repeat(50001);assert.equal(NormalizationResultSchema.safeParse(forged).success,false);
+});
+
+test('review cached quantity subject/status and complete label source hashes cannot be jointly strengthened', () => {
+ const group:any=structuredClone(ready(sourceReading('Glycerin + Water 2% w/w')));group.output.reading.occurrences[0].quantities[0].subject='ingredient';group.output.reading.facts.find((f:any)=>f.kind==='declared_quantity').value.subject='ingredient';assert.equal(NormalizationResultSchema.safeParse(group).success,false);
+ const disputed=sourceReading('Glycerin 20 mg/g');disputed.sections[0].transcription='uncertain';const ambiguous:any=structuredClone(ready(disputed));ambiguous.output.reading.occurrences[0].quantities[0].status='validated';ambiguous.output.reading.occurrences[0].quantities[0].convertedPercentWw='2';assert.equal(NormalizationResultSchema.safeParse(ambiguous).success,false);
+ const original=ready(boundLabelDeclaration());const changed:any=structuredClone(original);for(const snapshot of [changed.output.reading,changed.output.productFacts]){const a=snapshot.labelAssertions[0],raw='x'.repeat(a.text.length);a.sourceText=a.sourceText.slice(0,a.span.start)+raw+a.sourceText.slice(a.span.end);a.text=raw;a.span.raw=raw;}const f=changed.output.productFacts.facts.find((f:any)=>f.kind==='product_label_assertion');f.value.text=changed.output.productFacts.labelAssertions[0].text;f.spans[0].raw=f.value.text;assert.equal(NormalizationResultSchema.safeParse(changed).success,false);
+ const missing=boundLabelDeclaration();delete missing.sourceRefs[0].sourceTextHash;assert.equal(NormalizationInputSchema.safeParse(missing).success,false);
+});
+
+test('review residual structured alternative gaps taint printed quantity subjects/status/conversions', () => {
+ const raw='Retinol or\nRetinyl Palmitate 20 mg/g',input=boundDeclaration(raw),section=input.declaration.sections[0],base=section.entries[0],second=structuredClone(base);base.rawToken='Retinol';base.sourceSpans[0].end=7;second.entryId=p2id(151);second.order=1;second.rawToken='Retinyl Palmitate 20 mg/g';second.sourceSpans[0].start=raw.indexOf(second.rawToken);second.sourceSpans[0].end=raw.length;section.entries=[base,second];const r=ready(input);assert.ok(r.output.reading.occurrences.every(o=>o.modality==='unresolved'));const q=r.output.reading.occurrences[1].quantities[0];assert.equal(q.subject,'unresolved');assert.equal(q.status,'unresolved');assert.equal(q.convertedPercentWw,null);assert.ok(r.output.reading.facts.every(f=>f.kind!=='declared_quantity'));
+ const forged:any=structuredClone(r);for(const snapshot of [forged.output.reading,forged.output.productFacts]){const q=snapshot.occurrences[1].quantities[0];q.subject='ingredient';q.status='validated';q.convertedPercentWw='2';}assert.equal(NormalizationResultSchema.safeParse(forged).success,false);
+});
+test('review bound literal plus/minus context and header-first may-contain scope cannot produce definite side facts', () => {
+ for(const sign of ['(+/-)','±','+/-'])for(const factory of [sourceReading,boundDeclaration])for(const prefix of ['', 'Ingredients: ']){const raw=`${prefix}${sign}: CI 77491, CI 77492`,r=ready(factory(raw));assert.deepEqual(r.output.reading.occurrences.map(o=>o.modality),['may_contain','may_contain']);assert.deepEqual(r.output.reading.occurrences.map(o=>o.observedName),['CI 77491','CI 77492']);assert.ok(r.output.reading.facts.every(f=>f.limitations.includes('conditional_not_definite_presence')));if(r.output.kind==='bound')assert.equal(r.output.productFacts.claimLimits.productPresenceAllowed,false);for(const o of r.output.reading.occurrences)assert.equal(raw.slice(o.nameSpan.start,o.nameSpan.end),o.observedName);}
+ for(const factory of [sourceReading,boundDeclaration]){const r=ready(factory('Ingredients: May contain (+/-): CI 77491, CI 77492'));assert.deepEqual(r.output.reading.occurrences.map(o=>o.modality),['may_contain','may_contain']);assert.deepEqual(r.output.reading.occurrences.map(o=>o.observedName),['CI 77491','CI 77492']);}
+ const reset=ready(sourceReading('Ingredients: May contain (+/-): CI 77491, CI 77492\nInactive ingredients: Water'));assert.deepEqual(reset.output.reading.occurrences.map(o=>o.modality),['may_contain','may_contain','unconditional']);
+});
+
+test('review explicit section reset cannot silently retain a conflicting inherited bound qualifier', () => {
+ const raw='Ingredients:\nMay contain ±: CI 77491, CI 77492\nInactive Ingredients: Glycerin';const source=ready(sourceReading(raw));assert.deepEqual(source.output.reading.occurrences.map(o=>[o.observedName,o.modality]),[['CI 77491','may_contain'],['CI 77492','may_contain'],['Glycerin','unconditional']]);
+ const bound=ready(boundDeclaration(raw)),last=bound.output.reading.occurrences.at(-1)!;assert.equal(last.observedName,'Glycerin');assert.equal(last.sectionKind,'inactive');assert.equal(last.modality,'unresolved');assert.ok(last.limitations.includes('conditional_context_conflict'));assert.ok(bound.output.reading.facts.every(f=>f.occurrenceId!==last.occurrenceId));
 });

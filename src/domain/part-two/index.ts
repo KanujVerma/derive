@@ -1,14 +1,14 @@
 import { z } from 'zod';
-import { NormalizationInputSchema, NormalizationResultSchema, type NormalizationInput, type NormalizationResult, type PartTwoBinding, type PartTwoSnapshot, type PartTwoOccurrence, type PartTwoFact } from '../../contracts/PartTwo.ts';
+import { NormalizationInputSchema, NormalizationResultSchema, labelAssertionContextLimit, type NormalizationInput, type NormalizationResult, type PartTwoBinding, type PartTwoSnapshot, type PartTwoOccurrence, type PartTwoFact } from '../../contracts/PartTwo.ts';
 import { validateDictionaryRelease, deepFreeze, LOCAL_DICTIONARY_RELEASE, LOOKUP_VERSION, type DictionaryRelease } from './dictionary.ts';
-import { parseSections, ParseLimitError, PART_TWO_LIMITS, PARSER_VERSION, QUANTITY_VERSION, type ParserSection } from './parser.ts';
+import { parseSections, alternativeScopeRanges, conditionalScopeRanges, ParseLimitError, PART_TWO_LIMITS, PARSER_VERSION, QUANTITY_VERSION, type ParserSection } from './parser.ts';
 import { canonicalJson, sha256 } from './hash.ts';
 export { LOCAL_DICTIONARY_RELEASE, validateDictionaryRelease, dictionaryReleaseHash, lookupName, DictionaryReleaseSchema } from './dictionary.ts';
 export type { DictionaryRelease } from './dictionary.ts';
 export { PART_TWO_LIMITS, decodePartTwoText, ParseLimitError } from './parser.ts';
 export { sha256, canonicalJson } from './hash.ts';
-export const PART_TWO_VERSIONS = Object.freeze({ parser: PARSER_VERSION, dictionary: LOCAL_DICTIONARY_RELEASE.version, resolver: LOOKUP_VERSION, quantity: QUANTITY_VERSION, explanation: LOCAL_DICTIONARY_RELEASE.explanationVersion, factPolicy: 'attributed-positive-facts-v5' });
-export const FACT_POLICY_VERSION = 'attributed-positive-facts-v5';
+export const PART_TWO_VERSIONS = Object.freeze({ parser: PARSER_VERSION, dictionary: LOCAL_DICTIONARY_RELEASE.version, resolver: LOOKUP_VERSION, quantity: QUANTITY_VERSION, explanation: LOCAL_DICTIONARY_RELEASE.explanationVersion, factPolicy: 'attributed-positive-facts-v6' });
+export const FACT_POLICY_VERSION = 'attributed-positive-facts-v6';
 export const WithdrawalDependenciesSchema = z.array(z.string().min(1).max(200)).max(1000).refine(ids => new Set(ids).size === ids.length, 'Duplicate explanation withdrawal').readonly();
 export const NormalizationMetadataSchema = z.strictObject({ snapshotId: z.string().min(1).max(150), createdAt: z.iso.datetime({ offset: false }), resultRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), withdrawnExplanationDependencies: WithdrawalDependenciesSchema.default([]) });
 export type NormalizationMetadata = { snapshotId: string; createdAt: string; resultRevision: number; withdrawnExplanationDependencies?: readonly string[] };
@@ -22,7 +22,7 @@ export function normalizationVersions(input: NormalizationInput, dictionary: Dic
 export function normalizationKey(inputValue: NormalizationInput, release: DictionaryRelease = LOCAL_DICTIONARY_RELEASE, withdrawnExplanationDependencies: readonly string[] = []): string {
   const input = NormalizationInputSchema.parse(inputValue), dictionary = validateDictionaryRelease(release);
   const { requestId: _requestId, ...binding } = input.binding;
-  return sha256(canonicalJson({ input: { ...input, binding }, versions: normalizationVersions(input, dictionary), dictionaryHash: dictionary.contentHash, withdrawnExplanationDependencies: relevantExplanationWithdrawals(dictionary, withdrawnExplanationDependencies) }));
+  return sha256(canonicalJson({ input: { ...input, binding }, versions: normalizationVersions(input, dictionary), dictionaryHash: dictionary.contentHash, labelAssertionPermissions: input.kind === 'bound_declaration' ? input.labelAssertions.map(assertion => ({ assertionId: assertion.assertionId, ...assertion.fieldPermission })) : [], withdrawnExplanationDependencies: relevantExplanationWithdrawals(dictionary, withdrawnExplanationDependencies) }));
 }
 export function normalizationResultBinding(binding: PartTwoBinding, resultRevision: number) { return { schemaVersion: 2 as const, scanId: binding.scanId, captureSessionId: binding.captureSessionId, requestId: binding.requestId, authenticatedOwnerId: binding.authenticatedOwnerId, bindingKey: binding.bindingKey, generation: binding.generation, evidenceRevision: binding.evidenceRevision, resultRevision, expiresAt: binding.expiresAt }; }
 export function normalizationLiteral(input: NormalizationInput) { return { sections: (input.kind === 'source_reading' ? input.sections.map(s => ({ sectionId: s.sectionId, kind: s.kind, text: s.rawText })) : input.declaration.sections.map(s => ({ sectionId: s.sectionId, kind: s.kind, text: s.rawText }))), expiresAt: input.binding.expiresAt }; }
@@ -33,10 +33,18 @@ function parsedInput(input: NormalizationInput, dictionary: DictionaryRelease) {
   if (sections.length > PART_TWO_LIMITS.sections || sections.reduce((n,s) => n + Array.from(s.rawText).length,0) > PART_TWO_LIMITS.codePoints || sections.reduce((n,s) => n + new TextEncoder().encode(s.rawText).byteLength,0) > PART_TWO_LIMITS.sourceBytes) throw new ParseLimitError('section_or_source_limit');
   // Prefer authoritative structured rows. Explanation columns and layout gaps
   // are never interpreted as additional ingredient cells.
-  for (const section of sections) for (const entry of section.entries) {
+  for (const section of sections) {
+   const alternativeScopes = alternativeScopeRanges(section.rawText, dictionary);
+   const conditionalScopes = conditionalScopeRanges(section.rawText, dictionary);
+   let entryCursor = 0;
+   for (const entry of section.entries) {
+    const entryStart = section.rawText.indexOf(entry.rawToken, entryCursor);
+    entryCursor = entryStart + entry.rawToken.length;
+    const splitAlternative = alternativeScopes.some(range => range.start < entryCursor && range.end > entryStart);
+    const surroundingConditional = conditionalScopes.find(range => range.start < entryCursor && range.end > entryStart)?.qualifier ?? null;
     const original = entry.sourceSpans[0];
     if (entry.sourceSpans.length !== 1 || original.start === null || original.end === null || original.end - original.start !== entry.rawToken.length) throw new Error('unsupported_multispan_or_nonliteral_entry');
-    const parserSection: ParserSection = { sectionId: section.sectionId, kind: section.kind, rawText: entry.rawToken, observationId: original.observationId, sourceRevision: original.sourceRevision, transcription: input.bundle.state === 'conflict' ? 'conflict' : input.declaration.transcriptionUncertainty.length ? 'uncertain' : 'clear', entryRefs: [{ entryId: entry.entryId, start: 0, end: entry.rawToken.length, uncertaintyReasons: entry.uncertaintyReasons, conditional: entry.conditional }] };
+    const parserSection: ParserSection = { sectionId: section.sectionId, kind: section.kind, rawText: entry.rawToken, observationId: original.observationId, sourceRevision: original.sourceRevision, transcription: input.bundle.state === 'conflict' ? 'conflict' : input.declaration.transcriptionUncertainty.length ? 'uncertain' : 'clear', entryRefs: [{ entryId: entry.entryId, start: 0, end: entry.rawToken.length, uncertaintyReasons: entry.uncertaintyReasons, conditional: entry.conditional ?? surroundingConditional }] };
     const parsed = parseSections([parserSection], dictionary);
     const offset = original.start;
     const shift = <T extends { start: number; end: number }>(s: T): T => ({ ...s, start: s.start + offset, end: s.end + offset });
@@ -45,9 +53,17 @@ function parsedInput(input: NormalizationInput, dictionary: DictionaryRelease) {
       o.occurrenceId = `${section.sectionId}:${occurrences.length}`; o.order = occurrences.length;
       o.nameSpan = shift(o.nameSpan); o.spans = o.spans.map(shift); o.quantities = o.quantities.map(q => ({ ...q, span: shift(q.span) }));
       if (o.mapping.state === 'resolved') o.mapping.offsetMap = o.mapping.offsetMap.map(m => ({ ...m, sourceStart: m.sourceStart + offset, sourceEnd: m.sourceEnd + offset }));
+      if (splitAlternative && o.modality !== 'alternative') {
+        o.modality = 'unresolved'; o.qualifier = 'or';
+        o.mapping = { state: 'unresolved', reason: 'alternative_scope_unresolved' };
+        o.limitations.push('alternative_scope_unresolved');
+        for (const quantity of o.quantities) { quantity.subject = 'unresolved'; quantity.status = 'unresolved'; quantity.reasons.push('alternative_quantity_attachment_unresolved'); quantity.convertedPercentWw = null; }
+        unresolvedSpans.push(...o.spans);
+      }
       occurrences.push(o);
     }
     unresolvedSpans.push(...parsed.unresolvedSpans.map(shift));
+   }
   }
   for (const section of sections) {
     const first = section.entries[0];
@@ -86,7 +102,11 @@ function factsFor(input: NormalizationInput, occurrences: PartTwoOccurrence[], d
       facts.push({ ...base, factId: `${snapshotId}:${product ? 'product' : 'reading'}:${o.occurrenceId}:identity`, kind: 'resolved_ingredient_identity', subject, value: { ingredientId: mapping.ingredientId, aliasRecordId: mapping.aliasRecordId }, dictionaryDependencies: [mapping.ingredientId, mapping.aliasRecordId] });
       for (const card of dictionary.explanations) if (card.ingredientId === mapping.ingredientId && card.state === 'active' && card.permissionApproved && ![card.explanationId, card.policyId, ...card.dependencies].some(id => withdrawals.includes(id)) && Date.parse(card.expiresAt) >= Date.parse(input.binding.expiresAt) && dictionary.explanationPolicies.some(policy => policy.policyId === card.policyId && !policy.withdrawalDependencies.some(id => withdrawals.includes(id)) && !policy.revoked && Object.values(policy.operations).every(Boolean) && Date.parse(policy.expiresAt) >= Date.parse(input.binding.expiresAt))) { const policy = dictionary.explanationPolicies.find(policy => policy.policyId === card.policyId)!; facts.push({ ...base, factId: `${snapshotId}:${product ? 'product' : 'reading'}:${o.occurrenceId}:function:${card.explanationId}`, kind: 'reference_function', subject: { kind: 'ingredient_reference', ingredientId: mapping.ingredientId }, value: { roleId: card.roleId, explanationId: card.explanationId, explanationRevision: card.revision, sentence: card.sentence, reviewDate: card.reviewDate, evidenceKind: card.evidenceKind, sourceUrl: card.sourceUrl, sourceAttribution: policy.attribution, licenseUrl: policy.licenseUrl, roleDefinitionUrl: policy.roleDefinitionUrl, reviewOwner: policy.reviewOwner, policyId: policy.policyId, policyHash: policy.policyHash, sourceInventoryHash: policy.sourceInventoryHash }, dictionaryDependencies: [mapping.ingredientId, mapping.aliasRecordId, card.explanationId, ...card.dependencies, ...policy.withdrawalDependencies], limitations: [...limitations, 'reference_role_not_product_performance'] }); }
     }
-    for (const [index, q] of o.quantities.entries()) if (q.status === 'parsed' || q.status === 'validated') facts.push({ ...base, spans: [q.span], factId: `${snapshotId}:${product ? 'product' : 'reading'}:${o.occurrenceId}:quantity:${index}`, kind: 'declared_quantity', subject, value: q, limitations: [...limitations, ...(q.basis === 'unknown' ? ['quantity_basis_unknown'] : []), ...(q.subject === 'blend' ? ['blend_amount_not_constituent_amount'] : [])] });
+    for (const [index, q] of o.quantities.entries()) if (q.status === 'parsed' || q.status === 'validated') facts.push({ ...base, spans: [q.span], factId: `${snapshotId}:${product ? 'product' : 'reading'}:${o.occurrenceId}:quantity:${index}`, kind: 'declared_quantity', subject, value: q, limitations: [...limitations, ...(q.basis === 'unknown' ? ['quantity_basis_unknown'] : []), ...(q.subject === 'blend' ? ['blend_amount_not_constituent_amount'] : q.subject === 'group' ? ['group_amount_not_constituent_amount'] : [])] });
+  }
+  if (product && canAssociate && input.kind === 'bound_declaration') for (const assertion of input.labelAssertions ?? []) {
+    if (assertion.transcription !== 'clear' || assertion.conditional !== null) continue;
+    facts.push({ factId: `${snapshotId}:product:label:${assertion.assertionId}`, occurrenceId: assertion.assertionId, kind: 'product_label_assertion', subject: { kind: 'bound_label_assertion', assertionId: assertion.assertionId, declarationId: input.declaration.declarationId, declarationRevision: input.declaration.revision }, value: { text: assertion.text, attribution: 'label_says', assertionKind: assertion.assertionKind }, spans: [assertion.span], rule: FACT_POLICY_VERSION, sourceDependencies: [assertion.span.observationId], dictionaryDependencies: [], limitations: ['label_claim_not_verified', 'no_ingredient_absence_inference', ...(input.bundle.scope === 'public' && input.bundle.packageConfirmation === 'unconfirmed' ? ['published_source_not_confirmed_package'] : [])], validUntil: input.binding.expiresAt });
   }
   return facts;
 }
@@ -106,10 +126,11 @@ export function normalize(inputValue: NormalizationInput, release: DictionaryRel
   if (dictionary.provenance.expiresAt && Date.parse(dictionary.provenance.expiresAt) < Date.parse(input.binding.expiresAt)) return terminal('blocked', ['dictionary_deadline_exceeded'], true);
   try {
     const withdrawals = relevantExplanationWithdrawals(dictionary, metadata.withdrawnExplanationDependencies ?? []);
+    if (input.kind === 'bound_declaration') { const limit = labelAssertionContextLimit(input.labelAssertions, literalSections(input)); if (limit) throw new ParseLimitError(limit); }
     const parsed = parsedInput(input, dictionary);
     const readingFacts = factsFor(input, parsed.occurrences, dictionary, metadata.snapshotId, false, withdrawals);
     const refs = input.sourceRefs;
-    const snapshot: PartTwoSnapshot = { schemaVersion: 2, snapshotId: metadata.snapshotId, binding: input.binding, scope: input.kind === 'source_reading' ? 'private_package' : input.binding.scope, evidenceState: input.kind === 'source_reading' ? input.evidenceOutcome : input.bundle.state === 'none' ? 'blocked' : input.bundle.state, evidenceBasis: input.kind === 'source_reading' || input.binding.scope === 'private_package' ? 'private_package' : 'public_source', packageConfirmation: input.kind === 'source_reading' ? 'unconfirmed' : input.binding.packageConfirmation, claimLimits: { productPresenceAllowed: false, declarationCompleteness: input.kind === 'source_reading' ? 'unestablished' : input.bundle.state === 'accepted' ? 'accepted' : 'partial', negativeClaimsAllowed: false }, literalSections: literalSections(input), occurrences: parsed.occurrences, facts: readingFacts, unresolvedSpans: parsed.unresolvedSpans, blockers: input.kind === 'source_reading' && input.evidenceOutcome === 'conflict' ? ['source_conflict'] : input.kind === 'bound_declaration' ? input.bundle.uncertaintyReasons : [], versions: normalizationVersions(input, dictionary), dependencyManifest: { sourceRefs: refs, dictionaryRecordIds: [...new Set(readingFacts.flatMap(f => f.dictionaryDependencies))].sort(), dictionaryHash: dictionary.contentHash, withdrawnExplanationDependencies: withdrawals, explanationPolicies: dictionary.explanationPolicies, dependencyDigest: input.binding.dependencyDigest, deletionEpoch: input.binding.deletionEpoch, policyEpoch: input.binding.policyEpoch, dictionaryEpoch: input.binding.dictionaryEpoch }, observedAt: refs.map(s => s.observedAt).sort()[0], sourceUpdatedAt: input.kind === 'source_reading' ? null : input.declaration.sourceUpdatedAt, createdAt: metadata.createdAt, expiresAt: input.binding.expiresAt };
+    const snapshot: PartTwoSnapshot = { schemaVersion: 2, snapshotId: metadata.snapshotId, binding: input.binding, scope: input.kind === 'source_reading' ? 'private_package' : input.binding.scope, evidenceState: input.kind === 'source_reading' ? input.evidenceOutcome : input.bundle.state === 'none' ? 'blocked' : input.bundle.state, evidenceBasis: input.kind === 'source_reading' || input.binding.scope === 'private_package' ? 'private_package' : 'public_source', packageConfirmation: input.kind === 'source_reading' ? 'unconfirmed' : input.binding.packageConfirmation, claimLimits: { productPresenceAllowed: false, declarationCompleteness: input.kind === 'source_reading' ? 'unestablished' : input.bundle.state === 'accepted' ? 'accepted' : 'partial', negativeClaimsAllowed: false }, literalSections: literalSections(input), labelAssertions: input.kind === 'bound_declaration' ? input.labelAssertions : [], occurrences: parsed.occurrences, facts: readingFacts, unresolvedSpans: parsed.unresolvedSpans, blockers: input.kind === 'source_reading' && input.evidenceOutcome === 'conflict' ? ['source_conflict'] : input.kind === 'bound_declaration' ? input.bundle.uncertaintyReasons : [], versions: normalizationVersions(input, dictionary), dependencyManifest: { sourceRefs: refs, dictionaryRecordIds: [...new Set(readingFacts.flatMap(f => f.dictionaryDependencies))].sort(), dictionaryHash: dictionary.contentHash, labelAssertionPermissions: input.kind === 'bound_declaration' ? input.labelAssertions.map(assertion => ({ assertionId: assertion.assertionId, ...assertion.fieldPermission })) : [], withdrawnExplanationDependencies: withdrawals, explanationPolicies: dictionary.explanationPolicies, dependencyDigest: input.binding.dependencyDigest, deletionEpoch: input.binding.deletionEpoch, policyEpoch: input.binding.policyEpoch, dictionaryEpoch: input.binding.dictionaryEpoch }, observedAt: refs.map(s => s.observedAt).sort()[0], sourceUpdatedAt: input.kind === 'source_reading' ? null : input.declaration.sourceUpdatedAt, createdAt: metadata.createdAt, expiresAt: input.binding.expiresAt };
     const productFacts = input.kind === 'bound_declaration' ? factsFor(input, parsed.occurrences, dictionary, metadata.snapshotId, true, withdrawals) : null;
     return deepFreeze(NormalizationResultSchema.parse({ ...resultBinding, state: 'ready', output: productFacts ? { kind: 'bound', reading: snapshot, productFacts: { ...snapshot, snapshotId: `${metadata.snapshotId}:product`, facts: productFacts, claimLimits: { ...snapshot.claimLimits, productPresenceAllowed: productFacts.some(f => f.kind === 'declared_ingredient' && f.value.modality === 'unconditional') } } } : { kind: 'reading_only', reading: snapshot } }));
   } catch (error) { return terminal(error instanceof ParseLimitError ? 'parse_limit' : 'failed', [error instanceof ParseLimitError ? error.message : 'normalization_failed'], true); }
