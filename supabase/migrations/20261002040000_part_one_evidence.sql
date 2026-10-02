@@ -106,6 +106,14 @@ create table private.part_one_scans (
   created_at timestamptz not null default now(),
   unique(owner_id, idempotency_key)
 );
+create table private.part_one_candidate_bindings (
+  scan_id uuid not null references private.part_one_scans(id) on delete cascade,
+  generation integer not null,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  item_id uuid not null,
+  snapshot_id uuid not null references private.part_one_records(id),
+  primary key(scan_id,generation,item_id)
+);
 create table private.part_one_subscriptions (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -143,15 +151,69 @@ create table private.part_one_captures (
   removed_at timestamptz
 );
 
+-- No destination/retention is approved by this migration. The receipt boundary
+-- is server-only; client metadataStripped/hash/dimensions never attest bytes.
+create table private.part_one_private_config (
+ id boolean primary key default true check(id),enabled boolean not null default false,
+ policy_version text not null default 'retention-pending-1',
+ process_allowed boolean not null default false,ocr_allowed boolean not null default false,
+ upload_allowed boolean not null default false,private_display_allowed boolean not null default false,
+ source_policy_id uuid not null default '00000000-0000-4000-8000-000000000006',
+ bucket_id text references storage.buckets(id),retention_seconds integer check(retention_seconds between 1 and 31536000),
+ deletion_deadline_seconds integer check(deletion_deadline_seconds between 1 and 86400),
+ approval_evidence text,expires_at timestamptz,
+ check(not enabled or (process_allowed and ocr_allowed and upload_allowed and private_display_allowed and bucket_id is not null and retention_seconds is not null and deletion_deadline_seconds is not null
+   and approval_evidence is not null and expires_at is not null))
+);
+insert into private.part_one_private_config(id) values(true);
+create table private.part_one_asset_attestations (
+ id uuid primary key default gen_random_uuid(),owner_id uuid not null references auth.users(id) on delete cascade,
+ capture_id uuid not null references private.part_one_captures(id) on delete cascade,
+ package_observation_id uuid not null,generation integer not null,deletion_epoch integer not null,
+ storage_object_id uuid not null references storage.objects(id) on delete cascade,
+ object_version text not null,content_hash text not null,width integer not null check(width between 1 and 4096),
+ height integer not null check(height between 1 and 4096),sanitizer_version text not null,verification_evidence text not null,
+ metadata_stripped boolean not null check(metadata_stripped),observed_at timestamptz not null,expires_at timestamptz not null,
+ check(expires_at>observed_at),unique(capture_id,storage_object_id)
+);
+create table private.part_one_asset_status (
+ attestation_id uuid primary key references private.part_one_asset_attestations(id) on delete cascade,
+ revoked_at timestamptz,reason text
+);
+create table private.part_one_private_assets (
+ record_id uuid primary key references private.part_one_records(id) on delete cascade,
+ attestation_id uuid not null references private.part_one_asset_attestations(id) on delete cascade,
+ owner_id uuid not null references auth.users(id) on delete cascade,
+ capture_id uuid not null references private.part_one_captures(id) on delete cascade,
+ client_evidence_id uuid not null,unique(capture_id,client_evidence_id)
+);
+create table private.part_one_capture_commits (
+ owner_id uuid not null references auth.users(id) on delete cascade,
+ capture_id uuid not null references private.part_one_captures(id) on delete cascade,
+ idempotency_key text not null,request_hash text not null,package_observation_id uuid not null,
+ generation integer not null,deletion_epoch integer not null,capture_revision integer not null,
+ observation_ids uuid[] not null,declaration_ids uuid[] not null,asset_ids uuid[] not null,
+ deleted_at timestamptz,created_at timestamptz not null default now(),primary key(owner_id,idempotency_key)
+);
+-- Storage objects must be removed through the Storage API, not SQL metadata
+-- deletion. This durable outbox retains only the cleanup locator until ack.
+create table private.part_one_private_cleanup (
+ object_id uuid primary key,bucket_id text not null,object_name text not null,
+ due_at timestamptz not null,reason text not null,created_at timestamptz not null default now()
+);
+
 -- Even service-role writes cannot mutate historical observations/declarations.
 create function private.part_one_immutable() returns trigger language plpgsql set search_path='' as $$
 begin raise exception 'PART_ONE_IMMUTABLE'; end; $$;
 create trigger part_one_records_no_update before update on private.part_one_records
   for each row execute function private.part_one_immutable();
 
+create trigger part_one_attestations_no_update before update on private.part_one_asset_attestations for each row execute function private.part_one_immutable();
+create trigger part_one_private_assets_no_update before update on private.part_one_private_assets for each row execute function private.part_one_immutable();
+
 -- Tables are private to the server. Customer access is through checked RPCs.
 do $$ declare t text; begin
-  foreach t in array array['policies','records','record_status','jobs','worker_health','budgets','reservations','scans','subscriptions','saves','captures'] loop
+  foreach t in array array['policies','records','record_status','jobs','worker_health','budgets','reservations','scans','candidate_bindings','subscriptions','saves','captures','private_config','asset_attestations','asset_status','private_assets','capture_commits','private_cleanup'] loop
     execute format('alter table private.part_one_%I enable row level security', t);
     execute format('revoke all on private.part_one_%I from public, anon, authenticated', t);
     execute format('grant all on private.part_one_%I to service_role', t);
@@ -167,6 +229,82 @@ declare u uuid := auth.uid(); begin
   end if;
   return u;
 end $$;
+
+create function private.part_one_private_record_allowed(p_id uuid,p_owner uuid) returns boolean
+language plpgsql stable security definer set search_path='' as $$
+declare rec private.part_one_records; cfg private.part_one_private_config; a private.part_one_asset_attestations; c private.part_one_captures;
+begin
+ select * into rec from private.part_one_records where id=p_id;
+ if not found or rec.scope<>'private_package' or rec.owner_id is distinct from p_owner then return false; end if;
+ select * into cfg from private.part_one_private_config where id=true;
+ if not found or not cfg.enabled or cfg.expires_at<=now() or cfg.policy_version<>rec.policy_version then return false; end if;
+ select * into c from private.part_one_captures where id=nullif(rec.payload->>'captureSessionId','')::uuid and owner_id=p_owner;
+ if not found or c.package_observation_id::text is distinct from rec.payload->>'packageObservationId' then return false; end if;
+ if rec.payload->>'privateKind'='sanitized_image' then
+   select aa.* into a from private.part_one_private_assets pa join private.part_one_asset_attestations aa on aa.id=pa.attestation_id
+     where pa.record_id=rec.id and pa.owner_id=p_owner and pa.capture_id=c.id;
+   return found and a.expires_at>now() and not exists(select 1 from private.part_one_asset_status where attestation_id=a.id and revoked_at is not null)
+     and exists(select 1 from storage.objects o join storage.buckets b on b.id=o.bucket_id where o.id=a.storage_object_id
+       and o.owner_id=p_owner::text and o.bucket_id=cfg.bucket_id and not b.public and o.version=a.object_version
+       and coalesce(o.is_delete_marker,false)=false and o.archived_at is null);
+ end if;
+ return rec.payload->>'privateKind' in ('ocr','edit','declaration');
+exception when invalid_text_representation then return false;
+end $$;
+
+create function private.part_one_purge_capture(p_capture uuid,p_reason text) returns void
+language plpgsql security definer set search_path='' as $$
+declare c private.part_one_captures; cfg private.part_one_private_config; ids uuid[]; s private.part_one_scans; r jsonb;
+begin
+ select * into c from private.part_one_captures where id=p_capture for update;
+ if not found then return; end if;
+ select * into cfg from private.part_one_private_config where id=true;
+ insert into private.part_one_private_cleanup(object_id,bucket_id,object_name,due_at,reason)
+   select distinct o.id,o.bucket_id,o.name,now()+make_interval(secs=>coalesce(cfg.deletion_deadline_seconds,1)),p_reason
+   from private.part_one_asset_attestations aa join storage.objects o on o.id=aa.storage_object_id
+   where aa.capture_id=c.id and aa.owner_id=c.owner_id and o.owner_id=c.owner_id::text
+     and o.version=aa.object_version
+   on conflict(object_id) do update set due_at=least(private.part_one_private_cleanup.due_at,excluded.due_at);
+ select coalesce(array_agg(id),'{}') into ids from private.part_one_records
+   where owner_id=c.owner_id and scope='private_package' and payload->>'captureSessionId'=c.id::text;
+ -- Erase copied transcripts as well as source rows. Snapshot-at-save identity
+ -- remains; the removed private declaration cannot be inherited or replayed.
+ update private.part_one_saves set declaration_id=null,saved_result=saved_result || jsonb_build_object('declarationId',null,
+   'declarationState','conflict','scope',case when snapshot_at_save_id is null then null else 'public' end,
+   'evidenceIds','[]'::jsonb,'reasonCodes',jsonb_build_array('private_proof_removed'),
+   'display',(saved_result->'display') || jsonb_build_object('sections','[]'::jsonb,'sources','[]'::jsonb,'limitations',jsonb_build_array('Private proof removed')))
+   where owner_id=c.owner_id and declaration_id=any(ids);
+ update private.part_one_capture_commits set deleted_at=coalesce(deleted_at,now()),observation_ids='{}',declaration_ids='{}',asset_ids='{}'
+   where capture_id=c.id;
+ delete from private.part_one_private_assets where capture_id=c.id;
+ delete from private.part_one_records where id=any(ids);
+ delete from private.part_one_asset_attestations where capture_id=c.id;
+ update private.part_one_captures set removed_at=coalesce(removed_at,now()),
+   capture_revision=capture_revision+case when c.removed_at is null or cardinality(ids)>0 then 1 else 0 end where id=c.id;
+ for s in select * from private.part_one_scans where owner_id=c.owner_id and nullif(result->>'declarationId','')::uuid=any(ids) for update loop
+   r:=private.part_one_filter_result(s.result,c.owner_id) || jsonb_build_object('resultRevision',s.result_revision+1);
+   r:=jsonb_set(r,'{display,resultRevision}',r->'resultRevision');
+   update private.part_one_scans set result=r,result_revision=s.result_revision+1,binding_revision=binding_revision+1 where id=s.id;
+ end loop;
+end $$;
+
+create function private.part_one_purge_expired_private() returns void
+language plpgsql security definer set search_path='' as $$
+declare cid uuid; begin
+ for cid in select distinct (rr.payload->>'captureSessionId')::uuid from private.part_one_records rr
+   where rr.scope='private_package' and rr.payload->>'privateKind'='sanitized_image' and not private.part_one_record_allowed(rr.id,rr.owner_id)
+ loop perform private.part_one_purge_capture(cid,'private_evidence_expired_or_revoked'); end loop;
+end $$;
+
+create function private.part_one_before_owner_delete() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare c uuid; begin
+ for c in select id from private.part_one_captures where owner_id=old.id loop
+   perform private.part_one_purge_capture(c,'account_deleted');
+ end loop;
+ return old;
+end $$;
+create trigger part_one_private_before_owner_delete before delete on auth.users for each row execute function private.part_one_before_owner_delete();
 
 -- Whole dependency closure is checked on reads/saves/publication. A text copy
 -- cannot escape revocation of its source policy or evidence dependency.
@@ -186,6 +324,7 @@ language sql stable security definer set search_path='' as $$
         or coalesce(s.status,'active') in ('revoked','retracted')
         or d.expires_at <= now() or not p.retain_allowed or not p.display_allowed
         or p.version <> d.policy_version or (p.expires_at is not null and p.expires_at <= now())
+        or (d.scope='private_package' and not private.part_one_private_record_allowed(d.id,p_owner))
         or exists(select 1 from unnest(d.dependencies) x where not exists(select 1 from private.part_one_records r where r.id=x))
     );
 $$;
@@ -231,6 +370,73 @@ begin
  return true;
 end $$;
 
+create function private.part_one_identity_expiry(p_id uuid) returns timestamptz
+language sql stable security definer set search_path='' as $$
+ with recursive snap as (select * from private.part_one_records where id=p_id and kind='snapshot'),
+ explicit_ids as (
+   select x.value::uuid id from snap, lateral jsonb_each(coalesce(payload->'fieldEvidence','{}')) f,
+     lateral jsonb_array_elements_text(f.value) x
+   union select (a->>'evidenceId')::uuid from snap,lateral jsonb_array_elements(coalesce(payload->'barcodeAssertions','[]')) a
+ ), roots as (
+   select id from explicit_ids
+   union select r.id from private.part_one_records r,snap where r.id=any(snap.dependencies) and r.kind<>'declaration'
+     and not exists(select 1 from explicit_ids)
+ ), deps as (
+   select r.* from private.part_one_records r join roots on roots.id=r.id
+   union select r.* from private.part_one_records r join deps d on r.id=any(d.dependencies)
+ ), all_identity as (select * from snap union select * from deps)
+ select min(least(r.expires_at,coalesce(p.expires_at,'infinity'::timestamptz)))
+ from all_identity r join private.part_one_policies p on p.id=r.policy_id;
+$$;
+create function private.part_one_record_expiry(p_id uuid) returns timestamptz
+language sql stable security definer set search_path='' as $$
+ with recursive d as (select * from private.part_one_records where id=p_id
+   union select r.* from private.part_one_records r join d on r.id=any(d.dependencies))
+ select min(least(d.expires_at,coalesce(p.expires_at,'infinity'::timestamptz))) from d
+ join private.part_one_policies p on p.id=d.policy_id;
+$$;
+create function private.part_one_display_expiry(p_asset jsonb,p_kind text) returns timestamptz
+language plpgsql stable security definer set search_path='' as $$
+declare expires timestamptz := (p_asset->>'expiresAt')::timestamptz; ids uuid[]; id uuid; begin
+ if p_kind='section' then ids := array(select value::uuid from jsonb_array_elements_text(coalesce(p_asset->'evidenceIds','[]')));
+ elsif p_kind='source' then ids := array[nullif(p_asset->>'observationId','')::uuid];
+ else ids := array[nullif(p_asset->>'evidenceId','')::uuid]; end if;
+ foreach id in array ids loop expires := least(expires,private.part_one_record_expiry(id)); end loop;
+ return expires;
+end $$;
+create function private.part_one_display_allowed(p_asset jsonb,p_owner uuid,p_kind text) returns boolean
+language plpgsql stable security definer set search_path='' as $$
+declare evidence uuid; obs private.part_one_records; ids uuid[]; begin
+ if p_asset is null or p_asset='null'::jsonb or p_asset->>'expiresAt' is null
+   or (p_asset->>'expiresAt')::timestamptz<=now() then return false; end if;
+ if p_kind='section' then
+   ids := array(select value::uuid from jsonb_array_elements_text(coalesce(p_asset->'evidenceIds','[]')));
+ elsif p_kind='source' then ids := array[nullif(p_asset->>'observationId','')::uuid];
+ else ids := array[nullif(p_asset->>'evidenceId','')::uuid]; end if;
+ if cardinality(ids)=0 then return false; end if;
+ foreach evidence in array ids loop
+   if evidence is null or not private.part_one_record_allowed(evidence,p_owner) then return false; end if;
+   select * into obs from private.part_one_records where id=evidence;
+   if obs.payload ? 'policyId' and obs.payload->>'policyId' is distinct from p_asset->>'policyId' then return false; end if;
+ end loop;
+ return true;
+exception when invalid_text_representation or datetime_field_overflow then return false;
+end $$;
+create function private.part_one_bind_candidates(p_scan uuid,p_generation integer,p_owner uuid,p_ids jsonb,p_key text,p_market jsonb)
+returns void language plpgsql security definer set search_path='' as $$
+declare item uuid; snapshot uuid; begin
+ for item in select value::uuid from jsonb_array_elements_text(coalesce(p_ids,'[]')) loop
+   select r.id into snapshot from private.part_one_records r where r.item_id=item and r.kind='snapshot' and r.scope='public'
+     and r.canonical_key=p_key and r.payload->'requestedMarket' is not distinct from p_market
+     and private.part_one_snapshot_identity_allowed(r.id,p_owner) order by r.revision desc,r.created_at desc limit 1;
+   if snapshot is not null then
+     insert into private.part_one_candidate_bindings(scan_id,generation,owner_id,item_id,snapshot_id)
+       values(p_scan,p_generation,p_owner,item,snapshot)
+       on conflict(scan_id,generation,item_id) do update set snapshot_id=excluded.snapshot_id;
+   end if;
+ end loop;
+end $$;
+
 create function private.part_one_empty_result(p_request jsonb, p_scan uuid) returns jsonb
 language sql immutable set search_path='' as $$
  select jsonb_build_object('schemaVersion',1,'requestId',p_request->>'requestId','scanId',p_scan,
@@ -247,27 +453,89 @@ $$;
 
 create function private.part_one_filter_result(p_result jsonb, p_owner uuid) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare r jsonb := p_result; snapshot uuid; declaration uuid; begin
-  snapshot := nullif(r->>'snapshotId','')::uuid;
-  declaration := nullif(r->>'declarationId','')::uuid;
-  if snapshot is not null and not private.part_one_snapshot_identity_allowed(snapshot,p_owner) then
-    r := r || jsonb_build_object('snapshotId',null,'itemId',null,'identity','unresolved',
-      'declarationId',null,'declarationState','none','scope',null,'candidateIds','[]'::jsonb,
-      'display',jsonb_build_object('resultRevision',1,'selectedIdentity',null,'candidates','[]'::jsonb,'sections','[]'::jsonb,
-        'sources','[]'::jsonb,'limitations',jsonb_build_array('Evidence is no longer available')),
-      'evidenceIds','[]'::jsonb,'allowedActions',jsonb_build_array('rescan'),
-      'reasonCodes',jsonb_build_array('expired_evidence'),
-      'freshness',jsonb_build_object('observedAt',null,'expiresAt',null,'state','revoked'));
-  elsif (snapshot is not null and not private.part_one_record_allowed(snapshot,p_owner))
-    or (declaration is not null and not private.part_one_record_allowed(declaration,p_owner)) then
-    r := r || jsonb_build_object('declarationId',null,'declarationState','conflict','scope','public',
-      'reasonCodes',jsonb_build_array('identity_conflict'),'allowedActions',jsonb_build_array('save_partial','rescan'));
-    r := jsonb_set(r,'{display,sections}','[]'::jsonb);
-    r := jsonb_set(r,'{display,sources}','[]'::jsonb);
-    r := jsonb_set(r,'{display,limitations}',jsonb_build_array('Ingredient evidence was retracted'));
-    r := jsonb_set(r,'{evidenceIds}','[]'::jsonb);
-  end if;
-  return jsonb_set(r,'{display,resultRevision}',r->'resultRevision');
+declare r jsonb := p_result; snapshot uuid; declaration uuid; rec private.part_one_records;
+  bound private.part_one_records; cand jsonb; asset jsonb; candidates jsonb := '[]'; candidate_ids jsonb := '[]';
+  sections jsonb := '[]'; sources jsonb := '[]'; shortened boolean := false; deadline timestamptz; identity_deadline timestamptz;
+begin
+ snapshot := nullif(r->>'snapshotId','')::uuid; declaration := nullif(r->>'declarationId','')::uuid;
+ if snapshot is not null and not private.part_one_snapshot_identity_allowed(snapshot,p_owner) then
+   r := r || jsonb_build_object('snapshotId',null,'itemId',null,'identity','unresolved',
+     'declarationId',null,'declarationState','none','scope',null,'candidateIds','[]'::jsonb,
+     'display',jsonb_build_object('resultRevision',1,'selectedIdentity',null,'candidates','[]'::jsonb,'sections','[]'::jsonb,
+       'sources','[]'::jsonb,'limitations',jsonb_build_array('Evidence is no longer available')),
+     'evidenceIds','[]'::jsonb,'allowedActions',jsonb_build_array('rescan'),
+     'reasonCodes',jsonb_build_array('expired_evidence'),
+     'freshness',jsonb_build_object('observedAt',null,'expiresAt',null,'state','revoked'));
+   snapshot := null; declaration := null;
+ elsif (snapshot is not null and not private.part_one_record_allowed(snapshot,p_owner))
+   or (declaration is not null and not private.part_one_record_allowed(declaration,p_owner)) then
+   r := r || jsonb_build_object('declarationId',null,'declarationState','conflict','scope',case when snapshot is null then null else 'public' end,
+     'reasonCodes',jsonb_build_array('expired_evidence'),'allowedActions',jsonb_build_array('save_partial','rescan'));
+   r := jsonb_set(r,'{display,sections}','[]'); r := jsonb_set(r,'{display,sources}','[]');
+   r := jsonb_set(r,'{display,limitations}',jsonb_build_array('Ingredient evidence is no longer available'));
+   r := jsonb_set(r,'{evidenceIds}','[]'); declaration := null;
+ end if;
+ if snapshot is not null then
+   select * into rec from private.part_one_records where id=snapshot;
+   identity_deadline := private.part_one_identity_expiry(snapshot); deadline := identity_deadline;
+   if r->'display'->'selectedIdentity' <> 'null'::jsonb then
+     r := jsonb_set(r,'{display,selectedIdentity,expiresAt}',to_jsonb(identity_deadline));
+     asset := r->'display'->'selectedIdentity'->'image';
+     if asset is not null and asset<>'null'::jsonb then
+       if not private.part_one_display_allowed(asset,p_owner,'image') then
+         r := jsonb_set(r,'{display,selectedIdentity,image}','null');
+       else r := jsonb_set(r,'{display,selectedIdentity,image,expiresAt}',to_jsonb(private.part_one_display_expiry(asset,'image'))); end if;
+     end if;
+   end if;
+ end if;
+ if snapshot is not null or declaration is not null then
+   if declaration is not null then deadline := least(coalesce(deadline,'infinity'::timestamptz),private.part_one_record_expiry(declaration)); end if;
+   for asset in select value from jsonb_array_elements(coalesce(r->'display'->'sections','[]')) loop
+     if private.part_one_display_allowed(asset,p_owner,'section') then
+       asset := asset || jsonb_build_object('expiresAt',private.part_one_display_expiry(asset,'section'));
+       sections := sections || jsonb_build_array(asset); deadline := least(deadline,(asset->>'expiresAt')::timestamptz);
+     else shortened := true; deadline := least(deadline,coalesce((asset->>'expiresAt')::timestamptz,now()),now()); end if;
+   end loop;
+   for asset in select value from jsonb_array_elements(coalesce(r->'display'->'sources','[]')) loop
+     if private.part_one_display_allowed(asset,p_owner,'source') then
+       asset := asset || jsonb_build_object('expiresAt',private.part_one_display_expiry(asset,'source'));
+       sources := sources || jsonb_build_array(asset); deadline := least(deadline,(asset->>'expiresAt')::timestamptz);
+     else shortened := true; deadline := least(deadline,coalesce((asset->>'expiresAt')::timestamptz,now()),now()); end if;
+   end loop;
+   r := jsonb_set(r,'{display,sections}',sections); r := jsonb_set(r,'{display,sources}',sources);
+   if shortened and declaration is not null then
+     r := r || jsonb_build_object('declarationState',case when jsonb_array_length(sections)>0 then 'partial' else 'uncertain' end,
+       'allowedActions',jsonb_build_array('save_partial','rescan'),'reasonCodes',jsonb_build_array('expired_evidence'));
+   end if;
+   r := r || jsonb_build_object('freshness',jsonb_build_object('observedAt',
+     case when declaration is null then to_jsonb(rec.observed_at) else (select to_jsonb(observed_at) from private.part_one_records where id=declaration) end,
+     'expiresAt',deadline,'state',case when shortened or deadline<=now() then 'expired' else 'fresh' end));
+ end if;
+ -- Bind every copied candidate to the exact server-stored immutable snapshot.
+ for cand in select value from jsonb_array_elements(coalesce(r->'display'->'candidates','[]')) loop
+   select rr.* into bound from private.part_one_candidate_bindings cb join private.part_one_records rr on rr.id=cb.snapshot_id
+     where cb.scan_id=(r->>'scanId')::uuid and cb.generation=(r->>'generation')::integer and cb.owner_id=p_owner
+       and cb.item_id=(cand->>'id')::uuid;
+   if found and private.part_one_snapshot_identity_allowed(bound.id,p_owner) then
+     cand := jsonb_build_object('id',bound.item_id,'name',bound.payload->'name','brand',bound.payload->'brand',
+       'variantText',bound.payload->'variantText','image',bound.payload->'image','expiresAt',private.part_one_identity_expiry(bound.id));
+     asset := cand->'image';
+     if asset is not null and asset<>'null'::jsonb then
+       if not private.part_one_display_allowed(asset,p_owner,'image') then cand := cand || jsonb_build_object('image',null);
+       else cand := jsonb_set(cand,'{image,expiresAt}',to_jsonb(private.part_one_display_expiry(asset,'image'))); end if;
+     end if;
+     candidates := candidates || jsonb_build_array(cand); candidate_ids := candidate_ids || jsonb_build_array(bound.item_id);
+   end if;
+ end loop;
+ if r->'candidateIds' <> candidate_ids then
+   r := r || jsonb_build_object('candidateIds',candidate_ids,'reasonCodes',jsonb_build_array('expired_evidence'));
+   if snapshot is null then
+     r := r || jsonb_build_object('identity',case when jsonb_array_length(candidate_ids)=0 then 'unresolved' else 'candidate' end,
+       'allowedActions',case when jsonb_array_length(candidate_ids)=0 then jsonb_build_array('rescan','retry') else jsonb_build_array('choose_candidate','rescan') end);
+   end if;
+ end if;
+ r := jsonb_set(r,'{display,candidates}',candidates);
+ return jsonb_set(r,'{display,resultRevision}',r->'resultRevision');
 end $$;
 
 create function private.part_one_refresh_scan(p_id uuid, p_owner uuid) returns jsonb
@@ -345,17 +613,215 @@ begin
      else substr(raw,1,6)||'0000'||f end || substr(raw,8,1);
  else
    expected := case sym when 'upca' then 12 when 'ean13' then 13 when 'ean8' then 8 when 'itf14' then 14 when 'gtin14' then 14 end;
-   if expected is not null and length(native)<>expected then return null; end if;
+   if expected is not null and length(native)<>expected and not (sym='ean13' and length(native)=12) then return null; end if;
  end if;
  n := length(native);
  if n not in (8,12,13,14) then return null; end if;
- if (n=12 and native ~ '^[24]') or (n=13 and native ~ '^2') then return null; end if;
  for i in reverse n-1..1 loop
    total := total + substr(native,i,1)::integer * weight;
    weight := case weight when 3 then 1 else 3 end;
  end loop;
  if ((10 - total % 10) % 10) <> substr(native,n,1)::integer then return null; end if;
- return 'gtin:' || lpad(native,14,'0');
+ native := lpad(native,14,'0');
+ if native ~ '^00[24]' or native ~ '^02' then return null; end if;
+ return 'gtin:' || native;
+end $$;
+
+create function private.part_one_commit_capture(p_payload jsonb,p_owner uuid,p_scan private.part_one_scans,p_capture private.part_one_captures) returns jsonb
+language plpgsql security definer set search_path='' as $$
+#variable_conflict use_column
+declare cfg private.part_one_private_config; policy private.part_one_policies; receipt private.part_one_capture_commits;
+  att private.part_one_asset_attestations; asset_record private.part_one_records; prior private.part_one_records;
+  value jsonb; observation jsonb; line jsonb; raw_text text; source_id uuid; observation_id uuid; declaration_id uuid; section_id uuid;
+  source_revision integer; expiry timestamptz; image_ids uuid[] := '{}'; observation_ids uuid[] := '{}'; declaration_ids uuid[] := '{}';
+  deps uuid[]; previous_declaration uuid; uncertainty jsonb; predicate jsonb; sections jsonb; entries jsonb;
+  r jsonb:=p_scan.result; next_capture_revision integer; request_hash text; offset_value integer; line_order integer;
+  selected_decl jsonb; selected_sources jsonb; source_image uuid; known_asset boolean; assoc boolean;
+begin
+ select * into cfg from private.part_one_private_config where id=true;
+ select * into policy from private.part_one_policies where id='private_capture';
+ if not cfg.enabled or not cfg.process_allowed or not cfg.ocr_allowed or not cfg.upload_allowed or not cfg.private_display_allowed or cfg.expires_at<=now() or cfg.policy_version<>policy.version or not policy.retain_allowed or not policy.display_allowed
+   or policy.permission_evidence is null or (policy.expires_at is not null and policy.expires_at<=now())
+   or not exists(select 1 from storage.buckets where id=cfg.bucket_id and not public) then
+   raise exception 'PART_ONE_PRIVATE_RETENTION_DISABLED';
+ end if;
+ if p_capture.owner_id is distinct from p_owner or p_capture.scan_id<>p_scan.id or p_capture.removed_at is not null
+   or p_capture.expires_at<=now() or p_capture.generation<>p_scan.generation or p_capture.deletion_epoch<>p_scan.deletion_epoch
+   or p_capture.package_observation_id::text is distinct from p_payload->>'packageObservationId'
+   or p_capture.deletion_epoch is distinct from (p_payload->>'expectedDeletionEpoch')::integer
+   or p_capture.item_id is distinct from nullif(r->>'itemId','')::uuid then
+   return jsonb_build_object('conflict',true,'code','stale_capture','result',r);
+ end if;
+ if length(p_payload->>'idempotencyKey') not between 1 and 200 or p_payload->>'idempotencyKey' is null
+   or jsonb_typeof(p_payload->'assets')<>'array' or jsonb_typeof(p_payload->'observations')<>'array' or jsonb_typeof(p_payload->'edits')<>'array'
+   or jsonb_array_length(p_payload->'assets')>6 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+ -- Validate uniqueness independently of HTTP DTO validation: duplicate aliases
+ -- must never produce a committed receipt rejected by the strict response DTO.
+ if exists(select 1 from jsonb_array_elements(p_payload->'assets') a group by a->>'evidenceId' having count(*)>1)
+   or exists(select 1 from jsonb_array_elements(p_payload->'assets') a group by a->>'storageObjectId' having count(*)>1) then
+   raise exception 'PART_ONE_INVALID_PAYLOAD';
+ end if;
+ request_hash:=encode(extensions.digest(p_payload::text,'sha256'),'hex');
+ select * into receipt from private.part_one_capture_commits where owner_id=p_owner and idempotency_key=p_payload->>'idempotencyKey';
+ if found then
+   if receipt.deleted_at is not null then raise exception 'PART_ONE_DELETED'; end if;
+   if receipt.request_hash<>request_hash or receipt.capture_id<>p_capture.id then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT'; end if;
+   return jsonb_build_object('schemaVersion',1,'capture',jsonb_build_object('schemaVersion',1,'captureSessionId',p_capture.id,
+     'packageObservationId',p_capture.package_observation_id,'scanId',p_scan.id,'generation',p_capture.generation,
+     'captureRevision',p_capture.capture_revision,'deletionEpoch',p_capture.deletion_epoch,'itemId',p_capture.item_id,'candidateId',null),
+     'observationIds',to_jsonb(receipt.observation_ids),'declarationIds',to_jsonb(receipt.declaration_ids),'assetIds',to_jsonb(receipt.asset_ids),'result',r);
+ end if;
+ if (p_payload->>'expectedGeneration')::integer is distinct from p_scan.generation
+   or (p_payload->>'expectedResultRevision')::integer is distinct from p_scan.result_revision
+   or (p_payload->>'expectedCaptureRevision')::integer is distinct from p_capture.capture_revision then
+   return jsonb_build_object('conflict',true,'code','stale_capture','result',r);
+ end if;
+ expiry:=least(now()+make_interval(secs=>cfg.retention_seconds),cfg.expires_at,coalesce(policy.expires_at,'infinity'::timestamptz));
+ for value in select x from jsonb_array_elements(p_payload->'assets') x loop
+   if jsonb_typeof(value)<>'object' or value->>'metadataStripped' is distinct from 'true'
+     or exists(select 1 from jsonb_object_keys(value) k where k<>all(array['evidenceId','storageObjectId','contentHash','width','height','metadataStripped'])) then
+     raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+   select aa.* into att from private.part_one_asset_attestations aa join storage.objects o on o.id=aa.storage_object_id
+     join storage.buckets b on b.id=o.bucket_id where aa.storage_object_id=(value->>'storageObjectId')::uuid
+       and aa.owner_id=p_owner and aa.capture_id=p_capture.id and aa.package_observation_id=p_capture.package_observation_id
+       and aa.generation=p_capture.generation and aa.deletion_epoch=p_capture.deletion_epoch and aa.metadata_stripped
+       and aa.content_hash=value->>'contentHash' and aa.width=(value->>'width')::integer and aa.height=(value->>'height')::integer
+       and aa.expires_at>now() and o.owner_id=p_owner::text and o.bucket_id=cfg.bucket_id and not b.public
+       and o.version=aa.object_version and coalesce(o.is_delete_marker,false)=false and o.archived_at is null
+       and not exists(select 1 from private.part_one_asset_status where attestation_id=aa.id and revoked_at is not null)
+       for update of o;
+   if not found then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
+   expiry:=least(expiry,att.expires_at);
+   select rr.* into asset_record from private.part_one_private_assets pa join private.part_one_records rr on rr.id=pa.record_id
+     where pa.capture_id=p_capture.id and pa.client_evidence_id=(value->>'evidenceId')::uuid;
+   if found then
+     if not exists(select 1 from private.part_one_private_assets where record_id=asset_record.id and attestation_id=att.id)
+       then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT'; end if;
+   else
+     if (select count(*) from private.part_one_private_assets where capture_id=p_capture.id)>=6 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+     insert into private.part_one_records(kind,item_id,revision,canonical_key,policy_id,policy_version,owner_id,scope,payload,observed_at,expires_at)
+       values('observation',p_capture.item_id,1,private.part_one_code_key(p_scan.request->'code'),'private_capture',policy.version,p_owner,'private_package',
+         jsonb_build_object('privateKind','sanitized_image','captureSessionId',p_capture.id,'packageObservationId',p_capture.package_observation_id,
+           'generation',p_capture.generation,'deletionEpoch',p_capture.deletion_epoch,'policyId',cfg.source_policy_id,
+           'asset',value,'attestationId',att.id,'sanitizerVersion',att.sanitizer_version),now(),expiry) returning * into asset_record;
+     insert into private.part_one_record_status(record_id) values(asset_record.id);
+     insert into private.part_one_private_assets(record_id,attestation_id,owner_id,capture_id,client_evidence_id)
+       values(asset_record.id,att.id,p_owner,p_capture.id,(value->>'evidenceId')::uuid);
+   end if;
+   image_ids:=array_append(image_ids,asset_record.id);
+ end loop;
+ for observation in select entry from (select value as entry,0 as group_order,ordinality from jsonb_array_elements(p_payload->'observations') with ordinality
+   union all select value,1,ordinality from jsonb_array_elements(p_payload->'edits') with ordinality) rows order by group_order,ordinality loop
+   known_asset:=false; source_image:=null; uncertainty:='["full_panel_not_established","variant_market_unverified"]';
+   if observation ? 'evidenceId' then
+     observation_id:=(observation->>'evidenceId')::uuid; source_revision:=1;
+     if observation->>'captureSessionId' is distinct from p_capture.id::text or (observation->>'generation')::integer is distinct from p_capture.generation
+       or jsonb_typeof(observation->'lines')<>'array' or jsonb_typeof(observation->'languageConfig')<>'array'
+       or jsonb_array_length(observation->'orientationTransform')<>9
+       or observation->>'recognizer' is null or observation->>'recognizerVersion' is null
+       or observation->>'status' not in ('recognized','no_text','unsupported_script','model_unavailable','cancelled','failed')
+       or exists(select 1 from jsonb_object_keys(observation) k where k<>all(array['evidenceId','captureSessionId','generation','recognizer','recognizerVersion','languageConfig','correctionEnabled','sourceWidth','sourceHeight','orientationTransform','lines','status'])) then
+       raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+     if observation->>'status'='recognized' and ((observation->>'sourceWidth')::integer not between 1 and 4096 or (observation->>'sourceHeight')::integer not between 1 and 4096)
+       then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+     deps:=image_ids;
+     if cardinality(deps)=0 then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
+     for line in select value from jsonb_array_elements(observation->'lines') loop
+       if jsonb_typeof(line->'text')<>'string' or jsonb_typeof(line->'alternatives')<>'array' or jsonb_array_length(line->'region')<>4
+         or exists(select 1 from jsonb_object_keys(line) k where k<>all(array['text','alternatives','region','confidence'])) then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+       if jsonb_array_length(line->'alternatives')>0 then uncertainty:=uncertainty || '["recognition_alternatives_unresolved"]'; end if;
+     end loop;
+     select string_agg(value->>'text',E'\n' order by ordinality) into raw_text from jsonb_array_elements(observation->'lines') with ordinality;
+     raw_text:=coalesce(raw_text,'');
+     if cardinality(image_ids)=1 then source_image:=image_ids[1]; else uncertainty:=uncertainty || '["image_region_mapping_unresolved"]'; end if;
+   else
+     if exists(select 1 from jsonb_object_keys(observation) k where k<>all(array['observationId','supersedesId','revision','text','reason']))
+       or jsonb_typeof(observation->'text')<>'string' or length(observation->>'reason')=0 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
+     observation_id:=(observation->>'observationId')::uuid;
+     select * into prior from private.part_one_records where id=(observation->>'supersedesId')::uuid and kind='observation'
+       and owner_id=p_owner and scope='private_package' and payload->>'captureSessionId'=p_capture.id::text and payload->>'privateKind' in ('ocr','edit');
+     if not found or not private.part_one_record_allowed(prior.id,p_owner) then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
+     source_revision:=(observation->>'revision')::integer;
+     if source_revision<>prior.revision+1 or exists(select 1 from private.part_one_records where owner_id=p_owner and supersedes_id=prior.id and kind='observation')
+       then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT'; end if;
+     deps:=array_append(prior.dependencies,prior.id);raw_text:=observation->>'text';
+     uncertainty:=uncertainty || '["user_edit_does_not_establish_missing_coverage"]';
+   end if;
+   if exists(select 1 from private.part_one_records where id=observation_id) then raise exception 'PART_ONE_IDEMPOTENCY_CONFLICT'; end if;
+   for source_id in select unnest(deps) loop
+     if not private.part_one_record_allowed(source_id,p_owner) then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
+     expiry:=least(expiry,private.part_one_record_expiry(source_id));
+   end loop;
+   insert into private.part_one_records(id,kind,item_id,revision,canonical_key,policy_id,policy_version,owner_id,scope,payload,dependencies,supersedes_id,observed_at,expires_at)
+     values(observation_id,'observation',p_capture.item_id,source_revision,private.part_one_code_key(p_scan.request->'code'),'private_capture',policy.version,p_owner,'private_package',
+       jsonb_build_object('privateKind',case when observation ? 'evidenceId' then 'ocr' else 'edit' end,'captureSessionId',p_capture.id,
+         'packageObservationId',p_capture.package_observation_id,'generation',p_capture.generation,'deletionEpoch',p_capture.deletion_epoch,
+         'policyId',cfg.source_policy_id,'rawText',raw_text,'observation',observation,'uncertaintyReasons',uncertainty),deps,
+       case when observation ? 'evidenceId' then null else (observation->>'supersedesId')::uuid end,now(),expiry);
+   insert into private.part_one_record_status(record_id) values(observation_id);observation_ids:=array_append(observation_ids,observation_id);
+   if raw_text='' or (observation ? 'status' and observation->>'status'<>'recognized') then continue; end if;
+   section_id:=gen_random_uuid();declaration_id:=gen_random_uuid();offset_value:=0;line_order:=0;entries:='[]';
+   -- No chemical token split occurs here. Complete verbatim lines have exact
+   -- offsets and unresolved mapping; the grammar-aware parser may derive a new
+   -- revision later. Coverage/category/variant proof is absent from this DTO.
+   for line in select to_jsonb(x) from unnest(string_to_array(raw_text,E'\n')) x loop
+     entries:=entries || jsonb_build_array(jsonb_build_object('entryId',gen_random_uuid(),'sectionId',section_id,'order',line_order,
+       'rawToken',line#>>'{}','sourceSpans',jsonb_build_array(jsonb_build_object('observationId',observation_id,'imageId',source_image,
+       'sourceRevision',source_revision,'start',offset_value,'end',offset_value+length(line#>>'{}'),'region',null,'transformation','[]'::jsonb)),
+       'canonicalIngredientId',null,'aliasVersion','unmapped-1','mapping','unresolved','quantity',null,'conditional',null,
+       'uncertaintyReasons',jsonb_build_array('line_not_chemically_tokenized')));
+     offset_value:=offset_value+length(line#>>'{}')+1;line_order:=line_order+1;
+   end loop;
+   sections:=jsonb_build_array(jsonb_build_object('sectionId',section_id,'kind','ingredients','rawText',raw_text,'startCovered',false,'endCovered',false,'lineCoverageComplete',false,'entries',entries));
+   assoc:=p_capture.item_id is not null and r->>'snapshotId' is not null;
+   predicate:=jsonb_build_object('association',jsonb_build_object('passed',assoc,'evidenceIds',jsonb_build_array(observation_id),'reasons',case when assoc then '[]'::jsonb else '["no_association"]'::jsonb end),
+     'noContradiction',jsonb_build_object('passed',jsonb_array_length(r->'conflictIds')=0,'evidenceIds',r->'conflictIds','reasons',case when jsonb_array_length(r->'conflictIds')=0 then '[]'::jsonb else '["identity_conflict"]'::jsonb end),
+     'variantMarket',jsonb_build_object('passed',false,'evidenceIds','[]'::jsonb,'reasons','["private_variant_market_unverified"]'::jsonb),
+     'completeness',jsonb_build_object('passed',false,'evidenceIds',jsonb_build_array(observation_id),'reasons',uncertainty),
+     'rightsFreshness',jsonb_build_object('passed',true,'evidenceIds',to_jsonb(deps),'reasons','[]'::jsonb));
+   select id into previous_declaration from private.part_one_records where owner_id=p_owner and kind='declaration'
+     and payload->>'captureSessionId'=p_capture.id::text and payload->'observationIds' ? coalesce(observation->>'supersedesId','') order by revision desc limit 1;
+   selected_decl:=jsonb_build_object('declarationId',declaration_id,'revision',source_revision,'itemId',p_capture.item_id,'snapshotId',r->'snapshotId',
+     'observationIds',jsonb_build_array(observation_id),'dependencyIds',to_jsonb(array_append(deps,observation_id)),
+     'rawText',raw_text,'textStructureHash',encode(extensions.digest(jsonb_build_object('rawText',raw_text,'sections',sections)::text,'sha256'),'hex'),
+     'sections',sections,'category','unknown','completenessReasons',uncertainty,'transcriptionUncertainty',uncertainty,
+     'parserVersion','private-verbatim-lines-1','aliasVersion','unmapped-1','sourceRevision',source_revision,'sourceUpdatedAt',null,
+     'observedAt',now(),'expiresAt',expiry,'policyId',cfg.source_policy_id,'scope','private_package','ownerId',p_owner,
+     'packageObservationId',p_capture.package_observation_id,'associationEvidenceIds',case when assoc then jsonb_build_array(observation_id) else '[]'::jsonb end,
+     'variant','{"brand":null,"line":null,"form":null,"scent":null,"shade":null,"spf":null,"strength":null,"size":null,"unit":null,"packCount":null,"packagingLevel":null}'::jsonb,
+     'sourceMarkets','[]'::jsonb,'packageMarket',null,'conflictIds',r->'conflictIds','supersedesId',previous_declaration,'formulaEquivalence','unknown',
+     'privateKind','declaration','captureSessionId',p_capture.id,'generation',p_capture.generation,'deletionEpoch',p_capture.deletion_epoch,
+     'predicate',predicate,'state',case when jsonb_array_length(r->'conflictIds')>0 then 'conflict' else 'partial' end,'structuredSections',sections);
+   selected_decl:=selected_decl || jsonb_build_object('sections',jsonb_build_array(jsonb_build_object('sectionId',section_id,'kind','ingredients','text',raw_text,
+     'evidenceIds',jsonb_build_array(observation_id),'policyId',cfg.source_policy_id,'observedAt',now(),'expiresAt',expiry)));
+   selected_sources:=jsonb_build_array(jsonb_build_object('observationId',observation_id,'policyId',cfg.source_policy_id,'label',
+     case when observation ? 'evidenceId' then 'Private on-device OCR; incomplete panel' else 'Private user correction; incomplete panel' end,
+     'url',null,'observedAt',now(),'sourceUpdatedAt',null,'expiresAt',expiry));
+   selected_decl:=selected_decl || jsonb_build_object('sources',selected_sources);
+   insert into private.part_one_records(id,kind,item_id,revision,canonical_key,policy_id,policy_version,owner_id,scope,payload,dependencies,supersedes_id,observed_at,expires_at)
+     values(declaration_id,'declaration',p_capture.item_id,source_revision,private.part_one_code_key(p_scan.request->'code'),'private_capture',policy.version,
+       p_owner,'private_package',selected_decl,array_append(deps,observation_id),previous_declaration,now(),expiry);
+   insert into private.part_one_record_status(record_id) values(declaration_id);declaration_ids:=array_append(declaration_ids,declaration_id);
+ end loop;
+ next_capture_revision:=p_capture.capture_revision+1;
+ if selected_decl is not null then
+   r:=r || jsonb_build_object('declarationId',selected_decl->'declarationId','declarationState',selected_decl->'state','scope','private_package',
+     'evidenceIds',selected_decl->'dependencyIds','reasonCodes',selected_decl->'completenessReasons','allowedActions',
+       case when r->>'snapshotId' is null then jsonb_build_array('add_photo','rescan','remove_draft') else jsonb_build_array('save_partial','add_photo','rescan','remove_draft') end,
+     'freshness',jsonb_build_object('observedAt',now(),'expiresAt',expiry,'state','fresh'));
+   r:=jsonb_set(r,'{display,sections}',selected_decl->'sections');r:=jsonb_set(r,'{display,sources}',selected_sources);
+   r:=jsonb_set(r,'{display,limitations}','["Private package evidence; full panel, variant and market unverified"]');
+ end if;
+ r:=r || jsonb_build_object('resultRevision',p_scan.result_revision+1);
+ r:=jsonb_set(r,'{display,resultRevision}',r->'resultRevision');r:=private.part_one_filter_result(r,p_owner);
+ update private.part_one_captures set capture_revision=next_capture_revision where id=p_capture.id;
+ update private.part_one_scans set result=r,result_revision=p_scan.result_revision+1,binding_revision=binding_revision+1 where id=p_scan.id;
+ insert into private.part_one_capture_commits(owner_id,capture_id,idempotency_key,request_hash,package_observation_id,generation,deletion_epoch,capture_revision,observation_ids,declaration_ids,asset_ids)
+   values(p_owner,p_capture.id,p_payload->>'idempotencyKey',request_hash,p_capture.package_observation_id,p_capture.generation,p_capture.deletion_epoch,next_capture_revision,observation_ids,declaration_ids,image_ids);
+ return jsonb_build_object('schemaVersion',1,'capture',jsonb_build_object('schemaVersion',1,'captureSessionId',p_capture.id,
+   'packageObservationId',p_capture.package_observation_id,'scanId',p_scan.id,'generation',p_capture.generation,'captureRevision',next_capture_revision,
+   'deletionEpoch',p_capture.deletion_epoch,'itemId',p_capture.item_id,'candidateId',null),
+   'observationIds',to_jsonb(observation_ids),'declarationIds',to_jsonb(declaration_ids),'assetIds',to_jsonb(image_ids),'result',r);
 end $$;
 
 -- One transaction owns operation creation, binding, subscription and save.
@@ -407,7 +873,7 @@ begin
        r := r || jsonb_build_object('identity','exact','itemId',snap.item_id,'snapshotId',snap.id,
          'scope','public','reasonCodes',jsonb_build_array('no_declaration'),
          'display',jsonb_build_object('selectedIdentity',jsonb_build_object('id',snap.item_id,'name',snap.payload->'name','brand',snap.payload->'brand',
-           'variantText',snap.payload->'variantText','image',snap.payload->'image'),'candidates','[]'::jsonb,'sections','[]'::jsonb,
+           'variantText',snap.payload->'variantText','image',snap.payload->'image','expiresAt',private.part_one_identity_expiry(snap.id)),'candidates','[]'::jsonb,'sections','[]'::jsonb,
            'sources','[]'::jsonb,'limitations',jsonb_build_array('Ingredients not verified yet')),
          'allowedActions',jsonb_build_array('save_partial','rescan'),
          'freshness',jsonb_build_object('observedAt',snap.observed_at,'expiresAt',snap.expires_at,'state','fresh'));
@@ -434,7 +900,7 @@ begin
        r := r || jsonb_build_object('identity','ambiguous','candidateIds',(select jsonb_agg(x->'itemId') from jsonb_array_elements(catalog) x),
          'allowedActions',jsonb_build_array('choose_candidate','rescan'),'reasonCodes',jsonb_build_array('identity_conflict'));
        r := jsonb_set(r,'{display,candidates}',(select jsonb_agg(jsonb_build_object('id',rr.item_id,'name',rr.payload->'name',
-         'brand',rr.payload->'brand','variantText',rr.payload->'variantText','image',rr.payload->'image'))
+         'brand',rr.payload->'brand','variantText',rr.payload->'variantText','image',rr.payload->'image','expiresAt',private.part_one_identity_expiry(rr.id)))
          from private.part_one_records rr where rr.id::text in (select x->>'snapshotId' from jsonb_array_elements(catalog) x)));
      end if;
      if r->>'declarationState'<>'accepted' then
@@ -443,7 +909,7 @@ begin
        if not found then
          select exists(select 1 from private.part_one_worker_health where heartbeat_at>now()-interval '30 seconds') into worker_live;
          insert into private.part_one_jobs(coalescing_key,input,policy_version,state)
-           values(key,p_payload->'request'->'code' || jsonb_build_object('canonicalKey',p_payload->>'canonicalKey',
+           values(key,p_payload->'request'->'code' || jsonb_build_object('canonicalKey',private.part_one_code_key(p_payload->'request'->'code'),'normalizationVersion','part-one-gtin-2',
              'requestedMarket',p_payload->'request'->'requestedMarket'),'part-one-1',case when worker_live then 'queued' else 'deferred_budget' end) returning * into j;
        end if;
        r := r || jsonb_build_object('jobId',j.id,'work',j.state,'nextCheckAfter',j.next_eligible_at);
@@ -452,6 +918,9 @@ begin
    r := jsonb_set(r,'{display,resultRevision}',r->'resultRevision');
    insert into private.part_one_scans(id,owner_id,idempotency_key,request,generation,result,job_id)
      values(id,u,p_payload->>'idempotencyKey',p_payload->'request',(p_payload->'request'->>'generation')::integer,r,j.id) returning * into s;
+   perform private.part_one_bind_candidates(s.id,s.generation,u,r->'candidateIds',private.part_one_code_key(s.request->'code'),s.request->'requestedMarket');
+   r := private.part_one_filter_result(r,u);
+   update private.part_one_scans set result=r where id=s.id;
    return r;
  end if;
  if p_action='saves/list' then
@@ -480,6 +949,17 @@ begin
    if not found then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
    return jsonb_build_object('ended',true);
  end if;
+ if p_action in ('captures/read','captures/delete') then
+   select * into c from private.part_one_captures where id=(p_payload->>'id')::uuid and owner_id=u for update;
+   if not found then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
+   if p_action='captures/delete' then
+     perform private.part_one_purge_capture(c.id,'explicit_private_proof_removal');
+     return jsonb_build_object('deleted',true,'id',c.id);
+   end if;
+   if c.removed_at is not null or c.expires_at<=now() then raise exception 'PART_ONE_DELETED'; end if;
+   return jsonb_build_object('schemaVersion',1,'captureSessionId',c.id,'packageObservationId',c.package_observation_id,
+     'scanId',c.scan_id,'generation',c.generation,'captureRevision',c.capture_revision,'deletionEpoch',c.deletion_epoch,'itemId',c.item_id,'candidateId',null);
+ end if;
  if p_action='captures/observations' then
    select * into c from private.part_one_captures where id=(p_payload->>'captureSessionId')::uuid and owner_id=u for update;
    if not found then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
@@ -490,6 +970,7 @@ begin
  r := private.part_one_refresh_scan(s.id,u);
  select * into s from private.part_one_scans where id=s.id;
  if p_action='scans/read' then return r; end if;
+ if p_action='captures/observations' then return private.part_one_commit_capture(p_payload,u,s,c); end if;
  if p_action='subscriptions/create' then
    select id into sub from private.part_one_subscriptions where scan_id=s.id and generation=s.generation and ended_at is null;
    if sub is null then insert into private.part_one_subscriptions(owner_id,scan_id,generation) values(u,s.id,s.generation) returning id into sub; end if;
@@ -511,10 +992,11 @@ begin
  end if;
  if p_action='selection' then
    if not (r->'candidateIds') ? (p_payload->>'candidateId') then raise exception 'PART_ONE_INVALID_CANDIDATE'; end if;
-   select * into snap from private.part_one_records where item_id=(p_payload->>'candidateId')::uuid and kind='snapshot'
-     and scope='public' and canonical_key=private.part_one_code_key(s.request->'code')
-     and payload->'requestedMarket' is not distinct from s.request->'requestedMarket'
-     and private.part_one_snapshot_identity_allowed(id,u) order by revision desc limit 1;
+   select rr.* into snap from private.part_one_records rr join private.part_one_candidate_bindings cb on cb.snapshot_id=rr.id
+     where cb.scan_id=s.id and cb.generation=s.generation and cb.owner_id=u and cb.item_id=(p_payload->>'candidateId')::uuid
+       and rr.kind='snapshot' and rr.scope='public' and rr.canonical_key=private.part_one_code_key(s.request->'code')
+       and rr.payload->'requestedMarket' is not distinct from s.request->'requestedMarket'
+       and private.part_one_snapshot_identity_allowed(rr.id,u);
    if not found then return jsonb_build_object('conflict',true,'code','expired_evidence','result',r); end if;
    s.generation := s.generation+1; s.result_revision := s.result_revision+1;
    r := r || jsonb_build_object('generation',s.generation,'resultRevision',s.result_revision,'identity','exact',
@@ -522,11 +1004,17 @@ begin
      'packageConfirmation','user_bound','reasonCodes',jsonb_build_array('no_declaration'),'candidateIds','[]'::jsonb,
      'allowedActions',jsonb_build_array('save_partial','rescan'));
    r := jsonb_set(r,'{display}',jsonb_build_object('selectedIdentity',jsonb_build_object('id',snap.item_id,'name',snap.payload->'name',
-     'brand',snap.payload->'brand','variantText',snap.payload->'variantText','image',snap.payload->'image'),
+     'brand',snap.payload->'brand','variantText',snap.payload->'variantText','image',snap.payload->'image','expiresAt',private.part_one_identity_expiry(snap.id)),
      'candidates','[]'::jsonb,'sections','[]'::jsonb,'sources','[]'::jsonb,'limitations',jsonb_build_array('Ingredients not verified yet')));
    r := jsonb_set(r,'{display,resultRevision}',r->'resultRevision');
    update private.part_one_scans set generation=s.generation,result_revision=s.result_revision,binding_revision=binding_revision+1,result=r,deletion_epoch=deletion_epoch+1 where id=s.id;
    update private.part_one_subscriptions set ended_at=now() where scan_id=s.id and ended_at is null;
+   -- Uncommitted derivatives have no historical package to preserve; purge
+   -- their attestations/cleanup locators before ending the generation. A saved
+   -- committed package stays readable until explicit proof removal/expiry.
+   for c in select cc.* from private.part_one_captures cc where cc.scan_id=s.id and cc.removed_at is null
+     and not exists(select 1 from private.part_one_capture_commits cm where cm.capture_id=cc.id and cm.deleted_at is null)
+   loop perform private.part_one_purge_capture(c.id,'capture_selection_cancelled'); end loop;
    update private.part_one_captures set removed_at=now() where scan_id=s.id and removed_at is null;
    return r;
  end if;
@@ -538,20 +1026,10 @@ begin
      'schemaVersion',1,'itemId',c.item_id,'candidateId',null);
  end if;
  if p_action='captures/remove' then
-   update private.part_one_captures set removed_at=coalesce(removed_at,now()),capture_revision=capture_revision+1
-     where id=(p_payload->>'captureSessionId')::uuid and owner_id=u and scan_id=s.id;
+   select * into c from private.part_one_captures where id=(p_payload->>'captureSessionId')::uuid and owner_id=u and scan_id=s.id;
    if not found then raise exception 'PART_ONE_NOT_FOUND' using errcode='42501'; end if;
+   perform private.part_one_purge_capture(c.id,'explicit_private_proof_removal');
    return jsonb_build_object('removed',true);
- end if;
- if p_action='captures/observations' then
-   if c.removed_at is not null or c.expires_at<=now() or c.generation<>s.generation or c.deletion_epoch<>s.deletion_epoch
-     or c.capture_revision is distinct from (p_payload->>'expectedCaptureRevision')::integer
-     or c.package_observation_id is distinct from (p_payload->>'packageObservationId')::uuid
-     or c.deletion_epoch is distinct from (p_payload->>'expectedDeletionEpoch')::integer then
-     return jsonb_build_object('conflict',true,'code','stale_capture','result',r);
-   end if;
-   -- No OCR text, assets or edits enter persistence until privacy approval.
-   raise exception 'PART_ONE_PRIVATE_RETENTION_DISABLED';
  end if;
  if p_action='saves/create' then
    if p_payload->>'selectedSnapshotId' is distinct from r->>'snapshotId' or
@@ -578,6 +1056,57 @@ end $$;
 revoke all on function public.part_one_operation(text,jsonb) from public,anon;
 grant execute on function public.part_one_operation(text,jsonb) to authenticated;
 
+-- Service-side catalog reread after dequeue. It uses the same immutable
+-- association and rights gates as foreground scans; no owner profile is returned.
+create function private.part_one_lookup_catalog(p_job private.part_one_jobs) returns jsonb
+language plpgsql stable security definer set search_path='' as $$
+declare snap private.part_one_records; dec private.part_one_records; r jsonb; candidates jsonb; count_items integer;
+begin
+ select count(distinct item_id)::integer into count_items from private.part_one_records
+   where kind='snapshot' and scope='public' and canonical_key=p_job.input->>'canonicalKey'
+     and payload->'requestedMarket' is not distinct from p_job.input->'requestedMarket'
+     and private.part_one_snapshot_identity_allowed(id,null);
+ if count_items=0 then return null; end if;
+ r := private.part_one_empty_result(jsonb_build_object('schemaVersion',1,'requestId',p_job.id,'generation',0),p_job.id);
+ if count_items>1 then
+   select jsonb_agg(jsonb_build_object('id',rr.item_id,'name',rr.payload->'name','brand',rr.payload->'brand',
+     'variantText',rr.payload->'variantText','image',null,'expiresAt',private.part_one_identity_expiry(rr.id))) into candidates
+     from (select distinct on(item_id) * from private.part_one_records
+       where kind='snapshot' and scope='public' and canonical_key=p_job.input->>'canonicalKey'
+         and payload->'requestedMarket' is not distinct from p_job.input->'requestedMarket'
+         and private.part_one_snapshot_identity_allowed(id,null) order by item_id,revision desc,created_at desc) rr;
+   r := r || jsonb_build_object('identity','ambiguous','candidateIds',(select jsonb_agg(x->'id') from jsonb_array_elements(candidates) x),
+     'reasonCodes',jsonb_build_array('identity_conflict'),'allowedActions',jsonb_build_array('choose_candidate','rescan'));
+   r := jsonb_set(r,'{display,candidates}',candidates);
+   return jsonb_build_object('resultPatch',r-array['schemaVersion','requestId','scanId','generation','resultRevision','work','jobId','subscriptionId','nextCheckAfter'],'item',null);
+ end if;
+ select * into snap from private.part_one_records
+   where kind='snapshot' and scope='public' and canonical_key=p_job.input->>'canonicalKey'
+     and payload->'requestedMarket' is not distinct from p_job.input->'requestedMarket'
+     and private.part_one_snapshot_identity_allowed(id,null) order by revision desc,created_at desc limit 1;
+ r := r || jsonb_build_object('identity','exact','itemId',snap.item_id,'snapshotId',snap.id,'scope','public',
+   'reasonCodes',jsonb_build_array('no_declaration'),'allowedActions',jsonb_build_array('save_partial','scan_ingredients','rescan'),
+   'freshness',jsonb_build_object('observedAt',snap.observed_at,'expiresAt',private.part_one_identity_expiry(snap.id),'state','fresh'));
+ r := jsonb_set(r,'{display,selectedIdentity}',jsonb_build_object('id',snap.item_id,'name',snap.payload->'name',
+   'brand',snap.payload->'brand','variantText',snap.payload->'variantText','image',snap.payload->'image','expiresAt',private.part_one_identity_expiry(snap.id)));
+ select * into dec from private.part_one_records d where d.kind='declaration' and d.item_id=snap.item_id and d.scope='public'
+   and d.id::text in (select jsonb_array_elements_text(coalesce(snap.payload->'declarationIds','[]')))
+   and private.part_one_record_allowed(d.id,null) and private.part_one_record_allowed(snap.id,null)
+   and ((d.payload->>'state' in ('partial','uncertain') and d.payload->'predicate' @> '{"association":{"passed":true},"noContradiction":{"passed":true}}'::jsonb)
+     or (d.payload->>'state'='accepted' and d.payload->'predicate' @> '{"association":{"passed":true},"noContradiction":{"passed":true},"variantMarket":{"passed":true},"completeness":{"passed":true},"rightsFreshness":{"passed":true}}'::jsonb))
+   order by (d.payload->>'state'='accepted') desc,d.revision desc limit 1;
+ if found then
+   r := r || jsonb_build_object('declarationId',dec.id,'declarationState',dec.payload->>'state','evidenceIds',to_jsonb(dec.dependencies),
+     'reasonCodes',case when dec.payload->>'state'='accepted' then '[]'::jsonb else jsonb_build_array('missing_section') end,
+     'allowedActions',case when dec.payload->>'state'='accepted' then jsonb_build_array('save','scan_ingredients','view_source','rescan') else jsonb_build_array('save_partial','scan_ingredients','view_source','rescan') end);
+   r := jsonb_set(r,'{display,sections}',coalesce(dec.payload->'sections','[]'));
+   r := jsonb_set(r,'{display,sources}',coalesce(dec.payload->'sources','[]'));
+ end if;
+ r := private.part_one_filter_result(r,null);
+ return jsonb_build_object('resultPatch',r-array['schemaVersion','requestId','scanId','generation','resultRevision','work','jobId','subscriptionId','nextCheckAfter'],
+   'item',case when snap.payload ? 'snapshotId' and snap.payload ? 'variant' then snap.payload else null end);
+end $$;
+
 -- Service-only durable consumer actions. Transactions serialize provider budget
 -- changes; leases/CAS protect checkpoints and publication after process loss.
 create function public.part_one_worker(p_action text, p_payload jsonb) returns jsonb
@@ -590,9 +1119,14 @@ begin
  if jsonb_typeof(p_payload)<>'object' or octet_length(p_payload::text)>262144 then raise exception 'PART_ONE_INVALID_PAYLOAD'; end if;
  perform pg_catalog.pg_advisory_xact_lock(40203);
  if p_action='heartbeat' then
+   perform private.part_one_purge_expired_private();
    insert into private.part_one_worker_health(id,heartbeat_at,consumer_version) values(true,now(),p_payload->>'consumerVersion')
      on conflict(id) do update set heartbeat_at=excluded.heartbeat_at,consumer_version=excluded.consumer_version;
    return jsonb_build_object('alive',true);
+ end if;
+ if p_action='purge_private' then
+   perform private.part_one_purge_expired_private();
+   return jsonb_build_object('purged',true);
  end if;
  if p_action='revoke_policy' then
    update private.part_one_policies set lookup_allowed=false,retain_allowed=false,display_allowed=false,export_allowed=false
@@ -601,6 +1135,7 @@ begin
    for s in select * from private.part_one_scans for update loop
      perform private.part_one_refresh_scan(s.id,s.owner_id);
    end loop;
+   perform private.part_one_purge_expired_private();
    return jsonb_build_object('revoked',true);
  end if;
  if p_action='revoke' then
@@ -613,6 +1148,7 @@ begin
    for s in select * from private.part_one_scans for update loop
      perform private.part_one_refresh_scan(s.id,s.owner_id);
    end loop;
+   perform private.part_one_purge_expired_private();
    return jsonb_build_object('revoked',true);
  end if;
  if p_action='admit' then
@@ -623,6 +1159,20 @@ begin
    for sid in select value::uuid from jsonb_array_elements_text(coalesce(p_payload->'dependencies','[]')) loop
      if not private.part_one_record_allowed(sid,null) then raise exception 'PART_ONE_DEPENDENCY_UNAVAILABLE'; end if;
    end loop;
+   select * into rec from private.part_one_records where id=nullif(p_payload->>'id','')::uuid;
+   if found then
+     if rec.kind is distinct from p_payload->>'kind' or rec.item_id is distinct from nullif(p_payload->>'itemId','')::uuid
+       or rec.revision is distinct from (p_payload->>'revision')::integer or rec.canonical_key is distinct from p_payload->>'canonicalKey'
+       or rec.policy_id<>policy.id or rec.policy_version<>policy.version or rec.scope<>'public'
+       or rec.payload is distinct from p_payload->'payload'
+       or rec.dependencies is distinct from array(select value::uuid from jsonb_array_elements_text(coalesce(p_payload->'dependencies','[]')))
+       or rec.supersedes_id is distinct from nullif(p_payload->>'supersedesId','')::uuid
+       or rec.observed_at is distinct from (p_payload->>'observedAt')::timestamptz
+       or rec.expires_at is distinct from least((p_payload->>'expiresAt')::timestamptz,coalesce(policy.expires_at,'infinity'::timestamptz)) then
+       raise exception 'PART_ONE_ADMISSION_REPLAY_CONFLICT';
+     end if;
+     return jsonb_build_object('recordId',rec.id,'replay',true);
+   end if;
    insert into private.part_one_records(id,kind,item_id,revision,canonical_key,policy_id,policy_version,scope,
        payload,dependencies,supersedes_id,observed_at,expires_at)
      values(coalesce(nullif(p_payload->>'id','')::uuid,gen_random_uuid()),p_payload->>'kind',nullif(p_payload->>'itemId','')::uuid,
@@ -657,6 +1207,7 @@ begin
  select * into j from private.part_one_jobs where id=(p_payload->>'jobId')::uuid for update;
  if not found or j.state<>'running' or j.lease_token is distinct from (p_payload->>'leaseToken')::uuid
    or j.lease_expires_at<=now() then raise exception 'PART_ONE_STALE_LEASE'; end if;
+ if p_action='catalog' then return private.part_one_lookup_catalog(j); end if;
  if p_action='renew' then
    update private.part_one_jobs set lease_expires_at=now()+interval '30 seconds',updated_at=now() where id=j.id;
    return jsonb_build_object('renewed',true);
@@ -678,7 +1229,7 @@ begin
      and state in ('reserved','dispatched_unknown');
    if calls>=b.call_limit or active>=b.concurrency_limit or b.reset_at>now() then
      retry_at := greatest(now()+make_interval(secs=>b.window_seconds),coalesce(b.reset_at,now()));
-     update private.part_one_jobs set state='deferred_budget',next_eligible_at=retry_at,lease_token=null,
+     update private.part_one_jobs set state='deferred_budget',next_eligible_at=retry_at,attempts=greatest(0,attempts-1),lease_token=null,
        lease_expires_at=null,updated_at=now() where id=j.id;
      return jsonb_build_object('deferred',true,'nextCheckAfter',retry_at,'reason','quota_wait');
    end if;
@@ -713,12 +1264,12 @@ begin
      raise exception 'PART_ONE_UNPROVEN_NEGATIVE'; end if;
    update private.part_one_jobs set checkpoints=checkpoints || jsonb_build_object(p_payload->>'stage',p_payload->'output'),updated_at=now() where id=j.id;
    if p_payload->>'reservationId' is not null then
-     update private.part_one_reservations set state='settled',outcome=status,retry_after=nullif(p_payload->'output'->>'retryAfter','')::timestamptz
+     update private.part_one_reservations set state='settled',outcome=status,retry_after=nullif(coalesce(p_payload->'output'->>'retryAfter',p_payload->'output'->'reply'->>'retryAfter'),'')::timestamptz
        where id=(p_payload->>'reservationId')::uuid and job_id=j.id;
      if not found then raise exception 'PART_ONE_RESERVATION_NOT_FOUND'; end if;
      if status='rate_limited' then
        update private.part_one_budgets set reset_at=greatest(coalesce(reset_at,now()),
-         coalesce(nullif(p_payload->'output'->>'retryAfter','')::timestamptz,now()+interval '60 seconds'))
+         coalesce(nullif(coalesce(p_payload->'output'->>'retryAfter',p_payload->'output'->'reply'->>'retryAfter'),'')::timestamptz,now()+interval '60 seconds'))
          where provider=(select provider from private.part_one_reservations where id=(p_payload->>'reservationId')::uuid);
      end if;
    end if;
@@ -744,22 +1295,38 @@ begin
    -- Provider output cannot alter operation IDs, generations, ownership or
    -- subscriptions. Only explicit evidence fields are projected.
    r := r - array['ownerId','scanId','requestId','generation','resultRevision','subscriptionId','jobId','schemaVersion'];
-   for target in select value from jsonb_array_elements(coalesce(p_payload->'targets','[]')) loop
+   for target in
+     select value from jsonb_array_elements(coalesce(p_payload->'targets','[]'))
+     union all
+     select jsonb_build_object('scanId',ss.id,'generation',ss.generation,'bindingRevision',ss.binding_revision)
+       from private.part_one_scans ss where ss.job_id=j.id and ss.binding_revision=1
+         and ss.generation=(ss.request->>'generation')::integer
+         and not exists(select 1 from jsonb_array_elements(coalesce(p_payload->'targets','[]')) t where t->>'scanId'=ss.id::text)
+   loop
+     -- Lock the deletion marker before the scan, matching deletion's profile-
+     -- then-cascade order. A plain EXISTS snapshot can race a committed fence.
+     select * into s from private.part_one_scans where id=(target->>'scanId')::uuid and job_id=j.id;
+     if not found then continue; end if;
+     perform 1 from public.profiles where id=s.owner_id and deletion_started_at is null for update;
+     if not found then continue; end if;
      select * into s from private.part_one_scans where id=(target->>'scanId')::uuid and job_id=j.id for update;
      if found and s.generation=(target->>'generation')::integer and s.binding_revision=(target->>'bindingRevision')::integer
        and s.generation=(s.request->>'generation')::integer
        and exists(select 1 from public.profiles where id=s.owner_id and deletion_started_at is null)
        and s.result->>'scope' is distinct from 'private_package' then
+       if r ? 'candidateIds' then
+         perform private.part_one_bind_candidates(s.id,s.generation,s.owner_id,r->'candidateIds',j.input->>'canonicalKey',s.request->'requestedMarket');
+       end if;
        s.result_revision := s.result_revision+1;
        update private.part_one_scans set result_revision=s.result_revision,binding_revision=binding_revision+1,
          result=private.part_one_filter_result(s.result || r || jsonb_build_object('identity',
            case when s.result->>'identity'='pending' and not r ? 'identity' then 'unresolved' else coalesce(r->>'identity',s.result->>'identity') end,
            'resultRevision',s.result_revision,
-           'work',case when p_action='retry' and j.attempts<j.max_attempts then 'retry_wait'
+           'work',case when p_payload->>'terminalWork'='failed_final' then 'failed_final' when p_action='retry' and j.attempts<j.max_attempts then 'retry_wait'
              when p_action='retry' then 'failed_final' else 'complete' end),s.owner_id) where id=s.id;
      end if;
    end loop;
-   update private.part_one_jobs set state=case when p_action='retry' and attempts<max_attempts then 'retry_wait'
+   update private.part_one_jobs set state=case when p_payload->>'terminalWork'='failed_final' then 'failed_final' when p_action='retry' and attempts<max_attempts then 'retry_wait'
        when p_action='retry' then 'failed_final' else 'complete' end,
      next_eligible_at=case when p_action='retry' then greatest(now()+interval '1 second',coalesce(nullif(p_payload->>'nextEligibleAt','')::timestamptz,
        now()+make_interval(secs=>least(300,power(2,attempts)::integer)))) else now() end,
@@ -771,7 +1338,10 @@ end $$;
 revoke all on function public.part_one_worker(text,jsonb) from public,anon,authenticated;
 grant execute on function public.part_one_worker(text,jsonb) to service_role;
 -- Private helpers must never be RPC entry points.
-revoke all on function private.part_one_immutable(),private.part_one_owner(),private.part_one_record_allowed(uuid,uuid),
-  private.part_one_snapshot_identity_allowed(uuid,uuid),
+revoke all on function private.part_one_private_record_allowed(uuid,uuid),private.part_one_purge_capture(uuid,text),
+  private.part_one_purge_expired_private(),private.part_one_before_owner_delete(),
+  private.part_one_commit_capture(jsonb,uuid,private.part_one_scans,private.part_one_captures),private.part_one_immutable(),private.part_one_owner(),private.part_one_record_allowed(uuid,uuid),
+  private.part_one_snapshot_identity_allowed(uuid,uuid),private.part_one_identity_expiry(uuid),
+  private.part_one_record_expiry(uuid),private.part_one_display_expiry(jsonb,text),private.part_one_display_allowed(jsonb,uuid,text),private.part_one_bind_candidates(uuid,integer,uuid,jsonb,text,jsonb),
   private.part_one_empty_result(jsonb,uuid),private.part_one_filter_result(jsonb,uuid),private.part_one_code_key(jsonb),
-  private.part_one_refresh_scan(uuid,uuid),private.part_one_catalog_identity(text,jsonb) from public,anon,authenticated;
+  private.part_one_lookup_catalog(private.part_one_jobs),private.part_one_refresh_scan(uuid,uuid),private.part_one_catalog_identity(text,jsonb) from public,anon,authenticated;

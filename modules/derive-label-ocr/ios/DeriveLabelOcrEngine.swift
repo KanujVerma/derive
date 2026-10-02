@@ -87,7 +87,7 @@ enum DeriveLabelOcrEngine {
     let correction = input["correctionEnabled"] as? Bool ?? false
     var result: [String: Any] = [
       "evidenceId": input["evidenceId"] as? String ?? "", "captureSessionId": input["captureSessionId"] as? String ?? "",
-      "generation": input["generation"] as? Int ?? 0, "recognizer": "apple_vision",
+      "generation": (input["generation"] as? NSNumber)?.intValue ?? 0, "recognizer": "apple_vision",
       "recognizerVersion": "vision-revision-\(VNRecognizeTextRequest.currentRevision)-\(ProcessInfo.processInfo.operatingSystemVersionString)",
       "languageConfig": languages, "correctionEnabled": correction,
       "sourceWidth": 0, "sourceHeight": 0, "orientationTransform": orientationTransform(1), "lines": [], "status": "failed"

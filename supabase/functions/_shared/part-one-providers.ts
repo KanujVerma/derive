@@ -4,7 +4,7 @@ import type { LookupReply, SourceObservation, SourcePolicy, Variant } from '../.
 import { normalizeBarcode } from '../../../src/domain/part-one/barcode.ts';
 import { policyAllows } from '../../../src/domain/part-one/evidence.ts';
 
-export const PROVIDER_ADAPTER_VERSION = 'part-one-fixture-1';
+export const PROVIDER_ADAPTER_VERSION = 'part-one-provider-2';
 export const ProviderLookupRequestSchema = z.strictObject({ canonicalCode: z.string(), originalCode: z.string(), symbology: z.string().nullable(), nativeCode: z.string(), requestedMarket: z.string().nullable(), categoryHint: z.string().nullable(), requestedFields: z.array(z.enum(['identity', 'ingredients'])), jobId: PartOneIdSchema, stageId: PartOneIdSchema, deadlineAt: z.iso.datetime(), reservationId: PartOneIdSchema });
 export type ProviderLookupRequest = z.infer<typeof ProviderLookupRequestSchema>;
 export type BoundedProviderFixture = { status: number; contentType: string; body: string; retryAfter: string | null; providerRequestId: string | null; elapsedMs: number; decompressedBytes: number };
@@ -31,22 +31,24 @@ export function evaluateProviderFixture(provider: 'open_facts' | 'upcitemdb', re
   try { body = JSON.parse(fixture.body); } catch { return reply('malformed_response'); }
   const parsed = provider === 'open_facts' ? openEnvelopeSchema.safeParse(body) : upcEnvelopeSchema.safeParse(body);
   if (!parsed.success) return reply('malformed_response');
-  const records: Array<{ code: string; name: string | null; variant: Variant; ingredients: string | null; markets: string[]; updatedAt: string | null }> = [];
+  const records: Array<{ code: string; name: string | null; variant: Variant; nativeBrand: string | null; structuredVariant: Variant | null; ingredients: string | null; markets: string[]; updatedAt: string | null }> = [];
   if (provider === 'open_facts') {
     const envelope = openEnvelopeSchema.parse(body);
     if (envelope.status === 0) return envelope.product ? reply('malformed_response') : reply('not_found');
     if (!envelope.product) return reply('malformed_response');
     const p = envelope.product;
-    records.push({ code: p.code, name: p.product_name ?? null, variant: p.variant ?? { ...emptyVariant(), brand: p.brands ?? null }, ingredients: request.requestedFields.includes('ingredients') ? p.ingredients_text ?? null : null, markets: p.countries_tags ?? [], updatedAt: p.last_modified_t === undefined ? null : new Date(p.last_modified_t * 1000).toISOString() });
+    records.push({ code: p.code, name: p.product_name ?? null, variant: p.variant ?? { ...emptyVariant(), brand: p.brands ?? null }, nativeBrand: p.brands ?? null, structuredVariant: p.variant ?? null, ingredients: request.requestedFields.includes('ingredients') ? p.ingredients_text ?? null : null, markets: p.countries_tags ?? [], updatedAt: p.last_modified_t === undefined ? null : new Date(p.last_modified_t * 1000).toISOString() });
   } else {
     const envelope = upcEnvelopeSchema.parse(body);
     if (!envelope.items.length) return reply('not_found');
-    for (const p of envelope.items) { if (!p.ean && !p.upc) return reply('malformed_response'); records.push({ code: p.ean ?? p.upc!, name: p.title, variant: p.variant ?? { ...emptyVariant(), brand: p.brand ?? null }, ingredients: null, markets: [], updatedAt: null }); }
+    for (const p of envelope.items) { if (!p.ean && !p.upc) return reply('malformed_response'); records.push({ code: p.ean ?? p.upc!, name: p.title, variant: p.variant ?? { ...emptyVariant(), brand: p.brand ?? null }, nativeBrand: p.brand ?? null, structuredVariant: p.variant ?? null, ingredients: null, markets: [], updatedAt: null }); }
   }
   // Normalize every returned code before comparing; the requested barcode is not source proof.
   const observations: SourceObservation[] = records.map((record, i) => {
     const normalized = normalizeBarcode({ raw: record.code, symbology: record.code.length === 8 ? 'ean8' : null, namespace: 'gtin', retailerId: null });
-    return { observationId: records.length === 1 ? input.observationId : derivedId(input.observationId, i), provider, providerRequestId: fixture.providerRequestId, providerResponseId: null, comparison: !normalized.supported ? 'unknown' : normalized.canonicalCode === request.canonicalCode ? 'exact' : 'contradiction', fetchedAt: input.now, sourceUpdatedAt: record.updatedAt, adapterVersion: PROVIDER_ADAPTER_VERSION, parserVersion: 'raw-preserved-1', policyVersion: policy.version, contentHash: input.contentHash, variant: record.variant, sourceMarkets: record.markets, sourceUrl: input.sourceUrl, policyId: policy.policyId, status: 'active', dependencyIds: [], payload: { nativeCode: record.code, canonicalCode: normalized.canonicalCode, name: record.name, rawIngredients: record.ingredients } };
+    const normalizedBrand = (brand: string) => brand.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+    const brandContradiction = record.nativeBrand !== null && record.structuredVariant?.brand != null && normalizedBrand(record.nativeBrand) !== normalizedBrand(record.structuredVariant.brand);
+    return { observationId: records.length === 1 ? input.observationId : derivedId(input.observationId, i), provider, providerRequestId: fixture.providerRequestId, providerResponseId: null, comparison: brandContradiction ? 'contradiction' : !normalized.supported ? 'unknown' : normalized.canonicalCode === request.canonicalCode ? 'exact' : 'contradiction', fetchedAt: input.now, sourceUpdatedAt: record.updatedAt, adapterVersion: PROVIDER_ADAPTER_VERSION, parserVersion: 'raw-preserved-1', policyVersion: policy.version, contentHash: input.contentHash, variant: record.variant, sourceMarkets: record.markets, sourceUrl: input.sourceUrl, policyId: policy.policyId, status: 'active', dependencyIds: [], payload: { nativeCode: record.code, canonicalCode: normalized.canonicalCode, name: record.name, rawIngredients: record.ingredients, nativeBrand: record.nativeBrand, structuredVariant: record.structuredVariant } };
   });
   return reply(observations.length > 1 ? 'ambiguous' : 'found', observations);
 }
@@ -90,7 +92,7 @@ export function buildOpenFactsLookupUrl(requestInput: ProviderLookupRequest, rev
   if (!normalized.supported || normalized.canonicalCode !== request.canonicalCode || !native.supported || native.canonicalCode !== request.canonicalCode) throw new Error('unsupported_provider_code');
   const url = new URL(`/api/v2/product/${encodeURIComponent(request.nativeCode)}.json`, origin);
   url.searchParams.set('product_type', 'all');
-  url.searchParams.set('fields', 'code,product_name,brands,ingredients_text,countries_tags,last_modified_t');
+  url.searchParams.set('fields', ['code', 'product_name', 'brands', ...(request.requestedFields.includes('ingredients') ? ['ingredients_text'] : []), 'countries_tags', 'last_modified_t'].join(','));
   return url.toString();
 }
 export function needsUpcIdentityFallback(identity: 'pending' | 'exact' | 'candidate' | 'ambiguous' | 'unresolved', reply: LookupReply): boolean {
@@ -108,4 +110,97 @@ export function buildUpcIdentityLookupUrl(requestInput: ProviderLookupRequest, r
  * unresolved. No general website scrape or drug-name association is substituted. */
 export function supplementalAdapterDisabledReply(provider: 'manufacturer' | 'dailymed', policy: SourcePolicy, now: string): LookupReply {
   return LookupReplySchema.parse({ status: !policyAllows(policy, 'lookup', now) || !policyAllows(policy, 'process', now) || !policyAllows(policy, 'retain', now) || !policyAllows(policy, 'sharedDisplay', now) ? 'disallowed_by_source_policy' : 'configuration_required', provider, adapterVersion: PROVIDER_ADAPTER_VERSION, policyVersion: policy.version, providerRequestId: null, observations: [], retryAfter: null, reservationId: null, elapsedMs: 0, usage: { calls: 0, costMinor: 0 } });
+}
+
+export type PrimaryProvider = 'open_facts' | 'upcitemdb';
+export type ProviderConfiguration = { endpoint: string; allowedHosts: readonly string[]; userAgent: string; maxBytes?: number; timeoutMs?: number };
+export interface ProviderTransport {
+  /** The implementation connects only to the addresses supplied after validation. */
+  pinsResolvedAddresses: true;
+  resolve(hostname: string, signal: AbortSignal): Promise<string[]>;
+  fetch(url: string, options: { method: 'GET'; headers: Record<string, string>; redirect: 'manual'; signal: AbortSignal; resolvedAddresses: readonly string[] }): Promise<Response>;
+}
+export function providerOperationPermitted(provider: PrimaryProvider, policy: SourcePolicy | undefined, fields: readonly string[], now: string): boolean {
+  return policy?.provider === provider && ['lookup', 'process', 'retain', 'sharedDisplay'].every(operation => policyAllows(policy, operation as keyof SourcePolicy['operations'], now)) && fields.every(field => policy.retainedFields.includes(field));
+}
+export function emptyProviderReply(provider: string, status: LookupReply['status'], policyVersion = 'unconfigured', retryAfter: string | null = null): LookupReply {
+  return LookupReplySchema.parse({ status, provider, adapterVersion: PROVIDER_ADAPTER_VERSION, policyVersion, providerRequestId: null, observations: [], retryAfter, reservationId: null, elapsedMs: 0, usage: { calls: 0, costMinor: 0 } });
+}
+/** Callable bounded adapter. No default fetch exists: only an explicit DNS-pinning
+ * transport and reviewed per-operation policy can reach the dispatch boundary. */
+export async function lookupPrimaryProvider(provider: PrimaryProvider, requestInput: ProviderLookupRequest, policy: SourcePolicy | undefined,
+  config: ProviderConfiguration | undefined, transport: ProviderTransport | undefined,
+  ports: { now(): string; hash(text: string): Promise<string>; observationId: string;
+    beforeRequest(url: string, redirectIndex: number): Promise<boolean>; onUnknownDispatch?(): void; resume?: { url: string; redirectIndex: number }; afterRedirect?(url: string, redirectIndex: number): Promise<void> }): Promise<LookupReply> {
+  const request = ProviderLookupRequestSchema.parse(requestInput);
+  if (!providerOperationPermitted(provider, policy, request.requestedFields, ports.now())) return emptyProviderReply(provider, 'disallowed_by_source_policy', policy?.version);
+  if (!config || !transport || transport.pinsResolvedAddresses !== true || !config.userAgent) return emptyProviderReply(provider, 'configuration_required', policy!.version);
+  if (Date.parse(request.deadlineAt) <= Date.parse(ports.now())) return emptyProviderReply(provider, 'unavailable', policy!.version);
+  let url: string;
+  try { url = provider === 'open_facts' ? buildOpenFactsLookupUrl(request, config.endpoint) : buildUpcIdentityLookupUrl(request, config.endpoint); }
+  catch { return emptyProviderReply(provider, 'unsupported', policy!.version); }
+  if (ports.resume) {
+    if (!Number.isInteger(ports.resume.redirectIndex) || ports.resume.redirectIndex < 1 || ports.resume.redirectIndex > 3) return emptyProviderReply(provider, 'unsupported', policy!.version);
+    url = ports.resume.url;
+  }
+  const controller = new AbortController();
+  const timeoutMs = Math.min(10000, Math.max(1, config.timeoutMs ?? 8000), Math.max(1, Date.parse(request.deadlineAt) - Date.parse(ports.now())));
+  const maxBytes = Math.min(262144, Math.max(1, config.maxBytes ?? 65536));
+  let dispatched = 0;
+  let persistenceError: unknown;
+  let authorizationInProgress = false;
+  const started = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('provider_deadline')); }, timeoutMs); });
+  const account = (reply: LookupReply): LookupReply => ({ ...reply, reservationId: dispatched ? request.reservationId : null, elapsedMs: dispatched ? Date.now() - started : 0, usage: { calls: dispatched, costMinor: 0 } });
+  const execute = async (): Promise<LookupReply> => {
+    for (let redirect = ports.resume?.redirectIndex ?? 0; redirect <= 3; redirect++) {
+      // Validate again on every hop and every dispatch, including policy changes.
+      if (!providerOperationPermitted(provider, policy, request.requestedFields, ports.now())) return account(emptyProviderReply(provider, 'disallowed_by_source_policy', policy!.version));
+      const parsedUrl = new URL(url);
+      if (controller.signal.aborted) throw new Error('provider_deadline');
+      const addresses = await transport.resolve(parsedUrl.hostname, controller.signal);
+      if (controller.signal.aborted) throw new Error('provider_deadline');
+      if (!isPermittedProviderDestination(url, config.allowedHosts, addresses, redirect)) return account(emptyProviderReply(provider, 'unsupported', policy!.version));
+      let authorized: boolean;
+      try { authorizationInProgress = true; authorized = await ports.beforeRequest(url, redirect); authorizationInProgress = false; } catch (error) { persistenceError = error; throw error; }
+      if (controller.signal.aborted) throw new Error('provider_deadline');
+      if (!authorized) return account(emptyProviderReply(provider, 'rate_limited', policy!.version));
+      dispatched++;
+      const response = await transport.fetch(url, { method: 'GET', headers: { Accept: 'application/json', 'User-Agent': config.userAgent }, redirect: 'manual', signal: controller.signal, resolvedAddresses: addresses });
+      if (controller.signal.aborted) { await response.body?.cancel(); throw new Error('provider_deadline'); }
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const location = response.headers.get('location'); await response.body?.cancel();
+        if (!location || redirect === 3) return account(emptyProviderReply(provider, 'malformed_response', policy!.version));
+        url = new URL(location, url).toString();
+        try { await ports.afterRedirect?.(url, redirect + 1); } catch (error) { persistenceError = error; throw error; }
+        continue;
+      }
+      const type = response.headers.get('content-type') ?? '';
+      let body = '', bytes = 0;
+      // Error statuses do not need raw denial pages retained to classify them.
+      if (response.status === 200 && /^application\/(?:[a-z0-9.+-]*\+)?json(?:;|$)/i.test(type)) {
+        const reader = response.body?.getReader(); const chunks: Uint8Array[] = [];
+        if (reader) {
+          while (true) {
+            const chunk = await reader.read(); if (controller.signal.aborted) { await reader.cancel(); throw new Error('provider_deadline'); } if (chunk.done) break;
+            bytes += chunk.value.byteLength;
+            if (bytes > maxBytes) { await reader.cancel(); return account(emptyProviderReply(provider, 'malformed_response', policy!.version)); }
+            chunks.push(chunk.value);
+          }
+        }
+        const payload = new Uint8Array(bytes); let offset = 0;
+        for (const chunk of chunks) { payload.set(chunk, offset); offset += chunk.byteLength; }
+        body = new TextDecoder('utf-8', { fatal: true }).decode(payload);
+      } else await response.body?.cancel();
+      const reply = evaluateProviderFixture(provider, request, policy!, { status: response.status, contentType: type, body,
+        retryAfter: response.headers.get('retry-after'), providerRequestId: response.headers.get('x-request-id'), elapsedMs: Date.now() - started, decompressedBytes: bytes },
+      { now: ports.now(), observationId: ports.observationId, contentHash: await ports.hash(body), sourceUrl: url });
+      return account(reply);
+    }
+    return account(emptyProviderReply(provider, 'malformed_response', policy!.version));
+  };
+  try { return await Promise.race([execute(), timeout]); }
+  catch (error) { if (persistenceError !== undefined) throw persistenceError; if (dispatched || authorizationInProgress) ports.onUnknownDispatch?.(); return account(emptyProviderReply(provider, 'unavailable', policy!.version)); }
+  finally { if (timer) clearTimeout(timer); controller.abort(); }
 }

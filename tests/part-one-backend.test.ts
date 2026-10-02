@@ -113,3 +113,148 @@ test('authorization and tombstone RPC errors remain separate from provider failu
   assert.equal(rpcErrorToHttp('P0001','PART_ONE_DELETED').status,409);
   assert.equal(rpcErrorToHttp('P0001','other').status,503);
 });
+
+test('A02 restricted UPC2/4 representations never request a public HTTP lookup key',async()=>{
+  const cases=[['200000000004','upca'],['0200000000004','ean13'],['00200000000004','gtin14'],
+    ['400000000008','upca'],['0400000000008','ean13'],['00400000000008','gtin14'],
+    ['200000000004','ean13'],['400000000008','ean13'],['2000000000008','ean13'],['02000000000008','gtin14']];
+  for(const [raw,symbology] of cases) {
+    const p=ports(fixture({identity:'unresolved',work:'complete',jobId:null,reasonCodes:['unsupported_namespace']}));
+    const r=await handlePartOneRequest(request('/scans','POST',{...scan,code:{...scan.code,raw,symbology}}),p);
+    assert.equal(r.status,200,raw); assert.equal(p.calls[0].payload.canonicalKey,null,raw);
+    assert.deepEqual(p.calls[0].payload.reasonCodes,['unsupported_namespace'],raw);
+    assert.equal((await r.json()).jobId,null,raw);
+  }
+});
+test('A01 bounded iOS EAN-labeled UPC12 stays supported without namespace guessing',async()=>{
+  const p=ports();
+  await handlePartOneRequest(request('/scans','POST',{...scan,code:{...scan.code,symbology:'ean13'}}),p);
+  assert.equal(p.calls[0].payload.canonicalKey,'gtin:00305210416383');
+  assert.equal(p.calls[0].payload.normalizationVersion,'part-one-gtin-2');
+});
+test('A02 genuine nonzero packaging GTIN is retained distinctly at HTTP boundary',async()=>{
+  const p=ports();
+  for(const raw of ['20012345000014','20305210416387','40305210416381']) {
+    await handlePartOneRequest(request('/scans','POST',{...scan,code:{...scan.code,raw,symbology:'itf14'}}),p);
+    assert.equal(p.calls.at(-1)?.payload.canonicalKey,`gtin:${raw}`);
+    assert.notEqual(p.calls.at(-1)?.payload.canonicalKey,'gtin:00305210416383');
+  }
+});
+
+// The local CLI is JavaScript with deliberately injectable fixture ports.
+// @ts-ignore -- no declaration file is needed for the supervised local CLI.
+import { consumeOnce } from '../scripts/part-one-worker.mjs';
+import type { SourcePolicy } from '../src/contracts/PartOne.ts';
+function ledgerFixture() {
+  const calls:Array<{action:string;payload:Record<string,unknown>}>=[];
+  const job={id,leaseToken:other,publishRevision:0,targets:[{scanId:other,generation:0,bindingRevision:1}],
+    input:{raw:'3606000537538',symbology:'ean13',namespace:'gtin',retailerId:null,canonicalKey:'gtin:03606000537538',requestedMarket:null},
+    checkpoints:{} as Record<string,unknown>,unknownReservations:[] as unknown[],attempts:1,maxAttempts:4};
+  const rpc=async(action:string,payload:Record<string,unknown>)=>{
+    calls.push({action,payload});
+    if(action==='claim')return{job};
+    if(action==='catalog')return null;
+    if(action==='reserve')return{reservationId:other,mayDispatch:true};
+    if(action==='dispatch')return{mayDispatch:true};
+    if(action==='checkpoint')job.checkpoints[payload.stage as string]=structuredClone(payload.output);
+    return{};
+  };
+  return{calls,job,rpc};
+}
+function workerLookupFixture() {
+  const policy:SourcePolicy={policyId:id,provider:'open_facts',version:'synthetic-1',permissionEvidence:'Authorized synthetic fixture only',
+    reviewedAt:'2026-10-01T00:00:00.000Z',expiresAt:'2027-01-01T00:00:00.000Z',revokedAt:null,
+    operations:{lookup:true,process:true,retain:true,sharedDisplay:true,privateDisplay:false,ocr:false,cropThumbnail:false,rehost:false,hotlink:false,export:false},
+    retainedFields:['identity','ingredients'],attribution:'Synthetic fixture',purgeObligations:[]};
+  let fetches=0;
+  return{lookupPorts:{now:()=> '2026-10-02T12:00:00.000Z',policies:[policy],configs:{open_facts:{endpoint:'https://open.synthetic.invalid/',allowedHosts:['open.synthetic.invalid'],userAgent:'Synthetic local fixture'}},
+    transport:{pinsResolvedAddresses:true,resolve:async()=>['93.184.216.34'],fetch:async()=>{fetches++;return new Response(JSON.stringify({status:1,product:{code:'3606000537538',product_name:'Synthetic worker lotion',brands:'Fixture',ingredients_text:'Water, Glycerin'}}),{headers:{'content-type':'application/json'}});}}},get fetches(){return fetches;}};
+}
+test('A20 supervised consumer dispatches actual primary pipeline through durable RPC boundaries',async()=>{
+  const l=ledgerFixture(),f=workerLookupFixture();
+  assert.equal(await consumeOnce({rpc:l.rpc,lookupPorts:f.lookupPorts}),true);
+  assert.equal(f.fetches,1);
+  const actions=l.calls.map(c=>c.action);
+  assert.ok(actions.indexOf('reserve')<actions.indexOf('dispatch'));
+  assert.ok(actions.indexOf('checkpoint')<actions.indexOf('admit'));
+  assert.deepEqual(l.calls.filter(c=>c.action==='admit').map(c=>c.payload.kind),['observation','declaration','snapshot']);
+  const finished=l.calls.find(c=>c.action==='finish')!;
+  assert.equal(finished.payload.expectedPublishRevision,0);
+  assert.deepEqual(finished.payload.targets,l.job.targets);
+  assert.equal((finished.payload.resultPatch as ScanResult).identity,'exact');
+  assert.equal((finished.payload.resultPatch as ScanResult).declarationState,'partial');
+});
+test('A21 CLI default disabled policies complete with no quota/network/admission',async()=>{
+  const l=ledgerFixture();await consumeOnce({rpc:l.rpc});
+  assert.deepEqual(l.calls.map(c=>c.action),['heartbeat','claim','catalog','finish']);
+  assert.deepEqual((l.calls.at(-1)!.payload.resultPatch as ScanResult).reasonCodes,['source_blocked']);
+});
+test('A21 consumer unknown outcome resumes durably without re-dispatch',async()=>{
+  const l=ledgerFixture();l.job.unknownReservations=[{id:other}];await consumeOnce({rpc:l.rpc});
+  assert.deepEqual(l.calls.map(c=>c.action),['heartbeat','claim','retry']);
+  assert.deepEqual((l.calls.at(-1)!.payload.resultPatch as ScanResult).reasonCodes,['unknown_provider_outcome']);
+});
+test('A20 quota transaction defer relinquishes lease without stale publication or fetch',async()=>{
+  const l=ledgerFixture(),f=workerLookupFixture();
+  await consumeOnce({rpc:async(action:string,payload:Record<string,unknown>)=>action==='reserve'?{deferred:true,nextCheckAfter:'2026-10-03T00:00:00+00:00'}:l.rpc(action,payload),lookupPorts:f.lookupPorts});
+  assert.equal(f.fetches,0);assert.equal(l.calls.some(c=>c.action==='finish'||c.action==='retry'||c.action==='admit'),false);
+});
+test('A21 consumer publication failure does not acknowledge provider persistence as finished',async()=>{
+  const l=ledgerFixture(),f=workerLookupFixture();
+  await assert.rejects(consumeOnce({rpc:async(action:string,payload:Record<string,unknown>)=>{
+    if(action==='finish')throw new Error('synthetic stale publication');return l.rpc(action,payload);
+  },lookupPorts:f.lookupPorts}),/stale publication/);
+  assert.equal(f.fetches,1);assert.equal(l.calls.filter(c=>c.action==='admit').length,3);
+  assert.equal(l.calls.some(c=>c.action==='retry'),false);
+});
+
+test('A25 private capture recovery reads the owner-scoped session without repeating a commit', async () => {
+  const capture = {schemaVersion:1,captureSessionId:id,packageObservationId:other,scanId:other,generation:1,captureRevision:2,deletionEpoch:0,itemId:null,candidateId:null};
+  const p = ports(capture);
+  const r = await handlePartOneRequest(request(`/captures/${id}`, 'GET'), p);
+  assert.equal(r.status,200); assert.deepEqual(await r.json(),capture);
+  assert.deepEqual(p.calls,[{action:'captures/read',payload:{id}}]);
+});
+test('A18/A25 private capture removal routes to an authenticated tombstone operation', async () => {
+  const p = ports({deleted:true,id});
+  const r = await handlePartOneRequest(request(`/captures/${id}`, 'DELETE'),p);
+  assert.equal(r.status,200); assert.deepEqual(await r.json(),{deleted:true,id});
+  assert.deepEqual(p.calls,[{action:'captures/delete',payload:{id}}]);
+});
+test('A25 enabled private commit returns a strict bound receipt on its explicit route', async () => {
+  const capture = {schemaVersion:1,captureSessionId:id,packageObservationId:other,scanId:other,generation:0,captureRevision:1,deletionEpoch:0,itemId:null,candidateId:null};
+  const receipt={schemaVersion:1,capture,observationIds:[],declarationIds:[],assetIds:[],result:fixture()};
+  const p = ports(receipt);
+  const body={idempotencyKey:'private-commit-fixture',expectedGeneration:0,expectedResultRevision:1,expectedCaptureRevision:0,expectedDeletionEpoch:0,packageObservationId:other,
+    assets:[],observations:[],edits:[]};
+  const r=await handlePartOneRequest(request(`/captures/${id}/observations`,'POST',body),p);
+  assert.equal(r.status,200); assert.deepEqual(await r.json(),receipt);
+  assert.deepEqual(p.calls,[{action:'captures/observations',payload:{captureSessionId:id,...body}}]);
+});
+test('A19/A25 private commit receipt cannot cross capture/result bindings or duplicate immutable ids', async () => {
+  const capture={schemaVersion:1,captureSessionId:id,packageObservationId:other,scanId:other,generation:0,captureRevision:1,deletionEpoch:0,itemId:null,candidateId:null};
+  const body={idempotencyKey:'receipt-fixture',expectedGeneration:0,expectedResultRevision:1,expectedCaptureRevision:0,expectedDeletionEpoch:0,packageObservationId:other,assets:[],observations:[],edits:[]};
+  for(const receipt of [
+    {schemaVersion:1,capture:{...capture,scanId:id},observationIds:[],declarationIds:[],assetIds:[],result:fixture()},
+    {schemaVersion:1,capture,observationIds:[id,id],declarationIds:[],assetIds:[],result:fixture()},
+  ]) assert.equal((await handlePartOneRequest(request(`/captures/${id}/observations`,'POST',body),ports(receipt))).status,500);
+});
+test('A25 private commit response requires a complete receipt and the requested capture id', async () => {
+  const capture={schemaVersion:1,captureSessionId:other,packageObservationId:other,scanId:other,generation:0,captureRevision:1,deletionEpoch:0,itemId:null,candidateId:null};
+  const body={idempotencyKey:'complete-receipt',expectedGeneration:0,expectedResultRevision:1,expectedCaptureRevision:0,expectedDeletionEpoch:0,packageObservationId:other,assets:[],observations:[],edits:[]};
+  for(const output of [{result:fixture()}, {schemaVersion:1,capture,observationIds:[],declarationIds:[],assetIds:[],result:fixture()}])
+    assert.equal((await handlePartOneRequest(request(`/captures/${id}/observations`,'POST',body),ports(output))).status,500);
+});
+test('A25 duplicate sanitized asset references are rejected before private persistence', async () => {
+  const asset={evidenceId:id,storageObjectId:other,contentHash:'synthetic-content-hash',width:100,height:100,metadataStripped:true};
+  const body={idempotencyKey:'duplicate-assets',expectedGeneration:0,expectedResultRevision:1,expectedCaptureRevision:0,expectedDeletionEpoch:0,packageObservationId:other,assets:[asset,asset],observations:[],edits:[]};
+  const p=ports();
+  assert.equal((await handlePartOneRequest(request(`/captures/${id}/observations`,'POST',body),p)).status,400);
+  assert.equal(p.calls.length,0);
+});
+test('A25 UUID path casing cannot invalidate a successful owner capture response',async()=>{
+  const capture={schemaVersion:1,captureSessionId:id,packageObservationId:other,scanId:other,generation:0,captureRevision:0,deletionEpoch:0,itemId:null,candidateId:null};
+  const p=ports(capture);
+  assert.equal((await handlePartOneRequest(request(`/captures/${id.toUpperCase()}`,'GET'),p)).status,200);
+  assert.deepEqual(p.calls,[{action:'captures/read',payload:{id}}]);
+});

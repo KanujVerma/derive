@@ -1,5 +1,6 @@
 import { PART_ONE_OCR_LIMITS, validateOcrObservation } from '../../services/partOneOcr.ts';
 import type { LocalLabelRecognizer, LocalOcrInput, OcrObservation } from '../../services/partOneOcr.ts';
+import type { DraftReviewState, DraftLineRef } from './captureReview.ts';
 
 export type CaptureBinding = {
   ownerId: string; sheetSessionId: string; scanId: string; generation: number;
@@ -8,10 +9,10 @@ export type CaptureBinding = {
 export type DraftCoverage = { startSeen: boolean; endSeen: boolean; missingRegions: string[];
   requiredSections: string[]; observedSections: string[]; associationContradictions: string[] };
 export type DraftEdit = { revision: number; supersedesRevision: number | null; observationEvidenceId: string;
-  actorOwnerId: string; text: string };
+  actorOwnerId: string; text: string; observationIndex: number; lineIndex: number | null };
 export type DraftShot = { evidenceId: string; uri: string; observation: OcrObservation | null; observations: OcrObservation[] };
 export type CaptureDraft = { binding: CaptureBinding; captureEpoch: number; scrollOffset: number;
-  shots: DraftShot[]; edits: DraftEdit[]; coverage: DraftCoverage; lastActivityAt: number };
+  shots: DraftShot[]; edits: DraftEdit[]; coverage: DraftCoverage; review: DraftReviewState; lastActivityAt: number };
 export type CaptureTicket = { binding: CaptureBinding; captureEpoch: number; evidenceId: string };
 
 export function captureBindingsEqual(a: CaptureBinding, b: CaptureBinding) {
@@ -29,10 +30,13 @@ function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; 
 export class MemoryLabelDraft {
   private draft: CaptureDraft | null = null;
   private epoch = 0;
+  private editRevision = 0;
   private recognizing = false;
   private expiryTimer: ReturnType<typeof setTimeout> | null = null;
   private cleanupInFlight: Promise<void> = Promise.resolve();
   private readonly pendingPhotoCleanup = new Set<string>();
+  private readonly listeners = new Set<() => void>();
+  private notificationQueued = false;
   private readonly now: () => number;
   private readonly releasePhoto: (uri: string) => Promise<void>;
   /** releasePhoto must delete only app-owned picker/camera cache copies, never the user's original library asset. */
@@ -53,6 +57,13 @@ export class MemoryLabelDraft {
     this.cleanupInFlight.catch(() => {});
   }
   flushCleanup() { return this.cleanupInFlight; }
+  subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  private emit() {
+    if (this.notificationQueued) return;
+    this.notificationQueued = true;
+    // read() may detect delayed/background expiry during render. Notify after the render stack.
+    void Promise.resolve().then(() => { this.notificationQueued = false; for (const listener of [...this.listeners]) listener(); });
+  }
   discardPhoto(uri: string) { this.release([uri]); }
   private touch(draft: CaptureDraft) {
     draft.lastActivityAt = this.now();
@@ -62,16 +73,18 @@ export class MemoryLabelDraft {
     timer.unref?.();
   }
   private current(binding: CaptureBinding) {
-    if (this.draft && (this.now() - this.draft.lastActivityAt >= PART_ONE_OCR_LIMITS.draftInactivityMs ||
-      !sameBinding(binding, this.draft.binding))) this.remove();
-    return this.draft;
+    if (this.draft && this.now() - this.draft.lastActivityAt >= PART_ONE_OCR_LIMITS.draftInactivityMs) this.remove();
+    return this.draft && sameBinding(binding, this.draft.binding) ? this.draft : null;
   }
   begin(binding: CaptureBinding, scrollOffset: number): CaptureDraft {
     const existing = this.current(binding);
     if (existing) { this.touch(existing); return clone(existing); }
+    if (this.draft) this.remove();
+    this.editRevision = 0;
     this.draft = { binding: { ...binding }, captureEpoch: ++this.epoch, scrollOffset, shots: [], edits: [],
-      coverage: emptyCoverage(), lastActivityAt: this.now() };
-    this.touch(this.draft);
+      coverage: emptyCoverage(), review: { active: false, revision: 0, assemblyRevision: 0, mode: 'unknown', samePackagePhotoIds: [],
+        assignments: [], packageConflicts: [], gaps: [], boundaries: { start: [], end: [] }, assemblies: [] }, lastActivityAt: this.now() };
+    this.touch(this.draft); this.emit();
     return clone(this.draft);
   }
   read(binding: CaptureBinding): CaptureDraft | null {
@@ -85,7 +98,7 @@ export class MemoryLabelDraft {
     return draft?.scrollOffset ?? null;
   }
   remove() { this.release(this.draft?.shots.map(shot => shot.uri) ?? []); this.draft = null; ++this.epoch;
-    if (this.expiryTimer) clearTimeout(this.expiryTimer); this.expiryTimer = null; }
+    if (this.expiryTimer) clearTimeout(this.expiryTimer); this.expiryTimer = null; this.emit(); }
   endSheet() { this.remove(); }
   accountChanged() { this.remove(); }
   addPhoto(binding: CaptureBinding, evidenceId: string, uri: string): CaptureTicket | 'cap_reached' {
@@ -94,7 +107,7 @@ export class MemoryLabelDraft {
     if (!uri.startsWith('file://')) throw new Error('local_photo_required');
     if (draft.shots.some(shot => shot.evidenceId === evidenceId)) throw new Error('duplicate_evidence');
     if (draft.shots.length >= PART_ONE_OCR_LIMITS.maxImages) return 'cap_reached';
-    draft.shots.push({ evidenceId, uri, observation: null, observations: [] }); this.touch(draft);
+    draft.shots.push({ evidenceId, uri, observation: null, observations: [] }); this.touch(draft); this.emit();
     return { binding: { ...binding }, captureEpoch: draft.captureEpoch, evidenceId };
   }
   removePhoto(binding: CaptureBinding, evidenceId: string) {
@@ -102,25 +115,42 @@ export class MemoryLabelDraft {
     this.release(draft.shots.filter(shot => shot.evidenceId === evidenceId).map(shot => shot.uri));
     draft.shots = draft.shots.filter(shot => shot.evidenceId !== evidenceId);
     draft.edits = draft.edits.filter(edit => edit.observationEvidenceId !== evidenceId);
-    draft.coverage = emptyCoverage(); this.touch(draft);
+    draft.review.samePackagePhotoIds = draft.review.samePackagePhotoIds.filter(id => id !== evidenceId);
+    draft.review.assignments = draft.review.assignments.filter(value => value.ref.evidenceId !== evidenceId);
+    for (const boundary of ['start', 'end'] as const) draft.review.boundaries[boundary] = draft.review.boundaries[boundary].filter(ref => ref.evidenceId !== evidenceId);
+    for (const gap of draft.review.gaps) {
+      gap.observedRefs = gap.observedRefs.filter(ref => ref.evidenceId !== evidenceId);
+      if (!gap.observedRefs.length) gap.status = 'missing';
+    }
+    draft.review.assemblies = draft.review.assemblies.filter(assembly => !assembly.lines.some(line => line.sources.some(source => source.evidenceId === evidenceId)));
+    draft.review.revision++; draft.coverage = emptyCoverage(); this.touch(draft); this.emit();
   }
   setCoverage(binding: CaptureBinding, coverage: DraftCoverage) {
     const draft = this.current(binding); if (!draft) throw new Error('no_current_capture');
-    draft.coverage = clone(coverage); this.touch(draft);
+    draft.coverage = clone(coverage); this.touch(draft); this.emit();
   }
-  edit(binding: CaptureBinding, evidenceId: string, text: string) {
+  setReview(binding: CaptureBinding, captureEpoch: number, review: DraftReviewState, coverage: DraftCoverage) {
     const draft = this.current(binding);
-    if (!draft?.shots.some(shot => shot.evidenceId === evidenceId && shot.observation)) throw new Error('no_observation');
-    const previous = draft.edits.filter(edit => edit.observationEvidenceId === evidenceId).at(-1);
-    draft.edits.push({ revision: draft.edits.length + 1, supersedesRevision: previous?.revision ?? null,
-      observationEvidenceId: evidenceId, actorOwnerId: binding.ownerId, text }); this.touch(draft);
+    if (!draft || draft.captureEpoch !== captureEpoch || review.revision !== draft.review.revision + 1) throw new Error('stale_capture_review');
+    draft.review = clone(review); draft.coverage = clone(coverage); this.touch(draft); this.emit();
+  }
+  edit(binding: CaptureBinding, evidenceId: string, text: string, source?: DraftLineRef) {
+    const draft = this.current(binding);
+    const shot = draft?.shots.find(shot => shot.evidenceId === evidenceId && shot.observation);
+    if (!draft || !shot || !text.trim() || text.length > 50000) throw new Error('no_observation');
+    const observationIndex = source?.observationIndex ?? shot.observations.length - 1, lineIndex = source?.lineIndex ?? null;
+    if (source && (source.evidenceId !== evidenceId || !shot.observations[observationIndex]?.lines[lineIndex!])) throw new Error('no_observation');
+    const previous = draft.edits.filter(edit => edit.observationEvidenceId === evidenceId &&
+      edit.observationIndex === observationIndex && edit.lineIndex === lineIndex).at(-1);
+    draft.edits.push({ revision: ++this.editRevision, supersedesRevision: previous?.revision ?? null,
+      observationEvidenceId: evidenceId, observationIndex, lineIndex, actorOwnerId: binding.ownerId, text }); this.touch(draft); this.emit();
   }
   async recognize(ticket: CaptureTicket, recognizer: LocalLabelRecognizer, getCurrentBinding: () => CaptureBinding,
-    languages = ['en-US']): Promise<'applied' | 'stale' | 'busy'> {
+    languages = ['en-US'], canApply: () => boolean = () => true): Promise<'applied' | 'stale' | 'busy'> {
     if (this.recognizing) return 'busy';
     const draft = this.current(getCurrentBinding());
     const shot = draft?.shots.find(value => value.evidenceId === ticket.evidenceId);
-    if (!draft || !shot || ticket.captureEpoch !== draft.captureEpoch || !sameBinding(ticket.binding, draft.binding)) return 'stale';
+    if (!canApply() || !draft || !shot || ticket.captureEpoch !== draft.captureEpoch || !sameBinding(ticket.binding, draft.binding)) return 'stale';
     const input: LocalOcrInput = { uri: shot.uri, evidenceId: shot.evidenceId,
       captureSessionId: ticket.binding.captureSessionId, generation: ticket.binding.generation, languages,
       correctionEnabled: false };
@@ -129,8 +159,8 @@ export class MemoryLabelDraft {
       const observation = validateOcrObservation(await recognizer.recognize(input), input);
       const current = this.current(getCurrentBinding());
       const target = current?.shots.find(value => value.evidenceId === ticket.evidenceId);
-      if (!current || !target || current.captureEpoch !== ticket.captureEpoch || !sameBinding(current.binding, ticket.binding)) return 'stale';
-      target.observations.push(clone(observation)); target.observation = clone(observation); this.touch(current);
+      if (!canApply() || !current || !target || current.captureEpoch !== ticket.captureEpoch || !sameBinding(current.binding, ticket.binding)) return 'stale';
+      target.observations.push(clone(observation)); target.observation = clone(observation); this.touch(current); this.emit();
       return 'applied';
     } finally { this.recognizing = false; }
   }
@@ -146,6 +176,15 @@ export function draftReadiness(draft: CaptureDraft, identityConfirmed: boolean) 
   if (draft.shots.some(shot => shot.observation?.lines.some(line => line.alternatives.some(text => text !== line.text)))) reasons.push('recognition_alternatives');
   if (draft.shots.some(shot => new Set(shot.observations.filter(observation => observation.status === 'recognized')
     .map(observation => observation.lines.map(line => line.text).join('\n'))).size > 1)) reasons.push('recognition_disagreement');
+  if (draft.review.active) {
+    if (draft.review.mode === 'unknown') reasons.push('label_scope_unknown');
+    if (draft.shots.some(shot => !draft.review.samePackagePhotoIds.includes(shot.evidenceId))) reasons.push('package_observation_unconfirmed');
+    if (draft.shots.some(shot => shot.observation?.lines.some((_line, lineIndex) => {
+      const assignment = draft.review.assignments.find(value => value.ref.evidenceId === shot.evidenceId &&
+        value.ref.observationIndex === shot.observations.length - 1 && value.ref.lineIndex === lineIndex);
+      return !assignment || !assignment.language || assignment.section === 'unknown';
+    }))) reasons.push('section_or_language_unreviewed');
+  }
   // Even complete local previews cannot satisfy approved durable retention/commit rights.
   return { state: reasons.length ? 'partial' as const : 'preview_only' as const, reasons,
     canCommit: false as const, canPublish: false as const, addPhoto: reasons.length > 0 && draft.shots.length < 6 };

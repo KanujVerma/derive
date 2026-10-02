@@ -7,7 +7,7 @@ function result(revision = 1): ScanResult {
   return { schemaVersion: 1, requestId: id(1), scanId: id(2), generation: 0, resultRevision: revision,
     identity: 'exact', itemId: id(3), candidateIds: [], snapshotId: id(4), declarationId: null, declarationState: 'none', scope: 'public',
     packageConfirmation: 'unconfirmed', work: 'running', jobId: id(5), subscriptionId: id(6), nextCheckAfter: null,
-    display: { resultRevision: revision, selectedIdentity: { id: id(3), name: 'Fixture Cleanser', brand: 'Synthetic', variantText: '100 ml, single package', image: null }, candidates: [], sections: [], sources: [], limitations: ['Ingredients not verified'] },
+    display: { resultRevision: revision, selectedIdentity: { id: id(3), name: 'Fixture Cleanser', brand: 'Synthetic', variantText: '100 ml, single package', expiresAt: '2099-01-01T00:00:00Z', image: null }, candidates: [], sections: [], sources: [], limitations: ['Ingredients not verified'] },
     reasonCodes: ['no_declaration'], conflictIds: [], evidenceIds: [], allowedActions: ['save_partial', 'retry', 'rescan'], freshness: { observedAt: null, expiresAt: null, state: 'unknown' } };
 }
 const request: ScanRequest = { schemaVersion: 1, requestId: id(1), idempotencyKey: 'one', clientScanId: id(2), generation: 0,

@@ -43,6 +43,44 @@ test('A02 UPC-E expansion, EAN-8 namespace, case GTIN and retailer routing prese
   assert.equal(normalizeBarcode(code('https://metadata.invalid/', 'qr')).supported, false);
   assert.equal(normalizeBarcode(code('305210416384', 'upca')).reason, 'invalid_code');
 });
+test('A02 restricted UPC 2/4 namespace is invariant across UPC/EAN/GTIN and iOS representations', () => {
+  for (const upc of ['200000000004', '400000000008']) {
+    const representations: Array<[string, string | null]> = [[upc, 'upca'], [upc, 'ean13'], [`0${upc}`, 'ean13'], [`00${upc}`, 'gtin14'], [`00${upc}`, null]];
+    for (const [raw, symbology] of representations) {
+      const global = normalizeBarcode(code(raw, symbology));
+      assert.equal(global.supported, false, `${raw}:${symbology}`);
+      assert.equal(global.reason, 'unsupported_namespace'); assert.equal(global.canonicalCode, null); assert.equal(global.canonicalGtin14, null);
+      assert.equal(publicLookupKey(global, 'US', 'ingredients', '1'), null);
+      assert.equal(global.raw, raw); assert.equal(global.symbology, symbology);
+      const scoped = normalizeBarcode({ ...code(raw, symbology), namespace: 'retailer', retailerId: 'synthetic-store' });
+      assert.equal(scoped.supported, true); assert.equal(scoped.namespace, 'retailer'); assert.equal(scoped.canonicalGtin14, null);
+      assert.equal(scoped.nativeCode, raw); assert.equal(scoped.canonicalCode, `retailer:synthetic-store:${raw}`);
+      assert.equal(normalizeBarcode({ ...code(raw, symbology), namespace: 'retailer' }).supported, false);
+    }
+  }
+});
+test('A02 restricted EAN-13 20-29 stays restricted when zero-padded to GTIN-14', () => {
+  for (const ean of ['2000000000008', '2900000000001']) {
+    for (const [raw, symbology] of [[ean, 'ean13'], [`0${ean}`, 'gtin14'], [`0${ean}`, null]] as Array<[string, string | null]>) {
+      const normalized = normalizeBarcode(code(raw, symbology)); assert.equal(normalized.supported, false); assert.equal(normalized.reason, 'unsupported_namespace');
+      assert.equal(publicLookupKey(normalized, null, 'identity', '1'), null);
+      assert.equal(normalizeBarcode({ ...code(raw, symbology), namespace: 'retailer', retailerId: 'synthetic-store' }).supported, true);
+    }
+  }
+});
+test('A02 normal UPC equivalents retain one public key while nonzero case indicators stay distinct', () => {
+  const consumer = normalizeBarcode(code('305210416383', 'upca'));
+  for (const [raw, symbology] of [['305210416383', 'ean13'], ['0305210416383', 'ean13'], ['00305210416383', 'gtin14']] as Array<[string, string]>) {
+    const equivalent = normalizeBarcode(code(raw, symbology)); assert.equal(equivalent.supported, true); assert.equal(equivalent.canonicalGtin14, consumer.canonicalGtin14);
+    assert.equal(publicLookupKey(equivalent, 'US', 'identity', '1'), publicLookupKey(consumer, 'US', 'identity', '1'));
+  }
+  for (const raw of ['10012345000017', '20012345000014', '20305210416387', '40305210416381']) {
+    const packaged = normalizeBarcode(code(raw, 'itf14')); assert.equal(packaged.supported, true, raw); assert.equal(packaged.canonicalGtin14, raw); assert.equal(packaged.nativeCode, raw);
+    assert.notEqual(packaged.canonicalGtin14, consumer.canonicalGtin14); assert.notEqual(publicLookupKey(packaged, 'US', 'identity', '1'), publicLookupKey(consumer, 'US', 'identity', '1'));
+  }
+  assert.equal(normalizeBarcode(code('305210416383', 'ean8')).reason, 'invalid_code');
+  assert.equal(normalizeBarcode(code('305210416383', 'gtin14')).reason, 'invalid_code');
+});
 test('A03 deliberately selected foreground Vaseline only is handed off; repeated/background callbacks are suppressed', () => {
   const candidates = ['305210416383', '305210231597'];
   const gate = createBarcodeObservationGate(() => 0), selected = candidates[0];
@@ -145,10 +183,13 @@ test('A22 provider-native UPC identifiers normalize before comparison; requested
   assert.equal(ProviderLookupRequestSchema.safeParse({ ...request, ownerId: id(10), profile: {} }).success, false);
 });
 test('A26 rights revocation/read purge/offline expiry remove affected material but retain independent identity', () => {
-  const p = policy(); const display: DisplayProjection = { resultRevision: 1, selectedIdentity: { id: id(5), name: 'Example', brand: 'Example', variantText: '100 ml', image: { url: 'https://authorized.example/image', policyId: p.policyId, evidenceId: id(30), observedAt: now, expiresAt: later, sourceRevision: 1 } }, candidates: [], sections: [{ sectionId: id(2), kind: 'ingredients', text: 'Water', evidenceIds: [id(3)], policyId: p.policyId, observedAt: now, expiresAt: later }], sources: [], limitations: [] };
+  const p = policy(); const display: DisplayProjection = { resultRevision: 1, selectedIdentity: { id: id(5), name: 'Example', brand: 'Example', variantText: '100 ml', expiresAt: later, image: { url: 'https://authorized.example/image', policyId: p.policyId, evidenceId: id(30), observedAt: now, expiresAt: later, sourceRevision: 1 } }, candidates: [], sections: [{ sectionId: id(2), kind: 'ingredients', text: 'Water', evidenceIds: [id(3)], policyId: p.policyId, observedAt: now, expiresAt: later }], sources: [], limitations: [] };
   assert.equal(filterDisplayProjection(display, [p], now).sections.length, 1);
   const revoked = { ...p, revokedAt: now }; const purged = filterDisplayProjection(display, [revoked], now); assert.equal(purged.sections.length, 0); assert.equal(purged.selectedIdentity?.image, null); assert.equal(purged.selectedIdentity?.name, 'Example');
   const offline = filterDisplayProjection(display, [p], '2026-10-03T12:00:00.000Z', now); assert.equal(offline.sections.length, 0); assert.equal(offline.selectedIdentity?.image, null);
+  const expiredIdentity = { ...display.selectedIdentity!, expiresAt: now };
+  const expired = filterDisplayProjection({ ...display, selectedIdentity: expiredIdentity, candidates: [expiredIdentity] }, [p], now);
+  assert.equal(expired.selectedIdentity, null); assert.deepEqual(expired.candidates, []);
   assert.equal(selectDeclaration(declaration(), item(), 'public', p, now, { revokedIds: [id(3)] }).accepted, false);
 });
 test('SEC02 SSRF validation denies private addresses, redirects, missing DNS, credentials and oversized bodies', () => {

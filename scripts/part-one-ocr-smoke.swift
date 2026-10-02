@@ -69,10 +69,11 @@ import Vision
     // JPEG segments instead: JFIF/EXIF/IPTC thumbnails cannot remain without APP segments.
     try require(!hasJpegApplicationOrCommentSegments(sanitized), "No embedded metadata or thumbnail segments")
     let input: [String: Any] = ["uri": sourceUrl.absoluteString, "evidenceId": "00000000-0000-4000-8000-000000000001",
-      "captureSessionId": "00000000-0000-4000-8000-000000000002", "generation": 1,
+      "captureSessionId": "00000000-0000-4000-8000-000000000002", "generation": Double(1),
       "languages": ["en-US"], "correctionEnabled": false]
     let start = Date(); let observation = DeriveLabelOcrEngine.recognize(input)
     try require(observation["status"] as? String == "recognized", "Local Vision synthetic text recognition")
+    try require(observation["generation"] as? Int == 1, "JavaScript numeric nonzero generation retained")
     try require(observation["correctionEnabled"] as? Bool == false, "Correction disabled")
     try require(observation["sourceWidth"] as? Int == 5120, "Observation source dimensions")
     let lines = observation["lines"] as! [[String: Any]]
@@ -90,7 +91,7 @@ import Vision
     let receipt: [String: Any] = ["suite": "Part1-local-native-OCR", "fixtureVersion": "synthetic-heic-v1",
       "platform": platform, "osVersion": ProcessInfo.processInfo.operatingSystemVersionString,
       "visionRequestRevision": VNRecognizeTextRequest.currentRevision, "syntheticOnly": true,
-      "recognized": true, "gpsRemoved": true, "exifRemoved": true, "thumbnailRemoved": true,
+      "recognized": true, "nonzeroGenerationRetained": true, "gpsRemoved": true, "exifRemoved": true, "thumbnailRemoved": true,
       "longEdge": max(derivative.width, derivative.height), "elapsedMs": Int(Date().timeIntervalSince(start) * 1000),
       "timingScope": "single synthetic core run; no camera or device cohort", "physicalDeviceAcceptance": "unrun",
       "expoBridgeBuild": "separate-gate"]

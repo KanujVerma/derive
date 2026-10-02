@@ -10,6 +10,8 @@ import { createDraftCacheLifecycle, isAppCacheFileUri, LOCAL_OCR_MESSAGES, local
 import { createCatalogRequestId } from '../../../services/productCatalog';
 import { captureBindingsEqual, draftReadiness } from '../../../presentation/part-one/capture';
 import type { CaptureBinding, MemoryLabelDraft } from '../../../presentation/part-one/capture';
+import { createCapturePhotoHandlers, createCaptureReviewHandlers } from '../../../presentation/part-one/captureReview';
+import { PartOneCaptureReview } from './PartOneCaptureReview';
 
 const draftCache = Platform.OS === 'ios' ? createDraftCacheLifecycle({
   cacheRoot: Paths.cache.uri, draftRoot: new Directory(Paths.cache, PART_ONE_DRAFT_CACHE_DIRECTORY).uri,
@@ -46,90 +48,80 @@ export function PartOneLabelCapture({ draft, binding, onClose, onChange, product
   const mounted = useRef(true);
   const currentBinding = useRef(binding); currentBinding.current = binding;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => draft.subscribe(() => refresh(value => value + 1)), [draft]);
   useEffect(() => { setBusy(false); setCameraActive(false); setMessage(LOCAL_OCR_MESSAGES.unsaved); },
     [binding.ownerId, binding.sheetSessionId, binding.scanId, binding.generation, binding.captureSessionId, binding.itemId, binding.candidateId, binding.deletionEpoch]);
   const current = draft.read(binding);
+  useEffect(() => { setBusy(false); setCameraActive(false); }, [current?.captureEpoch]);
   const readiness = current ? draftReadiness(current, false) : null;
   const capReached = (current?.shots.length ?? 0) >= 6;
   const stillBound = (expected: CaptureBinding) => mounted.current &&
     captureBindingsEqual(expected, currentBinding.current);
+  const validRender = () => stillBound(binding) && draft.read(currentBinding.current)?.captureEpoch === current?.captureEpoch;
   const update = () => { if (mounted.current) { refresh(value => value + 1); onChange(); } };
-  const close = () => { draft.back(binding); setCameraActive(false); onClose(); };
-  const addAndRead = async (uri: string, expected: CaptureBinding) => {
-    // Bind before opening picker/camera; an account/product change during acquisition must
-    // never assign the old package image to the new selection.
-    let localUri = uri;
-    try {
-      const evidenceId = createCatalogRequestId();
-      if (!draftCache) throw new Error('local_capture_cache_unavailable');
-      localUri = draftCache.stage(uri, evidenceId);
-      if (!stillBound(expected)) { draft.discardPhoto(localUri); return; }
-      const ticket = draft.addPhoto(expected, evidenceId, localUri);
-      if (ticket === 'cap_reached') { draft.discardPhoto(localUri); setMessage(LOCAL_OCR_MESSAGES.cap_reached); return; }
-      update();
-      const applied = await draft.recognize(ticket, appleVisionLabelRecognizer, () => currentBinding.current);
-      if (!stillBound(expected)) return;
-      if (applied === 'busy') setMessage('A photo is already being read locally. Add the next photo after it finishes.');
-      else if (applied === 'applied') {
-        const status = draft.read(currentBinding.current)?.shots.find(shot => shot.evidenceId === ticket.evidenceId)?.observation?.status;
-        setMessage(status && status !== 'recognized' && status !== 'cancelled' ? LOCAL_OCR_MESSAGES[status] :
-          'Readable text is a temporary preview. Check the whole panel and add overlapping views of missing sections.');
-      }
-      update();
-    } catch {
-      if (!draft.read(currentBinding.current)?.shots.some(shot => shot.uri === localUri)) draft.discardPhoto(localUri);
-      if (stillBound(expected)) setMessage(LOCAL_OCR_MESSAGES.failed);
+  const close = () => {
+    if (!stillBound(binding)) return;
+    const live = draft.read(currentBinding.current);
+    if (live && live.captureEpoch !== current?.captureEpoch) return;
+    draft.back(binding); setCameraActive(false); onClose();
+  };
+  const photoHandlers = () => createCapturePhotoHandlers(draft, () => currentBinding.current, {
+    stage: (uri, evidenceId) => { if (!draftCache) throw new Error('local_capture_cache_unavailable'); return draftCache.stage(uri, evidenceId); },
+    createEvidenceId: createCatalogRequestId, recognizer: appleVisionLabelRecognizer, onChange: update, isActive: () => mounted.current,
+  });
+  const reportPhotoResult = (operations: ReturnType<typeof photoHandlers>, outcome: string, evidenceId = operations.getImportedEvidenceId()) => {
+    if (!mounted.current || !operations.isCurrent() || outcome === 'stale') return;
+    if (outcome === 'busy') setMessage('A photo is already being read locally. Try again after it finishes.');
+    else if (outcome === 'cap_reached') setMessage(LOCAL_OCR_MESSAGES.cap_reached);
+    else if (outcome === 'failed') setMessage(LOCAL_OCR_MESSAGES.failed);
+    else {
+      const status = draft.read(currentBinding.current)?.shots.find(shot => shot.evidenceId === evidenceId)?.observation?.status;
+      setMessage(status && status !== 'recognized' && status !== 'cancelled' ? LOCAL_OCR_MESSAGES[status] :
+        'Review the source photo, label coverage and overlapping views below. Corrections remain attributed and unsaved.');
     }
   };
   const pick = async () => {
-    if (busy || capReached) return;
-    const expected = { ...currentBinding.current };
+    if (busy || capReached || !current || !validRender()) return;
+    const operations = photoHandlers();
     setBusy(true); setCameraActive(false);
     try {
       // System selected-photo picker: no full-library or location permission request.
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false,
         quality: 1, exif: false, allowsMultipleSelection: false });
-      if (result.canceled) { if (stillBound(expected)) setMessage(LOCAL_OCR_MESSAGES.picker_cancelled); }
-      else if (result.assets[0]) await addAndRead(result.assets[0].uri, expected);
-    } catch { if (stillBound(expected)) setMessage(LOCAL_OCR_MESSAGES.failed); }
-    finally { if (stillBound(expected)) setBusy(false); }
+      if (result.canceled) { if (mounted.current && operations.isCurrent()) setMessage(LOCAL_OCR_MESSAGES.picker_cancelled); }
+      else if (result.assets[0]) reportPhotoResult(operations, await operations.importPhoto(result.assets[0].uri));
+    } catch { if (mounted.current && operations.isCurrent()) setMessage(LOCAL_OCR_MESSAGES.failed); }
+    finally { if (mounted.current && operations.isCurrent()) setBusy(false); }
   };
   const openCamera = async () => {
-    if (busy || capReached) return;
-    const expected = { ...currentBinding.current };
+    if (busy || capReached || !current || !validRender()) return;
+    const operations = photoHandlers();
     try {
       const allowed = permission?.granted || (await requestPermission()).granted;
-      if (!stillBound(expected)) return;
+      if (!mounted.current || !operations.isCurrent()) return;
       if (allowed) setCameraActive(true); else setMessage(LOCAL_OCR_MESSAGES.camera_denied);
-    } catch { if (stillBound(expected)) setMessage(LOCAL_OCR_MESSAGES.failed); }
+    } catch { if (mounted.current && operations.isCurrent()) setMessage(LOCAL_OCR_MESSAGES.failed); }
   };
   const takePhoto = async () => {
-    if (busy || capReached || !camera.current) return;
-    const expected = { ...currentBinding.current };
+    if (busy || capReached || !camera.current || !current || !validRender()) return;
+    const operations = photoHandlers();
     setBusy(true);
     try {
       const image = await camera.current.takePictureAsync({ quality: 1, exif: false });
-      if (stillBound(expected)) setCameraActive(false); if (image?.uri) await addAndRead(image.uri, expected);
-    } catch { if (stillBound(expected)) setMessage(LOCAL_OCR_MESSAGES.failed); }
-    finally { if (stillBound(expected)) setBusy(false); }
+      if (mounted.current && operations.isCurrent()) setCameraActive(false);
+      if (image?.uri) reportPhotoResult(operations, await operations.importPhoto(image.uri));
+    } catch { if (mounted.current && operations.isCurrent()) setMessage(LOCAL_OCR_MESSAGES.failed); }
+    finally { if (mounted.current && operations.isCurrent()) setBusy(false); }
   };
-  const remove = () => { draft.remove(); onChange(); onClose(); };
+  const reviewHandlers = createCaptureReviewHandlers(draft, () => currentBinding.current, update);
+  const remove = () => { if (!validRender()) return; draft.remove(); onChange(); onClose(); };
   const retryPhoto = async (evidenceId: string) => {
-    if (busy) return;
-    const expected = { ...currentBinding.current }, existing = draft.read(expected);
-    if (!existing) return;
+    if (busy || !current || !validRender()) return;
+    const operations = photoHandlers();
     setBusy(true);
     try {
-      const outcome = await draft.recognize({ binding: expected, captureEpoch: existing.captureEpoch, evidenceId },
-        appleVisionLabelRecognizer, () => currentBinding.current);
-      if (stillBound(expected)) {
-        const status = draft.read(expected)?.shots.find(shot => shot.evidenceId === evidenceId)?.observation?.status;
-        setMessage(outcome === 'busy' ? 'A photo is already being read locally. Try again after it finishes.' :
-          status && status !== 'recognized' && status !== 'cancelled' ? LOCAL_OCR_MESSAGES[status] : LOCAL_OCR_MESSAGES.unsaved);
-        update();
-      }
-    } catch { if (stillBound(expected)) setMessage(LOCAL_OCR_MESSAGES.failed); }
-    finally { if (stillBound(expected)) setBusy(false); }
+      reportPhotoResult(operations, await operations.retry(evidenceId), evidenceId);
+    } finally { if (mounted.current && operations.isCurrent()) setBusy(false); }
   };
   return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={close}
     supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}>
@@ -143,31 +135,32 @@ export function PartOneLabelCapture({ draft, binding, onClose, onChange, product
         <Text style={styles.body}>Start with the full ingredient panel. Keep the first and last lines visible. For glare or curved labels, add a view with some overlap.</Text>
         <Text accessibilityLiveRegion="polite" style={styles.status}>{message}</Text>
         {!PART_ONE_LOCAL_CAPTURE_AVAILABLE && <Text style={styles.status}>Local photo evaluation is disabled on this build.</Text>}
+        {!current && <Text accessibilityLiveRegion="polite" style={styles.status}>This temporary draft has ended. Back returns to the product; Scan ingredients starts a fresh private capture.</Text>}
         {busy && <View style={styles.progress}><ActivityIndicator accessibilityLabel="Reading photo locally" /><Text style={styles.body}>Reading on this device…</Text></View>}
         {cameraActive && permission?.granted && <View style={styles.cameraBox}>
           <CameraView ref={camera} facing="back" style={StyleSheet.absoluteFill} active={!busy} />
         </View>}
         {cameraActive ? <Pressable accessibilityRole="button" accessibilityLabel="Capture ingredient panel" disabled={busy || capReached}
           onPress={() => void takePhoto()} style={styles.action}><Text style={styles.actionText}>Capture ingredient panel</Text></Pressable> :
-          <Pressable accessibilityRole="button" accessibilityLabel="Use camera for ingredient panel" disabled={busy || capReached || !PART_ONE_LOCAL_CAPTURE_AVAILABLE}
+          <Pressable accessibilityRole="button" accessibilityLabel="Use camera for ingredient panel" disabled={busy || capReached || !current || !PART_ONE_LOCAL_CAPTURE_AVAILABLE}
             onPress={() => void openCamera()} style={styles.action}><Text style={styles.actionText}>Use camera</Text></Pressable>}
         <Pressable accessibilityRole="button" accessibilityLabel={current?.shots.length ? 'Add overlapping ingredient photo from selected photos' : 'Choose ingredient photo'}
-          disabled={busy || capReached || !PART_ONE_LOCAL_CAPTURE_AVAILABLE} onPress={() => void pick()} style={styles.action}>
+          disabled={busy || capReached || !current || !PART_ONE_LOCAL_CAPTURE_AVAILABLE} onPress={() => void pick()} style={styles.action}>
           <Text style={styles.actionText}>{current?.shots.length ? 'Add photo' : 'Choose photo'}</Text>
         </Pressable>
         {capReached && <Text style={styles.status}>{LOCAL_OCR_MESSAGES.cap_reached}</Text>}
         {current?.shots.map((shot, index) => <View key={shot.evidenceId} style={styles.preview}>
           <Text accessibilityRole="header" style={styles.product}>Photo {index + 1} · local preview</Text>
-          {shot.observation?.lines.map((line, lineIndex) => <Text key={lineIndex} selectable style={styles.body}>{line.text}</Text>)}
           {!shot.observation && <Text style={styles.body}>Text has not been recognized.</Text>}
           {shot.observation?.status !== 'recognized' && <Pressable accessibilityRole="button" accessibilityLabel={`Retry local text recognition for photo ${index + 1}`}
             disabled={busy || !PART_ONE_LOCAL_CAPTURE_AVAILABLE} onPress={() => void retryPhoto(shot.evidenceId)} style={styles.action}>
             <Text style={styles.actionText}>Read photo {index + 1} again</Text>
           </Pressable>}
-          <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${index + 1}`} onPress={() => { draft.removePhoto(binding, shot.evidenceId); update(); }} style={styles.action}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${index + 1}`} onPress={() => { reviewHandlers.removePhoto(shot.evidenceId); }} style={styles.action}>
             <Text style={styles.actionText}>Remove photo {index + 1}</Text>
           </Pressable>
         </View>)}
+        {current && current.shots.length > 0 && <PartOneCaptureReview key={current.captureEpoch} draft={draft} binding={binding} onChange={onChange} />}
         {readiness?.state === 'partial' && <Text style={styles.body}>This draft remains partial. Confirmation cannot fill hidden text or missing sections.</Text>}
         <Text style={styles.body}>{LOCAL_OCR_MESSAGES.unsaved} It expires after 30 minutes without activity and is removed when this sheet session ends.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Remove temporary ingredient draft" onPress={remove} style={styles.action}><Text style={styles.actionText}>Remove draft</Text></Pressable>

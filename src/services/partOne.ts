@@ -1,4 +1,4 @@
-import { ScanRequestSchema, ScanResultSchema, CaptureSessionSchema, type ScanRequest, type SelectionRequest, type SaveRequest } from '../contracts/PartOne.ts';
+import { ScanRequestSchema, ScanResultSchema, CaptureSessionSchema, CaptureCommitRequestSchema, CaptureCommitResultSchema, PartOneIdSchema, type CaptureCommitRequest, type CaptureCommitResult, type ScanRequest, type SelectionRequest, type SaveRequest } from '../contracts/PartOne.ts';
 import type { PartOneTransport } from '../presentation/part-one/resultController.ts';
 import { supabase } from './supabase';
 import { publicEnvironment } from '../config/environment';
@@ -33,3 +33,24 @@ export async function listPartOneSaves(): Promise<PartOneSavedProduct[]> {
 }
 export async function readPartOneSave(id: string): Promise<PartOneSavedProduct> { return SavedProductSchema.parse(await call(`/saves/${z.string().uuid().parse(id)}`, 'GET')); }
 export async function deletePartOneSave(id: string): Promise<void> { await call(`/saves/${z.string().uuid().parse(id)}`, 'DELETE'); }
+
+/** These explicit private operations remain subject to the server retention gate.
+ * They do not upload assets or turn a temporary local draft into catalog truth. */
+export async function commitPartOneCapture(id: string, request: CaptureCommitRequest): Promise<CaptureCommitResult> {
+  const expected=PartOneIdSchema.parse(id).toLowerCase();
+  const result=CaptureCommitResultSchema.parse(await call(`/captures/${expected}/observations`, 'POST', CaptureCommitRequestSchema.parse(request)));
+  if (result.capture.captureSessionId!==expected || result.capture.packageObservationId!==request.packageObservationId)
+    throw new Error('Private capture commit binding changed');
+  return result;
+}
+export async function readPartOneCapture(id: string) {
+  const expected=PartOneIdSchema.parse(id).toLowerCase();
+  const result=CaptureSessionSchema.parse(await call(`/captures/${expected}`, 'GET'));
+  if (result.captureSessionId!==expected) throw new Error('Private capture read binding changed');
+  return result;
+}
+export async function deletePartOneCapture(id: string): Promise<void> {
+  const expected = PartOneIdSchema.parse(id);
+  const result = z.strictObject({ deleted: z.literal(true), id: PartOneIdSchema }).parse(await call(`/captures/${expected}`, 'DELETE'));
+  if (result.id !== expected) throw new Error('Private capture deletion binding changed');
+}

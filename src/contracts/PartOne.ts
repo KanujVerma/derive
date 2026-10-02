@@ -16,7 +16,7 @@ export const CodeSchema = z.strictObject({ raw: z.string().min(1).max(4096), sym
 export const ScanRequestSchema = z.strictObject({ schemaVersion: z.literal(1), requestId: PartOneIdSchema, idempotencyKey: z.string().min(1).max(200), clientScanId: PartOneIdSchema, generation: revision, code: CodeSchema, requestedMarket: z.string().nullable(), categoryHint: z.string().nullable() });
 
 export const DisplayImageSchema = z.strictObject({ url: z.url(), policyId: PartOneIdSchema, evidenceId: PartOneIdSchema, observedAt: date, expiresAt: date, sourceRevision: revision });
-export const DisplayIdentitySchema = z.strictObject({ id: PartOneIdSchema, name: z.string(), brand: z.string().nullable(), variantText: z.string(), image: DisplayImageSchema.nullable() });
+export const DisplayIdentitySchema = z.strictObject({ id: PartOneIdSchema, name: z.string(), brand: z.string().nullable(), variantText: z.string(), expiresAt: date, image: DisplayImageSchema.nullable() });
 export const DisplaySourceSchema = z.strictObject({ observationId: PartOneIdSchema, policyId: PartOneIdSchema, label: z.string(), url: z.url().nullable(), observedAt: date, sourceUpdatedAt: date.nullable(), expiresAt: date });
 export const DisplaySectionSchema = z.strictObject({ sectionId: PartOneIdSchema, kind: z.enum(['ingredients', 'active', 'inactive', 'may_contain']), text: z.string(), evidenceIds: ids, policyId: PartOneIdSchema, observedAt: date, expiresAt: date });
 export const DisplayProjectionSchema = z.strictObject({ resultRevision: revision, selectedIdentity: DisplayIdentitySchema.nullable(), candidates: z.array(DisplayIdentitySchema), sections: z.array(DisplaySectionSchema), sources: z.array(DisplaySourceSchema), limitations: z.array(z.string()) });
@@ -30,7 +30,11 @@ export const CaptureSessionSchema = z.strictObject({ schemaVersion: z.literal(1)
 export const OcrObservationSchema = z.strictObject({ evidenceId: PartOneIdSchema, captureSessionId: PartOneIdSchema, generation: revision, recognizer: z.string().min(1), recognizerVersion: z.string().min(1), languageConfig: z.array(z.string()), correctionEnabled: z.boolean(), sourceWidth: z.number().int().nonnegative(), sourceHeight: z.number().int().nonnegative(), orientationTransform: z.array(z.number().finite()).length(9), lines: z.array(z.strictObject({ text: z.string(), alternatives: z.array(z.string()), region: z.array(z.number().finite()).length(4), confidence: z.number().min(0).max(1).nullable() })), status: z.enum(['recognized', 'no_text', 'unsupported_script', 'model_unavailable', 'cancelled', 'failed']) }).superRefine((observation, ctx) => { if (observation.status === 'recognized' && (!observation.sourceWidth || !observation.sourceHeight)) ctx.addIssue({ code: 'custom', path: ['sourceWidth'], message: 'Recognized lines require actual image dimensions' }); });
 export const SanitizedAssetSchema = z.strictObject({ evidenceId: PartOneIdSchema, storageObjectId: PartOneIdSchema, contentHash: z.string().min(1), width: z.number().int().positive().max(4096), height: z.number().int().positive().max(4096), metadataStripped: z.literal(true) });
 export const AttributedEditSchema = z.strictObject({ observationId: PartOneIdSchema, supersedesId: PartOneIdSchema, revision: revision, text: z.string(), reason: z.string().min(1) });
-export const CaptureCommitRequestSchema = z.strictObject({ idempotencyKey: z.string().min(1).max(200), expectedGeneration: revision, expectedResultRevision: revision, expectedCaptureRevision: revision, expectedDeletionEpoch: revision, packageObservationId: PartOneIdSchema, assets: z.array(SanitizedAssetSchema).max(6), observations: z.array(OcrObservationSchema), edits: z.array(AttributedEditSchema) });
+export const CaptureCommitRequestSchema = z.strictObject({ idempotencyKey: z.string().min(1).max(200), expectedGeneration: revision, expectedResultRevision: revision, expectedCaptureRevision: revision, expectedDeletionEpoch: revision, packageObservationId: PartOneIdSchema, assets: z.array(SanitizedAssetSchema).max(6), observations: z.array(OcrObservationSchema), edits: z.array(AttributedEditSchema) }).superRefine((request, context) => {
+  for (const field of ['evidenceId', 'storageObjectId'] as const)
+    if (new Set(request.assets.map(asset => asset[field])).size !== request.assets.length)
+      context.addIssue({ code: 'custom', path: ['assets'], message: 'Duplicate private asset reference' });
+});
 
 export const SourcePolicySchema = z.strictObject({ policyId: PartOneIdSchema, provider: z.string(), version: z.string(), permissionEvidence: z.string().nullable(), reviewedAt: date.nullable(), expiresAt: date.nullable(), revokedAt: date.nullable(), operations: z.strictObject({ lookup: z.boolean(), process: z.boolean(), retain: z.boolean(), sharedDisplay: z.boolean(), privateDisplay: z.boolean(), ocr: z.boolean(), cropThumbnail: z.boolean(), rehost: z.boolean(), hotlink: z.boolean(), export: z.boolean() }), retainedFields: z.array(z.string()), attribution: z.string().nullable(), purgeObligations: z.array(z.string()) });
 export const VariantSchema = z.strictObject({ brand: z.string().nullable(), line: z.string().nullable(), form: z.string().nullable(), scent: z.string().nullable(), shade: z.string().nullable(), spf: z.string().nullable(), strength: z.string().nullable(), size: z.string().nullable(), unit: z.string().nullable(), packCount: z.number().int().positive().nullable(), packagingLevel: z.enum(['each', 'case', 'multipack']).nullable() });
@@ -49,6 +53,17 @@ export const FactBundleV1Schema = z.strictObject({ schemaVersion: z.literal(1), 
   if (bundle.scope === 'public' ? bundle.ownerId !== null : bundle.ownerId === null) ctx.addIssue({ code: 'custom', path: ['ownerId'], message: 'Facts preserve the public/private owner boundary' });
 });
 export type ScanRequest = z.infer<typeof ScanRequestSchema>;
+/** Durable private commit receipt. Its result and capture have one current binding. */
+export const CaptureCommitResultSchema = z.strictObject({ schemaVersion: z.literal(1), capture: CaptureSessionSchema,
+  observationIds: z.array(PartOneIdSchema), declarationIds: z.array(PartOneIdSchema), assetIds: z.array(PartOneIdSchema), result: ScanResultSchema,
+}).superRefine((value, context) => {
+  if (value.capture.scanId !== value.result.scanId || value.capture.generation !== value.result.generation || value.capture.itemId !== value.result.itemId)
+    context.addIssue({ code: 'custom', message: 'Private commit binding mismatch' });
+  for (const field of ['observationIds', 'declarationIds', 'assetIds'] as const)
+    if (new Set(value[field]).size !== value[field].length) context.addIssue({ code: 'custom', message: 'Duplicate private receipt ids', path: [field] });
+});
+export type CaptureCommitResult = z.infer<typeof CaptureCommitResultSchema>;
+
 export type ScanResult = z.infer<typeof ScanResultSchema>;
 export type DisplayProjection = z.infer<typeof DisplayProjectionSchema>;
 export type SelectionRequest = z.infer<typeof SelectionRequestSchema>;

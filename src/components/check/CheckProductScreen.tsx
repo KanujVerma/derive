@@ -41,6 +41,8 @@ import { normalizeBarcode } from '@/src/utils/barcode';
 import { PART_ONE_ENABLED, partOneTransport } from '@/src/services/partOne';
 import { createPartOneResultController, type PartOneView } from '@/src/presentation/part-one/resultController';
 import { MemoryLabelDraft, type CaptureBinding } from '@/src/presentation/part-one/capture';
+import { captureMatchesCurrentResult, resumeLocalCapture } from '@/src/presentation/part-one/captureFlow';
+import { PartOneLocalDraftSummary } from '@/src/components/check/part-one/PartOneLocalDraftSummary';
 import { PartOneResultSheet } from '@/src/components/check/part-one/PartOneResultSheet';
 import { PartOneLabelCapture, PART_ONE_LOCAL_CAPTURE_AVAILABLE, purgeLocalCaptureFile } from '@/src/components/check/part-one/PartOneLabelCapture';
 import { useScanContextStore } from '@/src/stores/scanContextStore';
@@ -115,6 +117,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [labelBinding, setLabelBinding] = useState<CaptureBinding | null>(null);
   const [labelCaptureOpen, setLabelCaptureOpen] = useState(false);
   const [, refreshLabelDraft] = useState(0);
+  useEffect(() => labelDraft.subscribe(() => refreshLabelDraft(value => value + 1)), [labelDraft]);
   useEffect(() => {
     partOneController.setOwner(liveCheckOwner);
     labelDraft.accountChanged(); setLabelBinding(null); setLabelCaptureOpen(false);
@@ -1127,6 +1130,9 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   if (targetShell && captureRole) {
     const partOneVisible = PART_ONE_ENABLED && Boolean(partOneView.owner === liveCheckOwner && (partOneView.loading || partOneView.result || partOneView.error));
     const partOneSheet = partOneVisible ? <PartOneResultSheet view={partOneView} onClose={dismissCameraResult}
+      localDraft={labelBinding && <PartOneLocalDraftSummary draft={labelDraft} binding={labelBinding}
+        onReview={() => { if (labelDraft.read(labelBinding)) setLabelCaptureOpen(true); }}
+        onRemove={() => { labelDraft.remove(); setLabelBinding(null); setLabelCaptureOpen(false); }} />}
       onRefresh={() => { if (liveCheckOwner) void partOneController.refresh(liveCheckOwner); }}
       onSelect={id => { labelDraft.endSheet(); setLabelBinding(null); if (liveCheckOwner) void partOneController.select(liveCheckOwner, id); }}
       onSave={() => { if (liveCheckOwner && partOneView.result) void partOneController.save(liveCheckOwner, `save:${partOneView.result.scanId}:${partOneView.result.generation}:${partOneView.result.resultRevision}`); }}
@@ -1134,7 +1140,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       onCapture={PART_ONE_LOCAL_CAPTURE_AVAILABLE ? () => {
         const owner = currentLiveCheckOwner(); const result = partOneController.getView().result;
         if (!owner || !result) return;
-        if (labelBinding && labelBinding.ownerId === owner && labelBinding.scanId === result.scanId && labelBinding.generation === result.generation) { setLabelCaptureOpen(true); return; }
+        if (resumeLocalCapture(labelDraft, labelBinding, owner, result, partOneView.scrollOffset)) { setLabelCaptureOpen(true); return; }
         void partOneController.capture(owner).then(capture => {
           const current = partOneController.getView().result;
           if (owner !== currentLiveCheckOwner() || current?.scanId !== capture.scanId || current.generation !== capture.generation) return;
@@ -1212,7 +1218,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
               compactActions={compactRecovery} onNextStep={resultNextStep}
               onOpenSource={url => void Linking.openURL(url).catch(() => {})}>{renderResultExtras()}</CheckResultPresentation> : null)}
         />
-        {labelCaptureOpen && labelBinding && <PartOneLabelCapture draft={labelDraft} binding={labelBinding}
+        {labelCaptureOpen && labelBinding && captureMatchesCurrentResult(labelBinding, liveCheckOwner, partOneView.result) && <PartOneLabelCapture draft={labelDraft} binding={labelBinding}
           productLabel={[partOneView.result?.display.selectedIdentity?.brand, partOneView.result?.display.selectedIdentity?.name, partOneView.result?.display.selectedIdentity?.variantText].filter(Boolean).join(' ')}
           onClose={() => { labelDraft.back(labelBinding); setLabelCaptureOpen(false); }} onChange={() => refreshLabelDraft(value => value + 1)} />}
       </View>

@@ -12,10 +12,30 @@ export interface LocalLabelRecognizer {
   recognize(input: LocalOcrInput): Promise<OcrObservation>;
 }
 export interface NativeLabelOcrBridge { recognize(input: LocalOcrInput): Promise<unknown> }
-export function createAppleVisionRecognizer(native: NativeLabelOcrBridge | null): LocalLabelRecognizer {
+export type LocalOcrDiagnostic = 'native_unavailable' | 'native_call_failed' | 'native_payload_invalid' |
+  'native_binding_mismatch:evidenceId' | 'native_binding_mismatch:captureSessionId' | 'native_binding_mismatch:generation' |
+  'native_binding_mismatch:correctionEnabled' | 'native_binding_mismatch:languageConfig' | 'native_payload_valid';
+/** Diagnostic codes contain no photo URI, recognized text, identifiers or native exception details. */
+export function createAppleVisionRecognizer(native: NativeLabelOcrBridge | null,
+  onDiagnostic: (code: LocalOcrDiagnostic) => void = () => {}): LocalLabelRecognizer {
   return { async recognize(input) {
-    if (!native) throw new Error('model_unavailable');
-    return validateOcrObservation(await native.recognize(input), input);
+    if (!native) { onDiagnostic('native_unavailable'); throw new Error('model_unavailable'); }
+    let payload: unknown;
+    try { payload = await native.recognize(input); }
+    catch { onDiagnostic('native_call_failed'); throw new Error('native_ocr_call_failed'); }
+    const parsed = OcrObservationSchema.safeParse(payload);
+    if (!parsed.success) { onDiagnostic('native_payload_invalid'); throw new Error('malformed_ocr_observation'); }
+    const result = parsed.data;
+    for (const field of ['evidenceId', 'captureSessionId', 'generation', 'correctionEnabled'] as const) {
+      if (result[field] !== input[field]) { onDiagnostic(`native_binding_mismatch:${field}`); throw new Error('stale_ocr_binding'); }
+    }
+    if (JSON.stringify(result.languageConfig) !== JSON.stringify(input.languages)) {
+      onDiagnostic('native_binding_mismatch:languageConfig'); throw new Error('stale_ocr_binding');
+    }
+    let observation: OcrObservation;
+    try { observation = validateOcrObservation(result, input); }
+    catch { onDiagnostic('native_payload_invalid'); throw new Error('malformed_ocr_observation'); }
+    onDiagnostic('native_payload_valid'); return observation;
   } };
 }
 export const PART_ONE_OCR_LIMITS = Object.freeze({ maxImages: 6, maxLongEdge: 4096,

@@ -1,6 +1,6 @@
 import {
   ScanRequestSchema, ScanResultSchema, SelectionRequestSchema, SaveRequestSchema,
-  CaptureSessionSchema, CaptureCommitRequestSchema, PartOneIdSchema,
+  CaptureSessionSchema, CaptureCommitRequestSchema, CaptureCommitResultSchema, PartOneIdSchema,
 } from '../../../src/contracts/PartOne.ts';
 import { normalizeBarcode } from '../../../src/domain/part-one/barcode.ts';
 
@@ -57,6 +57,7 @@ function object(value: unknown): Record<string, unknown> {
 }
 function checkedResult(value: unknown): unknown {
   const data = object(normalizeDatabaseDates(value));
+  if (data.capture) return CaptureCommitResultSchema.parse(data);
   if (data.conflict === true) return { ...data, result: ScanResultSchema.parse(data.result) };
   if (Array.isArray(data.saves)) return { ...data, saves:data.saves.map(s => checkedResult(s)) };
   if (data.result) return { ...data, result: ScanResultSchema.parse(data.result) };
@@ -72,7 +73,8 @@ export async function handlePartOneRequest(request: Request, ports: PartOneHttpP
     const marker = pathname.indexOf('/part-one');
     if (marker < 0) throw new PartOneHttpError('not_found',404);
     const parts = pathname.slice(marker + '/part-one'.length).split('/').filter(Boolean);
-    const [resource,id,child] = parts;
+    const [resource,rawId,child] = parts;
+    const id=rawId?.toLowerCase();
     if (parts.length>3 || id && !PartOneIdSchema.safeParse(id).success) throw new PartOneHttpError('invalid_path',400);
     let action: string; let payload: Record<string, unknown>;
     if (resource==='scans' && !id && request.method==='POST') {
@@ -95,6 +97,10 @@ export async function handlePartOneRequest(request: Request, ports: PartOneHttpP
       action='captures/create'; payload={scanId:id,...body};
     } else if (resource==='captures' && id && child==='observations' && request.method==='POST') {
       action='captures/observations'; payload={captureSessionId:id,...CaptureCommitRequestSchema.parse(await boundedJson(request))};
+    } else if (resource==='captures' && id && !child && request.method==='GET') {
+      action='captures/read'; payload={id};
+    } else if (resource==='captures' && id && !child && request.method==='DELETE') {
+      action='captures/delete'; payload={id};
     } else if (resource==='saves' && !id && request.method==='GET') {
       action='saves/list'; payload={};
     } else if (resource==='saves' && !id && request.method==='POST') {
@@ -106,7 +112,19 @@ export async function handlePartOneRequest(request: Request, ports: PartOneHttpP
     } else throw new PartOneHttpError('not_found',404);
     const raw=await ports.operation(action,payload,request);
     let result: Record<string, unknown>;
-    try { result=object(checkedResult(raw)); } catch { throw new PartOneHttpError('invalid_server_projection',500); }
+    try {
+      const normalized=object(normalizeDatabaseDates(raw));
+      if (action==='captures/observations' && normalized.conflict!==true) {
+        const committed=CaptureCommitResultSchema.parse(normalized);
+        if (committed.capture.captureSessionId!==id || committed.capture.packageObservationId!==payload.packageObservationId)
+          throw new Error('private_commit_binding');
+        result=object(committed);
+      } else if (action==='captures/read') {
+        const capture=CaptureSessionSchema.parse(normalized);
+        if (capture.captureSessionId!==id) throw new Error('private_capture_binding');
+        result=object(capture);
+      } else result=object(checkedResult(normalized));
+    } catch { throw new PartOneHttpError('invalid_server_projection',500); }
     if (result.conflict===true) return response(result,409);
     const work=typeof result.work==='string' ? result.work : undefined;
     return response(result,work && ['queued','running','retry_wait','deferred_budget'].includes(work) ? 202 : 200);

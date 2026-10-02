@@ -1,6 +1,6 @@
 import type { Code } from '../../contracts/PartOne.ts';
 
-export const BARCODE_NORMALIZATION_VERSION = 'part-one-gtin-1';
+export const BARCODE_NORMALIZATION_VERSION = 'part-one-gtin-2';
 export type BarcodeNormalization = {
   supported: boolean; reason: 'invalid_code' | 'unsupported_namespace' | null;
   raw: string; symbology: string | null; namespace: 'gtin' | 'retailer' | 'unknown';
@@ -44,14 +44,17 @@ export function normalizeBarcode(code: Code): BarcodeNormalization {
     const iosUpcaRepresentation = symbol === 'ean13' && native.length === 12;
     if ((expected !== null && native.length !== expected && !iosUpcaRepresentation) || !hasValidGtinCheckDigit(native)) return { ...base, reason: 'invalid_code' };
   }
-  // Restricted circulation/variable-weight codes have meaning only in their retailer namespace.
-  const restricted = native.length === 12 && /^[24]/.test(native) || native.length === 13 && /^2\d/.test(native);
+  const canonicalGtin14 = native.padStart(14, '0');
+  // Classify namespace after equivalence normalization: zero-padded UPC 2/4 and
+  // EAN-13 20-29 remain restricted regardless of their native representation.
+  // A genuine nonzero GTIN-14 packaging indicator is retained, not interpreted
+  // as a UPC/EAN circulation prefix or truncated into a consumer-unit code.
+  const restricted = /^00[24]/.test(canonicalGtin14) || /^02/.test(canonicalGtin14);
   if (restricted && (code.namespace !== 'retailer' || !code.retailerId)) return base;
   if (code.namespace === 'retailer') {
     if (!code.retailerId) return base;
     return { ...base, supported: true, reason: null, canonicalCode: `retailer:${code.retailerId}:${native}`, nativeCode: native };
   }
-  const canonicalGtin14 = native.padStart(14, '0');
   return { ...base, supported: true, reason: null, canonicalCode: canonicalGtin14, canonicalGtin14, nativeCode: native };
 }
 /** Market routing never mutates evidence; JSON framing prevents namespace/key collisions. */

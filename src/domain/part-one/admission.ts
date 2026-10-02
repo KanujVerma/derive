@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DeclarationSchema, DisplaySectionSchema, DisplaySourceSchema, ItemSnapshotSchema, PartOneIdSchema, SourceObservationSchema, SourcePolicySchema } from '../../contracts/PartOne.ts';
+import { DeclarationSchema, DisplaySectionSchema, DisplaySourceSchema, ItemSnapshotSchema, PartOneIdSchema, SourceObservationSchema, SourcePolicySchema, VariantSchema } from '../../contracts/PartOne.ts';
 import type { Declaration, DisplayProjection, ItemSnapshot, SourceObservation, SourcePolicy } from '../../contracts/PartOne.ts';
 import { normalizeBarcode } from './barcode.ts';
 import { parseDeclarationSection } from './parser.ts';
@@ -28,7 +28,7 @@ export function buildEvidenceAdmissions(observationInput: SourceObservation, ite
   const binding = PolicyBindingSchema.parse(context.databasePolicy);
   if (binding.databasePolicyId !== policy.provider || binding.sourcePolicyId !== policy.policyId || binding.policyVersion !== policy.version || observation.policyId !== policy.policyId || declaration.policyId !== policy.policyId || observation.provider !== policy.provider || observation.policyVersion !== policy.version) throw new Error('policy_mapping_mismatch');
   if (!policyAllows(policy, 'process', now) || !policyAllows(policy, 'retain', now) || !policyAllows(policy, 'sharedDisplay', now) || !policy.retainedFields.includes('identity') || !policy.retainedFields.includes('ingredients')) throw new Error('source_policy_disabled');
-  // The installed DB boundary intentionally rejects durable private captures.
+  // Public provider admission stays separate from the guarded owner-private capture transaction.
   if (declaration.scope !== 'public' || item.scope !== 'public' || declaration.ownerId !== null) throw new Error('private_retention_disabled');
   if (declaration.observedAt !== observation.fetchedAt || declaration.sourceUpdatedAt !== observation.sourceUpdatedAt) throw new Error('declaration_source_date_mismatch');
   if (observation.status !== 'active') throw new Error('observation_invalidated');
@@ -41,10 +41,13 @@ export function buildEvidenceAdmissions(observationInput: SourceObservation, ite
   }))];
   if (keys.length !== 1) throw new Error('ambiguous_item_barcode');
   if (observation.dependencyIds.some(id => [observation.observationId, declaration.declarationId, item.snapshotId].includes(id))) throw new Error('cyclic_observation_dependency');
-  const rawPayload = z.strictObject({ nativeCode: z.string(), canonicalCode: z.string().nullable(), name: z.string().nullable(), rawIngredients: z.string().nullable() }).parse(observation.payload);
+  const rawPayload = z.strictObject({ nativeCode: z.string(), canonicalCode: z.string().nullable(), name: z.string().nullable(), rawIngredients: z.string().nullable(), nativeBrand: z.string().nullable().optional(), structuredVariant: VariantSchema.nullable().optional() }).parse(observation.payload);
   const returnedCode = normalizeBarcode({ raw: rawPayload.nativeCode, symbology: rawPayload.nativeCode.length === 8 ? 'ean8' : null, namespace: 'gtin', retailerId: null });
   const ownAssociation = declaration.associationEvidenceIds.includes(observation.observationId) && observation.comparison === 'exact' && returnedCode.supported && rawPayload.canonicalCode === returnedCode.canonicalCode && keys[0] === `gtin:${returnedCode.canonicalGtin14}`;
-  const sourceConflict = observation.comparison === 'contradiction' || returnedCode.supported && keys[0] !== `gtin:${returnedCode.canonicalGtin14}` || compareVariant(observation.variant, item.variant).contradictions.length > 0 || compareVariant(observation.variant, declaration.variant).contradictions.length > 0;
+  const normalizedBrand = (brand: string) => brand.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+  const nativeBrandConflict = rawPayload.nativeBrand != null && observation.variant.brand !== null && normalizedBrand(rawPayload.nativeBrand) !== normalizedBrand(observation.variant.brand);
+  const structuredVariantConflict = rawPayload.structuredVariant != null && compareVariant(rawPayload.structuredVariant, observation.variant).contradictions.length > 0;
+  const sourceConflict = nativeBrandConflict || structuredVariantConflict || observation.comparison === 'contradiction' || returnedCode.supported && keys[0] !== `gtin:${returnedCode.canonicalGtin14}` || compareVariant(observation.variant, item.variant).contradictions.length > 0 || compareVariant(observation.variant, declaration.variant).contradictions.length > 0;
   const sourceTextMatches = rawPayload.rawIngredients !== null && rawPayload.rawIngredients === declaration.rawText;
   let searchStart = 0;
   const coveredRanges: Array<[number, number]> = [];
