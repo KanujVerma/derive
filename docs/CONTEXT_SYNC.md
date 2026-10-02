@@ -1,5 +1,11 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-02 — approved Part 1 local implementation
+
+- **Authority/base:** approved Library `libfile_3e6fce8be450819194a56baff0d8d66e` read completely on Mac. Isolated `kanuj/part-one-implementation` from `fea1a214dd174deccffbdb08fb2aa48c1e8fd0e0`; no Sami import. Separate PostHog work and primary dirty checkout preserved. Local build/tests/commits only.
+- **Scope:** catalog-first barcode identity, immutable one-source declaration admission, typed provider/rights states, private additive job/quota/checkpoint ledger, atomic owner/revision saves/deletion, existing result sheet and gated Apple Vision preview. No Parts2/3, profile transmission, hosted activation, paid/provider/cloud calls or private truth promotion.
+- **Evidence/gates:** [Part 1 acceptance](acceptance/PART_ONE_LOCAL_IMPLEMENTATION_2026_10_02.md) tracks all29 synthetic cases separately from physical/live acceptance. DB719/719 and authenticated local smoke19 checks pass. Native Debug/Release module builds and simulator HEIC OCR/sanitation pass. External grants and durable private commit/retention stay disabled. Physical camera, performance and accessibility remain unrun; portrait orientation and SDK pre-return cache window are recorded limitations. Exact-head CI remains a future merge gate.
+
 ## 2026-10-02 — separate UX-only publication
 
 - **Authorization/base:** the user approved a separate UX-only PR, CI and normal merge from fresh `origin/main@7efb9ce446c6b7b54b3803fa85522b47da2a05ee`. Isolated branch `kanuj/ux-only-camera-search` preserves the original combined preview and the PostHog checkout/services. Sami PR194 remains separate.

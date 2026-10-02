@@ -20,6 +20,8 @@ import type { ProductState } from '@/src/presentation/my-stuff/myStuffPresentati
 import { useAuthStore } from '@/src/stores/authStore';
 import { useFreeAccessStore } from '@/src/stores/freeAccessStore';
 import { isFreeIntegrationShell, resolveShellPresentation } from '@/src/utils/shellPresentation';
+import { PART_ONE_ENABLED } from '@/src/services/partOne';
+import { PartOneSavedProducts } from '@/src/components/my-stuff/PartOneSavedProducts';
 
 /** MyStuffContent composes the shared GroupedSection rows; this route owns live free context. */
 export default function MyStuffScreen() {
@@ -106,6 +108,7 @@ export default function MyStuffScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <RootShellHeader title="My Stuff" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}>
+        {PART_ONE_ENABLED && liveOwner && <PartOneSavedProducts key={liveOwner} ownerId={liveOwner} />}
         {liveOwner && (error || actionError) ? <View>
           <Text accessibilityRole="alert" style={styles.message}>{error || actionError}</Text>
           {status === 'error' ? <Button label="Try again" variant="ghost" onPress={() => void myStuffStore.getState().load()} /> : null}

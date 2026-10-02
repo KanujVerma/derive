@@ -30,6 +30,8 @@ interface Props {
   /** Inline occupies the camera's existing companion slot. Other results use their current native Modal. */
   inline?: boolean;
   onClose: () => void;
+  onExpandedChange?: (expanded: boolean) => void;
+  onScrollOffset?: (offset: number) => void;
   dismissLabel?: string;
   initialDetent?: 0 | 1;
   bottomInset?: number;
@@ -59,7 +61,7 @@ export function ResultSheetSurface({ visible = true, inline = false, presentatio
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey }: Omit<Props, 'visible' | 'inline'> & {
+  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset }: Omit<Props, 'visible' | 'inline'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
@@ -70,6 +72,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   const sheet = useRef<BottomSheet>(null);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
+  useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
   // The callback is captured for this mount, never replaced by a newer case's callback.
   const [guard] = useState(() => createSheetDismissGuard(presentationKey, onClose, readCurrentKey));
   const close = useCallback(() => {
@@ -115,11 +118,11 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     </Pressable>
   </View>, [close, dismissLabel, guard, index, contentSized]);
   return <GestureHandlerRootView style={styles.root} pointerEvents="box-none" accessibilityViewIsModal>
-    <BottomSheet ref={sheet} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
+    <BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
       onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
-      <BottomSheetScrollView onAccessibilityEscape={close}
+      <BottomSheetScrollView onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {/* Keep search height stable as loading/helper rows disappear; explicit empty input resets it. */}

@@ -4,6 +4,10 @@
 
 Ship scanner-first personalized skincare product intelligence where a customer in the approved first-release audience can point at or search for a skincare product, see what Derive actually knows, get a supported personal action and reason, know what to do next, and improve later checks by adding useful context. The prior U.S.-adult-18+ target is reopened; audience and runtime treatment are not yet selected. The intended quality bar is correctness, relevance, actionability, honest uncertainty and low customer effort. More context must not make a less-correct result appear better.
 
+## Part 1 local implementation checkpoint — 2026-10-02
+
+The approved Part 1 identity/evidence specification is implemented on an isolated local branch from accepted UX main. [The acceptance matrix](acceptance/PART_ONE_LOCAL_IMPLEMENTATION_2026_10_02.md) separates all29 deterministic fixtures from unrun physical/live gates. Catalog identity and private save/job contracts are local; the replaceable Apple Vision bridge compiled in native Debug/Release simulator builds. External source operations and durable private OCR commits remain disabled pending source grants and retention decisions. This checkpoint does not activate hosted scanners or Parts2/3 personalized reasoning/Jev.
+
 ## Product model
 
 **Free Check** is the acquisition wedge for product/formula facts and contextual personal decision support. There is no universal numerical compatibility/health score. Internally, “personalized Yuka for skincare” is an analogy only, not customer-facing positioning. The paid hypothesis is **$25/month Managed Skincare** for ongoing routine management, check-ins, adaptation, progress and product decisions, with founder support during early beta where needed. Price, retention and billing activation are not validated by the existing display price or local flows.

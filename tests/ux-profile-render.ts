@@ -35,6 +35,10 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     function requireModule(id: string): any {
       if (options.modules && id in options.modules) return options.modules[id];
       if (id === 'react') return react;
+      if (id.endsWith('/services/partOne')) return { PART_ONE_ENABLED: false, partOneTransport: {} };
+      if (id.endsWith('/PartOneLabelCapture')) return { PartOneLabelCapture: 'PartOneLabelCapture', PART_ONE_LOCAL_CAPTURE_AVAILABLE: false, purgeLocalCaptureFile() {} };
+      if (id.endsWith('/PartOneResultSheet')) return { PartOneResultSheet: 'PartOneResultSheet' };
+      if (id.endsWith('/PartOneSavedProducts')) return { PartOneSavedProducts: 'PartOneSavedProducts' };
       if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
       if (id.startsWith('@/src/components/ui/')) { const component = id.slice(id.lastIndexOf('/') + 1); return { [component]: component }; }

@@ -197,3 +197,10 @@ entrypoint = "./functions/personal-context/index.ts"
 
 [functions.personal-decision]
 verify_jwt = false
+
+# Part 1 validates the bearer with Auth and executes RPC as that user.
+[functions.part-one]
+enabled = true
+verify_jwt = false
+import_map = "./functions/part-one/deno.json"
+entrypoint = "./functions/part-one/index.ts"

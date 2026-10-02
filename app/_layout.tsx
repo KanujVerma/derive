@@ -23,8 +23,10 @@ import { canOpenPersonalizationRoute } from '@/src/presentation/personalization/
 import { resolveLocalAccessRoute } from '@/src/utils/localAccessRouting';
 import { refreshCustomerBootstrap, resolveCustomerBootstrap } from '@/src/services/deriveClient';
 import { resolveAuthRoute, getAuthRedirectRoute } from '@/src/utils/authRouting';
+import { initializePartOneDraftCache } from '@/src/components/check/part-one/PartOneLabelCapture';
 
 export default function RootLayout() {
+  useEffect(() => { initializePartOneDraftCache(); }, []);
   useEffect(() => bindCustomerOwnerLifecycle(customerController, currentCustomerOwner, listener => useAuthStore.subscribe(listener), listener => useFreeAccessStore.subscribe(listener), () => ownerPinnedLegacyGateway.clear()), []);
   const router = useRouter();
   const segments = useSegments();

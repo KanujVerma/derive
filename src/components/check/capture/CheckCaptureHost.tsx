@@ -18,12 +18,13 @@ interface Props {
   onSearch?: () => void;
   live?: boolean;
   detectionPaused?: boolean;
+  deliberateBarcodeSelection?: boolean;
   catalogSearch?: (query: string) => Promise<import('../../../contracts/ProductCatalog').CatalogProductSummary[]>;
   onCatalogSelect?: (product: import('../../../contracts/ProductCatalog').CatalogProductSummary) => void;
   companion?: React.ReactNode;
 }
 
-export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', initialEvidence = [], photoCaptureEnabled = CHECK_PHOTO_CAPTURE_ENABLED, resumeKey = 0, onSearch, live = false, detectionPaused = false, catalogSearch, onCatalogSelect, companion = null }: Props) {
+export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRole = 'barcode', initialEvidence = [], photoCaptureEnabled = CHECK_PHOTO_CAPTURE_ENABLED, resumeKey = 0, onSearch, live = false, detectionPaused = false, deliberateBarcodeSelection = false, catalogSearch, onCatalogSelect, companion = null }: Props) {
   const [appActive, setAppActive] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
   const activeRef = useRef(appActive);
   const delivered = useRef(false);
@@ -73,6 +74,7 @@ export function CheckCaptureHost({ onClose, onCaptureReady, processor, initialRo
             resumeKey={resumeKey}
             onSearch={onSearch}
             detectionPaused={detectionPaused || !appActive}
+            deliberateBarcodeSelection={deliberateBarcodeSelection}
             catalogSearch={catalogSearch}
             onCatalogSelect={product => { if (activeRef.current && !delivered.current && onCatalogSelect) { delivered.current = true; onCatalogSelect(product); } }}
             processor={bridge.processor}
