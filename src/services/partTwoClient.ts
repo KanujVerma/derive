@@ -1,5 +1,5 @@
 import { NormalizationRequestSchema, NormalizationResultSchema } from '../contracts/PartTwo.ts';
-import type { PartTwoTransport } from '../presentation/part-two/controller.ts';
+import { PartTwoSourceWithdrawalError, type PartTwoTransport } from '../presentation/part-two/controller.ts';
 import { z } from 'zod';
 import { SaveRequestSchema, PartOneIdSchema, type SaveRequest } from '../contracts/PartOne.ts';
 export type PartTwoInvoke = (path: string, body: string, signal?: AbortSignal) => Promise<{ data: unknown; error: unknown }>;
@@ -28,7 +28,8 @@ export function createPartTwoSavedTransport(saveId: string, ports: { enabled: ()
     const response = await ports.invoke('part-two/saved-details', JSON.stringify({ saveId: PartOneIdSchema.parse(saveId), requestId: request.requestId }), signal);
     if (response.error) throw new Error('Ingredient details unavailable');
     const value = z.strictObject({ result: NormalizationResultSchema.nullable(), withdrawn: z.boolean() }).parse(response.data);
-    if (value.withdrawn || !value.result) throw new Error('Ingredient evidence unavailable');
+    if (value.withdrawn) throw new PartTwoSourceWithdrawalError('Ingredient evidence unavailable');
+    if (!value.result) throw new Error('Ingredient evidence unavailable');
     return value.result;
   } };
 }

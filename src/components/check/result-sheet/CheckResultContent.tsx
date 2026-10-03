@@ -52,9 +52,9 @@ function VerdictBlock({ verdict }: { verdict: VerdictPresentation }) {
   </View>;
 }
 /** Same rendering for bound live content and explicitly labeled development semantic examples. */
-export function CheckResultView({ facts, verdict, section = 'all', showIdentity = true, onOpenSource, children }: {
+export function CheckResultView({ facts, verdict, section = 'all', showIdentity = true, identityImage, onOpenSource, children }: {
   facts: CustomerCheckFacts; verdict: VerdictPresentation; section?: 'summary' | 'findings' | 'all';
-  showIdentity?: boolean; onOpenSource?: (url: string) => void; children?: React.ReactNode;
+  showIdentity?: boolean; identityImage?: React.ReactNode; onOpenSource?: (url: string) => void; children?: React.ReactNode;
 }) {
   const category = facts.categoryLabel === 'Product formula evidence' ? '' : facts.categoryLabel;
   const source = facts.formula?.provenanceType;
@@ -65,7 +65,7 @@ export function CheckResultView({ facts, verdict, section = 'all', showIdentity 
     evidence: [{ label: sourceLabel, detail: facts.formula ? facts.formula.ingredients.join(', ') : 'A listing does not verify the ingredient list in your package.' }], limits: [] } : null;
   return <View style={styles.content}>
     {section !== 'findings' && <View style={styles.summary}>
-      {showIdentity && <View style={styles.identityRow}><View style={styles.placeholder}><Icon name="bottle" size={24} color={colors.brand} /></View>
+      {showIdentity && <View style={styles.identityRow}>{identityImage ?? <View style={styles.placeholder}><Icon name="bottle" size={24} color={colors.brand} /></View>}
         <View style={styles.identity}>{facts.brand ? <Text style={styles.brand}>{facts.brand}</Text> : null}
           <Text style={styles.productName} accessibilityRole="header">{facts.name}</Text>{category ? <Text style={styles.brand}>{category}</Text> : null}</View>
       </View>}

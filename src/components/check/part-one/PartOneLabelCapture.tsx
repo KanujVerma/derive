@@ -78,7 +78,7 @@ export function PartOneLabelCapture({ draft, binding, onClose, onChange, product
     else {
       const status = draft.read(currentBinding.current)?.shots.find(shot => shot.evidenceId === evidenceId)?.observation?.status;
       setMessage(status && status !== 'recognized' && status !== 'cancelled' ? LOCAL_OCR_MESSAGES[status] :
-        'Review the source photo, label coverage and overlapping views below. Corrections remain attributed and unsaved.');
+        'Check the readable text below. Correct a line or add another view if needed.');
     }
   };
   const pick = async (role: 'ingredients' | 'package' = 'ingredients') => {

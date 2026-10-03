@@ -37,7 +37,7 @@ test('A14 live coverage controls preserve missing tail/glare after identity conf
   const draft = await fixture(); let changes = 0;
   const ui = componentHarness('src/components/check/part-one/PartOneCaptureReview.tsx', 'PartOneCaptureReview',
     { draft, binding, onChange: () => changes++ }, { modules: reviewModules });
-  let nodes = ui.render(); press(control(nodes, 'This is Drug Facts with active and inactive ingredients'));
+  let nodes = ui.render(); assert(!textContent(nodes).includes('declaration start')); press(control(nodes, 'Label options')); nodes = ui.render(); press(control(nodes, 'This is Drug Facts with active and inactive ingredients'));
   nodes = ui.render(); press(control(nodes, 'Report right edge missing or unreadable'));
   nodes = ui.render(); press(control(nodes, 'Report glare missing or unreadable'));
   nodes = ui.render(); press(control(nodes, 'Select all readable lines from photo 1'));
@@ -58,7 +58,7 @@ test('A15 live section/language/package and assembly controls preserve exact uni
   const draft = await fixture();
   const ui = componentHarness('src/components/check/part-one/PartOneCaptureReview.tsx', 'PartOneCaptureReview',
     { draft, binding, onChange() {} }, { modules: reviewModules });
-  let nodes = ui.render(); press(control(nodes, 'This is a cosmetic ingredients label'));
+  let nodes = ui.render(); press(control(nodes, 'Label options')); nodes = ui.render(); press(control(nodes, 'This is a cosmetic ingredients label'));
   for (const photo of [1, 2]) {
     nodes = ui.render(); control(nodes, `Observed language for photo ${photo}`).props.onChangeText('en');
     nodes = ui.render(); press(control(nodes, `Apply observed language to photo ${photo}`));
@@ -74,7 +74,7 @@ test('A15 live section/language/package and assembly controls preserve exact uni
   assert.deepEqual(assembly.lines[2].sources.map(value => [value.evidenceId, value.observationIndex, value.lineIndex]), [[id(10), 0, 2], [id(11), 0, 1]]);
   assert.deepEqual(assembly.lines[2].sources[0].region, [0.1, 0.2, 0.8, 0.05]);
   const summary = componentHarness('src/components/check/part-one/PartOneLocalDraftSummary.tsx', 'PartOneLocalDraftSummary', { draft, binding }, { modules: reviewModules });
-  const rendered = textContent(summary.render()); assert.match(rendered, /overlapping views reviewed by you/); assert.match(rendered, /Photo 1/); assert.match(rendered, /recognition 1/);
+  assert(!textContent(summary.render()).includes('recognition 1')); press(control(summary.render(), 'Label reading source')); const rendered = textContent(summary.render()); assert.match(rendered, /overlapping views reviewed by you/); assert.match(rendered, /Photo 1/); assert.match(rendered, /recognition 1/);
   draft.endSheet();
 });
 
@@ -101,6 +101,7 @@ test('A16 live corrections keep supersedes history and invalidate a previously a
   h.assignLines(a, 'ingredients', 'en'); h.assignLines(b, 'ingredients', 'en'); assert.equal(h.assemble([...a, ...b], true).ok, true);
   const ui = componentHarness('src/components/check/part-one/PartOneCaptureReview.tsx', 'PartOneCaptureReview',
     { draft, binding, onChange() {} }, { modules: reviewModules });
+  press(control(ui.render(), 'Label options'));
   for (const text of ['Water (Aqua),', 'Aqua (Water, Eau),']) {
     let nodes = ui.render(); press(control(nodes, 'Correct photo 1 line 1'));
     nodes = ui.render(); control(nodes, 'Correction for photo 1 line 1').props.onChangeText(text);
@@ -253,9 +254,25 @@ test('A15 live language reassignment retracts assembly readiness while retaining
   assert.equal(h.assemble([...latestPhotoRefs(current, id(10)), ...latestPhotoRefs(current, id(11))], true).ok, true);
   const ui = componentHarness('src/components/check/part-one/PartOneCaptureReview.tsx', 'PartOneCaptureReview',
     { draft, binding, onChange() {} }, { modules: reviewModules });
-  let nodes = ui.render(); control(nodes, 'Observed language for photo 1').props.onChangeText('fr');
+  let nodes = ui.render(); press(control(nodes, 'Label options')); nodes = ui.render(); control(nodes, 'Observed language for photo 1').props.onChangeText('fr');
   press(control(ui.render(), 'Apply observed language to photo 1'));
   const model = buildLocalDraftSummary(draft.read(binding))!;
   assert.equal(model.assemblies[0].stale, true); assert.equal(model.assemblies[0].language, 'en');
   assert(model.reasons.includes('assembly_needs_review')); draft.endSheet();
+});
+test('compact capture retains package warnings and section meaning while hiding provenance again', async () => {
+  const draft = await fixture(), h = createCaptureReviewHandlers(draft, () => binding);
+  let current = draft.read(binding)!; h.setMode('drug_facts');
+  for (const photo of [10,11]) { h.confirmPackage(id(photo),true); h.assignLines(latestPhotoRefs(current,id(photo)), 'active', 'en'); }
+  assert.equal(h.assemble([...latestPhotoRefs(current,id(10)),...latestPhotoRefs(current,id(11))],true).ok,true);
+  const summary = componentHarness('src/components/check/part-one/PartOneLocalDraftSummary.tsx','PartOneLocalDraftSummary',{draft,binding},{modules:reviewModules});
+  assert.match(textContent(summary.render()),/Active ingredients/); assert(!textContent(summary.render()).includes('recognition 1'));
+  h.reportPackageConflict(id(10));
+  assert.match(textContent(summary.render()),/package.*mismatch|different.*package|package.*conflict/i);
+  const ui = componentHarness('src/components/check/part-one/PartOneCaptureReview.tsx','PartOneCaptureReview',{draft,binding,onChange(){}},{modules:reviewModules});
+  press(control(ui.render(),'Label options'));
+  press(control(ui.render(),'Show original recognition history for photo 1'));
+  assert.match(textContent(ui.render()),/sanitized_fixture/);
+  press(control(ui.render(),'Hide label options'));
+  assert(!textContent(ui.render()).includes('sanitized_fixture')); draft.endSheet();
 });

@@ -62,6 +62,14 @@ test('save conflict refreshes the current result and never claims success', asyn
   const f = fixture(); await f.controller.begin(id(20), request); f.transport.save = async () => { throw new Error('409'); }; f.update(result(2));
   assert.equal(await f.controller.save(id(20), 'save-one'), false); assert.equal(f.controller.getView().result?.resultRevision, 2); assert.equal(f.controller.getView().saved, false);
 });
+test('retry clears a transport failure after a successful unchanged-revision read without discarding saved state', async () => {
+  const f = fixture(); await f.controller.begin(id(20), request); await f.controller.save(id(20), 'saved');
+  f.transport.read = async () => { throw Error('offline'); };
+  await f.controller.refresh(id(20)); assert.ok(f.controller.getView().error);
+  f.transport.read = async () => result();
+  assert.equal(await f.controller.retry(id(20)), true);
+  assert.equal(f.controller.getView().error, null); assert.equal(f.controller.getView().saved, true);
+});
 test('A23/A28 a newly published revision can be saved after an older incomplete save', async () => {
   const f = fixture(); await f.controller.begin(id(20), request);
   assert.equal(await f.controller.save(id(20), 'incomplete'), true);

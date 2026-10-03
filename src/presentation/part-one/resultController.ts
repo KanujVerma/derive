@@ -12,15 +12,27 @@ export interface PartOneTransport {
 }
 export type PartOneView = { owner: string | null; result: ScanResult | null; loading: boolean; error: string | null; saved: boolean; scrollOffset: number };
 
+/** Observe active worker results promptly without advancing a server retry deadline. */
+export function partOneResultPollDelay(result: Pick<ScanResult, 'work' | 'nextCheckAfter'>, now = Date.now()): number {
+  const active = result.work === 'queued' || result.work === 'running';
+  if (result.nextCheckAfter) return Math.max(active ? 1000 : 2000, Date.parse(result.nextCheckAfter) - now);
+  return active ? 1000 : result.work === 'retry_wait' ? 4000 : 10000;
+}
+
 /** Owns view interest, never provider work. Reopen reads/rejoins the same durable scan. */
 export function createPartOneResultController(transport: PartOneTransport, changed: (view: PartOneView) => void) {
   let epoch = 0;
+  let lastScan: { owner: string; request: ScanRequest } | null = null;
   let view: PartOneView = { owner: null, result: null, loading: false, error: null, saved: false, scrollOffset: 0 };
   const emit = () => changed({ ...view });
   const release = () => { const id = view.result?.subscriptionId; if (id) void transport.unsubscribe(id).catch(() => {}); };
   const publish = (result: ScanResult, token: number, owner: string) => {
     result = ScanResultSchema.parse(result);
     if (token !== epoch || view.owner !== owner) return false;
+    if (view.result && result.scanId === view.result.scanId && result.generation === view.result.generation
+      && result.resultRevision === view.result.resultRevision && view.error?.startsWith('Product lookup is unavailable.')) {
+      view = { ...view, loading: false, error: null }; emit(); return true;
+    }
     if (view.result && (result.scanId !== view.result.scanId || result.generation < view.result.generation
       || result.generation === view.result.generation && result.resultRevision <= view.result.resultRevision)) return false;
     view = { ...view, result, loading: false, error: null, saved: false }; emit(); return true;
@@ -33,7 +45,8 @@ export function createPartOneResultController(transport: PartOneTransport, chang
   };
   return {
     getView: () => ({ ...view }),
-    begin(owner: string, request: ScanRequest) { return run(owner, () => transport.scan(request), true); },
+    begin(owner: string, request: ScanRequest) { lastScan = { owner, request }; return run(owner, () => transport.scan(request), true); },
+    retry(owner: string) { return view.result ? this.refresh(owner) : lastScan?.owner === owner ? this.begin(owner, lastScan.request) : Promise.resolve(false); },
     reopen(owner: string, scanId: string) {
       const same = view.owner === owner && view.result?.scanId === scanId;
       return run(owner, async () => { await transport.read(scanId); return transport.subscribe(scanId); }, !same);
@@ -55,7 +68,7 @@ export function createPartOneResultController(transport: PartOneTransport, chang
     capture(owner: string) { const r = view.result; if (!r || owner !== view.owner) throw new Error('Capture binding unavailable'); return transport.capture(r.scanId, r.generation, r.resultRevision); },
     setScroll(offset: number) { view = { ...view, scrollOffset: Math.max(0, offset) }; },
     publish(result: ScanResult, owner: string) { return publish(result, epoch, owner); },
-    close() { release(); epoch++; view = { owner: null, result: null, loading: false, error: null, saved: false, scrollOffset: 0 }; emit(); },
+    close() { lastScan = null; release(); epoch++; view = { owner: null, result: null, loading: false, error: null, saved: false, scrollOffset: 0 }; emit(); },
     setOwner(owner: string | null) { if (view.owner !== owner) this.close(); },
   };
 }

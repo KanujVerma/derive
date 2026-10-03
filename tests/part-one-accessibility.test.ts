@@ -18,8 +18,8 @@ test('A29 incomplete results expose named save, capture, retry and rescan action
     '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.children) },
   } });
   const nodes = h.render();
-  for (const label of ['Save product without verified ingredients', 'Scan ingredients', 'Check lookup status', 'Rescan']) press(control(nodes, label));
-  assert.deepEqual(calls, ['save', 'capture', 'retry', 'rescan']);
+  for (const label of ['Save product', 'Scan ingredients', 'Retry']) press(control(nodes, label));
+  assert.deepEqual(calls, ['save', 'capture', 'retry']);
   assert.match(textContent(nodes), /unverified|incomplete/i);
   assert.match(textContent(nodes), /right edge/);
   assert(nodes.some(node => node.props.accessibilityLiveRegion === 'polite'));

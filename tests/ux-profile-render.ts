@@ -43,6 +43,7 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       if (id === 'react') return { ...react, ...options.modules?.react };
       if (options.modules && id in options.modules) return options.modules[id];
       if (id === 'expo-haptics') return { impactAsync: async () => {}, notificationAsync: async () => {}, selectionAsync: async () => {}, ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' }, NotificationFeedbackType: { Success: 'Success', Error: 'Error' } };
+      if (id.endsWith('/ui/Icon')) return { Icon: 'Icon' };
       if (id.endsWith('/services/partOne')) return { PART_ONE_ENABLED: false, partOneTransport: {} };
       if (id.endsWith('/services/partTwo')) return { PART_TWO_ENABLED: false, partTwoTransport: {} };
       if (id.endsWith('/PartOneLabelCapture')) return { PartOneLabelCapture: 'PartOneLabelCapture', PART_ONE_LOCAL_CAPTURE_AVAILABLE: false, purgeLocalCaptureFile() {} };

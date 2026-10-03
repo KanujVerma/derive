@@ -1,12 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, Text, View } from 'react-native';
+import { CheckResultView } from '../result-sheet/CheckResultContent';
 import { ResultSheetSurface } from '../result-sheet/ResultSheetSurface';
 import { Button } from '../../ui/Button';
 import { colors, spacing, typography } from '../../../constants/theme';
 import type { PartOneView } from '../../../presentation/part-one/resultController';
-import { PartTwoIngredients, PartTwoSavedIngredients } from '../part-two/PartTwoIngredients';
+import { PartTwoIngredientContent, usePartTwoIngredients } from '../part-two/PartTwoIngredients';
+import { PART_TWO_ENABLED, partTwoTransport, partTwoSavedTransport } from '../../../services/partTwo';
 import type { PartTwoSaveGuard } from '../../../services/partTwoClient';
 import type { PartTwoView, PartTwoTransport } from '../../../presentation/part-two/controller';
+import { markCheckVerificationTiming } from '../../../services/checkVerificationTiming';
 
 export function partOneStatus(view: PartOneView, now = Date.now()): string {
   const r = view.result;
@@ -16,12 +19,14 @@ export function partOneStatus(view: PartOneView, now = Date.now()): string {
   if (r.declarationState === 'accepted') return r.scope === 'private_package' ? 'Ingredients from this package' : 'Published ingredient declaration. Your package is unconfirmed.';
   if (r.declarationState === 'partial') return 'Partial ingredients. Missing sections remain unverified.';
   if (r.declarationState === 'uncertain') return 'Ingredient text needs review.';
-  if (r.identity === 'unresolved') return 'Product identity is unresolved.';
+  if (r.identity === 'unresolved') return r.reasonCodes.includes('provider:not_found') ? 'No verified match for this barcode.' : r.reasonCodes.includes('source_blocked') ? 'Product lookup source is unavailable.' : 'Product identity is unresolved.';
   return 'Ingredients not verified yet';
 }
 
 /** Uses the existing sheet. Revision updates keep its mounted scroll and detent. */
-export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave, onCapture, onSearch, onFullChange, onScroll, localDraft, inline = true, savedInterpretationId, interpretationCaptureSessionId = null, ingredientEnabled, ingredientTransport }: {
+export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave, onCapture, onSearch, onFullChange, onScroll, localDraft, inline = true, savedInterpretationId, interpretationCaptureSessionId = null, ingredientEnabled, ingredientTransport, searchContent, searchEmpty, captureContent }: {
+  searchContent?: React.ReactNode; searchEmpty?: boolean;
+  captureContent?: React.ReactNode;
   view: PartOneView; onClose: () => void; onRefresh: () => void;
   onSelect: (id: string) => void; onSave: (details?: PartTwoSaveGuard) => void; onCapture?: () => void;
   onSearch: () => void; onFullChange: (full: boolean) => void;
@@ -34,8 +39,13 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   ingredientTransport?: PartTwoTransport;
 }) {
   const r = view.result;
+  const fallbackTransport = React.useMemo(() => savedInterpretationId ? partTwoSavedTransport(savedInterpretationId) : partTwoTransport, [savedInterpretationId]);
+  const ingredientState = usePartTwoIngredients({ target: { ownerId: view.owner ?? '', scanId: r?.scanId ?? '00000000-0000-4000-8000-000000000000', captureSessionId: interpretationCaptureSessionId, generation: r?.generation ?? 0, evidenceRevision: r?.resultRevision ?? 0 }, enabled: (ingredientEnabled ?? PART_TWO_ENABLED) && Boolean(view.owner && r && (savedInterpretationId || !interpretationCaptureSessionId)), transport: ingredientTransport ?? fallbackTransport });
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [failedImage, setFailedImage] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now);
-  const [details, setDetails] = useState<PartTwoView | null>(null);
+  const [privateDetails, setDetails] = useState<PartTwoView | null>(null);
+  const details = interpretationCaptureSessionId && !savedInterpretationId ? privateDetails : ingredientState.current;
   const sourceKey = JSON.stringify([view.owner, r?.scanId, interpretationCaptureSessionId, r?.generation, r?.resultRevision]);
   const sourceAccess = useRef({ key: sourceKey, denied: false, privateDenied: false });
   if (sourceAccess.current.key !== sourceKey) sourceAccess.current = { key: sourceKey, denied: false, privateDenied: false };
@@ -59,6 +69,8 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   useEffect(() => { setNow(Date.now()); }, [r]);
   const current = (expiry: string) => Number.isFinite(Date.parse(expiry)) && Date.parse(expiry) > clock;
   const identity = r?.display.selectedIdentity && current(r.display.selectedIdentity.expiresAt) ? r.display.selectedIdentity : null;
+  useEffect(() => { if (identity && r) markCheckVerificationTiming('barcode', 'identity', r.requestId); }, [identity, r?.requestId]);
+  useEffect(() => { if (ingredientState.current.result?.state === 'ready' && r) markCheckVerificationTiming('barcode', 'ingredients', r.requestId); }, [ingredientState.current.result, r?.requestId]);
   const candidates = r?.display.candidates.filter(candidate => current(candidate.expiresAt)) ?? [];
   const expiredIdentity = Boolean(r && ((r.display.selectedIdentity && !identity) || candidates.length !== r.display.candidates.length));
   const sections = r?.display.sections.filter(section => current(section.expiresAt)) ?? [];
@@ -69,6 +81,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   const detailTarget = details?.target;
   const currentDetails = detailTarget && r && detailTarget.ownerId === view.owner && detailTarget.scanId === r.scanId && detailTarget.captureSessionId === interpretationCaptureSessionId && detailTarget.generation === r.generation && detailTarget.evidenceRevision === r.resultRevision ? details : null;
   if (currentDetails?.error || currentDetails?.result && currentDetails.result.state !== 'pending') sourceAccess.current.denied = true;
+  if (currentDetails?.sourceWithdrawn) sourceAccess.current.privateDenied = true;
   if (currentDetails?.result && currentDetails.result.state !== 'ready' && currentDetails.result.state !== 'pending' && currentDetails.result.reasonCodes.some(code => code === 'source_evidence_unavailable' || code === 'source_withdrawn')) sourceAccess.current.privateDenied = true;
   // Ready details own fresh source attribution in their disclosure. A later
   // pending retry cannot restore a cached Part 1 source after a refusal.
@@ -80,12 +93,13 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   const originalSections = !expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
     <Text accessibilityRole="header">{({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[section.kind]}</Text><Text selectable>{section.text}</Text>
   </View>);
-  return <ResultSheetSurface inline={inline} presentationKey={`part-one:${r?.scanId ?? 'pending'}`}
-    onClose={onClose} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
+  return <ResultSheetSurface inline={inline} overlay={captureContent} presentationKey={`part-one:${r?.scanId ?? 'pending'}`}
+    replacement={searchContent} contentSized={Boolean(searchContent)} contentSizeResetKey={searchEmpty ? 'empty' : 'query'} onClose={onClose} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
       {view.loading && <ActivityIndicator color={colors.brand} />}
-      {identity?.image && current(identity.image.expiresAt) && <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 64, height: 80 }} resizeMode="contain" />}
-      {identity && <><Text>{identity.brand}</Text><Text accessibilityRole="header" style={{ fontSize: typography.sizes.sectionTitle, color: colors.ink }}>{identity.name}</Text><Text>{identity.variantText}</Text></>}
-      <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>{status}</Text>
+      <CheckResultView section="summary" facts={{ brand: identity?.brand ?? '', name: identity?.name ?? 'Product not confirmed', categoryLabel: identity?.variantText ?? '', formula: null, source: null }}
+        identityImage={identity?.image && current(identity.image.expiresAt) && failedImage !== identity.image.url ? <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 48, height: 54 }} resizeMode="contain" onLoad={() => markCheckVerificationTiming('barcode', 'image', r?.requestId)} onError={() => setFailedImage(identity.image!.url)} /> : undefined}
+        verdict={{ state: 'unknown', label: 'Not enough information', reason: status, findings: [] }} />
+      {identity && (!identity.image || failedImage === identity.image.url) && <Text style={{ color: colors.inkMuted, fontSize: typography.sizes.caption }}>No product image available</Text>}
       {r?.work === 'deferred_budget' && <Text>Lookup is deferred. Existing product facts remain available.</Text>}
       {r?.work === 'retry_wait' && <Text>The source is temporarily unavailable. Lookup will retry when eligible.</Text>}
       {r && ['queued', 'running'].includes(r.work) && <Text>Lookup is pending. You can close and reopen this result.</Text>}
@@ -96,23 +110,23 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
         <Button label="Yes, this product" accessibilityHint={`Select ${candidate.name}. This confirms identity only.`} variant="outline" onPress={() => onSelect(candidate.id)} />
       </View>)}
       {!expiredIdentity && !expired && !(expiredFields && r?.declarationState === 'accepted') && r?.snapshotId && r.allowedActions.some(action => action === 'save' || action === 'save_partial') && <Button
-        label={view.saved ? 'Saved' : r.declarationState === 'accepted' ? 'Save product and evidence' : 'Save product without verified ingredients'}
-        disabled={view.saved} variant="outline" onPress={() => {
+        label={view.saved ? 'Saved' : 'Save product'}
+        disabled={view.saved} size="medium" variant="outline" onPress={() => {
           const d = details?.result, t = details?.target;
           const guard = d?.state === 'ready' && t && t.ownerId === view.owner && t.scanId === r.scanId && t.captureSessionId === interpretationCaptureSessionId && t.generation === r.generation && t.evidenceRevision === r.resultRevision && Date.parse(d.expiresAt) > Date.now() ? { bindingKey: d.bindingKey, expectedPartTwoRevision: d.resultRevision } : undefined;
           onSave(guard);
         }} />}
       {r?.snapshotId && !r.declarationId && <Text>Saves the product only; this photo reading is not saved.</Text>}
-      {onCapture && r && (expired || expiredFields || r.declarationState !== 'accepted') && <Button label="Scan ingredients" variant="outline" onPress={onCapture} />}
-      {r?.allowedActions.includes('retry') && <Button label="Check lookup status" variant="ghost" onPress={onRefresh} />}
-      {r?.allowedActions.includes('rescan') && <Button label="Rescan" variant="ghost" onPress={onClose} />}
-      {r && r.identity !== 'exact' && <Button label="Search by name" variant="ghost" onPress={onSearch} />}
+      <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+        {onCapture && r && (expired || expiredFields || r.declarationState !== 'accepted') && <Button label="Scan ingredients" size="medium" style={{ flex: 1 }} variant="ghost" onPress={onCapture} />}
+        {(view.error || r?.allowedActions.includes('retry')) && <Button label="Retry" size="medium" style={{ flex: 1 }} variant="ghost" onPress={onRefresh} />}
+        <Button label="Search by name" size="medium" style={{ flex: 1 }} variant="ghost" onPress={onSearch} />
+      </View>
     </View>}>
     {typeof localDraft === 'function' ? localDraft(sourceAccess.current.privateDenied, setDetails) : !sourceAccess.current.privateDenied && localDraft}
-    {view.owner && r && !expired && (savedInterpretationId || !interpretationCaptureSessionId) ?
-      savedInterpretationId ? <PartTwoSavedIngredients saveId={savedInterpretationId} onView={setDetails} enabled={ingredientEnabled} transport={ingredientTransport} fallback={originalSections} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: interpretationCaptureSessionId, generation: r.generation, evidenceRevision: r.resultRevision }} /> :
-        <PartTwoIngredients onView={setDetails} enabled={ingredientEnabled} transport={ingredientTransport} fallback={originalSections} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: null, generation: r.generation, evidenceRevision: r.resultRevision }} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
-    {!expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
+    {!expired && (savedInterpretationId || !interpretationCaptureSessionId) ? <PartTwoIngredientContent state={ingredientState} fallback={originalSections} /> : !localDraft && originalSections}
+    <Pressable accessibilityRole="button" accessibilityLabel="Source" accessibilityState={{ expanded: sourceOpen }} onPress={() => setSourceOpen(value => !value)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.brand }}>Source</Text></Pressable>
+    {sourceOpen && !expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
       <Text>{source.label} · Observed {source.observedAt.slice(0, 10)}</Text>
       {source.url && <Button label={`View source: ${source.label}`} variant="ghost" onPress={() => {
         const url = source.url; if (url && new URL(url).protocol === 'https:') void Linking.openURL(url).catch(() => {});

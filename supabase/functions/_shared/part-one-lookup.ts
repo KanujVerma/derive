@@ -6,7 +6,7 @@ import { buildEvidenceAdmissions, EvidenceAdmissionSchema } from '../../../src/d
 import type { EvidenceAdmission } from '../../../src/domain/part-one/admission.ts';
 import { compareVariant, policyAllows } from '../../../src/domain/part-one/evidence.ts';
 import { DECLARATION_ALIAS_VERSION, DECLARATION_PARSER_VERSION, parseDeclarationSection } from '../../../src/domain/part-one/parser.ts';
-import { emptyProviderReply, lookupPrimaryProvider, needsUpcIdentityFallback, providerOperationPermitted } from './part-one-providers.ts';
+import { emptyProviderReply, permittedOpenFactsImage, lookupPrimaryProvider, needsUpcIdentityFallback, providerOperationPermitted } from './part-one-providers.ts';
 import type { PrimaryProvider, ProviderConfiguration, ProviderLookupRequest, ProviderTransport } from './part-one-providers.ts';
 
 export type PartOneResultPatch = Pick<ScanResult, 'identity' | 'itemId' | 'candidateIds' | 'snapshotId' | 'declarationId' | 'declarationState' | 'scope' | 'packageConfirmation' | 'display' | 'reasonCodes' | 'conflictIds' | 'evidenceIds' | 'allowedActions' | 'freshness'>;
@@ -32,7 +32,7 @@ export interface PartOneLookupPorts {
 }
 const PlanSchema = z.strictObject({ observationId: z.string().uuid(), itemId: z.string().uuid(), snapshotId: z.string().uuid(), declarationId: z.string().uuid(), sectionId: z.string().uuid(), entryIds: z.array(z.string().uuid()), snapshotRevision: z.number().int().positive(), supersedesSnapshotId: z.string().uuid().nullable(), extraction: z.strictObject({ category: z.enum(['cosmetic', 'drug', 'unknown']), complete: z.boolean(), uncertaintyReasons: z.array(z.string()) }) });
 type CompositionPlan = z.infer<typeof PlanSchema>;
-const PayloadSchema = z.strictObject({ nativeCode: z.string(), canonicalCode: z.string().nullable(), name: z.string().nullable(), rawIngredients: z.string().nullable(), nativeBrand: z.string().nullable().optional(), structuredVariant: VariantSchema.nullable().optional() });
+const PayloadSchema = z.strictObject({ nativeCode: z.string(), canonicalCode: z.string().nullable(), name: z.string().nullable(), rawIngredients: z.string().nullable(), nativeBrand: z.string().nullable().optional(), structuredVariant: VariantSchema.nullable().optional(), imageUrl: z.string().nullable().optional(), sourceQuantity: z.string().nullable().optional() });
 const emptyPatch = (reasonCodes: string[] = []): PartOneResultPatch => ({ identity: 'unresolved', itemId: null, candidateIds: [], snapshotId: null, declarationId: null, declarationState: 'none', scope: null, packageConfirmation: 'unconfirmed', display: { resultRevision: 0, selectedIdentity: null, candidates: [], sections: [], sources: [], limitations: [] }, reasonCodes, conflictIds: [], evidenceIds: [], allowedActions: ['scan_ingredients', 'retry', 'rescan'], freshness: { observedAt: null, expiresAt: null, state: 'unknown' } });
 const transient = (reply: LookupReply) => reply.status === 'unavailable' || reply.status === 'rate_limited';
 // Conservative 24-hour bound applies to identity, partial and accepted material.
@@ -146,7 +146,7 @@ export async function runPartOneLookup(job: PartOneLookupJob, ports: PartOneLook
   if (observations.length !== 1 || reply.status === 'ambiguous') {
     const contradictions = reply.observations.filter(o => o.comparison === 'contradiction');
     if (catalogItem && contradictions.length) base = { ...base, declarationId: null, declarationState: 'conflict', conflictIds: contradictions.map(o => o.observationId), display: { ...base.display, sections: [] }, allowedActions: ['scan_ingredients', 'save_partial', 'rescan'] };
-    const reasons = [...base.reasonCodes, reply.status === 'disallowed_by_source_policy' ? 'source_blocked' : `provider:${reply.status}`];
+    const reasons = [...base.reasonCodes, reply.status === 'disallowed_by_source_policy' ? open.status === 'not_found' ? 'provider:not_found' : 'source_blocked' : `provider:${reply.status}`];
     if (reply.observations.some(o => o.comparison === 'contradiction')) reasons.push('identity_conflict');
     if (budget.current) return send({ ...base, reasonCodes: reasons }, budget.current.work ?? 'deferred_budget', budget.current.nextEligibleAt ?? null);
     const retry = transient(reply) ? reply : transient(open) ? open : null;
@@ -175,7 +175,9 @@ export async function runPartOneLookup(job: PartOneLookupJob, ports: PartOneLook
   if (plan.observationId !== observation.observationId || plan.itemId !== (catalogItem?.itemId ?? plan.itemId)) throw new Error('composition_binding_mismatch');
   const expiry = expires(observation.fetchedAt, policy);
   const item: ItemSnapshot = ItemSnapshotSchema.parse({ snapshotId: plan.snapshotId, itemId: plan.itemId, revision: plan.snapshotRevision, name: catalogItem?.name ?? payload.name!, variant: catalogItem?.variant ?? observation.variant, fieldEvidence: { ...catalogItem?.fieldEvidence, name: catalogItem?.fieldEvidence.name ?? [observation.observationId], variant: catalogItem?.fieldEvidence.variant ?? [observation.observationId] }, barcodeAssertions: [{ raw: payload.nativeCode, symbology: payload.nativeCode.length === 8 ? 'ean8' : null, namespace: 'gtin', canonical: payload.canonicalCode, evidenceId: observation.observationId }], requestedMarket: job.input.requestedMarket, sourceMarkets: observation.sourceMarkets, packageMarket: null, declarationIds: [], conflictIds: [], scope: 'public', supersedesId: plan.supersedesSnapshotId });
-  const identityDisplay = { id: item.itemId, name: item.name, brand: item.variant.brand, variantText: [item.variant.form, item.variant.scent, item.variant.size && item.variant.unit ? `${item.variant.size} ${item.variant.unit}` : null, item.variant.packCount ? `${item.variant.packCount} pack` : null].filter(Boolean).join(' · '), expiresAt: expiry, image: null };
+  const imageUrl = reply.provider === 'open_facts' ? permittedOpenFactsImage(payload.imageUrl ?? null, payload.nativeCode, policy, ports.now()) : null;
+  const image = imageUrl ? { url: imageUrl, policyId: policy.policyId, evidenceId: observation.observationId, observedAt: observation.fetchedAt, expiresAt: expiry, sourceRevision: 1 } : null;
+  const identityDisplay = { id: item.itemId, name: item.name, brand: item.variant.brand, variantText: [item.variant.form, item.variant.scent, item.variant.size && item.variant.unit ? `${item.variant.size} ${item.variant.unit}` : null, item.variant.packCount ? `${item.variant.packCount} pack` : null, payload.sourceQuantity].filter(Boolean).join(' · '), expiresAt: expiry, image };
   const sources = [{ observationId: observation.observationId, policyId: policy.policyId, label: policy.attribution ?? policy.provider, url: observation.sourceUrl, observedAt: observation.fetchedAt, sourceUpdatedAt: observation.sourceUpdatedAt, expiresAt: expiry }];
   let patch: PartOneResultPatch = { ...emptyPatch(), identity: 'exact', itemId: item.itemId, snapshotId: item.snapshotId, scope: 'public', display: { resultRevision: 0, selectedIdentity: identityDisplay, candidates: [], sections: [], sources, limitations: ['Catalog identity does not prove a timeless formula'] }, evidenceIds: [observation.observationId], allowedActions: ['scan_ingredients', 'add_photo', 'save_partial', 'rescan', 'view_source'], freshness: { observedAt: observation.fetchedAt, expiresAt: expiry, state: 'fresh' } };
   let admissions: readonly EvidenceAdmission[];
@@ -194,6 +196,8 @@ export async function runPartOneLookup(job: PartOneLookupJob, ports: PartOneLook
     admissions = [EvidenceAdmissionSchema.parse({ ...common, id: observation.observationId, kind: 'observation', revision: 1, dependencies: observation.dependencyIds, supersedesId: null, payload: { ...observation } }), EvidenceAdmissionSchema.parse({ ...common, id: item.snapshotId, kind: 'snapshot', revision: item.revision, dependencies: [observation.observationId, ...Object.values(item.fieldEvidence).flat()], supersedesId: item.supersedesId, payload: { ...item, brand: item.variant.brand, variantText: identityDisplay.variantText, image: null } })];
     patch.reasonCodes = ['ingredients_missing'];
   }
+  // The immutable snapshot retains exactly the permitted photo binding, independently of formula readiness.
+  admissions = admissions.map(admission => admission.kind === 'snapshot' ? EvidenceAdmissionSchema.parse({ ...admission, payload: { ...admission.payload, variantText: identityDisplay.variantText, image } }) : admission);
   // RPC enforces policy version/dependencies again at ingestion and publication.
   // Persistence errors are never acknowledged as completed provider work.
   for (const admission of admissions) {

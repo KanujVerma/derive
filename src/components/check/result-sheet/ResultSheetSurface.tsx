@@ -44,10 +44,12 @@ interface Props {
   /** Search has one measured detent; keyboard lift must not select a full-result detent. */
   contentSized?: boolean;
   contentSizeResetKey?: string;
+  /** Capture presents from the current native result modal, independently of sheet detents. */
+  overlay?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function ResultSheetSurface({ visible = true, inline = false, presentationKey, ...props }: Props) {
+export function ResultSheetSurface({ visible = true, inline = false, presentationKey, overlay, ...props }: Props) {
   const currentKey = useRef<string | null>(null);
   currentKey.current = visible ? presentationKey : null;
   const readCurrentKey = useCallback(() => currentKey.current, []);
@@ -55,13 +57,13 @@ export function ResultSheetSurface({ visible = true, inline = false, presentatio
   if (!visible) return null;
   const body = <SheetBody key={presentationKey} {...props} presentationKey={presentationKey}
     readCurrentKey={readCurrentKey} requestClose={requestClose} />;
-  return inline ? body : <Modal visible transparent animationType="none" onRequestClose={() => requestClose.current?.()}>
-    <SafeAreaProvider>{body}</SafeAreaProvider>
+  return inline ? <>{body}{overlay}</> : <Modal visible transparent animationType="none" onRequestClose={() => requestClose.current?.()}>
+    <SafeAreaProvider>{body}{overlay}</SafeAreaProvider>
   </Modal>;
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset }: Omit<Props, 'visible' | 'inline'> & {
+  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset }: Omit<Props, 'visible' | 'inline' | 'overlay'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();

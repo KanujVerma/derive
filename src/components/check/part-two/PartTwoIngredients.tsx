@@ -104,7 +104,7 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
 }
 
 /** Shared by actual Check and private saved evidence. No new screen or device cache. */
-export function PartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transport = partTwoTransport, onView, fallback }: { target: PartTwoTarget; enabled?: boolean; transport?: PartTwoTransport; onView?: (view: PartTwoView) => void; fallback?: React.ReactNode }) {
+export function usePartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transport = partTwoTransport, onView }: { target: PartTwoTarget; enabled?: boolean; transport?: PartTwoTransport; onView?: (view: PartTwoView) => void; fallback?: React.ReactNode }) {
   const [view, setView] = useState<PartTwoView>({ target: null, result: null, loading: false, error: null });
   const controller = useMemo(() => createPartTwoController(transport, createCatalogRequestId, setView), [transport]);
   const [clockTick, clock] = useState(0);
@@ -127,7 +127,7 @@ export function PartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transpo
     const timer = setTimeout(() => { controller.expire(); clock(value => value + 1); }, Math.max(1, Math.min(60000, Date.parse(expiry) - Date.now())));
     return () => clearTimeout(timer);
   }, [expiry, view.result, controller, clockTick]);
-  if (!enabled) return <>{fallback}</>;
+
   // Prop binding fences the render before effects handle owner/selection changes.
   const current = view.target && JSON.stringify(view.target) === key ? view : { target, result: null, loading: true, error: null };
   // Never restore an older original-text copy after a current-authority refusal.
@@ -137,7 +137,16 @@ export function PartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transpo
   if (current.error || result && !['ready', 'pending', 'parse_limit'].includes(result.state)) originalAccess.current.denied = true;
   const permitted = result && result.state !== 'ready' && result.permittedText && Date.parse(result.permittedText.expiresAt) > Date.now() ? result.permittedText : null;
   const originalAllowed = !originalAccess.current.denied && (result?.state === 'pending' || !result && current.loading && !current.error);
+  return { current, permitted, originalAllowed, enabled };
+}
+export function PartTwoIngredientContent({ state, fallback }: { state: ReturnType<typeof usePartTwoIngredients>; fallback?: React.ReactNode }) {
+  if (!state.enabled) return <>{fallback}</>;
+  const {current,permitted,originalAllowed}=state;
   return <>{permitted ? permitted.sections.map(section => <View key={section.sectionId}><Text accessibilityRole="header">{sectionLabel(section.kind)}</Text><Text selectable>{ingredientDisplayText(section.text)}</Text></View>) : originalAllowed && fallback}<PartTwoInlineView view={current} /></>;
+}
+export function PartTwoIngredients(props: { target: PartTwoTarget; enabled?: boolean; transport?: PartTwoTransport; onView?: (view: PartTwoView) => void; fallback?: React.ReactNode }) {
+  const state=usePartTwoIngredients(props);
+  return <PartTwoIngredientContent state={state} fallback={props.fallback} />;
 }
 export function PartTwoSavedIngredients({ saveId, target, fallback, onView, enabled, transport: provided }: { saveId: string; target: PartTwoTarget; fallback?: React.ReactNode; onView?: (view: PartTwoView) => void; enabled?: boolean; transport?: PartTwoTransport }) {
   const transport = useMemo(() => provided ?? partTwoSavedTransport(saveId), [saveId, provided]);

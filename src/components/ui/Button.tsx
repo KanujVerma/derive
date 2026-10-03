@@ -41,10 +41,10 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   accessibilityHint,
 }) => {
-  const handlePress = async () => {
+  const handlePress = () => {
     if (disabled || loading) return;
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     } catch {
       // Ignore if haptics unavailable
     }

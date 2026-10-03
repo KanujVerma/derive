@@ -38,8 +38,9 @@ import { evaluateProduct } from '@/src/services/deriveClient';
 import { ProductScanResult, ProductScanVerdict, type ProductCategory } from '@/src/types/schema';
 import { resolveScanResultPresentation, resolveScanVerdictLabel } from '@/src/commerce/scanPresentation';
 import { normalizeBarcode } from '@/src/utils/barcode';
-import { PART_ONE_ENABLED, partOneTransport } from '@/src/services/partOne';
-import { createPartOneResultController, type PartOneView } from '@/src/presentation/part-one/resultController';
+import { PART_ONE_ENABLED, partOneTransport, searchPartOneProducts } from '@/src/services/partOne';
+import { beginCheckVerificationTiming, endCheckVerificationTiming } from '@/src/services/checkVerificationTiming';
+import { createPartOneResultController, partOneResultPollDelay, type PartOneView } from '@/src/presentation/part-one/resultController';
 import { MemoryLabelDraft, type CaptureBinding } from '@/src/presentation/part-one/capture';
 import { captureResponseMatchesRequest, localCaptureProductLabel, resumeLocalCapture } from '@/src/presentation/part-one/captureFlow';
 import { createPrivateCaptureController, privateCaptureProjectionBlocked } from '@/src/presentation/part-one/privateCaptureController';
@@ -133,14 +134,15 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [, refreshLabelDraft] = useState(0);
   useEffect(() => labelDraft.subscribe(() => refreshLabelDraft(value => value + 1)), [labelDraft]);
   useEffect(() => {
+    endCheckVerificationTiming();
     partOneController.setOwner(liveCheckOwner); privateCapture.setOwner(liveCheckOwner);
     labelDraft.accountChanged(); setLabelBinding(null); setLabelCaptureOpen(false);
   }, [liveCheckOwner, partOneController, labelDraft, privateCapture]);
-  useEffect(() => () => { partOneController.close(); privateCapture.close(); labelDraft.endSheet(); }, [partOneController, labelDraft, privateCapture]);
+  useEffect(() => () => { endCheckVerificationTiming(); partOneController.close(); privateCapture.close(); labelDraft.endSheet(); }, [partOneController, labelDraft, privateCapture]);
   useEffect(() => {
     const result = partOneView.result;
     if (!PART_ONE_ENABLED || !liveCheckOwner || !result) return;
-    const delay = result.nextCheckAfter ? Math.max(2000, Date.parse(result.nextCheckAfter) - Date.now()) : ['queued', 'running', 'retry_wait'].includes(result.work) ? 4000 : 10000;
+    const delay = partOneResultPollDelay(result);
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout>;
     const poll = async () => {
@@ -174,7 +176,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   useFocusEffect(React.useCallback(() => {
     setCheckFocused(true);
     setEditingContext(false);
-    return () => setCheckFocused(false);
+    return () => { endCheckVerificationTiming(); setCheckFocused(false); };
   }, []));
   const [nextStepMessage, setNextStepMessage] = useState<{ snapshotId: string; contextRevision: number; text: string } | null>(null);
   const { routine, userProducts, checkIns } = useRoutineStore();
@@ -185,8 +187,14 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [searchQuery, setSearchQuery] = useState('');
   // Check owns this input across camera mounts and transient result sheets.
   const searchTransportRef = useRef(preview ? searchPreviewCatalog : searchCatalogProducts);
-  searchTransportRef.current = preview ? searchPreviewCatalog : searchCatalogProducts;
-  const [searchController] = useState(() => createCatalogSearchController<CatalogProductSummary>(query => searchTransportRef.current(query)));
+  searchTransportRef.current = PART_ONE_ENABLED ? query => {
+    if (/^\d{8,14}$/.test(query.trim())) {
+      beginPartOneBarcode(query.trim(), null, captureRole ? resultOriginRef.current ?? undefined : { kind: 'search', query: searchQuery, scrollOffset: entryScrollOffset.current, selectedProductId: '' });
+      return Promise.resolve([]);
+    }
+    return searchPartOneProducts(query);
+  } : preview ? searchPreviewCatalog : searchCatalogProducts;
+  const [searchController] = useState(() => createCatalogSearchController<CatalogProductSummary>(query => searchTransportRef.current(query), () => {}, { automatic: !PART_ONE_ENABLED, onInvalidate: () => endCheckVerificationTiming('name') }));
   useEffect(() => { searchController.reset(); setSearchQuery(''); }, [searchController, liveCheckOwner]);
   useEffect(() => () => searchController.dispose(), [searchController]);
   const [productLink, setProductLink] = useState('');
@@ -339,6 +347,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       const next = currentLiveCheckOwner();
       if (next === owner) return;
       owner = next;
+      endCheckVerificationTiming();
       resultLifecycle.current.invalidate();
       resultOperationRef.current = null;
       resolutionSequenceRef.current += 1;
@@ -362,7 +371,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   }, [resultOperation, personalTarget, visibleDecision, liveCheckOwner]);
 
   const invalidateResult = () => {
-    partOneController.close(); privateCapture.close(); labelDraft.endSheet(); setLabelBinding(null); setLabelCaptureOpen(false);
+    endCheckVerificationTiming(); partOneController.close(); privateCapture.close(); labelDraft.endSheet(); setLabelBinding(null); setLabelCaptureOpen(false);
     resultLifecycle.current.invalidate();
     resultOperationRef.current = null;
     resolutionSequenceRef.current += 1;
@@ -710,6 +719,21 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     if (published && pendingResolutionRef.current?.requestId === requestId) pendingResolutionRef.current = null;
   };
 
+  const beginPartOneBarcode = (barcode: string, symbology: string | null, origin?: CheckResultOrigin) => {
+    const owner = currentLiveCheckOwner(); if (!PART_ONE_ENABLED || !owner) return;
+    invalidateResult();
+    const requestId = createCatalogRequestId();
+    beginResult(origin ?? { kind: 'camera', sessionId: cameraScanId || requestId }, requestId);
+    setResolution(null); setCatalogDetail(null); setUnknownBarcode(null); setEvaluationError(null);
+    setCameraAwaitingResult(Boolean(captureRole)); setDetectionPaused(Boolean(captureRole));
+    beginCheckVerificationTiming('barcode', requestId);
+    void partOneController.begin(owner, {
+      schemaVersion: 1, requestId, idempotencyKey: requestId, clientScanId: requestId, generation: 0,
+      code: { raw: barcode, symbology: symbology ?? (barcode.length === 8 ? 'ean8' : null), namespace: 'gtin', retailerId: null },
+      requestedMarket: null, categoryHint: null,
+    });
+  };
+
   const handleCaptureReady = (handoff: CheckCaptureHandoff) => {
     const recovering = recoveryActiveRef.current;
     if (!recovering) lastTypedNameRef.current = null;
@@ -728,14 +752,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     }
     if (handoff.barcodeLookup) {
       if (PART_ONE_ENABLED && liveCheckOwner) {
-        invalidateResult();
-        setCameraAwaitingResult(true); setDetectionPaused(true);
-        const requestId = createCatalogRequestId();
-        void partOneController.begin(liveCheckOwner, {
-          schemaVersion: 1, requestId, idempotencyKey: requestId, clientScanId: cameraScanId || requestId, generation: 0,
-          code: { raw: handoff.barcodeLookup.barcode, symbology: handoff.barcodeLookup.symbology ?? null, namespace: 'gtin', retailerId: null },
-          requestedMarket: 'US', categoryHint: null,
-        });
+        beginPartOneBarcode(handoff.barcodeLookup.barcode, handoff.barcodeLookup.symbology ?? null, origin ?? undefined);
         return;
       }
       if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('barcode');
@@ -783,8 +800,13 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   const handleSelectSearchResult = (item: CatalogProductSummary, origin?: CheckResultOrigin) => {
-    partOneController.close(); privateCapture.close(); labelDraft.endSheet(); setLabelCaptureOpen(false);
     const selectedOrigin = origin ?? (captureRole ? resultOriginRef.current : null) ?? { kind: 'search' as const, query: searchQuery, scrollOffset: entryScrollOffset.current, selectedProductId: item.productId };
+    if (PART_ONE_ENABLED && item.sourceLookup) {
+      if (Date.parse(item.sourceLookup.expiresAt) <= Date.now()) { searchController.releaseSelection(); void searchController.submit(); return; }
+      beginPartOneBarcode(item.sourceLookup.barcode, null, selectedOrigin);
+      return;
+    }
+    endCheckVerificationTiming(); partOneController.close(); privateCapture.close(); labelDraft.endSheet(); setLabelCaptureOpen(false);
     const insideSheet = Boolean(captureRole);
     setCameraSearchOpen(false);
     if (targetShell && captureRole && !insideSheet) setCaptureRole(null);
@@ -904,7 +926,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   const dismissCameraResult = () => {
-    partOneController.close(); privateCapture.close(); labelDraft.endSheet(); setLabelCaptureOpen(false); setLabelBinding(null);
+    endCheckVerificationTiming(); partOneController.close(); privateCapture.close(); labelDraft.endSheet(); setLabelCaptureOpen(false); setLabelBinding(null);
     if (resultOriginRef.current && resultOriginRef.current.kind !== 'camera') {
       setCaptureRole(null);
       closeContextualResult();
@@ -1065,7 +1087,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     resolverResult: resolution, ownerId: liveCheckOwner }) : null;
   const isIngredientChild = Boolean(resolution && 'attemptRevision' in resolution && resolution.attemptRevision === 2);
   const requestedAction = !isIngredientChild && requestedModel?.kind === 'result' ? requestedModel.requestedEvidence : null;
-  const directCatalogSearch = <CatalogProductSearch controller={searchController} label="Search by name" actionLabel="Check" embedded preserveSelection
+  const directCatalogSearch = <CatalogProductSearch controller={searchController} barcodeEntry={PART_ONE_ENABLED} label="Search by name" actionLabel="Check" embedded preserveSelection
     InputComponent={BottomSheetTextInput} keepFocusAfterSelect={false} onSelect={handleSelectSearchResult} onQueryChange={setSearchQuery}
     errorCopy="Search is unavailable right now." emptyCopy="No products found" />;
   const compactRecovery = <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
@@ -1141,21 +1163,27 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     );
   }
 
-  if (targetShell && captureRole) {
-    const partOneVisible = PART_ONE_ENABLED && Boolean(partOneView.owner === liveCheckOwner && (partOneView.loading || partOneView.result || partOneView.error));
-    const privateEvidenceBlocked = privateCaptureProjectionBlocked(privateState, partOneView.result, liveCheckOwner, labelBinding);
-    const privateReadId = privateState.capture?.captureSessionId ?? (labelBinding?.ownerId === liveCheckOwner ? labelBinding?.captureSessionId : null);
-    const partOneSheet = partOneVisible ? <PartOneResultSheet interpretationCaptureSessionId={partOneView.result?.scope === 'private_package' ? privateReadId : null} view={(['removing','removed'].includes(privateState.stage) || privateEvidenceBlocked) && partOneView.result?.scope === 'private_package' ? { ...partOneView, result: null, loading: privateState.stage === 'removing', error: privateState.stage === 'removed' ? 'Private label evidence was removed. Refresh product evidence.' : privateState.error } : partOneView} onClose={dismissCameraResult}
+  const partOneVisible = PART_ONE_ENABLED && isCheckFocused && !editingContext && Boolean(partOneView.owner === liveCheckOwner && (partOneView.loading || partOneView.result || partOneView.error));
+  const privateEvidenceBlocked = privateCaptureProjectionBlocked(privateState, partOneView.result, liveCheckOwner, labelBinding);
+  const privateReadId = privateState.capture?.captureSessionId ?? (labelBinding?.ownerId === liveCheckOwner ? labelBinding?.captureSessionId : null);
+  const closePartOneSearch = () => { searchController.cancel(); setCameraSearchOpen(false); };
+  const partOneActiveCapture = <PartOneActiveCapture open={labelCaptureOpen} draft={labelDraft} binding={labelBinding} owner={liveCheckOwner}
+          result={partOneView.result} productLabel={labelProductLabel} interactionLocked={privateWorking}
+          onPackagePhotoAdded={PART_ONE_PRIVATE_ENABLED ? evidenceId => { privateCapture.setPhotoRole(evidenceId, 'package'); } : undefined}
+          privatePanel={PART_ONE_PRIVATE_ENABLED && liveCheckOwner ? <PartOnePrivateCapturePanel controller={privateCapture} ownerId={liveCheckOwner} draft={labelDraft} binding={labelBinding} /> : undefined}
+          onClose={() => { if (labelBinding) labelDraft.back(labelBinding); setLabelCaptureOpen(false); }} onChange={() => refreshLabelDraft(value => value + 1)} />;
+
+  const partOneSheet = partOneVisible ? <PartOneResultSheet captureContent={partOneActiveCapture} inline={Boolean(captureRole)} searchContent={cameraSearchOpen ? <View><Button label="Back to result" variant="ghost" size="medium" onPress={closePartOneSearch} />{directCatalogSearch}</View> : undefined} searchEmpty={!searchQuery.trim()} interpretationCaptureSessionId={partOneView.result?.scope === 'private_package' ? privateReadId : null} view={(['removing','removed'].includes(privateState.stage) || privateEvidenceBlocked) && partOneView.result?.scope === 'private_package' ? { ...partOneView, result: null, loading: privateState.stage === 'removing', error: privateState.stage === 'removed' ? 'Private label evidence was removed. Refresh product evidence.' : privateState.error } : partOneView} onClose={cameraSearchOpen ? closePartOneSearch : dismissCameraResult}
       localDraft={labelBinding ? (sourceDenied, onIngredientView) => <>{!sourceDenied && <PartOneLocalDraftSummary draft={labelDraft} binding={labelBinding}
         onReview={() => { if (labelDraft.read(labelBinding)) setLabelCaptureOpen(true); }}
         onRemove={privateWorking ? undefined : () => { privateCapture.close(); labelDraft.remove(); setLabelBinding(null); setLabelCaptureOpen(false); }} />}
         {PART_ONE_PRIVATE_ENABLED && liveCheckOwner && <PartOnePrivateCapturePanel controller={privateCapture} ownerId={liveCheckOwner} draft={labelDraft} binding={labelBinding} onIngredientView={onIngredientView} />}</> : undefined}
-      onRefresh={() => { if (liveCheckOwner) void partOneController.refresh(liveCheckOwner).then(() => {
+      onRefresh={() => { if (liveCheckOwner) void partOneController.retry(liveCheckOwner).then(() => {
         if (privateEvidenceBlocked && privateReadId && currentLiveCheckOwner() === liveCheckOwner) void privateCapture.recover(liveCheckOwner, privateReadId);
       }); }}
       onSelect={id => { privateCapture.close(); labelDraft.endSheet(); setLabelBinding(null); if (liveCheckOwner) void partOneController.select(liveCheckOwner, id); }}
       onSave={details => { if (liveCheckOwner && partOneView.result) void partOneController.save(liveCheckOwner, `save:${partOneView.result.scanId}:${partOneView.result.generation}:${partOneView.result.resultRevision}${details ? `:details:${details.expectedPartTwoRevision}` : ''}`, details); }}
-      onSearch={() => { partOneController.close(); privateCapture.close(); labelDraft.endSheet(); openCameraSearch(); }} onFullChange={setFullResult} onScroll={offset => partOneController.setScroll(offset)}
+      onSearch={() => { searchController.releaseSelection(); setCameraSearchOpen(true); }} onFullChange={setFullResult} onScroll={offset => partOneController.setScroll(offset)}
       onCapture={PART_ONE_LOCAL_CAPTURE_AVAILABLE ? () => {
         const owner = currentLiveCheckOwner(); const result = partOneController.getView().result;
         if (!owner || !result) return;
@@ -1168,6 +1196,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           privateCapture.bind(owner, capture, result); labelDraft.begin(binding, partOneView.scrollOffset); setLabelBinding(binding); setLabelProductLabel(localCaptureProductLabel(binding, result)); setLabelCaptureOpen(true);
         }).catch(() => {});
       } : undefined} /> : null;
+
+  if (targetShell && captureRole) {
     const companion = cameraCompanionSheet({
       awaiting: cameraAwaitingResult && !recoveringPhoto, checking: isCheckingProduct, ownerId: liveCheckOwner,
       scanId: cameraScanId, error: evaluationError, unknownBarcode, searchOpen: cameraSearchOpen, hasUnresolvedPhotos: Boolean(captureEvidence?.localPhotos.length), resolution, catalogProduct: catalogDetail,
@@ -1237,11 +1267,6 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
               compactActions={compactRecovery} onNextStep={resultNextStep}
               onOpenSource={url => void Linking.openURL(url).catch(() => {})}>{renderResultExtras()}</CheckResultPresentation> : null)}
         />
-        <PartOneActiveCapture open={labelCaptureOpen} draft={labelDraft} binding={labelBinding} owner={liveCheckOwner}
-          result={partOneView.result} productLabel={labelProductLabel} interactionLocked={privateWorking}
-          onPackagePhotoAdded={PART_ONE_PRIVATE_ENABLED ? evidenceId => { privateCapture.setPhotoRole(evidenceId, 'package'); } : undefined}
-          privatePanel={PART_ONE_PRIVATE_ENABLED && liveCheckOwner ? <PartOnePrivateCapturePanel controller={privateCapture} ownerId={liveCheckOwner} draft={labelDraft} binding={labelBinding} /> : undefined}
-          onClose={() => { if (labelBinding) labelDraft.back(labelBinding); setLabelCaptureOpen(false); }} onChange={() => refreshLabelDraft(value => value + 1)} />
       </View>
     );
   }
@@ -1256,8 +1281,10 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           <View style={styles.entrySearch}>
             <CatalogProductSearch
               controller={searchController}
+              barcodeEntry={PART_ONE_ENABLED}
               key={integrated ? liveCheckOwner ?? 'signed-out' : 'preview'}
               label="Search by name"
+              placeholder={PART_ONE_ENABLED ? "Product name or barcode" : undefined}
               actionLabel="Check"
               search={preview ? searchPreviewCatalog : undefined}
               onSelect={(item) => { abandonProductLink(); handleSelectSearchResult(item); }}
@@ -1306,7 +1333,8 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
             )}
           </View>
         </ScrollView>
-        <CheckResultPresentation visible={isCheckFocused && !editingContext && (contextualResultOpen || Boolean(catalogDetail || resolution || unknownBarcode || captureEvidence || isCheckingProduct || evaluationError))}
+        {partOneSheet}
+        <CheckResultPresentation visible={!partOneVisible && isCheckFocused && !editingContext && (contextualResultOpen || Boolean(catalogDetail || resolution || unknownBarcode || captureEvidence || isCheckingProduct || evaluationError))}
           input={sharedResultInput} presentationKey={resultKey} compactActions={compactRecovery} loading={isCheckingProduct} error={evaluationError}
           unresolvedTitle={unknownBarcode ? 'No verified match for this barcode.' : undefined}
           unresolvedMessage={preview && lastTypedNameRef.current ? `Name entered: ${lastTypedNameRef.current}. Product and formula are unverified.` : undefined}
@@ -1597,6 +1625,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           {!targetShell && <Text style={styles.subtitle}>Search by product name. A barcode is optional.</Text>}
           <CatalogProductSearch
             controller={searchController}
+            barcodeEntry={PART_ONE_ENABLED}
             label={targetShell ? 'Search by name' : 'Search products'}
             actionLabel="Check"
             search={preview ? searchPreviewCatalog : undefined}
