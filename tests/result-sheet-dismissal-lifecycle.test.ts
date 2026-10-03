@@ -32,7 +32,7 @@ function surfaceLifecycle() {
       previous?.cleanup?.(); instance.slots[index] = { deps, cleanup: callback() };
     });
   };
-  const hooks = { ...React, useRef(initial: any) {
+  const hooks = { ...React, createContext(initial: any) { const context: any={value:initial}; context.Provider={context}; return context; }, useContext(context: any) { return context.value; }, useRef(initial: any) {
     const { instance, index } = slot();
     return instance.slots[index] ??= { current: initial };
   }, useState(initial: any) {
@@ -51,7 +51,7 @@ function surfaceLifecycle() {
         Keyboard: { dismiss() {} }, Platform: { OS: 'ios' }, AccessibilityInfo: {}, findNodeHandle: () => null,
         StyleSheet: { create: (value: unknown) => value, absoluteFill: {} }, useWindowDimensions: () => ({ height: 844 }) };
       if (name === 'react-native-safe-area-context') return { SafeAreaProvider: 'SafeAreaProvider', useSafeAreaInsets: () => ({ top: 44, bottom: 34 }) };
-      if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: 'GestureHandlerRootView', GestureDetector: 'GestureDetector', Gesture: { Native: () => ({ disallowInterruption: () => ({}) }) } };
+      if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: 'GestureHandlerRootView' };
       if (name === 'react-native-reanimated') return { ReduceMotion: { System: 'system' } };
       if (name === '@gorhom/bottom-sheet') return { __esModule: true, default: 'BottomSheet', BottomSheetScrollView: 'BottomSheetScrollView', BottomSheetBackdrop: 'BottomSheetBackdrop' };
       if (name.endsWith('/Icon')) return { Icon: 'Icon' };
@@ -67,6 +67,7 @@ function surfaceLifecycle() {
   function visit(value: any, path: string): void {
     if (Array.isArray(value)) { value.forEach((item, i) => visit(item, `${path}/${i}`)); return; }
     if (!value || typeof value !== 'object' || !('props' in value)) return;
+    if (value.type?.context) { const context=value.type.context,previous=context.value; context.value=value.props.value;visit(value.props.children,`${path}/provider`);context.value=previous;return; }
     if (value.type === React.Fragment) { visit(value.props.children, `${path}/fragment`); return; }
     if (typeof value.type === 'function') {
       if (!types.has(value.type)) types.set(value.type, types.size + 1);
@@ -100,7 +101,7 @@ function surfaceLifecycle() {
         nativeSheets.set(key, native);
       }
       native.props = props; props.ref.current = native; mountedSheets.push(native);
-      visit(props.handleComponent({}), `${path}/handle`);
+      visit(React.createElement(props.handleComponent, {}), `${path}/handle`);
     }
     visit(value.props.children, `${path}/children`);
   }
@@ -177,6 +178,18 @@ test('same-lifetime callback updates use the current action while one-shot and k
   assert.equal(first.sheet, updated.sheet, 'same presentation/mode remains mounted');
   updated.sheet.gestureClose(); updated.sheet.finishClose(); updated.sheet.props.onClose();
   assert.equal(old, 0); assert.equal(current, 1);
+});
+
+test('native handle keeps its component type through detent and interaction callback updates', t => {
+  const r=surfaceLifecycle();t.after(()=>r.dispose());let latest=0;
+  const props={presentationKey:'stable-touch',summary:React.createElement('Summary'),children:React.createElement('Findings'),onClose(){},onInteraction(){}};
+  const initial=r.render(props),handleType=initial.sheet.props.handleComponent;
+  initial.sheet.props.onChange(1);
+  const updated=r.render({...props,onInteraction(){latest++;}});
+  assert.equal(updated.sheet.props.handleComponent,handleType,'changing the handle component type replaces its native press target during an in-flight touch');
+  const handle=updated.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Product result')!;
+  assert.equal(handle.props.accessibilityValue.text,'Expanded','stable handle still receives the current detent');
+  handle.props.onPress();assert.equal(latest,1,'stable handle uses the current interaction callback');
 });
 
 
