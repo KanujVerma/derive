@@ -145,7 +145,7 @@ final class CombinedCheckUI: XCTestCase {
   XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);expand();tap("Scan ingredients")
   XCTAssertTrue(element("Choose ingredient photo").waitForExistence(timeout:20),app.debugDescription);tap("Choose ingredient photo")
   let photo=app.images.matching(NSPredicate(format:"label BEGINSWITH %@","Photo,")).firstMatch
-  XCTAssertTrue(photo.waitForExistence(timeout:20),app.debugDescription);photo.tap()
+  XCTAssertTrue(photo.waitForExistence(timeout:20),app.debugDescription);XCTAssertFalse(photo.frame.isEmpty);photo.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
   XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:25),app.debugDescription)
   XCTAssertTrue(contains("Hexanediol").waitForExistence(timeout:25),app.debugDescription);shot("combined-ordinary-local-photo-reading")
   tap("Back to product result");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:20));XCTAssertTrue(contains("Hexanediol").exists);XCTAssertFalse(contains("Worth considering").exists)
