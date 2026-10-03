@@ -26,7 +26,7 @@ function renderer(interactive = false) {
   const pressables: any[] = [], state: any[] = [];
   let stateCursor = 0;
   const modalScopes: any[] = [], scrollScopes: any[] = [];
-  const sheet = (props: any) => { sheets.push(props); return React.createElement('section', {}, props.children); };
+  const sheet = (props: any) => { sheets.push(props); return React.createElement('section', {}, props.handleComponent ? React.createElement(props.handleComponent, {}) : null, props.children); };
   function load(path: string): any {
     path = resolve(root, path);
     const file = [path, `${path}.tsx`, `${path}.ts`].find(existsSync);
@@ -350,10 +350,10 @@ test('direct Search has one content detent, no empty details, and stable height 
   assert.ok(withResults > 300, 'results grow the same search surface');
   measure(90); r.render(ScanResultSheet, props);
   assert.equal(r.sheets.at(-1).snapPoints[0], withResults, 'typing/loading rows cannot shrink and bounce the sheet');
-  const handle = r.sheets.at(-1).handleComponent({});
-  assert.equal(handle.props.style.paddingTop, handle.props.style.paddingHorizontal, 'X center has equal top/right inset');
-  const close = handle.props.children[1];
-  assert.equal(close.props.style.width, 44); assert.equal(close.props.style.height, 44);
+  const handle = r.views.find(view => view.style?.flexDirection === 'row' && view.style?.paddingTop !== undefined);
+  assert.equal(handle.style.paddingTop, handle.style.paddingHorizontal, 'X center has equal top/right inset');
+  const close = r.pressables.find(view => view.accessibilityLabel === 'Close result and scan another product');
+  assert.equal(close.style.width, 44); assert.equal(close.style.height, 44);
 });
 
 
