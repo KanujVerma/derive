@@ -7,6 +7,8 @@ final class CombinedCheckUI: XCTestCase {
   let system=XCUIApplication(bundleIdentifier:"com.apple.springboard")
   for _ in 0..<3{if system.buttons["Open"].waitForExistence(timeout:1){system.buttons["Open"].tap()}else{break}}
   app.activate()
+  let localHost=app.buttons.matching(NSPredicate(format:"label CONTAINS %@","http://127.0.0.1:8171")).firstMatch
+  if localHost.waitForExistence(timeout:2) && localHost.isHittable{localHost.tap()}
   if app.buttons["Continue"].waitForExistence(timeout:2) && app.buttons["Continue"].isHittable{app.buttons["Continue"].tap()}
   if app.buttons["Go home"].exists && app.buttons["Close"].exists{app.buttons["Close"].tap()}
   if element("Try again").exists && element("Try again").isHittable{element("Try again").tap()}
