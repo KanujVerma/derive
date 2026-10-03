@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {Text,View} from 'react-native';
-import {Redirect,useLocalSearchParams} from 'expo-router';
+import {Redirect,useLocalSearchParams,useRouter} from 'expo-router';
 import {z} from 'zod';
 import {PartOneResultSheet} from '@/src/components/check/part-one/PartOneResultSheet';
 import {ContextFlow} from '@/src/components/p0b-personalization/ContextFlow';
@@ -18,24 +18,33 @@ import {catalogReferenceLabels} from '@/src/presentation/part-three/catalogLabel
 import {getCatalogProductDetail} from '@/src/services/productCatalog';
 import {createCatalogRequestId} from '@/src/services/productCatalog';
 import type {PartThreePorts} from '@/src/components/check/part-three/usePartThreeCheck';
-const CONTROL='http://127.0.0.1:8353';
-const Bootstrap=z.strictObject({ownerId:PartOneIdSchema,token:z.string(),apiKey:z.string(),apiOrigin:z.literal('http://127.0.0.1:59521'),result:ScanResultSchema,encounterId:PartOneIdSchema});
+import {supabase} from '@/src/services/supabase';
+import {publicEnvironment} from '@/src/config/environment';
+const Bootstrap=z.strictObject({ownerId:PartOneIdSchema,token:z.string(),refreshToken:z.string().optional(),apiKey:z.string(),apiOrigin:z.enum(['http://127.0.0.1:59521','http://127.0.0.1:59721']),result:ScanResultSchema,encounterId:PartOneIdSchema});
 type Fixture=z.infer<typeof Bootstrap>;
 /** Loopback-only synthetic Auth/Edge/SQL harness using the production sheet and
  * preference controller. Never available in release builds. */
 export default function PartThreePreview(){
  const enabled=__DEV__&&process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI==='true';
- const {fixture:fixtureParam}=useLocalSearchParams<{fixture?:string}>();
+ const {fixture:fixtureParam,integration}=useLocalSearchParams<{fixture?:string;integration?:string}>();
+ const router=useRouter();
+ const CONTROL=integration==='1'?'http://127.0.0.1:8373':'http://127.0.0.1:8353';
  const [fixture,setFixture]=useState<Fixture|null>(null),[visible,setVisible]=useState(true),[tick,setTick]=useState(0),[savedId,setSavedId]=useState<string|null>(null),[preference,setPreference]=useState(false),[status,setStatus]=useState('Synthetic fixture not loaded'),[offline,setOffline]=useState(false),[setupMode,setSetupMode]=useState(false),[setupSaving,setSetupSaving]=useState(false),[setupError,setSetupError]=useState<string|null>(null);
  const setupAttempt=useRef<{signature:string;request:any}|null>(null);
  const owner=useRef<string|null>(null),generation=useRef(1),online=useRef(true),encounters=useRef(new Map<string,string>());
  async function load(path='/bootstrap'){if(!enabled)return;const next=Bootstrap.parse(await (await fetch(CONTROL+path)).json());owner.current=next.ownerId;online.current=true;generation.current++;encounters.current.clear();setFixture(next);setVisible(true);setSavedId(null);setOffline(false);setStatus('Actual local Part3 fixture loaded');}
- useEffect(()=>{if(enabled&&fixtureParam==='long')void load('/long-name-bootstrap');},[enabled,fixtureParam]);
+ useEffect(()=>{if(enabled&&fixtureParam==='long')void load('/long-name-bootstrap');},[enabled,fixtureParam,CONTROL]);
  const invoke=useMemo(()=>async(path:string,body:string,signal?:AbortSignal)=>{if(!fixture||owner.current!==fixture.ownerId||!online.current)throw Error('Synthetic account offline or changed');const r=await fetch(`${fixture.apiOrigin}/functions/v1/${path}`,{method:'POST',headers:{apikey:fixture.apiKey,Authorization:`Bearer ${fixture.token}`,'content-type':'application/json'},body,signal});const data=await r.json();return {data,error:r.ok?null:Object.assign(Error('Synthetic local request refused'),{code:data?.code})};},[fixture]);
  const personalPorts=useMemo<PartThreePorts>(()=>({transport:createPartThreeTransport({enabled:()=>enabled,invoke}),labels:async(expected,references)=>catalogReferenceLabels(references,()=>{if(expected!==owner.current||!online.current)throw Error('Synthetic label owner changed');},id=>getCatalogProductDetail(id,{functions:{invoke:(path:string,request:{body:unknown})=>invoke(path,JSON.stringify(request.body))}})),identity:async request=>{const r=await invoke('part-three',JSON.stringify({...request,operation:'identity'}));if(r.error)throw r.error;const parsed=PartThreeResponseSchema.parse(r.data);if(parsed.kind!=='identity')throw Error('Synthetic identity changed');return parsed.identity;},context:async expected=>{if(expected!==owner.current)throw Error('Owner changed');const r=await invoke('personal-context',JSON.stringify({operation:'read_context_v2'}));if(r.error)throw r.error;return personalContextV2Schema.parse(r.data);},session:(expected,scan)=>{if(!fixture||expected!==owner.current)return null;if(!encounters.current.has(scan))encounters.current.set(scan,scan===fixture.result.scanId?fixture.encounterId:createCatalogRequestId());return {ownerId:expected,accountGeneration:generation.current,encounterId:encounters.current.get(scan)!};},online:()=>online.current,createId:createCatalogRequestId}),[enabled,fixture,invoke]);
  const ingredients=useMemo(()=>createPartTwoTransport({enabled:()=>enabled,invoke}),[enabled,invoke]);
  const preferencePorts=useMemo(()=>({owner:()=>owner.current,read:personalPorts.context,createId:createCatalogRequestId,write:async(expected:string,request:any)=>{if(expected!==owner.current)throw Error('Owner changed');const r=await invoke('personal-context',JSON.stringify(request));if(r.error)throw r.error;return request.operation==='save_setup'?setupWriteResultSchema.parse(r.data):contextDeleteResultSchema.parse(r.data);}}),[personalPorts,invoke]);
  async function reopen(){if(!online.current){setStatus('Offline: current personal assessment unavailable');return;}const r=await personalPorts.transport.request({operation:'list_saved'});if(r.kind!=='saved_list'||!r.items.length){setStatus('No saved assessment');return;}setSavedId(r.items[0].savedAssessmentId);setVisible(true);setTick(n=>n+1);setStatus('Reopened exact saved assessment');}
+ async function openNormalCheck(){
+  if(!enabled||integration!=='1'||!fixture?.refreshToken||!supabase||publicEnvironment.supabaseUrl!=='http://127.0.0.1:59731')return;
+  const {data,error}=await supabase.auth.setSession({access_token:fixture.token,refresh_token:fixture.refreshToken});
+  if(error||data.user?.id!==fixture.ownerId){setStatus('Synthetic local session was not adopted');return;}
+  router.replace('/(tabs)/check');
+ }
  if(!enabled)return <Redirect href="/(tabs)/check"/>;
  if(preference&&fixture)return <PreferenceContext ownerId={fixture.ownerId} ports={preferencePorts} onSaved={()=>{setPreference(false);setVisible(true);setTick(n=>n+1);setStatus('Confirmed preferences committed');}} onClose={()=>setPreference(false)}/>;
  async function openSetup(){const next=Bootstrap.parse(await (await fetch(CONTROL+'/setup-bootstrap')).json());owner.current=next.ownerId;online.current=true;generation.current++;encounters.current.clear();setFixture(next);setVisible(false);setSavedId(null);setupAttempt.current=null;setSetupError(null);setSetupMode(true);}
@@ -44,6 +53,7 @@ export default function PartThreePreview(){
  const result=fixture?.result,display=result&&(savedId||tick>0)?{...result,display:{...result.display,sections:[],sources:[]}}:result;
  return <View style={{flex:1,paddingTop:60,paddingHorizontal:20,backgroundColor:'#FAFAF7'}}><Text accessibilityRole="header">Part3 local runtime verification</Text><Text accessibilityLiveRegion="polite">{status}</Text>
  <Button label="Load long-name Part3 fixture" onPress={()=>void load('/long-name-bootstrap')}/><Button label="Open five-step setup" onPress={()=>void openSetup()}/><Button label="Load Part3 local fixture" onPress={()=>void load()}/><Button label="Reopen Part3 saved assessment" onPress={()=>void reopen()}/><Button label="Open confirmed preferences" onPress={()=>{setVisible(false);setPreference(true);}}/>
+ {integration==='1'&&<Button label="Open normal Check with synthetic session" onPress={()=>void openNormalCheck()}/>}
  <Button label={offline?'Reconnect synthetic client':'Take synthetic client offline'} onPress={()=>{online.current=!online.current;setOffline(!online.current);setStatus(online.current?'Synthetic client connected; authority will be checked':'Synthetic client offline; current personal assessment unavailable');}}/>
  <Button label="Withdraw Part3 purpose field" onPress={()=>void fetch(CONTROL+'/withdraw-purpose',{method:'POST'}).then(()=>setStatus('Synthetic purpose field withdrawn'))}/><Button label="Switch Part3 fixture account" onPress={()=>{owner.current=null;generation.current++;setFixture(null);setSavedId(null);setStatus('Synthetic owner cleared');}}/>
  {fixture&&result&&display&&visible&&<PartOneResultSheet key={`${fixture.ownerId}:${tick}:${savedId??'scan'}`} view={{owner:fixture.ownerId,result:display,loading:false,error:null,saved:false,scrollOffset:0}} ingredientEnabled ingredientTransport={ingredients} personalEnabled personalPorts={personalPorts} savedAssessmentId={savedId} onClose={()=>setVisible(false)} onSelect={()=>{}} onSearch={()=>setVisible(false)} onRefresh={()=>setTick(n=>n+1)} onFullChange={()=>{}} onSave={()=>void invoke('part-one/saves',JSON.stringify({idempotencyKey:createCatalogRequestId(),scanId:result.scanId,expectedGeneration:result.generation,expectedResultRevision:result.resultRevision,selectedSnapshotId:result.snapshotId,selectedDeclarationId:result.declarationId})).then(r=>setStatus(r.error?'Synthetic product save refused':'Synthetic product and evidence saved independently'))}/>

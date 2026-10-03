@@ -189,6 +189,10 @@ export default function RootLayout() {
     }
     if (localFreeIntegration) {
       if (!localReady || !access) return;
+      // Dedicated loopback synthetic harness; release routing is unchanged.
+      if (__DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true'
+        && publicEnvironment.supabaseUrl === 'http://127.0.0.1:59731'
+        && segments[0] === 'part-three-preview') return;
       const route = resolveLocalAccessRoute(segments, access);
       if (route) router.replace(route);
       return;
