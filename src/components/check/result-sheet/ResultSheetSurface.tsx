@@ -87,10 +87,12 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   // The guard owns this body lifetime; callback updates cannot cross its key fence.
   const [guard] = useState(() => createSheetDismissGuard(presentationKey, () => closeAction.current(), readCurrentKey));
   const close = useCallback(() => {
-    if (!guard.isCurrent() || closing.current) return;
+    if (!guard.isCurrent()) return;
     closing.current = true;
     Keyboard.dismiss();
-    if (sheet.current) sheet.current.close(); else guard.dismiss();
+    // The library can reevaluate detents independently of our layout effect.
+    // Its forced close fences that native reevaluation until acknowledgment.
+    if (sheet.current) sheet.current.forceClose(); else guard.dismiss();
   }, [guard]);
   requestClose.current = close;
   useEffect(() => {

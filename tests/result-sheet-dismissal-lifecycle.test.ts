@@ -85,16 +85,17 @@ function surfaceLifecycle() {
       used.add(key);
       let native = nativeSheets.get(key);
       if (!native) {
-        native = { index: props.index, props, pending: [] as Array<() => void>,
+        native = { index: props.index, props, pending: [] as Array<() => void>, forced: false,
           close() { this.gestureClose(); },
-          snapToIndex(index: number) { if (this.index === -1 && index >= 0) this.pending = []; this.index = index; this.props.onChange(index); },
+          forceClose() { if(this.forced)return; this.forced = true; this.gestureClose(); },
+          snapToIndex(index: number) { if(this.forced)return; if (this.index === -1 && index >= 0) this.pending = []; this.index = index; this.props.onChange(index); },
           gestureClose() {
             const closeProps = this.props;
             closeProps.onAnimate?.(this.index, -1);
             this.index = -1; closeProps.onChange(-1);
             this.pending.push(() => closeProps.onClose());
           },
-          finishClose() { this.pending.shift()?.(); },
+          finishClose() { this.pending.shift()?.(); this.forced = false; },
         };
         nativeSheets.set(key, native);
       }
@@ -192,4 +193,14 @@ test('late oversized summary updates cannot reopen an explicit or gesture close 
     expanded.sheet.finishClose();assert.equal(closed,1,'close acknowledgment survives the late update');
     const newer=render('new-case');measure(newer);const resized=render('new-case');assert.equal(resized.sheet.index,2,'a new body may size normally after the prior close');
   }
+});
+
+test('explicit dismissal fences native detent reevaluation and retries an interrupted native close', t => {
+  const r=surfaceLifecycle();t.after(()=>r.dispose());let closed=0;
+  const result=r.render({presentationKey:'native-interruption',onClose:()=>{closed++;},summary:React.createElement('Summary'),children:React.createElement('Findings')});
+  result.sheet.gestureClose();result.sheet.snapToIndex(2);
+  assert.equal(result.sheet.index,2,'native detent reevaluation can interrupt an ordinary library close');
+  result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Close result')!.props.onPress();
+  result.sheet.snapToIndex(2);assert.equal(result.sheet.index,-1,'explicit close must fence library-internal detent reevaluation too');
+  result.sheet.finishClose();assert.equal(closed,1);
 });
