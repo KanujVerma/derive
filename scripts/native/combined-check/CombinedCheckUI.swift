@@ -18,6 +18,7 @@ final class CombinedCheckUI: XCTestCase {
   shot("combined-native-host-loaded")
  }
  func element(_ label:String)->XCUIElement {app.descendants(matching:.any).matching(NSPredicate(format:"label == %@",label)).firstMatch}
+ func fixtureRoute(){let entry=element("Open local integration fixture");if entry.exists && entry.isHittable{entry.tap()}}
  func tab(_ label:String){let target=app.buttons.matching(NSPredicate(format:"label CONTAINS %@",", "+label+",")).firstMatch;XCTAssertTrue(target.waitForExistence(timeout:15),app.debugDescription);target.tap()}
  func contains(_ label:String)->XCUIElement {app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@",label)).firstMatch}
  func scroll()->XCUIElement{let region=app.otherElements["result-sheet-scroll"].firstMatch;let sheet=region.scrollViews.firstMatch;if sheet.exists{return sheet};let views=app.scrollViews;return views.count>1 ? views.element(boundBy:views.count-1) : views.firstMatch}
@@ -29,7 +30,7 @@ final class CombinedCheckUI: XCTestCase {
  func testComparisonQuestionSaveReopenWithdrawalAndOwner() throws {
   continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
   if element("Close result").exists{close()}
-  XCTAssertTrue(element("Load Part3 local fixture").waitForExistence(timeout:20),app.debugDescription);tap("Load Part3 local fixture")
+  fixtureRoute();XCTAssertTrue(element("Load Part3 local fixture").waitForExistence(timeout:20),app.debugDescription);tap("Load Part3 local fixture")
   XCTAssertTrue(element("Product result").waitForExistence(timeout:30));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertTrue(contains("Purpose, application site or use form needs clarification.").exists,app.debugDescription);XCTAssertFalse(contains("Ingredient details").exists,"Collapsed result must earn an immediate judgment before detail disclosure");shot("part-three-collapsed-immediate-judgment");expand()
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:35),app.debugDescription);shot("part-three-first-card-bounded-insufficiency")
   tap("Compare or describe this check");tap("Original synthetic current cream")
@@ -60,7 +61,7 @@ final class CombinedCheckUI: XCTestCase {
  func testFiveStepAtomicSetupAndConfirmedPreference() throws {
   continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
   if element("Close result").exists{close()}
-  XCTAssertTrue(element("Open five-step setup").waitForExistence(timeout:20),app.debugDescription);tap("Open five-step setup")
+  fixtureRoute();XCTAssertTrue(element("Open five-step setup").waitForExistence(timeout:20),app.debugDescription);tap("Open five-step setup")
   XCTAssertTrue(contains("Step 1 of 5").waitForExistence(timeout:20));tap("Dryness");tap("Continue")
   XCTAssertTrue(contains("Step 2 of 5").waitForExistence(timeout:10));tap("Dry or tight");tap("Usually not");tap("Continue")
   XCTAssertTrue(contains("Step 3 of 5").waitForExistence(timeout:10))
@@ -100,7 +101,7 @@ final class CombinedCheckUI: XCTestCase {
 
  func testNormalCheckNameSearchComparisonSkipSaveAndMyStuff() throws {
   continueAfterFailure=false;app.activate()
-  _ = try controlRequest("/restore-purpose",method:"POST")
+  fixtureRoute();_ = try controlRequest("/restore-purpose",method:"POST")
   if element("Close result").exists{close()}
   tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close()
   let initial=try controlRequest("/integration-state")

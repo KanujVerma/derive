@@ -1278,6 +1278,9 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
         <ScrollView ref={entryScroll} onScroll={(event) => { entryScrollOffset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.entryContent, { paddingTop: spacing.sm, paddingBottom: insets.bottom + spacing.xl }]}>
           <Button label="Open camera" variant="brand" onPress={() => { abandonProductLink(); openCapture('barcode'); }} style={styles.entryAction} />
+          {__DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true'
+            && publicEnvironment.supabaseUrl === 'http://127.0.0.1:59731'
+            && <Button label="Open local integration fixture" variant="ghost" onPress={() => router.push({ pathname: '/part-three-preview', params: { integration: '1' } })} />}
           <View style={styles.entrySearch}>
             <CatalogProductSearch
               controller={searchController}
