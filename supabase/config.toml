@@ -197,3 +197,9 @@ entrypoint = "./functions/personal-context/index.ts"
 
 [functions.personal-decision]
 verify_jwt = false
+
+[functions.product-check-facts]
+enabled = true
+verify_jwt = true
+import_map = "./functions/product-check-facts/deno.json"
+entrypoint = "./functions/product-check-facts/index.ts"
