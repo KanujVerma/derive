@@ -100,64 +100,24 @@ final class CombinedCheckUI: XCTestCase {
  }
 
 
- func testNormalCheckNameSearchComparisonSkipSaveAndMyStuff() throws {
-  continueAfterFailure=false;app.activate()
-  fixtureRoute();_ = try controlRequest("/restore-purpose",method:"POST")
-  if element("Close result").exists{close()}
-  tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close()
-  let initial=try controlRequest("/integration-state")
-  tap("Open normal Check with synthetic session")
-  XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:30),app.debugDescription)
-  let input=element("Search catalog products");input.tap();input.typeText("Original synthetic\n")
-  let item=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Check Synthetic Original synthetic authority fixture")).firstMatch
-  XCTAssertTrue(item.waitForExistence(timeout:30),app.debugDescription);item.tap()
-  XCTAssertTrue(element("Product result").waitForExistence(timeout:30),app.debugDescription)
-  XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription)
-  XCTAssertEqual(app.staticTexts.matching(NSPredicate(format:"label == %@","Personal Fit")).count,1,"One Personal Fit surface")
-  XCTAssertEqual(app.staticTexts.matching(NSPredicate(format:"label == %@","Original synthetic authority fixture")).count,1,"One product identity")
-  shot("combined-normal-check-collapsed")
-  expand();tap("Compare or describe this check");tap("Original synthetic current cream")
-  XCTAssertTrue(element("Skip this question for this check").waitForExistence(timeout:20),app.debugDescription)
-  tap("Skip this question for this check");XCTAssertFalse(element("Skip this question for this check").exists)
-  choose("Replace one item");choose("Moisturizing");choose("Face");choose("Leave on")
-  XCTAssertTrue(contains("Worth considering").waitForExistence(timeout:30),app.debugDescription)
-  tap("Close comparison choices");tap("Save product");XCTAssertTrue(element("Saved").waitForExistence(timeout:20),app.debugDescription)
-  tap("Compare or describe this check");tap("Save this assessment");XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription)
-  tap("Close comparison choices");shot("combined-normal-check-separate-saves")
-  let beforeSearch=try controlRequest("/integration-state")
-  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));XCTAssertFalse(contains("Worth considering").exists)
-  tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Worth considering").waitForExistence(timeout:20));XCTAssertFalse(element("Skip this question for this check").exists)
-  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Close result");XCTAssertFalse(element("Back to result").exists);XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Worth considering").waitForExistence(timeout:20))
-  let afterSearch=try controlRequest("/integration-state")
-  XCTAssertEqual((afterSearch["counts"] as? [String:Int])?["normalize"],(beforeSearch["counts"] as? [String:Int])?["normalize"],"Search Back/X keep one mounted Part2 acquisition lifecycle")
-  shot("combined-search-back-and-x-preserve-encounter")
-  close();tab("My Stuff")
-  XCTAssertTrue(contains("Saved product evidence").waitForExistence(timeout:25),app.debugDescription)
-  let saved=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Open assessment saved ")).firstMatch
-  for _ in 0..<20{if saved.exists && saved.isHittable{break};app.scrollViews.firstMatch.swipeUp()}
-  XCTAssertTrue(saved.exists,app.debugDescription);saved.tap();XCTAssertTrue(element("Product result").waitForExistence(timeout:25));expand()
-  XCTAssertTrue(contains("Assessment when saved").waitForExistence(timeout:25),app.debugDescription);XCTAssertTrue(contains("Current assessment").exists);XCTAssertTrue(contains("Worth considering").exists);shot("combined-normal-my-stuff-reopen-history-current")
-  let state=try controlRequest("/integration-state")
-  XCTAssertEqual(state["saves"] as? Int,(initial["saves"] as? Int ?? 0)+1)
-  XCTAssertEqual(state["assessments"] as? Int,(initial["assessments"] as? Int ?? 0)+1)
-  let counts=try XCTUnwrap(state["counts"] as? [String:Int]);XCTAssertGreaterThanOrEqual(counts["search"] ?? 0,1);XCTAssertEqual(counts["scan"],1)
-  close()
- }
-
- func testNormalCheckNameWithoutMarketStaysConservative() throws {
+ func testNormalCheckNameSearchUnknownSaveAndMyStuff() throws {
   continueAfterFailure=false;app.activate();if element("Close result").exists{close()};fixtureRoute()
-  tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close();tap("Open normal Check with synthetic session")
+  tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close();let initial=try controlRequest("/integration-state");tap("Open normal Check with synthetic session")
   XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:25));let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"Original synthetic\n")
   let item=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Check Synthetic Original synthetic authority fixture")).firstMatch;XCTAssertTrue(item.waitForExistence(timeout:25),app.debugDescription);item.tap()
-  XCTAssertTrue(element("Product result").waitForExistence(timeout:25));XCTAssertTrue(contains("Product not confirmed").waitForExistence(timeout:25),app.debugDescription)
-  XCTAssertTrue(contains("Personal assessment unavailable").exists);XCTAssertTrue(contains("Ingredient evidence unavailable").exists);XCTAssertFalse(contains("Worth considering").exists)
-  // React Native exposes nested text nodes for the same rendered label. Distinct
-  // frames, plus the mounted component proof, identify one visible Fit surface.
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:25));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertTrue(contains("The available evidence cannot support a judgment for this purpose.").exists);XCTAssertTrue(contains("Published list · Package not confirmed").exists);XCTAssertFalse(contains("Worth considering").exists)
+  // React Native exposes nested text nodes for the same rendered label.
   let fits=app.staticTexts.matching(NSPredicate(format:"label == %@","Personal Fit")).allElementsBoundByIndex;XCTAssertEqual(Set(fits.map{String(describing:$0.frame)}).count,1)
-  shot("combined-ordinary-name-unanswered-market-conservative");expand();XCTAssertFalse(element("Save product").exists);XCTAssertFalse(element("Save this assessment").exists)
-  let before=try controlRequest("/integration-state");tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Personal assessment unavailable").exists)
-  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Close result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Personal assessment unavailable").exists);XCTAssertFalse(contains("Worth considering").exists)
-  let after=try controlRequest("/integration-state");XCTAssertEqual((after["counts"] as? [String:Int])?["normalize"],(before["counts"] as? [String:Int])?["normalize"],"Ordinary search Back/X keep one Part2 acquisition owner");shot("combined-ordinary-unscoped-search-return");close()
+  let names=app.staticTexts.matching(NSPredicate(format:"label == %@","Original synthetic authority fixture")).allElementsBoundByIndex;XCTAssertEqual(Set(names.map{String(describing:$0.frame)}).count,1)
+  XCTAssertFalse(element("Ingredient details: Glycerin").exists,"collapsed judgment precedes ingredient disclosure");shot("combined-normal-partial-immediate-judgment");expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:20),app.debugDescription)
+  tap("Compare or describe this check");tap("Original synthetic current cream");XCTAssertFalse(element("Skip this question for this check").exists,"unsupported purpose cannot make an intent question useful");choose("Replace one item");choose("Moisturizing");choose("Face");choose("Leave on");XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:20));XCTAssertFalse(contains("Worth considering").exists)
+  tap("Close comparison choices");tap("Save product");XCTAssertTrue(element("Saved").waitForExistence(timeout:20),app.debugDescription);tap("Compare or describe this check");tap("Save this assessment");XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription);tap("Close comparison choices");shot("combined-normal-partial-separate-saves")
+  let before=try controlRequest("/integration-state");tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Not enough info").exists);XCTAssertTrue(element("Ingredient details: Glycerin").exists)
+  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Close result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Not enough info").exists);XCTAssertTrue(element("Ingredient details: Glycerin").exists)
+  let after=try controlRequest("/integration-state");XCTAssertEqual((after["counts"] as? [String:Int])?["normalize"],(before["counts"] as? [String:Int])?["normalize"],"Search Back/X preserve one Part2 acquisition owner");shot("combined-partial-search-return");close();tab("My Stuff")
+  XCTAssertTrue(contains("Saved product evidence").waitForExistence(timeout:25));let saved=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Open assessment saved ")).firstMatch;for _ in 0..<20{if saved.exists && saved.isHittable{break};app.scrollViews.firstMatch.swipeUp()};XCTAssertTrue(saved.exists,app.debugDescription);saved.tap();XCTAssertTrue(element("Product result").waitForExistence(timeout:25));expand()
+  XCTAssertTrue(contains("Assessment when saved").waitForExistence(timeout:25),app.debugDescription);XCTAssertTrue(contains("Current assessment").exists);XCTAssertTrue(contains("Not enough info").exists);XCTAssertFalse(contains("Worth considering").exists);XCTAssertTrue(element("Ingredient details: Glycerin").exists);shot("combined-normal-my-stuff-partial-history-current")
+  let state=try controlRequest("/integration-state");XCTAssertEqual(state["saves"] as? Int,(initial["saves"] as? Int ?? 0)+1);XCTAssertEqual(state["assessments"] as? Int,(initial["assessments"] as? Int ?? 0)+1);let counts=try XCTUnwrap(state["counts"] as? [String:Int]);XCTAssertGreaterThanOrEqual(counts["search"] ?? 0,1);XCTAssertEqual(counts["scan"],1);close()
  }
 
  func testNormalBarcodeLocalPhotoDraftBackSearchAndRemoval() throws {
