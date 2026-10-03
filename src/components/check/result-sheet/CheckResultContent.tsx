@@ -41,11 +41,11 @@ function FindingCard({ finding, onSource }: { finding: ResultFinding; onSource?:
     <SourceDisclosure finding={finding} onSource={onSource} />
   </View>;
 }
-export function CheckVerdictBlock({ verdict, heading = 'PERSONAL FIT', beforeTitle, children }: {
+export function VerdictBlock({ verdict, heading, beforeTitle, children }: {
   verdict: VerdictPresentation; heading?: string; beforeTitle?: React.ReactNode; children?: React.ReactNode;
 }) {
   const tone = tones[verdict.state];
-  return <View style={styles.fitBlock}><Text style={styles.eyebrow} accessibilityRole="header">{heading}</Text>
+  return <View style={styles.fitBlock}>{heading ? <Text style={styles.eyebrow} accessibilityRole="header" accessibilityLabel={heading}>{heading}</Text> : <Text style={styles.eyebrow}>PERSONAL FIT</Text>}
     <View style={[styles.verdict, { backgroundColor: tone.bg, borderColor: tone.border }]} accessibilityLiveRegion="polite">
       {beforeTitle}
       <View style={styles.verdictTitleRow}><Icon name={tone.icon} size={22} color={tone.text} />
@@ -72,7 +72,7 @@ export function CheckResultView({ facts, verdict, section = 'all', showIdentity 
         <View style={styles.identity}>{facts.brand ? <Text style={styles.brand}>{facts.brand}</Text> : null}
           <Text style={styles.productName} accessibilityRole="header">{facts.name}</Text>{category ? <Text style={styles.brand}>{category}</Text> : null}</View>
       </View>}
-      {personalSummary ?? <CheckVerdictBlock verdict={verdict} />}
+      {personalSummary ?? <VerdictBlock verdict={verdict} />}
     </View>}
     {section !== 'summary' && <View style={styles.findings}>
       {verdict.findings.map(finding => <FindingCard key={finding.id} finding={finding} />)}
