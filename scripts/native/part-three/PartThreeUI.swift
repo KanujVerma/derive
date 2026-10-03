@@ -25,7 +25,7 @@ final class PartThreeUI: XCTestCase {
   XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription);shot("part-three-exact-assessment-save")
   // Retained recall tests may durably revoke the reference card. Exact identity
   // survives independently; this flow must not require recalled reference prose.
-  tap("Ingredient details: Glycerin");tap("Listed as: Glycerin");XCTAssertTrue(contains("Listed as: Glycerin").exists,app.debugDescription);shot("part-three-unaffected-ingredient-detail");tap("Close ingredient detail")
+  tap("Ingredient details: Glycerin");tap("Listed as: Glycerin");XCTAssertTrue(contains("Listed as: Glycerin").exists,app.debugDescription);XCTAssertFalse(contains("reference humectant role").exists,"Durably recalled reference wording must not return");shot("part-three-unaffected-ingredient-detail");tap("Close ingredient detail")
   close();tap("Reopen Part3 saved assessment");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand()
   XCTAssertTrue(contains("Assessment when saved").waitForExistence(timeout:20),app.debugDescription)
   XCTAssertTrue(contains("Current assessment").exists);XCTAssertTrue(contains("Worth considering").exists);XCTAssertFalse(element("Replace this item").exists);shot("part-three-reopened-history-versus-current")
@@ -37,7 +37,7 @@ final class PartThreeUI: XCTestCase {
   XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand()
   XCTAssertTrue(contains("The earlier personal assessment is no longer available.").waitForExistence(timeout:30),app.debugDescription)
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertFalse(contains("Worth considering").exists);XCTAssertFalse(contains("Its label matches the step").exists)
-  tap("Ingredient details: Glycerin");tap("Listed as: Glycerin");XCTAssertTrue(contains("Listed as: Glycerin").exists,app.debugDescription);shot("part-three-withdrawn-purpose-safe-ingredient-survival");tap("Close ingredient detail")
+  tap("Ingredient details: Glycerin");tap("Listed as: Glycerin");XCTAssertTrue(contains("Listed as: Glycerin").exists,app.debugDescription);XCTAssertFalse(contains("reference humectant role").exists,"Durably recalled reference wording must not return");shot("part-three-withdrawn-purpose-safe-ingredient-survival");tap("Close ingredient detail")
   close();tap("Switch Part3 fixture account");XCTAssertFalse(contains("Worth considering").exists);XCTAssertFalse(contains("Original synthetic authority fixture").exists);shot("part-three-owner-clear")
  }
  func testFiveStepAtomicSetupAndConfirmedPreference() throws {
