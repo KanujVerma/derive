@@ -65,3 +65,12 @@ test('current reaction may coexist with an explicit none remembered answer for p
 });
 
 test('experience date precision and uncertainty are faithful through v2 serialization and v1-compatible null projection',()=>{const setup=emptySetup();setup.experiences=[{...migratePersonalContextV1(v1).experiences[0].data,occurred:{start:{state:'known',value:{value:'2020',precision:'year'}},end:{state:'withheld'}}}];const parsed=setupV2Schema.parse(JSON.parse(JSON.stringify(setup)));assert.deepEqual(parsed.experiences[0].occurred,setup.experiences[0].occurred);const c=projectPersonalContextV2({...v1,revision:2,experiences:[]},{...metadata,revision:2,data:parsed});assert.deepEqual(projectPersonalContextV1(c).experiences[0].data.occurred,{start:null,end:null});});
+
+test('review 7: delayed setup acknowledgment cannot discard a newer note; failure retains the submitted draft',async()=>{
+ let release!:()=>void;const pending=new Promise<void>(resolve=>release=resolve);const submitted:Array<any>=[];let acknowledged=false;
+ const h=componentHarness('src/components/p0b-personalization/ContextFlow.tsx','ContextFlow',{setup:true,durableSetup:true,ownerId:owner,collectIntent:false,createId:()=>id(3),onSetup(b:unknown){submitted.push(structuredClone(b));void pending.then(()=>{acknowledged=true;});},onApply(){},onSkip(){}});
+ for(let i=0;i<4;i++)press(control(h.render(),'Continue'));
+ control(h.render(),'Anything else').props.onChangeText('Retained original note');press(control(h.render(),'Save skin profile'));
+ const saving=control(h.render({loading:true}),'Anything else');assert.equal(saving.props.editable,false);saving.props.onChangeText('Newer note while save pending'); assert.equal(control(h.render(),'Anything else').props.value,'Retained original note');assert.equal(submitted[0].additionalNote,'Retained original note');assert.equal(acknowledged,false);
+ const failed=h.render({loading:false,error:'Your setup was not saved.'});assert.equal(control(failed,'Anything else').props.value,'Retained original note');control(failed,'Anything else').props.onChangeText('Newer note after failure');press(control(h.render(),'Save skin profile'));assert.equal(submitted[1].additionalNote,'Newer note after failure');release();await pending;await Promise.resolve();assert.equal(acknowledged,true);h.dispose();
+});

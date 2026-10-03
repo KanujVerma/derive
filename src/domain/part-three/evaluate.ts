@@ -11,6 +11,10 @@ function referenceRelation(ref:ContextProductReference,binding:DecisionBindingV2
  const s=binding.subject;if(s.kind!=='declaration'||ref.kind!=='catalog'||!s.productId||ref.productId!==s.productId)return null;
  return s.variantId!==null&&s.formulaVersionId!==null&&ref.variantId===s.variantId&&ref.formulaVersionId===s.formulaVersionId?'exact_version':'product_family';
 }
+function matchesAvoidedReference(ref:ContextProductReference,binding:DecisionBindingV2):boolean {
+ const s=binding.subject;if(s.kind!=='declaration'||ref.kind!=='catalog'||!s.productId||ref.productId!==s.productId)return false;
+ return (!ref.variantId||ref.variantId===s.variantId)&&(!ref.formulaVersionId||ref.formulaVersionId===s.formulaVersionId);
+}
 const known=<T>(a:{state:string;value?:T}|undefined):T|null=>a?.state==='known'?a.value??null:null;
 export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalResultV2 {
  const b=DecisionBindingV2Schema.parse(input.binding),p=NormalizationResultSchema.parse(input.partTwo),c=input.context,clock=Date.parse(input.now);
@@ -41,7 +45,13 @@ export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalRe
    const matches=matching(v.target.identity.ingredientId);
    if(v.strength==='decisive'&&(!product||matches.some(({f,o})=>f.subject.kind!=='bound_declaration_entry'||o.modality!=='unconditional'||o.transcription!=='clear')||(!matches.length&&(product.claimLimits.declarationCompleteness!=='accepted'||product.occurrences.some(o=>o.mapping.state!=='resolved')))))gap('avoidance_unresolved','missing','evidence');
    for(const {f,o} of matches){const definite=product&&product.evidenceState!=='conflict'&&product.evidenceState!=='blocked'&&f.subject.kind==='bound_declaration_entry'&&o.modality==='unconditional'&&o.transcription==='clear';add(definite?'avoidance':'evidence_limit','exact-avoidance',definite&&v.strength==='decisive'?'decisive':definite?'optional':'information',definite?'preference':'conditional',{facts:[f],reports:[pref.id],name:o.observedName});}
-  }else if(v.kind==='avoid_product'&&v.target.kind==='product'&&(referenceRelation(v.target.reference,b)||candidateCurrent&&JSON.stringify(candidateCurrent.reference)===JSON.stringify(v.target.reference)))add('avoidance','avoid-retry',v.strength==='decisive'?'decisive':'optional','preference',{reports:[pref.id,...(candidateCurrent&&c.routine?[c.routine.id]:[])],scope:'report'});
+  }else if(v.kind==='avoid_product'&&v.target.kind==='product'){
+   const ref=v.target.reference;
+   if(matchesAvoidedReference(ref,b)||candidateCurrent?.reference.kind==='manual'&&JSON.stringify(candidateCurrent.reference)===JSON.stringify(ref))add('avoidance','avoid-retry',v.strength==='decisive'?'decisive':'optional','preference',{reports:[pref.id,...(candidateCurrent&&c.routine?[c.routine.id]:[])],scope:'report'});
+   else if(v.strength==='decisive'&&ref.kind==='catalog'&&declaration?.productId===ref.productId&&(ref.variantId&&!declaration.variantId||ref.formulaVersionId&&!declaration.formulaVersionId)){
+    gap('avoidance_unresolved','missing','evidence');add('evidence_limit','unresolved-product-avoidance','information','unresolved',{reports:[pref.id],relation:'product_family',scope:'report'});
+   }
+  }
  }
  const profile=c.profile?.data;
  if(profile?.sensitivities.status==='reported')for(const term of profile.sensitivities.values){const aliases=LOCAL_DICTIONARY_RELEASE.aliases.filter(a=>a.status==='active'&&a.lookupKey===lookupName(term).key),ids=[...new Set(aliases.map(a=>a.ingredientId))];if(ids.length!==1)continue;
@@ -59,11 +69,12 @@ export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalRe
  const requested=input.requestedUse;
  const comparator=b.comparatorId?c.routine?.data.items.find(i=>i.id===b.comparatorId):null;
  function assessmentFor(item:NonNullable<typeof comparator>){return c.assessments.filter(a=>a.ownerId===b.ownerId&&b.assessmentRevisions.includes(a.id)&&JSON.stringify(a.data.reference)===JSON.stringify(item.reference)&&known(a.data.useContext.reportedPurpose?.answer)===known(item.reportedPurpose?.answer)&&known(a.data.useContext.applicationSite?.answer)===known(item.applicationSite?.answer)&&known(a.data.useContext.useForm?.answer)===known(item.useForm?.answer)&&[known(item.reportedPurpose?.answer),goal].includes(known(a.data.goalOrPurpose))&&known(a.data.goalOrPurpose)!==null).sort((a,b)=>b.revision-a.revision)[0];}
+ const materialUseKnown=(item:NonNullable<typeof comparator>)=>known(item.reportedPurpose?.answer)!==null&&known(item.applicationSite?.answer)!==null&&known(item.useForm?.answer)!==null;
  const sameUse=(item:NonNullable<typeof comparator>,f:typeof purpose[number])=>known(item.reportedPurpose?.answer)===f.purposeId&&known(item.applicationSite?.answer)===f.site&&known(item.useForm?.answer)===f.useForm;
  const admitted=purpose.find(f=>requested.site===f.site&&requested.useForm===f.useForm&&(requested.purpose===f.purposeId||requested.purpose===null&&goal==='dryness'&&f.purposeId==='moisturizing'));
  if(b.intent==='check_current'&&candidateCurrent&&(candidateCurrent.state==='current'||candidateCurrent.state==='occasional')){
   const assessment=assessmentFor(candidateCurrent),relation=referenceRelation(candidateCurrent.reference,b)??(candidateCurrent.reference.kind==='manual'?'selected_manual':'product_family');
-  if(assessment&&relation&&requested.purpose===known(candidateCurrent.reportedPurpose?.answer)&&requested.site===known(candidateCurrent.applicationSite?.answer)&&requested.useForm===known(candidateCurrent.useForm?.answer)&&assessment.data.perceivedHelp==='helps'&&(known(assessment.data.goalOrPurpose)===goal||known(assessment.data.goalOrPurpose)===requested.purpose)&&goal==='maintain')add('current_help','current-help','value','helps',{reports:[c.routine!.id,assessment.id,...(c.profile?[c.profile.id]:[])],scope:'report',subject:{kind:'report',recordId:assessment.data.id,relation},relation});
+  if(assessment&&relation&&materialUseKnown(candidateCurrent)&&requested.purpose===known(candidateCurrent.reportedPurpose?.answer)&&requested.site===known(candidateCurrent.applicationSite?.answer)&&requested.useForm===known(candidateCurrent.useForm?.answer)&&assessment.data.perceivedHelp==='helps'&&(known(assessment.data.goalOrPurpose)===goal||known(assessment.data.goalOrPurpose)===requested.purpose)&&goal==='maintain')add('current_help','current-help','value','helps',{reports:[c.routine!.id,assessment.id,...(c.profile?[c.profile.id]:[])],scope:'report',subject:{kind:'report',recordId:assessment.data.id,relation},relation});
  }
  if(comparator&&declaration&&c.routine){
   const assessment=assessmentFor(comparator),f=purpose.find(f=>sameUse(comparator,f)&&(requested.purpose===null||requested.purpose===f.purposeId)&&(requested.site===null||requested.site===f.site)&&(requested.useForm===null||requested.useForm===f.useForm));const self=referenceRelation(comparator.reference,b)==='exact_version'||candidateCurrent?.id===comparator.id;
@@ -76,12 +87,12 @@ export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalRe
    }
   }else add('comparison','different-use','information','different_use',{reports:[c.routine.id],scope:'comparison',subject:{kind:'comparison',candidateItemId:declaration.itemId,comparatorId:comparator.id}});
  }
- if(admitted&&goal==='dryness'&&b.intent==='add')add('purpose_value','purpose-value','value','helps',{facts:product!.facts.filter(x=>x.factId===admitted.partTwoFactId),reports:c.profile?[c.profile.id]:[]});
+ if(admitted?.purposeId==='moisturizing'&&goal==='dryness'&&b.intent==='add')add('purpose_value','purpose-value','value','helps',{facts:product!.facts.filter(x=>x.factId===admitted.partTwoFactId),reports:c.profile?[c.profile.id]:[]});
  if(!declaration)gap('identity_or_use','missing','evidence');
  if(product?.evidenceState==='conflict')gap('formula_association','conflict','evidence');
  if(!findings.some(f=>f.consequence==='value')&&!findings.some(f=>f.consequence==='decisive'||f.consequence==='concern'))gap(purpose.length?'purpose_or_site':'purpose_coverage','missing',purpose.length?'user':'reviewer');
  let question:EligibleQuestion|null=null;
- if(!findings.some(f=>f.consequence==='decisive')&&!input.questionSuppression.exposedQuestionId&&!input.questionSuppression.skip&&!input.questionSuppression.answered&&comparator&&c.routine&&purpose.some(f=>sameUse(comparator,f)&&(requested.purpose===null||requested.purpose===f.purposeId)&&(requested.site===null||requested.site===f.site)&&(requested.useForm===null||requested.useForm===f.useForm))&&assessmentFor(comparator)?.data.perceivedHelp==='helps'&&b.intent==='unanswered')question={id:'question:replace-or-add',version:PART_THREE_RELEASE.question,missingInput:'intent',ruleIds:['pair-comparison'],affectedPropositionIds:['personal-candidacy'],branches:[{answer:'replace',outcome:'replacement'},{answer:'add',outcome:'extra_step'},{answer:'unsure',outcome:'unknown'}],sensitivity:'ordinary',relevanceReason:'replacement_or_extra',writeScope:'encounter',suppressionKey:'encounter:intent',priority:[2,2,1,1,0]};
+ if(!findings.some(f=>f.consequence==='decisive')&&!input.questionSuppression.exposedQuestionId&&!input.questionSuppression.skip&&!input.questionSuppression.answered&&comparator&&(comparator.state==='current'||comparator.state==='occasional')&&c.routine&&purpose.some(f=>sameUse(comparator,f)&&(requested.purpose===null||requested.purpose===f.purposeId)&&(requested.site===null||requested.site===f.site)&&(requested.useForm===null||requested.useForm===f.useForm))&&assessmentFor(comparator)?.data.perceivedHelp==='helps'&&b.intent==='unanswered')question={id:'question:replace-or-add',version:PART_THREE_RELEASE.question,missingInput:'intent',ruleIds:['pair-comparison'],affectedPropositionIds:['personal-candidacy'],branches:[{answer:'replace',outcome:'replacement'},{answer:'add',outcome:'extra_step'},{answer:'unsure',outcome:'unknown'}],sensitivity:'ordinary',relevanceReason:'replacement_or_extra',writeScope:'encounter',suppressionKey:'encounter:intent',priority:[2,2,1,1,0]};
  const decisive=findings.filter(f=>f.consequence==='decisive'),concerns=findings.filter(f=>f.consequence==='concern'),values=findings.filter(f=>f.consequence==='value');
  const material=gaps.filter(g=>g.affectedPropositionIds.includes('personal-candidacy'));
  const judgment=decisive.length?'skip':concerns.length?'check_first':values.length&&!material.length?'worth_considering':material.some(g=>g.reason==='avoidance_unresolved')?'check_first':'not_enough_info';

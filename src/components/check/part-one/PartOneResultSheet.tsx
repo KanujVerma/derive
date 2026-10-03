@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Text, View } from 'react-native';
 import { ResultSheetSurface } from '../result-sheet/ResultSheetSurface';
 import { Button } from '../../ui/Button';
 import { colors, spacing, typography } from '../../../constants/theme';
 import type { PartOneView } from '../../../presentation/part-one/resultController';
-import { PartTwoIngredients, PartTwoSavedIngredients } from '../part-two/PartTwoIngredients';
+import { usePartTwoView, PartTwoIngredientsView } from '../part-two/PartTwoIngredients';
+import { partTwoTransport, partTwoSavedTransport } from '../../../services/partTwo';
 import type { PartTwoSaveGuard } from '../../../services/partTwoClient';
 import { usePartThreeCheck, type PartThreePorts } from '../part-three/usePartThreeCheck';
 import { PartThreeSummary } from '../part-three/PartThreeSummary';
@@ -73,8 +74,12 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   const expiredFields = Boolean(r && (sections.length !== r.display.sections.length || sources.length !== r.display.sources.length));
   const expired = r?.declarationState === 'accepted' && (r.freshness.state !== 'fresh' || !expiresAt || Date.parse(expiresAt) <= clock);
   const partOneSummary = expiredIdentity ? 'Product evidence expired. Check the current source before relying on it.' : expiredFields && r?.declarationState !== 'conflict' ? 'Some ingredient evidence expired. Check the current source before relying on it.' : partOneStatus(view, clock);
-  const detailTarget = details?.target;
-  const currentDetails = detailTarget && r && detailTarget.ownerId === view.owner && detailTarget.scanId === r.scanId && detailTarget.captureSessionId === interpretationCaptureSessionId && detailTarget.generation === r.generation && detailTarget.evidenceRevision === r.resultRevision ? details : null;
+  const acquisitionTarget = view.owner && r && !expired && (savedInterpretationId || !interpretationCaptureSessionId) ? { ownerId: view.owner, scanId: r.scanId, captureSessionId: interpretationCaptureSessionId, generation: r.generation, evidenceRevision: r.resultRevision } : null;
+  const acquisitionTransport = useMemo(() => ingredientTransport ?? (savedInterpretationId ? partTwoSavedTransport(savedInterpretationId) : partTwoTransport), [ingredientTransport, savedInterpretationId]);
+  const acquired = usePartTwoView(acquisitionTarget, ingredientEnabled, acquisitionTransport);
+  const evidenceDetails = acquisitionTarget ? acquired : details;
+  const detailTarget = evidenceDetails?.target;
+  const currentDetails = detailTarget && r && detailTarget.ownerId === view.owner && detailTarget.scanId === r.scanId && detailTarget.captureSessionId === interpretationCaptureSessionId && detailTarget.generation === r.generation && detailTarget.evidenceRevision === r.resultRevision ? evidenceDetails : null;
   if (currentDetails?.error || currentDetails?.result && currentDetails.result.state !== 'pending') sourceAccess.current.denied = true;
   if (currentDetails?.result && currentDetails.result.state !== 'ready' && currentDetails.result.state !== 'pending' && currentDetails.result.reasonCodes.some(code => code === 'source_evidence_unavailable' || code === 'source_withdrawn')) sourceAccess.current.privateDenied = true;
   // Ready details own fresh source attribution in their disclosure. A later
@@ -108,7 +113,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       {!expiredIdentity && !expired && !(expiredFields && r?.declarationState === 'accepted') && r?.snapshotId && r.allowedActions.some(action => action === 'save' || action === 'save_partial') && <Button
         label={view.saved ? 'Saved' : r.declarationState === 'accepted' ? 'Save product and evidence' : 'Save product without verified ingredients'}
         disabled={view.saved} variant="outline" onPress={() => {
-          const d = details?.result, t = details?.target;
+          const d = currentDetails?.result, t = currentDetails?.target;
           const guard = d?.state === 'ready' && t && t.ownerId === view.owner && t.scanId === r.scanId && t.captureSessionId === interpretationCaptureSessionId && t.generation === r.generation && t.evidenceRevision === r.resultRevision && Date.parse(d.expiresAt) > Date.now() ? { bindingKey: d.bindingKey, expectedPartTwoRevision: d.resultRevision } : undefined;
           onSave(guard);
         }} />}
@@ -119,9 +124,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       {r && r.identity !== 'exact' && <Button label="Search by name" variant="ghost" onPress={onSearch} />}
     </View>}>
     {typeof localDraft === 'function' ? localDraft(sourceAccess.current.privateDenied, setDetails) : !sourceAccess.current.privateDenied && localDraft}
-    {view.owner && r && !expired && (savedInterpretationId || !interpretationCaptureSessionId) ?
-      savedInterpretationId ? <PartTwoSavedIngredients saveId={savedInterpretationId} onView={setDetails} enabled={ingredientEnabled} transport={ingredientTransport} fallback={originalSections} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: interpretationCaptureSessionId, generation: r.generation, evidenceRevision: r.resultRevision }} /> :
-        <PartTwoIngredients onView={setDetails} enabled={ingredientEnabled} transport={ingredientTransport} fallback={originalSections} target={{ ownerId: view.owner, scanId: r.scanId, captureSessionId: null, generation: r.generation, evidenceRevision: r.resultRevision }} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
+    {acquisitionTarget ? <PartTwoIngredientsView view={acquired} target={acquisitionTarget} enabled={ingredientEnabled} fallback={originalSections} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
     {!expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
       <Text>{source.label} · Observed {source.observedAt.slice(0, 10)}</Text>
       {source.url && <Button label={`View source: ${source.label}`} variant="ghost" onPress={() => {

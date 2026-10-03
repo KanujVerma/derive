@@ -1,7 +1,6 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.116.0';
 import {normalizeAuthorized} from '../_shared/part-two-runtime.ts';
 import {createPartOneBoundedFetch} from '../_shared/part-one-bounded-fetch.ts';
-import {normalizeDatabaseDates} from '../_shared/part-one-runtime.ts';
 import {projectPersonalContextV2,migrateExperienceV1} from '../../../src/services/context/migrateV2.ts';
 import {createJevProvider,createJevHttpTransport} from '../../../src/domain/part-three/provider.ts';
 import {handlePersonalRequest,PartThreeError} from './handler.ts';
@@ -22,7 +21,7 @@ Deno.serve(async(req:Request)=>{
   const checked=async(name:string,args:Record<string,unknown>)=>{const {data,error}=await admin.rpc(name,args);if(error)throw new PartThreeError(error.code==='42501'?'forbidden':'changed_basis',error.code==='42501'?403:409);return data;};
   let context:any=null;
   const result=await handlePersonalRequest(raw,{ownerId:owner.id,now:()=>new Date().toISOString(),defer:work=>EdgeRuntime.waitUntil(work().catch(()=>undefined)),
-   async identity(scanId,generation,revision){const {data,error}=await user.rpc('part_one_operation',{p_action:'scans/read',p_payload:{scanId}});if(error||!data||data.generation!==generation||data.resultRevision!==revision)return null;const identity=data.display?.selectedIdentity;const normalized=identity?normalizeDatabaseDates(identity) as {expiresAt?:unknown}:null;return identity&&typeof identity.name==='string'&&typeof normalized?.expiresAt==='string'?{name:identity.name,expiresAt:normalized.expiresAt}:null;},
+   identity:(scanId,generation,revision,snapshotId,pinnedSnapshotId,captureSessionId)=>checked('part_three_worker',{p_owner:owner.id,p_action:'identity/resolve',p_payload:{scanId,generation,revision,snapshotId,pinnedSnapshotId,captureSessionId}}),
    worker:(action,payload)=>checked('part_three_worker',{p_owner:owner.id,p_action:action,p_payload:payload}),
    async normalize(r){return normalizeAuthorized({schemaVersion:1,requestId:r.requestId,scanId:r.scanId,captureSessionId:r.captureSessionId,expectedGeneration:r.expectedPartOneGeneration,expectedEvidenceRevision:r.expectedPartOneRevision},owner.id,{authorize:async()=>owner.id,localFixtureApproved:Deno.env.get('PART_TWO_LOCAL_FIXTURE')==='1',operation:(action,payload)=>action==='resolve'?checked('part_two_resolve',{p_owner:owner.id,p_payload:payload}):checked('part_two_operation',{p_action:action,p_payload:payload}),worker:(action,payload)=>checked('part_two_worker',{p_action:action,p_payload:payload})});},
    async context(){const raw=await checked('read_personal_context_v2',{p_user_id:owner.id});context=projectPersonalContextV2(raw.v1,raw.setupRevision);return context;},

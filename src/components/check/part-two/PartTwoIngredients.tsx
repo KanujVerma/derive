@@ -103,17 +103,14 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
   </View>;
 }
 
-/** Shared by actual Check and private saved evidence. No new screen or device cache. */
-export function PartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transport = partTwoTransport, onView, fallback }: { target: PartTwoTarget; enabled?: boolean; transport?: PartTwoTransport; onView?: (view: PartTwoView) => void; fallback?: React.ReactNode }) {
+/** Acquisition belongs to the mounted result owner, independent of disclosure. */
+export function usePartTwoView(target: PartTwoTarget | null, enabled = PART_TWO_ENABLED, transport = partTwoTransport): PartTwoView {
   const [view, setView] = useState<PartTwoView>({ target: null, result: null, loading: false, error: null });
   const controller = useMemo(() => createPartTwoController(transport, createCatalogRequestId, setView), [transport]);
   const [clockTick, clock] = useState(0);
   const key = JSON.stringify(target);
-  const originalAccess = useRef({ key, denied: false });
-  if (originalAccess.current.key !== key) originalAccess.current = { key, denied: false };
-  useEffect(() => { onView?.(view); }, [view, onView]);
   useEffect(() => {
-    if (!enabled) { controller.close(); return; }
+    if (!enabled || !target) { controller.close(); return; }
     controller.bind(target); void controller.refresh();
     const timer = setInterval(() => { controller.expire(); void controller.refresh(); }, 15000);
     const listener = AppState.addEventListener('change', state => {
@@ -127,6 +124,12 @@ export function PartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transpo
     const timer = setTimeout(() => { controller.expire(); clock(value => value + 1); }, Math.max(1, Math.min(60000, Date.parse(expiry) - Date.now())));
     return () => clearTimeout(timer);
   }, [expiry, view.result, controller, clockTick]);
+  return target && view.target && JSON.stringify(view.target) === key ? view : { target, result: null, loading: Boolean(enabled && target), error: null };
+}
+export function PartTwoIngredientsView({ target, view, enabled = PART_TWO_ENABLED, fallback }: { target: PartTwoTarget; view: PartTwoView; enabled?: boolean; fallback?: React.ReactNode }) {
+  const key = JSON.stringify(target);
+  const originalAccess = useRef({ key, denied: false });
+  if (originalAccess.current.key !== key) originalAccess.current = { key, denied: false };
   if (!enabled) return <>{fallback}</>;
   // Prop binding fences the render before effects handle owner/selection changes.
   const current = view.target && JSON.stringify(view.target) === key ? view : { target, result: null, loading: true, error: null };
@@ -138,6 +141,12 @@ export function PartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transpo
   const permitted = result && result.state !== 'ready' && result.permittedText && Date.parse(result.permittedText.expiresAt) > Date.now() ? result.permittedText : null;
   const originalAllowed = !originalAccess.current.denied && (result?.state === 'pending' || !result && current.loading && !current.error);
   return <>{permitted ? permitted.sections.map(section => <View key={section.sectionId}><Text accessibilityRole="header">{sectionLabel(section.kind)}</Text><Text selectable>{ingredientDisplayText(section.text)}</Text></View>) : originalAllowed && fallback}<PartTwoInlineView view={current} /></>;
+}
+/** Standalone owners (private evidence and saved screens) retain the same lifecycle. */
+export function PartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transport = partTwoTransport, onView, fallback }: { target: PartTwoTarget; enabled?: boolean; transport?: PartTwoTransport; onView?: (view: PartTwoView) => void; fallback?: React.ReactNode }) {
+  const view = usePartTwoView(target, enabled, transport);
+  useEffect(() => { onView?.(view); }, [view, onView]);
+  return <PartTwoIngredientsView target={target} view={view} enabled={enabled} fallback={fallback} />;
 }
 export function PartTwoSavedIngredients({ saveId, target, fallback, onView, enabled, transport: provided }: { saveId: string; target: PartTwoTarget; fallback?: React.ReactNode; onView?: (view: PartTwoView) => void; enabled?: boolean; transport?: PartTwoTransport }) {
   const transport = useMemo(() => provided ?? partTwoSavedTransport(saveId), [saveId, provided]);

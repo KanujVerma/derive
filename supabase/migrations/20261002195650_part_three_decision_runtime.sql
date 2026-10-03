@@ -89,6 +89,23 @@ begin
 end $$;
 revoke all on function private.part_three_owner(uuid) from public,anon,authenticated;
 
+-- Catalog linkage is identity-only. Part 1 deliberately carries no catalog
+-- formula promotion, so a formula ID is never synthesized from a variant.
+create function private.part_three_catalog_reference(p_owner uuid,p_snapshot uuid) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare rec private.part_one_records; v record;
+begin
+ select * into rec from private.part_one_records where id=p_snapshot and kind='snapshot';
+ if not found or not private.part_one_snapshot_identity_allowed(rec.id,p_owner) then return null; end if;
+ select pv.id,pv.product_id into v from public.product_variants pv
+ join public.product_identifiers i on i.variant_id=pv.id
+ where pv.id=rec.item_id and pv.lifecycle_status='active' and i.verified_at is not null
+ and i.identifier_type like 'gtin_%' and 'gtin:'||lpad(i.identifier_value,14,'0')=rec.canonical_key limit 1;
+ if not found then return null; end if;
+ return jsonb_build_object('productId',v.product_id,'variantId',v.id,'formulaVersionId',null);
+end $$;
+revoke all on function private.part_three_catalog_reference(uuid,uuid) from public,anon,authenticated;
+
 create function private.part_three_binding_current(p_owner uuid,b jsonb,p_pinned uuid default null,p_context_required boolean default true) returns boolean
 language plpgsql security definer set search_path='' as $$
 declare ctx jsonb; cur private.part_two_current; rel private.part_three_release; body jsonb; head public.personal_context_heads; s private.part_two_snapshots;
@@ -119,6 +136,7 @@ begin
   or body->'output'->'reading'->'dependencyManifest'->>'dependencyDigest' is distinct from b->>'sourceDigest'
   or body->'output'->'reading'->'dependencyManifest'->>'policyEpoch' is distinct from b->>'fieldPermissionEpoch'
   or (body->>'expiresAt')::timestamptz<=now() then return false; end if;
+ if b->'subject'->>'kind'='declaration' and jsonb_build_object('productId',b->'subject'->'productId','variantId',b->'subject'->'variantId','formulaVersionId',b->'subject'->'formulaVersionId') is distinct from coalesce(private.part_three_catalog_reference(p_owner,(b->'subject'->>'snapshotId')::uuid),jsonb_build_object('productId',null,'variantId',null,'formulaVersionId',null)) then return false; end if;
  return true;
 exception when invalid_text_representation or numeric_value_out_of_range then return false;
 end $$;
@@ -144,7 +162,7 @@ revoke all on function private.part_three_baseline_packet(jsonb,bigint,boolean) 
 
 create function public.part_three_worker(p_owner uuid,p_action text,p_payload jsonb) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare row public.part_three_results; saved public.part_three_saved_assessments; rel private.part_three_release; b jsonb; digest text; token uuid; packet jsonb; pinned uuid; enc private.part_three_encounters; snap private.part_two_snapshots; attempt private.part_three_provider_attempts; menu jsonb; v_grant_ids text[]; sanitized_saved_packet jsonb;
+declare row public.part_three_results; saved public.part_three_saved_assessments; rel private.part_three_release; b jsonb; digest text; token uuid; packet jsonb; pinned uuid; enc private.part_three_encounters; snap private.part_two_snapshots; attempt private.part_three_provider_attempts; menu jsonb; v_grant_ids text[]; sanitized_saved_packet jsonb; identity_record private.part_one_records; identity_body jsonb; scan private.part_one_scans;
 begin
  if p_action='release/register' then
   if p_payload->>'releaseHash' !~ '^[a-f0-9]{64}$' or p_payload->>'localFixture' is distinct from 'true' then raise exception 'PART_THREE_INVALID_RELEASE'; end if;
@@ -159,7 +177,20 @@ begin
  end if;
  perform private.part_three_owner(p_owner);
  select * into rel from private.part_three_release where id=true for update;
- if p_action='cancel_encounter' then
+ if p_action='identity/resolve' then
+  if nullif(p_payload->>'pinnedSnapshotId','') is not null then
+   identity_body:=private.part_two_project_withdrawals((p_payload->>'pinnedSnapshotId')::uuid,p_owner);
+   if identity_body is null or identity_body->>'scanId' is distinct from p_payload->>'scanId' or identity_body->>'generation' is distinct from p_payload->>'generation' or identity_body->>'evidenceRevision' is distinct from p_payload->>'revision' or identity_body->'output'->'productFacts'->'binding'->>'snapshotId' is distinct from p_payload->>'snapshotId' then return null; end if;
+  else
+   select * into scan from private.part_one_scans where id=(p_payload->>'scanId')::uuid and owner_id=p_owner;
+   if not found or scan.generation is distinct from (p_payload->>'generation')::bigint or scan.result_revision is distinct from (p_payload->>'revision')::bigint then return null; end if;
+   identity_body:=private.part_one_filter_result(scan.result,p_owner);
+   if identity_body->>'snapshotId' is distinct from p_payload->>'snapshotId' then return null; end if;
+  end if;
+  select * into identity_record from private.part_one_records where id=nullif(p_payload->>'snapshotId','')::uuid and kind='snapshot';
+  if not found or not private.part_one_snapshot_identity_allowed(identity_record.id,p_owner) then return null; end if;
+  return jsonb_build_object('name',identity_record.payload->>'name','expiresAt',private.part_one_utc(private.part_one_identity_expiry(identity_record.id)),'catalogReference',private.part_three_catalog_reference(p_owner,identity_record.id));
+ elsif p_action='cancel_encounter' then
   insert into private.part_three_encounters(owner_id,id,interacted) values(p_owner,(p_payload->>'encounterId')::uuid,true) on conflict(owner_id,id) do update set interacted=true;
   update public.part_three_results set lease_token=null where owner_id=p_owner and encounter_id=(p_payload->>'encounterId')::uuid;
   delete from public.part_three_results where owner_id=p_owner and encounter_id=(p_payload->>'encounterId')::uuid and state='pending';
@@ -195,6 +226,8 @@ begin
   select * into row from public.part_three_results where owner_id=p_owner and request_id=(p_payload->'request'->>'requestId')::uuid;
   if found and row.request is distinct from p_payload->'request' then raise exception 'PART_THREE_IDEMPOTENCY_CONFLICT'; end if;
   if not found then select * into row from public.part_three_results where owner_id=p_owner and encounter_id=(b->>'encounterId')::uuid and binding_hash=digest; end if;
+  -- An idempotency key never replays or rebinds a different authority generation.
+  if found and ((row.binding-'refinement') is distinct from (b-'refinement') or row.pinned_snapshot_id is distinct from pinned or not private.part_three_binding_current(p_owner,row.binding,row.pinned_snapshot_id)) then return jsonb_build_object('kind','unavailable','reason','changed_basis'); end if;
   if found and row.expires_at>now() and row.state='ready' then
   if row.payload->'refinementTrace' is not null and row.payload->'refinementTrace'<>'null'::jsonb and not private.part_three_refinement_authorized(p_owner,row.payload->'refinementTrace') then
    select * into enc from private.part_three_encounters where owner_id=p_owner and id=row.encounter_id;
@@ -225,6 +258,16 @@ begin
   if not found or row.lease_token is distinct from (p_payload->>'leaseToken')::uuid or not private.part_three_binding_current(p_owner,row.binding,row.pinned_snapshot_id) then return jsonb_build_object('kind','unavailable','reason','changed_basis'); end if;
   packet:=p_payload->'result';
   if (packet->'binding')-'refinement' is distinct from row.binding-'refinement' or packet->>'resultId' is distinct from row.id::text or (packet->>'resultRevision')::bigint<>row.result_revision+1 or packet->>'schemaVersion'<>'personal-result/v2' or (packet->>'validUntil')::timestamptz>row.expires_at or (packet->>'validUntil')::timestamptz<=now() then raise exception 'PART_THREE_INVALID_PUBLICATION'; end if;
+  -- Publication and encounter events share the owner fence. A touch/exposure
+  -- committed after the handler's last read cannot apply a late selection.
+  select * into enc from private.part_three_encounters where owner_id=p_owner and id=row.encounter_id for update;
+  if packet->'refinementTrace' is not null and packet->'refinementTrace'<>'null'::jsonb and (enc.interacted or enc.exposed_question_id is not null or enc.skipped or enc.answered) then
+   if row.payload is not null then
+    update public.part_three_results set lease_token=null where id=row.id;
+    return jsonb_build_object('kind','result','result',row.payload,'replayed',true);
+   end if;
+   packet:=private.part_three_baseline_packet(packet,(packet->>'resultRevision')::bigint,coalesce(enc.skipped,false) or coalesce(enc.answered,false));
+  end if;
   if packet->'refinementTrace' is not null and packet->'refinementTrace'<>'null'::jsonb then
    select a.* into attempt from private.part_three_provider_attempts a where a.id=(packet->'refinementTrace'->>'callId')::uuid and a.result_id=row.id and a.owner_id=p_owner;
    if not found or not rel.provider_enabled or not rel.processing_approved or not rel.spend_cap_approved or rel.circuit_open or rel.configured_model is distinct from attempt.configured_model or exists(select 1 from jsonb_array_elements(attempt.planned_menu->'jobs') j where (j->>'id'='prioritize_tradeoff' and not rel.tradeoff_utility_approved) or (j->>'id'='select_question' and not rel.question_utility_approved)) or attempt.processing_approval_id is distinct from rel.processing_approval_id or exists(select 1 from unnest(attempt.grant_ids) required where not exists(select 1 from private.part_three_external_grants g where g.id=required and g.permitted and g.expires_at>now())) then return jsonb_build_object('kind','unavailable','reason','changed_basis'); end if;
@@ -254,6 +297,14 @@ begin
   if row.payload is null then return jsonb_build_object('kind','unavailable','reason','evidence_unavailable'); end if;
   return jsonb_build_object('kind','result','result',row.payload,'replayed',true);
  elsif p_action='save' then
+  -- A committed receipt survives the short current-result lease. Reauthorize
+  -- its independently retained historical source before replaying metadata.
+  select * into saved from public.part_three_saved_assessments where owner_id=p_owner and request_id=(p_payload->>'requestId')::uuid for update;
+  if found then
+   if saved.packet is null or not private.part_three_binding_current(p_owner,saved.packet->'binding',saved.pinned_snapshot_id,false) or (saved.packet->'refinementTrace' is not null and saved.packet->'refinementTrace'<>'null'::jsonb and not private.part_three_refinement_authorized(p_owner,saved.packet->'refinementTrace')) then return jsonb_build_object('kind','unavailable','reason','changed_basis'); end if;
+   if saved.result_id is distinct from (p_payload->>'resultId')::uuid or saved.binding_hash is distinct from p_payload->>'expectedBindingHash' or saved.result_revision is distinct from (p_payload->>'expectedResultRevision')::bigint then raise exception 'PART_THREE_IDEMPOTENCY_CONFLICT'; end if;
+   return jsonb_build_object('kind','saved','savedAssessmentId',saved.id,'resultRevision',saved.result_revision,'replayed',true);
+  end if;
   select * into row from public.part_three_results where id=(p_payload->>'resultId')::uuid and owner_id=p_owner for update;
   if not found or row.state<>'ready' or row.expires_at<=now() or row.result_revision<>(p_payload->>'expectedResultRevision')::bigint or row.binding_hash is distinct from p_payload->>'expectedBindingHash' or not private.part_three_binding_current(p_owner,row.binding,row.pinned_snapshot_id) then return jsonb_build_object('kind','unavailable','reason','changed_basis'); end if;
   if row.payload->'refinementTrace' is not null and row.payload->'refinementTrace'<>'null'::jsonb and not private.part_three_refinement_authorized(p_owner,row.payload->'refinementTrace') then
@@ -301,6 +352,11 @@ begin
   else
    update private.part_three_encounters set exposed_question_id=coalesce(exposed_question_id,p_payload->>'questionId'),skipped=skipped or p_payload->>'event'='skip',answered=answered or p_payload->>'event'='answer',interacted=interacted or p_payload->>'event' in('skip','answer') where owner_id=p_owner and id=row.encounter_id;
   end if;
+  if p_payload->>'event' in('skip','answer') and row.payload->'question' is not null and row.payload->'question'<>'null'::jsonb then
+   packet:=jsonb_set(jsonb_set(row.payload,'{question}','null'::jsonb),'{resultRevision}',to_jsonb(row.result_revision+1));
+   update public.part_three_results set payload=packet,result_revision=result_revision+1 where id=row.id;
+  end if;
+  update public.part_three_results set lease_token=null where id=row.id;
   return jsonb_build_object('kind','acknowledged');
  end if;
  raise exception 'PART_THREE_INVALID_ACTION';
@@ -365,3 +421,33 @@ begin
 end $$;
 create trigger part_three_snapshot_projection after insert on private.part_two_snapshots for each row execute function private.part_three_snapshot_projection();
 revoke all on function private.part_three_snapshot_projection() from public,anon,authenticated;
+
+-- Verified catalog candidates exercise this existing Part 1 path. Qualify the
+-- stored payload so PL/pgSQL does not confuse it with the local payload variable.
+-- Preserve the approved Part 1 migration and every admission/permission rule.
+create or replace function private.part_one_catalog_identity(p_key text, p_request jsonb) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare v record; rid uuid; payload jsonb; results jsonb := '[]'; begin
+ for v in select distinct pv.id as item_id,p.name,p.brand,pv.variant_name,pv.package_size,pv.region_code
+   from public.product_identifiers i join public.product_variants pv on pv.id=i.variant_id
+   join public.products p on p.id=pv.product_id
+   where i.verified_at is not null and pv.lifecycle_status='active'
+     and i.identifier_type like 'gtin_%' and 'gtin:' || lpad(i.identifier_value,14,'0')=p_key
+ loop
+   select r.id into rid from private.part_one_records r where r.kind='snapshot' and r.item_id=v.item_id
+     and r.canonical_key=p_key and private.part_one_snapshot_identity_allowed(r.id,null)
+     and r.payload->'requestedMarket' is not distinct from p_request->'requestedMarket' order by r.revision desc limit 1;
+   if rid is null then
+     rid := gen_random_uuid();
+     payload := jsonb_build_object('itemId',v.item_id,'name',v.name,'brand',v.brand,
+       'variantText',concat_ws(' · ',v.variant_name,v.package_size),'image',null,
+       'declarationIds','[]'::jsonb,'sourceMarkets',case when v.region_code is null then '[]'::jsonb else jsonb_build_array(v.region_code) end,
+       'packageMarket',null,'requestedMarket',p_request->'requestedMarket');
+     insert into private.part_one_records(id,kind,item_id,revision,canonical_key,policy_id,policy_version,payload,observed_at,expires_at)
+       values(rid,'snapshot',v.item_id,coalesce((select max(revision)+1 from private.part_one_records where kind='snapshot' and item_id=v.item_id),1),
+       p_key,'derive_catalog','1',payload,now(),now()+interval '24 hours');
+   end if;
+   results := results || jsonb_build_array(jsonb_build_object('itemId',v.item_id,'snapshotId',rid));
+ end loop;
+ return results;
+end $$;

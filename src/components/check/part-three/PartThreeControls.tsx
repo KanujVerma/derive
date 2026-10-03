@@ -1,3 +1,4 @@
+import { catalogReferenceKey } from '../../../presentation/p0b-personalization/storageAdapter';
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, AppState, Text, View, useWindowDimensions } from 'react-native';
 import { Button } from '../../ui/Button';
@@ -36,7 +37,13 @@ export function PartThreeControls({ check }: {
     if (!check.enabled)
         return null;
     const current = context?.routine?.data.items.filter(i => i.state === 'current' || i.state === 'occasional') ?? [];
-    const label = (item: typeof current[number], index: number) => item.reference.kind === 'manual' ? item.reference.name : `Catalog routine item ${index + 1} (name unavailable)`;
+    const label = (item: typeof current[number], _index: number) => {
+      if(item.reference.kind==='manual')return item.reference.name;
+      const named=check.displayLabels?.[catalogReferenceKey(item.reference)];if(named)return named;
+      const answer=(field:{answer:{state:string;value?:string}}|undefined)=>field?.answer.state==='known'?field.answer.value:null;
+      const use=[answer(item.reportedPurpose),answer(item.applicationSite),answer(item.useForm)].filter(Boolean).map(v=>v!.replace(/_/g,' ')).join(' · ');
+      return `Catalog item ${item.reference.productId} · ${use||'use not recorded'} · ${item.timing==='unknown'?'schedule not recorded':item.timing.toUpperCase()} (name unavailable)`;
+    };
     return <View style={{ gap: spacing.sm }}>
   {view.question?.missingInput === 'intent' && <View ref={questionView} collapsable={false}><QuestionGroup label="Replace the selected item or add another?" support="This changes whether you are replacing a step or adding one. Your answer applies to this Check.">
    {([['replace', 'Replace this item'], ['add', 'Add another'], ['unsure', 'Not sure']] as const).map(([value, text]) => <Button key={value} label={text} variant="outline" onPress={() => check.questionAnswer(value)}/>)}

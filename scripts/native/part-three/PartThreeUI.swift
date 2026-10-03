@@ -13,7 +13,7 @@ final class PartThreeUI: XCTestCase {
   continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
   if element("Close result").exists{close()}
   XCTAssertTrue(element("Load Part3 local fixture").waitForExistence(timeout:20),app.debugDescription);tap("Load Part3 local fixture")
-  XCTAssertTrue(element("Product result").waitForExistence(timeout:30));expand()
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:30));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertTrue(contains("Purpose, application site or use form needs clarification.").exists,app.debugDescription);XCTAssertFalse(contains("Ingredient details").exists,"Collapsed result must earn an immediate judgment before detail disclosure");shot("part-three-collapsed-immediate-judgment");expand()
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:35),app.debugDescription);shot("part-three-first-card-bounded-insufficiency")
   tap("Compare or describe this check");tap("Original synthetic current cream")
   XCTAssertTrue(element("Replace this item").waitForExistence(timeout:30),app.debugDescription);shot("part-three-one-material-intent-question")
