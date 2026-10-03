@@ -21,7 +21,7 @@ final class PartThreeUI: XCTestCase {
   XCTAssertTrue(contains("Worth considering").waitForExistence(timeout:30),app.debugDescription)
   XCTAssertTrue(contains("Its label matches the step you want to replace.").exists);XCTAssertTrue(contains("Published list").exists)
   XCTAssertFalse(element("Replace this item").exists);shot("part-three-earned-replacement-card")
-  tap("Close comparison choices");tap("Save this assessment")
+  tap("Close comparison choices");tap("Worth considering");tap("Its label matches the step you want to replace.");shot("part-three-earned-first-card-visible");tap("Save this assessment")
   XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription);shot("part-three-exact-assessment-save")
   tap("Ingredient details: Glycerin");XCTAssertTrue(contains("reference humectant role").waitForExistence(timeout:15),app.debugDescription);shot("part-three-unaffected-ingredient-detail");tap("Close ingredient detail")
   close();tap("Reopen Part3 saved assessment");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand()
@@ -75,7 +75,7 @@ final class PartThreeUI: XCTestCase {
   continueAfterFailure=false;app.activate();XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);expand()
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription)
   let labels=app.staticTexts.allElementsBoundByIndex.map{$0.label};let name=try XCTUnwrap(labels.firstIndex(where:{$0.contains("deliberately long multilingual product name")}));let judgment=try XCTUnwrap(labels.firstIndex(of:"Not enough info"));let reason=try XCTUnwrap(labels.firstIndex(where:{$0.contains("The available evidence cannot support a judgment for this purpose.")}));let scope=try XCTUnwrap(labels.firstIndex(of:"Published list · Package not confirmed"));XCTAssertLessThan(name,judgment);XCTAssertLessThan(judgment,reason);XCTAssertLessThan(reason,scope)
-  shot("part-three-large-text-long-name-first-card");tap("Compare or describe this check");choose("Moisturizing");choose("Face");choose("Leave on");XCTAssertFalse(contains("Worth considering").exists);shot("part-three-large-text-controls-reachable-without-color-authority");close()
+  shot("part-three-large-text-long-name-first-card");tap("Not enough info");shot("part-three-large-text-judgment-visible");tap("The available evidence cannot support a judgment for this purpose.");shot("part-three-large-text-reason-visible");tap("Published list · Package not confirmed");shot("part-three-large-text-scope-visible");tap("Compare or describe this check");choose("Moisturizing");choose("Face");choose("Leave on");XCTAssertFalse(contains("Worth considering").exists);shot("part-three-large-text-controls-reachable-without-color-authority");close()
  }
 
 }
