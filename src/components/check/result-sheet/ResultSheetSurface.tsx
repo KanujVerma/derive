@@ -77,6 +77,8 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   useLayoutEffect(() => { if (contentSized) setSummaryHeight(0); }, [contentSized, contentSizeResetKey]);
   const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight, contentSized });
   const sheet = useRef<BottomSheet>(null);
+  // Native close is asynchronous. Late personal/layout updates must not reopen it.
+  const closing = useRef(false);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
   useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
@@ -85,13 +87,14 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   // The guard owns this body lifetime; callback updates cannot cross its key fence.
   const [guard] = useState(() => createSheetDismissGuard(presentationKey, () => closeAction.current(), readCurrentKey));
   const close = useCallback(() => {
-    if (!guard.isCurrent()) return;
+    if (!guard.isCurrent() || closing.current) return;
+    closing.current = true;
     Keyboard.dismiss();
     if (sheet.current) sheet.current.close(); else guard.dismiss();
   }, [guard]);
   requestClose.current = close;
   useEffect(() => {
-    if ((summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent()) sheet.current?.snapToIndex(2);
+    if ((summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent() && !closing.current) sheet.current?.snapToIndex(2);
   }, [summaryHeight, geometry.needsFullHeight, guard, summary, compactActions, contentSized]);
   useLayoutEffect(() => {
     guard.activate();
@@ -114,13 +117,13 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       accessibilityActions={[{ name: 'increment', label: 'Expand result' }, { name: 'decrement', label: 'Collapse result' }, { name: 'escape', label: dismissLabel }]}
       onAccessibilityEscape={close}
       onAccessibilityAction={({ nativeEvent }) => {
-        if (!guard.isCurrent()) return;
+        if (!guard.isCurrent() || closing.current) return;
         onInteraction?.();
         if (nativeEvent.actionName === 'increment') sheet.current?.snapToIndex(Math.min(index + 1, contentSized ? 0 : 2));
         if (nativeEvent.actionName === 'decrement') { if (index > 0) sheet.current?.snapToIndex(index - 1); else close(); }
         if (nativeEvent.actionName === 'escape') close();
       }}
-      onPress={() => { if (guard.isCurrent()) { onInteraction?.(); sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); } }}>
+      onPress={() => { if (guard.isCurrent() && !closing.current) { onInteraction?.(); sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); } }}>
       <View style={styles.indicator} />
     </Pressable>
     <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel={dismissLabel}>
@@ -130,6 +133,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   return <GestureHandlerRootView style={styles.root} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
     <BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
+      onAnimate={(_from, next) => { if (guard.isCurrent() && next === -1) closing.current = true; }}
       onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
       <BottomSheetScrollView testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}

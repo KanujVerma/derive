@@ -87,9 +87,10 @@ function surfaceLifecycle() {
       if (!native) {
         native = { index: props.index, props, pending: [] as Array<() => void>,
           close() { this.gestureClose(); },
-          snapToIndex(index: number) { this.index = index; this.props.onChange(index); },
+          snapToIndex(index: number) { if (this.index === -1 && index >= 0) this.pending = []; this.index = index; this.props.onChange(index); },
           gestureClose() {
             const closeProps = this.props;
+            closeProps.onAnimate?.(this.index, -1);
             this.index = -1; closeProps.onChange(-1);
             this.pending.push(() => closeProps.onClose());
           },
@@ -175,4 +176,20 @@ test('same-lifetime callback updates use the current action while one-shot and k
   assert.equal(first.sheet, updated.sheet, 'same presentation/mode remains mounted');
   updated.sheet.gestureClose(); updated.sheet.finishClose(); updated.sheet.props.onClose();
   assert.equal(old, 0); assert.equal(current, 1);
+});
+
+
+test('late oversized summary updates cannot reopen an explicit or gesture close in flight', t => {
+  for (const method of ['button', 'gesture'] as const) {
+    const r = surfaceLifecycle();let closed = 0;t.after(() => r.dispose());
+    const render = (key='oversized') => r.render({ presentationKey: key, onClose: () => { closed++; },
+      summary: React.createElement('Summary', { revision: closed }), compactActions: React.createElement('Actions'), children: React.createElement('Findings') });
+    const measure = (value: ReturnType<typeof render>) => value.hosts.find(host => host.type === 'View' && typeof host.props.onLayout === 'function')!.props.onLayout({ nativeEvent: { layout: { height: 1000 } } });
+    measure(render());const expanded = render();assert.equal(expanded.sheet.index,2,'oversized content genuinely requires the full detent');
+    if(method==='button')expanded.hosts.find(host => host.type==='Pressable' && host.props.accessibilityLabel==='Close result')!.props.onPress();else expanded.sheet.gestureClose();
+    assert.equal(expanded.sheet.index,-1);render();
+    assert.equal(expanded.sheet.index,-1,'late summary/personal-result updates must not cancel the native close animation');
+    expanded.sheet.finishClose();assert.equal(closed,1,'close acknowledgment survives the late update');
+    const newer=render('new-case');measure(newer);const resized=render('new-case');assert.equal(resized.sheet.index,2,'a new body may size normally after the prior close');
+  }
 });
