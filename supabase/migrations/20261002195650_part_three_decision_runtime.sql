@@ -302,7 +302,9 @@ begin
   select * into saved from public.part_three_saved_assessments where owner_id=p_owner and request_id=(p_payload->>'requestId')::uuid for update;
   if found then
    if saved.packet is null or not private.part_three_binding_current(p_owner,saved.packet->'binding',saved.pinned_snapshot_id,false) or (saved.packet->'refinementTrace' is not null and saved.packet->'refinementTrace'<>'null'::jsonb and not private.part_three_refinement_authorized(p_owner,saved.packet->'refinementTrace')) then return jsonb_build_object('kind','unavailable','reason','changed_basis'); end if;
-   if saved.result_id is distinct from (p_payload->>'resultId')::uuid or saved.binding_hash is distinct from p_payload->>'expectedBindingHash' or saved.result_revision is distinct from (p_payload->>'expectedResultRevision')::bigint then raise exception 'PART_THREE_IDEMPOTENCY_CONFLICT'; end if;
+   -- The current row can be pruned independently (FK ON DELETE SET NULL).
+   -- The freshly authorized retained packet owns the original committed identity.
+   if (saved.packet->>'resultId')::uuid is distinct from (p_payload->>'resultId')::uuid or saved.binding_hash is distinct from p_payload->>'expectedBindingHash' or saved.result_revision is distinct from (p_payload->>'expectedResultRevision')::bigint then raise exception 'PART_THREE_IDEMPOTENCY_CONFLICT'; end if;
    return jsonb_build_object('kind','saved','savedAssessmentId',saved.id,'resultRevision',saved.result_revision,'replayed',true);
   end if;
   select * into row from public.part_three_results where id=(p_payload->>'resultId')::uuid and owner_id=p_owner for update;

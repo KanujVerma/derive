@@ -128,3 +128,35 @@ test('review 8: selected catalog comparators use safe resolved names or stable d
  const h=componentHarness('src/components/check/part-three/PartThreeControls.tsx','PartThreeControls',{check},{modules:{'../../ui/Button':{Button:'Button'},'../../ui/ChoiceChip':{ChoiceChip:'ChoiceChip'}}});press(control(h.render(),'Compare or describe this check'));const nodes=h.render();const options=nodes.filter(n=>typeof n.props.label==='string'&&n.props.label.startsWith('Catalog item '));assert.equal(options.length,2);assert(options[0].props.label.includes('moisturizing'));assert(options[1].props.label.includes('cleansing'));assert.notEqual(options[0].props.label,options[1].props.label);press(options[1]);assert.equal(selected.comparatorId,b.id);
  const named=h.render({check:{...check,displayLabels:{[a.reference.productId+':null:null']:'Current name: Original catalog moisturizer',[b.reference.productId+':null:null']:'Current name: Original catalog cleanser'}}});assert(control(named,'Current name: Original catalog moisturizer'));press(control(named,'Current name: Original catalog cleanser'));assert.equal(selected.comparatorId,b.id);
 });
+
+test('review residual: identical catalog display details withhold selection until permitted variant names distinguish it', () => {
+ const x = p3input();
+ const a = p3routine(p2id(74)), b = p3routine(p2id(75));
+ const productId = p2id(76);
+ a.reference = { kind: 'catalog', productId, variantId: p2id(77), formulaVersionId: null };
+ b.reference = { kind: 'catalog', productId, variantId: p2id(78), formulaVersionId: null };
+ x.context.routine = p3revision('routine', { completeness: 'partial', items: [a, b] });
+ let selected: any = null;
+ const check = { enabled: true, view: emptyView(), context: x.context, displayLabels: {}, choices: emptyPartThreeChoices(), update: (value: any) => selected = value, save() {}, refresh() {}, questionAnswer() {}, questionSkip() {}, interact() {}, exposeQuestion() {} };
+ const h = componentHarness('src/components/check/part-three/PartThreeControls.tsx', 'PartThreeControls', { check }, { modules: { '../../ui/Button': { Button: 'Button' }, '../../ui/ChoiceChip': { ChoiceChip: 'ChoiceChip' } } });
+ try {
+  press(control(h.render(), 'Compare or describe this check'));
+  let nodes = h.render();
+  const options = nodes.filter(n => typeof n.props.label === 'string' && n.props.label.startsWith('Catalog item '));
+  assert.equal(options.length, 2);
+  assert.equal(options[0].props.label, options[1].props.label);
+  for (const option of options) { assert.equal(option.props.disabled, true); option.props.onSelect(); }
+  assert.equal(selected, null, 'Ambiguous labels cannot silently choose a different saved variant');
+  assert(textContent(nodes).includes('Selection is unavailable until they can be distinguished'));
+  nodes = h.render({ check: { ...check, choices: { ...check.choices, intent: 'check_current' } } });
+  for (const option of nodes.filter(n => typeof n.props.label === 'string' && n.props.label.startsWith('This is Catalog item '))) { assert.equal(option.props.disabled, true); option.props.onSelect(); }
+  assert.equal(selected, null, 'Current-item selection uses the same ambiguity guard');
+  const displayLabels = { [`${productId}:${p2id(77)}:null`]: 'Current name: Original lotion small bottle', [`${productId}:${p2id(78)}:null`]: 'Current name: Original lotion large bottle' };
+  nodes = h.render({ check: { ...check, displayLabels } });
+  const named = control(nodes, 'Current name: Original lotion large bottle');
+  assert.equal(named.props.disabled, false);
+  press(named);
+  assert.equal(selected.comparatorId, b.id);
+  assert.deepEqual(selected.use, check.choices.use, 'Display disambiguation adds no purpose or formula authority');
+ } finally { h.dispose(); }
+});

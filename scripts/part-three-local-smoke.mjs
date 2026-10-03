@@ -104,6 +104,16 @@ try{
   check(await sql(`select context_revision::text from public.part_three_results where id='${result.resultId}';`),String(result.binding.contextRevision),'Rejected replay cannot rebind its old dependency manifest');
   await sql(`update public.part_three_results set expires_at=now()-interval '1 second' where id='${result.resultId}';`);
   const expiredRetry=await p3(req);check(expiredRetry.kind,'unavailable','Same evaluate key cannot reuse stale binding after TTL');
+  const expiredRead = await p3({ operation: 'read', resultId: result.resultId });
+  check(expiredRead.kind, 'unavailable', 'Normal expired read removes current authority');
+  check(await sql(`select count(*) from public.part_three_results where id='${result.resultId}';`), '0', 'Expired current read physically deletes result row');
+  check(await sql(`select (result_id is null)::text from public.part_three_saved_assessments where id='${savedId}';`), 'true', 'Expired current cleanup clears only ephemeral saved foreign key');
+  const differentRequest = await requestPart3({ ...saveReq, resultId: randomUUID() });
+  check(differentRequest.status, 409, 'Committed request rejects changed result identity after expired read');
+  for (const changed of [{ expectedBindingHash: '0'.repeat(64) }, { expectedResultRevision: result.resultRevision + 1 }]) {
+   const rejected = await requestPart3({ ...saveReq, ...changed });
+   check(rejected.status, 409, 'Committed request still rejects changed binding or revision after expired read');
+  }
   const committedRetry=await p3(saveReq);check(committedRetry.kind,'saved','Committed exact save receipt survives current result TTL');check(committedRetry.savedAssessmentId,savedId,'Expired retry returns original committed receipt');check(committedRetry.replayed,true,'Expired save receipt remains idempotent');
  }
  if(process.argv.includes('--review-regressions')){

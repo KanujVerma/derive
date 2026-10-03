@@ -22,7 +22,21 @@ test('review secondary: paused/stopped helpful comparators cannot make add/repla
  for(const state of ['paused','stopped'] as const){const x=full(),{item}=current(x);item.state=state;x.binding.comparatorId=item.id;x.binding.intent='unanswered';assert.equal(evaluate(x).question,null);x.binding.intent='add';assert(!evaluate(x).findings.some(f=>f.ruleId==='already-helpful'));}
 });
 test('review 2: catalog preferences match their explicit product, variant and formula scope',()=>{
- const x=full();if(x.binding.subject.kind!=='declaration')throw Error('bound fixture');const ref={kind:'catalog' as const,productId:p2id(820),variantId:p2id(821),formulaVersionId:p2id(822)};x.binding.subject.productId=ref.productId;x.binding.subject.variantId=ref.variantId;x.binding.subject.formulaVersionId=null;x.context.preferences=[p3revision(p2id(823),{id:p2id(824),revision:1,kind:'avoid_product' as const,target:{kind:'product' as const,reference:ref},strength:'decisive' as const,status:'confirmed' as const,confirmedAt:x.now,source:{kind:'structured' as const}})];x.binding.preferenceRevisions=[p2id(823)];assert.equal(evaluate(x).summary?.judgment,'check_first');assert(evaluate(x).materialGaps.some(g=>g.reason==='avoidance_unresolved'));x.binding.subject.formulaVersionId=ref.formulaVersionId;assert.equal(evaluate(x).summary?.judgment,'skip');x.binding.subject.formulaVersionId=p2id(825);assert.notEqual(evaluate(x).summary?.judgment,'skip');const target=x.context.preferences[0].data.target;if(target.kind!=='product')throw Error('product target');target.reference={...ref,variantId:null,formulaVersionId:null};assert.equal(evaluate(x).summary?.judgment,'skip','explicit whole-product avoidance is respected at its own family scope');
+ const x=full();if(x.binding.subject.kind!=='declaration')throw Error('bound fixture');const ref={kind:'catalog' as const,productId:p2id(820),variantId:p2id(821),formulaVersionId:p2id(822)};x.binding.subject.productId=ref.productId;x.binding.subject.variantId=ref.variantId;x.binding.subject.formulaVersionId=null;x.context.preferences=[p3revision(p2id(823),{id:p2id(824),revision:1,kind:'avoid_product' as const,target:{kind:'product' as const,reference:ref},strength:'decisive' as const,status:'confirmed' as const,confirmedAt:x.now,source:{kind:'structured' as const}})];x.binding.preferenceRevisions=[p2id(823)];
+ x.binding.subject.variantId = p2id(826);
+ const differentVariant = evaluate(x);
+ assert.equal(differentVariant.summary?.judgment, 'worth_considering', 'Known different variant rules out exact avoidance despite unknown formula');
+ assert(!differentVariant.materialGaps.some(g => g.reason === 'avoidance_unresolved'));
+ assert(!differentVariant.findings.some(f => f.ruleId === 'avoid-retry'));
+ x.binding.subject.variantId = ref.variantId;
+ assert.equal(evaluate(x).summary?.judgment,'check_first');assert(evaluate(x).materialGaps.some(g=>g.reason==='avoidance_unresolved'));x.binding.subject.formulaVersionId=ref.formulaVersionId;assert.equal(evaluate(x).summary?.judgment,'skip');x.binding.subject.formulaVersionId=p2id(825);
+ const differentFormula = evaluate(x);
+ assert.equal(differentFormula.summary?.judgment, 'worth_considering');
+ assert(!differentFormula.materialGaps.some(g => g.reason === 'avoidance_unresolved'));
+ x.binding.subject.variantId = null;
+ assert.equal(evaluate(x).summary?.judgment, 'worth_considering', 'Known formula mismatch also rules out the constrained target when variant is unknown');
+ x.binding.subject.variantId = ref.variantId;
+const target=x.context.preferences[0].data.target;if(target.kind!=='product')throw Error('product target');target.reference={...ref,variantId:null,formulaVersionId:null};assert.equal(evaluate(x).summary?.judgment,'skip','explicit whole-product avoidance is respected at its own family scope');
 });
 test('review 2: the actual handler drains candidate and comparator at one revision, including a reaction after row 50',async()=>{
  const x=full(),{item}=current(x);item.reference={kind:'catalog',productId:p2id(840),variantId:null,formulaVersionId:null};x.context.assessments[0].data.reference=item.reference;const candidate={productId:p2id(841),variantId:p2id(842),formulaVersionId:null};x.context.historyTruncated=true;

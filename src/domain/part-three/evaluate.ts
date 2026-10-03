@@ -48,7 +48,10 @@ export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalRe
   }else if(v.kind==='avoid_product'&&v.target.kind==='product'){
    const ref=v.target.reference;
    if(matchesAvoidedReference(ref,b)||candidateCurrent?.reference.kind==='manual'&&JSON.stringify(candidateCurrent.reference)===JSON.stringify(ref))add('avoidance','avoid-retry',v.strength==='decisive'?'decisive':'optional','preference',{reports:[pref.id,...(candidateCurrent&&c.routine?[c.routine.id]:[])],scope:'report'});
-   else if(v.strength==='decisive'&&ref.kind==='catalog'&&declaration?.productId===ref.productId&&(ref.variantId&&!declaration.variantId||ref.formulaVersionId&&!declaration.formulaVersionId)){
+   else if (v.strength === 'decisive' && ref.kind === 'catalog' && declaration?.productId === ref.productId
+    && (!ref.variantId || !declaration.variantId || ref.variantId === declaration.variantId)
+    && (!ref.formulaVersionId || !declaration.formulaVersionId || ref.formulaVersionId === declaration.formulaVersionId)
+    && (ref.variantId && !declaration.variantId || ref.formulaVersionId && !declaration.formulaVersionId)) {
     gap('avoidance_unresolved','missing','evidence');add('evidence_limit','unresolved-product-avoidance','information','unresolved',{reports:[pref.id],relation:'product_family',scope:'report'});
    }
   }
