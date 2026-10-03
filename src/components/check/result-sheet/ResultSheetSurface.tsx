@@ -83,6 +83,8 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   const explicitlyClosing = useRef(false);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
+  const [diagnostic, setDiagnostic] = useState('unpressed');
+  const diagnosticEnabled = typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true';
   useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
   const closeAction = useRef(onClose);
   closeAction.current = onClose;
@@ -117,6 +119,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.18} pressBehavior="close" />, []);
   const renderHandle = useCallback((_props: BottomSheetHandleProps) => <View style={styles.handleRow}>
     <Pressable ref={handle} style={styles.dragTarget} accessibilityRole="adjustable" accessibilityLabel="Product result"
+      testID={diagnosticEnabled ? `sheet-handle:${diagnostic}` : undefined}
       accessibilityHint={contentSized ? 'Swipe down to return. Search results expand this sheet.' : 'Swipe up for findings. Swipe down to return. Double tap to expand or collapse.'}
       accessibilityValue={{ min: 0, max: contentSized ? 0 : 2, now: Math.max(index, 0), text: index === 0 ? 'Compact' : 'Expanded' }}
       accessibilityActions={[{ name: 'increment', label: 'Expand result' }, { name: 'decrement', label: 'Collapse result' }, { name: 'escape', label: dismissLabel }]}
@@ -128,13 +131,13 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
         if (nativeEvent.actionName === 'decrement') { if (index > 0) sheet.current?.snapToIndex(index - 1); else close(); }
         if (nativeEvent.actionName === 'escape') close();
       }}
-      onPress={() => { if (guard.isCurrent() && !closing.current) { onInteraction?.(); sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); } }}>
+      onPress={() => { if (diagnosticEnabled) setDiagnostic(`current=${guard.isCurrent()};closing=${closing.current};explicit=${explicitlyClosing.current};index=${index};sized=${contentSized}`); if (guard.isCurrent() && !closing.current) { onInteraction?.(); sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); } }}>
       <View style={styles.indicator} />
     </Pressable>
     <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel={dismissLabel}>
       <Icon name="close" size={20} color={colors.inkMuted} />
     </Pressable>
-  </View>, [close, dismissLabel, guard, index, contentSized, onInteraction]);
+  </View>, [close, dismissLabel, guard, index, contentSized, onInteraction, diagnosticEnabled, diagnostic]);
   return <GestureHandlerRootView style={styles.root} onLayout={event => { containerHeight.current = event.nativeEvent.layout.height; }} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
     <BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
