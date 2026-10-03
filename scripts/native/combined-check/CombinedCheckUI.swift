@@ -147,7 +147,7 @@ final class CombinedCheckUI: XCTestCase {
   let photo=app.images.matching(NSPredicate(format:"label BEGINSWITH %@","Photo,")).firstMatch
   XCTAssertTrue(photo.waitForExistence(timeout:20),app.debugDescription);XCTAssertFalse(photo.frame.isEmpty);photo.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
   XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:25),app.debugDescription)
-  XCTAssertTrue(contains("Hexanediol").waitForExistence(timeout:25),app.debugDescription);shot("combined-ordinary-local-photo-reading")
+  tap("Correct photo 1 line 1");let recognized=element("Correction for photo 1 line 1");XCTAssertTrue(recognized.waitForExistence(timeout:20),app.debugDescription);XCTAssertTrue((recognized.value as? String ?? "").contains("Hexanediol"),"Original native OCR line remains available without editing");shot("combined-ordinary-local-photo-reading");tap("Cancel correction for photo 1 line 1")
   tap("Back to product result");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:20));XCTAssertTrue(contains("Hexanediol").exists);XCTAssertFalse(contains("Worth considering").exists)
   tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:15));XCTAssertTrue(contains("Hexanediol").exists);shot("combined-capture-back-and-search-preserve-draft")
   tap("Review local label draft and add missing photos");XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:15));tap("Remove temporary ingredient draft")
