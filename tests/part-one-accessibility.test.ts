@@ -18,8 +18,8 @@ test('A29 incomplete results expose named save, capture, retry and rescan action
     '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.children) },
   } });
   const nodes = h.render();
-  for (const label of ['Save product without verified ingredients', 'Scan ingredients', 'Check lookup status', 'Rescan']) press(control(nodes, label));
-  assert.deepEqual(calls, ['save', 'capture', 'retry', 'rescan']);
+  for (const label of ['Save product', 'Scan ingredients', 'Retry']) press(control(nodes, label));
+  assert.deepEqual(calls, ['save', 'capture', 'retry']);
   assert.match(textContent(nodes), /unverified|incomplete/i);
   assert.match(textContent(nodes), /right edge/);
   assert(nodes.some(node => node.props.accessibilityLiveRegion === 'polite'));
@@ -40,7 +40,7 @@ test('A26 expired accepted ingredients are purged from the rendered sheet before
   } }).render();
   assert.match(textContent(nodes), /expired/); assert.match(textContent(nodes), /Independent identity/);
   assert(!textContent(nodes).includes('EXPIRED INGREDIENT TEXT'));
-  assert(!nodes.some(node => node.props.label === 'Save product and evidence'));
+  assert(!nodes.some(node => node.props.label === 'Save product'));
   assert(control(nodes, 'Scan ingredients'));
 });
 
@@ -74,5 +74,5 @@ test('Offline identity and unselected candidates expire even when no declaration
   assert(!textContent(h.render()).includes('EXPIRED CANDIDATE'));
   result.snapshotId = 'old-snapshot'; result.identity = 'exact'; result.display.selectedIdentity = { ...result.display.candidates[0], name: 'EXPIRED IDENTITY' }; result.display.candidates = []; result.allowedActions = ['save_partial'];
   assert(!textContent(h.render()).includes('EXPIRED IDENTITY'));
-  assert(!h.render().some(n => n.props.label === 'Save product without verified ingredients'));
+  assert(!h.render().some(n => n.props.label === 'Save product'));
 });

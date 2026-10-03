@@ -41,7 +41,7 @@ export function buildEvidenceAdmissions(observationInput: SourceObservation, ite
   }))];
   if (keys.length !== 1) throw new Error('ambiguous_item_barcode');
   if (observation.dependencyIds.some(id => [observation.observationId, declaration.declarationId, item.snapshotId].includes(id))) throw new Error('cyclic_observation_dependency');
-  const rawPayload = z.strictObject({ nativeCode: z.string(), canonicalCode: z.string().nullable(), name: z.string().nullable(), rawIngredients: z.string().nullable(), nativeBrand: z.string().nullable().optional(), structuredVariant: VariantSchema.nullable().optional() }).parse(observation.payload);
+  const rawPayload = z.strictObject({ nativeCode: z.string(), canonicalCode: z.string().nullable(), name: z.string().nullable(), rawIngredients: z.string().nullable(), nativeBrand: z.string().nullable().optional(), structuredVariant: VariantSchema.nullable().optional(), imageUrl: z.string().nullable().optional(), sourceQuantity: z.string().nullable().optional() }).parse(observation.payload);
   const returnedCode = normalizeBarcode({ raw: rawPayload.nativeCode, symbology: rawPayload.nativeCode.length === 8 ? 'ean8' : null, namespace: 'gtin', retailerId: null });
   const ownAssociation = declaration.associationEvidenceIds.includes(observation.observationId) && observation.comparison === 'exact' && returnedCode.supported && rawPayload.canonicalCode === returnedCode.canonicalCode && keys[0] === `gtin:${returnedCode.canonicalGtin14}`;
   const normalizedBrand = (brand: string) => brand.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');

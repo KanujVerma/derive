@@ -10,7 +10,7 @@ export type ProviderLookupRequest = z.infer<typeof ProviderLookupRequestSchema>;
 export type BoundedProviderFixture = { status: number; contentType: string; body: string; retryAfter: string | null; providerRequestId: string | null; elapsedMs: number; decompressedBytes: number };
 const emptyVariant = (): Variant => ({ brand: null, line: null, form: null, scent: null, shade: null, spf: null, strength: null, size: null, unit: null, packCount: null, packagingLevel: null });
 const optionalString = z.string().nullable().optional();
-const openProductSchema = z.object({ code: z.string(), product_name: optionalString, brands: optionalString, ingredients_text: optionalString, countries_tags: z.array(z.string()).optional(), last_modified_t: z.number().int().nonnegative().optional(), variant: VariantSchema.optional() });
+const openProductSchema = z.object({ code: z.string(), product_name: optionalString, brands: optionalString, ingredients_text: optionalString, quantity: optionalString, image_front_url: optionalString, countries_tags: z.array(z.string()).optional(), last_modified_t: z.number().int().nonnegative().optional(), variant: VariantSchema.optional() });
 const openEnvelopeSchema = z.object({ status: z.union([z.literal(0), z.literal(1)]), product: openProductSchema.optional() });
 const upcEnvelopeSchema = z.object({ code: z.literal('OK'), items: z.array(z.object({ ean: z.string().optional(), upc: z.string().optional(), title: z.string(), brand: optionalString, variant: VariantSchema.optional() })).max(20) });
 /** Frozen responses only: no network path, credentials, user profile or uploaded assets. */
@@ -31,13 +31,13 @@ export function evaluateProviderFixture(provider: 'open_facts' | 'upcitemdb', re
   try { body = JSON.parse(fixture.body); } catch { return reply('malformed_response'); }
   const parsed = provider === 'open_facts' ? openEnvelopeSchema.safeParse(body) : upcEnvelopeSchema.safeParse(body);
   if (!parsed.success) return reply('malformed_response');
-  const records: Array<{ code: string; name: string | null; variant: Variant; nativeBrand: string | null; structuredVariant: Variant | null; ingredients: string | null; markets: string[]; updatedAt: string | null }> = [];
+  const records: Array<{ code: string; name: string | null; variant: Variant; nativeBrand: string | null; structuredVariant: Variant | null; ingredients: string | null; imageUrl?: string | null; sourceQuantity?: string | null; markets: string[]; updatedAt: string | null }> = [];
   if (provider === 'open_facts') {
     const envelope = openEnvelopeSchema.parse(body);
     if (envelope.status === 0) return envelope.product ? reply('malformed_response') : reply('not_found');
     if (!envelope.product) return reply('malformed_response');
     const p = envelope.product;
-    records.push({ code: p.code, name: p.product_name ?? null, variant: p.variant ?? { ...emptyVariant(), brand: p.brands ?? null }, nativeBrand: p.brands ?? null, structuredVariant: p.variant ?? null, ingredients: request.requestedFields.includes('ingredients') ? p.ingredients_text ?? null : null, markets: p.countries_tags ?? [], updatedAt: p.last_modified_t === undefined ? null : new Date(p.last_modified_t * 1000).toISOString() });
+    records.push({ code: p.code, name: p.product_name ?? null, variant: p.variant ?? { ...emptyVariant(), brand: p.brands ?? null }, nativeBrand: p.brands ?? null, structuredVariant: p.variant ?? null, ingredients: request.requestedFields.includes('ingredients') ? p.ingredients_text ?? null : null, imageUrl: permittedOpenFactsImage(p.image_front_url ?? null, p.code, policy, input.now), sourceQuantity: p.quantity ?? null, markets: p.countries_tags ?? [], updatedAt: p.last_modified_t === undefined ? null : new Date(p.last_modified_t * 1000).toISOString() });
   } else {
     const envelope = upcEnvelopeSchema.parse(body);
     if (!envelope.items.length) return reply('not_found');
@@ -48,7 +48,7 @@ export function evaluateProviderFixture(provider: 'open_facts' | 'upcitemdb', re
     const normalized = normalizeBarcode({ raw: record.code, symbology: record.code.length === 8 ? 'ean8' : null, namespace: 'gtin', retailerId: null });
     const normalizedBrand = (brand: string) => brand.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
     const brandContradiction = record.nativeBrand !== null && record.structuredVariant?.brand != null && normalizedBrand(record.nativeBrand) !== normalizedBrand(record.structuredVariant.brand);
-    return { observationId: records.length === 1 ? input.observationId : derivedId(input.observationId, i), provider, providerRequestId: fixture.providerRequestId, providerResponseId: null, comparison: brandContradiction ? 'contradiction' : !normalized.supported ? 'unknown' : normalized.canonicalCode === request.canonicalCode ? 'exact' : 'contradiction', fetchedAt: input.now, sourceUpdatedAt: record.updatedAt, adapterVersion: PROVIDER_ADAPTER_VERSION, parserVersion: 'raw-preserved-1', policyVersion: policy.version, contentHash: input.contentHash, variant: record.variant, sourceMarkets: record.markets, sourceUrl: input.sourceUrl, policyId: policy.policyId, status: 'active', dependencyIds: [], payload: { nativeCode: record.code, canonicalCode: normalized.canonicalCode, name: record.name, rawIngredients: record.ingredients, nativeBrand: record.nativeBrand, structuredVariant: record.structuredVariant } };
+    return { observationId: records.length === 1 ? input.observationId : derivedId(input.observationId, i), provider, providerRequestId: fixture.providerRequestId, providerResponseId: null, comparison: brandContradiction ? 'contradiction' : !normalized.supported ? 'unknown' : normalized.canonicalCode === request.canonicalCode ? 'exact' : 'contradiction', fetchedAt: input.now, sourceUpdatedAt: record.updatedAt, adapterVersion: PROVIDER_ADAPTER_VERSION, parserVersion: 'raw-preserved-1', policyVersion: policy.version, contentHash: input.contentHash, variant: record.variant, sourceMarkets: record.markets, sourceUrl: input.sourceUrl, policyId: policy.policyId, status: 'active', dependencyIds: [], payload: { nativeCode: record.code, canonicalCode: normalized.canonicalCode, name: record.name, rawIngredients: record.ingredients, nativeBrand: record.nativeBrand, structuredVariant: record.structuredVariant, ...(provider === 'open_facts' ? { imageUrl: record.imageUrl ?? null, sourceQuantity: record.sourceQuantity ?? null } : {}) } };
   });
   return reply(observations.length > 1 ? 'ambiguous' : 'found', observations);
 }
@@ -92,7 +92,7 @@ export function buildOpenFactsLookupUrl(requestInput: ProviderLookupRequest, rev
   if (!normalized.supported || normalized.canonicalCode !== request.canonicalCode || !native.supported || native.canonicalCode !== request.canonicalCode) throw new Error('unsupported_provider_code');
   const url = new URL(`/api/v2/product/${encodeURIComponent(request.nativeCode)}.json`, origin);
   url.searchParams.set('product_type', 'all');
-  url.searchParams.set('fields', ['code', 'product_name', 'brands', ...(request.requestedFields.includes('ingredients') ? ['ingredients_text'] : []), 'countries_tags', 'last_modified_t'].join(','));
+  url.searchParams.set('fields', ['code', 'product_name', 'brands', ...(request.requestedFields.includes('ingredients') ? ['ingredients_text'] : []), 'quantity', 'image_front_url', 'countries_tags', 'last_modified_t'].join(','));
   return url.toString();
 }
 export function needsUpcIdentityFallback(identity: 'pending' | 'exact' | 'candidate' | 'ambiguous' | 'unresolved', reply: LookupReply): boolean {
@@ -203,4 +203,16 @@ export async function lookupPrimaryProvider(provider: PrimaryProvider, requestIn
   try { return await Promise.race([execute(), timeout]); }
   catch (error) { if (persistenceError !== undefined) throw persistenceError; if (dispatched || authorizationInProgress) ports.onUnknownDispatch?.(); return account(emptyProviderReply(provider, 'unavailable', policy!.version)); }
   finally { if (timer) clearTimeout(timer); controller.abort(); }
+}
+
+/** Only the returned barcode's unmodified provider front photo can be hotlinked. */
+export function permittedOpenFactsImage(raw: string | null, code: string, policy: SourcePolicy, now: string): string | null {
+  if (!raw || !policy.retainedFields.includes('images') || !policyAllows(policy, 'hotlink', now) || !policyAllows(policy, 'sharedDisplay', now)) return null;
+  try {
+    const url = new URL(raw);
+    const pathCode = code.replace(/^0+(?=\d{13}$)/, '');
+    const chunks = pathCode.length > 8 ? `${pathCode.slice(0, 3)}/${pathCode.slice(3, 6)}/${pathCode.slice(6, 9)}/${pathCode.slice(9)}` : pathCode;
+    return url.protocol === 'https:' && ['images.openbeautyfacts.org', 'images.openfoodfacts.org'].includes(url.hostname) && !url.port && !url.username && !url.password && !url.search && !url.hash
+      && url.pathname.startsWith(`/images/products/${chunks}/front_`) && /\.\d+\.\d+\.jpg$/.test(url.pathname) ? url.toString() : null;
+  } catch { return null; }
 }

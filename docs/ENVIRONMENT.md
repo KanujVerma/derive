@@ -293,3 +293,5 @@ messages name missing variables but never echo credential values.
 ## Part 1 development evaluation gates
 
 `EXPO_PUBLIC_PART_ONE_ENABLED`, `EXPO_PUBLIC_PART_ONE_OCR_EVALUATION` and `EXPO_PUBLIC_PART_ONE_FIXTURE_UI` are public booleans, default off when empty in `.env.example`. They contain no keys. The first additionally requires a development build, remote service and loopback local Supabase. OCR requires the compiled local iOS module and successful task-cache initialization. The fixture route is synthetic only. Release/hosted source operations and durable private OCR commits remain disabled; setting these flags cannot approve provider permissions or private retention.
+
+`EXPO_PUBLIC_CHECK_TIMING_EVALUATION=true` is an opt-in development-runtime measurement gate. It prints only sequence, operation kind, stage and elapsed milliseconds to the local app console. It does not log product/ingredient/profile text, identifiers or credentials and does not enable analytics, replay, source rights, or any hosted operation. Leave it blank normally.

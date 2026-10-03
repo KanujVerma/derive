@@ -1,7 +1,8 @@
 import { NormalizationRequestSchema, NormalizationResultSchema, type NormalizationRequest, type NormalizationResult } from '../../contracts/PartTwo.ts';
 
 export type PartTwoTarget = { ownerId: string; scanId: string; captureSessionId: string | null; generation: number; evidenceRevision: number };
-export type PartTwoView = { target: PartTwoTarget | null; result: NormalizationResult | null; loading: boolean; error: string | null };
+export class PartTwoSourceWithdrawalError extends Error {}
+export type PartTwoView = { sourceWithdrawn?: boolean; target: PartTwoTarget | null; result: NormalizationResult | null; loading: boolean; error: string | null };
 export interface PartTwoTransport { normalize(request: NormalizationRequest, signal?: AbortSignal): Promise<unknown> }
 const targetKey = (target: PartTwoTarget) => JSON.stringify(target);
 /** Request correlation is transport metadata; equal result revisions require identical content. */
@@ -57,8 +58,8 @@ export function createPartTwoController(transport: PartTwoTransport, createId: (
           const accepted = publish(raw, target, requestId, token, attempt);
           if (!accepted && epoch === token && attempt === sequence) { view = { ...view, result: null, loading: false, error: 'Ingredient details changed. Reopen the current evidence.' }; emit(); }
           return accepted;
-        } catch {
-          if (epoch === token && attempt === sequence) { view = { ...view, result: null, loading: false, error: 'Ingredient details unavailable' }; emit(); }
+        } catch (error) {
+          if (epoch === token && attempt === sequence) { view = { ...view, result: null, loading: false, error: 'Ingredient details unavailable', sourceWithdrawn: view.sourceWithdrawn || error instanceof PartTwoSourceWithdrawalError }; emit(); }
           return false;
         } finally {
           clearTimeout(timeout); current.abort.signal.removeEventListener('abort', rejectAbort);

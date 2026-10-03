@@ -3,7 +3,9 @@ import type { PartOneTransport } from '../presentation/part-one/resultController
 import { supabase } from './supabase';
 import { publicEnvironment } from '../config/environment';
 import { z } from 'zod';
+import { PartOneSearchReplySchema } from '../contracts/PartOneSearch';
 import { savePartTwoInterpretation } from './partTwoClient';
+import { beginCheckVerificationTiming, markCheckVerificationTiming } from './checkVerificationTiming';
 
 // Source activation is local-only. Hosted source/retention gates have not been approved.
 export const PART_ONE_ENABLED = typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PART_ONE_ENABLED === 'true'
@@ -57,4 +59,11 @@ export async function deletePartOneCapture(id: string): Promise<void> {
   const expected = PartOneIdSchema.parse(id).toLowerCase();
   const result = z.strictObject({ deleted: z.literal(true), id: PartOneIdSchema }).parse(await call(`/captures/${expected}`, 'DELETE'));
   if (result.id !== expected) throw new Error('Private capture deletion binding changed');
+}
+
+export async function searchPartOneProducts(query: string) {
+  const timing = beginCheckVerificationTiming('name');
+  const items = PartOneSearchReplySchema.parse(await call('/search', 'POST', { query })).items;
+  markCheckVerificationTiming('name', 'candidates', timing);
+  return items;
 }

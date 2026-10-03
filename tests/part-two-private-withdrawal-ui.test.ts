@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { componentHarness, control, textContent } from './ux-profile-render.ts';
 import { normalize, LOCAL_DICTIONARY_RELEASE } from '../src/domain/part-two/index.ts';
-import { sourceReading, p2metadata, p2id } from './fixtures/part-two-core.ts';
+import { sourceReading, p2metadata, p2id, p2now } from './fixtures/part-two-core.ts';
 import * as privateController from '../src/presentation/part-one/privateCaptureController.ts';
 import type { PrivateCaptureController } from '../src/presentation/part-one/privateCaptureController.ts';
 import type { PartTwoInvoke } from '../src/services/partTwoClient.ts';
@@ -44,7 +44,7 @@ function noHistory(nodes: ReturnType<ReturnType<typeof mounted>['h']['render']>)
 }
 
 test('actual private Panel withdraws only source-denied originals and keeps the child mounted through pending retry', async t => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: Date.parse(p2now) });
   let calls = 0;
   const f = mounted(async (path, body) => {
     if (path !== 'part-two/normalize') return { data: { result: null, withdrawn: false, interpretationId: null }, error: null };
@@ -61,7 +61,8 @@ test('actual private Panel withdraws only source-denied originals and keeps the 
   } finally { f.h.dispose(); }
 });
 
-test('dictionary-only refusal and transport failure keep independently permitted Part 1 private history', async () => {
+test('dictionary-only refusal and transport failure keep independently permitted Part 1 private history', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse(p2now) });
   for (const failTransport of [false, true]) {
     const f = mounted(async (path, body) => {
       if (path !== 'part-two/normalize') return { data: { result: null, withdrawn: false, interpretationId: null }, error: null };
@@ -74,7 +75,8 @@ test('dictionary-only refusal and transport failure keep independently permitted
   }
 });
 
-test('foreign current-response binding cannot withdraw private originals', async () => {
+test('foreign current-response binding cannot withdraw private originals', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse(p2now) });
   const f = mounted(async (path, body) => {
     if (path !== 'part-two/normalize') return { data: { result: null, withdrawn: false, interpretationId: null }, error: null };
     const { output, ...base } = f.ready; void output;
@@ -84,7 +86,8 @@ test('foreign current-response binding cannot withdraw private originals', async
   finally { f.h.dispose(); }
 });
 
-test('saved Sheet-qualified source denial removes Panel originals while recovery actions remain', () => {
+test('saved Sheet-qualified source denial removes Panel originals while recovery actions remain', t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse(p2now) });
   const f = mounted(async () => ({ data: null, error: null }), true);
   try { assert(textContent(f.h.render()).includes('Private observation secret')); noHistory(f.h.render({ sourceDenied: true })); }
   finally { f.h.dispose(); }

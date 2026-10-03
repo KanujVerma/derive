@@ -355,3 +355,38 @@ test('direct Search has one content detent, no empty details, and stable height 
   const close = handle.props.children[1];
   assert.equal(close.props.style.width, 44); assert.equal(close.props.style.height, 44);
 });
+
+
+test('capture overlay presents inside the current native result modal outside lazy findings and sheet detents', () => {
+  const r = renderer(true);
+  const { ResultSheetSurface } = r.load('src/components/check/result-sheet/ResultSheetSurface');
+  const overlay = React.createElement('aside', {}, 'Retained label capture');
+  const props = { presentationKey: 'retained-result', onClose() {},
+    summary: React.createElement('p', {}, 'Product summary'),
+    children: React.createElement('p', {}, 'Lazy ingredient finding'), overlay };
+  const render = (extra: object = {}) => r.render(ResultSheetSurface, { ...props, ...extra });
+  const assertNativeParent = () => {
+    const nativeModal = r.views.find(view => view.visible && view.transparent);
+    assert(nativeModal, 'normal entry owns one native result modal');
+    const provider = nativeModal.children;
+    const [body, hostedOverlay] = React.Children.toArray(provider.props.children) as React.ReactElement<any>[];
+    assert.equal(hostedOverlay.props.children, 'Retained label capture');
+    assert.equal(body.props.overlay, undefined, 'capture is outside SheetBody and its conditional findings');
+    assert.equal(nativeModal.children.props.children[1], overlay, 'current native modal owns the actual overlay');
+  };
+  let html = render(); assertNativeParent();
+  assert.match(html, /Retained label capture/); assert.doesNotMatch(html, /Lazy ingredient finding/);
+  r.sheets.at(-1).onChange(1); html = render(); assertNativeParent();
+  assert.match(html, /Lazy ingredient finding/); assert.match(html, /Retained label capture/);
+  html = render({ replacement: React.createElement('p', {}, 'Replacement search') }); assertNativeParent();
+  assert.match(html, /Replacement search/); assert.match(html, /Retained label capture/);
+  assert.doesNotMatch(html, /Lazy ingredient finding/);
+  // This SSR harness checks ancestry, not React's keyed remounts. Return to
+  // result before exercising its change handler; lifecycle has a keyed harness.
+  render(); r.sheets.at(-1).onChange(0); html = render(); assertNativeParent();
+  assert.doesNotMatch(html, /Lazy ingredient finding/); assert.match(html, /Retained label capture/);
+  html = render({ inline: true });
+  assert.match(html, /Retained label capture/);
+  assert(!r.views.some(view => view.visible && view.transparent), 'camera retains inline companion presentation');
+  assert.equal(render({ visible: false }), '', 'a hidden result cannot leave a capture overlay visible');
+});

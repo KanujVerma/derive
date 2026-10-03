@@ -1,4 +1,5 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.116.0';
+import {authorizeServerUser} from '../_shared/server-auth.ts';
 import {normalizeAuthorized} from '../_shared/part-two-runtime.ts';
 import {createPartOneBoundedFetch} from '../_shared/part-one-bounded-fetch.ts';
 import {projectPersonalContextV2,migrateExperienceV1} from '../../../src/services/context/migrateV2.ts';
@@ -14,7 +15,7 @@ Deno.serve(async(req:Request)=>{
   const url=Deno.env.get('SUPABASE_URL')??'',anon=Deno.env.get('SUPABASE_ANON_KEY')??'',service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'',authorization=req.headers.get('authorization')??'';
   if(!url||!anon||!service||!authorization.startsWith('Bearer '))return reply({error:'Authentication required'},401);
   const user=createClient(url,anon,{global:{headers:{Authorization:authorization},fetch:bounded},auth:{persistSession:false,autoRefreshToken:false}});
-  const {data:{user:owner},error}=await user.auth.getUser();if(error||!owner)return reply({error:'Authentication required'},401);
+  const owner={id:await authorizeServerUser(user.auth,(code,status)=>new PartThreeError(code,status))};
   const admin=createClient(url,service,{global:{fetch:bounded},auth:{persistSession:false,autoRefreshToken:false}});
   if(Deno.env.get('PART_THREE_LOCAL_FIXTURE')!=='1'||!/^http:\/\/(?:127\.0\.0\.1|localhost|kong)(?::[0-9]+)?\/?$/.test(url))return reply({kind:'unavailable',reason:'configuration_required'});
   const reader=req.body?.getReader(),chunks:Uint8Array[]=[];let size=0;if(!reader)return reply({error:'Request required'},400);try{for(;;){const next=await reader.read();if(next.done)break;size+=next.value.byteLength;if(size>32768){await reader.cancel();return reply({error:'Request is too large'},413);}chunks.push(next.value);}}finally{reader.releaseLock();}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}const raw=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));

@@ -108,12 +108,12 @@ export default function MyStuffScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <RootShellHeader title="My Stuff" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}>
-        {PART_ONE_ENABLED && liveOwner && <PartOneSavedProducts key={liveOwner} ownerId={liveOwner} />}
+        {PART_ONE_ENABLED && liveOwner && <PartOneSavedProducts key={`part-one-saved:${liveOwner}`} ownerId={liveOwner} />}
         {liveOwner && (error || actionError) ? <View>
           <Text accessibilityRole="alert" style={styles.message}>{error || actionError}</Text>
           {status === 'error' ? <Button label="Try again" variant="ghost" onPress={() => void myStuffStore.getState().load()} /> : null}
         </View> : null}
-        <MyStuffContent key={liveOwner ?? 'preview'} model={live ? model : anonymousEmptyMyStuff}
+        <MyStuffContent key={`my-stuff:${liveOwner ?? 'preview'}`} model={live ? model : anonymousEmptyMyStuff}
           liveFree={isFreeIntegrationShell(shell)} memoryStatus={memoryStatus}
           profileContent={canonicalProfile}
           canonicalExperiences={liveOwner ? context ? mapCanonicalExperiences(context, customerState.displayLabels) : [] : undefined}

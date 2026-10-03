@@ -9,6 +9,7 @@ import { normalizeBarcode } from '../../../src/domain/part-one/barcode.ts';
  * a service-role shortcut. The consumer has a separate service-only RPC. */
 export interface PartOneHttpPorts {
   authorize(request: Request): Promise<void>;
+  search?(input: unknown): Promise<unknown>;
   privateUpload?(request: Request, id: string, binding: CaptureUploadBinding): Promise<unknown>;
   privateCommit?(id: string, payload: CapturePrivateCommitRequest, request: Request): Promise<unknown>;
   privateRecover?(id: string, request: Request): Promise<unknown>;
@@ -78,6 +79,10 @@ export async function handlePartOneRequest(request: Request, ports: PartOneHttpP
     if (marker < 0) throw new PartOneHttpError('not_found',404);
     const parts = pathname.slice(marker + '/part-one'.length).split('/').filter(Boolean);
     const [resource,rawId,child] = parts;
+    if (resource === 'search' && parts.length === 1 && request.method === 'POST') {
+      if (!ports.search) throw new PartOneHttpError('source_configuration_required',503);
+      return response(await ports.search(await boundedJson(request)));
+    }
     const id=rawId?.toLowerCase();
     if (parts.length>3 || id && !PartOneIdSchema.safeParse(id).success) throw new PartOneHttpError('invalid_path',400);
     if(resource==='captures' && id && child==='assets' && request.method==='POST') {

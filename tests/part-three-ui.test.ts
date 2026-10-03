@@ -47,19 +47,20 @@ function mounted(saved=false,erasedChoices=false,realCollapsed=false){
   if(request.operation==='save')return {kind:'saved',savedAssessmentId:p2id(88),resultRevision:request.expectedResultRevision,replayed:false};
   return {kind:'acknowledged'};
  }}};
+ let ingredientReads=0;
  const details={target:{ownerId:x.context.ownerId,scanId:x.partTwo.scanId,captureSessionId:x.partTwo.captureSessionId,generation:x.partTwo.generation,evidenceRevision:x.partTwo.evidenceRevision},result:x.partTwo,loading:false,error:null};
  const p1={scanId:x.partTwo.scanId,generation:x.partTwo.generation,resultRevision:x.partTwo.evidenceRevision,declarationState:'partial',identity:'exact',work:'complete',snapshotId:p2id(12),declarationId:p2id(10),scope:'public',freshness:{state:'fresh',observedAt:x.now,expiresAt:x.partTwo.expiresAt},display:{selectedIdentity:null,candidates:[],sections:[{sectionId:p2id(17),kind:'ingredients',text:'Original synthetic facts',expiresAt:x.partTwo.expiresAt}],sources:[],limitations:[]},allowedActions:['save_partial']};
- const sheet=componentHarness('src/components/check/part-one/PartOneResultSheet.tsx','PartOneResultSheet',{view:{owner:x.context.ownerId,result:p1,saved:false,loading:false,error:null,scrollOffset:0},personalEnabled:true,personalPorts:ports,ingredientEnabled:realCollapsed,ingredientTransport:realCollapsed?{normalize:async(request:any)=>{const result=structuredClone(x.partTwo);result.requestId=request.requestId;if(result.state==='ready'){result.output.reading.binding.requestId=request.requestId;if(result.output.kind==='bound')result.output.productFacts.binding.requestId=request.requestId;}return result;}}:undefined,savedAssessmentId:saved?p2id(88):null,onClose(){},onRefresh(){},onSelect(){},onSave(){},onSearch(){},onFullChange(){}},{effects:true,modules:{'expo-network':{useNetworkState:()=>({isConnected:network,isInternetReachable:network})},'../../ui/Button':{Button:'Button'},'../../ui/ChoiceChip':{ChoiceChip:'ChoiceChip'},'../../../services/productCatalog':{createCatalogRequestId:()=>p2id(sequence++)},...(realCollapsed?{react:{useLayoutEffect:()=>{}},'react-native-gesture-handler':{GestureHandlerRootView:'GestureHandlerRootView'},'react-native-reanimated':{ReduceMotion:{System:'System'}},'@gorhom/bottom-sheet':{__esModule:true,default:'BottomSheet',BottomSheetScrollView:'BottomSheetScrollView',BottomSheetBackdrop:'BottomSheetBackdrop'}}:{'../result-sheet/ResultSheetSurface':surface,'../part-two/PartTwoIngredients':{usePartTwoView:()=>details,PartTwoIngredientsView:()=>React.createElement('Text',{},'Original synthetic facts')}})}});
- return {sheet,calls,ports,x,refuse:()=>{bodyRefused=true;},offline:()=>{online=false;},networkOffline:()=>{network=false;},logout:()=>{sessionOwner='';}};
+ const sheet=componentHarness('src/components/check/part-one/PartOneResultSheet.tsx','PartOneResultSheet',{view:{owner:x.context.ownerId,result:p1,saved:false,loading:false,error:null,scrollOffset:0},personalEnabled:true,personalPorts:ports,ingredientEnabled:realCollapsed,ingredientTransport:realCollapsed?{normalize:async(request:any)=>{ingredientReads++;const result=structuredClone(x.partTwo);result.requestId=request.requestId;if(result.state==='ready'){result.output.reading.binding.requestId=request.requestId;if(result.output.kind==='bound')result.output.productFacts.binding.requestId=request.requestId;}return result;}}:undefined,savedAssessmentId:saved?p2id(88):null,onClose(){},onRefresh(){},onSelect(){},onSave(){},onSearch(){},onFullChange(){}},{effects:true,modules:{'expo-network':{useNetworkState:()=>({isConnected:network,isInternetReachable:network})},'../../ui/Button':{Button:'Button'},'../../ui/ChoiceChip':{ChoiceChip:'ChoiceChip'},'../../../services/productCatalog':{createCatalogRequestId:()=>p2id(sequence++)},...(realCollapsed?{react:{useLayoutEffect:()=>{}},'react-native-gesture-handler':{GestureHandlerRootView:'GestureHandlerRootView'},'react-native-reanimated':{ReduceMotion:{System:'System'}},'@gorhom/bottom-sheet':{__esModule:true,default:'BottomSheet',BottomSheetScrollView:'BottomSheetScrollView',BottomSheetBackdrop:'BottomSheetBackdrop'}}:{'../result-sheet/ResultSheetSurface':surface,'../part-two/PartTwoIngredients':{usePartTwoView:()=>details,PartTwoIngredientsView:()=>React.createElement('Text',{},'Original synthetic facts')}})}});
+ return {sheet,calls,ports,x,p1,ingredientReads:()=>ingredientReads,refuse:()=>{bodyRefused=true;},offline:()=>{online=false;},networkOffline:()=>{network=false;},logout:()=>{sessionOwner='';}};
 }
 test('actual canonical sheet orders judgment before factual evidence and saves assessment separately',async t=>{
  t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted();try{
   for(let i=0;i<6;i++){f.sheet.render();await settle();}
   let nodes=f.sheet.render();press(control(nodes,'Compare or describe this check'));nodes=f.sheet.render();press(control(nodes,'Add to my routine'));nodes=f.sheet.render();press(control(nodes,'Moisturizing'));nodes=f.sheet.render();press(control(nodes,'Face'));nodes=f.sheet.render();press(control(nodes,'Leave on'));
   for(let i=0;i<4;i++){f.sheet.render();await settle();}
-  nodes=f.sheet.render();const content=textContent(nodes);assert.match(content,/Worth considering/);assert(content.indexOf('Worth considering')<content.indexOf('Original synthetic facts'));assert(control(nodes,'Save product without verified ingredients'));
-  press(control(nodes,'Save this assessment'));await settle();nodes=f.sheet.render();assert(control(nodes,'Assessment saved'));assert(f.calls.some(r=>r.operation==='save'));assert(control(nodes,'Save product without verified ingredients'));
-  f.refuse();t.mock.timers.tick(10000);await settle();nodes=f.sheet.render();assert(!textContent(nodes).includes('Worth considering'));assert(control(nodes,'Save product without verified ingredients'));
+  nodes=f.sheet.render();const content=textContent(nodes);assert.match(content,/Worth considering/);assert(content.indexOf('Worth considering')<content.indexOf('Original synthetic facts'));assert(control(nodes,'Save product'));
+  press(control(nodes,'Save this assessment'));await settle();nodes=f.sheet.render();assert(control(nodes,'Assessment saved'));assert(f.calls.some(r=>r.operation==='save'));assert(control(nodes,'Save product'));
+  f.refuse();t.mock.timers.tick(10000);await settle();nodes=f.sheet.render();assert(!textContent(nodes).includes('Worth considering'));assert(control(nodes,'Save product'));
  }finally{f.sheet.dispose();}
 });
 test('saved reopen uses pinned saved_basis and current context, restores intent and hides bodies offline/logout',async t=>{
@@ -108,7 +109,7 @@ test('persistent saved index reaches product-linked and standalone assessments a
  }
 });
 
-test('L09 native connectivity event hides current and historical bodies before polling or TTL expiry',async t=>{t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true);try{for(let i=0;i<6;i++){f.sheet.render();await settle();}assert(textContent(f.sheet.render()).includes('Worth considering'));f.networkOffline();const nodes=f.sheet.render();assert(!textContent(nodes).includes('Worth considering'));assert(!textContent(nodes).includes('Assessment when saved'));assert(control(nodes,'Save product without verified ingredients'));}finally{f.sheet.dispose();}});
+test('L09 native connectivity event hides current and historical bodies before polling or TTL expiry',async t=>{t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true);try{for(let i=0;i<6;i++){f.sheet.render();await settle();}assert(textContent(f.sheet.render()).includes('Worth considering'));f.networkOffline();const nodes=f.sheet.render();assert(!textContent(nodes).includes('Worth considering'));assert(!textContent(nodes).includes('Assessment when saved'));assert(control(nodes,'Save product'));}finally{f.sheet.dispose();}});
 
 test('erased encounter choices retain safe saved evidence for fresh explicit reassessment',async t=>{
  t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true,true);try{for(let i=0;i<6;i++){f.sheet.render();await settle();}const req=f.calls.find((r):r is Extract<PartThreeRequest,{operation:'evaluate'}>=>r.operation==='evaluate');assert(req);assert.equal(req.intent,'unanswered');assert.equal(req.comparatorId,null);assert.deepEqual(req.selectedManualReportIds,[]);assert.deepEqual(req.use,{purpose:null,site:null,useForm:null});assert.equal(req.savedAssessmentId,p2id(88));assert(textContent(f.sheet.render()).includes('Current assessment'));}finally{f.sheet.dispose();}
@@ -161,4 +162,29 @@ test('review residual: identical catalog display details withhold selection unti
   assert.equal(chosen.comparatorId, b.id);
   assert.deepEqual(chosen.use, check.choices.use, 'Display disambiguation adds no purpose or formula authority');
  } finally { h.dispose(); }
+});
+
+test('combined Check uses one identity/fit card and keeps one P2 read across replacement search and capture',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});
+ const raf=globalThis.requestAnimationFrame,caf=globalThis.cancelAnimationFrame;globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=()=>{};
+ const f=mounted(false,false,true);
+ try{
+  const identity={id:p2id(11),name:'Synthetic face lotion',brand:'Synthetic',variantText:'100 ml',expiresAt:f.x.partTwo.expiresAt,image:null};
+  const view={owner:f.x.context.ownerId,result:{...f.p1,display:{...f.p1.display,selectedIdentity:identity}},saved:false,loading:false,error:null,scrollOffset:0};
+  for(let i=0;i<6;i++){f.sheet.render({view});await settle();}
+  let nodes=f.sheet.render();press(control(nodes,'Compare or describe this check'));
+  for(const label of ['Add to my routine','Moisturizing','Face','Leave on']){press(control(f.sheet.render(),label));}
+  for(let i=0;i<5;i++){f.sheet.render();await settle();}
+  nodes=f.sheet.render();let content=textContent(nodes);
+  assert.equal((content.match(/Synthetic face lotion/g)??[]).length,1,'identity is presented once while judgment keeps its reason/scope');
+  assert.equal((content.match(/Personal Fit/g)??[]).length,1);assert.match(content,/Worth considering/);assert(!content.includes('Not enough information'));
+  assert.equal(f.ingredientReads(),1,'one mounted owner acquires P2 while the sheet is collapsed');
+  nodes=f.sheet.render({searchContent:React.createElement('Text',{},'Synthetic replacement name search'),searchEmpty:false});
+  assert.match(textContent(nodes),/Synthetic replacement name search/);assert(!textContent(nodes).includes('Worth considering'));
+  assert.equal(f.ingredientReads(),1,'replacement presentation cannot create a second normalization owner');
+  nodes=f.sheet.render({searchContent:undefined,captureContent:React.createElement('Text',{},'Synthetic retained capture overlay')});
+  assert.match(textContent(nodes),/Worth considering/);assert.match(textContent(nodes),/Synthetic retained capture overlay/);
+  assert.equal(f.ingredientReads(),1,'capture remains an overlay and does not restart normalization');
+  assert(control(nodes,'Save product'));assert(control(nodes,'Save this assessment'));
+ }finally{f.sheet.dispose();globalThis.requestAnimationFrame=raf;globalThis.cancelAnimationFrame=caf;}
 });

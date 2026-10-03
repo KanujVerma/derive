@@ -1,3 +1,4 @@
+import { authorizeServerIdentity } from './server-auth.ts';
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.39.8";
 import type {
   ContextProduct,
@@ -70,7 +71,7 @@ export interface AuthenticatedRuntime {
 
 export async function authenticate(req: Request): Promise<AuthenticatedRuntime> {
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) throw new ServiceError("UNAUTHORIZED", "Authentication required", 401);
+  if (!authHeader?.startsWith("Bearer ")) throw new ServiceError("UNAUTHORIZED", "Authentication required", 401);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -84,8 +85,8 @@ export async function authenticate(req: Request): Promise<AuthenticatedRuntime> 
     global: { headers: { Authorization: authHeader } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data: { user }, error } = await userClient.auth.getUser();
-  if (error || !user) throw new ServiceError("UNAUTHORIZED", "Invalid or expired session", 401);
+  const user = await authorizeServerIdentity(userClient.auth, (code, status) =>
+    new ServiceError(code, status === 503 ? "Authentication temporarily unavailable" : "Authentication required", status));
 
   return {
     userId: user.id,

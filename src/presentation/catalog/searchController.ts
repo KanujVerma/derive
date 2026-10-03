@@ -2,7 +2,7 @@ export interface CatalogSearchState<T> {
   query: string; resultQuery: string; items: T[]; loading: boolean; error: boolean;
 }
 export function createCatalogSearchController<T>(search: (query: string) => Promise<T[]>,
-  onChange: (state: CatalogSearchState<T>) => void = () => {}) {
+  onChange: (state: CatalogSearchState<T>) => void = () => {}, options: { automatic?: boolean; onInvalidate?: () => void } = {}) {
   const empty = (): CatalogSearchState<T> => ({ query: '', resultQuery: '', items: [], loading: false, error: false });
   let state = empty();
   let generation = 0;
@@ -12,7 +12,7 @@ export function createCatalogSearchController<T>(search: (query: string) => Prom
   let timer: ReturnType<typeof setTimeout> | null = null;
   const listeners = new Set<() => void>();
   const cancelTimer = () => { if (timer !== null) clearTimeout(timer); timer = null; };
-  const invalidate = () => { cancelTimer(); generation++; activeQuery = null; };
+  const invalidate = () => { cancelTimer(); generation++; activeQuery = null; options.onInvalidate?.(); };
   const publish = (next: CatalogSearchState<T>) => {
     state = next;
     onChange({ ...state, items: [...state.items] });
@@ -43,8 +43,8 @@ export function createCatalogSearchController<T>(search: (query: string) => Prom
     setQuery(query: string) {
       if (disposed) return;
       invalidate(); selectionLocked = false;
-      publish({ query, resultQuery: '', items: [], loading: query.trim().length >= 2, error: false });
-      if (query.trim().length >= 2) timer = setTimeout(() => { void submit(); }, 275);
+      publish({ query, resultQuery: '', items: [], loading: options.automatic !== false && query.trim().length >= 2, error: false });
+      if (options.automatic !== false && query.trim().length >= 2) timer = setTimeout(() => { void submit(); }, 275);
     },
     submit,
     select(preserve: boolean): boolean {
