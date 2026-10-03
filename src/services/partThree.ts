@@ -1,7 +1,7 @@
 import { PART_TWO_ENABLED } from './partTwo';
 import { supabase } from './supabase';
 import { useAuthStore } from '../stores/authStore';
-import { catalogReferenceKey } from '../presentation/p0b-personalization/storageAdapter';
+import { catalogReferenceLabels } from '../presentation/part-three/catalogLabels';
 import type { ContextProductReference } from '../contracts/PersonalContext';
 import { getCatalogProductDetail } from './productCatalog';
 import { createCatalogRequestId } from './productCatalog';
@@ -52,11 +52,6 @@ export async function listPartThreeSaved(ownerId: string): Promise<SavedAssessme
 
 /** Display names use the existing catalog read boundary and never supply formula authority. */
 export async function loadPartThreeLabels(owner: string, references: ContextProductReference[]): Promise<Record<string,string>> {
-  const client = await ownerClient(owner); client.guard();
-  const catalog = references.filter((r): r is Extract<ContextProductReference,{kind:'catalog'}> => r.kind==='catalog');
-  const ids = [...new Set(catalog.map(r=>r.productId))].slice(0,50);
-  const settled = await Promise.allSettled(ids.map(id=>getCatalogProductDetail(id))); client.guard();
-  const labels: Record<string,string> = {};
-  for(const ref of catalog){const i=ids.indexOf(ref.productId), result=settled[i];if(!result||result.status!=='fulfilled'||result.value?.productId!==ref.productId)continue;const product=result.value, variant=ref.variantId?product.variants.find(v=>v.variantId===ref.variantId):null;labels[catalogReferenceKey(ref)]='Current name: '+[product.brand,product.name,variant?.name,variant?.packageSize].filter(Boolean).join(' ');}
-  return labels;
+  const client = await ownerClient(owner);
+  return catalogReferenceLabels(references,client.guard,id=>getCatalogProductDetail(id,{functions:{invoke:(path:string,request:{body:unknown})=>client.invoke(path,JSON.stringify(request.body))}}));
 }
