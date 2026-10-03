@@ -10,6 +10,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { consumeOnce } from './part-one-worker.mjs';
 import { handlePartOneRequest, PartOneHttpError } from '../supabase/functions/_shared/part-one-runtime.ts';
+import { classifyServerAuthFailure } from '../supabase/functions/_shared/server-auth.ts';
 import { localProductProxyDestination } from '../supabase/functions/_shared/part-one-local-gateway.ts';
 import { searchPartOneProducts } from '../supabase/functions/_shared/part-one-search.ts';
 import { ExternalSourcePolicies } from '../src/domain/part-one/policies.ts';
@@ -46,7 +47,7 @@ const server=createServer(async(req,res)=>{
   const url=localProductProxyDestination(req.url??'/',backend);
   if(req.url==='/functions/v1/part-one/search'){
    const request=new Request(url,{method:req.method,headers:req.headers,...(req.method==='POST'?{body:Readable.toWeb(req),duplex:'half'}:{})});
-   const reply=await handlePartOneRequest(request,{authorize:async r=>{const token=r.headers.get('authorization')??'';if(!token.startsWith('Bearer '))throw new PartOneHttpError('unauthorized',401);const auth=await fetch(new URL('/auth/v1/user',backend),{headers:{Authorization:token,apikey:r.headers.get('apikey')??''},signal:AbortSignal.timeout(8000)});if(!auth.ok)throw new PartOneHttpError('unauthorized',401);},operation:async()=>{throw Error('unsupported');},search});
+   const reply=await handlePartOneRequest(request,{authorize:async r=>{const token=r.headers.get('authorization')??'';if(!token.startsWith('Bearer '))throw new PartOneHttpError('unauthorized',401);const auth=await fetch(new URL('/auth/v1/user',backend),{headers:{Authorization:token,apikey:r.headers.get('apikey')??''},signal:AbortSignal.timeout(8000)});if(!auth.ok){const failure=classifyServerAuthFailure({status:auth.status});throw new PartOneHttpError(failure.code,failure.status);}},operation:async()=>{throw Error('unsupported');},search});
    res.writeHead(reply.status,Object.fromEntries(reply.headers));res.end(await reply.text());return;
   }
   const response=await fetch(url,{method:req.method,headers:req.headers,...(['GET','HEAD'].includes(req.method)?{}:{body:Readable.toWeb(req),duplex:'half'}),redirect:'manual',signal:AbortSignal.timeout(35000)});

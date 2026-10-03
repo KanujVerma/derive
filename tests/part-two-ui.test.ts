@@ -36,7 +36,8 @@ test('A31 actual tap shows the original formulation-role sentence with reference
   assert(control(nodes,'View role reference'));assert(control(nodes,'View reference license'));
   press(control(nodes,'Ingredient details: Unknown ingredient'));assert(!textContent(h.render()).includes('reference humectant role'));
 });
-test('review actual Check and saved sheet composition use one primary list and retain authorized original fallback',async()=>{
+test('review actual Check and saved sheet composition use one primary list and retain authorized original fallback',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.parse(p2metadata.createdAt)});
  const {normalize:run}=await import('../src/domain/part-two/index.ts');
  for(const saved of [false,true]){
   const input=boundDeclaration('Glycerin, Water','public'),norm=run(input,LOCAL_DICTIONARY_RELEASE,p2metadata);
@@ -89,7 +90,7 @@ test('review exact admitted claims appear as Label says without ingredient-absen
  input.labelAssertions![0].transcription='uncertain';nodes=componentHarness(modulePath,'PartTwoInlineView',{view:{...v,result:normalize(input,LOCAL_DICTIONARY_RELEASE,p2metadata)},now:Date.parse(p2metadata.createdAt)}).render();assert(!textContent(nodes).includes('Label says:'));
 });
 test('review actual sheet never restores revoked original attribution on blocked-to-pending retries',async t=>{
- t.mock.timers.enable({apis:['setTimeout','setInterval']});const input=boundDeclaration('Glycerin, Water','public'),ready=normalize(input,LOCAL_DICTIONARY_RELEASE,p2metadata);assert.equal(ready.state,'ready');
+ t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:Date.parse(p2metadata.createdAt)});const input=boundDeclaration('Glycerin, Water','public'),ready=normalize(input,LOCAL_DICTIONARY_RELEASE,p2metadata);assert.equal(ready.state,'ready');
  const {output,...base}=ready as Extract<NonNullable<PartTwoView['result']>,{state:'ready'}>;void output;const target={ownerId:input.binding.authenticatedOwnerId,scanId:input.binding.scanId,captureSessionId:null,generation:input.binding.generation,evidenceRevision:input.binding.evidenceRevision};let calls=0;
  const transport={normalize:async(request:any)=>++calls===1?{...base,requestId:request.requestId,state:'blocked',resultRevision:2,reasonCodes:['source_withdrawn'],permittedText:null}:{...base,requestId:request.requestId,state:'pending',resultRevision:3,permittedText:null}};
  const result={scanId:target.scanId,generation:target.generation,resultRevision:target.evidenceRevision,declarationState:'accepted',identity:'exact',work:'complete',snapshotId:input.binding.snapshotId,declarationId:input.binding.declarationId,scope:'public',freshness:{state:'fresh',observedAt:p2metadata.createdAt,expiresAt:input.binding.expiresAt},display:{selectedIdentity:null,candidates:[],sections:[{sectionId:'original',kind:'ingredients',text:'Glycerin, Water',expiresAt:input.binding.expiresAt}],sources:[{observationId:'source',label:'Revoked label source',url:'https://example.test/revoked-label',observedAt:p2metadata.createdAt,expiresAt:input.binding.expiresAt}],limitations:[]},allowedActions:[]};
@@ -98,7 +99,7 @@ test('review actual sheet never restores revoked original attribution on blocked
  try{const initial=h.render();const summary=initial.find(n=>n.type==='View'&&n.props.onLayout&&n.props.style?.gap!==undefined);assert(summary);summary.props.onLayout({nativeEvent:{layout:{height:480}}});let nodes=await settle();const held=nodes.find(n=>n.type==='View'&&n.props.onLayout&&n.props.style?.minHeight===480);assert(held,'withdrawal retains numeric measured summary height');assert(!textContent(nodes).includes('Revoked label source'));assert(!textContent(nodes).includes('Published ingredient declaration'));assert.match(textContent(nodes),/Ingredient evidence unavailable/);assert(!textContent(nodes).includes('Cached private source text'));assert(textContent(nodes).includes('Reopen private source'));t.mock.timers.tick(15000);nodes=await settle();assert.equal(calls,2);assert(!textContent(nodes).includes('Cached private source text'));assert(!textContent(nodes).includes('Published ingredient declaration'));assert(!textContent(nodes).includes('Revoked label source'));assert(!nodes.some(n=>n.props.label==='View source: Revoked label source'));assert(!textContent(nodes).includes('Glycerin, Water'));}finally{h.dispose();}
 });
 test('review the mounted 15-second poll accepts 20-second success, settles failure, and retries without original-text resurrection',async t=>{
- t.mock.timers.enable({apis:['setTimeout','setInterval']});
+ t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:Date.parse(p2metadata.createdAt)});
  const seed=view('Glycerin');const waits:{request:any;resolve:(v:any)=>void;reject:(e:Error)=>void}[]=[];let id=0;
  const transport={normalize:(request:any)=>new Promise((resolve,reject)=>waits.push({request,resolve,reject}))};
  const h=componentHarness(modulePath,'PartTwoIngredients',{target:seed.target,enabled:true,transport,fallback:React.createElement('Text',{},'Private original fallback')},{effects:true,modules:{'../../../services/productCatalog':{createCatalogRequestId:()=>`mounted-${++id}`}}});
@@ -110,7 +111,8 @@ test('review the mounted 15-second poll accepts 20-second success, settles failu
   t.mock.timers.tick(10000);assert.equal(waits.length,3);assert(!textContent(h.render()).includes('Private original fallback'),'retry cannot restore a previously refused private original');waits[2].resolve(ready(waits[2].request));await settle();assert(control(h.render(),'Ingredient details: Glycerin'));
  }finally{h.dispose();await settle();}
 });
-test('A20/A29 actual private interpretation button sends the viewed capture revision and ignores late account feedback',async()=>{
+test('A20/A29 actual private interpretation button sends the viewed capture revision and ignores late account feedback',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.parse(p2metadata.createdAt)});
   const v=view('Glycerin'); const calls:{path:string;body:any}[]=[];let finish:((value:any)=>void)|null=null;
   const invoke=async(path:string,body:string)=>{calls.push({path,body:JSON.parse(body)});return await new Promise<any>(resolve=>{finish=resolve;});};
   const h=componentHarness('src/components/check/part-two/PartTwoPrivateInterpretation.tsx','PartTwoPrivateInterpretation',{target:v.target,result:{},enabled:true,invoke},{modules:{

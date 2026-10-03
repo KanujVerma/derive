@@ -2146,3 +2146,7 @@ Validation: full `npm test`, app and test typechecks, web and iOS JavaScript exp
 # 2026-10-03 — actual Check public workflow repair
 
 Isolated `kanuj/check-workflow-live` from accepted Part 2 `96b102dd`; see [workflow evidence and release boundaries](acceptance/CHECK_PUBLIC_WORKFLOW_2026_10_03.md). Normal explicit public name search and typed/camera barcode selection now connect through Part 1's real identity/evidence worker into the accepted shared sheet. Permitted image/quantity are preserved, P2 reads start above lazy findings, and source text remains partial/package unconfirmed. Capture review's technical controls are optional. No production source/privacy gate changed; all actual public reads used task-only loopback stack and synthetic Auth.
+
+## 2026-10-03 — Check transient Auth and elapsed lease correction
+
+Separate `kanuj/check-workflow-recovery-fixes` from accepted workflow `67675d44`; accepted checkpoint and concurrent Part3 remain preserved. Shared Auth classification returns retryable503 for SDK transport/deadline, throttling and upstream failures; real401/403 still deny access before any owner RPC. P1 worker and P2 resolve/publication use post-lock wall time only for lease expiry/deadlines, retaining all owner, rights, deletion, token/revision and lock-order gates. See [correction evidence](acceptance/CHECK_RECOVERY_2026_10_03.md). No diagnostic hooks, provider-policy expansion, hosted mutation or deployment.

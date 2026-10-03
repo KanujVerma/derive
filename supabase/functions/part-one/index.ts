@@ -6,6 +6,7 @@ import { commitPrivateCapture } from '../_shared/part-one-private-commit.ts';
 
 import { normalizeAuthorized, PartTwoHttpError } from '../_shared/part-two-runtime.ts';
 import { createPartOneBoundedFetch } from '../_shared/part-one-bounded-fetch.ts';
+import { authorizeServerUser } from '../_shared/server-auth.ts';
 const boundedFetch=createPartOneBoundedFetch();
 Deno.serve(async (request: Request) => {
   // Clients and the verified owner are request-scoped, including private work.
@@ -32,9 +33,7 @@ Deno.serve(async (request: Request) => {
     async authorize() {
       if (!url || !key) throw new PartOneHttpError('configuration_required',503);
       if (!authorization.startsWith('Bearer ')) throw new PartOneHttpError('unauthorized',401);
-      const {data:{user},error}=await client.auth.getUser();
-      if (error || !user) throw new PartOneHttpError('unauthorized',401);
-      ownerId=user.id;
+      ownerId=await authorizeServerUser(client.auth,(code,status)=>new PartOneHttpError(code,status));
     },
     operation,
     privateUpload:(request,id,binding)=>uploadPrivateDerivative(request,{captureSessionId:id,...binding},privatePorts()),
