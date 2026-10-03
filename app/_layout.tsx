@@ -265,7 +265,7 @@ export default function RootLayout() {
         <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development'
           && (shell === 'scanner_first_preview' || (localFreeIntegration && localReady
             && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true'
-            && publicEnvironment.supabaseUrl === 'http://127.0.0.1:59731')))}>
+            && publicEnvironment.supabaseUrl === 'http://127.0.0.1:59731'))}>
           <Stack.Screen name="part-three-preview" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development' && shell !== 'legacy' && (!localFreeIntegration || localReady)}>
