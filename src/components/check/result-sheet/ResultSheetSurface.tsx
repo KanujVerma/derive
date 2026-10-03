@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, Keyboard, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions, type View as NativeView } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ReduceMotion } from 'react-native-reanimated';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, type BottomSheetBackdropProps, type BottomSheetHandleProps } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,10 +86,12 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
   const closeAction = useRef(onClose);
   closeAction.current = onClose;
+  // The custom handle is inside the sheet's pan gesture. Let the native close
+  // control own its touch until release instead of the pan cancelling its press.
+  const closeGesture = useMemo(() => Gesture.Native().disallowInterruption(true), []);
   // The guard owns this body lifetime; callback updates cannot cross its key fence.
   const [guard] = useState(() => createSheetDismissGuard(presentationKey, () => closeAction.current(), readCurrentKey));
   const close = useCallback(() => {
-    if (__DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true') console.log('P3_CLOSE_TRACE', { event: 'explicit', current: guard.isCurrent(), closing: closing.current, explicit: explicitlyClosing.current, sheet: Boolean(sheet.current), search: presentationKey.endsWith(':search') });
     if (!guard.isCurrent()) return;
     closing.current = true;
     explicitlyClosing.current = true;
@@ -97,7 +99,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     // The library can reevaluate detents independently of our layout effect.
     // Its forced close fences that native reevaluation until acknowledgment.
     if (sheet.current) sheet.current.forceClose(); else guard.dismiss();
-  }, [guard, presentationKey]);
+  }, [guard]);
   requestClose.current = close;
   useEffect(() => {
     if ((summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent() && !closing.current) sheet.current?.snapToIndex(2);
@@ -132,10 +134,10 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       onPress={() => { if (guard.isCurrent() && !closing.current) { onInteraction?.(); sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); } }}>
       <View style={styles.indicator} />
     </Pressable>
-    <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel={dismissLabel}>
+    <GestureDetector gesture={closeGesture}><Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel={dismissLabel}>
       <Icon name="close" size={20} color={colors.inkMuted} />
-    </Pressable>
-  </View>, [close, dismissLabel, guard, index, contentSized, onInteraction]);
+    </Pressable></GestureDetector>
+  </View>, [close, closeGesture, dismissLabel, guard, index, contentSized, onInteraction]);
   return <GestureHandlerRootView style={styles.root} onLayout={event => { containerHeight.current = event.nativeEvent.layout.height; }} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
     <BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
@@ -147,7 +149,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
         // A visibly reopened detent restores interaction; forceClose stays fenced.
         if (next >= 0 && !explicitlyClosing.current) closing.current = false;
         setIndex(next);
-      } }} onClose={() => { if (__DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true') console.log('P3_CLOSE_TRACE', { event: 'ack', current: guard.isCurrent(), search: presentationKey.endsWith(':search') }); if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
+      } }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
       <BottomSheetScrollView testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}

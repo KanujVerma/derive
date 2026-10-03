@@ -51,7 +51,7 @@ function surfaceLifecycle() {
         Keyboard: { dismiss() {} }, Platform: { OS: 'ios' }, AccessibilityInfo: {}, findNodeHandle: () => null,
         StyleSheet: { create: (value: unknown) => value, absoluteFill: {} }, useWindowDimensions: () => ({ height: 844 }) };
       if (name === 'react-native-safe-area-context') return { SafeAreaProvider: 'SafeAreaProvider', useSafeAreaInsets: () => ({ top: 44, bottom: 34 }) };
-      if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: 'GestureHandlerRootView' };
+      if (name === 'react-native-gesture-handler') return { GestureHandlerRootView: 'GestureHandlerRootView', GestureDetector: 'GestureDetector', Gesture: { Native: () => ({ disallowInterruption: () => ({}) }) } };
       if (name === 'react-native-reanimated') return { ReduceMotion: { System: 'system' } };
       if (name === '@gorhom/bottom-sheet') return { __esModule: true, default: 'BottomSheet', BottomSheetScrollView: 'BottomSheetScrollView', BottomSheetBackdrop: 'BottomSheetBackdrop' };
       if (name.endsWith('/Icon')) return { Icon: 'Icon' };
