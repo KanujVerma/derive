@@ -216,3 +216,15 @@ test('off-detent layout and keyboard animations do not latch a live result as cl
   result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Product result')!.props.onPress();
   assert.equal(result.sheet.index,1,'a genuine close animation must fence accidental handle expansion');
 });
+
+
+test('oversized verdicts retain distinct reachable detents after replacement search', async () => {
+  const {resultSheetGeometry}=await import('../src/presentation/check/result-sheet/geometry.ts');
+  for(const height of [568,844,874])for(const summaryHeight of [700,1000,1600]){
+    const geometry=resultSheetGeometry({height,topInset:44,bottomPadding:34,summaryHeight});
+    assert.equal(geometry.needsFullHeight,true);
+    assert.ok(geometry.snapPoints[1]-geometry.snapPoints[0]>=20,'compact and expanded positions must not collapse to a one-pixel move');
+    assert.ok(geometry.snapPoints[2]-geometry.snapPoints[1]>=20,'full-height expansion must remain a distinct native position');
+    assert.ok(geometry.snapPoints[2]<=height-44,'the full result remains within the safe viewport');
+  }
+});
