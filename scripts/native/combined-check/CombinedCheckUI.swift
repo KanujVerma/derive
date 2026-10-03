@@ -1,6 +1,18 @@
 import XCTest
 final class CombinedCheckUI: XCTestCase {
  let app=XCUIApplication(bundleIdentifier:"com.derive.skincare")
+ override func setUpWithError() throws {
+  continueAfterFailure=false
+  let system=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+  if system.buttons["Open"].waitForExistence(timeout:2){system.buttons["Open"].tap()}
+ }
+ func testDevelopmentClientConnection() throws {
+  app.activate()
+  if app.buttons["Continue"].waitForExistence(timeout:5){app.buttons["Continue"].tap()}
+  let loaded=XCTNSPredicateExpectation(predicate:NSPredicate{_,_ in self.contains("Derive could not connect").exists || self.contains("Check").exists || self.element("Load Part3 local fixture").exists},object:app)
+  XCTAssertEqual(XCTWaiter.wait(for:[loaded],timeout:90),.completed,app.debugDescription)
+  shot("combined-native-host-loaded")
+ }
  func element(_ label:String)->XCUIElement {app.descendants(matching:.any).matching(NSPredicate(format:"label == %@",label)).firstMatch}
  func contains(_ label:String)->XCUIElement {app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@",label)).firstMatch}
  func scroll()->XCUIElement{let region=app.otherElements["result-sheet-scroll"].firstMatch;let sheet=region.scrollViews.firstMatch;if sheet.exists{return sheet};let views=app.scrollViews;return views.count>1 ? views.element(boundBy:views.count-1) : views.firstMatch}
