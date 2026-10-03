@@ -31,7 +31,7 @@ final class CombinedCheckUI: XCTestCase {
  func testComparisonQuestionSaveReopenWithdrawalAndOwner() throws {
   continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
   if element("Close result").exists{close()}
-  fixtureRoute();XCTAssertTrue(element("Load Part3 local fixture").waitForExistence(timeout:20),app.debugDescription);tap("Load Part3 local fixture")
+  fixtureRoute();let initialSavedState=try controlRequest("/integration-state");XCTAssertTrue(element("Load Part3 local fixture").waitForExistence(timeout:20),app.debugDescription);tap("Load Part3 local fixture")
   XCTAssertTrue(element("Product result").waitForExistence(timeout:30));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertTrue(contains("Purpose, application site or use form needs clarification.").exists,app.debugDescription);XCTAssertFalse(contains("Ingredient details").exists,"Collapsed result must earn an immediate judgment before detail disclosure");shot("part-three-collapsed-immediate-judgment");expand()
   XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:35),app.debugDescription);shot("part-three-first-card-bounded-insufficiency")
   tap("Compare or describe this check");tap("Original synthetic current cream")
@@ -40,7 +40,7 @@ final class CombinedCheckUI: XCTestCase {
   XCTAssertTrue(contains("Worth considering").waitForExistence(timeout:30),app.debugDescription)
   XCTAssertTrue(contains("Its label matches the step you want to replace.").exists);XCTAssertTrue(contains("Published list").exists)
   XCTAssertFalse(element("Replace this item").exists);shot("part-three-earned-replacement-card")
-  tap("Close comparison choices");tap("Worth considering");tap("Its label matches the step you want to replace.");shot("part-three-earned-first-card-visible");tap("Save this assessment")
+  tap("Close comparison choices");tap("Worth considering");tap("Its label matches the step you want to replace.");shot("part-three-earned-first-card-visible");tap("Save product");var savedProductState=try controlRequest("/integration-state");for _ in 0..<20{if savedProductState["saves"] as? Int == (initialSavedState["saves"] as? Int ?? 0)+1{break};Thread.sleep(forTimeInterval:0.2);savedProductState=try controlRequest("/integration-state")};XCTAssertEqual(savedProductState["saves"] as? Int,(initialSavedState["saves"] as? Int ?? 0)+1,"Product save is independently acknowledged by local SQL");tap("Save this assessment")
   XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription);shot("part-three-exact-assessment-save")
   // Retained recall tests may durably revoke the reference card. Exact identity
   // survives independently; this flow must not require recalled reference prose.
@@ -144,8 +144,24 @@ final class CombinedCheckUI: XCTestCase {
   close()
  }
 
+ func testNormalCheckNameWithoutMarketStaysConservative() throws {
+  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};fixtureRoute()
+  tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close();tap("Open normal Check with synthetic session")
+  XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:25));let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"Original synthetic\n")
+  let item=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Check Synthetic Original synthetic authority fixture")).firstMatch;XCTAssertTrue(item.waitForExistence(timeout:25),app.debugDescription);item.tap()
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:25));XCTAssertTrue(contains("Product not confirmed").waitForExistence(timeout:25),app.debugDescription)
+  XCTAssertTrue(contains("Personal assessment unavailable").exists);XCTAssertTrue(contains("Ingredient evidence unavailable").exists);XCTAssertFalse(contains("Worth considering").exists)
+  // React Native exposes nested text nodes for the same rendered label. Distinct
+  // frames, plus the mounted component proof, identify one visible Fit surface.
+  let fits=app.staticTexts.matching(NSPredicate(format:"label == %@","Personal Fit")).allElementsBoundByIndex;XCTAssertEqual(Set(fits.map{String(describing:$0.frame)}).count,1)
+  shot("combined-ordinary-name-unanswered-market-conservative");expand();XCTAssertFalse(element("Save product").exists);XCTAssertFalse(element("Save this assessment").exists)
+  let before=try controlRequest("/integration-state");tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Personal assessment unavailable").exists)
+  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Close result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Personal assessment unavailable").exists);XCTAssertFalse(contains("Worth considering").exists)
+  let after=try controlRequest("/integration-state");XCTAssertEqual((after["counts"] as? [String:Int])?["normalize"],(before["counts"] as? [String:Int])?["normalize"],"Ordinary search Back/X keep one Part2 acquisition owner");shot("combined-ordinary-unscoped-search-return");close()
+ }
+
  func testNormalBarcodeLocalPhotoDraftBackSearchAndRemoval() throws {
-  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};tab("Check")
+  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};fixtureRoute();tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close();tap("Open normal Check with synthetic session");tab("Check")
   XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:20),app.debugDescription)
   let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"123456789012\n")
   XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);expand();tap("Scan ingredients")
