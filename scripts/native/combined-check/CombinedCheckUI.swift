@@ -133,11 +133,11 @@ final class CombinedCheckUI: XCTestCase {
   let photo=app.images.matching(NSPredicate(format:"label BEGINSWITH %@","Photo,")).firstMatch
   XCTAssertTrue(photo.waitForExistence(timeout:20),app.debugDescription);photo.tap()
   XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:25),app.debugDescription)
-  XCTAssertTrue(contains("Glycerin").waitForExistence(timeout:25),app.debugDescription);shot("combined-ordinary-local-photo-reading")
-  tap("Back to product result");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:20));XCTAssertTrue(contains("Glycerin").exists);XCTAssertFalse(contains("Worth considering").exists)
-  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:15));XCTAssertTrue(contains("Glycerin").exists);shot("combined-capture-back-and-search-preserve-draft")
+  XCTAssertTrue(contains("Hexanediol").waitForExistence(timeout:25),app.debugDescription);shot("combined-ordinary-local-photo-reading")
+  tap("Back to product result");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:20));XCTAssertTrue(contains("Hexanediol").exists);XCTAssertFalse(contains("Worth considering").exists)
+  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:15));XCTAssertTrue(contains("Hexanediol").exists);shot("combined-capture-back-and-search-preserve-draft")
   tap("Review local label draft and add missing photos");XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:15));tap("Remove temporary ingredient draft")
-  XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertFalse(contains("Label reading").exists);XCTAssertFalse(contains("Glycerin").exists);shot("combined-local-draft-erased")
-  close();XCTAssertFalse(contains("Glycerin").exists)
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertFalse(contains("Label reading").exists);XCTAssertFalse(contains("Hexanediol").exists);shot("combined-local-draft-erased")
+  close();XCTAssertFalse(contains("Hexanediol").exists)
  }
 }
