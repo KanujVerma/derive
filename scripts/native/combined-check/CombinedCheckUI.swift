@@ -7,6 +7,7 @@ final class CombinedCheckUI: XCTestCase {
   for _ in 0..<3{if system.buttons["Open"].waitForExistence(timeout:1){system.buttons["Open"].tap()}else{break}}
   app.activate()
   if app.buttons["Continue"].waitForExistence(timeout:2) && app.buttons["Continue"].isHittable{app.buttons["Continue"].tap()}
+  if app.buttons["Go home"].exists && app.buttons["Close"].exists{app.buttons["Close"].tap()}
   if element("Try again").exists && element("Try again").isHittable{element("Try again").tap()}
  }
  func testDevelopmentClientConnection() throws {
@@ -17,6 +18,7 @@ final class CombinedCheckUI: XCTestCase {
   shot("combined-native-host-loaded")
  }
  func element(_ label:String)->XCUIElement {app.descendants(matching:.any).matching(NSPredicate(format:"label == %@",label)).firstMatch}
+ func tab(_ label:String){let target=app.buttons.matching(NSPredicate(format:"label CONTAINS %@",", "+label+",")).firstMatch;XCTAssertTrue(target.waitForExistence(timeout:15),app.debugDescription);target.tap()}
  func contains(_ label:String)->XCUIElement {app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@",label)).firstMatch}
  func scroll()->XCUIElement{let region=app.otherElements["result-sheet-scroll"].firstMatch;let sheet=region.scrollViews.firstMatch;if sheet.exists{return sheet};let views=app.scrollViews;return views.count>1 ? views.element(boundBy:views.count-1) : views.firstMatch}
  func tap(_ label:String){let target=element(label);if target.exists && target.isHittable{target.tap();return};if app.keyboards.firstMatch.exists && scroll().exists{scroll().swipeDown()};for _ in 0..<30{if target.exists && target.isHittable{target.tap();return};if scroll().exists{if target.exists && target.frame.midY < scroll().frame.minY+12{scroll().swipeDown()}else{scroll().swipeUp()}}};XCTFail("Unreachable: \(label)\n\(app.debugDescription)")}
@@ -127,7 +129,7 @@ final class CombinedCheckUI: XCTestCase {
   let afterSearch=try controlRequest("/integration-state")
   XCTAssertEqual((afterSearch["counts"] as? [String:Int])?["normalize"],(beforeSearch["counts"] as? [String:Int])?["normalize"],"Search Back/X keep one mounted Part2 acquisition lifecycle")
   shot("combined-search-back-and-x-preserve-encounter")
-  close();tap("My Stuff")
+  close();tab("My Stuff")
   XCTAssertTrue(contains("Saved product evidence").waitForExistence(timeout:25),app.debugDescription)
   let saved=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Open assessment saved ")).firstMatch
   for _ in 0..<20{if saved.exists && saved.isHittable{break};app.scrollViews.firstMatch.swipeUp()}
@@ -141,7 +143,7 @@ final class CombinedCheckUI: XCTestCase {
  }
 
  func testNormalBarcodeLocalPhotoDraftBackSearchAndRemoval() throws {
-  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};tap("Check")
+  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};tab("Check")
   XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:20),app.debugDescription)
   let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"123456789012\n")
   XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);expand();tap("Scan ingredients")
