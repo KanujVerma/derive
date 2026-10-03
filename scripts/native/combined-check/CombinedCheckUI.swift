@@ -3,6 +3,7 @@ final class CombinedCheckUI: XCTestCase {
  let app=XCUIApplication(bundleIdentifier:"com.derive.skincare")
  override func setUpWithError() throws {
   continueAfterFailure=false
+  print("COMBINED_CHECK_NATIVE_FIXTURE_ENTRY_V1")
   let system=XCUIApplication(bundleIdentifier:"com.apple.springboard")
   for _ in 0..<3{if system.buttons["Open"].waitForExistence(timeout:1){system.buttons["Open"].tap()}else{break}}
   app.activate()
