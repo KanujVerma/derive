@@ -1,3 +1,5 @@
+> Current combined Check + Part 3 candidate: [final combined implementation and exact receipts](PART_THREE_COMBINED_IMPLEMENTATION.md). The counts and runtime heads below describe the accepted predecessor.
+
 # Part 3 local implementation candidate
 
 Part 3 adds an earned personal judgment and reason to the existing result sheet, faithful durable context and five-step setup, explicit preferences and current-item comparison, one optional material question, independent exact assessment save/reopen, and a bounded provider-neutral Jev adapter. Deterministic output is complete with every provider gate disabled. Ingredient reference roles never become clinical, efficacy, tolerance or safety claims.

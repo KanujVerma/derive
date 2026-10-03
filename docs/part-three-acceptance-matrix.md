@@ -11,6 +11,10 @@ Q06 does not require an encounter-only intent answer to become a durable profile
 The final root ledger below records exact local receipts. The original matrix author ran no SQL/Auth/native/provider evaluation; those receipts are independently credited by the root validation pass. No real provider or human comprehension evaluation was performed.
 
 
+## Current combined candidate verification
+
+All 44 exact case rows below retain their authored Givens and case-specific scope. The [combined final report](PART_THREE_COMBINED_IMPLEMENTATION.md) supersedes predecessor run counts and records exact final runtime `76485de`, 189 total app files / 1,541 TAP passes / five skips, both types/exports, clean SQL 38/1,091, actual Auth/Edge/SQL and preserved Part 2 erasure/response proofs, eight native workflows, environment and receipt hashes. C10/Q05/Q06/L06/U01 remain exact golden skips; narrower native setup/conflict, withdrawal, gesture and large-text checks are supporting evidence only. Retained-public replay remains blocked by automatic transfer approval, distinct from synthetic implementation proof. Physical phone, human comprehension, independent review and live provider benchmark remain open.
+
 ## Judgment
 
 | Case | Exact Given | Required result | Source / precise tests | Current pure or mounted evidence | Local Auth/SQL/native obligations |
@@ -93,7 +97,7 @@ These are executable local proof sources and the interpretation required of thei
 | L05 / L06 / L09 / L13 | [V1/V2 original report/note erasure](../supabase/tests/part_three_context_v2.sql#L19); [dependent purge](../supabase/migrations/20261002195650_part_three_decision_runtime.sql#L70); [source/field/snapshot erasure and safe handoff](../supabase/migrations/20261002195650_part_three_decision_runtime.sql#L315); [safe pin and withdrawal assertions](../scripts/part-three-local-smoke.mjs#L103); [connectivity hook](../src/components/check/part-three/usePartThreeCheck.ts#L39) | New immutable safe Part2 projection must repoint saved pin, erase old derived body before predecessor deletion, retain independently permitted input only and authorize fresh reassessment. Context erasure scrubs dependent encounter choices; null request may still expose safe authorized basis for new explicit choices. Offline hides all private current/historical packets immediately and may retain permitted neutral metadata only. |
 | L10 / L11 / provider gate | [SQL permissions/default-off](../supabase/tests/part_three_runtime_permissions.sql#L11); [real SQL with injected Jev transport](../scripts/part-three-injected-proof.mjs#L18); [save/read-saved refinement revocation](../scripts/part-three-injected-proof.mjs#L25); [deferred baseline runtime](../tests/part-three-runtime.test.ts#L16) | Boolean flags alone cannot grant source/derivation processing. Job utility/rights/spend/circuit/model/grant authorization must remain current through publication, read and exact save. Refusal restores complete baseline without promoting optional model selection. Injected calls are not outbound evaluation. |
 
-## Corrected serial verification ledger
+## Accepted predecessor serial verification ledger
 
 The immutable command ledger distinguishes corrected-source receipts from the predecessor candidate and from every failed orchestration attempt. Corrected native receipts are complete exit-zero runs at 6bbd96c; the 877-entry equivalence proof pins all app/export/type inputs to tested 60263b2; the only later change is the separately executed lifecycle fixture. Predecessor native passes do not validate changed code.
 
