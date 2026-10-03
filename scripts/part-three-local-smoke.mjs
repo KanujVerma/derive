@@ -56,6 +56,7 @@ async function normalize(scan,requestToken=token){
 async function requestPart3(body,asToken=token){const r=await fetch(new URL('/functions/v1/part-three',url),{method:'POST',headers:{apikey:anon,authorization:`Bearer ${asToken}`,'content-type':'application/json'},body:JSON.stringify(body)});const bodyOut=await r.json();return {status:r.status,body:bodyOut};}
 const p3=async(body,requestToken=token)=>{const r=await requestPart3(body,requestToken);if(r.status!==200)throw Error(`Part3 synthetic ${body.operation} failed ${r.status}/${r.body.code??'unknown'}`);return r.body;};
 let savedId,secondOwner,secondToken,injectedAdapterCalls=0;
+let lostResponseSaveReq = null, lostResponseSavedId = null;
 try{
  const {data,error}=await client.auth.signInAnonymously();if(error||!data.user||!data.session)throw Error('Synthetic Auth failed');owner=data.user.id;token=data.session.access_token;
  const foreign=createClient(endpoint,anon,{auth:{persistSession:false,autoRefreshToken:false}});const second=await foreign.auth.signInAnonymously();if(second.error)throw Error('Synthetic foreign Auth failed');secondOwner=second.data.user.id;secondToken=second.data.session.access_token;
@@ -88,6 +89,17 @@ try{
  const saved=await p3(saveReq);check(saved.kind,'saved','exact full binding saves atomically');savedId=saved.savedAssessmentId;check((await p3(saveReq)).replayed,true,'exact save retries stay identical');
  const historical=await p3({operation:'read_saved',savedAssessmentId:savedId});check(historical.assessmentWhenSaved,result,'saved original packet preserved separately from current assessment');check(historical.currentAssessment,'unavailable','history is never represented as current green');
  const list=await p3({operation:'list_saved'});check(list.items.some(x=>x.savedAssessmentId===savedId&&x.scanId===req.scanId),true,'neutral durable saved listing reaches correct scan across restarts');check(JSON.stringify(list).includes('private note'),false,'listing cannot hydrate personal notes or judgment');
+ if (process.argv.includes('--review-regressions')) {
+  lostResponseSaveReq = { ...saveReq, requestId: randomUUID() };
+  const committed = await fetch(new URL('/functions/v1/part-three', url), {
+   method: 'POST', headers: { apikey: anon, authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+   body: JSON.stringify(lostResponseSaveReq)
+  });
+  check(committed.status, 200, 'Lost-response fixture commits through actual Edge before dropping the response body');
+  await committed.body.cancel();
+  lostResponseSavedId = await sql(`select id::text from public.part_three_saved_assessments where owner_id='${owner}' and request_id='${lostResponseSaveReq.requestId}';`);
+  check(/^[0-9a-f-]{36}$/.test(lostResponseSavedId), true, 'SQL independently witnesses the committed receipt unknown to the retrying consumer');
+ }
  if(process.argv.includes('--review-regressions')){
   const scan=ScanResultSchema.parse(await edge('part-one','/scans',{schemaVersion:1,requestId:randomUUID(),clientScanId:randomUUID(),idempotencyKey:randomUUID(),generation:0,code:{raw:candidate.barcode,symbology:'upc_a',namespace:'gtin',retailerId:null},requestedMarket:'US',categoryHint:null},secondToken));await normalize(scan,secondToken);
   for(const state of ['unanswered','unsure','withheld']){
@@ -115,6 +127,10 @@ try{
    check(rejected.status, 409, 'Committed request still rejects changed binding or revision after expired read');
   }
   const committedRetry=await p3(saveReq);check(committedRetry.kind,'saved','Committed exact save receipt survives current result TTL');check(committedRetry.savedAssessmentId,savedId,'Expired retry returns original committed receipt');check(committedRetry.replayed,true,'Expired save receipt remains idempotent');
+  const lostResponseRetry = await p3(lostResponseSaveReq);
+  check(lostResponseRetry.kind, 'saved', 'Dropped-response exact save retries after normal expired-read deletion');
+  check(lostResponseRetry.savedAssessmentId, lostResponseSavedId, 'Dropped-response retry returns the original SQL-witnessed committed ID');
+  check(lostResponseRetry.replayed, true, 'Dropped-response receipt remains idempotent without a current result row');
  }
  if(process.argv.includes('--review-regressions')){
   const avoidedCatalog=await fixtureProduct({label:true,catalog:true,name:'Original synthetic avoided catalog item'});await normalize(avoidedCatalog.scan);
@@ -149,7 +165,7 @@ try{
  }
  const beforeDelete=await p3({...req,requestId:randomUUID(),generation:4});const packetBytes=JSON.stringify(beforeDelete.result);
  const erase=()=>edge('personal-context','',{operation:'delete_context_record',requestId:randomUUID(),baseContextRevision:beforeDelete.result.binding.contextRevision,record:{kind:'note',id:noteId}});
- const deletion=process.argv.includes('--lifecycle-races')?await (await import('./part-three-race-proof.mjs')).proveSaveContextErasureRace({owner,result:beforeDelete.result,sql,erase,check}):await erase();check(deletion.contextRevision,beforeDelete.result.binding.contextRevision+1,'actual note delete advances owner context');check((await p3({operation:'read',resultId:beforeDelete.result.resultId})).kind,'unavailable','deleted context cannot reopen stale assessment');check((await p3({operation:'read_saved',savedAssessmentId:savedId})).assessmentWhenSaved,null,'unsafe original saved prose and derived enums are purged on note erase');check((await p3(saveReq)).kind,'unavailable','Committed receipt retry after context erasure cannot restore protected result metadata or prose');check(await sql(`select count(*) from public.personal_context_revisions where user_id='${owner}' and payload::text like '%Original synthetic private note%';`),'0','original historical note bytes physically erased');
+ const deletion=process.argv.includes('--lifecycle-races')?await (await import('./part-three-race-proof.mjs')).proveSaveContextErasureRace({owner,result:beforeDelete.result,sql,erase,check}):await erase();check(deletion.contextRevision,beforeDelete.result.binding.contextRevision+1,'actual note delete advances owner context');check((await p3({operation:'read',resultId:beforeDelete.result.resultId})).kind,'unavailable','deleted context cannot reopen stale assessment');check((await p3({operation:'read_saved',savedAssessmentId:savedId})).assessmentWhenSaved,null,'unsafe original saved prose and derived enums are purged on note erase');check((await p3(saveReq)).kind,'unavailable','Committed receipt retry after context erasure cannot restore protected result metadata or prose');if (lostResponseSaveReq) check((await p3(lostResponseSaveReq)).kind, 'unavailable', 'Dropped-response receipt cannot replay after protected context erasure');check(await sql(`select count(*) from public.personal_context_revisions where user_id='${owner}' and payload::text like '%Original synthetic private note%';`),'0','original historical note bytes physically erased');
  check(await sql(`select count(*) from private.part_three_encounters where owner_id='${owner}' and id='${compareReq.encounterId}' and exposed_question_id is null and skipped=true and interacted=true;`),'1','Opaque same-encounter suppression survives context erasure without erased question ID');
  const suppressedAfterErase=await p3({...compareReq,requestId:randomUUID(),generation:8});check(suppressedAfterErase.result.question,null,'Context erasure cannot grant a second automatic question in the same encounter');
  const erasedSavedBasis=await p3({operation:'saved_basis',savedAssessmentId:savedId});check(erasedSavedBasis.request,null,'Context erasure purges saved encounter choices');check(erasedSavedBasis.partTwo.state,'ready','Context erasure retains independent pinned product evidence for fresh choices');
