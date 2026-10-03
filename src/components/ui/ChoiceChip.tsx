@@ -33,12 +33,12 @@ export const ChoiceChip: React.FC<ChoiceChipProps> = ({
   size = 'medium',
   selectionType = 'multiple',
 }) => {
-  const handlePress = async () => {
+  const handlePress = () => {
     if (disabled) return;
-    try {
-      await Haptics.selectionAsync();
-    } catch {}
     onSelect();
+    try {
+      void Haptics.selectionAsync().catch(() => {});
+    } catch {}
   };
 
   const isSmall = size === 'small';
