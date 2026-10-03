@@ -33,6 +33,16 @@ final class CombinedCheckUI: XCTestCase {
  func pressClose(){let target=element("Close result");var prior=CGRect.null;let stable=XCTNSPredicateExpectation(predicate:NSPredicate{_,_ in let frame=target.frame;defer{prior=frame};return target.exists && target.isHittable && !frame.isEmpty && frame == prior},object:target);XCTAssertEqual(XCTWaiter.wait(for:[stable],timeout:10),.completed,"Close control must finish its sheet transition");target.tap()}
  func close(){pressClose();XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Close result"))],timeout:10),.completed)}
  func cancelSearch(){pressClose();XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Back to result"))],timeout:15),.completed,app.debugDescription)}
+ func testRepeatedOrdinarySearchReturn() throws {
+  fixtureRoute();tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close();tap("Open normal Check with synthetic session")
+  XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:25));let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"Original synthetic\n")
+  let item=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Check Synthetic Original synthetic authority fixture")).firstMatch;XCTAssertTrue(item.waitForExistence(timeout:25),app.debugDescription);item.tap();XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30));expand()
+  for cycle in 0..<6 {
+   print("SEARCH_RETURN_CYCLE \(cycle)")
+   tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:15))
+   tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));cancelSearch();expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:15));XCTAssertTrue(contains("Not enough info").exists)
+  };close()
+ }
  func testComparisonQuestionSaveReopenWithdrawalAndOwner() throws {
   continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
   if element("Close result").exists{close()}

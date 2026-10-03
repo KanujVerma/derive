@@ -83,14 +83,12 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   const explicitlyClosing = useRef(false);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
-  const [closeTrace, setCloseTrace] = useState('idle');
   useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
   const closeAction = useRef(onClose);
   closeAction.current = onClose;
   // The guard owns this body lifetime; callback updates cannot cross its key fence.
   const [guard] = useState(() => createSheetDismissGuard(presentationKey, () => closeAction.current(), readCurrentKey));
   const close = useCallback(() => {
-    if (__DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true') setCloseTrace(`explicit-current-${guard.isCurrent()}`);
     if (__DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true') console.log('P3_CLOSE_TRACE', { event: 'explicit', current: guard.isCurrent(), closing: closing.current, explicit: explicitlyClosing.current, sheet: Boolean(sheet.current), search: presentationKey.endsWith(':search') });
     if (!guard.isCurrent()) return;
     closing.current = true;
@@ -138,7 +136,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       <Icon name="close" size={20} color={colors.inkMuted} />
     </Pressable>
   </View>, [close, dismissLabel, guard, index, contentSized, onInteraction]);
-  return <GestureHandlerRootView testID={__DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true' ? `p3-close-trace-${closeTrace}` : undefined} style={styles.root} onLayout={event => { containerHeight.current = event.nativeEvent.layout.height; }} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
+  return <GestureHandlerRootView style={styles.root} onLayout={event => { containerHeight.current = event.nativeEvent.layout.height; }} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
     <BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
       // -1 also means an off-detent keyboard/layout position in this library.
