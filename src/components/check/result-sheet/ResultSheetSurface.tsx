@@ -50,12 +50,15 @@ interface Props {
 }
 
 export function ResultSheetSurface({ visible = true, inline = false, presentationKey, overlay, ...props }: Props) {
+  // Cancelling replacement search returns to an open result with a fresh guard.
+  // Keep the native Modal and capture overlay mounted across this body lifetime.
+  const bodyKey = `${presentationKey}:${props.replacement ? 'search' : 'result'}`;
   const currentKey = useRef<string | null>(null);
-  currentKey.current = visible ? presentationKey : null;
+  currentKey.current = visible ? bodyKey : null;
   const readCurrentKey = useCallback(() => currentKey.current, []);
   const requestClose = useRef<(() => void) | null>(null);
   if (!visible) return null;
-  const body = <SheetBody key={presentationKey} {...props} presentationKey={presentationKey}
+  const body = <SheetBody key={bodyKey} {...props} presentationKey={bodyKey}
     readCurrentKey={readCurrentKey} requestClose={requestClose} />;
   return inline ? <>{body}{overlay}</> : <Modal visible transparent animationType="none" onRequestClose={() => requestClose.current?.()}>
     <SafeAreaProvider>{body}{overlay}</SafeAreaProvider>
@@ -75,8 +78,10 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
   useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
-  // The callback is captured for this mount, never replaced by a newer case's callback.
-  const [guard] = useState(() => createSheetDismissGuard(presentationKey, onClose, readCurrentKey));
+  const closeAction = useRef(onClose);
+  closeAction.current = onClose;
+  // The guard owns this body lifetime; callback updates cannot cross its key fence.
+  const [guard] = useState(() => createSheetDismissGuard(presentationKey, () => closeAction.current(), readCurrentKey));
   const close = useCallback(() => {
     if (!guard.isCurrent()) return;
     Keyboard.dismiss();

@@ -381,7 +381,9 @@ test('capture overlay presents inside the current native result modal outside la
   html = render({ replacement: React.createElement('p', {}, 'Replacement search') }); assertNativeParent();
   assert.match(html, /Replacement search/); assert.match(html, /Retained label capture/);
   assert.doesNotMatch(html, /Lazy ingredient finding/);
-  r.sheets.at(-1).onChange(0); html = render(); assertNativeParent();
+  // This SSR harness checks ancestry, not React's keyed remounts. Return to
+  // result before exercising its change handler; lifecycle has a keyed harness.
+  render(); r.sheets.at(-1).onChange(0); html = render(); assertNativeParent();
   assert.doesNotMatch(html, /Lazy ingredient finding/); assert.match(html, /Retained label capture/);
   html = render({ inline: true });
   assert.match(html, /Retained label capture/);
