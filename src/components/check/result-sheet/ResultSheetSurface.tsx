@@ -80,6 +80,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   const containerHeight = useRef(height - bottomInset);
   // Native close is asynchronous. Late personal/layout updates must not reopen it.
   const closing = useRef(false);
+  const explicitlyClosing = useRef(false);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
   useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
@@ -90,6 +91,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   const close = useCallback(() => {
     if (!guard.isCurrent()) return;
     closing.current = true;
+    explicitlyClosing.current = true;
     Keyboard.dismiss();
     // The library can reevaluate detents independently of our layout effect.
     // Its forced close fences that native reevaluation until acknowledgment.
@@ -139,7 +141,12 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       // -1 also means an off-detent keyboard/layout position in this library.
       // Only an animation to the closed container boundary owns dismissal.
       onAnimate={(_from, next, _fromPosition, nextPosition) => { if (guard.isCurrent() && next === -1 && nextPosition >= containerHeight.current - 1) closing.current = true; }}
-      onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
+      onChange={next => { if (guard.isCurrent()) {
+        // A gesture close may be interrupted by keyboard/layout reevaluation.
+        // A visibly reopened detent restores interaction; forceClose stays fenced.
+        if (next >= 0 && !explicitlyClosing.current) closing.current = false;
+        setIndex(next);
+      } }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
       <BottomSheetScrollView testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}

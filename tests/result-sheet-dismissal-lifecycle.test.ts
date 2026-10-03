@@ -228,3 +228,19 @@ test('oversized verdicts retain distinct reachable detents after replacement sea
     assert.ok(geometry.snapPoints[2]<=height-44,'the full result remains within the safe viewport');
   }
 });
+
+
+test('interrupted gesture close rearms visible result interaction while explicit close remains fenced', t => {
+ const r=surfaceLifecycle();t.after(()=>r.dispose());let closed=0;
+ const props={presentationKey:'interrupted-gesture',onClose:()=>{closed++;},summary:React.createElement('Summary'),children:React.createElement('Findings')};
+ let result=r.render(props);
+ result.sheet.props.onAnimate(0,-1,500,844);
+ result.sheet.snapToIndex(2);result=r.render(props);
+ result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Product result')!.props.onPress();
+ assert.equal(result.sheet.index,0,'a native close interrupted by a visible detent must allow the next deliberate handle action');
+ result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Close result')!.props.onPress();
+ result.sheet.props.onChange(2);result=r.render(props);
+ result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Product result')!.props.onPress();
+ assert.equal(result.sheet.index,-1,'queued native updates must not rearm an explicit forced close');
+ result.sheet.finishClose();assert.equal(closed,1);
+});
