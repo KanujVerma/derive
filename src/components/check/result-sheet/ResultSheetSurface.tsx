@@ -118,7 +118,8 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   useLayoutEffect(() => { if (contentSized) setSummaryHeight(0); }, [contentSized, contentSizeResetKey]);
   const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight, contentSized });
   const sheet = useRef<BottomSheet>(null);
-  const containerHeight = useRef(height - bottomInset);
+  const outerHeight = useRef(height);
+  const sheetTopInset = insets.top + spacing.xs;
   // Native close is asynchronous. Late personal/layout updates must not reopen it.
   const closing = useRef(false);
   const explicitlyClosing = useRef(false);
@@ -156,12 +157,14 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   }, [guard]);
   const backdrop = useCallback((props: BottomSheetBackdropProps) => <BottomSheetBackdrop {...props}
     appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.18} pressBehavior="close" />, []);
-  return <GestureHandlerRootView style={styles.root} onLayout={event => { containerHeight.current = event.nativeEvent.layout.height; }} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
+  return <GestureHandlerRootView style={styles.root} onLayout={event => { outerHeight.current = event.nativeEvent.layout.height; }} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
     <SheetHandleContext.Provider value={{ handle, sheet, closing, contentSized, index, close, dismissLabel, guard, onInteraction }}><BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
-      topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
+      topInset={sheetTopInset} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
       // -1 also means an off-detent keyboard/layout position in this library.
-      // Only an animation to the closed container boundary owns dismissal.
-      onAnimate={(_from, next, _fromPosition, nextPosition) => { if (guard.isCurrent() && next === -1 && nextPosition >= containerHeight.current - 1) closing.current = true; }}
+      // This nonmodal, nondetached sheet's hosting container excludes BOTH
+      // insets. Its native close position is not the outer gesture-root height.
+      // Require the actual boundary; keyboard/off-detent -1 stays interactive.
+      onAnimate={(_from, next, _fromPosition, nextPosition) => { if (guard.isCurrent() && next === -1 && Math.abs(nextPosition - (outerHeight.current - sheetTopInset - bottomInset)) <= 1) closing.current = true; }}
       onChange={next => { if (guard.isCurrent()) {
         // A gesture close may be interrupted by keyboard/layout reevaluation.
         // A visibly reopened detent restores interaction; forceClose stays fenced.

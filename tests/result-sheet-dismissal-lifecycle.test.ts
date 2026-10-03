@@ -19,7 +19,7 @@ function surfaceLifecycle() {
   let current: Instance | null = null, used = new Set<string>();
   let effects: Array<() => void> = [];
   const nativeSheets = new Map<string, any>();
-  let hosts: Array<{ type: string; props: any }> = [], mountedSheets: any[] = [];
+  let hosts: Array<{ type: string; props: any }> = [], mountedSheets: any[] = [], nativeOuterHeight=844;
   const slot = () => { assert(current, 'hooks need a mounted component'); return { instance: current, index: current.cursor++ }; };
   const memo = (factory: () => any, deps: readonly unknown[]) => {
     const { instance, index } = slot(), previous = instance.slots[index];
@@ -80,7 +80,7 @@ function surfaceLifecycle() {
       try { child = value.type(value.props); } finally { current = parent; }
       visit(child, key); return;
     }
-    hosts.push({ type: value.type, props: value.props });
+    hosts.push({ type: value.type, props: value.type==='GestureHandlerRootView' ? {...value.props,onLayout(event: any){nativeOuterHeight=event.nativeEvent.layout.height;value.props.onLayout(event);}} : value.props });
     if (value.type === 'BottomSheet') {
       const key = `${path}/native-sheet`, props = value.props;
       used.add(key);
@@ -92,7 +92,9 @@ function surfaceLifecycle() {
           snapToIndex(index: number) { if(this.forced)return; if (this.index === -1 && index >= 0) this.pending = []; this.index = index; this.props.onChange(index); },
           gestureClose() {
             const closeProps = this.props;
-            closeProps.onAnimate?.(this.index, -1, 100, 844);
+            // Pinned Gorhom nonmodal/non-detached hosting container subtracts
+            // both insets before calculating its closed detent position.
+            closeProps.onAnimate?.(this.index, -1, 100, nativeOuterHeight-closeProps.topInset-closeProps.bottomInset);
             this.index = -1; closeProps.onChange(-1);
             this.pending.push(() => closeProps.onClose());
           },
@@ -256,4 +258,27 @@ test('interrupted gesture close rearms visible result interaction while explicit
  result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Product result')!.props.onPress();
  assert.equal(result.sheet.index,-1,'queued native updates must not rearm an explicit forced close');
  result.sheet.finishClose();assert.equal(closed,1);
+});
+
+test('actual inset-adjusted swipe and backdrop close fence late oversized layout before acknowledgment', t => {
+  for(const bottomInset of [0,40])for(const method of ['swipe','backdrop']){
+    const r=surfaceLifecycle();t.after(()=>r.dispose());let closed=0;
+    const render=()=>r.render({presentationKey:`inset-${bottomInset}-${method}`,bottomInset,onClose(){closed++;},summary:React.createElement('Summary'),children:React.createElement('Findings')});
+    const initial=render();initial.hosts.find(host=>host.type==='GestureHandlerRootView')!.props.onLayout({nativeEvent:{layout:{height:844}}});
+    assert.equal(initial.sheet.props.topInset,52);assert.equal(844-initial.sheet.props.topInset-bottomInset,bottomInset===0?792:752);
+    if(method==='swipe')initial.sheet.gestureClose();else initial.sheet.close();
+    initial.hosts.find(host=>host.type==='View'&&host.props.onLayout)!.props.onLayout({nativeEvent:{layout:{height:1000}}});
+    const late=render();assert.equal(late.sheet.index,-1,'a native close at the inner inset-adjusted boundary must stay closed while late content requests full height');
+    late.sheet.finishClose();assert.equal(closed,1,'the current lifetime delivers exactly one native acknowledgment');
+  }
+});
+
+test('keyboard and off-detent minus-one positions on either side of the close boundary remain interactive', t => {
+  for(const position of [560,790,794,880]){
+    const r=surfaceLifecycle();t.after(()=>r.dispose());let closed=0;
+    const props={presentationKey:`keyboard-${position}`,onClose(){closed++;},summary:React.createElement('Summary'),children:React.createElement('Findings')};
+    const initial=r.render(props);initial.sheet.props.onAnimate(0,-1,100,position);
+    initial.hosts.find(host=>host.type==='Pressable'&&host.props.accessibilityLabel==='Product result')!.props.onPress();
+    assert.equal(initial.sheet.index,1,'minus-one alone or a non-boundary position must not latch live interaction as closing');assert.equal(closed,0);
+  }
 });

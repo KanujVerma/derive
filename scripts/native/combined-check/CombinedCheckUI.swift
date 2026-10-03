@@ -43,6 +43,16 @@ final class CombinedCheckUI: XCTestCase {
    tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));cancelSearch();expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:15));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription)
   };close()
  }
+ func testNativeGestureAndBackdropDismissal() throws {
+  fixtureRoute();tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30))
+  let handle=element("Product result");XCTAssertTrue(handle.isHittable);print("GESTURE_CLOSE_START \(handle.frame)")
+  let end=app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.98));handle.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).press(forDuration:0.05,thenDragTo:end)
+  XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Close result"))],timeout:15),.completed,"Actual native pan-down must acknowledge dismissal");shot("part-three-native-gesture-dismissed")
+  tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30))
+  let current=element("Product result");XCTAssertGreaterThan(current.frame.minY,app.frame.minY+100,"Compact sheet must leave an observed backdrop region")
+  let backdrop=app.coordinate(withNormalizedOffset:CGVector.zero).withOffset(CGVector(dx:app.frame.width/2,dy:(current.frame.minY-app.frame.minY)/2));print("BACKDROP_CLOSE_START \(current.frame)");backdrop.tap()
+  XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Close result"))],timeout:15),.completed,"Actual native backdrop must acknowledge dismissal");XCTAssertTrue(element("Load Part3 local fixture").isHittable);shot("part-three-native-backdrop-dismissed")
+ }
  func testComparisonQuestionSaveReopenWithdrawalAndOwner() throws {
   continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
   if element("Close result").exists{close()}
