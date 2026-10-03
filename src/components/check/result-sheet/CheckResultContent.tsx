@@ -41,13 +41,16 @@ function FindingCard({ finding, onSource }: { finding: ResultFinding; onSource?:
     <SourceDisclosure finding={finding} onSource={onSource} />
   </View>;
 }
-function VerdictBlock({ verdict }: { verdict: VerdictPresentation }) {
+export function CheckVerdictBlock({ verdict, heading = 'PERSONAL FIT', beforeTitle, children }: {
+  verdict: VerdictPresentation; heading?: string; beforeTitle?: React.ReactNode; children?: React.ReactNode;
+}) {
   const tone = tones[verdict.state];
-  return <View style={styles.fitBlock}><Text style={styles.eyebrow}>PERSONAL FIT</Text>
+  return <View style={styles.fitBlock}><Text style={styles.eyebrow} accessibilityRole="header">{heading}</Text>
     <View style={[styles.verdict, { backgroundColor: tone.bg, borderColor: tone.border }]} accessibilityLiveRegion="polite">
+      {beforeTitle}
       <View style={styles.verdictTitleRow}><Icon name={tone.icon} size={22} color={tone.text} />
         <Text style={[styles.verdictTitle, { color: tone.text }]} accessibilityRole="header">{verdict.label}</Text></View>
-      <Text style={styles.reason}>{verdict.reason}</Text>
+      {verdict.reason && <Text style={styles.reason}>{verdict.reason}</Text>}{children}
     </View>
   </View>;
 }
@@ -69,7 +72,7 @@ export function CheckResultView({ facts, verdict, section = 'all', showIdentity 
         <View style={styles.identity}>{facts.brand ? <Text style={styles.brand}>{facts.brand}</Text> : null}
           <Text style={styles.productName} accessibilityRole="header">{facts.name}</Text>{category ? <Text style={styles.brand}>{category}</Text> : null}</View>
       </View>}
-      {personalSummary ?? <VerdictBlock verdict={verdict} />}
+      {personalSummary ?? <CheckVerdictBlock verdict={verdict} />}
     </View>}
     {section !== 'summary' && <View style={styles.findings}>
       {verdict.findings.map(finding => <FindingCard key={finding.id} finding={finding} />)}
@@ -92,7 +95,7 @@ const styles = StyleSheet.create({
   placeholder: { width: 48, height: 54, borderRadius: radii.md, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center' },
   identity: { flex: 1, minWidth: 0, gap: spacing.xxs }, brand: { color: colors.inkMuted, fontSize: typography.sizes.caption },
   productName: { color: colors.ink, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
-  fitBlock: { gap: spacing.xs }, eyebrow: { color: colors.inkMuted, fontSize: typography.sizes.micro, letterSpacing: 1.1, fontWeight: typography.weights.semibold },
+  fitBlock: { gap: spacing.xs }, eyebrow: { color: colors.inkMuted, fontSize: typography.sizes.micro, letterSpacing: 1.1, fontWeight: typography.weights.semibold, textTransform: 'uppercase' },
   verdict: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm }, verdictTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   verdictTitle: { flex: 1, fontSize: typography.sizes.sectionTitle, lineHeight: typography.lineHeights.sectionTitle, fontWeight: typography.weights.semibold },
   reason: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular }, findings: { gap: spacing.md },
