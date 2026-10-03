@@ -77,6 +77,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   useLayoutEffect(() => { if (contentSized) setSummaryHeight(0); }, [contentSized, contentSizeResetKey]);
   const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight, contentSized });
   const sheet = useRef<BottomSheet>(null);
+  const containerHeight = useRef(height - bottomInset);
   // Native close is asynchronous. Late personal/layout updates must not reopen it.
   const closing = useRef(false);
   const handle = useRef<NativeView>(null);
@@ -132,10 +133,12 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       <Icon name="close" size={20} color={colors.inkMuted} />
     </Pressable>
   </View>, [close, dismissLabel, guard, index, contentSized, onInteraction]);
-  return <GestureHandlerRootView style={styles.root} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
+  return <GestureHandlerRootView style={styles.root} onLayout={event => { containerHeight.current = event.nativeEvent.layout.height; }} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
     <BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
       topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
-      onAnimate={(_from, next) => { if (guard.isCurrent() && next === -1) closing.current = true; }}
+      // -1 also means an off-detent keyboard/layout position in this library.
+      // Only an animation to the closed container boundary owns dismissal.
+      onAnimate={(_from, next, _fromPosition, nextPosition) => { if (guard.isCurrent() && next === -1 && nextPosition >= containerHeight.current - 1) closing.current = true; }}
       onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
       <BottomSheetScrollView testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}

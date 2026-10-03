@@ -91,7 +91,7 @@ function surfaceLifecycle() {
           snapToIndex(index: number) { if(this.forced)return; if (this.index === -1 && index >= 0) this.pending = []; this.index = index; this.props.onChange(index); },
           gestureClose() {
             const closeProps = this.props;
-            closeProps.onAnimate?.(this.index, -1);
+            closeProps.onAnimate?.(this.index, -1, 100, 844);
             this.index = -1; closeProps.onChange(-1);
             this.pending.push(() => closeProps.onClose());
           },
@@ -203,4 +203,16 @@ test('explicit dismissal fences native detent reevaluation and retries an interr
   result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Close result')!.props.onPress();
   result.sheet.snapToIndex(2);assert.equal(result.sheet.index,-1,'explicit close must fence library-internal detent reevaluation too');
   result.sheet.finishClose();assert.equal(closed,1);
+});
+
+test('off-detent layout and keyboard animations do not latch a live result as closing', t => {
+  const r=surfaceLifecycle();t.after(()=>r.dispose());let closed=0;
+  const result=r.render({presentationKey:'restored-result',onClose:()=>{closed++;},summary:React.createElement('Summary'),children:React.createElement('Findings')});
+  result.hosts.find(host=>host.type==='GestureHandlerRootView')!.props.onLayout({nativeEvent:{layout:{height:800}}});
+  result.sheet.props.onAnimate(0,-1,500,450);
+  result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Product result')!.props.onPress();
+  assert.equal(result.sheet.index,1,'a restored result must still expand after a nonclosing off-detent animation');assert.equal(closed,0);
+  result.sheet.props.onAnimate(1,-1,450,800);
+  result.hosts.find(host=>host.type==='Pressable' && host.props.accessibilityLabel==='Product result')!.props.onPress();
+  assert.equal(result.sheet.index,1,'a genuine close animation must fence accidental handle expansion');
 });
