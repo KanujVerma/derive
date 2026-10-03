@@ -156,7 +156,9 @@ test('review residual: identical catalog display details withhold selection unti
   const named = control(nodes, 'Current name: Original lotion large bottle');
   assert.equal(named.props.disabled, false);
   press(named);
-  assert.equal(selected.comparatorId, b.id);
-  assert.deepEqual(selected.use, check.choices.use, 'Display disambiguation adds no purpose or formula authority');
+  const chosen = selected as { comparatorId: string; use: typeof check.choices.use } | null;
+  assert(chosen, 'Distinct permitted names allow an explicit selection');
+  assert.equal(chosen.comparatorId, b.id);
+  assert.deepEqual(chosen.use, check.choices.use, 'Display disambiguation adds no purpose or formula authority');
  } finally { h.dispose(); }
 });
