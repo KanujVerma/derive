@@ -20,6 +20,7 @@ import {createCatalogRequestId} from '@/src/services/productCatalog';
 import type {PartThreePorts} from '@/src/components/check/part-three/usePartThreeCheck';
 import {supabase} from '@/src/services/supabase';
 import {publicEnvironment} from '@/src/config/environment';
+import {requireOptionalNativeModule} from 'expo-modules-core';
 const Bootstrap=z.strictObject({ownerId:PartOneIdSchema,token:z.string(),refreshToken:z.string().optional(),apiKey:z.string(),apiOrigin:z.enum(['http://127.0.0.1:59521','http://127.0.0.1:59721']),result:ScanResultSchema,encounterId:PartOneIdSchema});
 type Fixture=z.infer<typeof Bootstrap>;
 /** Loopback-only synthetic Auth/Edge/SQL harness using the production sheet and
@@ -29,6 +30,13 @@ export default function PartThreePreview(){
  const {fixture:fixtureParam,integration}=useLocalSearchParams<{fixture?:string;integration?:string}>();
  const router=useRouter();
  const CONTROL=integration==='1'?'http://127.0.0.1:8373':'http://127.0.0.1:8353';
+ useEffect(()=>{
+  if(!enabled||integration!=='1'||publicEnvironment.supabaseUrl!=='http://127.0.0.1:59731')return;
+  // The development Tools button overlaps the real result close target.
+  // Set only these existing SDK preferences on the task's synthetic host.
+  const menu=requireOptionalNativeModule<{setPreferencesAsync(settings:{showFloatingActionButton:boolean;showsAtLaunch:boolean}):Promise<void>}>('DevMenuPreferences');
+  void menu?.setPreferencesAsync({showFloatingActionButton:false,showsAtLaunch:false}).catch(()=>{});
+ },[enabled,integration]);
  const [fixture,setFixture]=useState<Fixture|null>(null),[visible,setVisible]=useState(true),[tick,setTick]=useState(0),[savedId,setSavedId]=useState<string|null>(null),[preference,setPreference]=useState(false),[status,setStatus]=useState('Synthetic fixture not loaded'),[offline,setOffline]=useState(false),[setupMode,setSetupMode]=useState(false),[setupSaving,setSetupSaving]=useState(false),[setupError,setSetupError]=useState<string|null>(null);
  const setupAttempt=useRef<{signature:string;request:any}|null>(null);
  const owner=useRef<string|null>(null),generation=useRef(1),online=useRef(true),encounters=useRef(new Map<string,string>());
