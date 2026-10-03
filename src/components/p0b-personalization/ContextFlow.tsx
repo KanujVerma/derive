@@ -1,6 +1,7 @@
+import { parseSpendingAmount } from '../../presentation/p0b-personalization/spendingInput';
 import { editSensitivityInput } from '@/src/presentation/p0b-personalization/sensitivityInput';
 import React, { useState } from 'react';
-import { InputAccessoryView, Keyboard, Platform, Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Keyboard, Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Screen } from '@/src/components/ui/Screen';
 import { Button } from '@/src/components/ui/Button';
 import { ChoiceChip } from '@/src/components/ui/ChoiceChip';
@@ -9,9 +10,10 @@ import { colors, layout, radii, spacing, typography } from '@/src/constants/them
 import { createContextDraft, relevantQuestions, validateContextDraft, GOALS, type Treatment, type Answer, type ContextDraft, type RoutineReference, type SafetyRelevance } from '@/src/presentation/p0b-personalization/draft';
 
 import { toggleProfileGoal } from '@/src/presentation/p0b-personalization/goalSelection';
-import { addCurrentProduct, addPastOutcome, currentProductFeedback, currentFeedbackChoices, currentFeedbackLabels, toggleCurrentFeedback, clearCurrentFeedback, setSetupAnswer, removePastOutcome, productOutcomeLabels, catalogFamilyReference, createSetupBundle, currentUseItem, manualUnverifiedReference, removeSetupProduct, setAdditionalNote, type SetupBundle, type ProductOutcome } from '@/src/presentation/p0b-personalization/setup';
+import { addCurrentProduct, addPastOutcome, currentProductFeedback, currentFeedbackChoices, currentFeedbackLabels, toggleCurrentFeedback, clearCurrentFeedback, setSetupAnswer, removePastOutcome, productOutcomeLabels, catalogFamilyReference, createSetupBundle, currentUseItem, manualUnverifiedReference, removeSetupProduct, type SetupBundle, type ProductOutcome } from '@/src/presentation/p0b-personalization/setup';
 import { CatalogProductSearch } from '@/src/components/catalog/CatalogProductSearch';
 import { PreferenceChoices } from './PreferenceChoices';
+import { StructuredPreferenceFields, type SpendingInput } from './StructuredPreferenceFields';
 import { referenceToStorage } from '@/src/presentation/p0b-personalization/storageAdapter';
 import type { CatalogProductSummary } from '@/src/contracts/ProductCatalog';
 
@@ -25,7 +27,7 @@ export interface ContextFlowProps {
   collectIntent?: boolean;
   /** The host names the completion action, including temporary previews. */
   completionLabel?: string;
-  /** Fresh setup may also record current products, product experiences, and a raw note. Profile editing does not replay those stages. */
+  /** Fresh setup may also record current products, product experiences, and confirmed preferences. Profile editing does not replay those stages. */
   setup?: boolean;
   ownerId?: string | null;
   createId?: () => string;
@@ -56,7 +58,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   const [bundle, setBundle] = useState(() => createSetupBundle(ownerId));
   const [manualName, setManualName] = useState('');
   const [outcomeOpen, setOutcomeOpen] = useState<string | null>(null);
-  const [noteText, setNoteText] = useState('');
+  const [spendingInput, setSpendingInput] = useState<SpendingInput>(()=>{const v=initialDraft?.spendingPreference?.state==='answered'?initialDraft.spendingPreference.value:null;return {amount:v?(v.amountMinor/100).toFixed(2):'',currency:v?.currency??'USD',scope:v?.scope??'per_product',period:v?.period??'purchase'};});
   const [pending, setPending] = useState<RoutineReference | null>(null);
   const fields = relevantQuestions(relevance);
   const hasContext = contextQuestions.length > 0 || fields.length > 0;
@@ -64,9 +66,9 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
   const extended = setup && !editing && !hasContext;
   const last = hasContext ? 2 : extended ? 4 : 1;
   const currentBundle = bundle.ownerId === ownerId ? bundle : createSetupBundle(ownerId);
-  if (currentBundle !== bundle) { setBundle(currentBundle); setNoteText(''); setOutcomeOpen(null); setPending(null); setManualName(''); }
+  if (currentBundle !== bundle) { setBundle(currentBundle); setOutcomeOpen(null); setPending(null); setManualName(''); }
   const update = <K extends keyof ContextDraft>(key: K, value: ContextDraft[K]) => { setValidation(null); setDraft(current => ({ ...current, [key]: value })); };
-  const finish = () => { const message = validateContextDraft(draft); setValidation(message); if (message) return; if (extended && onSetup) { onSetup(currentBundle, createContextDraft(draft)); return; } onApply(createContextDraft(draft)); };
+  const finish = () => { const message = spendingInput.amount.trim() && parseSpendingAmount(spendingInput.amount) === null ? 'Enter a spending amount with up to two decimal places, or leave it unanswered.' : validateContextDraft(draft); setValidation(message); if (message) return; if (extended && onSetup) { onSetup(currentBundle, createContextDraft(draft)); return; } onApply(createContextDraft(draft)); };
   const continueOrApply = () => { if (editing || step === last) finish(); else setStep(step + 1); };
   const addNamedProduct = (reference: ReturnType<typeof manualUnverifiedReference> | ReturnType<typeof catalogFamilyReference>, catalog?: CatalogProductSummary) => {
     if(durableSetup && currentBundle.products.length >= 20) { setValidation('Save up to 20 current products.'); return; }
@@ -108,6 +110,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       <AnswerChoices label="How does your skin usually feel?" answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Neither dry nor oily'], ['combination', 'Oily in some areas, dry in others'], ['oily', 'Oily'], ['unsure', 'Not sure']]} onChange={value => update('behavior', value)} />
       <AnswerChoices label="When you try a new skincare product, does your skin get irritated easily?" support="Think stinging, burning, redness, or peeling." answer={draft.reactivity} basic disabled={loading} choices={[['reacts_easily', 'Yes, often'], ['generally_tolerates', 'Usually not'], ['unsure', 'Not sure']]} onChange={value => update('reactivity', value)} />
     </View>}
+    {(editing || step === 1) && <StructuredPreferenceFields input={spendingInput} onInput={patch=>setSpendingInput(current=>({...current,...patch}))} draft={draft} disabled={loading} onChange={patch=>setDraft(current=>({...current,...patch}))}/>}
     {extended && step === 2 && <View style={styles.questions}>
       <QuestionGroup label="What are you using now?" support="Add the skincare products you use regularly.">
         <CatalogProductSearch embedded label="Search products" search={catalogSearch} selectedIds={currentBundle.products.flatMap(product => product.reference.kind === 'catalog' ? [product.reference.productId] : [])} onQueryChange={setManualName} onSelect={(product: CatalogProductSummary) => addNamedProduct(catalogFamilyReference(product), product)} />
@@ -150,12 +153,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
     </View>}
     {extended && step === 4 && <View style={styles.questions}>
       {durableSetup && createId && <PreferenceChoices key={'preferences:' + ownerId} preferences={currentBundle.preferences ?? []} products={[...currentBundle.products.map(p=>({key:p.id,label:p.reference.label,reference:referenceToStorage(p.reference)})),...currentBundle.previewOnly.pastReports.map(p=>({key:p.id,label:p.reference.label,reference:referenceToStorage(p.reference)}))]} createId={createId} loading={loading} onChange={preferences=>setBundle({...currentBundle,preferences})}/>}
-      <QuestionGroup label="Anything else you'd like Derive to know?">
-        <TextInput style={styles.input} accessibilityLabel="Anything else" inputAccessoryViewID="part-three-setup-note" editable={!loading} multiline placeholder="Anything we didn't cover." value={noteText} onChangeText={text => { if (loading) return; setNoteText(text); setBundle(setAdditionalNote(currentBundle, text)); }} />
-        <Text style={styles.copy}>{durableSetup ? 'This private note will be saved. It is not interpreted or used in Check. Limit: 2,000 characters.' : 'Preview only. This note isn’t saved or used in a Check.'}</Text>
-        {durableSetup && <Text style={styles.copy}>Save your profile, current products, feedback, past experiences and optional note together. If saving fails, your entries remain here for retry. Up to 20 current products and 20 experiences.</Text>}
-      </QuestionGroup>
-      {Platform.OS === 'ios' && <InputAccessoryView nativeID="part-three-setup-note"><View style={{padding:spacing.xs,backgroundColor:colors.surface}}><Button label="Done editing note" variant="ghost" onPress={()=>Keyboard.dismiss()}/></View></InputAccessoryView>}
+      {durableSetup && <Text style={styles.copy}>Save your profile, current products, feedback, past experiences and confirmed preferences together. If saving fails, your entries remain here for retry. Up to 20 current products and 20 experiences.</Text>}
     </View>}
     {hasContext && (editing || step === 2) && <View style={styles.questions}>
       {contextQuestions.includes('treatments') && <QuestionGroup label="Treatments you use" support="Choose treatments you know you use."><View style={styles.chips}>

@@ -25,6 +25,7 @@ export interface PartThreeView {
     loading: boolean;
     saving: boolean;
     error: string | null;
+    pendingSave?: boolean;
 }
 const key = (t: PartThreeTarget) => canonicalJson(t), encounterKey = (t: PartThreeTarget) => canonicalJson([t.binding.ownerId, t.binding.accountGeneration, t.binding.encounterId]);
 /** Private memory only. Every publication requires the full expected authority and live grant. */
@@ -34,10 +35,12 @@ export function createPartThreeController(transport: PartThreeTransport, createI
         promise: Promise<boolean>;
         abort: AbortController;
     } | null = null, last: PersonalResultV2 | null = null;
-    let saveAttempt: {
-        key: string;
-        id: string;
-    } | null = null;
+    let saveAttempt: { key: string; id: string } | null = null;
+    // Uncertain transport outcomes retain the original owner-bound request.
+    // Receipt replay is allowed after the current display lease expires.
+    const pendingSaves = new Map<string, { ownerId: string; accountGeneration: number; request: Extract<PartThreeRequest,{operation:'save'}> }>();
+    const saveScope=(t:PartThreeTarget)=>canonicalJson([t.binding.ownerId,t.binding.accountGeneration,t.binding.encounterId,t.binding.scanId,t.binding.captureSessionId]);
+    const pendingFor=(t:PartThreeTarget|null)=>t?pendingSaves.get(saveScope(t)):undefined;
     let interaction:{target:string;resultId:string;selectedTradeoffId:string|null}|null=null;
     const highest = new Map<string, {
         revision: number;
@@ -104,7 +107,7 @@ export function createPartThreeController(transport: PartThreeTransport, createI
     }
     function run(read: boolean): Promise<boolean> {
         const t = view.target;
-        if (!t || !online)
+        if (!t || !online || pendingFor(t))
             return Promise.resolve(false);
         if (flight)
             return flight.promise;
@@ -129,8 +132,8 @@ export function createPartThreeController(transport: PartThreeTransport, createI
         getView: () => ({ ...view }),
         bind(t: PartThreeTarget | null) { if (t && view.target && key(t) === key(view.target))
             return; const old = view.target; if (old && t && (old.binding.ownerId !== t.binding.ownerId || old.binding.accountGeneration !== t.binding.accountGeneration))
-            latches.clear(); if (t?.request.savedAssessmentId)
-            latches.suppress(encounterKey(t)); epoch++; cancel(); last = null; interaction=null;saveAttempt = null; highest.clear(); view = { target: t, result: null, question: null, historical: null, savedAssessmentId: null, savedAt: null, loading: false, saving: false, error: null }; emit(); },
+            latches.clear(); if(t)for(const [scope,pending] of pendingSaves)if(t.binding.ownerId!==pending.ownerId||t.binding.accountGeneration!==pending.accountGeneration)pendingSaves.delete(scope); if (t?.request.savedAssessmentId)
+            latches.suppress(encounterKey(t)); epoch++; cancel(); last = null; interaction=null;saveAttempt = null; highest.clear(); view = { target: t, result: null, question: null, historical: null, savedAssessmentId: null, savedAt: null, loading: false, saving: false, error: pendingFor(t) ? 'Save confirmation is pending. Retry the original Save to recover its confirmation.' : null, pendingSave: Boolean(pendingFor(t)) }; emit(); },
         evaluate: () => run(false), renew: () => run(true),
         // The mounted UI calls this only after native visibility or an actual
         // accessibility announcement. Receiving a packet is not exposure.
@@ -158,34 +161,36 @@ export function createPartThreeController(transport: PartThreeTransport, createI
             last = null;
             hide('Personal assessment expired. Refresh to review.');
         } },
+        clearPendingSave() { pendingSaves.clear(); saveAttempt=null; view={...view,pendingSave:false}; },
         async save(): Promise<string | null> {
-            const t = view.target, r = view.result;
-            if (!t || !r || !online || view.saving || !['ready', 'unavailable', 'blocked'].includes(r.state))
-                return null;
-            const token = epoch;
-            view = { ...view, saving: true, error: null };
-            emit();
+            const t=view.target, r=view.result;
+            const prior=pendingFor(t);
+            if (!t || !online || view.saving || (!prior && (!r || !['ready','unavailable','blocked'].includes(r.state)))) return null;
+            const token=epoch;
+            view={...view,saving:true,error:null}; emit();
             try {
-                const read = await transport.request({ operation: 'read', resultId: r.resultId });
-                if(read.kind!=='result'||canonicalJson(read.result)!==canonicalJson(r))throw Error('Displayed assessment revision changed');
-                if (!active(token, t) || !publish(read, t, r.binding.attemptId, token) || view.result?.resultRevision !== r.resultRevision || canonicalJson(view.result) !== canonicalJson(r))
-                    throw Error('Changed basis');
-                const bindingHash = sha256(canonicalJson(r.binding)), attemptKey = canonicalJson([r.resultId, r.resultRevision, bindingHash]);
-                if (saveAttempt?.key !== attemptKey)
-                    saveAttempt = { key: attemptKey, id: createId() };
-                const rawSaved = await transport.request({ operation: 'save', requestId: saveAttempt.id, resultId: r.resultId, expectedResultRevision: r.resultRevision, expectedBindingHash: bindingHash });
-                if (!active(token, t))
-                    return null;
-                const saved = PartThreeResponseSchema.parse(rawSaved);
-                if (saved.kind !== 'saved' || saved.resultRevision !== r.resultRevision)
-                    throw Error('Changed basis');
-                view = { ...view, savedAssessmentId: saved.savedAssessmentId, saving: false, error: null };
-                emit();
-                return saved.savedAssessmentId;
-            }
-            catch {
-                if (active(token, t))
-                    hide('Assessment was not saved. Your choices remain here; review the current result.');
+                if(!pendingFor(t)) {
+                    const read=await transport.request({operation:'read',resultId:r!.resultId});
+                    if(read.kind!=='result'||canonicalJson(read.result)!==canonicalJson(r)) throw Error('Displayed assessment revision changed');
+                    if(!active(token,t)||!publish(read,t,r!.binding.attemptId,token)||canonicalJson(view.result)!==canonicalJson(r)) throw Error('Changed basis');
+                    const bindingHash=sha256(canonicalJson(r!.binding)),packetHash=sha256(canonicalJson(r)),attemptKey=canonicalJson([r!.resultId,r!.resultRevision,bindingHash,packetHash]);
+                    if(saveAttempt?.key!==attemptKey)saveAttempt={key:attemptKey,id:createId()};
+                    pendingSaves.set(saveScope(t),{ownerId:t.binding.ownerId,accountGeneration:t.binding.accountGeneration,request:{operation:'save',requestId:saveAttempt.id,resultId:r!.resultId,expectedResultRevision:r!.resultRevision,expectedBindingHash:bindingHash,expectedPacketHash:packetHash}});
+                    view={...view,pendingSave:true};
+                }
+                const attempt=pendingFor(t)!;
+                const rawSaved=await transport.request(attempt.request);
+                if(!active(token,t))return null;
+                const saved=PartThreeResponseSchema.parse(rawSaved);
+                if(saved.kind!=='saved') { pendingSaves.delete(saveScope(t));view={...view,pendingSave:false};throw Error('Save was rejected'); }
+                if(saved.resultRevision!==attempt.request.expectedResultRevision)throw Error('Unexpected save receipt');
+                pendingSaves.delete(saveScope(t));
+                view={...view,savedAssessmentId:saved.savedAssessmentId,saving:false,pendingSave:false,error:null};emit();return saved.savedAssessmentId;
+            } catch {
+                if(active(token,t)) {
+                    if(pendingFor(t)) { view={...view,saving:false,pendingSave:true,error:'Save confirmation is pending. Retry the original Save to recover its confirmation.'};emit(); }
+                    else hide('Save confirmation is unavailable from this result. Review the current result.');
+                }
                 return null;
             }
         },
@@ -207,6 +212,6 @@ export function createPartThreeController(transport: PartThreeTransport, createI
         } },
         close() { if(view.target&&online&&(flight||last)){const encounterId=view.target.request.encounterId;void transport.request({operation:'cancel_encounter',encounterId}).catch(()=>undefined);}
         if (view.target && latches.get(encounterKey(view.target)))
-            latches.suppress(encounterKey(view.target)); epoch++; cancel(); last = null; interaction=null;highest.clear(); saveAttempt = null; view = { target: null, result: null, question: null, historical: null, savedAssessmentId: null, savedAt: null, loading: false, saving: false, error: null }; emit(); },
+            latches.suppress(encounterKey(view.target)); epoch++; cancel(); last = null; interaction=null;highest.clear(); saveAttempt = null; view = { target: null, result: null, question: null, historical: null, savedAssessmentId: null, savedAt: null, loading: false, saving: false, error: null, pendingSave:false }; emit(); },
     };
 }

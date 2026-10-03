@@ -28,6 +28,7 @@ export interface ProductAssessment {
   goalOrPurpose: Answer<ContextGoal | PurposeId>;
   perceivedHelp: 'helps' | 'mixed' | 'not_helping' | 'unsure' | 'unanswered' | 'withheld';
   satisfaction: 'satisfied' | 'mixed' | 'dissatisfied' | 'unsure' | 'unanswered' | 'withheld';
+  textureExperience?: Answer<'too_heavy' | 'too_light' | 'comfortable'>;
   assessedAt: string; supersedesRevisionId?: string | null;
 }
 export interface ContextNoteInput { id: string; scope: 'profile' | 'routine_item' | 'experience'; targetRef: string | null; text: string }

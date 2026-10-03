@@ -1,3 +1,4 @@
+import { researchSubjectFor } from '../../../presentation/part-four/researchSubject';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, Text, View } from 'react-native';
 import { CheckResultView } from '../result-sheet/CheckResultContent';
@@ -10,6 +11,7 @@ import { usePartTwoView, PartTwoIngredientsView } from '../part-two/PartTwoIngre
 import { partTwoTransport, partTwoSavedTransport } from '../../../services/partTwo';
 import type { PartTwoSaveGuard } from '../../../services/partTwoClient';
 import { usePartThreeCheck, type PartThreePorts } from '../part-three/usePartThreeCheck';
+import { PartFourSections } from '../part-four/PartFourSections';
 import { PartThreeSummary } from '../part-three/PartThreeSummary';
 import { PartThreeDetails } from '../part-three/PartThreeDetails';
 import { PartThreeControls } from '../part-three/PartThreeControls';
@@ -49,8 +51,11 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   const [sourceOpen, setSourceOpen] = useState(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now);
+  const ingredientOrigin=useRef({key:'',y:0});
+  const [ingredientScroll,setIngredientScroll]=useState<{key:string;y:number}|null>(null);
   const [details, setDetails] = useState<PartTwoView | null>(null);
   const sourceKey = JSON.stringify([view.owner, r?.scanId, interpretationCaptureSessionId, r?.generation, r?.resultRevision]);
+  if(ingredientOrigin.current.key!==sourceKey)ingredientOrigin.current={key:sourceKey,y:0};
   const sourceAccess = useRef({ key: sourceKey, denied: false, privateDenied: false });
   if (sourceAccess.current.key !== sourceKey) sourceAccess.current = { key: sourceKey, denied: false, privateDenied: false };
   const summaryLayout = useRef({ key: sourceKey, height: 0 });
@@ -99,11 +104,13 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
     ? 'Ingredient evidence unavailable'
     : currentDetails?.result?.state === 'parse_limit' ? currentDetails.result.permittedText?.sections.length ? 'Ingredient wording remains available. Details need review.' : 'Ingredient details need review.' : partOneSummary;
   const personal = usePartThreeCheck({ ownerId: view.owner, details: currentDetails, enabled: personalEnabled, ports: personalPorts, savedAssessmentId });
+  const partFour = personal.view.result?.partFour;
+  const partFourCurrent = Boolean(partFour && personal.view.result && Date.parse(personal.view.result.validUntil)>clock);
   const originalSections = !expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
     <Text accessibilityRole="header">{({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[section.kind]}</Text><Text selectable>{section.text}</Text>
   </View>);
   return <ResultSheetSurface inline={inline} overlay={captureContent} replacement={searchContent} contentSized={Boolean(searchContent)} contentSizeResetKey={searchEmpty ? 'empty' : 'query'} presentationKey={`part-one:${r?.scanId ?? 'pending'}`}
-    onClose={onClose} onInteraction={personal.interact} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: personal.enabled || currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
+    scrollRequest={ingredientScroll?.key.startsWith(sourceKey+':')?ingredientScroll:null} onClose={onClose} onInteraction={personal.interact} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: personal.enabled || currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
       {view.loading && <ActivityIndicator color={colors.brand} />}
       <CheckResultView section="summary" facts={{ brand: identity?.brand ?? '', name: identity?.name ?? 'Product not confirmed', categoryLabel: identity?.variantText ?? '', formula: null, source: null }}
         identityImage={identity?.image && current(identity.image.expiresAt) && failedImage !== identity.image.url ? <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 48, height: 54 }} resizeMode="contain" onLoad={() => markCheckVerificationTiming('barcode', 'image', r?.requestId)} onError={() => setFailedImage(identity.image!.url)} /> : undefined}
@@ -121,14 +128,14 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
         <Text>Is this the product?</Text><Text>{candidate.brand} {candidate.name} {candidate.variantText}</Text>
         <Button label="Yes, this product" accessibilityHint={`Select ${candidate.name}. This confirms identity only.`} variant="outline" onPress={() => onSelect(candidate.id)} />
       </View>)}
-      {!expiredIdentity && !expired && !(expiredFields && r?.declarationState === 'accepted') && r?.snapshotId && r.allowedActions.some(action => action === 'save' || action === 'save_partial') && <Button
+      {!partFourCurrent && !expiredIdentity && !expired && !(expiredFields && r?.declarationState === 'accepted') && r?.snapshotId && r.allowedActions.some(action => action === 'save' || action === 'save_partial') && <Button
         label={view.saved ? 'Saved' : 'Save product'}
         disabled={view.saved} size="medium" variant="outline" onPress={() => {
           const d = currentDetails?.result, t = currentDetails?.target;
           const guard = d?.state === 'ready' && t && t.ownerId === view.owner && t.scanId === r.scanId && t.captureSessionId === interpretationCaptureSessionId && t.generation === r.generation && t.evidenceRevision === r.resultRevision && Date.parse(d.expiresAt) > Date.now() ? { bindingKey: d.bindingKey, expectedPartTwoRevision: d.resultRevision } : undefined;
           onSave(guard);
         }} />}
-      {r?.snapshotId && !r.declarationId && <Text>Saves the product only; this photo reading is not saved.</Text>}
+      {!partFourCurrent && r?.snapshotId && !r.declarationId && <Text>Saves the product only; this photo reading is not saved.</Text>}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
         {onCapture && r && (expired || expiredFields || r.declarationState !== 'accepted') && <Button label="Scan ingredients" size="medium" style={{ flex: 1 }} variant="ghost" onPress={onCapture} />}
         {(view.error || r?.allowedActions.includes('retry')) && <Button label="Retry" size="medium" style={{ flex: 1 }} variant="ghost" onPress={onRefresh} />}
@@ -136,15 +143,16 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       </View>
     </View>}>
     {typeof localDraft === 'function' ? localDraft(sourceAccess.current.privateDenied, setDetails) : !sourceAccess.current.privateDenied && localDraft}
-    {acquisitionTarget ? <PartTwoIngredientsView view={acquired} target={acquisitionTarget} enabled={ingredientEnabled} fallback={originalSections} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
-    <Pressable accessibilityRole="button" accessibilityLabel="Source" accessibilityState={{ expanded: sourceOpen }} onPress={() => setSourceOpen(value => !value)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.brand }}>Source</Text></Pressable>
-    {sourceOpen && !expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
+    {personal.enabled && partFourCurrent && <PartThreeDetails view={personal.view} />}
+    {partFourCurrent && partFour && currentDetails?.result?.state==='ready' ? <View onLayout={event=>{ingredientOrigin.current.y=event.nativeEvent.layout.y;}}><PartFourSections onIngredientJump={(id,y)=>{if(y!==undefined)setIngredientScroll({key:sourceKey+':'+id,y:ingredientOrigin.current.y+y});}} packet={partFour} researchSubject={researchSubjectFor(personal.view.result?.binding.subject)} now={clock} expectedBindingKey={currentDetails.result.bindingKey} expectedResultRevision={currentDetails.result.resultRevision} expectedDependencyDigest={currentDetails.result.output.reading.binding.dependencyDigest} withdrawn={Boolean(currentRefusal) || sourceAccess.current.privateDenied}/></View> : acquisitionTarget ? <PartTwoIngredientsView view={acquired} target={acquisitionTarget} enabled={ingredientEnabled} fallback={originalSections} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
+    {!partFourCurrent && <Pressable accessibilityRole="button" accessibilityLabel="Source" accessibilityState={{ expanded: sourceOpen }} onPress={() => setSourceOpen(value => !value)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.brand }}>Source</Text></Pressable>}
+    {!partFourCurrent && sourceOpen && !expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
       <Text>{source.label} · Observed {source.observedAt.slice(0, 10)}</Text>
       {source.url && <Button label={`View source: ${source.label}`} variant="ghost" onPress={() => {
         const url = source.url; if (url && new URL(url).protocol === 'https:') void Linking.openURL(url).catch(() => {});
       }} />}
     </View>)}
-    {personal.enabled && <PartThreeDetails view={personal.view} />}
-    {r?.display.limitations.map((limitation, i) => <Text key={i}>{limitation}</Text>)}
+    {personal.enabled && !partFourCurrent && <PartThreeDetails view={personal.view} />}
+    {!partFourCurrent && r?.display.limitations.map((limitation, i) => <Text key={i}>{limitation}</Text>)}
   </ResultSheetSurface>;
 }

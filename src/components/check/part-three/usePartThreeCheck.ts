@@ -4,7 +4,7 @@ import {useNetworkState} from 'expo-network';
 import type { PartTwoView } from '../../../presentation/part-two/controller';
 import { createPartThreeController, type PartThreeView } from '../../../presentation/part-three/controller';
 import { partThreeTarget, emptyPartThreeChoices, type PartThreeChoices } from '../../../presentation/part-three/target';
-import { PART_THREE_ENABLED, partThreeTransport, loadPartThreeContext, partThreeEncounter, subscribePartThreeSession, loadPartThreeLabels } from '../../../services/partThree';
+import { PART_THREE_ENABLED, PART_FOUR_ENABLED, partThreeTransport, loadPartThreeContext, partThreeEncounter, subscribePartThreeSession, loadPartThreeLabels } from '../../../services/partThree';
 import type { PartThreeTransport } from '../../../services/partThreeClient';
 import type { PersonalContextV2 } from '../../../contracts/PersonalContextV2';
 import { PartThreeResponseSchema, type PartThreeResponse, type CandidateIdentity, type PartThreeEvaluateRequest } from '../../../contracts/PartThreeService';
@@ -73,7 +73,7 @@ export function usePartThreeCheck({ ownerId, details, enabled = PART_THREE_ENABL
     const semanticKey = canonicalJson([scope, context?.revision, source?.bindingKey, source?.resultRevision, authorizedIdentity?.value, choices]);
     if (generation.current.key !== semanticKey)
         generation.current = { key: semanticKey, value: generation.current.value + 1 };
-    const target = canRead && context && source && session ? partThreeTarget(context, source, { ...session, generation: generation.current.value }, choices, savedAssessmentId, authorizedIdentity?.value ?? null) : null;
+    const target = canRead && context && source && session ? partThreeTarget(context, source, { ...session, generation: generation.current.value }, choices, savedAssessmentId, authorizedIdentity?.value ?? null, PART_FOUR_ENABLED) : null;
     const targetKey = target ? canonicalJson(target) : null;
     const matches = view.target && target && canonicalJson(view.target) === targetKey;
     const current: PartThreeView = matches ? { ...view } : { ...emptyView(), error: view.target?.binding.ownerId === ownerId ? view.error : null };
@@ -83,6 +83,7 @@ export function usePartThreeCheck({ ownerId, details, enabled = PART_THREE_ENABL
         current.savedAt = safeSaved.historical.savedAt;
     }
     useEffect(() => subscribePartThreeSession(() => {
+        controller.clearPendingSave();
         controller.bind(null);
         setContext(null);
         setSaved(null);

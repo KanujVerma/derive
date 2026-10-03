@@ -1,0 +1,12 @@
+begin;
+select plan(8);
+select ok((select not permitted from private.part_four_release where id),'Part Four starts off');
+select ok((select release_hash ~ '^[a-f0-9]{64}$' and knowledge_hash ~ '^[a-f0-9]{64}$' from private.part_four_release where id),'Release and knowledge hashes are exact SHA256 pins');
+select ok(not has_table_privilege('anon','private.part_four_release','SELECT,INSERT,UPDATE,DELETE'),'Anonymous cannot inspect or activate Part Four');
+select ok(not has_table_privilege('authenticated','private.part_four_release','SELECT,INSERT,UPDATE,DELETE'),'Client cannot mint release authority');
+select ok(has_table_privilege('service_role','private.part_four_release','SELECT,INSERT,UPDATE,DELETE'),'Trusted service composes explicit release authority');
+select ok(not has_function_privilege('authenticated','private.part_three_binding_current(uuid,jsonb,uuid,boolean)','EXECUTE'),'Current binding check remains private');
+select ok(not has_function_privilege('authenticated','public.part_three_worker(uuid,text,jsonb)','EXECUTE'),'Save/publication retain trusted worker boundary');
+select is((select knowledge_version from private.part_four_release where id),'approved-37-v7/editorial-v1','Exact knowledge release is pinned');
+select * from finish();
+rollback;

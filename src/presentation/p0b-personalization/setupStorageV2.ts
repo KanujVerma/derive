@@ -17,7 +17,7 @@ export function setupToStorageV2(draft:ContextDraft,bundle:SetupBundle,createId:
   const {id: _id,reference: _reference,state: _state,...useContext}=product;
   const feedback=currentProductFeedback(bundle,product.id);if(!feedback.length)continue;
   const helpful=feedback.includes('helpful'),negative=feedback.includes('not_helping')||feedback.includes('still_dry');
-  assessments.push({id:createId(),reference:product.reference,useContext,reportingPeriod:{start:{state:'unanswered'},end:{state:'unanswered'}},goalOrPurpose:product.reportedPurpose?.answer??{state:'unanswered'},perceivedHelp:helpful&&negative?'mixed':helpful?'helps':feedback.includes('not_helping')?'not_helping':feedback.includes('still_dry')?'mixed':feedback.includes('not_sure')?'unsure':'unanswered',satisfaction:'unanswered',assessedAt});
+  assessments.push({id:createId(),reference:product.reference,useContext,reportingPeriod:{start:{state:'unanswered'},end:{state:'unanswered'}},goalOrPurpose:product.reportedPurpose?.answer??{state:'unanswered'},perceivedHelp:helpful&&negative?'mixed':helpful?'helps':feedback.includes('not_helping')?'not_helping':feedback.includes('still_dry')?'mixed':feedback.includes('not_sure')?'unsure':'unanswered',satisfaction:'unanswered',...(feedback.includes('too_heavy')?{textureExperience:{state:'known' as const,value:'too_heavy' as const}}:{}),assessedAt});
   const symptoms:Partial<Record<CurrentProductFeedback,string>>={stung:'Stinging',broke_out:'Breakouts',too_drying:'Dryness'};
   const noticed=feedback.flatMap(f=>symptoms[f]?[symptoms[f]!]:[]);
   if(noticed.length)experiences.push({id:createId(),reference:product.reference,kind:'reacted',occurred:{start:{state:'unanswered'},end:{state:'unanswered'}},useContext,symptoms:noticed,note:null});

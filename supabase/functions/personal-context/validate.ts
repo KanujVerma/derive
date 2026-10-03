@@ -6,7 +6,10 @@ const goal = z.enum(['breakouts','dark_spots','dryness','oiliness','texture','re
 const answer = z.enum(['yes','no','unsure','unanswered','withheld']);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => { const d = new Date(v); return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === v; }, 'Date is invalid');
 const unique = <T>(items: T[]) => new Set(items).size === items.length;
+const structuredAnswer = <T extends z.ZodType>(value:T) => z.discriminatedUnion('state',[z.strictObject({state:z.literal('known'),value}), ...(['unanswered','unsure','withheld'] as const).map(state=>z.strictObject({state:z.literal(state)}))]);
 export const profileSchema = z.strictObject({
+  texturePreference: structuredAnswer(z.enum(['lightweight','rich','no_preference'])).optional(),
+  spendingPreference: structuredAnswer(z.strictObject({currency:z.string().regex(/^[A-Z]{3}$/),scope:z.enum(['per_product','routine']),amountMinor:z.number().int().nonnegative().max(100000000),period:z.enum(['purchase','month'])})).optional(),
   intent: z.enum(['add','replace','check_current','unanswered','withheld']), primaryGoal: goal.nullable(), secondaryGoals: z.array(goal).max(2).refine(unique),
   skinBehavior: z.enum(['dry_tight','comfortable','oily_shiny','combination','unsure','unanswered','withheld']),
   reactivity: z.enum(['reacts_easily','generally_tolerates','unsure','unanswered','withheld']),

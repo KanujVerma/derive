@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useLayoutEffe
 import { AccessibilityInfo, findNodeHandle, Keyboard, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions, type View as NativeView } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ReduceMotion } from 'react-native-reanimated';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, type BottomSheetBackdropProps, type BottomSheetHandleProps } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, type BottomSheetBackdropProps, type BottomSheetHandleProps, type BottomSheetScrollViewMethods } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, radii, spacing } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
@@ -32,6 +32,8 @@ interface Props {
   onClose: () => void;
   onExpandedChange?: (expanded: boolean) => void;
   onScrollOffset?: (offset: number) => void;
+  /** Owner-bound measured target; no product text or cached evidence. */
+  scrollRequest?: { key:string; y:number } | null;
   /** User interaction, excluding programmatic layout scroll. */
   onInteraction?: () => void;
   dismissLabel?: string;
@@ -109,7 +111,7 @@ function SheetHandle(_props: BottomSheetHandleProps) {
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset, onInteraction }: Omit<Props, 'visible' | 'inline' | 'overlay'> & {
+  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset, onInteraction, scrollRequest }: Omit<Props, 'visible' | 'inline' | 'overlay'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
@@ -118,6 +120,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   useLayoutEffect(() => { if (contentSized) setSummaryHeight(0); }, [contentSized, contentSizeResetKey]);
   const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight, contentSized });
   const sheet = useRef<BottomSheet>(null);
+  const scroll = useRef<BottomSheetScrollViewMethods>(null);
   const outerHeight = useRef(height);
   const sheetTopInset = insets.top + spacing.xs;
   // Native close is asynchronous. Late personal/layout updates must not reopen it.
@@ -140,6 +143,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
     if (sheet.current) sheet.current.forceClose(); else guard.dismiss();
   }, [guard]);
   requestClose.current = close;
+  useEffect(()=>{if(!scrollRequest||!Number.isFinite(scrollRequest.y)||scrollRequest.y<0||!guard.isCurrent()||closing.current||replacement)return;sheet.current?.snapToIndex(2);const frame=requestAnimationFrame(()=>{if(guard.isCurrent()&&!closing.current)scroll.current?.scrollTo({y:scrollRequest.y,animated:true});});return()=>cancelAnimationFrame(frame);},[scrollRequest,guard,replacement]);
   useEffect(() => {
     if ((summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent() && !closing.current) sheet.current?.snapToIndex(2);
   }, [summaryHeight, geometry.needsFullHeight, guard, summary, compactActions, contentSized]);
@@ -172,7 +176,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
         setIndex(next);
       } }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={SheetHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
-      <BottomSheetScrollView testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
+      <BottomSheetScrollView ref={scroll} testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {/* Keep search height stable as loading/helper rows disappear; explicit empty input resets it. */}

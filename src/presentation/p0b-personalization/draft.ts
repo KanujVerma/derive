@@ -1,3 +1,4 @@
+import type { TexturePreference, SpendingPreference } from '../../contracts/PartFour.ts';
 /** Local collection seam. The composition owner supplies ownership and persistence. */
 export type ListAnswer<T> = Answer<T[]> | { state: 'unsure' };
 export type Answer<T> = { state: 'unanswered' } | { state: 'withheld' } | { state: 'answered'; value: T };
@@ -8,6 +9,8 @@ export type Intent = 'add' | 'replace' | 'check_current';
 export type SafetyField = 'pregnancy' | 'trying' | 'nursing';
 export interface SafetyRelevance { fields: readonly SafetyField[]; evidenceReason: string }
 export interface ContextDraft {
+  texturePreference?: Answer<TexturePreference> | { state: 'unsure' };
+  spendingPreference?: Answer<SpendingPreference> | { state: 'unsure' };
   intent: Answer<Intent>; primaryGoal: Answer<Goal> | { state: 'unsure' }; secondaryGoals: Goal[];
   behavior: Answer<'dry_tight' | 'balanced' | 'combination' | 'oily' | 'unsure'>;
   reactivity: Answer<'reacts_easily' | 'generally_tolerates' | 'unsure'>;
@@ -15,7 +18,7 @@ export interface ContextDraft {
   pregnancy: Answer<'yes' | 'no' | 'unsure'>; trying: Answer<'yes' | 'no' | 'unsure'>; nursing: Answer<'yes' | 'no' | 'unsure'>;
 }
 export function createContextDraft(initial?: ContextDraft): ContextDraft {
-  if (initial) return { ...initial, intent: { ...initial.intent }, primaryGoal: { ...initial.primaryGoal }, secondaryGoals: [...initial.secondaryGoals], behavior: { ...initial.behavior }, reactivity: { ...initial.reactivity }, treatments: initial.treatments.state === 'answered' ? { state: 'answered', value: [...initial.treatments.value] } : { ...initial.treatments }, sensitivities: initial.sensitivities.state === 'answered' ? { state: 'answered', value: [...initial.sensitivities.value] } : { ...initial.sensitivities }, pregnancy: { ...initial.pregnancy }, trying: { ...initial.trying }, nursing: { ...initial.nursing } };
+  if (initial) return { ...initial, ...(initial.texturePreference ? {texturePreference:{...initial.texturePreference}}:{}), ...(initial.spendingPreference ? {spendingPreference:structuredClone(initial.spendingPreference)}:{}), intent: { ...initial.intent }, primaryGoal: { ...initial.primaryGoal }, secondaryGoals: [...initial.secondaryGoals], behavior: { ...initial.behavior }, reactivity: { ...initial.reactivity }, treatments: initial.treatments.state === 'answered' ? { state: 'answered', value: [...initial.treatments.value] } : { ...initial.treatments }, sensitivities: initial.sensitivities.state === 'answered' ? { state: 'answered', value: [...initial.sensitivities.value] } : { ...initial.sensitivities }, pregnancy: { ...initial.pregnancy }, trying: { ...initial.trying }, nursing: { ...initial.nursing } };
   return { intent: { state: 'unanswered' }, primaryGoal: { state: 'unanswered' }, secondaryGoals: [], behavior: { state: 'unanswered' }, reactivity: { state: 'unanswered' }, treatments: { state: 'unanswered' }, sensitivities: { state: 'unanswered' }, pregnancy: { state: 'unanswered' }, trying: { state: 'unanswered' }, nursing: { state: 'unanswered' } };
 }
 export function toggleSecondaryGoal(draft: ContextDraft, goal: Goal): ContextDraft {
@@ -28,6 +31,8 @@ export function relevantQuestions(relevance?: SafetyRelevance): SafetyField[] {
   return relevance?.evidenceReason.trim() ? [...new Set(relevance.fields)] : [];
 }
 export function validateContextDraft(draft: ContextDraft): string | null {
+  if(draft.spendingPreference?.state==='answered'){const v=draft.spendingPreference.value;if(!/^[A-Z]{3}$/.test(v.currency)||!Number.isSafeInteger(v.amountMinor)||v.amountMinor<0||v.amountMinor>100000000)return 'Enter a valid currency and spending amount.';}
+
   if (draft.secondaryGoals.length > 2) return 'Choose up to two other goals.';
   if (new Set(draft.secondaryGoals).size !== draft.secondaryGoals.length || (draft.primaryGoal.state === 'answered' && draft.secondaryGoals.includes(draft.primaryGoal.value))) return 'Choose each goal once.';
   return null;

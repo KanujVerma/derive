@@ -1,7 +1,11 @@
+import type { Answer as StructuredAnswer } from './PersonalContextV2.ts';
+import type { TexturePreference, SpendingPreference } from './PartFour.ts';
 /** P0-B storage context. Reports are not catalog facts or ingredient causation. */
 export type ContextGoal = 'breakouts' | 'dark_spots' | 'dryness' | 'oiliness' | 'texture' | 'redness' | 'fine_lines' | 'simplify' | 'maintain';
 export type SensitiveAnswer = 'yes' | 'no' | 'unsure' | 'unanswered' | 'withheld';
 export interface PersonalProfileInput {
+  texturePreference?: StructuredAnswer<TexturePreference>;
+  spendingPreference?: StructuredAnswer<SpendingPreference>;
   intent: 'add' | 'replace' | 'check_current' | 'unanswered' | 'withheld';
   primaryGoal: ContextGoal | null;
   secondaryGoals: ContextGoal[];

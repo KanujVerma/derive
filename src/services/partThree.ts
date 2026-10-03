@@ -10,6 +10,7 @@ import { personalContextV2Schema } from '../contracts/PersonalContextV2Schema';
 import { partThreeQuestionLatches } from '../presentation/part-three/controller';
 import { z } from 'zod';
 export const PART_THREE_ENABLED = PART_TWO_ENABLED && process.env.EXPO_PUBLIC_PART_THREE_ENABLED === 'true';
+export const PART_FOUR_ENABLED = PART_THREE_ENABLED && process.env.EXPO_PUBLIC_PART_FOUR_LOCAL_FOUNDATION === 'true';
 let accountGeneration = 0;
 let previous = JSON.stringify([useAuthStore.getState().status, useAuthStore.getState().sessionUserId]);
 const encounters = new Map<string, string>();
