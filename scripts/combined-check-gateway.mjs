@@ -10,7 +10,7 @@ import {searchPartOneProducts} from '../supabase/functions/_shared/part-one-sear
 import {createClient} from '@supabase/supabase-js';
 export async function startCombinedCheckGateway({backend,anon,barcode,name,policy}){
  if(backend.origin!=='http://127.0.0.1:59721')throw Error('Integration stack required');
- const counts={search:0,scan:0,normalize:0,saveProduct:0,evaluate:0};
+ const counts={search:0,scan:0,normalize:0,saveProduct:0};
  const syntheticPolicy={...policy,provider:'open_facts',retainedFields:['identity']};
  const config={endpoint:'https://world.openbeautyfacts.org/',allowedHosts:['world.openbeautyfacts.org'],userAgent:'DeriveOriginalSyntheticIntegration/1',maxBytes:262144,timeoutMs:10000};
  const transport={pinsResolvedAddresses:true,resolve:async()=>['93.184.216.34'],fetch:async()=>new Response(JSON.stringify({products:[{code:barcode,brands:'Synthetic',product_name:name,quantity:'100 ml',countries_tags:['en:united-states']}]}),{headers:{'content-type':'application/json'}})};

@@ -4,7 +4,10 @@ final class CombinedCheckUI: XCTestCase {
  override func setUpWithError() throws {
   continueAfterFailure=false
   let system=XCUIApplication(bundleIdentifier:"com.apple.springboard")
-  if system.buttons["Open"].waitForExistence(timeout:2){system.buttons["Open"].tap()}
+  for _ in 0..<3{if system.buttons["Open"].waitForExistence(timeout:1){system.buttons["Open"].tap()}else{break}}
+  app.activate()
+  if app.buttons["Continue"].waitForExistence(timeout:2) && app.buttons["Continue"].isHittable{app.buttons["Continue"].tap()}
+  if element("Try again").exists && element("Try again").isHittable{element("Try again").tap()}
  }
  func testDevelopmentClientConnection() throws {
   app.activate()
@@ -117,9 +120,13 @@ final class CombinedCheckUI: XCTestCase {
   tap("Close comparison choices");tap("Save product");XCTAssertTrue(element("Saved").waitForExistence(timeout:20),app.debugDescription)
   tap("Compare or describe this check");tap("Save this assessment");XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription)
   tap("Close comparison choices");shot("combined-normal-check-separate-saves")
+  let beforeSearch=try controlRequest("/integration-state")
   tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));XCTAssertFalse(contains("Worth considering").exists)
   tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Worth considering").waitForExistence(timeout:20));XCTAssertFalse(element("Skip this question for this check").exists)
-  shot("combined-search-back-preserves-encounter")
+  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Close result");XCTAssertFalse(element("Back to result").exists);XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Worth considering").waitForExistence(timeout:20))
+  let afterSearch=try controlRequest("/integration-state")
+  XCTAssertEqual((afterSearch["counts"] as? [String:Int])?["normalize"],(beforeSearch["counts"] as? [String:Int])?["normalize"],"Search Back/X keep one mounted Part2 acquisition lifecycle")
+  shot("combined-search-back-and-x-preserve-encounter")
   close();tap("My Stuff")
   XCTAssertTrue(contains("Saved product evidence").waitForExistence(timeout:25),app.debugDescription)
   let saved=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Open assessment saved ")).firstMatch
@@ -131,5 +138,22 @@ final class CombinedCheckUI: XCTestCase {
   XCTAssertEqual(state["assessments"] as? Int,(initial["assessments"] as? Int ?? 0)+1)
   let counts=try XCTUnwrap(state["counts"] as? [String:Int]);XCTAssertGreaterThanOrEqual(counts["search"] ?? 0,1);XCTAssertEqual(counts["scan"],1)
   close()
+ }
+
+ func testNormalBarcodeLocalPhotoDraftBackSearchAndRemoval() throws {
+  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};tap("Check")
+  XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:20),app.debugDescription)
+  let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"123456789012\n")
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);expand();tap("Scan ingredients")
+  XCTAssertTrue(element("Choose ingredient photo").waitForExistence(timeout:20),app.debugDescription);tap("Choose ingredient photo")
+  let photo=app.images.matching(NSPredicate(format:"label BEGINSWITH %@","Photo,")).firstMatch
+  XCTAssertTrue(photo.waitForExistence(timeout:20),app.debugDescription);photo.tap()
+  XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:25),app.debugDescription)
+  XCTAssertTrue(contains("Glycerin").waitForExistence(timeout:25),app.debugDescription);shot("combined-ordinary-local-photo-reading")
+  tap("Back to product result");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:20));XCTAssertTrue(contains("Glycerin").exists);XCTAssertFalse(contains("Worth considering").exists)
+  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:15));XCTAssertTrue(contains("Glycerin").exists);shot("combined-capture-back-and-search-preserve-draft")
+  tap("Review local label draft and add missing photos");XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:15));tap("Remove temporary ingredient draft")
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertFalse(contains("Label reading").exists);XCTAssertFalse(contains("Glycerin").exists);shot("combined-local-draft-erased")
+  close();XCTAssertFalse(contains("Glycerin").exists)
  }
 }
