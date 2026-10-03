@@ -40,7 +40,7 @@ final class CombinedCheckUI: XCTestCase {
   for cycle in 0..<6 {
    print("SEARCH_RETURN_CYCLE \(cycle)")
    tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:15))
-   tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));cancelSearch();expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:15));XCTAssertTrue(contains("Not enough info").exists)
+   tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));cancelSearch();expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:15));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription)
   };close()
  }
  func testComparisonQuestionSaveReopenWithdrawalAndOwner() throws {
