@@ -4,27 +4,31 @@ import {useNetworkState} from 'expo-network';
 import type { PartTwoView } from '../../../presentation/part-two/controller';
 import { createPartThreeController, type PartThreeView } from '../../../presentation/part-three/controller';
 import { partThreeTarget, emptyPartThreeChoices, type PartThreeChoices } from '../../../presentation/part-three/target';
-import { PART_THREE_ENABLED, PART_FOUR_ENABLED, partThreeTransport, loadPartThreeContext, partThreeEncounter, subscribePartThreeSession, loadPartThreeLabels } from '../../../services/partThree';
+import { PART_THREE_ENABLED, PART_FOUR_ENABLED, partThreeTransport, loadPartThreeContext, partThreeEncounter, recoverPartThreeEncounter, partThreeSaveRecovery, subscribePartThreeSession, loadPartThreeLabels } from '../../../services/partThree';
 import type { PartThreeTransport } from '../../../services/partThreeClient';
 import type { PersonalContextV2 } from '../../../contracts/PersonalContextV2';
 import { PartThreeResponseSchema, type PartThreeResponse, type CandidateIdentity, type PartThreeEvaluateRequest } from '../../../contracts/PartThreeService';
 import { createCatalogRequestId } from '../../../services/productCatalog';
 import type { ContextProductReference } from '../../../contracts/PersonalContext';
 import { canonicalJson } from '../../../domain/part-two/hash';
+import type {PartThreeSaveRecoveryPort} from '../../../presentation/part-three/saveRecovery';
 export interface PartThreePorts {
     transport: PartThreeTransport;
     context: (owner: string) => Promise<PersonalContextV2>;
-    session: (owner: string, scan: string) => {
+    session: (owner: string, scan: string, captureSessionId?:string|null) => {
         ownerId: string;
         accountGeneration: number;
         encounterId: string;
     } | null;
+    recoverSession?: (owner:string,scan:string,captureSessionId:string|null)=>Promise<{ownerId:string;accountGeneration:number;encounterId:string}>;
+    recovery?:PartThreeSaveRecoveryPort;
+    subscribeSession?:(listener:(event?:'retired')=>void)=>()=>void;
     identity?: (request: PartThreeEvaluateRequest) => Promise<CandidateIdentity | null>;
     labels?: (owner: string, references: ContextProductReference[]) => Promise<Record<string,string>>;
     online?: () => boolean;
     createId?: () => string;
 }
-const livePorts: PartThreePorts = { transport: partThreeTransport, context: loadPartThreeContext, session: partThreeEncounter, labels: loadPartThreeLabels, identity: async request => {const response=await partThreeTransport.request({...request,operation:'identity'});if(response.kind!=='identity')throw Error('Identity changed');return response.identity;} };
+const livePorts: PartThreePorts = { transport: partThreeTransport, context: loadPartThreeContext, session: partThreeEncounter, recoverSession:recoverPartThreeEncounter,recovery:partThreeSaveRecovery,subscribeSession:subscribePartThreeSession,labels: loadPartThreeLabels, identity: async request => {const response=await partThreeTransport.request({...request,operation:'identity'});if(response.kind!=='identity')throw Error('Identity changed');return response.identity;} };
 type SavedBasis = Extract<PartThreeResponse, {
     kind: 'saved_basis';
 }>;
@@ -54,10 +58,16 @@ export function usePartThreeCheck({ ownerId, details, enabled = PART_THREE_ENABL
     const [identity, setIdentity] = useState<{key:string;value:CandidateIdentity|null}|null>(null);
     const [labels, setLabels] = useState<{owner:string;revision:number;values:Record<string,string>}|null>(null);
     const [tick, setTick] = useState(0);
-    const controller = useMemo(() => createPartThreeController(ports.transport, ports.createId ?? createCatalogRequestId, setView), [ports]);
+    const [sessionEpoch,setSessionEpoch]=useState(0);
+    const [sessionError,setSessionError]=useState<{key:string;message:string}|null>(null);
+    const [recoveredSession,setRecoveredSession]=useState<{key:string;value:{ownerId:string;accountGeneration:number;encounterId:string}}|null>(null);
+    const controller = useMemo(() => createPartThreeController(ports.transport, ports.createId ?? createCatalogRequestId, setView,Date.now,undefined,ports.recovery), [ports]);
     // A saved assessment has its own encounter and independently reauthorized pinned basis.
     const sessionScan = savedAssessmentId ?? details?.target?.scanId;
-    const session = ownerId && sessionScan ? ports.session(ownerId, sessionScan) : null;
+    const sessionCapture=savedAssessmentId?null:details?.target?.captureSessionId??null;
+    const recoveryKey=canonicalJson([ownerId,sessionScan,sessionCapture,sessionEpoch]);
+    const candidateSession=ownerId&&sessionScan?ports.session(ownerId,sessionScan,sessionCapture):null;
+    const session=ports.recoverSession?recoveredSession?.key===recoveryKey&&canonicalJson(candidateSession)===canonicalJson(recoveredSession.value)?candidateSession:null:candidateSession;
     const scope = canonicalJson([session?.ownerId, session?.accountGeneration, session?.encounterId, savedAssessmentId]);
     const safeSaved = saved?.scope === scope ? saved : null;
     const restored = safeSaved?.basis.request;
@@ -77,23 +87,33 @@ export function usePartThreeCheck({ ownerId, details, enabled = PART_THREE_ENABL
     const targetKey = target ? canonicalJson(target) : null;
     const matches = view.target && target && canonicalJson(view.target) === targetKey;
     const current: PartThreeView = matches ? { ...view } : { ...emptyView(), error: view.target?.binding.ownerId === ownerId ? view.error : null };
+    if(!session&&sessionError?.key===recoveryKey)current.error=sessionError.message;
     if (safeSaved && connected) {
         current.historical = safeSaved.historical;
         current.savedAssessmentId = savedAssessmentId;
         current.savedAt = safeSaved.historical.savedAt;
     }
-    useEffect(() => subscribePartThreeSession(() => {
-        controller.clearPendingSave();
+    useEffect(() => ports.subscribeSession?.(event => {
+        if(event==='retired')void controller.clearPendingSave().catch(()=>undefined);
         controller.bind(null);
         setContext(null);
         setSaved(null);
         setDraft(null);
+        setRecoveredSession(null);
+        setSessionError(null);
+        setSessionEpoch(t=>t+1);
         setTick(t => t + 1);
-    }), [controller]);
+    }), [controller,ports]);
+    useEffect(()=>{
+        if(!ports.recoverSession||!enabled||!ownerId||!sessionScan||!connected)return;
+        let active=true;setSessionError(null);
+        void ports.recoverSession(ownerId,sessionScan,sessionCapture).then(value=>{if(active)setRecoveredSession({key:recoveryKey,value});}).catch(()=>{if(active){setRecoveredSession(null);controller.bind(null);setSessionError({key:recoveryKey,message:'Save recovery is unavailable. Try again before reviewing or saving this assessment.'});}});
+        return ()=>{active=false;};
+    },[ports,enabled,ownerId,sessionScan,sessionCapture,connected,recoveryKey,tick,controller]);
     useEffect(() => { setDraft(null); setContext(null); setSaved(null); setIdentity(null); setLabels(null); }, [scope]);
     useEffect(() => {
         let active = true, sequence = 0;
-        const isCurrent = () => active && Boolean(ownerId && sessionScan) && canonicalJson(ports.session(ownerId!, sessionScan!)) === canonicalJson(session);
+        const isCurrent = () => active && Boolean(ownerId && sessionScan) && canonicalJson(ports.session(ownerId!, sessionScan!,sessionCapture)) === canonicalJson(session);
         const clear = () => { controller.setOnline(false); setContext(null); setSaved(null); setIdentity(null); setLabels(null); };
         const refresh = async () => {
             const request = ++sequence;

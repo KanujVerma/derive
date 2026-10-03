@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { PartTwoOccurrenceSchema, PartTwoSourceRefSchema, PartTwoVersionsSchema, PartTwoBindingSchema, PartTwoFactSchema } from './PartTwo.ts';
+import { RetainedEvidenceSchema } from './RetainedEvidence.ts';
+import { RoutineFormulaEvidenceSchema } from './RoutineFormula.ts';
 const id = z.string().min(1).max(200);
 const text = z.string().min(1).max(4000);
 const refs = z.array(id).max(1000);
@@ -18,7 +20,7 @@ export const ProductResearchBriefSchema=z.strictObject({version:z.literal('produ
 export type ProductResearchBrief=z.infer<typeof ProductResearchBriefSchema>;
 export type ResearchBriefSource=z.infer<typeof ResearchBriefSourceSchema>;
 const section = z.strictObject({ state: z.enum(['pending','unavailable','ready','conflict']), explanation: text, sourceIds: refs });
-export const PartFourPacketSchema = z.strictObject({ version: z.literal('part-four-foundations/v1'), releaseId: id, formula: FormulaAnalysisSchema, insights: z.array(PartFourInsightSchema).max(100), comparison: PartFourComparisonSchema, reviews: section.extend({evidenceKind:z.literal('limited_research_brief').optional(),brief:ProductResearchBriefSchema.optional()}).superRefine((value,ctx)=>{if(value.state==='ready'&&(!value.brief||value.evidenceKind!=='limited_research_brief'))ctx.addIssue({code:'custom',path:['brief'],message:'A ready report section requires its reviewed brief'});if(value.brief&&value.state!=='ready')ctx.addIssue({code:'custom',path:['brief'],message:'Unavailable sections cannot carry protected brief bytes'});}), value: section, requiredEvidence: z.array(z.enum(['G01','G02','G03','G04','G05'])).max(5), decisionState: z.enum(['supported','pending','unavailable','conflict']), action: text, contextRevision: z.number().int().nonnegative() });
+export const PartFourPacketSchema = z.strictObject({ version: z.literal('part-four-foundations/v1'), releaseId: id, formula: FormulaAnalysisSchema, insights: z.array(PartFourInsightSchema).max(100), comparison: PartFourComparisonSchema, reviews: section.extend({evidenceKind:z.literal('limited_research_brief').optional(),brief:ProductResearchBriefSchema.optional()}).superRefine((value,ctx)=>{if(value.state==='ready'&&(!value.brief||value.evidenceKind!=='limited_research_brief'))ctx.addIssue({code:'custom',path:['brief'],message:'A ready report section requires its reviewed brief'});if(value.brief&&value.state!=='ready')ctx.addIssue({code:'custom',path:['brief'],message:'Unavailable sections cannot carry protected brief bytes'});}), value: section, retainedEvidence: RetainedEvidenceSchema.optional(), routineEvidence: z.array(RoutineFormulaEvidenceSchema).max(50).optional(), requiredEvidence: z.array(z.enum(['G01','G02','G03','G04','G05'])).max(5), decisionState: z.enum(['supported','pending','unavailable','conflict']), action: text, contextRevision: z.number().int().nonnegative() });
 export type PartFourPacket = z.infer<typeof PartFourPacketSchema>;
 /** Raw notes are intentionally absent. These structured fields are optional additions,
  * retaining old profile revisions without silently assigning a preference. */

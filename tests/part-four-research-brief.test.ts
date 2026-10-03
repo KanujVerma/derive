@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import type { PartFourPacket, ProductResearchBrief } from '../src/contracts/PartFour.ts';
-import { admitResearchBrief, researchBriefHash, type ResearchBriefSubject } from '../src/domain/part-four/researchBrief.ts';
-import { canonicalJson } from '../src/domain/part-two/hash.ts';
+import { admitResearchBrief, researchBriefHash, type ResearchBriefSubject, type ResearchBriefAdmissionOptions } from '../src/domain/part-four/researchBrief.ts';
+import { canonicalJson, sha256 } from '../src/domain/part-two/hash.ts';
 import { componentHarness, control, press, textContent } from './ux-profile-render.ts';
 import { p3input } from './fixtures/part-three.ts';
 import { evaluatePersonalResult } from '../src/domain/part-three/evaluate.ts';
@@ -15,7 +15,10 @@ const component = 'src/components/check/part-four/ResearchBrief.tsx';
 
 /** Every observation and association below is synthetic validation data. URLs
  * test public URL shape/deduplication; no source was acquired or market claim
- * established by these tests. This fixture is never exported into runtime. */
+ * established by these tests. Explicit fixture human approval includes reviewing
+ * each observation against the source content and its product applicability.
+ * This compatibility path is never production approval or a page-identity gate.
+ * This fixture is never exported into runtime. */
 function fixture(): ProductResearchBrief {
   const source = (id: string, url: string) => ({ id, title: 'Synthetic validation source metadata', url,
     kind: 'personal_anecdote' as const, retrievedAt: '2026-10-01T10:00:00Z', publishedAt: '2026-09-30T10:00:00Z',
@@ -35,6 +38,99 @@ function fixture(): ProductResearchBrief {
 }
 function seal(value: ProductResearchBrief): ProductResearchBrief { value.contentHash = researchBriefHash(value); return value; }
 const admit = (value: unknown) => admitResearchBrief(value, { now, expectedSubject: subject, allowLocalFixture: true });
+
+function qualifiedOptions(value:ProductResearchBrief,contents:Record<string,string>={}):ResearchBriefAdmissionOptions {
+  const currentSourceContents:NonNullable<ResearchBriefAdmissionOptions['currentSourceContents']>={};
+  const contentAssessments:Record<string,Record<string,NonNullable<ResearchBriefAdmissionOptions['contentAssessments']>[string][string]>>={};
+  for(const source of value.sources){
+    const content=contents[source.id]??`Synthetic provided report content for ${source.id}: the target variant felt light.`;
+    (currentSourceContents as Record<string,unknown>)[source.id]={versionId:`synthetic-source-content-version-${source.id}`,contentHash:sha256(content),content,retrievedAt:source.retrievedAt,validUntil:source.permission.validUntil};
+  }
+  for(const observation of value.observations){contentAssessments[observation.id]={};for(const sourceId of [...observation.sourceIds,...observation.opposingSourceIds]){
+    const source=currentSourceContents[sourceId];
+    contentAssessments[observation.id][sourceId]={briefContentHash:value.contentHash,sourceVersionId:source.versionId,sourceContentHash:source.contentHash,
+      basis:'source_content',decision:'matched',subject:{productId:value.productId,variantId:value.variantId,formulaVersionId:value.formulaVersionId},scope:observation.scope,
+      reviewerId:'synthetic-content-reviewer',reviewedAt:value.reviewedAt};
+  }}
+  return {now,expectedSubject:{productId:value.productId,variantId:value.variantId,formulaVersionId:value.formulaVersionId},allowLocalFixture:true,currentSourceContents,contentAssessments};
+}
+
+/** Strict artifacts model the reported PM-page/AM-review failure. These bytes
+ * are newly authored regression data, not quotes, fetched Ulta content, market
+ * evidence or an authorization to ingest a retailer's reviews. */
+function pmFixture():ProductResearchBrief {
+  const value=fixture();value.productId='cerave-pm';value.variantId='cerave-pm-us';value.formulaVersionId=null;
+  value.sources=value.sources.slice(0,1);Object.assign(value.sources[0],{productId:value.productId,variantId:value.variantId,formulaVersionId:null,matching:'exact_variant',title:'Synthetic PM listing with individual review content'});
+  value.observations[0].opposingSourceIds=[];value.observations[0].text='A selected PM report describes a light feel.';value.reviewDecision='approved_source_brief';
+  return seal(value);
+}
+
+test('production source briefs require independent content qualification; page identity and approval alone stay unresolved',()=>{
+  const value=pmFixture(),options=qualifiedOptions(value);
+  assert.equal(admitResearchBrief(value,{now,expectedSubject:options.expectedSubject}),null);
+  assert.equal(admitResearchBrief(value,{...options,contentAssessments:undefined}),null);
+  assert.equal(admitResearchBrief(value,{...options,currentSourceContents:undefined}),null);
+  const assessment=options.contentAssessments![value.observations[0].id][value.sources[0].id];assessment.basis='page_identity_only';
+  assert.equal(admitResearchBrief(value,options),null,'An exact PM listing cannot qualify an individual review about another item');
+  assessment.basis='source_content';assert(admitResearchBrief(value,options));
+  assert.equal(admitResearchBrief({...value,contentAssessments:options.contentAssessments},options),null,'An incoming brief cannot attach its own authority');
+});
+
+test('PM page placement does not admit a review explicitly about AM/SPF30; wrong-product, pooled and contradictory content are excluded',()=>{
+  const value=pmFixture(),sourceId=value.sources[0].id,observationId=value.observations[0].id;
+  const texts={wrong_product:'Synthetic report: I am reviewing CeraVe AM SPF 30; its sunscreen finish feels heavy.',
+    pooled:'Synthetic combined review content covers both CeraVe PM and AM without attributing this feel report.',
+    contradictory:'Synthetic content identifies PM in the title but explicitly identifies the tested item as AM SPF 30.',
+    unresolved:'Synthetic report names only this lotion, with no independently resolved product.'};
+  for(const decision of ['wrong_product','pooled','contradictory','unresolved'] as const){
+    const options=qualifiedOptions(value,{[sourceId]:texts[decision]});options.contentAssessments![observationId][sourceId].decision=decision;
+    assert.equal(admitResearchBrief(value,options),null,decision);
+  }
+  const options=qualifiedOptions(value,{[sourceId]:texts.wrong_product});
+  options.contentAssessments![observationId][sourceId].subject={productId:'cerave-am-spf30',variantId:'cerave-am-spf30-us',formulaVersionId:null};
+  assert.equal(admitResearchBrief(value,options),null,'Even a positive decision cannot bind foreign content identity to PM');
+});
+
+test('a reviewed PM experience comparing AM remains eligible; source-content maps are never returned',()=>{
+  const value=pmFixture(),content='Synthetic PM report: I use CeraVe PM at night. Compared with CeraVe AM SPF 30, PM feels lighter to me.';
+  const options=qualifiedOptions(value,{[value.sources[0].id]:content}),admitted=admitResearchBrief(value,options);
+  assert(admitted);assert.deepEqual(admitted,value);assert.equal(admitted.observations[0].text,value.observations[0].text);
+  assert(!canonicalJson(admitted).includes(content));assert(!canonicalJson(admitted).includes('synthetic-content-reviewer'));
+});
+
+test('content assessment is required for each observation/supporting/opposing pair; supplied negatives override fixture approval',()=>{
+  const value=fixture(),options=qualifiedOptions(value),opposing=value.observations[0].opposingSourceIds[0];
+  assert(admitResearchBrief(value,options));options.contentAssessments![value.observations[0].id][opposing].decision='wrong_product';
+  assert.equal(admitResearchBrief(value,options),null,'Opposing content must concern the target as well');
+  const second=fixture();second.observations.push({...second.observations[0],id:'second',text:'Second approved synthetic feel observation.'});seal(second);
+  const incomplete=qualifiedOptions(second);delete (incomplete.contentAssessments as Record<string,unknown>).second;
+  assert.equal(admitResearchBrief(second,incomplete),null,'Qualification of one observation does not qualify another observation automatically');
+});
+
+test('independently current immutable source version, actual content hash and human review deadlines fence applicability',()=>{
+  for(const mutate of [
+    (options:ResearchBriefAdmissionOptions,value:ProductResearchBrief)=>{options.currentSourceContents![value.sources[0].id].versionId='replacement-version';},
+    (options:ResearchBriefAdmissionOptions,value:ProductResearchBrief)=>{options.currentSourceContents![value.sources[0].id].content='Replacement bytes not reviewed';},
+    (options:ResearchBriefAdmissionOptions,value:ProductResearchBrief)=>{options.currentSourceContents![value.sources[0].id].validUntil=now;},
+    (options:ResearchBriefAdmissionOptions,value:ProductResearchBrief)=>{options.currentSourceContents![value.sources[0].id].retrievedAt='2026-10-02T09:00:00Z';},
+    (options:ResearchBriefAdmissionOptions,value:ProductResearchBrief)=>{options.contentAssessments![value.observations[0].id][value.sources[0].id].briefContentHash='c'.repeat(64);},
+    (options:ResearchBriefAdmissionOptions,value:ProductResearchBrief)=>{options.contentAssessments![value.observations[0].id][value.sources[0].id].reviewerId=' ';},
+    (options:ResearchBriefAdmissionOptions,value:ProductResearchBrief)=>{options.contentAssessments![value.observations[0].id][value.sources[0].id].reviewedAt='2026-10-02T11:00:00Z';},
+  ]){const value=pmFixture(),options=qualifiedOptions(value);mutate(options,value);assert.equal(admitResearchBrief(value,options),null);}
+  const value=pmFixture(),sourceId=value.sources[0].id,urlOnly=qualifiedOptions(value,{[sourceId]:value.sources[0].url});
+  assert.equal(admitResearchBrief(value,urlOnly),null,'Hashing a listing URL is not source-content proof');
+  assert.equal(admitResearchBrief(value,qualifiedOptions(value,{[sourceId]:value.sources[0].url+'?share=alias'})),null,'A URL alias is still page identity rather than review content');
+  const options=qualifiedOptions(value),authority=options.currentSourceContents![sourceId],review=options.contentAssessments![value.observations[0].id][sourceId];
+  for(const dependency of [authority.versionId,authority.contentHash,review.reviewerId])assert.equal(admitResearchBrief(value,{...options,withdrawnDependencies:[dependency]}),null);
+});
+
+test('content subject and observation scope remain exact; formula-unknown qualification cannot supply formula context',()=>{
+  const value=fixture();value.observations[0].scope='formula_context';seal(value);const options=qualifiedOptions(value);
+  assert(admitResearchBrief(value,options));options.contentAssessments![value.observations[0].id][value.sources[0].id].subject!.formulaVersionId=null;
+  assert.equal(admitResearchBrief(value,options),null);
+  const feel=pmFixture(),feelOptions=qualifiedOptions(feel);feelOptions.contentAssessments![feel.observations[0].id][feel.sources[0].id].scope='formula_context';
+  assert.equal(admitResearchBrief(feel,feelOptions),null,'A content review for another claim scope cannot authorize this observation');
+});
 
 function foundation(): PartFourPacket {
   const input = p3input();

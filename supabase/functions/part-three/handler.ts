@@ -1,6 +1,7 @@
 import { resolveCurrentComparator } from '../../../src/domain/part-four/comparison.ts';
 import { assembleFoundation } from '../../../src/domain/part-four/assemble.ts';
 import { partFourBindingRelease } from '../../../src/domain/part-four/release.ts';
+import { planRoutineFormulaRequests, admitRoutineFormulaEvidence } from '../../../src/domain/part-four/routineFormula.ts';
 import {PartThreeRequestSchema,PartThreeResponseSchema,type PartThreeEvaluateRequest,type PartThreeResponse,type CandidateIdentity} from '../../../src/contracts/PartThreeService.ts';
 import {DecisionBindingV2Schema,PersonalResultV2Schema,type DecisionBindingV2} from '../../../src/contracts/PersonalResultV2.ts';
 import {NormalizationResultSchema,type NormalizationResult} from '../../../src/contracts/PartTwo.ts';
@@ -65,9 +66,21 @@ export async function handlePersonalRequest(raw:unknown,ports:PartThreePorts):Pr
  const binding=makeBinding(evaluationRequest,p,c,identity,ports.partFourEnabled),validUntil=new Date(Math.min(Date.parse(p.expiresAt),Date.parse(ports.now())+60000,...(identity?[Date.parse(identity.expiresAt)]:[]))).toISOString();
  const lease=await ports.worker('prepare',{binding,request:r,pinnedSnapshotId,validUntil,sourceRefs:p.output.reading.dependencyManifest.sourceRefs,contextRefs:[...new Set([c.profile?.id,c.routine?.id,...context.experiences.map(x=>x.id),...c.preferences.map(x=>x.id),...c.assessments.map(x=>x.id),...c.notes.map(x=>x.id)].filter((x):x is string=>Boolean(x)))]});
  if(lease.kind==='unavailable')return PartThreeResponseSchema.parse(lease);if(lease.cached)return {kind:'result',result:PersonalResultV2Schema.parse(lease.cached),replayed:true};if(lease.pending)return {kind:'unavailable',reason:'evidence_unavailable'};
+ // Sample decision time only after the independently authorized routine lookup.
+ // Its checkedAt cannot be later than the evaluation consuming that evidence.
+ const routineRequests=ports.partFourEnabled?planRoutineFormulaRequests(context).requests:[];
+ const routineEvidence=routineRequests.length?await ports.worker('routine/formulas',{requests:routineRequests}):[];
  const result=evaluatePersonalResult({binding,partTwo:p,context,history,now:ports.now(),resultId:lease.resultId,resultRevision:lease.resultRevision,name:identity&&Date.parse(identity.expiresAt)>Date.parse(ports.now())?identity.name:p.output.reading.binding.kind==='declaration'?'Selected product':'Label reading',requestedUse:r.use,selectedManualReportIds:r.selectedManualReportIds,candidateRoutineItemId:r.candidateRoutineItemId,questionSuppression:{exposedQuestionId:suppression.exposedQuestionId??null,skip:Boolean(suppression.skip),answered:Boolean(suppression.answered)}});
  result.validUntil=validUntil;
- if(ports.partFourEnabled){const packet=assembleFoundation({context,partTwo:p,requestedUse:r.use,intent:r.intent,candidateRoutineItemId:r.candidateRoutineItemId,selectedComparatorId:r.comparatorId,candidateReference:identity?.catalogReference?{kind:'catalog',...identity.catalogReference}:null,now:result.evaluatedAt},result);if(!packet)throw new PartThreeError('evidence_unavailable');result.partFour=packet;}
+ if(ports.partFourEnabled){
+  // Formula authority is loaded independently by the authenticated worker.
+  // Incoming requests never carry source, association or permission claims.
+  const evidence=routineEvidence;
+  const admission=admitRoutineFormulaEvidence(context,evidence,{now:result.evaluatedAt});
+  const packet=assembleFoundation({context,partTwo:p,requestedUse:r.use,intent:r.intent,candidateRoutineItemId:r.candidateRoutineItemId,selectedComparatorId:r.comparatorId,candidateReference:identity?.catalogReference?{kind:'catalog',...identity.catalogReference}:null,routineFormulas:admission.qualified,routineFormulaEvidence:evidence,now:result.evaluatedAt},result);
+  if(!packet)throw new PartThreeError('evidence_unavailable');result.partFour=packet;
+  if(admission.validUntil)result.validUntil=new Date(Math.min(Date.parse(result.validUntil),Date.parse(admission.validUntil))).toISOString();
+ }
  // The same live path hosts real provider wiring. Gate checks happen outside the
  // provider; no payload/grant/model is borrowed from incoming client JSON.
  const refine=async(currentResult:typeof result,currentLease:typeof lease)=>{

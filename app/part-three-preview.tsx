@@ -21,7 +21,7 @@ import type {PartThreePorts} from '@/src/components/check/part-three/usePartThre
 import {supabase} from '@/src/services/supabase';
 import {publicEnvironment} from '@/src/config/environment';
 import {requireOptionalNativeModule} from 'expo-modules-core';
-const Bootstrap=z.strictObject({ownerId:PartOneIdSchema,token:z.string(),refreshToken:z.string().optional(),apiKey:z.string(),apiOrigin:z.enum(['http://127.0.0.1:59521','http://127.0.0.1:59721']),result:ScanResultSchema,encounterId:PartOneIdSchema});
+const Bootstrap=z.strictObject({ownerId:PartOneIdSchema,token:z.string(),refreshToken:z.string().optional(),apiKey:z.string(),apiOrigin:z.enum(['http://127.0.0.1:59521','http://127.0.0.1:59721','http://127.0.0.1:60721']),result:ScanResultSchema,encounterId:PartOneIdSchema});
 type Fixture=z.infer<typeof Bootstrap>;
 /** Loopback-only synthetic Auth/Edge/SQL harness using the production sheet and
  * preference controller. Never available in release builds. */
@@ -29,9 +29,10 @@ export default function PartThreePreview(){
  const enabled=__DEV__&&process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI==='true';
  const {fixture:fixtureParam,integration}=useLocalSearchParams<{fixture?:string;integration?:string}>();
  const router=useRouter();
- const CONTROL=integration==='1'?'http://127.0.0.1:8373':'http://127.0.0.1:8353';
+ const CONTROL=integration==='4'?'http://127.0.0.1:8374':integration==='1'?'http://127.0.0.1:8373':'http://127.0.0.1:8353';
+ const normalIntegration=(integration==='1'&&publicEnvironment.supabaseUrl==='http://127.0.0.1:59731')||(integration==='4'&&publicEnvironment.supabaseUrl==='http://127.0.0.1:60731');
  useEffect(()=>{
-  if(!enabled||integration!=='1'||publicEnvironment.supabaseUrl!=='http://127.0.0.1:59731')return;
+  if(!enabled||!normalIntegration)return;
   // The development Tools button overlaps the real result close target.
   // Set only these existing SDK preferences on the task's synthetic host.
   const menu=requireOptionalNativeModule<{setPreferencesAsync(settings:{showFloatingActionButton:boolean;showsAtLaunch:boolean}):Promise<void>}>('DevMenuPreferences');
@@ -48,7 +49,7 @@ export default function PartThreePreview(){
  const preferencePorts=useMemo(()=>({owner:()=>owner.current,read:personalPorts.context,createId:createCatalogRequestId,write:async(expected:string,request:any)=>{if(expected!==owner.current)throw Error('Owner changed');const r=await invoke('personal-context',JSON.stringify(request));if(r.error)throw r.error;return request.operation==='save_setup'?setupWriteResultSchema.parse(r.data):contextDeleteResultSchema.parse(r.data);}}),[personalPorts,invoke]);
  async function reopen(){if(!online.current){setStatus('Offline: current personal assessment unavailable');return;}const r=await personalPorts.transport.request({operation:'list_saved'});if(r.kind!=='saved_list'||!r.items.length){setStatus('No saved assessment');return;}setSavedId(r.items[0].savedAssessmentId);setVisible(true);setTick(n=>n+1);setStatus('Reopened exact saved assessment');}
  async function openNormalCheck(){
-  if(!enabled||integration!=='1'||!fixture?.refreshToken||!supabase||publicEnvironment.supabaseUrl!=='http://127.0.0.1:59731')return;
+  if(!enabled||!normalIntegration||!fixture?.refreshToken||!supabase)return;
   const {data,error}=await supabase.auth.setSession({access_token:fixture.token,refresh_token:fixture.refreshToken});
   if(error||data.user?.id!==fixture.ownerId){setStatus('Synthetic local session was not adopted');return;}
   router.replace('/(tabs)/check');
@@ -61,7 +62,7 @@ export default function PartThreePreview(){
  const result=fixture?.result,display=result&&(savedId||tick>0)?{...result,display:{...result.display,sections:[],sources:[]}}:result;
  return <View style={{flex:1,paddingTop:60,paddingHorizontal:20,backgroundColor:'#FAFAF7'}}><Text accessibilityRole="header">Part3 local runtime verification</Text><Text accessibilityLiveRegion="polite">{status}</Text>
  <Button label="Load long-name Part3 fixture" onPress={()=>void load('/long-name-bootstrap')}/><Button label="Open five-step setup" onPress={()=>void openSetup()}/><Button label="Load Part3 local fixture" onPress={()=>void load()}/><Button label="Reopen Part3 saved assessment" onPress={()=>void reopen()}/><Button label="Open confirmed preferences" onPress={()=>{setVisible(false);setPreference(true);}}/>
- {integration==='1'&&<Button label="Open normal Check with synthetic session" onPress={()=>void openNormalCheck()}/>}
+ {normalIntegration&&<Button label="Open normal Check with synthetic session" onPress={()=>void openNormalCheck()}/>}
  <Button label={offline?'Reconnect synthetic client':'Take synthetic client offline'} onPress={()=>{online.current=!online.current;setOffline(!online.current);setStatus(online.current?'Synthetic client connected; authority will be checked':'Synthetic client offline; current personal assessment unavailable');}}/>
  <Button label="Withdraw Part3 purpose field" onPress={()=>void fetch(CONTROL+'/withdraw-purpose',{method:'POST'}).then(()=>setStatus('Synthetic purpose field withdrawn'))}/><Button label="Switch Part3 fixture account" onPress={()=>{owner.current=null;generation.current++;setFixture(null);setSavedId(null);setStatus('Synthetic owner cleared');}}/>
  {fixture&&result&&display&&visible&&<PartOneResultSheet key={`${fixture.ownerId}:${tick}:${savedId??'scan'}`} view={{owner:fixture.ownerId,result:display,loading:false,error:null,saved:false,scrollOffset:0}} ingredientEnabled ingredientTransport={ingredients} personalEnabled personalPorts={personalPorts} savedAssessmentId={savedId} onClose={()=>setVisible(false)} onSelect={()=>{}} onSearch={()=>setVisible(false)} onRefresh={()=>setTick(n=>n+1)} onFullChange={()=>{}} onSave={()=>void invoke('part-one/saves',JSON.stringify({idempotencyKey:createCatalogRequestId(),scanId:result.scanId,expectedGeneration:result.generation,expectedResultRevision:result.resultRevision,selectedSnapshotId:result.snapshotId,selectedDeclarationId:result.declarationId})).then(r=>setStatus(r.error?'Synthetic product save refused':'Synthetic product and evidence saved independently'))}/>

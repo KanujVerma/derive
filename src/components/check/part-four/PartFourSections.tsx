@@ -4,6 +4,7 @@ import type { PartFourInsight, PartFourPacket } from '../../../contracts/PartFou
 import { colors, spacing } from '../../../constants/theme';
 import type { ResearchBriefSubject } from '../../../domain/part-four/researchBrief';
 import { ResearchBrief, ResearchBriefSources } from './ResearchBrief';
+import { RetainedEvidence, RetainedEvidenceSources } from './RetainedEvidence';
 import { authorizedPartFourPacket, formulaEvidenceNotice, formulaLimitationsForDisplay, formulaScope, ingredientRow, ingredientSectionHeading,
   ingredientTargets, partFourDisclosureKey, partFourDisplayText, safePartFourSourceUrl, visiblePartFourInsights,
   type PartFourRenderFence } from '../../../presentation/part-four/sections';
@@ -78,6 +79,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
 
   return <View style={styles.sections}>
     <ResearchBrief {...briefProps} onViewSources={() => toggleSources(true)} />
+    <RetainedEvidence evidence={packet.retainedEvidence} now={props.now} withdrawnDependencies={props.researchWithdrawnDependencies}/>
     <View style={styles.comparison}>
       <Text accessibilityRole="header" style={styles.heading}>Compared with your current routine</Text>
       <Text style={styles.copy}>{partFourDisplayText(packet.comparison.explanation)}</Text>
@@ -153,6 +155,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
       </Pressable>
       {sourcesOpen && <View style={styles.sourceContent}>
         <ResearchBriefSources {...briefProps} />
+        <RetainedEvidenceSources evidence={packet.retainedEvidence} now={props.now} withdrawnDependencies={props.researchWithdrawnDependencies}/>
         {limits.length > 0 && <View style={styles.sourceEntry}>
           <Text style={styles.insightTitle}>Evidence limits</Text>
           {limits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}

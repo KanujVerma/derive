@@ -2191,3 +2191,11 @@ Isolated `kanuj/check-workflow-live` from accepted Part 2 `96b102dd`; see [workf
 ## 2026-10-03 — Check transient Auth and elapsed lease correction
 
 Separate `kanuj/check-workflow-recovery-fixes` from accepted workflow `67675d44`; accepted checkpoint and concurrent Part3 remain preserved. Shared Auth classification returns retryable503 for SDK transport/deadline, throttling and upstream failures; real401/403 still deny access before any owner RPC. P1 worker and P2 resolve/publication use post-lock wall time only for lease expiry/deadlines, retaining all owner, rights, deletion, token/revision and lock-order gates. See [correction evidence](acceptance/CHECK_RECOVERY_2026_10_03.md). No diagnostic hooks, provider-policy expansion, hosted mutation or deployment.
+
+
+## 2026-10-03 — Part Four continued isolated integration review checkpoint
+
+- Accepted combined source remains c797960f36a7. Frozen foundation263c395 and Library bundle remain immutable; continuation on kanuj/part-four-foundation is local only.
+- Exact service-owned routine formula/source associations, read-only authorization, durable per-field source retention with physical withdrawal, one inherited exact-original-packet receipt writer, and metadata-only process recovery now compose. Independent challenge corrected JSON union validation, wall-clock expiry, global-before-row locks, complete Save insertion basis and physical current-source purge.
+- Actual isolated Auth/Edge/SQL smoke10 passed93 synthetic checks; cold Node original receipt retry passed after short lease. Clean migrations and database1123/40 passed; both types passed. Committed-head aggregate/native/race/export verification remains pending at this checkpoint. No current-source/model/clinical/provider calls, real-account/accepted-worktree mutation, hosted activation or publication.
+- Live pricing is now explicitly optional. Retailer-neutral eligible seller/exact offer/unit-price/retention contracts remain; Sami handles applications. Useful science and cited brief gates remain. Public eligible catalog denominator0, coverage undefined, Library libfile_086ab96dd7408191a32fdfde57481795v0. Parent reviewed evidence addendum libfile_9d843a9332ac8191bbe7000800a8e992v0 does not authorize runtime source activation.

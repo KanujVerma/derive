@@ -1,14 +1,42 @@
 import { ProductResearchBriefSchema, type ProductResearchBrief, type ResearchBriefSource } from '../../contracts/PartFour.ts';
 import { canonicalJson, sha256 } from '../part-two/hash.ts';
 import { deepFreeze } from '../part-two/dictionary.ts';
+import {z} from 'zod';
 
 export interface ResearchBriefSubject { productId: string; variantId: string; formulaVersionId: string | null }
+export interface ResearchBriefSourceContent {
+  versionId:string;
+  contentHash:string;
+  /** Supplied source-content bytes, not page identity or a URL. Used only during
+   * validation; this gate returns neither these bytes nor review metadata. */
+  content:string;
+  retrievedAt:string;
+  validUntil:string;
+}
+export interface ResearchBriefContentAssessment {
+  briefContentHash:string;
+  sourceVersionId:string;
+  sourceContentHash:string;
+  basis:'source_content'|'page_identity_only';
+  decision:'matched'|'wrong_product'|'pooled'|'unresolved'|'contradictory';
+  subject:ResearchBriefSubject|null;
+  scope:'feel_context'|'formula_context';
+  reviewerId:string;
+  reviewedAt:string;
+}
 export interface ResearchBriefAdmissionOptions {
   now: string;
   expectedSubject: ResearchBriefSubject;
   withdrawnDependencies?: readonly string[];
   /** Explicit local preview/test opt-in; never a production approval. */
   allowLocalFixture?: boolean;
+  /** Trusted, independently current server-held source-version authority. Never
+   * derive this map from incoming brief metadata, URLs or HTTP claim fields. */
+  currentSourceContents?:Readonly<Record<string,ResearchBriefSourceContent>>;
+  /** Human content-applicability decisions, keyed by observation then source.
+   * Required for production, including opposing references. Page placement is
+   * not evidence that an individual report concerns this product/variant. */
+  contentAssessments?:Readonly<Record<string,Readonly<Record<string,ResearchBriefContentAssessment>>>>;
 }
 
 export function researchBriefHash(value: ProductResearchBrief | Omit<ProductResearchBrief, 'contentHash'>): string {
@@ -41,11 +69,44 @@ function citationIdentity(value: string): string | null {
 
 const nonblank = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 const unique = (values: readonly string[]) => new Set(values).size === values.length;
+const contentHashSchema=z.string().regex(/^[a-f0-9]{64}$/);
+const reviewedId=z.string().min(1).max(200).refine(value=>value.trim().length>0);
+const contentSubjectSchema=z.strictObject({productId:reviewedId,variantId:reviewedId,formulaVersionId:reviewedId.nullable()});
+const currentContentSchema=z.strictObject({versionId:reviewedId,contentHash:contentHashSchema,content:z.string().min(1).max(200000),retrievedAt:z.iso.datetime({offset:true}),validUntil:z.iso.datetime({offset:true})});
+const contentAssessmentSchema=z.strictObject({briefContentHash:contentHashSchema,sourceVersionId:reviewedId,sourceContentHash:contentHashSchema,
+  basis:z.enum(['source_content','page_identity_only']),decision:z.enum(['matched','wrong_product','pooled','unresolved','contradictory']),
+  subject:contentSubjectSchema.nullable(),scope:z.enum(['feel_context','formula_context']),reviewerId:reviewedId,reviewedAt:z.iso.datetime({offset:true})});
+
+function contentApplies(brief:ProductResearchBrief,options:ResearchBriefAdmissionOptions,observation:ProductResearchBrief['observations'][number],source:ResearchBriefSource):boolean {
+  // Explicit synthetic fixture approval includes a trusted human review of
+  // content applicability. It is not a production shortcut. Supplying either
+  // independent map opts into the stricter gate even for these local fixtures.
+  if(options.contentAssessments===undefined&&options.currentSourceContents===undefined)
+    return brief.reviewDecision==='approved_local_fixture'&&options.allowLocalFixture===true;
+  const authority=currentContentSchema.safeParse(options.currentSourceContents?.[source.id]);
+  const assessment=contentAssessmentSchema.safeParse(options.contentAssessments?.[observation.id]?.[source.id]);
+  if(!authority.success||!assessment.success)return false;
+  const current=authority.data,review=assessment.data,expected=options.expectedSubject;
+  if(!nonblank(current.content)||/^https?:\/\/\S+$/i.test(current.content.trim())||current.contentHash!==sha256(current.content))return false;
+  if(review.basis!=='source_content'||review.decision!=='matched'||review.briefContentHash!==brief.contentHash||
+    review.sourceVersionId!==current.versionId||review.sourceContentHash!==current.contentHash||review.scope!==observation.scope)return false;
+  const reviewed=Date.parse(review.reviewedAt),retrieved=Date.parse(current.retrievedAt),expiry=Date.parse(current.validUntil),now=Date.parse(options.now);
+  if(retrieved>reviewed||reviewed>Date.parse(brief.reviewedAt)||reviewed>now||expiry<=now||expiry<Date.parse(brief.validUntil))return false;
+  const subject=review.subject;
+  if(!subject||subject.productId!==expected.productId||subject.variantId!==expected.variantId||
+    subject.formulaVersionId!==null&&subject.formulaVersionId!==expected.formulaVersionId)return false;
+  if(observation.scope==='formula_context'&&(subject.formulaVersionId===null||subject.formulaVersionId!==brief.formulaVersionId))return false;
+  return ![current.versionId,current.contentHash,review.reviewerId].some(id=>options.withdrawnDependencies?.includes(id));
+}
 
 /** Validates the already human-reviewed, permission-qualified JSON artifact.
  * Hashes ensure integrity, not approval or prose entailment. The canonical owner
  * must supply the exact current subject and a trusted reviewed artifact; this
- * provider-independent gate does not acquire, summarize or authenticate sources. */
+ * provider-independent gate does not acquire, summarize or authenticate sources.
+ * Production admission additionally requires trusted current content-version
+ * authority and a human assessment of every observation/source relationship.
+ * Failure returns unresolved/null for the whole immutable brief; it never edits
+ * approved prose to remove a bad reference or preserve a now-unsupported claim. */
 export function admitResearchBrief(value: unknown, options: ResearchBriefAdmissionOptions): ProductResearchBrief | null {
   const parsed = ProductResearchBriefSchema.safeParse(value);
   if (!parsed.success) return null;
@@ -91,6 +152,7 @@ export function admitResearchBrief(value: unknown, options: ResearchBriefAdmissi
       observation.sourceIds.some(id => observation.opposingSourceIds.includes(id))) return null;
     const refs = [...observation.sourceIds, ...observation.opposingSourceIds];
     if (refs.some(id => !sources.has(id))) return null;
+    if(refs.some(id=>!contentApplies(brief,options,observation,sources.get(id)!)))return null;
     refs.forEach(id => used.add(id));
     const support = observation.sourceIds.map(id => sources.get(id)!);
     if (observation.kind === 'reported_experience' && (support.some(source => source.kind === 'manufacturer') || !support.some(source => source.kind === 'personal_anecdote'))) return null;

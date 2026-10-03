@@ -4,6 +4,7 @@ import {PART_THREE_RELEASE} from '../../domain/part-three/release.ts';
 import { canonicalJson, sha256 } from '../../domain/part-two/hash.ts';
 import type { PartThreeTransport } from '../../services/partThreeClient.ts';
 import type { PartThreeTarget } from './target.ts';
+import type { PartThreeSaveRecoveryPort, PendingSaveRequest, SaveRecoveryScope } from './saveRecovery.ts';
 export function createQuestionLatchStore() { const rows = new Map<string, {
     id: string;
     suppressed: boolean;
@@ -28,8 +29,9 @@ export interface PartThreeView {
     pendingSave?: boolean;
 }
 const key = (t: PartThreeTarget) => canonicalJson(t), encounterKey = (t: PartThreeTarget) => canonicalJson([t.binding.ownerId, t.binding.accountGeneration, t.binding.encounterId]);
-/** Private memory only. Every publication requires the full expected authority and live grant. */
-export function createPartThreeController(transport: PartThreeTransport, createId: () => string, changed: (v: PartThreeView) => void, now = Date.now, latches = partThreeQuestionLatches) {
+/** Every publication requires the full expected authority and live grant.
+ * Optional durable recovery retains only exact Save request metadata. */
+export function createPartThreeController(transport: PartThreeTransport, createId: () => string, changed: (v: PartThreeView) => void, now = Date.now, latches = partThreeQuestionLatches, recovery?: PartThreeSaveRecoveryPort) {
     let epoch = 0, online = true, view: PartThreeView = { target: null, result: null, question: null, historical: null, savedAssessmentId: null, savedAt: null, loading: false, saving: false, error: null };
     let flight: {
         promise: Promise<boolean>;
@@ -38,9 +40,12 @@ export function createPartThreeController(transport: PartThreeTransport, createI
     let saveAttempt: { key: string; id: string } | null = null;
     // Uncertain transport outcomes retain the original owner-bound request.
     // Receipt replay is allowed after the current display lease expires.
-    const pendingSaves = new Map<string, { ownerId: string; accountGeneration: number; request: Extract<PartThreeRequest,{operation:'save'}> }>();
+    const pendingSaves = new Map<string, { scope: SaveRecoveryScope; ownerId: string; accountGeneration: number; request: PendingSaveRequest }>();
+    const recoveryScope=(t:PartThreeTarget):SaveRecoveryScope=>({ownerId:t.binding.ownerId,accountGeneration:t.binding.accountGeneration,encounterId:t.binding.encounterId,scanId:t.binding.scanId,captureSessionId:t.binding.captureSessionId});
     const saveScope=(t:PartThreeTarget)=>canonicalJson([t.binding.ownerId,t.binding.accountGeneration,t.binding.encounterId,t.binding.scanId,t.binding.captureSessionId]);
     const pendingFor=(t:PartThreeTarget|null)=>t?pendingSaves.get(saveScope(t)):undefined;
+    const pendingMessage='Save confirmation is pending. Retry the original Save to recover its confirmation.';
+    let recoveredEpoch=-1, recoveryFlight:{token:number;target:string;promise:Promise<boolean>}|null=null;
     let interaction:{target:string;resultId:string;selectedTradeoffId:string|null}|null=null;
     const highest = new Map<string, {
         revision: number;
@@ -50,6 +55,30 @@ export function createPartThreeController(transport: PartThreeTransport, createI
     const cancel = () => { const f = flight; flight = null; f?.abort.abort(); };
     const active = (token: number, t: PartThreeTarget) => online && token === epoch && view.target !== null && key(t) === key(view.target);
     const hide = (message: string) => { view = { ...view, result: null, question: null, historical: null, loading: false, saving: false, error: message }; emit(); };
+    async function recoverPendingSave(force=false):Promise<boolean> {
+        const t=view.target,token=epoch;
+        if(!t||!online)return false;
+        if(!recovery)return true;
+        if(recoveryFlight?.token===token&&recoveryFlight.target===key(t))return recoveryFlight.promise;
+        if(!force&&recoveredEpoch===token)return true;
+        const operation=(async()=>{
+            try {
+                const request=await recovery.recover(recoveryScope(t));
+                if(!active(token,t))return false;
+                if(request)pendingSaves.set(saveScope(t),{scope:recoveryScope(t),ownerId:t.binding.ownerId,accountGeneration:t.binding.accountGeneration,request});
+                else pendingSaves.delete(saveScope(t));
+                recoveredEpoch=token;
+                view={...view,pendingSave:Boolean(request),error:request?pendingMessage:null,...(request?{result:null,question:null,historical:null}: {})};emit();
+                return true;
+            } catch {
+                if(active(token,t))hide('Save recovery is unavailable. Try again before reviewing or saving this assessment.');
+                return false;
+            }
+        })();
+        const f={token,target:key(t),promise:operation};recoveryFlight=f;
+        void operation.finally(()=>{if(recoveryFlight===f)recoveryFlight=null;});
+        return operation;
+    }
     async function event(t: PartThreeTarget, r: PersonalResultV2, q: string, kind: 'expose' | 'skip' | 'answer' | 'interact', token: number) { try {
         const raw = PartThreeResponseSchema.parse(await transport.request({ operation: 'question_event', encounterId: t.request.encounterId, resultId: r.resultId, questionId: q, expectedResultRevision:r.resultRevision, event: kind }));
         if (active(token, t) && raw.kind !== 'acknowledged')
@@ -105,13 +134,14 @@ export function createPartThreeController(transport: PartThreeTransport, createI
             return false;
         }
     }
-    function run(read: boolean): Promise<boolean> {
+    async function run(read: boolean): Promise<boolean> {
         const t = view.target;
-        if (!t || !online || pendingFor(t))
-            return Promise.resolve(false);
+        const token=epoch;
+        if (!t || !online || recovery && !await recoverPendingSave() || !active(token,t) || pendingFor(t))
+            return false;
         if (flight)
             return flight.promise;
-        const token = epoch, requestId = read && last ? last.binding.attemptId : createId();
+        const requestId = read && last ? last.binding.attemptId : createId();
         const request: PartThreeRequest = read && last ? { operation: 'read', resultId: last.resultId } : { operation: 'evaluate', requestId, ...t.request };
         const abort = new AbortController();
         let finish!: (v: boolean) => void;
@@ -134,7 +164,7 @@ export function createPartThreeController(transport: PartThreeTransport, createI
             return; const old = view.target; if (old && t && (old.binding.ownerId !== t.binding.ownerId || old.binding.accountGeneration !== t.binding.accountGeneration))
             latches.clear(); if(t)for(const [scope,pending] of pendingSaves)if(t.binding.ownerId!==pending.ownerId||t.binding.accountGeneration!==pending.accountGeneration)pendingSaves.delete(scope); if (t?.request.savedAssessmentId)
             latches.suppress(encounterKey(t)); epoch++; cancel(); last = null; interaction=null;saveAttempt = null; highest.clear(); view = { target: t, result: null, question: null, historical: null, savedAssessmentId: null, savedAt: null, loading: false, saving: false, error: pendingFor(t) ? 'Save confirmation is pending. Retry the original Save to recover its confirmation.' : null, pendingSave: Boolean(pendingFor(t)) }; emit(); },
-        evaluate: () => run(false), renew: () => run(true),
+        evaluate: () => run(false), renew: () => run(true), recoverPendingSave: () => recoverPendingSave(),
         // The mounted UI calls this only after native visibility or an actual
         // accessibility announcement. Receiving a packet is not exposure.
         exposeQuestion(expectedQuestionId?:string) { const t=view.target,r=view.result,q=view.question;if(!t||!r||!q||!online||expectedQuestionId!==undefined&&expectedQuestionId!==q.id)return null;const prior=latches.get(encounterKey(t));const latch=latches.expose(encounterKey(t),q.id);if(latch.suppressed||latch.id!==q.id)return null;if(!prior)void event(t,r,q.id,'expose',epoch);return q; },
@@ -161,34 +191,49 @@ export function createPartThreeController(transport: PartThreeTransport, createI
             last = null;
             hide('Personal assessment expired. Refresh to review.');
         } },
-        clearPendingSave() { pendingSaves.clear(); saveAttempt=null; view={...view,pendingSave:false}; },
+        clearPendingSave():Promise<void> {
+            const accounts=new Map<string,{ownerId:string;accountGeneration:number}>();
+            for(const pending of pendingSaves.values())accounts.set(canonicalJson([pending.ownerId,pending.accountGeneration]),pending);
+            if(view.target){const {ownerId,accountGeneration}=view.target.binding;accounts.set(canonicalJson([ownerId,accountGeneration]),{ownerId,accountGeneration});}
+            epoch++;cancel();pendingSaves.clear();saveAttempt=null;view={...view,result:null,question:null,historical:null,saving:false,pendingSave:false};emit();
+            return recovery?Promise.all([...accounts.values()].map(account=>recovery.retireOwner(account.ownerId,account.accountGeneration))).then(()=>undefined):Promise.resolve();
+        },
         async save(): Promise<string | null> {
             const t=view.target, r=view.result;
-            const prior=pendingFor(t);
-            if (!t || !online || view.saving || (!prior && (!r || !['ready','unavailable','blocked'].includes(r.state)))) return null;
+            if (!t || !online || view.saving) return null;
             const token=epoch;
             view={...view,saving:true,error:null}; emit();
             try {
+                if(!await recoverPendingSave(true)||!active(token,t))return null;
+                if(!pendingFor(t)&&(!r||!['ready','unavailable','blocked'].includes(r.state))){view={...view,saving:false};emit();return null;}
                 if(!pendingFor(t)) {
                     const read=await transport.request({operation:'read',resultId:r!.resultId});
                     if(read.kind!=='result'||canonicalJson(read.result)!==canonicalJson(r)) throw Error('Displayed assessment revision changed');
                     if(!active(token,t)||!publish(read,t,r!.binding.attemptId,token)||canonicalJson(view.result)!==canonicalJson(r)) throw Error('Changed basis');
                     const bindingHash=sha256(canonicalJson(r!.binding)),packetHash=sha256(canonicalJson(r)),attemptKey=canonicalJson([r!.resultId,r!.resultRevision,bindingHash,packetHash]);
                     if(saveAttempt?.key!==attemptKey)saveAttempt={key:attemptKey,id:createId()};
-                    pendingSaves.set(saveScope(t),{ownerId:t.binding.ownerId,accountGeneration:t.binding.accountGeneration,request:{operation:'save',requestId:saveAttempt.id,resultId:r!.resultId,expectedResultRevision:r!.resultRevision,expectedBindingHash:bindingHash,expectedPacketHash:packetHash}});
+                    pendingSaves.set(saveScope(t),{scope:recoveryScope(t),ownerId:t.binding.ownerId,accountGeneration:t.binding.accountGeneration,request:{operation:'save',requestId:saveAttempt.id,resultId:r!.resultId,expectedResultRevision:r!.resultRevision,expectedBindingHash:bindingHash,expectedPacketHash:packetHash}});
                     view={...view,pendingSave:true};
                 }
                 const attempt=pendingFor(t)!;
-                const rawSaved=await transport.request(attempt.request);
+                await recovery?.retain(attempt.scope,attempt.request);
                 if(!active(token,t))return null;
+                const rawSaved=await transport.request(attempt.request);
                 const saved=PartThreeResponseSchema.parse(rawSaved);
-                if(saved.kind!=='saved') { pendingSaves.delete(saveScope(t));view={...view,pendingSave:false};throw Error('Save was rejected'); }
+                if(saved.kind!=='saved') {
+                    // Only the explicit refusal contract is a definitive outcome.
+                    // A valid response for another operation remains uncertain.
+                    if(saved.kind==='unavailable'){await recovery?.complete(attempt.scope,attempt.request);pendingSaves.delete(saveScope(t));if(active(token,t))view={...view,pendingSave:false};}
+                    throw Error('Save was not confirmed');
+                }
                 if(saved.resultRevision!==attempt.request.expectedResultRevision)throw Error('Unexpected save receipt');
+                await recovery?.complete(attempt.scope,attempt.request);
                 pendingSaves.delete(saveScope(t));
+                if(!active(token,t))return null;
                 view={...view,savedAssessmentId:saved.savedAssessmentId,saving:false,pendingSave:false,error:null};emit();return saved.savedAssessmentId;
             } catch {
                 if(active(token,t)) {
-                    if(pendingFor(t)) { view={...view,saving:false,pendingSave:true,error:'Save confirmation is pending. Retry the original Save to recover its confirmation.'};emit(); }
+                    if(pendingFor(t)) { view={...view,saving:false,pendingSave:true,error:pendingMessage};emit(); }
                     else hide('Save confirmation is unavailable from this result. Review the current result.');
                 }
                 return null;
