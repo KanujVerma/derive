@@ -1,5 +1,13 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-03 — standalone selected-source review brief pilot
+
+- **Confirmed development base:** `fea1a214dd174deccffbdb08fb2aa48c1e8fd0e0`, branch `sami/review-brief-pilot`. Founders identify local `c797960f36a7902aa23d7a22b36090e45269c8cb` as accepted combined P1–P3 work; Part 4 is separate. This pilot neither assumes main is the integration base nor modifies unpublished app work.
+- **Scope:** isolated versioned data module and separate tests. No sheet/scanner/engine/schema edits, app wiring, network/persistence behavior, merge or deployment. Proposed contract awaits integration-owner acceptance.
+- **Content:** source audit distinguishes explicit terms from absent licensing and manual original-summary use from bulk/API collection. Two original editorial drafts are documented for review only, not included in runtime observations. Two withheld product records prevent accidental publication; CeraVe US-market package identity and narrow-summary clearance remain gaps. No permission grant or consensus is invented.
+- **Handoff:** [pilot audit and contract](REVIEW_BRIEF_PILOT.md). Source metadata and rejection gates are delivered; permission-cleared customer briefs are not yet complete.
+- **Validation:** 10/10 pilot tests, full suite 1,000/1,000 across 116 TAP files, app/test TypeScript, web export and diff checks pass. No phone or app integration acceptance is claimed.
+
 ## 2026-10-02 — separate UX-only publication
 
 - **Authorization/base:** the user approved a separate UX-only PR, CI and normal merge from fresh `origin/main@7efb9ce446c6b7b54b3803fa85522b47da2a05ee`. Isolated branch `kanuj/ux-only-camera-search` preserves the original combined preview and the PostHog checkout/services. Sami PR194 remains separate.
