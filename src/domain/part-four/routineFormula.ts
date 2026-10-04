@@ -5,8 +5,7 @@ import { canonicalJson, sha256 } from '../part-two/hash.ts';
 import { deepFreeze } from '../part-two/dictionary.ts';
 import { activeRoutineItem } from './comparison.ts';
 import { analyzeFormula } from './formula.ts';
-import { PART_FOUR_RELEASE } from './release.ts';
-import { APPROVED_INGREDIENT_KNOWLEDGE, ingredientKnowledgeAvailable, type IngredientKnowledgeRelease } from './knowledge.ts';
+import { APPROVED_37_INGREDIENT_KNOWLEDGE, ingredientKnowledgeAvailable, type IngredientKnowledgeRelease } from './knowledge.ts';
 import { ExactRoutineReferenceSchema, RoutineFormulaRequestSchema, RoutineFormulaEvidenceSchema, type RoutineFormulaRequest, type RoutineFormulaReadyEvidence } from '../../contracts/RoutineFormula.ts';
 export { ExactRoutineReferenceSchema, RoutineFormulaRequestSchema, RoutineFormulaReadyEvidenceSchema, RoutineFormulaEvidenceSchema } from '../../contracts/RoutineFormula.ts';
 export type { RoutineFormulaRequest, RoutineFormulaReadyEvidence, RoutineFormulaEvidence } from '../../contracts/RoutineFormula.ts';
@@ -22,7 +21,7 @@ export interface RoutineFormulaOptions {now:string;knowledge?:IngredientKnowledg
  * independently stored association/source-grant lookup. Parsing echoed grants
  * from HTTP/client JSON is not authorization. This module performs no lookup,
  * acquisition or promotion of catalog names/ingredient arrays into evidence. */
-export function planRoutineFormulaRequests(context:PersonalContextV2):{requests:RoutineFormulaRequest[];items:RoutineFormulaItemState[]} {
+export function planRoutineFormulaRequests(context:PersonalContextV2,knowledge:IngredientKnowledgeRelease=APPROVED_37_INGREDIENT_KNOWLEDGE):{requests:RoutineFormulaRequest[];items:RoutineFormulaItemState[]} {
  const routine=context.routine;
  if(routine&&(routine.ownerId!==context.ownerId||routine.revision>context.revision))throw Error('Foreign or future routine revision');
  const active=routine?.data.items.filter(activeRoutineItem)??[];
@@ -31,7 +30,7 @@ export function planRoutineFormulaRequests(context:PersonalContextV2):{requests:
  for(const item of active){
   const reference=ExactRoutineReferenceSchema.safeParse(item.reference);
   if(!reference.success){items.push({routineItemId:item.id,state:'missing',reasonCodes:[item.reference.kind==='manual'?'manual_reference_not_formula_identity':'exact_formula_reference_missing']});continue;}
-  requests.push(RoutineFormulaRequestSchema.parse({version:'routine-formula-request/v1',ownerId:context.ownerId,contextRevision:context.revision,routineRevisionId:routine!.id,routineItemId:item.id,routineItemHash:sha256(canonicalJson(item)),reference:reference.data,knowledgeVersion:PART_FOUR_RELEASE.knowledgeVersion,knowledgeHash:PART_FOUR_RELEASE.knowledgeHash}));
+  requests.push(RoutineFormulaRequestSchema.parse({version:'routine-formula-request/v1',ownerId:context.ownerId,contextRevision:context.revision,routineRevisionId:routine!.id,routineItemId:item.id,routineItemHash:sha256(canonicalJson(item)),reference:reference.data,knowledgeVersion:knowledge.version,knowledgeHash:knowledge.contentHash}));
   items.push({routineItemId:item.id,state:'pending',reasonCodes:['formula_lookup_required']});
  }
  return {requests,items};
@@ -67,7 +66,7 @@ function validateReady(expected:RoutineFormulaRequest,evidence:RoutineFormulaRea
   if(permission.revoked||!permission.evaluate||!permission.display||!permission.store)return refuse('denied','formula_source_permission_denied');
   if(Date.parse(source.expiresAt)<=now||Date.parse(permission.validUntil)<=now)return refuse('stale','formula_source_expired');
  }
- const knowledge=options.knowledge??APPROVED_INGREDIENT_KNOWLEDGE;
+ const knowledge=options.knowledge??APPROVED_37_INGREDIENT_KNOWLEDGE;
  if(knowledge.version!==expected.knowledgeVersion||knowledge.contentHash!==expected.knowledgeHash)return refuse('unavailable','shared_knowledge_mismatch');
  const withdrawn=[...new Set([...(options.withdrawnDependencies??[]),...authorization.withdrawnDependencies])];
  const dependencyIds=[...new Set([association.id,association.partOneItemId,association.partOneSnapshotId,association.declarationId,association.partTwoSnapshotId,authorization.authorityId,p.bindingKey,association.dependencyDigest,expected.knowledgeVersion,expected.knowledgeHash,...sourceRefs.flatMap(source=>[source.observationId,source.policyId,source.contentHash]),...authorization.sourcePermissions.map(permission=>permission.grantId),...snapshot.facts.flatMap(fact=>[fact.factId,...fact.sourceDependencies,...fact.dictionaryDependencies]),...snapshot.dependencyManifest.dictionaryRecordIds])].sort();
@@ -81,7 +80,7 @@ function validateReady(expected:RoutineFormulaRequest,evidence:RoutineFormulaRea
 export function admitRoutineFormulaEvidence(context:PersonalContextV2,evidence:readonly unknown[],options:RoutineFormulaOptions):RoutineFormulaAdmission {
  if(!Number.isFinite(Date.parse(options.now)))throw Error('Routine formula evaluation time must be valid');
  if(evidence.length>50)throw Error('Routine formula evidence limit exceeded');
- const plan=planRoutineFormulaRequests(context),requests=new Map(plan.requests.map(request=>[request.routineItemId,request]));
+ const plan=planRoutineFormulaRequests(context,options.knowledge??APPROVED_37_INGREDIENT_KNOWLEDGE),requests=new Map(plan.requests.map(request=>[request.routineItemId,request]));
  const byItem=new Map<string,unknown[]>();
  for(const raw of evidence){
   if(!raw||typeof raw!=='object')continue;

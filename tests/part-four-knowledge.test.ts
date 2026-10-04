@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { APPROVED_CARD_TEXT } from '../src/domain/part-four/approved-card-text.ts';
-import { APPROVED_INGREDIENT_KNOWLEDGE, ingredientKnowledgeHash, resolveIngredientKnowledge, validateIngredientKnowledgeRelease } from '../src/domain/part-four/knowledge.ts';
+import { APPROVED_37_INGREDIENT_KNOWLEDGE as APPROVED_INGREDIENT_KNOWLEDGE, ingredientKnowledgeHash, resolveIngredientKnowledge as resolveSelectedKnowledge, validateIngredientKnowledgeRelease } from '../src/domain/part-four/knowledge.ts';
 import { analyzeFormula } from '../src/domain/part-four/formula.ts';
 import { canonicalJson, sha256 } from '../src/domain/part-two/hash.ts';
 import { LOCAL_DICTIONARY_RELEASE, lookupName } from '../src/domain/part-two/dictionary.ts';
@@ -10,7 +10,8 @@ import { boundDeclaration, p2metadata, p2now, p2expiry, sourceReading } from './
 import { FormulaAnalysisSchema } from '../src/contracts/PartFour.ts';
 
 const pack = APPROVED_INGREDIENT_KNOWLEDGE;
-const opts = { now: p2now };
+const opts = { now: p2now, knowledge:pack };
+const resolveIngredientKnowledge: typeof resolveSelectedKnowledge = (name,value=pack,lifecycle={})=>resolveSelectedKnowledge(name,value,lifecycle);
 const vanicream = ['Water','Squalane','Glycerin','Pentylene Glycol','Polyglyceryl-2 Stearate','Glyceryl Stearate','Stearyl Alcohol','Hyaluronic Acid','Ceramide EOP','Ceramide NG','Ceramide NP','Ceramide AS','Ceramide AP','Carnosine','Hydrogenated Lecithin','Phytosterols','Caprylyl Glycol','Polyacrylate Crosspolymer-11','1,2-Hexanediol'];
 const cerave = ['Aqua / Water / Eau','Glycerin','Caprylic/Capric Triglyceride','Niacinamide','Cetearyl Alcohol','Potassium Phosphate','Ceramide NP','Ceramide AP','Ceramide EOP','Carbomer','Dimethicone','Ceteareth-20','Behentrimonium Methosulfate','Sodium Lauroyl Lactylate','Sodium Hyaluronate','Cholesterol','Phenoxyethanol','Disodium EDTA','Dipotassium Phosphate','Caprylyl Glycol','Phytosphingosine','Xanthan Gum','Polyglyceryl-3 Diisostearate','Ethylhexylglycerin'];
 const ready = (raw: string, bound = true) => normalize(bound ? boundDeclaration(raw) : sourceReading(raw), LOCAL_DICTIONARY_RELEASE, p2metadata);

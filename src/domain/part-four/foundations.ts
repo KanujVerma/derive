@@ -1,3 +1,4 @@
+import { APPROVED_37_INGREDIENT_KNOWLEDGE, type IngredientKnowledgeRelease } from './knowledge.ts';
 import type { PersonalContextV2, PersonalRoutineItemV2, ProductAssessment, ReportedDate } from '../../contracts/PersonalContextV2.ts';
 import type { ContextGoal, ContextProductReference } from '../../contracts/PersonalContext.ts';
 import { NormalizationResultSchema, type NormalizationResult, type PartTwoFact } from '../../contracts/PartTwo.ts';
@@ -11,7 +12,7 @@ export interface FoundationInput {
  intent:'add'|'replace'|'check_current'|'unanswered'|'unsure'|'withheld'; candidateRoutineItemId:string|null; selectedComparatorId:string|null;
  /** Pass evaluation time at the authority boundary. Omitted time evaluates only
   * the immutable normalization snapshot, not present-day authorization. */
- now?:string; candidateReference?:ContextProductReference|null; routineFormulas?:QualifiedRoutineFormula[]; routineFormulaEvidence?:readonly unknown[]; routineLabels?:Readonly<Record<string,string>>;
+ knowledge?:IngredientKnowledgeRelease; now?:string; candidateReference?:ContextProductReference|null; routineFormulas?:QualifiedRoutineFormula[]; routineFormulaEvidence?:readonly unknown[]; routineLabels?:Readonly<Record<string,string>>;
 }
 export interface FoundationResult { insights:PartFourInsight[]; comparison:PartFourComparison; routineFormulaStates:RoutineFormulaItemState[] }
 const goalsWithNoEfficacy = new Set<ContextGoal>(['breakouts','dark_spots','oiliness','texture','redness','fine_lines']);
@@ -88,7 +89,7 @@ export function buildFoundationInsights(input:FoundationInput):FoundationResult 
  // Independently revalidate worker admission against the current routine/use
  // and clock. A bare exact_formula marker never grants formula authority.
  const supplied=input.routineFormulas??[];
- const routineAdmission=admitRoutineFormulaEvidence(c,input.routineFormulaEvidence??supplied.filter(q=>q.evidence&&q.routineItemId===q.evidence.request.routineItemId&&exactCatalogReference(q.reference,q.evidence.request.reference)).map(q=>q.evidence),{now:new Date(now).toISOString()});
+ const routineAdmission=admitRoutineFormulaEvidence(c,input.routineFormulaEvidence??supplied.filter(q=>q.evidence&&q.routineItemId===q.evidence.request.routineItemId&&exactCatalogReference(q.reference,q.evidence.request.reference)).map(q=>q.evidence),{now:new Date(now).toISOString(),knowledge:input.knowledge??APPROVED_37_INGREDIENT_KNOWLEDGE});
  let presence=0;
  for(const qualified of routineAdmission.qualified){
   const item=active.find(i=>i.id===qualified.routineItemId);

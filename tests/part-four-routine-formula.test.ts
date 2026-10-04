@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { APPROVED_INGREDIENT_KNOWLEDGE } from '../src/domain/part-four/knowledge.ts';
 import { planRoutineFormulaRequests, admitRoutineFormulaEvidence, type RoutineFormulaReadyEvidence } from '../src/domain/part-four/routineFormula.ts';
 import { buildFoundationInsights } from '../src/domain/part-four/foundations.ts';
 import { p3input, p3routine, p3revision } from './fixtures/part-three.ts';
@@ -43,4 +44,9 @@ test('production admission rejects a future trusted-worker check without a clock
  const f=fixture();f.evidence.authorization.checkedAt=new Date(Date.parse(p2now)+1).toISOString();
  const result=admitRoutineFormulaEvidence(f.x.context,[f.evidence],{now:p2now});
  assert.equal(result.items[0].state,'stale');assert.deepEqual(result.qualified,[]);
+});
+
+test('explicit47 routine request and admission share the candidate knowledge pin;37 envelopes cannot cross it',()=>{
+ const f=fixture();const request=(planRoutineFormulaRequests as any)(f.x.context,APPROVED_INGREDIENT_KNOWLEDGE).requests[0];assert.equal(request.knowledgeHash,APPROVED_INGREDIENT_KNOWLEDGE.contentHash);
+ const current={...f.evidence,request};assert.equal(admitRoutineFormulaEvidence(f.x.context,[current],{now:p2now,knowledge:APPROVED_INGREDIENT_KNOWLEDGE}).items[0].state,'ready');assert.equal(admitRoutineFormulaEvidence(f.x.context,[f.evidence],{now:p2now,knowledge:APPROVED_INGREDIENT_KNOWLEDGE}).qualified.length,0);
 });

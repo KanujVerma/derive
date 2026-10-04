@@ -131,6 +131,29 @@ export function PartFourSections(props: PartFourSectionsProps) {
                   <Text style={styles.evidenceTitle}>What we know</Text>
                   <Text style={styles.caption}>{partFourDisplayText(row.card.evidence)}</Text>
                 </View>
+                {row.card.editorial && <>
+                  {row.card.editorial.amountAndUse && <View style={styles.insight}>
+                    <Text accessibilityRole="header" style={styles.insightTitle}>Amount and use context</Text>
+                    <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.amountAndUse)}</Text>
+                  </View>}
+                  {row.card.editorial.caution && <View style={styles.insight}>
+                    <Text accessibilityRole="header" style={styles.insightTitle}>Cautions in the approved reference</Text>
+                    <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.caution)}</Text>
+                  </View>}
+                  {row.card.editorial.aliasNotes && <View style={styles.insight}>
+                    <Text accessibilityRole="header" style={styles.insightTitle}>Names used in the reference</Text>
+                    <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.aliasNotes)}</Text>
+                  </View>}
+                  {row.card.editorial.distinctIngredients && <View style={styles.insight}>
+                    <Text accessibilityRole="header" style={styles.insightTitle}>Different ingredients</Text>
+                    <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.distinctIngredients)}</Text>
+                  </View>}
+                  {row.card.editorial.qualifications.length > 0 && <View style={styles.insight}>
+                    <Text accessibilityRole="header" style={styles.insightTitle}>Reference qualifications</Text>
+                    {row.card.editorial.qualifications.map((qualification, qualificationIndex) =>
+                      <Text key={qualificationIndex} selectable style={styles.caption}>{partFourDisplayText(qualification)}</Text>)}
+                  </View>}
+                </>}
               </>}
               <Text style={styles.caption}>Ingredient information does not establish the finished product’s effect or your experience with it.</Text>
               <Pressable accessibilityRole="button" accessibilityLabel={`View sources for ${row.name}, position ${index + 1}`}
@@ -162,6 +185,27 @@ export function PartFourSections(props: PartFourSectionsProps) {
           <Text style={styles.insightTitle}>Evidence limits</Text>
           {limits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}
         </View>}
+        {packet.formula.educationContext?.map((context, contextIndex) => <View key={`${context.documentId}:${contextIndex}`} style={styles.sourceEntry}>
+          {context.sections.map((section, sectionIndex) => <View key={sectionIndex} style={styles.insight}>
+            <Text accessibilityRole="header" style={styles.insightTitle}>{partFourDisplayText(section.heading)}</Text>
+            {section.paragraphs.map((paragraph, paragraphIndex) => <View key={paragraphIndex} style={styles.insight}>
+              <Text selectable style={styles.copy}>{partFourDisplayText(paragraph.text)}</Text>
+              {paragraph.links.map((link, linkIndex) => {
+                const url = safePartFourSourceUrl(link.url);
+                return url ? <Pressable key={linkIndex} accessibilityRole="link" accessibilityLabel={`View reference: ${partFourDisplayText(link.label)}`}
+                  onPress={() => { void Linking.openURL(url).catch(() => {}); }} style={styles.sourceButton}>
+                  <Text style={styles.link}>{partFourDisplayText(link.label)}</Text>
+                </Pressable> : <Text key={linkIndex} style={styles.caption}>{partFourDisplayText(link.label)}</Text>;
+              })}
+            </View>)}
+          </View>)}
+          {context.researchTable && <View style={styles.insight}>
+            <Text accessibilityRole="header" style={styles.insightTitle}>Research context from the reference</Text>
+            {context.researchTable.rows.map((cells, rowIndex) => <View key={rowIndex} style={styles.evidence}>
+              {cells.map((cell, cellIndex) => <Text key={cellIndex} selectable style={styles.caption}>{partFourDisplayText(cell)}</Text>)}
+            </View>)}
+          </View>}
+        </View>)}
         {packet.formula.sourceRefs.map(source => {
           const url = safePartFourSourceUrl(source.sourceUrl);
           return <View key={`${source.observationId}:${source.sourceRevision}`} style={styles.sourceEntry}>
@@ -173,7 +217,9 @@ export function PartFourSections(props: PartFourSectionsProps) {
         {packet.formula.sources.map(source => {
           const url = safePartFourSourceUrl(source.url);
           return <View key={source.id} style={styles.sourceEntry}>
-            <Text style={styles.caption}>{`${partFourDisplayText(source.title)} · Reviewed ${source.reviewedAt.slice(0, 10)}`}</Text>
+            <Text style={styles.caption}>{source.editorial
+              ? `${partFourDisplayText(source.title)} · Copy approved ${partFourDisplayText(source.editorial.copyApprovedAt.slice(0, 10))} · remote source revision unverified`
+              : `${partFourDisplayText(source.title)} · Reviewed ${source.reviewedAt.slice(0, 10)}`}</Text>
             {url && <Pressable accessibilityRole="link" accessibilityLabel={`View reference: ${partFourDisplayText(source.title)}`}
               onPress={() => { void Linking.openURL(url).catch(() => {}); }} style={styles.sourceButton}><Text style={styles.link}>View reference</Text></Pressable>}
           </View>;

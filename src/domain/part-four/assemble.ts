@@ -2,15 +2,20 @@ import { PartFourPacketSchema, type PartFourPacket } from '../../contracts/PartF
 import type { PersonalResultV2 } from '../../contracts/PersonalResultV2.ts';
 import { analyzeFormula } from './formula.ts';
 import { buildFoundationInsights, type FoundationInput } from './foundations.ts';
-import { PART_FOUR_RELEASE } from './release.ts';
+import { PART_FOUR_RELEASE, partFourBindingRelease } from './release.ts';
+import { APPROVED_INGREDIENT_KNOWLEDGE, APPROVED_37_INGREDIENT_KNOWLEDGE } from './knowledge.ts';
+import { canonicalJson } from '../part-two/hash.ts';
 import { createRetainedEvidence } from './retainedEvidence.ts';
 import { RoutineFormulaEvidenceSchema } from '../../contracts/RoutineFormula.ts';
 /** Optional source adapters are deliberately absent until permission-qualified.
  * This produces a foundation packet, never a claim of full Part 4 capability. */
 export function assembleFoundation(input:FoundationInput,result:PersonalResultV2):PartFourPacket|null {
- const formula=analyzeFormula(input.partTwo,{now:result.evaluatedAt,expectedBinding:{bindingKey:result.binding.partTwoBindingKey,resultRevision:result.binding.partTwoRevision,dependencyDigest:result.binding.sourceDigest}});
+ const selected=result.binding.releases.partFour;
+ const knowledge=canonicalJson(selected)===canonicalJson(partFourBindingRelease('approved47'))?APPROVED_INGREDIENT_KNOWLEDGE:canonicalJson(selected)===canonicalJson(partFourBindingRelease())?APPROVED_37_INGREDIENT_KNOWLEDGE:null;
+ if(!knowledge)return null;
+ const formula=analyzeFormula(input.partTwo,{knowledge,now:result.evaluatedAt,expectedBinding:{bindingKey:result.binding.partTwoBindingKey,resultRevision:result.binding.partTwoRevision,dependencyDigest:result.binding.sourceDigest}});
  if(!formula)return null;
- const {insights,comparison}=buildFoundationInsights({...input,now:result.evaluatedAt});
+ const {insights,comparison}=buildFoundationInsights({...input,knowledge,now:result.evaluatedAt});
  const p=input.context.profile?.data;
  const goals=[...(p?.primaryGoal.state==='known'?[p.primaryGoal.value]:[]),...(p?.secondaryGoals??[])];
  const needsBenefitEvidence=goals.some(g=>!['simplify','maintain'].includes(g))&&!result.findings.some(f=>f.kind==='current_help'&&f.supportState==='supported');

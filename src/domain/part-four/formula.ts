@@ -37,7 +37,12 @@ export function analyzeFormula(value: NormalizationResult, options: FormulaAnaly
       ingredientId: card?.ingredientId ?? (occurrence.mapping.state === 'resolved' ? occurrence.mapping.ingredientId : null),
       card, modality: occurrence.modality, quantityText: amounts.length ? amounts.map(quantity => quantity.span.raw).join('; ') : null };
   });
+  const documentIds = new Set(ingredients.flatMap(ingredient=>ingredient.card?.editorial?[ingredient.card.editorial.documentId]:[]));
+  const context = knowledge.educationContext?.filter(document=>documentIds.has(document.documentId));
   const sourceIds = new Set(ingredients.flatMap(ingredient => ingredient.card?.sourceIds ?? []));
+  // Context citations remain navigable references, not source-processing grants.
+  const contextUrls = new Set(context?.flatMap(doc=>doc.sections.flatMap(section=>section.paragraphs.flatMap(p=>p.links.map(link=>link.url))))??[]);
+  knowledge.sources.filter(source=>contextUrls.has(source.url)).forEach(source=>sourceIds.add(source.id));
   const limitations = [
     'approved_editorial_local_only', 'reference_roles_not_finished_product_efficacy',
     'no_product_identity_or_dose_inference', 'ingredient_order_not_concentration',
@@ -52,7 +57,7 @@ export function analyzeFormula(value: NormalizationResult, options: FormulaAnaly
   return deepFreeze(FormulaAnalysisSchema.parse({ version: 'formula-analysis/v1', knowledgeVersion: knowledge.version,
     knowledgeHash: knowledge.contentHash, partTwoBindingKey: result.bindingKey, partTwoRevision: result.resultRevision,
     dependencyDigest: reading.binding.dependencyDigest, binding: reading.binding, versions: reading.versions,
-    sourceRefs: reading.dependencyManifest.sourceRefs, facts: snapshot.facts, expiresAt: result.expiresAt,
+    sourceRefs: reading.dependencyManifest.sourceRefs, facts: snapshot.facts, expiresAt: knowledge.provenance.expiresAt===null?result.expiresAt:new Date(Math.min(Date.parse(result.expiresAt),Date.parse(knowledge.provenance.expiresAt))).toISOString(),
     scope: reading.scope, evidenceState: reading.evidenceState, ingredients,
-    sources: knowledge.sources.filter(source => sourceIds.has(source.id)), limitations }));
+    sources: knowledge.sources.filter(source => sourceIds.has(source.id)), ...(context?.length?{educationContext:context}:{}), limitations }));
 }
