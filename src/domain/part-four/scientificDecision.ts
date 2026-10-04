@@ -10,7 +10,7 @@ export function buildScientificManifest(claims:unknown,admissions:unknown=[]):Sc
  const value=ScientificManifestSchema.parse({version:'part-four-science-candidates/v1',contentHash:'0'.repeat(64),claims,admissions});value.contentHash=scientificManifestHash(value);return value;
 }
 export const PENDING_SCIENTIFIC_MANIFEST=buildScientificManifest(PENDING_SCIENTIFIC_RECORDS);
-const targets:Record<string,readonly ContextGoal[]>={'G01-01':['dryness'],'G01-02':['dryness'],'G02-01':['oiliness'],'G02-02':['breakouts'],'G03-01':['fine_lines','dark_spots'],'G03-02':['fine_lines']};
+const targets:Record<string,readonly ContextGoal[]>={'G01-03-reviewed-barrier-reference-v1':['dryness'],'G03-03-reviewed-photoaging-reference-v1':['fine_lines','dark_spots'],'G01-01':['dryness'],'G01-02':['dryness'],'G02-01':['oiliness'],'G02-02':['breakouts'],'G03-01':['fine_lines','dark_spots'],'G03-02':['fine_lines']};
 const targetEndpoint:Partial<Record<ContextGoal,string>>={fine_lines:'fine-lines-wrinkles',dark_spots:'hyperpigmented-spots'};
 /** The feature envelope is loaded by a trusted host after its independent
  * formula/source/applicability lookup. Client requests never carry it. Exact
@@ -31,7 +31,7 @@ export function assessScientificDecision(input:{manifest:unknown;evidence?:unkno
    const features:Partial<Record<import('../../contracts/ScientificClaim.ts').ClaimField,ClaimFeature>>={...(rows[0]?.features??{})};
    // One source record can support several endpoints, each assessed separately.
    // A reported redness/texture goal does not inherit photoaging blotchiness.
-   if(claim.id==='G03-01'&&goal&&targetEndpoint[goal]&&features.endpoint?.state==='known'&&!features.endpoint.values?.includes(targetEndpoint[goal]!))features.endpoint={...features.endpoint,values:[`different-reported-goal:${goal}`]};
+   if((claim.id==='G03-01'||claim.id==='G03-03-reviewed-photoaging-reference-v1')&&goal&&targetEndpoint[goal]&&features.endpoint?.state==='known'&&!features.endpoint.values?.includes(targetEndpoint[goal]!))features.endpoint={...features.endpoint,values:[`different-reported-goal:${goal}`]};
    const admission=p.state==='ready'&&Date.parse(p.expiresAt)>Date.parse(input.now)&&!['blocked','conflict'].includes(p.output.reading.evidenceState)&&!(p.output.kind==='bound'&&['blocked','conflict'].includes(p.output.productFacts.evidenceState))?manifest.admissions:[];
    assessments.push({goal,assessment:assessScientificClaim(claim,{now:input.now,features,admissions:admission,withdrawnDependencies:input.withdrawnDependencies})});
   }

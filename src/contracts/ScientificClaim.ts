@@ -3,7 +3,7 @@ import {EvidenceReviewSchema} from './EvidenceReview.ts';
 import {canonicalJson} from '../domain/part-two/hash.ts';
 import {contextGoalSchema} from './PersonalContextV2Schema.ts';
 const id=z.string().min(1).max(200), text=z.string().min(1).max(4000), hash=z.string().regex(/^[a-f0-9]{64}$/), date=z.iso.datetime();
-export const ClaimFieldSchema=z.enum(['ingredientId','amountPercent','amountBasis','amountSubject','chemicalForm','vehicleBridge','site','useForm','frequency','duration','population','endpoint','formulaVersionId','productId','variantId','labelAssertionId','routineOtherMedication','timingRelation','purpose','broadSpectrum','pH','indication']);
+export const ClaimFieldSchema=z.enum(['ingredientId','amountPercent','amountBasis','amountSubject','chemicalForm','vehicleBridge','site','useForm','frequency','duration','population','endpoint','formulaVersionId','productId','variantId','labelAssertionId','routineOtherMedication','routineSunProtection','timingRelation','purpose','broadSpectrum','pH','indication']);
 export type ClaimField=z.infer<typeof ClaimFieldSchema>;
 export const ScientificClaimSchema=z.strictObject({
  id,family:z.enum(['G01','G02','G03','G04','G05']),tier:z.enum(['decision_candidate','reference','policy']),

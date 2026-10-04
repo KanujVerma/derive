@@ -1,3 +1,4 @@
+import {AHA_SUN_PLAN_CLAIM_ID} from '../part-four/reviewedAha.ts';
 import { ScientificDecisionPacketSchema, type ScientificDecisionPacket } from '../../contracts/ScientificClaim.ts';
 import type { PersonalContextV2, ApplicationSite, UseForm, PurposeId } from '../../contracts/PersonalContextV2.ts';
 import type { ContextProductReference } from '../../contracts/PersonalContext.ts';
@@ -102,7 +103,7 @@ export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalRe
   if(b.releases.partFour?.scientificManifestHash!==science.manifestHash)throw Error('Scientific manifest binding mismatch');
   for(const {goal,assessment:a} of science.assessments){
    if(a.state!=='supported'||!a.reason||!a.validUntil||Date.parse(a.validUntil)<=clock||!declaration)continue;
-   const routine=a.family==='G04'||a.family==='G05',id=`scientific:${a.claimId}:${goal??'routine'}`,consequence=routine?(a.family==='G04'?'concern':'information'):'value';
+   const routine=a.family==='G04'||a.family==='G05',id=`scientific:${a.claimId}:${goal??'routine'}`,consequence=routine?(a.family==='G04'||a.claimId===AHA_SUN_PLAN_CLAIM_ID?'concern':'information'):'value';
    findings.push({id,kind:routine?'routine_evidence':'goal_evidence',subject:baseSubject,allowedPropositionId:a.claimId,ruleId:a.family,ruleVersion:'G01-G05/local-candidate-v1',applicability:'eligible',consequence,supportState:'supported',mandatoryVisibility:true,factRefs:a.factIds,reportRefs:a.contextRevisionIds,evidenceCardRefs:[a.claimHash,science.manifestHash],requiredQualifierIds:[],blockingGapIds:[],templateId:routine?'routine_evidence':'goal_evidence',templateVersion:release.template,scientificEvidence:{claimId:a.claimId,claimHash:a.claimHash,manifestHash:science.manifestHash,reason:a.reason,action:a.action,qualifications:a.reasons},arguments:{reportTrace:null,name:null,relation:null,scope,detail:routine?'label_caution':'benefit'},dependencies:{sourceIds:a.sourceIds,sourceFields:[],contextRevisionIds:a.contextRevisionIds,factIds:a.factIds,occurrenceIds:[],releaseIds:[science.manifestHash,a.claimHash],validUntil:new Date(Math.min(Date.parse(deadline),Date.parse(a.validUntil))).toISOString()}});
   }
   for(const goal of science.unresolvedGoals)gap('goal_evidence','unavailable','reviewer',`goal:${goal}`);

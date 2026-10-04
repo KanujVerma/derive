@@ -10,6 +10,7 @@ import { activeRoutineItem, exactCatalogReference, knownAnswer, sameReportedUse,
 import { admitRoutineFormulaEvidence, type QualifiedRoutineFormula, type RoutineFormulaItemState } from './routineFormula.ts';
 export type { QualifiedRoutineFormula } from './routineFormula.ts';
 export interface FoundationInput {
+ composition?:'reviewed_usefulness';
  releaseSelection?:PartThreeReleaseSelection;
  scientificDecision?:import('../../contracts/ScientificClaim.ts').ScientificDecisionPacket;
  scientificManifest?:import('../../contracts/ScientificClaim.ts').ScientificManifest;
@@ -87,9 +88,26 @@ export function buildFoundationInsights(input:FoundationInput):FoundationResult 
  else add('F03','inapplicable','Simplification relation','An extra same-use step is not established for this intention and the available routine.',{context:[...profileRefs,...routineRefs]});
  const targetIds=new Set([input.candidateRoutineItemId,comparison.routineItemId].filter((id):id is string=>id!==null));
  let reported=0;
+ const feelTarget=input.intent==='check_current'?input.candidateRoutineItemId:comparison.routineItemId??input.candidateRoutineItemId;
+ const feelReports:{label:string;assessmentId:string;texture:'comfortable'|'too_heavy'|'too_light';help:ProductAssessment['perceivedHelp'];satisfaction:ProductAssessment['satisfaction'];concern:boolean;keepAction:string|null}[]=[];
  const superseded=new Set(c.assessments.flatMap(a=>[a.supersedesRevisionId,a.data.supersedesRevisionId]).filter(Boolean));
  for(const item of active.filter(i=>targetIds.has(i.id))){
-  const assessment=c.assessments.filter(a=>!superseded.has(a.id)&&reportRelation(a.data.reference,item.reference)!==null&&assessmentUse(a.data,item,input.requestedUse)&&knownAnswer(a.data.goalOrPurpose)!==null&&[input.requestedUse.purpose,...goals].includes(knownAnswer(a.data.goalOrPurpose))).sort((a,b)=>Date.parse(b.data.assessedAt)-Date.parse(a.data.assessedAt)||b.revision-a.revision)[0];
+  const matching=c.assessments.filter(a=>!superseded.has(a.id)&&reportRelation(a.data.reference,item.reference)!==null&&assessmentUse(a.data,item,input.requestedUse)&&knownAnswer(a.data.goalOrPurpose)!==null&&[input.requestedUse.purpose,...goals].includes(knownAnswer(a.data.goalOrPurpose))).sort((a,b)=>Date.parse(b.data.assessedAt)-Date.parse(a.data.assessedAt)||b.revision-a.revision);
+  const assessment=matching[0];
+  // The composed selector refuses array-order tie breaking and not-yet-recorded
+  // reports. Frozen ordinary foundation selection remains unchanged.
+  if(input.composition==='reviewed_usefulness'&&assessment){
+   const top=matching.filter(a=>Date.parse(a.data.assessedAt)===Date.parse(assessment.data.assessedAt)&&a.revision===assessment.revision);
+   const content=(a:typeof assessment)=>{const {id:_,supersedesRevisionId:__,...data}=a.data;return canonicalJson(data);};
+   const temporal=top.some(a=>!Number.isFinite(Date.parse(a.recordedAt))||Date.parse(a.recordedAt)>now);
+   const disagrees=new Set(top.map(content)).size>1;
+   if(temporal||disagrees){
+    reported++;
+    add('F04','conflict',temporal?'Report date needs review':'Your equally current reports disagree',temporal?`A report for ${label(item)} was recorded after this check's evaluation time or has an invalid recording date. It cannot establish current helpfulness or feel. Review the report date before deciding.`:`Your equally current reports for ${label(item)} disagree about helpfulness, satisfaction, feel or reported use. This check does not choose a report by array order or recommend keeping or replacing the step from that conflict. Review which report is current.`,{context:[...profileRefs,...routineRefs,...top.map(a=>a.id)],key:item.id});
+    continue;
+   }
+  }
+
   if(!assessment)continue;
   reported++; const help=assessment.data.perceivedHelp, satisfaction=assessment.data.satisfaction, texture=knownAnswer(assessment.data.textureExperience);
   const relation=reportRelation(assessment.data.reference,item.reference);
@@ -103,6 +121,7 @@ export function buildFoundationInsights(input:FoundationInput):FoundationResult 
   const knownFutureStart=[use.startedOn,period.start].some(date=>date.state==='known'&&Date.parse(date.value.value)>now);
   const currentReport=!knownFutureStart&&assessedToday&&!useChanged&&!c.historyTruncated&&relation!=='product_family'&&use.stoppedOn.state==='unanswered'&&(period.end.state==='unanswered'||period.end.state==='known'&&period.end.value.precision==='day'&&period.end.value.value===new Date(now).toISOString().slice(0,10));
   const reportedAction=currentReport&&help==='helps'&&!['mixed','dissatisfied'].includes(satisfaction)&&texture==='comfortable'&&!reportedConcern?`Keep ${label(item)} for ${readable(knownAnswer(assessment.data.goalOrPurpose)!)} if your reported benefit and comfortable feel remain current. This is based on your report; it does not establish a better formula or resolve other goals.`:undefined;
+  if(input.composition==='reviewed_usefulness'&&currentReport&&item.state==='current'&&item.id===feelTarget&&texture)feelReports.push({label:label(item),assessmentId:assessment.id,texture,help,satisfaction,concern:reportedConcern,keepAction:reportedAction??null});
   const frequency=use.frequency.kind==='exact'?`${use.frequency.count}/${use.frequency.unit}`:use.frequency.kind==='unknown'?'unknown':use.frequency.value;
   add('F04',state,'Your product report',`You reported${relation==='product_family'?' at the product family level (a different or unspecified variant or formula)':''} that ${label(item)} ${help==='helps'?'helps':help==='not_helping'?'is not helping':help==='mixed'?'has mixed helpfulness':'has unknown helpfulness'} for ${readable(knownAnswer(assessment.data.goalOrPurpose)!)}; satisfaction is ${satisfaction}${texture?`; you reported texture as ${readable(texture)}`:''}. Reporting period: ${reportDate(period.start)} to ${reportDate(period.end)}. Reported use: ${use.timing}, frequency ${frequency}, started ${reportDate(use.startedOn)}, stopped ${reportDate(use.stoppedOn)}, duration ${use.duration?`${use.duration.count} ${use.duration.unit}`:'unknown'} (assessed ${assessment.data.assessedAt}).${uncertainOrPast?(reportedAction?' Your latest feedback supports only the conditional report-based action below; detailed reporting dates or use remain unknown.':' This report does not establish current helpfulness for the present use.'):''} Helpfulness and satisfaction are separate reports, not clinical efficacy or an ingredient culprit.${c.historyTruncated?' Applicable history is incomplete.':''}`,{context:[...profileRefs,...routineRefs,assessment.id],key:item.id,action:reportedAction});
  }
@@ -133,7 +152,11 @@ export function buildFoundationInsights(input:FoundationInput):FoundationResult 
   for(const fact of candidateFacts){const matches=otherFacts.filter(f=>f.value.ingredientId===fact.value.ingredientId);if(!matches.length)continue;
    presence++; const occurrence=product.occurrences.find(o=>o.occurrenceId===fact.occurrenceId)!;
    const session=input.candidateRoutineItemId?active.find(i=>i.id===input.candidateRoutineItemId)?.timing:undefined;
-   const sessionCopy=session&&session!=='unknown'&&item.timing!=='unknown'?(session==='both'||item.timing==='both'||session===item.timing?'Reported timing shares a session.':'Reported timing uses separate sessions.'):'Session overlap is unknown.';
+   const frequency=(i:PersonalRoutineItemV2)=>i.frequency.kind==='unknown'?'unknown frequency':i.frequency.kind==='exact'?`${i.frequency.count} per ${i.frequency.unit}`:readable(i.frequency.value);
+   const candidateItem=input.candidateRoutineItemId?active.find(i=>i.id===input.candidateRoutineItemId):undefined;
+   const sessionCopy=input.composition==='reviewed_usefulness'?
+    `${session&&session!=='unknown'?`Candidate reported timing: ${session}${candidateItem?`, ${frequency(candidateItem)}`:''}.`:'Candidate timing is unknown; it was not reported for this check.'} ${label(item)} reported timing: ${item.timing}, ${frequency(item)}. ${session&&session!=='unknown'&&item.timing!=='unknown'?(session==='both'||item.timing==='both'||session===item.timing?'These uses share the same reported session; that is context for reviewing the two steps, not proof they are applied together.':'These uses occupy separate reported sessions; ingredient co-presence does not establish same-session application or absence of cumulative burden.'):'Session overlap remains unknown.'}`:
+    session&&session!=='unknown'&&item.timing!=='unknown'?(session==='both'||item.timing==='both'||session===item.timing?'Reported timing shares a session.':'Reported timing uses separate sessions.'):'Session overlap is unknown.';
    add('F07','supported','Exact declared ingredient co-presence',`${occurrence.observedName} is declared unconditionally in the candidate and ${label(item)}. ${sessionCopy} This does not establish total dose, irritation or an interaction.`,{context:routineRefs,facts:[fact,...matches],key:`${item.id}:${fact.occurrenceId}`});
   }
  }
@@ -142,7 +165,16 @@ export function buildFoundationInsights(input:FoundationInput):FoundationResult 
  if(quantityFacts.length)for(const fact of quantityFacts)add('F08','limited','Printed quantity and limits',`Printed quantity: ${fact.value.span.raw}; subject ${fact.value.subject}, operator ${fact.value.operator}, unit ${fact.value.unit}, basis ${fact.value.basis}. Known ingredient functions remain readable. Effectiveness at this amount is not established; blend or group amounts do not establish each ingredient's concentration.`,{facts:[fact],key:fact.factId});
  else add('F08','limited','Amount-dependent evidence limit','No applicable printed quantity is available. Known ingredient functions remain readable; ingredient order does not establish percentage, effective dose or safety. Dose-dependent claims require separately admitted applicability evidence.');
  const texturePreference=knownAnswer(profile?.texturePreference);
- add('F09','unknown','Texture and value tradeoff unavailable',`${texturePreference?`You reported a ${readable(texturePreference)} texture preference. `:''}Feel and price comparison are unavailable because no matched sensory evidence or current offers were supplied. Ingredient functions alone do not show personal feel.`,{context:[...profileRefs,...routineRefs]});
+ const candidateFeelLimit=input.candidateRoutineItemId===feelTarget&&feelTarget!==null?'This is your reported feel for the candidate’s current use, not a prediction of future response.':input.candidateRoutineItemId?'The candidate’s feel is not inferred from this comparison report; ingredient names cannot predict it.':"The untried candidate's feel is unknown; ingredient names cannot predict it.";
+ if(input.composition==='reviewed_usefulness'&&feelReports.length){
+  for(const report of feelReports){
+   const mismatch=texturePreference==='lightweight'&&report.texture==='too_heavy'||texturePreference==='rich'&&report.texture==='too_light';
+   const candidateRelevant=admitted?.mapping.purposeId==='moisturizing'||moistureFunctions.length>0;
+   const explore=mismatch&&candidateRelevant&&!report.concern&&report.help!=='mixed'&&report.satisfaction!=='mixed'&&input.intent==='replace';
+   const action=report.keepAction??(explore?`Explore replacing this moisturizing step for the feel you want. This candidate's feel is unknown; changing for comfort does not establish better results.`:undefined);
+   add('F09','limited','Your reported feel tradeoff',`You reported that ${report.label} feels ${readable(report.texture)}${report.help==='helps'?' and helps for the reported goal or purpose':report.help==='mixed'?'; helpfulness is mixed':report.help==='not_helping'?' and is not helping for the reported goal or purpose':'; helpfulness is not established as current benefit'}.${texturePreference?` You prefer a ${readable(texturePreference)} texture.`:''} ${candidateFeelLimit} Product and unit prices remain separately unavailable.`,{context:[...profileRefs,...routineRefs,report.assessmentId],key:'reported_feel'+(feelReports.length>1?':'+report.assessmentId:''),action});
+  }
+ }else add('F09','unknown','Texture and value tradeoff unavailable',`${texturePreference?`You reported a ${readable(texturePreference)} texture preference. `:''}Feel and price comparison are unavailable because no matched sensory evidence or current offers were supplied. Ingredient functions alone do not show personal feel.`,{context:[...profileRefs,...routineRefs]});
  add('F10','unknown','Review themes unavailable','No matched review evidence is available. Review themes and counts cannot be shown yet.');
  return {insights:insights.map(i=>PartFourInsightSchema.parse(i)),comparison:PartFourComparisonSchema.parse(comparison),routineFormulaStates:routineAdmission.items};
 }

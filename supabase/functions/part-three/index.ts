@@ -1,3 +1,4 @@
+import {REVIEWED_USEFULNESS_MANIFEST} from '../../../src/domain/part-four/reviewedUsefulness.ts';
 import {ordinaryPartThreeRelease} from '../../../src/domain/part-three/release.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.116.0';
 import {authorizeServerUser} from '../_shared/server-auth.ts';
@@ -7,6 +8,7 @@ import {projectPersonalContextV2,migrateExperienceV1} from '../../../src/service
 import {createJevProvider,createJevHttpTransport} from '../../../src/domain/part-three/provider.ts';
 import {handlePersonalRequest,PartThreeError} from './handler.ts';
 import {PENDING_SCIENTIFIC_MANIFEST} from '../../../src/domain/part-four/scientificDecision.ts';
+import {REVIEWED_AHA_MANIFEST} from '../../../src/domain/part-four/reviewedAha.ts';
 import {projectScientificFeatures} from '../../../src/domain/part-four/featureProjection.ts';
 const headers={'content-type':'application/json','cache-control':'private, no-store, max-age=0','access-control-allow-origin':'*','access-control-allow-headers':'authorization,apikey,content-type'};
 const bounded=createPartOneBoundedFetch();
@@ -26,8 +28,10 @@ Deno.serve(async(req:Request)=>{
   const checked=async(name:string,args:Record<string,unknown>)=>{const {data,error}=await admin.rpc(name,args);if(error)throw new PartThreeError(error.code==='42501'?'forbidden':'changed_basis',error.code==='42501'?403:409);return data;};
   let context:any=null;
   const pendingScience=Boolean(ordinary)||Deno.env.get('PART_FOUR_LOCAL_PENDING_SCIENCE')==='1';
-  const result=await handlePersonalRequest(raw,{releaseSelection:ordinary??undefined,partFourEnabled:Boolean(ordinary)||Deno.env.get('PART_FOUR_LOCAL_FOUNDATION')==='1',partFourEducation:ordinary||Deno.env.get('PART_FOUR_LOCAL_EDUCATION')==='approved423'?'approved423':undefined,
-   ...(pendingScience?{partFourDecisionEvidence:{manifest:PENDING_SCIENTIFIC_MANIFEST,load:async(binding,input)=>projectScientificFeatures({manifest:PENDING_SCIENTIFIC_MANIFEST,binding,...input,now:new Date().toISOString()})}}:{}),
+  const composition=!ordinary&&Deno.env.get('PART_FOUR_LOCAL_REVIEWED_USEFULNESS')==='1'?'reviewed_usefulness' as const:undefined;
+  const scientificManifest=composition?REVIEWED_USEFULNESS_MANIFEST:!ordinary&&Deno.env.get('PART_FOUR_LOCAL_REVIEWED_AHA')==='1'?REVIEWED_AHA_MANIFEST:pendingScience?PENDING_SCIENTIFIC_MANIFEST:null;
+  const result=await handlePersonalRequest(raw,{partFourComposition:composition,releaseSelection:ordinary??undefined,partFourEnabled:Boolean(ordinary)||Deno.env.get('PART_FOUR_LOCAL_FOUNDATION')==='1',partFourEducation:ordinary||Deno.env.get('PART_FOUR_LOCAL_EDUCATION')==='approved423'?'approved423':undefined,
+   ...(scientificManifest?{partFourDecisionEvidence:{manifest:scientificManifest,load:async(binding,input)=>projectScientificFeatures({manifest:scientificManifest,binding,...input,now:new Date().toISOString()})}}:{}),
    ownerId:owner.id,now:()=>new Date().toISOString(),defer:work=>EdgeRuntime.waitUntil(work().catch(()=>undefined)),
    identity:(scanId,generation,revision,snapshotId,pinnedSnapshotId,captureSessionId)=>checked('part_three_worker',{p_owner:owner.id,p_action:'identity/resolve',p_payload:{scanId,generation,revision,snapshotId,pinnedSnapshotId,captureSessionId}}),
    worker:(action,payload)=>checked('part_three_worker',{p_owner:owner.id,p_action:action,p_payload:payload}),
