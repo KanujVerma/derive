@@ -1,4 +1,4 @@
--- DRAFT/UNEXECUTED: only for a separately authorized disposable migration replay.
+-- Public acquisition is enabled only within this rolled-back test transaction.
 begin;
 select no_plan();
 select ok(has_function_privilege('service_role','public.part_one_worker(text,jsonb)','execute'),'outer worker remains service-owned');
@@ -7,7 +7,9 @@ select ok(not has_function_privilege('service_role','public.part_one_worker_befo
 select ok((select count(*)=0 from private.part_one_policies where id='open_facts' and lookup_allowed),'migration did not activate public acquisition');
 insert into auth.users(id,email,is_anonymous,raw_user_meta_data) values('ea170000-0000-4000-8000-000000000001',null,true,'{}');
 update private.part_one_policies set version='derive-obf-public-content-v1',lookup_allowed=true,retain_allowed=true,display_allowed=true,expires_at='2027-01-04T00:00:00Z',permission_evidence='https://openfoodfacts.github.io/openfoodfacts-server/api/tutorials/license-be-on-the-legal-side/ ; ODbL database / DbCL contents; reviewed public identity and ingredient fields only' where id='open_facts';
-update private.part_one_budgets set reset_at=null where provider='open_facts';
+insert into private.part_one_budgets(provider,call_limit,concurrency_limit,window_seconds,reset_at)
+values('open_facts',1000,1,86400,null)
+on conflict(provider) do update set reset_at=null;
 delete from private.external_candidate_lookup_reservations;
 select is((public.part_one_worker('public/policy','{"policyVersion":"derive-obf-public-content-v1"}')->>'allowed')::boolean,true,'exact live public grant is admitted only inside test transaction');
 select throws_ok($q$select public.part_one_worker('public/budget','{"policyVersion":"derive-obf-public-content-v1","ownerId":"ea170000-0000-4000-8000-000000000001","operation":"product"}')$q$,'P0001','PART_ONE_INVALID_PAYLOAD','product requests must use leased reserve, never free-form budget bypass');
