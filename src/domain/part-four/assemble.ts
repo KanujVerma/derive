@@ -1,3 +1,4 @@
+import {isReviewedUsefulnessManifest} from './reviewedHostedUsefulness.ts';
 import {REVIEWED_USEFULNESS_MANIFEST} from './reviewedUsefulness.ts';
 import { PartFourPacketSchema, type PartFourPacket } from '../../contracts/PartFour.ts';
 import type { PersonalResultV2 } from '../../contracts/PersonalResultV2.ts';
@@ -13,7 +14,7 @@ import { RoutineFormulaEvidenceSchema } from '../../contracts/RoutineFormula.ts'
  * This produces a foundation packet, never a claim of full Part 4 capability. */
 export function assembleFoundation(input:FoundationInput,result:PersonalResultV2):PartFourPacket|null {
  const raw=result.binding.releases.partFour;
- if(input.composition==='reviewed_usefulness'&&(input.scientificManifest?.contentHash!==REVIEWED_USEFULNESS_MANIFEST.contentHash||raw?.scientificManifestHash!==REVIEWED_USEFULNESS_MANIFEST.contentHash))return null;
+ if(input.composition==='reviewed_usefulness'&&(!isReviewedUsefulnessManifest(input.scientificManifest?.contentHash)||raw?.scientificManifestHash!==input.scientificManifest?.contentHash))return null;
  const selected=raw?{releaseId:raw.releaseId,releaseHash:raw.releaseHash,knowledgeVersion:raw.knowledgeVersion,knowledgeHash:raw.knowledgeHash}:undefined;
  const matches=(selection?:'approved47'|'approved423')=>{const {scientificManifestHash:_,...expected}=partFourBindingRelease(selection,raw?.scientificManifestHash,input.composition);return canonicalJson(selected)===canonicalJson(expected);};
  const knowledge=matches('approved423')?ISOLATED_423_EDUCATION:matches('approved47')?APPROVED_INGREDIENT_KNOWLEDGE:matches()?APPROVED_37_INGREDIENT_KNOWLEDGE:null;

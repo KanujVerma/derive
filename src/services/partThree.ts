@@ -1,4 +1,4 @@
-import {parsePartFourClientSelection} from '../domain/part-four/clientRelease';
+import {parsePartFourClientSelection,ordinaryPartFourClientSelection} from '../domain/part-four/clientRelease';
 import {PART_ONE_ORDINARY_RELEASE} from './partOne';
 import { PART_TWO_ENABLED } from './partTwo';
 import { supabase } from './supabase';
@@ -19,7 +19,7 @@ import type {SaveRecoveryAccount} from '../presentation/part-three/saveRecovery'
 export const PART_THREE_RELEASE_SELECTION = PART_ONE_ORDINARY_RELEASE??undefined;
 export const PART_THREE_ENABLED = PART_TWO_ENABLED && process.env.EXPO_PUBLIC_PART_THREE_ENABLED === 'true';
 export const PART_FOUR_ENABLED = PART_THREE_ENABLED && (Boolean(PART_ONE_ORDINARY_RELEASE)||process.env.EXPO_PUBLIC_PART_FOUR_LOCAL_FOUNDATION === 'true');
-export const PART_FOUR_CLIENT_SELECTION = parsePartFourClientSelection(PART_ONE_ORDINARY_RELEASE?'approved423':process.env.EXPO_PUBLIC_PART_FOUR_EDUCATION,PART_ONE_ORDINARY_RELEASE?'pending_candidates':process.env.EXPO_PUBLIC_PART_FOUR_SCIENCE);
+export const PART_FOUR_CLIENT_SELECTION = PART_ONE_ORDINARY_RELEASE?ordinaryPartFourClientSelection(process.env.EXPO_PUBLIC_PART_FOUR_SCIENCE):parsePartFourClientSelection(process.env.EXPO_PUBLIC_PART_FOUR_EDUCATION,process.env.EXPO_PUBLIC_PART_FOUR_SCIENCE);
 const encounters = new Map<string, string>();
 const listeners = new Set<(event?:'retired') => void>();
 let lastAccount:string|null=null;

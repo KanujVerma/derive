@@ -1,4 +1,5 @@
 import {createPartOneOrdinaryServices} from '../_shared/part-one-ordinary.ts';
+import {OBF_REUSE_METHOD} from '../_shared/obf-reuse-method.ts';
 import {createOpenBeautyFactsTransport} from '../_shared/part-one-pinned-transport.ts';
 import {ordinaryPartThreeRelease} from '../../../src/domain/part-three/release.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0';
@@ -15,6 +16,14 @@ const publicTransport=createOpenBeautyFactsTransport();
 Deno.serve(async (request: Request) => {
   // Clients and the verified owner are request-scoped, including private work.
   const url=Deno.env.get('SUPABASE_URL') ?? '';
+  // Public static source-reuse offer only. This branch performs no Auth/SQL,
+  // provider, private Storage or owner-bound operation and stays opt-in.
+  if(new URL(request.url).pathname.endsWith('/part-one/source-method/v1')){
+    const headers={'content-type':'application/json','access-control-allow-origin':'*','cache-control':'public, max-age=31536000, immutable','link':'<https://opendatacommons.org/licenses/odbl/1-0/>; rel="license"'};
+    if(request.method!=='GET')return new Response(JSON.stringify({code:'method_not_allowed'}),{status:405,headers:{...headers,'cache-control':'no-store'}});
+    if(url!=='https://snojlbqovlawewwqbviz.supabase.co'||Deno.env.get('DERIVE_OBF_REUSE_RELEASE')!==OBF_REUSE_METHOD.version)return new Response(JSON.stringify({code:'source_reuse_configuration_required'}),{status:503,headers:{...headers,'cache-control':'no-store'}});
+    return new Response(JSON.stringify(OBF_REUSE_METHOD),{headers});
+  }
   const key=Deno.env.get('SUPABASE_ANON_KEY') ?? '';
   const authorization=request.headers.get('authorization') ?? '';
   const client=createClient(url || 'http://127.0.0.1',key || 'unconfigured',{

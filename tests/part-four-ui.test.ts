@@ -9,6 +9,16 @@ import { componentHarness, control, press, textContent } from './ux-profile-rend
 
 const component = 'src/components/check/part-four/PartFourSections.tsx';
 const now = Date.parse(p2now);
+test('OBF reuse attribution appears only in an authorized open source disclosure', () => {
+  const value = packet('Water', true);
+  value.formula.sourceRefs[0].sourceUrl = 'https://world.openbeautyfacts.org/product/123';
+  const h = componentHarness(component, 'PartFourSections', { packet: value, now });
+  assert(!textContent(h.render()).includes('Data licence and reuse'));
+  press(control(h.render(), 'Part Four sources'));
+  assert.match(textContent(h.render()), /Open Beauty Facts contributors · Database ODbL · Contents DbCL/);
+  assert.equal(control(h.render(), 'Open Beauty Facts data licence and reuse').props.accessibilityRole, 'link');
+  assert(!textContent(componentHarness(component, 'PartFourSections', { packet: value, now, withdrawn: true, sourcesExpanded: true }).render()).includes('Data licence and reuse'));
+});
 function packet(text = 'Glycerin, Glycerin, Water, Mystery compound', published = false): PartFourPacket {
   const normalized = normalize(published ? boundDeclaration(text, 'public') : sourceReading(text), LOCAL_DICTIONARY_RELEASE, p2metadata);
   assert.equal(normalized.state, 'ready');

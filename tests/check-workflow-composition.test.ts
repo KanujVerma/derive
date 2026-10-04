@@ -30,7 +30,7 @@ const settle = async () => { for (let n = 0; n < 6; n++) await Promise.resolve()
 
 /** Real Check/controller and catalog handlers, inert native hosts, synthetic transport only.
  * These tests establish client composition, never provider coverage or live lookup. */
-function integration(captureEnabled = false, readScan?: PartOneTransport['read']) {
+function integration(captureEnabled = false, readScan?: PartOneTransport['read'], platform: 'ios'|'android'|'web' = 'ios') {
   const auth = { sessionUserId: id(1), status: 'SIGNED_IN' };
   const access = { status: 'READY', userId: id(1), access: { userId: id(1) } };
   function store(state: object) {
@@ -97,7 +97,7 @@ function integration(captureEnabled = false, readScan?: PartOneTransport['read']
     '@/src/components/my-stuff/MyStuffContent': { MyStuffContent: 'MyStuffContent' },
     '@/src/presentation/my-stuff/myStuffRemote': { myStuffStore: {} },
     zustand: { useStore: (_store: unknown, select: (state: any) => unknown) => select({ ownerId: null, status: 'idle', model: null, error: null, cursors: {}, loadingMore: false }) },
-    'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity',
+    'react-native': { Platform: { OS: platform }, View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity',
       Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
       Keyboard: { dismiss() { keyboardDismissals++; } }, Linking: {}, StyleSheet: { create: (value: unknown) => value } },
   };
@@ -129,10 +129,25 @@ test('normal Part 1 Check explicitly searches names, resolves selected barcode i
   assert.equal(nodes.find(node => node.type === 'CheckResultPresentation')!.props.visible, false);
   assert.equal(f.sheet()!.props.view.result.packageConfirmation, 'unconfirmed');
   assert.equal(f.sheet()!.props.view.result.declarationState, 'none');
-  const focusKey = f.search().props.focusKey; f.sheet()!.props.onClose();
+  const focusKey = f.search().props.focusKey, dismissals=f.keyboardDismissals(); f.sheet()!.props.onClose();
   assert.equal(f.sheet(), undefined); assert.equal(f.search().props.controller.getState().query, 'Synthetic');
-  assert.equal(f.search().props.focusKey, focusKey + 1); assert.deepEqual(f.released, [id(103)]);
+  assert.equal(f.search().props.focusKey, focusKey, 'native Close retains the query without asking the editable input to refocus'); assert.deepEqual(f.released, [id(103)]);
+  assert.equal(f.keyboardDismissals(),dismissals+1,'native Close explicitly dismisses the keyboard');
   assert(f.keyboardDismissals() > 0);
+});
+
+test('Close preserves web input focus and dismisses Android keyboard without changing the retained query', async t => {
+  for (const [platform, focusChange, dismissChange] of [['web',1,0],['android',0,1]] as const) {
+    const f=integration(false,undefined,platform);t.after(()=>f.flow.dispose());
+    const catalog=f.catalog();t.after(()=>catalog.dispose());
+    const input=control(catalog.render(),'Search catalog products');input.props.onChangeText('3337875597197');input.props.onSubmitEditing();
+    f.scans[0].resolve(result(f.scans[0].request));await settle();
+    const key=f.search().props.focusKey,dismissals=f.keyboardDismissals();f.sheet()!.props.onClose();
+    assert.equal(f.search().props.focusKey,key+focusChange);
+    assert.equal(f.keyboardDismissals(),dismissals+dismissChange);
+    assert.equal(f.search().props.controller.getState().query,'3337875597197');
+    assert.equal(f.sheet(),undefined);
+  }
 });
 
 test('typed barcode dispatches Part 1 immediately without name lookup, and close fences a late response', async t => {

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PartFourInsight, PartFourPacket } from '../../../contracts/PartFour';
 import { colors, spacing } from '../../../constants/theme';
+import { isOpenBeautyFactsSource, OBF_SOURCE_METHOD_URL } from '../../../presentation/part-one/sourceReuse';
 import type { ResearchBriefSubject } from '../../../domain/part-four/researchBrief';
 import { ResearchBrief, ResearchBriefSources } from './ResearchBrief';
 import { RetainedEvidence, RetainedEvidenceSources } from './RetainedEvidence';
@@ -232,6 +233,10 @@ export function PartFourSections(props: PartFourSectionsProps) {
               onPress={() => { void Linking.openURL(url).catch(() => {}); }} style={styles.sourceButton}><Text style={styles.link}>View reference</Text></Pressable>}
           </View>;
         })}
+        {packet.formula.sourceRefs.some(source => isOpenBeautyFactsSource(source.sourceUrl)) && <View>
+          <Text style={styles.caption}>Open Beauty Facts contributors · Database ODbL · Contents DbCL.</Text>
+          <Pressable accessibilityRole="link" accessibilityLabel="Open Beauty Facts data licence and reuse" onPress={() => { void Linking.openURL(OBF_SOURCE_METHOD_URL).catch(() => {}); }} style={styles.sourceButton}><Text style={styles.link}>Data licence and reuse</Text></Pressable>
+        </View>}
         {packet.formula.sourceRefs.length === 0 && packet.formula.sources.length === 0 && <Text style={styles.caption}>Source references unavailable.</Text>}
       </View>}
     </View>

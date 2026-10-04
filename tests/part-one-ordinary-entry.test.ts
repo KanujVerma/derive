@@ -31,6 +31,17 @@ test('actual ordinary entrypoint wires search and one bounded background claim a
  assert.equal((await f.handler(request('/scans/'+scanId))).status,202);assert.equal(f.background.length,1);await Promise.all(f.background);
  assert.equal(f.rpcCalls.filter(c=>c.action==='claim').length,1);assert.ok(f.rpcCalls.find(c=>c.action==='scans/read'&&!c.service));assert.ok(f.rpcCalls.find(c=>c.action==='claim'&&c.service));
 });
+test('public source alteration method is opt-in and contains no live account data or privileged I/O',async()=>{
+ const f=entryFixture();f.env.DERIVE_OBF_REUSE_RELEASE='derive-obf-reuse-method-v1';
+ const response=await f.handler(new Request('https://derive.invalid/functions/v1/part-one/source-method/v1'));
+ assert.equal(response.status,200);const method=await response.json();
+ assert.equal(method.version,'derive-obf-reuse-method-v1');assert.equal(method.databaseLicense,'https://opendatacommons.org/licenses/odbl/1-0/');
+ assert.equal(method.additionalContents.explanations.length,0);assert.equal(method.additionalContents.contentHash,'c674da69b1688b92de703892bcf96525e07de4b61332b2df0b79f5be8276cfe4');
+ assert(method.methods.some((m:any)=>m.path==='src/domain/part-two/index.ts'));
+ assert.equal(f.rpcCalls.length,0);assert.equal(f.fetches,0);assert.equal(f.background.length,0);
+ delete f.env.DERIVE_OBF_REUSE_RELEASE;assert.equal((await f.handler(new Request('https://derive.invalid/functions/v1/part-one/source-method/v1'))).status,503);
+ assert.equal((await f.handler(new Request('https://derive.invalid/functions/v1/part-one/scans/'+scanId))).status,401,'anonymous access is limited to the static licensed method asset');
+});
 test('actual entrypoint source selection and Auth refusal perform no provider work or background claim',async()=>{
  for(const blocked of ['source','project','auth']){const f=entryFixture();if(blocked==='source')delete f.env.DERIVE_OBF_SOURCE_RELEASE;if(blocked==='project')f.env.SUPABASE_URL='https://other.supabase.co';if(blocked==='auth')f.denyAuth();
  const response=await f.handler(request('/search','POST',{query:'Synthetic lotion'}));assert.equal(response.status,blocked==='auth'?401:503);assert.equal(f.fetches,0);assert.equal(f.background.length,0);assert.equal(f.rpcCalls.some(c=>c.service),false);}

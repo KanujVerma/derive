@@ -1,4 +1,5 @@
 import { researchSubjectFor } from '../../../presentation/part-four/researchSubject';
+import { isOpenBeautyFactsSource, OBF_SOURCE_METHOD_URL } from '../../../presentation/part-one/sourceReuse';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, Text, View } from 'react-native';
 import { CheckResultView } from '../result-sheet/CheckResultContent';
@@ -152,6 +153,10 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
         const url = source.url; if (url && new URL(url).protocol === 'https:') void Linking.openURL(url).catch(() => {});
       }} />}
     </View>)}
+    {!partFourCurrent && sourceOpen && !expired && !sourceUnavailable && sources.some(source => isOpenBeautyFactsSource(source.url)) && <View>
+      <Text>Open Beauty Facts contributors · Database ODbL · Contents DbCL.</Text>
+      <Button label="Data licence and reuse" variant="ghost" onPress={() => { void Linking.openURL(OBF_SOURCE_METHOD_URL).catch(() => {}); }} />
+    </View>}
     {personal.enabled && !partFourCurrent && <PartThreeDetails view={personal.view} />}
     {!partFourCurrent && r?.display.limitations.map((limitation, i) => <Text key={i}>{limitation}</Text>)}
   </ResultSheetSurface>;

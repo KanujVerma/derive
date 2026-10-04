@@ -1,4 +1,5 @@
 import {REVIEWED_USEFULNESS_MANIFEST} from '../../../src/domain/part-four/reviewedUsefulness.ts';
+import {REVIEWED_PUBLIC_USEFULNESS_MANIFEST} from '../../../src/domain/part-four/reviewedHostedUsefulness.ts';
 import {ordinaryPartThreeRelease} from '../../../src/domain/part-three/release.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.116.0';
 import {authorizeServerUser} from '../_shared/server-auth.ts';
@@ -23,13 +24,15 @@ Deno.serve(async(req:Request)=>{
   const owner={id:await authorizeServerUser(user.auth,(code,status)=>new PartThreeError(code,status))};
   const admin=createClient(url,service,{global:{fetch:bounded},auth:{persistSession:false,autoRefreshToken:false}});
   const ordinary=ordinaryPartThreeRelease(url,Deno.env.get('DERIVE_CHECK_RELEASE'));
+  const ordinaryScience=Deno.env.get('DERIVE_PART_FOUR_SCIENCE');
+  if(ordinary&&ordinaryScience&&!['pending_candidates','reviewed_public_usefulness'].includes(ordinaryScience))return reply({kind:'unavailable',reason:'configuration_required'});
   if(!ordinary&&(Deno.env.get('PART_THREE_LOCAL_FIXTURE')!=='1'||!/^http:\/\/(?:127\.0\.0\.1|localhost|kong)(?::[0-9]+)?\/?$/.test(url)))return reply({kind:'unavailable',reason:'configuration_required'});
   const reader=req.body?.getReader(),chunks:Uint8Array[]=[];let size=0;if(!reader)return reply({error:'Request required'},400);try{for(;;){const next=await reader.read();if(next.done)break;size+=next.value.byteLength;if(size>32768){await reader.cancel();return reply({error:'Request is too large'},413);}chunks.push(next.value);}}finally{reader.releaseLock();}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}const raw=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
   const checked=async(name:string,args:Record<string,unknown>)=>{const {data,error}=await admin.rpc(name,args);if(error)throw new PartThreeError(error.code==='42501'?'forbidden':'changed_basis',error.code==='42501'?403:409);return data;};
   let context:any=null;
   const pendingScience=Boolean(ordinary)||Deno.env.get('PART_FOUR_LOCAL_PENDING_SCIENCE')==='1';
-  const composition=!ordinary&&Deno.env.get('PART_FOUR_LOCAL_REVIEWED_USEFULNESS')==='1'?'reviewed_usefulness' as const:undefined;
-  const scientificManifest=composition?REVIEWED_USEFULNESS_MANIFEST:!ordinary&&Deno.env.get('PART_FOUR_LOCAL_REVIEWED_AHA')==='1'?REVIEWED_AHA_MANIFEST:pendingScience?PENDING_SCIENTIFIC_MANIFEST:null;
+  const composition=(ordinary?ordinaryScience==='reviewed_public_usefulness':Deno.env.get('PART_FOUR_LOCAL_REVIEWED_USEFULNESS')==='1')?'reviewed_usefulness' as const:undefined;
+  const scientificManifest=composition?(ordinary?REVIEWED_PUBLIC_USEFULNESS_MANIFEST:REVIEWED_USEFULNESS_MANIFEST):!ordinary&&Deno.env.get('PART_FOUR_LOCAL_REVIEWED_AHA')==='1'?REVIEWED_AHA_MANIFEST:pendingScience?PENDING_SCIENTIFIC_MANIFEST:null;
   const result=await handlePersonalRequest(raw,{partFourComposition:composition,releaseSelection:ordinary??undefined,partFourEnabled:Boolean(ordinary)||Deno.env.get('PART_FOUR_LOCAL_FOUNDATION')==='1',partFourEducation:ordinary||Deno.env.get('PART_FOUR_LOCAL_EDUCATION')==='approved423'?'approved423':undefined,
    ...(scientificManifest?{partFourDecisionEvidence:{manifest:scientificManifest,load:async(binding,input)=>projectScientificFeatures({manifest:scientificManifest,binding,...input,now:new Date().toISOString()})}}:{}),
    ownerId:owner.id,now:()=>new Date().toISOString(),defer:work=>EdgeRuntime.waitUntil(work().catch(()=>undefined)),

@@ -11,6 +11,7 @@ import {
   AppState,
   Linking,
   Keyboard,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -411,7 +412,10 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     // Query/list are retained inside the mounted search. Retry identity survives a transient close.
     if (origin?.kind === 'search' || origin?.kind === 'link') {
       entryScroll.current?.scrollTo({ y: origin.scrollOffset, animated: false });
-      if (origin.kind === 'search') setSearchFocusKey(value => value + 1);
+      // Native editable focus reopens the keyboard after the result closes.
+      // Keep the retained query/list/offset; web still restores input focus.
+      if (Platform.OS !== 'web') Keyboard.dismiss();
+      else if (origin.kind === 'search') setSearchFocusKey(value => value + 1);
       else requestAnimationFrame(() => linkInput.current?.focus());
     }
     resultOriginRef.current = null;
