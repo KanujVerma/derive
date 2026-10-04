@@ -1,6 +1,7 @@
 import { canonicalJson, sha256 } from '../part-two/hash.ts';
 import { z } from 'zod';
 import { LOCAL_DICTIONARY_RELEASE, validateDictionaryRelease, dictionaryReleaseHash, deepFreeze, type DictionaryRelease } from '../part-two/dictionary.ts';
+import {approved423CanonicalDictionary} from '../part-two/approved423-dictionary.ts';
 /** Original engineering semantics/copy, local-only. Independent evidence and
  * privacy approval is required before any production release can select it. */
 export const PART_THREE_RELEASE = Object.freeze({
@@ -53,7 +54,8 @@ const originalSemantics:PartThreeSemanticRelease={...structuredClone(PART_THREE_
 const reviewedOriginal=selectedPartThreeRelease({semanticRelease:originalSemantics,dictionaryRelease:originalDictionary});
 /** A compiled expectation, not database registration, release activation,
  * source acquisition permission, clinical approval or an operational grant. */
-export const ORDINARY_PART_THREE_RELEASE_SELECTION:PartThreeReleaseSelection=Object.freeze({semanticRelease:reviewedOriginal.semantic,dictionaryRelease:reviewedOriginal.dictionary});
+export const ORIGINAL_PART_THREE_RELEASE_SELECTION:PartThreeReleaseSelection=Object.freeze({semanticRelease:reviewedOriginal.semantic,dictionaryRelease:reviewedOriginal.dictionary});
+export const ORDINARY_PART_THREE_RELEASE_SELECTION:PartThreeReleaseSelection=Object.freeze({semanticRelease:reviewedOriginal.semantic,dictionaryRelease:approved423CanonicalDictionary(reviewedOriginal.dictionary)});
 export function ordinaryPartThreeRelease(url:string,selectedReleaseId:string|undefined,selection:PartThreeReleaseSelection|null=ORDINARY_PART_THREE_RELEASE_SELECTION):PartThreeReleaseSelection|null{
  if(!selectedReleaseId||!selection)return null;
  try{const selected=selectedPartThreeRelease(selection,{url,selectedReleaseId});return {semanticRelease:selected.semantic,dictionaryRelease:selected.dictionary};}catch{return null;}
