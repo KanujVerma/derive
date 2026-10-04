@@ -11,14 +11,14 @@ import {DecisionBindingV2Schema,PersonalResultV2Schema,type DecisionBindingV2} f
 import {NormalizationResultSchema,type NormalizationResult} from '../../../src/contracts/PartTwo.ts';
 import type {PersonalContextV2} from '../../../src/contracts/PersonalContextV2.ts';
 import {personalContextV2Schema} from '../../../src/contracts/PersonalContextV2Schema.ts';
-import {evaluatePersonalResult,type HistoryResult} from '../../../src/domain/part-three/evaluate.ts';
+import {evaluatePersonalResult,type HistoryResult,type PersonalEvaluationInput} from '../../../src/domain/part-three/evaluate.ts';
 import {retrieveDecisionHistory,type HistoryPageV2} from '../../../src/domain/part-three/history.ts';
 import {PART_THREE_RELEASE,PART_THREE_RELEASE_HASH} from '../../../src/domain/part-three/release.ts';
 import {eligibleMenuFor} from '../../../src/domain/part-three/menu.ts';
 import {canonicalJson,sha256} from '../../../src/domain/part-two/hash.ts';
 import type {DecisionProvider,AuthorizedProjection,NormalizedSelection} from '../../../src/domain/part-three/provider.ts';
 export class PartThreeError extends Error{readonly code:string;readonly status:number;constructor(code:string,status=409){super(code);this.code=code;this.status=status;}}
-export interface PartThreePorts {partFourDecisionEvidence?:{manifest:ScientificManifest;load:(binding:DecisionBindingV2)=>Promise<unknown>};partFourEnabled?:boolean;partFourEducation?:'approved47'|'approved423';ownerId:string;now:()=>string;normalize:(r:PartThreeEvaluateRequest)=>Promise<NormalizationResult>;context:()=>Promise<PersonalContextV2>;history:(revision:number,scope:HistoryResult['requestedScopes'][number],cursor:string|null)=>Promise<HistoryPageV2>;worker:(action:string,payload:Record<string,unknown>)=>Promise<any>;identity?:(scanId:string,generation:number,revision:number,snapshotId:string|null,pinnedSnapshotId:string|null,captureSessionId:string|null)=>Promise<(Pick<CandidateIdentity,'name'|'expiresAt'>&Partial<Pick<CandidateIdentity,'catalogReference'>>)|null>;provider?:(model:string)=>DecisionProvider;defer?:(work:()=>Promise<void>)=>void}
+export interface PartThreePorts {partFourDecisionEvidence?:{manifest:ScientificManifest;load:(binding:DecisionBindingV2,input:{partTwo:NormalizationResult;context:PersonalContextV2;requestedUse:PersonalEvaluationInput['requestedUse']})=>Promise<unknown>};partFourEnabled?:boolean;partFourEducation?:'approved47'|'approved423';ownerId:string;now:()=>string;normalize:(r:PartThreeEvaluateRequest)=>Promise<NormalizationResult>;context:()=>Promise<PersonalContextV2>;history:(revision:number,scope:HistoryResult['requestedScopes'][number],cursor:string|null)=>Promise<HistoryPageV2>;worker:(action:string,payload:Record<string,unknown>)=>Promise<any>;identity?:(scanId:string,generation:number,revision:number,snapshotId:string|null,pinnedSnapshotId:string|null,captureSessionId:string|null)=>Promise<(Pick<CandidateIdentity,'name'|'expiresAt'>&Partial<Pick<CandidateIdentity,'catalogReference'>>)|null>;provider?:(model:string)=>DecisionProvider;defer?:(work:()=>Promise<void>)=>void}
 function makeBinding(r:PartThreeEvaluateRequest,p:NormalizationResult,c:PersonalContextV2,identity:Partial<CandidateIdentity>|null,partFourEnabled=false,partFourEducation?:'approved47'|'approved423',scientificHash?:string):DecisionBindingV2{
  if(p.state!=='ready')throw new PartThreeError('evidence_unavailable',503);
  const s=p.output.reading,d=p.output.kind==='bound'?p.output.productFacts.binding:null;
@@ -77,15 +77,15 @@ export async function handlePersonalRequest(raw:unknown,ports:PartThreePorts):Pr
  const knowledge=ports.partFourEducation==='approved423'?ISOLATED_423_EDUCATION:ports.partFourEducation==='approved47'?APPROVED_INGREDIENT_KNOWLEDGE:APPROVED_37_INGREDIENT_KNOWLEDGE;
  const routineRequests=ports.partFourEnabled?planRoutineFormulaRequests(context,knowledge).requests:[];
  const routineEvidence=routineRequests.length?await ports.worker('routine/formulas',{requests:routineRequests}):[];
- const scientificDecision=scientificManifest?assessScientificDecision({manifest:scientificManifest,evidence:await ports.partFourDecisionEvidence!.load(binding),context,partTwo:p,now:ports.now()}):undefined;
+ const scientificDecision=scientificManifest?assessScientificDecision({manifest:scientificManifest,evidence:await ports.partFourDecisionEvidence!.load(binding,{partTwo:p,context,requestedUse:r.use}),context,partTwo:p,now:ports.now()}):undefined;
  const result=evaluatePersonalResult({scientificDecision,binding,partTwo:p,context,history,now:ports.now(),resultId:lease.resultId,resultRevision:lease.resultRevision,name:identity&&Date.parse(identity.expiresAt)>Date.parse(ports.now())?identity.name:p.output.reading.binding.kind==='declaration'?'Selected product':'Label reading',requestedUse:r.use,selectedManualReportIds:r.selectedManualReportIds,candidateRoutineItemId:r.candidateRoutineItemId,questionSuppression:{exposedQuestionId:suppression.exposedQuestionId??null,skip:Boolean(suppression.skip),answered:Boolean(suppression.answered)}});
- result.validUntil=new Date(Math.min(Date.parse(result.validUntil),Date.parse(validUntil),...(scientificDecision?.assessments.filter(row=>row.assessment.state==='supported'&&row.assessment.validUntil).map(row=>Date.parse(row.assessment.validUntil!))??[]))).toISOString();
+ result.validUntil=new Date(Math.min(Date.parse(result.validUntil),Date.parse(validUntil),...(scientificDecision?.assessments.filter(row=>['supported','reference'].includes(row.assessment.state)&&row.assessment.validUntil).map(row=>Date.parse(row.assessment.validUntil!))??[]))).toISOString();
  if(ports.partFourEnabled){
   // Formula authority is loaded independently by the authenticated worker.
   // Incoming requests never carry source, association or permission claims.
   const evidence=routineEvidence;
   const admission=admitRoutineFormulaEvidence(context,evidence,{now:result.evaluatedAt,knowledge});
-  const packet=assembleFoundation({scientificDecision,context,partTwo:p,requestedUse:r.use,intent:r.intent,candidateRoutineItemId:r.candidateRoutineItemId,selectedComparatorId:r.comparatorId,candidateReference:identity?.catalogReference?{kind:'catalog',...identity.catalogReference}:null,routineFormulas:admission.qualified,routineFormulaEvidence:evidence,now:result.evaluatedAt},result);
+  const packet=assembleFoundation({scientificDecision,scientificManifest:scientificManifest??undefined,context,partTwo:p,requestedUse:r.use,intent:r.intent,candidateRoutineItemId:r.candidateRoutineItemId,selectedComparatorId:r.comparatorId,candidateReference:identity?.catalogReference?{kind:'catalog',...identity.catalogReference}:null,routineFormulas:admission.qualified,routineFormulaEvidence:evidence,now:result.evaluatedAt},result);
   if(!packet)throw new PartThreeError('evidence_unavailable');result.partFour=packet;
   if(admission.validUntil)result.validUntil=new Date(Math.min(Date.parse(result.validUntil),Date.parse(admission.validUntil))).toISOString();
  }

@@ -9,6 +9,7 @@ import { admitRoutineFormulaEvidence, type QualifiedRoutineFormula, type Routine
 export type { QualifiedRoutineFormula } from './routineFormula.ts';
 export interface FoundationInput {
  scientificDecision?:import('../../contracts/ScientificClaim.ts').ScientificDecisionPacket;
+ scientificManifest?:import('../../contracts/ScientificClaim.ts').ScientificManifest;
  context:PersonalContextV2; partTwo:NormalizationResult; requestedUse:RequestedUse;
  intent:'add'|'replace'|'check_current'|'unanswered'|'unsure'|'withheld'; candidateRoutineItemId:string|null; selectedComparatorId:string|null;
  /** Pass evaluation time at the authority boundary. Omitted time evaluates only

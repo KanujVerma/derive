@@ -26,7 +26,9 @@ export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalRe
  if(JSON.stringify(b.encounterInputs)!==JSON.stringify({candidateRoutineItemId:input.candidateRoutineItemId,selectedManualReportIds:input.selectedManualReportIds,use:input.requestedUse}))throw Error('Encounter input mismatch');
  const source=p.state==='ready'?p.output.reading:null,product=p.state==='ready'&&p.output.kind==='bound'?p.output.productFacts:null;
  const scientificPacket=input.scientificDecision?ScientificDecisionPacketSchema.parse(input.scientificDecision):null;
- const deadline=new Date(Math.min(Date.parse(p.expiresAt),clock+60000,...(scientificPacket?.assessments.filter(row=>row.assessment.state==='supported'&&row.assessment.validUntil&&Date.parse(row.assessment.validUntil)>clock).map(row=>Date.parse(row.assessment.validUntil!))??[]))).toISOString();
+ const displayedScience=scientificPacket?.assessments.filter(row=>['supported','reference'].includes(row.assessment.state))??[];
+ if(displayedScience.some(row=>!row.assessment.validUntil||Date.parse(row.assessment.validUntil)<=clock))throw Error('Displayed scientific evidence expired before evaluation');
+ const deadline=new Date(Math.min(Date.parse(p.expiresAt),clock+60000,...displayedScience.map(row=>Date.parse(row.assessment.validUntil!)))).toISOString();
  const findings:FindingV2[]=[],gaps:MaterialGap[]=[],ruleResults:PersonalResultV2['ruleResults']=[];let findingSequence=0;
  const declaration=b.subject.kind==='declaration'?b.subject:null;
  const scope=declaration?.packageScope??'source_reading';

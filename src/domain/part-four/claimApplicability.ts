@@ -27,7 +27,7 @@ export function assessScientificClaim(value:unknown,input:ClaimApplicabilityInpu
  const admission=matches[0],rights=admission.rights;
  if(claim.sourceRefs.some(source=>Date.parse(source.retrievedAt)>Date.parse(admission.reviewedAt))){reasons.push('Source retrieval is later than the exact review.');return finish('unavailable');}
  if(admission.status==='rejected'){reasons.push('The exact proposition was rejected by its independent reviewer.');return finish('rejected',admission.reviewerId);}
- if(Date.parse(admission.reviewedAt)>clock||Date.parse(admission.validUntil)<=clock||Date.parse(rights.validUntil)<=clock||rights.revoked||!rights.process||!rights.store||!rights.display||!rights.export||[admission.reviewerId,admission.qualificationRef,rights.grantId,rights.version].some(id=>withdrawn.has(id))){reasons.push('Exact admission or required durable evidence operation is unavailable.');return finish('unavailable');}
+ if(Date.parse(admission.reviewedAt)>clock||Date.parse(admission.validUntil)<=clock||Date.parse(rights.validUntil)<=clock||rights.revoked||!rights.process||!rights.store||!rights.display||[admission.reviewerId,admission.qualificationRef,rights.grantId,rights.version].some(id=>withdrawn.has(id))){reasons.push('Exact admission or required durable evidence operation is unavailable.');return finish('unavailable');}
  deadline=Math.min(deadline,Date.parse(admission.validUntil),Date.parse(rights.validUntil));
  reasons.push(...claim.copy.qualifications,...claim.endpoint.limitations);
  const reference=claim.tier!=='decision_candidate'||claim.scope==='ingredient_reference'||claim.scope==='policy_reference';

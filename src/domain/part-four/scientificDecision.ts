@@ -37,10 +37,14 @@ export function assessScientificDecision(input:{manifest:unknown;evidence?:unkno
   }
  }
  const unresolvedGoals=goals.filter(goal=>!['maintain','simplify'].includes(goal)&&!assessments.some(row=>row.goal===goal&&row.assessment.state==='supported'));
+ // A base source identity must retain one exact metadata pin. Separate
+ // admission review dates and independently bounded goal leases remain distinct.
+ const pins=new Map<string,string>();
+ for(const row of assessments.filter(row=>['supported','reference'].includes(row.assessment.state))){const claim=manifest.claims.find(c=>c.id===row.assessment.claimId)!;for(const source of claim.sourceRefs){const pin=claimSourcePin(source);if(pins.has(source.id)&&pins.get(source.id)!==pin)throw Error('Scientific source identity has conflicting pins');pins.set(source.id,pin);}}
  const sourceRefs=[...new Map(assessments.filter(row=>['supported','reference'].includes(row.assessment.state)).flatMap(row=>{
   const claim=manifest.claims.find(c=>c.id===row.assessment.claimId)!;
   const admission=manifest.admissions.find(a=>a.claimId===claim.id&&a.claimHash===row.assessment.claimHash&&a.reviewerId===row.assessment.admissionId&&canonicalJson([...a.sourcePins].sort())===canonicalJson(claim.sourceRefs.map(claimSourcePin).sort()))!;
-  return claim.sourceRefs.map(source=>[source.id,{...source,reviewedAt:admission.reviewedAt,validUntil:row.assessment.validUntil!}] as const);
+  return claim.sourceRefs.map(source=>{const ref={...source,reviewedAt:admission.reviewedAt,validUntil:row.assessment.validUntil!};return [canonicalJson(ref),ref] as const;});
  })).values()];
  return ScientificDecisionPacketSchema.parse({version:'part-four-scientific-decision/v1',manifestHash:manifest.contentHash,assessments,sourceRefs,unresolvedGoals,coverage:'bounded_claims_not_full_goal_coverage'});
 }

@@ -183,7 +183,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
         <RetainedEvidenceSources evidence={packet.retainedEvidence} now={props.now} withdrawnDependencies={props.researchWithdrawnDependencies}/>
         {packet.scientificDecision?.sourceRefs.map(source=>{
           const url=safePartFourSourceUrl(source.url);
-          return <View key={`science:${source.id}`} style={styles.sourceEntry}>
+          return <View key={`science:${source.id}:${source.reviewedAt}:${source.validUntil}`} style={styles.sourceEntry}>
             <Text style={styles.caption}>{`Evidence source · Read ${source.retrievedAt.slice(0,10)} · Reviewed ${source.reviewedAt.slice(0,10)}`}</Text>
             <Text selectable style={styles.caption}>{partFourDisplayText(source.locator)}</Text>
             {url&&<Pressable accessibilityRole="link" accessibilityLabel="View scientific evidence source" onPress={()=>{void Linking.openURL(url).catch(()=>{});}} style={styles.sourceButton}><Text style={styles.link}>View evidence source</Text></Pressable>}

@@ -28,6 +28,7 @@ export function authorizedPartFourPacket(packet: PartFourPacket | null, fence: P
   if (fence.expectedResultRevision !== undefined && fence.expectedResultRevision !== formula.partTwoRevision) return null;
   if (fence.expectedDependencyDigest !== undefined && fence.expectedDependencyDigest !== formula.dependencyDigest) return null;
   if (formula.sourceRefs.some(source => !source.permitted || !live(source.expiresAt)) || formula.facts.some(fact => !live(fact.validUntil))) return null;
+  if (packet.scientificDecision?.assessments.some(row => ['supported','reference'].includes(row.assessment.state) && (!row.assessment.validUntil || !live(row.assessment.validUntil))) || packet.scientificDecision?.sourceRefs.some(source => !live(source.validUntil))) return null;
   return packet;
 }
 

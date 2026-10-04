@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { canonicalJson } from '../domain/part-two/hash.ts';
+import {ClaimAssessmentSchema,ScientificDecisionPacketSchema} from './ScientificClaim.ts';
+import {contextGoalSchema} from './PersonalContextV2Schema.ts';
 const OFFER_RETENTION_FIELDS=['identity','merchant','seller','fulfillment','price','availability','conditions','dates'] as const;
 const id=z.string().min(1).max(200),text=z.string().min(1).max(4000),date=z.iso.datetime();
 const retention=z.strictObject({mode:z.enum(['retain_until','omit','tombstone','restricted']),until:date.nullable()});
 const operations=z.strictObject({process:z.boolean(),store:z.boolean(),display:z.boolean(),export:z.boolean()});
-export const RetainedEvidenceGrantSchema=z.strictObject({sourceId:id,field:z.enum([...OFFER_RETENTION_FIELDS,'brief']),policyId:id,policyVersion:id,validUntil:date,operations,retention,revoked:z.boolean()});
+export const RetainedEvidenceGrantSchema=z.strictObject({sourceId:id,field:z.enum([...OFFER_RETENTION_FIELDS,'brief','science']),policyId:id,policyVersion:id,validUntil:date,operations,retention,revoked:z.boolean()});
 export type RetentionGrant=z.infer<typeof RetainedEvidenceGrantSchema>;
 const common={recordId:z.string().regex(/^[a-f0-9]{64}$/),sourceIds:z.array(id).max(100),withdrawalIds:z.array(id).max(100),originallyVisible:z.boolean(),state:z.enum(['retained','omitted','tombstoned','restricted','unavailable']),reason:z.enum(['unknown_grant','source_withdrawn','grant_revoked','permission_expired','retention_expired','retention_omitted','source_tombstone','retention_restricted','storage_not_permitted','processing_not_permitted','display_not_permitted','export_not_permitted']).nullable(),grants:z.array(RetainedEvidenceGrantSchema).max(100)};
 const fulfillment=z.strictObject({id:text,name:text,shipsFrom:text.nullable(),prime:z.boolean()}).nullable();
@@ -21,6 +23,7 @@ export const RetainedEvidencePayloadSchemas={
  brief_header:z.strictObject({revision:id,productId:id,variantId:id,formulaVersionId:id.nullable(),coverageLimit:text,reviewedAt:date,reviewerId:id,reviewDecision:z.enum(['approved_local_fixture','approved_source_brief']),validUntil:date}),
  brief_source:z.strictObject({title:text,url:z.url().max(4096),kind:z.enum(['personal_anecdote','editorial','manufacturer']),retrievedAt:date,publishedAt:date.nullable(),matching:z.enum(['exact_variant','exact_formula']),productId:id,variantId:id,formulaVersionId:id.nullable(),coverageLimit:text}),
  brief_observation:z.strictObject({text:text.max(600),kind:z.enum(['reported_experience','editorial_observation']),scope:z.enum(['feel_context','formula_context']),sourceIds:z.array(id).max(100),opposingSourceIds:z.array(id).max(100)}),
+ scientific_claim:z.strictObject({manifestHash:z.string().regex(/^[a-f0-9]{64}$/),goal:contextGoalSchema.nullable(),assessment:ClaimAssessmentSchema,sources:ScientificDecisionPacketSchema.shape.sourceRefs}),
 };
 export type RetainedEvidenceKind=keyof typeof RetainedEvidencePayloadSchemas;
 export const RetainedEvidenceFieldSchema=z.discriminatedUnion('kind',[
@@ -36,11 +39,13 @@ export const RetainedEvidenceFieldSchema=z.discriminatedUnion('kind',[
  z.strictObject({...common,kind:z.literal('brief_header'),value:RetainedEvidencePayloadSchemas.brief_header.nullable()}),
  z.strictObject({...common,kind:z.literal('brief_source'),value:RetainedEvidencePayloadSchemas.brief_source.nullable()}),
  z.strictObject({...common,kind:z.literal('brief_observation'),value:RetainedEvidencePayloadSchemas.brief_observation.nullable()}),
+ z.strictObject({...common,kind:z.literal('scientific_claim'),value:RetainedEvidencePayloadSchemas.scientific_claim.nullable()}),
 ]).superRefine((row,ctx)=>{
  if((row.state==='retained')!==(row.value!==null)||row.state==='retained'&&(row.reason!==null||!row.grants.length)||row.state!=='retained'&&row.reason===null)ctx.addIssue({code:'custom',message:'Retained source field state/payload mismatch'});
  const sources=[...new Set(row.grants.map(g=>g.sourceId))].sort();
  if(canonicalJson([...row.sourceIds].sort())!==canonicalJson(sources)||row.grants.some(g=>[g.sourceId,g.policyId,g.policyVersion].some(id=>!row.withdrawalIds.includes(id))))ctx.addIssue({code:'custom',message:'Retained source field lacks exact grant/withdrawal dependencies'});
  if(row.kind.startsWith('brief_')&&row.grants.some(g=>g.field!=='brief'))ctx.addIssue({code:'custom',message:'Brief field carries a foreign grant'});
+ if(row.kind==='scientific_claim'&&row.grants.some(g=>g.field!=='science'))ctx.addIssue({code:'custom',message:'Scientific field carries a foreign grant'});
  if(row.kind.startsWith('offer_')&&row.kind!=='offer_source'&&row.grants.some(g=>g.field!==row.kind.slice(6)))ctx.addIssue({code:'custom',message:'Offer field carries a foreign field grant'});
  if(row.kind==='offer_source'&&row.state==='retained'&&OFFER_RETENTION_FIELDS.some(name=>!row.grants.some(g=>g.field===name)))ctx.addIssue({code:'custom',message:'Offer URL lacks every source field dependency'});
 });

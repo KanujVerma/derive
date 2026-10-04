@@ -7,6 +7,8 @@ import {ScientificClaimSchema} from '../src/contracts/ScientificClaim.ts';
 import {handlePersonalRequest,type PartThreePorts} from '../supabase/functions/part-three/handler.ts';
 import {p2id} from './fixtures/part-two-core.ts';
 import {decisionCopy} from '../src/presentation/part-three/copy.ts';
+import {evaluatePersonalResult} from '../src/domain/part-three/evaluate.ts';
+import {partFourBindingRelease} from '../src/domain/part-four/release.ts';
 const api=await import('../src/domain/part-four/scientificDecision.ts').catch(()=>null);
 test('scientific decision composition exists upstream of canonical judgment',()=>assert(api,'Missing scientific decision integration'));
 const claims=(PENDING_SCIENTIFIC_RECORDS as unknown[]).map(c=>ScientificClaimSchema.parse(c));
@@ -37,4 +39,16 @@ test('actual pending records cannot earn a green judgment through the canonical 
 });
 test('unresolved secondary goal keeps the canonical judgment pending with distinct goal and personal gaps',async()=>{
  const r=await canonical(false,['texture']);assert.equal(r.partFour?.decisionState,'pending');assert.notEqual(r.summary?.judgment,'worth_considering');assert(r.materialGaps.some(g=>g.affectedPropositionIds.includes('personal-candidacy')));assert(r.materialGaps.some(g=>g.affectedPropositionIds.includes('goal:texture')));
+});
+test('displayed reference prose and Sources cap the result lease at their own admission deadline',()=>{
+ assert(api);const f=fixture();const claim=f.manifest.claims.find(c=>c.id==='G01-02')!;
+ f.x.context.profile!.data.primaryGoal={state:'known',value:'dryness'};f.x.context.profile!.data.secondaryGoals=[];
+ const until=new Date(Date.parse(f.now)+1000).toISOString();
+ f.manifest.admissions=[{claimId:claim.id,claimHash:scientificClaimHash(claim),status:'approved',reviewerId:'fixture:reference-reviewer',qualificationRef:'fixture:reference-qualification',reviewedAt:f.now,sourcePins:claim.sourceRefs.map(claimSourcePin),rights:{grantId:'fixture:reference-grant',version:'1',process:true,store:true,display:true,export:true,validUntil:until,revoked:false},validUntil:until}];
+ f.manifest.contentHash=api.scientificManifestHash(f.manifest);
+ const evidence={...f.evidence,manifestHash:f.manifest.contentHash,claims:[{claimId:claim.id,goal:'dryness',features:Object.fromEntries(claim.applicability.map(p=>[p.field,{state:'known',values:[p.expected[0]],factIds:['fixture:reference-fact'],contextRevisionIds:[],sourceIds:['fixture:reference-source'],validUntil:f.x.partTwo.expiresAt}]))}]};
+ const science=api.assessScientificDecision({...f,evidence,context:f.x.context,partTwo:f.x.partTwo});assert.equal(science.assessments.find(r=>r.assessment.claimId===claim.id)?.assessment.state,'reference');
+ f.x.binding.releases.partFour=partFourBindingRelease(undefined,f.manifest.contentHash);
+ const result=evaluatePersonalResult({...f.x,scientificDecision:science});assert.equal(result.validUntil,until);
+ assert.throws(()=>evaluatePersonalResult({...f.x,now:until,scientificDecision:science}),/Displayed scientific evidence expired/);
 });

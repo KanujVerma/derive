@@ -12,6 +12,7 @@ export function RetainedEvidence({evidence,now=Date.now(),withdrawnDependencies=
  const observations=projected.fields.filter(row=>row.kind==='brief_observation'&&row.value!==null);
  const prices=projected.fields.filter(row=>row.kind==='offer_price'&&row.value!==null);
  const omitted=projected.fields.filter(row=>row.state!=='retained');
+ if(!observations.length&&!prices.length&&!omitted.length)return null;
  return <View style={{gap:8}}>
   <Text accessibilityRole="header">Evidence saved with this check</Text>
   {observations.map(row=>row.kind==='brief_observation'&&row.value&&<Text key={row.recordId}>{partFourDisplayText(row.value.text)}</Text>)}

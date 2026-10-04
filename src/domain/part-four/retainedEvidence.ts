@@ -4,6 +4,9 @@ import { canonicalJson, sha256 } from '../part-two/hash.ts';
 import { deepFreeze } from '../part-two/dictionary.ts';
 import { researchBriefHash } from './researchBrief.ts';
 import { OFFER_FIELDS } from './value.ts';
+import {ScientificManifestSchema,ScientificDecisionPacketSchema,type ScientificManifest,type ScientificDecisionPacket} from '../../contracts/ScientificClaim.ts';
+import {scientificManifestHash} from './scientificDecision.ts';
+import {claimSourcePin,scientificClaimHash} from './claimApplicability.ts';
 
 import { RetainedEvidenceSchema, RetainedEvidenceGrantSchema as grant, RetainedEvidenceFieldSchema as field, RetainedEvidencePayloadSchemas as payloads, type RetainedEvidence, type RetentionGrant as Grant, type RetainedEvidenceField as Field, type RetainedEvidenceKind as Kind, type RetainedEvidencePurpose as Purpose } from '../../contracts/RetainedEvidence.ts';
 export { RetainedEvidenceSchema, type RetainedEvidence } from '../../contracts/RetainedEvidence.ts';
@@ -53,7 +56,7 @@ function envelope(fields:Field[],savedAt:string,options:RetentionOptions,purpose
  * JSON container. Formula/ingredient ownership remains with the canonical save
  * envelope, independently of this projection. Source IDs/policy IDs are assumed
  * to be service-owned opaque metadata, not URLs or protected content. */
-export function createRetainedEvidence(input:{value?:unknown;brief?:unknown},options:RetentionOptions):RetainedEvidence {
+export function createRetainedEvidence(input:{value?:unknown;brief?:unknown;science?:{manifest:ScientificManifest;packet:ScientificDecisionPacket}},options:RetentionOptions):RetainedEvidence {
  if(!Number.isFinite(Date.parse(options.now)))throw Error('Retention projection requires a valid time');
  const fields:Field[]=[];
  const value=z.object({state:z.enum(['ready','pending','unavailable']),unitPrices:z.array(z.unknown()).max(100)}).safeParse(input.value);
@@ -105,6 +108,20 @@ export function createRetainedEvidence(input:{value?:unknown;brief?:unknown},opt
     const refs=unique([...observation.sourceIds,...observation.opposingSourceIds]);
     fields.push(record(sha256(canonicalJson([recordId,observation.id])),'brief_observation',{text:observation.text,kind:observation.kind,scope:observation.scope,sourceIds:observation.sourceIds,opposingSourceIds:observation.opposingSourceIds},refs.flatMap(id=>grants.has(id)?[grants.get(id)!]:[]),options,refs.some(id=>!grants.has(id)),dependencies));
    }
+  }
+ }
+ if(input.science){
+  const m=ScientificManifestSchema.safeParse(input.science.manifest),p=ScientificDecisionPacketSchema.safeParse(input.science.packet);
+  if(!m.success||!p.success||m.data.contentHash!==scientificManifestHash(m.data)||m.data.contentHash!==p.data.manifestHash)fields.push(record(sha256('unsupported-scientific-manifest'),'scientific_claim',null,[],options,true,[],false));
+  else for(const row of p.data.assessments.filter(row=>['supported','reference'].includes(row.assessment.state))){
+   const a=row.assessment,claim=m.data.claims.find(c=>c.id===a.claimId&&scientificClaimHash(c)===a.claimHash);
+   const matches=claim?m.data.admissions.filter(v=>v.claimId===a.claimId&&v.claimHash===a.claimHash&&v.status==='approved'&&v.reviewerId===a.admissionId&&canonicalJson([...v.sourcePins].sort())===canonicalJson(claim.sourceRefs.map(claimSourcePin).sort())):[];
+   const admission=matches.length===1?matches[0]:null;
+   const sources=claim&&admission?p.data.sourceRefs.filter(s=>s.reviewedAt===admission.reviewedAt&&s.validUntil===a.validUntil).filter(s=>{const {reviewedAt:_,validUntil:__,...rest}=s;return claim.sourceRefs.some(ref=>canonicalJson(ref)===canonicalJson(rest));}):[];
+   const invalid=!claim||!admission||!a.validUntil||Date.parse(a.validUntil)<=Date.parse(options.now)||Date.parse(admission.reviewedAt)>Date.parse(options.now)||a.reason!==claim.copy.reason||canonicalJson(a.reasons)!==canonicalJson([...claim.copy.qualifications,...claim.endpoint.limitations])||sources.length!==claim.sourceRefs.length||sources.some(s=>s.reviewedAt!==admission.reviewedAt||s.validUntil!==a.validUntil)||Date.parse(a.validUntil)>Math.min(Date.parse(admission.validUntil),Date.parse(admission.rights.validUntil));
+   const grants:Grant[]=admission&&a.validUntil?claim!.sourceRefs.map(s=>({sourceId:s.id,field:'science',policyId:admission.rights.grantId,policyVersion:admission.rights.version,validUntil:a.validUntil!,operations:{process:admission.rights.process,store:admission.rights.store,display:admission.rights.display,export:admission.rights.export},retention:{mode:'retain_until',until:a.validUntil!},revoked:admission.rights.revoked})):[];
+   const dependencies=[p.data.manifestHash,a.claimId,a.claimHash,...a.factIds,...a.contextRevisionIds,...a.sourceIds,...(claim?claim.sourceRefs.flatMap(s=>[s.url,claimSourcePin(s),...(s.bodySha256?[s.bodySha256]:[])]):[]),...(admission?[admission.reviewerId,admission.qualificationRef]:[])];
+   fields.push(record(sha256(canonicalJson([p.data.manifestHash,a.claimHash,row.goal])),'scientific_claim',{manifestHash:p.data.manifestHash,goal:row.goal,assessment:a,sources},grants,options,invalid,dependencies));
   }
  }
  return envelope(fields,options.now,options,'save');

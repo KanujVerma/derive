@@ -24,3 +24,7 @@ test('reference-only source never earns a product action and synthetic review mu
  const r=imported.assessScientificClaim(ref,{now,features,admissions:[a]});assert.equal(r.state,'reference');assert.equal(r.action,null);
  const wrong=admission();wrong.sourcePins=['a'.repeat(64)];assert.equal(evaluate({}, {admissions:[wrong]}).state,'pending');
 });
+test('display and durable retention admission do not confer or require export rights',()=>{
+ const limited=admission();limited.rights.export=false;
+ assert.equal(evaluate({}, {admissions:[limited]}).state,'supported');
+});

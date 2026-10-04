@@ -5,6 +5,8 @@ import {createPartOneBoundedFetch} from '../_shared/part-one-bounded-fetch.ts';
 import {projectPersonalContextV2,migrateExperienceV1} from '../../../src/services/context/migrateV2.ts';
 import {createJevProvider,createJevHttpTransport} from '../../../src/domain/part-three/provider.ts';
 import {handlePersonalRequest,PartThreeError} from './handler.ts';
+import {PENDING_SCIENTIFIC_MANIFEST} from '../../../src/domain/part-four/scientificDecision.ts';
+import {projectScientificFeatures} from '../../../src/domain/part-four/featureProjection.ts';
 const headers={'content-type':'application/json','cache-control':'private, no-store, max-age=0','access-control-allow-origin':'*','access-control-allow-headers':'authorization,apikey,content-type'};
 const bounded=createPartOneBoundedFetch();
 Deno.serve(async(req:Request)=>{
@@ -21,7 +23,10 @@ Deno.serve(async(req:Request)=>{
   const reader=req.body?.getReader(),chunks:Uint8Array[]=[];let size=0;if(!reader)return reply({error:'Request required'},400);try{for(;;){const next=await reader.read();if(next.done)break;size+=next.value.byteLength;if(size>32768){await reader.cancel();return reply({error:'Request is too large'},413);}chunks.push(next.value);}}finally{reader.releaseLock();}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}const raw=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
   const checked=async(name:string,args:Record<string,unknown>)=>{const {data,error}=await admin.rpc(name,args);if(error)throw new PartThreeError(error.code==='42501'?'forbidden':'changed_basis',error.code==='42501'?403:409);return data;};
   let context:any=null;
-  const result=await handlePersonalRequest(raw,{partFourEnabled:Deno.env.get('PART_FOUR_LOCAL_FOUNDATION')==='1',ownerId:owner.id,now:()=>new Date().toISOString(),defer:work=>EdgeRuntime.waitUntil(work().catch(()=>undefined)),
+  const pendingScience=Deno.env.get('PART_FOUR_LOCAL_PENDING_SCIENCE')==='1';
+  const result=await handlePersonalRequest(raw,{partFourEnabled:Deno.env.get('PART_FOUR_LOCAL_FOUNDATION')==='1',partFourEducation:Deno.env.get('PART_FOUR_LOCAL_EDUCATION')==='approved423'?'approved423':undefined,
+   ...(pendingScience?{partFourDecisionEvidence:{manifest:PENDING_SCIENTIFIC_MANIFEST,load:async(binding,input)=>projectScientificFeatures({manifest:PENDING_SCIENTIFIC_MANIFEST,binding,...input,now:new Date().toISOString()})}}:{}),
+   ownerId:owner.id,now:()=>new Date().toISOString(),defer:work=>EdgeRuntime.waitUntil(work().catch(()=>undefined)),
    identity:(scanId,generation,revision,snapshotId,pinnedSnapshotId,captureSessionId)=>checked('part_three_worker',{p_owner:owner.id,p_action:'identity/resolve',p_payload:{scanId,generation,revision,snapshotId,pinnedSnapshotId,captureSessionId}}),
    worker:(action,payload)=>checked('part_three_worker',{p_owner:owner.id,p_action:action,p_payload:payload}),
    async normalize(r){return normalizeAuthorized({schemaVersion:1,requestId:r.requestId,scanId:r.scanId,captureSessionId:r.captureSessionId,expectedGeneration:r.expectedPartOneGeneration,expectedEvidenceRevision:r.expectedPartOneRevision},owner.id,{authorize:async()=>owner.id,localFixtureApproved:Deno.env.get('PART_TWO_LOCAL_FIXTURE')==='1',operation:(action,payload)=>action==='resolve'?checked('part_two_resolve',{p_owner:owner.id,p_payload:payload}):checked('part_two_operation',{p_action:action,p_payload:payload}),worker:(action,payload)=>checked('part_two_worker',{p_action:action,p_payload:payload})});},
