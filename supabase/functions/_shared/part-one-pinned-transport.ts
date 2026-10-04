@@ -1,5 +1,6 @@
 import {lookup} from 'node:dns/promises';
 import {request} from 'node:https';
+import {createConnection} from 'node:net';
 import {Readable} from 'node:stream';
 import {isPermittedProviderDestination,type ProviderTransport} from './part-one-providers.ts';
 /** TLS connects to a validated literal IP, with the original hostname retained
@@ -12,8 +13,12 @@ export function createOpenBeautyFactsTransport():ProviderTransport{
   async fetch(url,options){
    options.signal.throwIfAborted();if(!isPermittedProviderDestination(url,hosts,options.resolvedAddresses)||options.method!=='GET'||options.redirect!=='manual')throw Error('unapproved_source_destination');
    const parsed=new URL(url),address=options.resolvedAddresses[0];
+   // Deno's HTTP compatibility layer derives TLS identity from request hostname,
+   // ignoring servername. Keep that hostname and pin its plain TCP socket instead.
+   const edge=Boolean((globalThis as {Deno?:unknown}).Deno);
+   const connection=edge?{hostname:parsed.hostname,createConnection:()=>createConnection({host:address,port:443})}:{hostname:address};
    return new Promise<Response>((resolve,reject)=>{
-    const req=request({protocol:'https:',hostname:address,port:443,servername:parsed.hostname,rejectUnauthorized:true,agent:false,method:'GET',path:parsed.pathname+parsed.search,signal:options.signal,
+    const req=request({protocol:'https:',...connection,port:443,servername:parsed.hostname,rejectUnauthorized:true,agent:false,method:'GET',path:parsed.pathname+parsed.search,signal:options.signal,
      headers:{Accept:'application/json','User-Agent':options.headers['User-Agent'],Host:parsed.hostname,'Accept-Encoding':'identity'}},res=>{
       const headers=new Headers();for(const [name,value] of Object.entries(res.headers))if(value!==undefined)headers.set(name,Array.isArray(value)?value.join(','):value);
       if([204,205,304].includes(res.statusCode??0)){res.destroy();resolve(new Response(null,{status:res.statusCode,headers}));return;}

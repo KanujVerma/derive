@@ -71,3 +71,16 @@ test('stalled response body settles at the search deadline and aborts its transp
  assert(signal, 'the read reached the stalled body before the deadline');
  t.mock.timers.tick(10000); await rejected; assert.equal(signal.aborted,true);
 });
+
+test('search diagnostics identify the failed boundary without retaining query or network messages',async t=>{
+ const log=t.mock.method(console,'warn',()=>{});
+ const f=fixture();f.transport.fetch=async()=>{throw Object.assign(Error('secret-query-and-token'),{code:'ECONNRESET'});};
+ await assert.rejects(searchPartOneProducts({query:'private query'},policy,config,f.transport,f.ports));
+ assert.equal(log.mock.calls.length,1);assert.deepEqual(JSON.parse(log.mock.calls[0].arguments[0]),{event:'part_one_public_search_failure',stage:'fetch',reason:'network',networkCode:'ECONNRESET',networkHint:'unclassified',responseStatus:null,jsonContentType:null});
+ assert(!JSON.stringify(log.mock.calls).includes('secret-query-and-token'));assert(!JSON.stringify(log.mock.calls).includes('private query'));
+ log.mock.resetCalls();f.transport.fetch=async()=>{throw Error('invalid peer certificate: NotValidForName secret token');};
+ await assert.rejects(searchPartOneProducts({query:'private query'},policy,config,f.transport,f.ports));assert.equal(JSON.parse(log.mock.calls[0].arguments[0]).networkHint,'tls_hostname');assert(!JSON.stringify(log.mock.calls).includes('secret token'));
+ log.mock.resetCalls();f.transport.fetch=async()=>new Response('not JSON',{status:200,headers:{'content-type':'text/html'}});
+ await assert.rejects(searchPartOneProducts({query:'private query'},policy,config,f.transport,f.ports));
+ const event=JSON.parse(log.mock.calls[0].arguments[0]);assert.equal(event.stage,'response');assert.equal(event.responseStatus,200);assert.equal(event.jsonContentType,false);
+});
