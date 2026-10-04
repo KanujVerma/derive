@@ -1,7 +1,7 @@
 # Guest-first authenticated scanner candidate
 
 This candidate restores a persisted session or creates an anonymous Auth owner, then integrates optional skincare context
-and Check routes. It is not hosted acceptance, a signed binary or catalog coverage.
+and Check routes. Matching hosted simulator UI acceptance now passes; a signed binary and broad catalog coverage remain separate gates.
 The six-hour scanner-only sprint parks Plus checkout and Scandit adoption.
 
 ## Explicit candidate, unchanged defaults
@@ -11,7 +11,7 @@ The new `scanner-release` EAS profile selects production Remote mode and
 project `snojlbqovlawewwqbviz` and a public publishable key; legacy production and
 ordinary development profiles remain unchanged. It grants no server entitlement.
 An EAS environment must supply the matching public URL/key before exporting this
-candidate. No secret, existing local environment or hosted setting is modified.
+candidate. Its production EAS public URL/key now match the accepted hosted simulator configuration. This uses the existing publishable key; server secrets and Auth/signing credentials are unchanged.
 
 ## Journey and ownership
 
@@ -40,9 +40,7 @@ Check's own integration helper is composed in a separate bounded integration sli
 Default App Store source preflight still inspects the unchanged legacy production
 profile and remains blocked. The new profile must be explicitly tested and included
 in a reconciled native candidate; changing the public flag is not acceptance.
-Fresh migration/function readback, hosted anonymous Auth readiness and abuse-control
-readback, private account
-deletion, real product coverage and signed iPhone checks remain necessary. Email
+Migration/function readback, normal hosted anonymous Auth and one public product Check/Save/reopen have passed; see the scoped evidence in GUEST_SCANNER_STARTUP.md. Private account deletion, broader real product coverage and signed iPhone checks remain necessary. Email
 confirmation/custom SMTP are not weakened to bypass a failed signup. The candidate
 does not fetch arbitrary pasted URLs, promote provider candidates to formula truth,
 or replace Expo Camera with the unlicensed Scandit evaluation branch.

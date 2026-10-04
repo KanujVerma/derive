@@ -32,11 +32,17 @@
       "autoIncrement": true,
       "distribution": "store",
       "environment": "production",
-      "ios": { "simulator": false },
+      "ios": {
+        "simulator": false
+      },
       "env": {
         "EXPO_PUBLIC_USE_REMOTE_SERVICE": "true",
         "EXPO_PUBLIC_BUILD_FLAVOR": "production",
-        "EXPO_PUBLIC_SCANNER_RELEASE_ENABLED": "true"
+        "EXPO_PUBLIC_SCANNER_RELEASE_ENABLED": "true",
+        "EXPO_PUBLIC_PART_ONE_ENABLED": "true",
+        "EXPO_PUBLIC_PART_TWO_ENABLED": "true",
+        "EXPO_PUBLIC_PART_THREE_ENABLED": "true",
+        "EXPO_PUBLIC_PART_FOUR_SCIENCE": "reviewed_public_usefulness"
       }
     },
     "production": {
