@@ -19,7 +19,16 @@ test('Edge compatibility keeps TLS hostname while connecting only to the validat
   queueMicrotask(()=>reply({headers:{'content-type':'application/json'},statusCode:204,destroy(){}}));
   return {once(){return this;},end(){}};};
  const output=ts.transpileModule(readFileSync(moduleUrl,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,exports:any={};
- new Function('require','exports','globalThis',output)((id:string)=>id==='node:https'?{request:fakeRequest}:id==='node:net'?{createConnection:(options:any)=>{sockets.push(options);return {};}}:external(id),exports,{Deno:{version:{deno:'synthetic-edge'}}});
+ new Function('require','exports','globalThis',output)((id:string)=>id==='node:https'?{request:fakeRequest}:id==='node:net'?{createConnection:(options:any)=>{sockets.push(options);return {once(){return this;}};}}:external(id),exports,{Deno:{version:{deno:'synthetic-edge'}}});
  const result=await exports.createOpenBeautyFactsTransport().fetch('https://world.openbeautyfacts.org/cgi/search.pl',{method:'GET',headers:{'User-Agent':'Synthetic'},redirect:'manual',signal:new AbortController().signal,resolvedAddresses:['93.184.216.34']});
- assert.equal(result.status,204);assert.equal(calls[0].hostname,'world.openbeautyfacts.org');assert.equal(calls[0].servername,'world.openbeautyfacts.org');assert.equal(calls[0].rejectUnauthorized,true);assert.equal(calls[0].agent,false);assert.deepEqual(sockets,[{host:'93.184.216.34',port:443}]);
+ assert.equal(result.status,204);assert.equal(calls[0].hostname,'world.openbeautyfacts.org');assert.equal(calls[0].servername,'world.openbeautyfacts.org');assert.equal(calls[0].rejectUnauthorized,true);assert.equal(calls[0].agent,undefined);assert.deepEqual(sockets,[{host:'93.184.216.34',port:443}]);
+});
+
+test('an Edge compatibility runtime that ignores the pinned callback cannot send HTTP',async()=>{
+ const external=createRequire(moduleUrl);let ended=false,destroyed=false;
+ const fakeRequest=()=>({once(){return this;},destroy(){destroyed=true;},end(){ended=true;}});
+ const output=ts.transpileModule(readFileSync(moduleUrl,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,exports:any={};
+ new Function('require','exports','globalThis',output)((id:string)=>id==='node:https'?{request:fakeRequest}:external(id),exports,{Deno:{version:{deno:'unsupported-fixture'}}});
+ await assert.rejects(exports.createOpenBeautyFactsTransport().fetch('https://world.openbeautyfacts.org/',{method:'GET',headers:{'User-Agent':'Synthetic'},redirect:'manual',signal:new AbortController().signal,resolvedAddresses:['93.184.216.34']}),/pinned_socket_not_used/);
+ assert.equal(destroyed,true);assert.equal(ended,false);
 });

@@ -16,14 +16,18 @@ export function createOpenBeautyFactsTransport():ProviderTransport{
    // Deno's HTTP compatibility layer derives TLS identity from request hostname,
    // ignoring servername. Keep that hostname and pin its plain TCP socket instead.
    const edge=Boolean((globalThis as {Deno?:unknown}).Deno);
-   const connection=edge?{hostname:parsed.hostname,createConnection:()=>createConnection({host:address,port:443})}:{hostname:address};
+   let pinnedSocketCreated=false;
+   const connection=edge?{hostname:parsed.hostname,createConnection:()=>{pinnedSocketCreated=true;const socket=createConnection({host:address,port:443});socket.once('connect',()=>console.info(JSON.stringify({event:'part_one_pinned_socket',denoVersion:(globalThis as {Deno?:{version?:{deno?:string}}}).Deno?.version?.deno??'unknown',matchedAddress:socket.remoteAddress===address,remotePortIsTLS:socket.remotePort===443})));return socket;}}:{hostname:address,agent:false as const};
    return new Promise<Response>((resolve,reject)=>{
-    const req=request({protocol:'https:',...connection,port:443,servername:parsed.hostname,rejectUnauthorized:true,agent:false,method:'GET',path:parsed.pathname+parsed.search,signal:options.signal,
+    const req=request({protocol:'https:',...connection,port:443,servername:parsed.hostname,rejectUnauthorized:true,method:'GET',path:parsed.pathname+parsed.search,signal:options.signal,
      headers:{Accept:'application/json','User-Agent':options.headers['User-Agent'],Host:parsed.hostname,'Accept-Encoding':'identity'}},res=>{
       const headers=new Headers();for(const [name,value] of Object.entries(res.headers))if(value!==undefined)headers.set(name,Array.isArray(value)?value.join(','):value);
       if([204,205,304].includes(res.statusCode??0)){res.destroy();resolve(new Response(null,{status:res.statusCode,headers}));return;}
       resolve(new Response(Readable.toWeb(res) as unknown as ReadableStream<Uint8Array>,{status:res.statusCode,headers}));
-     });req.once('error',reject);req.end();
+     });req.once('error',reject);
+    // A compatibility runtime that ignores this callback must not send HTTP.
+    if(edge&&!pinnedSocketCreated){req.destroy();reject(Error('pinned_socket_not_used'));return;}
+    req.end();
    });
   },
  };

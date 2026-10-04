@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {writeFileSync} from 'node:fs';
 import {api,fixture,check,dated,now,label,sunRoutine} from './fixtures/part-four-usefulness-composition.ts';
 import {p3routine,p3assessment,p3revision} from './fixtures/part-three.ts';
 import {p2id} from './fixtures/part-two-core.ts';
@@ -76,4 +75,4 @@ test('parent-passed AHA still produces qualified Check first in the integrated c
 test('checking a current candidate does not choose the comparator comfort report as the primary feel evidence',async()=>{
  const f=moisturizer();const selected=reported(f,'too_heavy');f.context.profile!.data.texturePreference={state:'known',value:'lightweight'};const other=dated(p3routine(p2id(550)));other.reference={kind:'manual',name:'Different comfortable current item'};const a=dated(p3assessment(other));a.id=p2id(551);a.goalOrPurpose={state:'known',value:'dryness'};a.textureExperience={state:'known',value:'comfortable'};f.context.routine!.data.items.unshift(other);f.context.assessments.push(dated(p3revision(p2id(552),a)));const r=await check(f,[],'composition',selected.item.id,'check_current');const i=insight(r,'foundation:F09:reported_feel');assert(i);assert.match(i.explanation,/CeraVe PM.*too heavy/);assert.doesNotMatch(i.explanation,/Different comfortable current item/);assert.doesNotMatch(i.explanation,/untried candidate/);
 });
-test('examples are captured from actual normalized handler packets, not invented output',()=>{assert.equal(examples.length,2);writeFileSync(new URL('../../bounded-usefulness-composition/before-after-examples.json',import.meta.url),JSON.stringify(examples,null,2)+'\n');});
+test('examples are captured from actual normalized handler packets, not invented output',()=>{assert.equal(examples.length,2);assert.deepEqual(JSON.parse(JSON.stringify(examples)),examples);});
