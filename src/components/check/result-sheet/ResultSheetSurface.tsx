@@ -128,6 +128,9 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   const explicitlyClosing = useRef(false);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
+  // The library owns its mount animation. Expanding before its first settled
+  // detent can be overwritten by that animation, leaving findings unmounted.
+  const [mountSettled, setMountSettled] = useState(false);
   useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
   const closeAction = useRef(onClose);
   closeAction.current = onClose;
@@ -145,8 +148,8 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   requestClose.current = close;
   useEffect(()=>{if(!scrollRequest||!Number.isFinite(scrollRequest.y)||scrollRequest.y<0||!guard.isCurrent()||closing.current||replacement)return;sheet.current?.snapToIndex(2);const frame=requestAnimationFrame(()=>{if(guard.isCurrent()&&!closing.current)scroll.current?.scrollTo({y:scrollRequest.y,animated:true});});return()=>cancelAnimationFrame(frame);},[scrollRequest,guard,replacement]);
   useEffect(() => {
-    if ((summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent() && !closing.current) sheet.current?.snapToIndex(2);
-  }, [summaryHeight, geometry.needsFullHeight, guard, summary, compactActions, contentSized]);
+    if (mountSettled && (summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent() && !closing.current) sheet.current?.snapToIndex(2);
+  }, [mountSettled, summaryHeight, geometry.needsFullHeight, guard, summary, compactActions, contentSized]);
   useLayoutEffect(() => {
     guard.activate();
     return () => guard.deactivate();
@@ -173,6 +176,7 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
         // A gesture close may be interrupted by keyboard/layout reevaluation.
         // A visibly reopened detent restores interaction; forceClose stays fenced.
         if (next >= 0 && !explicitlyClosing.current) closing.current = false;
+        if (next >= 0) setMountSettled(true);
         setIndex(next);
       } }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={SheetHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>

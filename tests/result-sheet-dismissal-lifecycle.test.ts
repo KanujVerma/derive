@@ -201,12 +201,12 @@ test('late oversized summary updates cannot reopen an explicit or gesture close 
     const render = (key='oversized') => r.render({ presentationKey: key, onClose: () => { closed++; },
       summary: React.createElement('Summary', { revision: closed }), compactActions: React.createElement('Actions'), children: React.createElement('Findings') });
     const measure = (value: ReturnType<typeof render>) => value.hosts.find(host => host.type === 'View' && typeof host.props.onLayout === 'function')!.props.onLayout({ nativeEvent: { layout: { height: 1000 } } });
-    measure(render());const expanded = render();assert.equal(expanded.sheet.index,2,'oversized content genuinely requires the full detent');
+    const initial=render();initial.sheet.props.onChange(0);measure(initial);const expanded = render();assert.equal(expanded.sheet.index,2,'oversized content genuinely requires the full detent');
     if(method==='button')expanded.hosts.find(host => host.type==='Pressable' && host.props.accessibilityLabel==='Close result')!.props.onPress();else expanded.sheet.gestureClose();
     assert.equal(expanded.sheet.index,-1);render();
     assert.equal(expanded.sheet.index,-1,'late summary/personal-result updates must not cancel the native close animation');
     expanded.sheet.finishClose();assert.equal(closed,1,'close acknowledgment survives the late update');
-    const newer=render('new-case');measure(newer);const resized=render('new-case');assert.equal(resized.sheet.index,2,'a new body may size normally after the prior close');
+    const newer=render('new-case');newer.sheet.props.onChange(0);measure(newer);const resized=render('new-case');assert.equal(resized.sheet.index,2,'a new body may size normally after the prior close');
   }
 });
 
@@ -281,4 +281,15 @@ test('keyboard and off-detent minus-one positions on either side of the close bo
     initial.hosts.find(host=>host.type==='Pressable'&&host.props.accessibilityLabel==='Product result')!.props.onPress();
     assert.equal(initial.sheet.index,1,'minus-one alone or a non-boundary position must not latch live interaction as closing');assert.equal(closed,0);
   }
+});
+
+test('oversized summary waits for the initial native detent before automatic expansion', t => {
+  const r=surfaceLifecycle();t.after(()=>r.dispose());
+  const props={presentationKey:'mount-race',onClose(){},summary:React.createElement('Summary'),children:React.createElement('Findings')};
+  const initial=r.render(props);
+  initial.hosts.find(host=>host.type==='View'&&typeof host.props.onLayout==='function')!.props.onLayout({nativeEvent:{layout:{height:1600}}});
+  const mounting=r.render(props);assert.equal(mounting.sheet.index,0,'do not fight the native mount animation');
+  mounting.sheet.props.onChange(0);
+  const settled=r.render(props);assert.equal(settled.sheet,initial.sheet);assert.equal(settled.sheet.index,2,'expand after mount without waiting for a personal refresh');
+  r.render(props);assert.equal(settled.sheet.index,2);
 });

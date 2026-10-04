@@ -183,7 +183,10 @@ export function createPartThreeController(transport: PartThreeTransport, createI
             cancel();
             hide('Offline · Current personal assessment unavailable');
         } },
-        allowOptionalRefresh(){interaction=null;},
+        // An explicit refresh requests a new assessment from the current bound
+        // basis. A refused/expired receipt must not become an endless read loop.
+        // invalidate still owns epoch cancellation; pending Save recovery is retained.
+        allowOptionalRefresh(){interaction=null;last=null;},
         invalidate() { epoch++; cancel(); hide('Checking current personal assessment'); },
         expire() { if (view.result && Date.parse(view.result.validUntil) <= now()) {
             epoch++;

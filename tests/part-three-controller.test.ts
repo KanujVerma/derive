@@ -71,3 +71,9 @@ test('local gate prevents any transport invocation and responses must pass stric
 test('reopening never automatically re-exposes even the first unanswered question',async()=>{
  const f=fixture(true),latches=createQuestionLatchStore();const c=client(r=>r.operation==='question_event'?{kind:'acknowledged'}:{kind:'result',result:f.result((r as any).requestId),replayed:false},latches);c.bind(f.t);await c.evaluate();assert(c.getView().question);c.exposeQuestion();c.close();c.bind(f.t);await c.evaluate();assert.equal(c.getView().question,null);c.close();
 });
+
+test('explicit refresh after a refused read reacquires current assessment',async()=>{
+ const f=fixture(),calls:string[]=[];
+ const c=client(r=>{calls.push(r.operation);if(r.operation==='evaluate'){const result=f.result(r.requestId);result.resultId=r.requestId;return {kind:'result',result,replayed:false};}if(r.operation==='read')return {kind:'unavailable',reason:'evidence_unavailable'};throw Error('Unexpected request');});
+ c.bind(f.t);assert(await c.evaluate());assert.equal(await c.renew(),false);assert.equal(c.getView().result,null);c.allowOptionalRefresh();c.invalidate();assert.equal(await c.renew(),true);assert(c.getView().result);assert.deepEqual(calls,['evaluate','read','evaluate']);c.close();
+});
