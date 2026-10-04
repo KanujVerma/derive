@@ -1,3 +1,4 @@
+import type {DictionaryRelease} from '../../domain/part-two/dictionary';
 import { parseSpendingAmount } from '../../presentation/p0b-personalization/spendingInput';
 import { editSensitivityInput } from '@/src/presentation/p0b-personalization/sensitivityInput';
 import React, { useState } from 'react';
@@ -36,6 +37,7 @@ export interface ContextFlowProps {
   onSetup?: (bundle: SetupBundle, draft: ContextDraft) => void;
   /** A live host acknowledges atomic storage; fixture collection remains disclosed. */
   durableSetup?: boolean;
+  dictionaryRelease?:DictionaryRelease;
   onApply: (draft: ContextDraft) => void; onSkip: () => void;
   loading?: boolean; error?: string | null;
 }
@@ -50,7 +52,7 @@ function AnswerChoices<T extends string>({ label, support, answer, choices, onCh
   </View></QuestionGroup>;
 }
 /** Local optional collection. The host acknowledges saving and refreshes the originating Check. */
-export function ContextFlow({ initialDraft, relevance, contextQuestions = [], collectIntent = true, completionLabel = 'Save skin profile', setup = false, ownerId = null, createId, catalogSearch, onSetup, durableSetup = false, onApply, onSkip, loading = false, error }: ContextFlowProps) {
+export function ContextFlow({ initialDraft, relevance, contextQuestions = [], collectIntent = true, completionLabel = 'Save skin profile', setup = false, ownerId = null, createId, catalogSearch, onSetup, durableSetup = false, dictionaryRelease, onApply, onSkip, loading = false, error }: ContextFlowProps) {
   const [draft, setDraft] = useState(() => createContextDraft(initialDraft));
   const [sensitivityText, setSensitivityText] = useState(() => initialDraft?.sensitivities.state === 'answered' ? initialDraft.sensitivities.value.join('\n') : '');
   const [step, setStep] = useState(0);
@@ -152,7 +154,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       </QuestionGroup>
     </View>}
     {extended && step === 4 && <View style={styles.questions}>
-      {durableSetup && createId && <PreferenceChoices key={'preferences:' + ownerId} preferences={currentBundle.preferences ?? []} products={[...currentBundle.products.map(p=>({key:p.id,label:p.reference.label,reference:referenceToStorage(p.reference)})),...currentBundle.previewOnly.pastReports.map(p=>({key:p.id,label:p.reference.label,reference:referenceToStorage(p.reference)}))]} createId={createId} loading={loading} onChange={preferences=>setBundle({...currentBundle,preferences})}/>}
+      {durableSetup && createId && <PreferenceChoices dictionaryRelease={dictionaryRelease} key={'preferences:' + ownerId} preferences={currentBundle.preferences ?? []} products={[...currentBundle.products.map(p=>({key:p.id,label:p.reference.label,reference:referenceToStorage(p.reference)})),...currentBundle.previewOnly.pastReports.map(p=>({key:p.id,label:p.reference.label,reference:referenceToStorage(p.reference)}))]} createId={createId} loading={loading} onChange={preferences=>setBundle({...currentBundle,preferences})}/>}
       {durableSetup && <Text style={styles.copy}>Save your profile, current products, feedback, past experiences and confirmed preferences together. If saving fails, your entries remain here for retry. Up to 20 current products and 20 experiences.</Text>}
     </View>}
     {hasContext && (editing || step === 2) && <View style={styles.questions}>

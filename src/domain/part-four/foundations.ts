@@ -5,11 +5,12 @@ import { NormalizationResultSchema, type NormalizationResult, type PartTwoFact }
 import { PartFourInsightSchema, PartFourComparisonSchema, type PartFourInsight, type PartFourComparison } from '../../contracts/PartFour.ts';
 import { canonicalJson } from '../part-two/hash.ts';
 import { analyzeFormula } from './formula.ts';
-import { PART_THREE_RELEASE } from '../part-three/release.ts';
+import { selectedPartThreeRelease, type PartThreeReleaseSelection } from '../part-three/release.ts';
 import { activeRoutineItem, exactCatalogReference, knownAnswer, sameReportedUse, selectCurrentComparator, routineItemLabel, type RequestedUse } from './comparison.ts';
 import { admitRoutineFormulaEvidence, type QualifiedRoutineFormula, type RoutineFormulaItemState } from './routineFormula.ts';
 export type { QualifiedRoutineFormula } from './routineFormula.ts';
 export interface FoundationInput {
+ releaseSelection?:PartThreeReleaseSelection;
  scientificDecision?:import('../../contracts/ScientificClaim.ts').ScientificDecisionPacket;
  scientificManifest?:import('../../contracts/ScientificClaim.ts').ScientificManifest;
  context:PersonalContextV2; partTwo:NormalizationResult; requestedUse:RequestedUse;
@@ -32,7 +33,9 @@ function assessmentUse(a:ProductAssessment,item:PersonalRoutineItemV2,use:Reques
  return sameReportedUse(item,use)&&knownAnswer(a.useContext.reportedPurpose?.answer)===use.purpose&&knownAnswer(a.useContext.applicationSite?.answer)===use.site&&knownAnswer(a.useContext.useForm?.answer)===use.useForm;
 }
 export function buildFoundationInsights(input:FoundationInput):FoundationResult {
+ const {semantic:release,dictionary}=selectedPartThreeRelease(input.releaseSelection);
  const p=NormalizationResultSchema.parse(input.partTwo), c=input.context;
+ if(p.state==='ready'&&(p.output.reading.versions.dictionary!==dictionary.version||p.output.reading.dependencyManifest.dictionaryHash!==dictionary.contentHash))throw Error('Part Four selected dictionary mismatch');
  if(c.ownerId!==p.authenticatedOwnerId)throw Error('Part Four context owner mismatch');
  for(const row of [c.profile,c.routine,...c.assessments,...c.preferences,...c.experiences].filter(x=>x!==null))if(row.ownerId!==c.ownerId||row.revision>c.revision)throw Error('Foreign or future Part Four context revision');
  const now=Date.parse(input.now??(p.state==='ready'?p.output.reading.createdAt:''));
@@ -50,7 +53,7 @@ export function buildFoundationInsights(input:FoundationInput):FoundationResult 
   insights.push({id:`foundation:${ruleId}:${options.key??insights.filter(i=>i.ruleId===ruleId).length}`,ruleId,state,title,explanation,action:options.action??null,contextRevisionIds:[...new Set(options.context??[])],factIds:facts.map(f=>f.factId),occurrenceIds:[...new Set([...(options.occurrences??[]),...facts.flatMap(f=>f.kind==='product_label_assertion'?[]:[f.occurrenceId])])],sourceIds:[...new Set([...(options.sources??[]),...facts.flatMap(f=>f.sourceDependencies)])]});
  }
  const purposes=product?.labelAssertions.flatMap(assertion=>{
-  const mapping=PART_THREE_RELEASE.purposes.find(m=>m.literal===assertion.text), fact=product.facts.find(f=>f.kind==='product_label_assertion'&&f.subject.assertionId===assertion.assertionId&&f.value.assertionKind==='purpose'&&f.value.text===assertion.text);
+  const mapping=release.purposes.find(m=>m.literal===assertion.text), fact=product.facts.find(f=>f.kind==='product_label_assertion'&&f.subject.assertionId===assertion.assertionId&&f.value.assertionKind==='purpose'&&f.value.text===assertion.text);
   const source=product.dependencyManifest.sourceRefs.find(s=>s.observationId===assertion.span.observationId&&s.sourceRevision===assertion.span.sourceRevision);
   if(!mapping||!fact||!source||assertion.assertionKind!=='purpose'||assertion.transcription!=='clear'||assertion.conditional!==null||Date.parse(assertion.fieldPermission.expiresAt)<=now||Date.parse(source.expiresAt)<=now||Date.parse(fact.validUntil)<=now)return [];
   return [{mapping,fact}];

@@ -1,3 +1,4 @@
+import type {PartThreeReleaseSelection} from '../../../domain/part-three/release';
 import type {PartFourClientSelection} from '../../../domain/part-four/clientRelease';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
@@ -5,7 +6,7 @@ import {useNetworkState} from 'expo-network';
 import type { PartTwoView } from '../../../presentation/part-two/controller';
 import { createPartThreeController, type PartThreeView } from '../../../presentation/part-three/controller';
 import { partThreeTarget, emptyPartThreeChoices, type PartThreeChoices } from '../../../presentation/part-three/target';
-import { PART_THREE_ENABLED, PART_FOUR_ENABLED, PART_FOUR_CLIENT_SELECTION, partThreeTransport, loadPartThreeContext, partThreeEncounter, recoverPartThreeEncounter, partThreeSaveRecovery, subscribePartThreeSession, loadPartThreeLabels } from '../../../services/partThree';
+import { PART_THREE_ENABLED, PART_FOUR_ENABLED, PART_FOUR_CLIENT_SELECTION, PART_THREE_RELEASE_SELECTION, partThreeTransport, loadPartThreeContext, partThreeEncounter, recoverPartThreeEncounter, partThreeSaveRecovery, subscribePartThreeSession, loadPartThreeLabels } from '../../../services/partThree';
 import type { PartThreeTransport } from '../../../services/partThreeClient';
 import type { PersonalContextV2 } from '../../../contracts/PersonalContextV2';
 import { PartThreeResponseSchema, type PartThreeResponse, type CandidateIdentity, type PartThreeEvaluateRequest } from '../../../contracts/PartThreeService';
@@ -16,6 +17,7 @@ import type {PartThreeSaveRecoveryPort} from '../../../presentation/part-three/s
 export interface PartThreePorts {
     transport: PartThreeTransport;
     partFourSelection?:PartFourClientSelection;
+    releaseSelection?:PartThreeReleaseSelection;
     context: (owner: string) => Promise<PersonalContextV2>;
     session: (owner: string, scan: string, captureSessionId?:string|null) => {
         ownerId: string;
@@ -30,7 +32,7 @@ export interface PartThreePorts {
     online?: () => boolean;
     createId?: () => string;
 }
-const livePorts: PartThreePorts = { transport: partThreeTransport, context: loadPartThreeContext, session: partThreeEncounter, recoverSession:recoverPartThreeEncounter,recovery:partThreeSaveRecovery,subscribeSession:subscribePartThreeSession,labels: loadPartThreeLabels, identity: async request => {const response=await partThreeTransport.request({...request,operation:'identity'});if(response.kind!=='identity')throw Error('Identity changed');return response.identity;} };
+const livePorts: PartThreePorts = { releaseSelection:PART_THREE_RELEASE_SELECTION, transport: partThreeTransport, context: loadPartThreeContext, session: partThreeEncounter, recoverSession:recoverPartThreeEncounter,recovery:partThreeSaveRecovery,subscribeSession:subscribePartThreeSession,labels: loadPartThreeLabels, identity: async request => {const response=await partThreeTransport.request({...request,operation:'identity'});if(response.kind!=='identity')throw Error('Identity changed');return response.identity;} };
 type SavedBasis = Extract<PartThreeResponse, {
     kind: 'saved_basis';
 }>;
@@ -82,10 +84,10 @@ export function usePartThreeCheck({ ownerId, details, enabled = PART_THREE_ENABL
     const authorizedIdentity = identity?.key===sourceKey ? identity : null;
     const canRead = enabled && Boolean(session && context?.ownerId === ownerId && source?.state === 'ready' && source.authenticatedOwnerId === ownerId) && connected && (!ports.identity || Boolean(authorizedIdentity));
     const generation = useRef({ key: '', value: 0 });
-    const semanticKey = canonicalJson([scope, context?.revision, source?.bindingKey, source?.resultRevision, authorizedIdentity?.value, choices, PART_FOUR_ENABLED, ports.partFourSelection ?? PART_FOUR_CLIENT_SELECTION]);
+    const semanticKey = canonicalJson([scope, context?.revision, source?.bindingKey, source?.resultRevision, authorizedIdentity?.value, choices, PART_FOUR_ENABLED, ports.partFourSelection ?? PART_FOUR_CLIENT_SELECTION,ports.releaseSelection]);
     if (generation.current.key !== semanticKey)
         generation.current = { key: semanticKey, value: generation.current.value + 1 };
-    const target = canRead && context && source && session ? partThreeTarget(context, source, { ...session, generation: generation.current.value }, choices, savedAssessmentId, authorizedIdentity?.value ?? null, PART_FOUR_ENABLED, ports.partFourSelection ?? PART_FOUR_CLIENT_SELECTION) : null;
+    const target = canRead && context && source && session ? partThreeTarget(context, source, { ...session, generation: generation.current.value }, choices, savedAssessmentId, authorizedIdentity?.value ?? null, PART_FOUR_ENABLED, ports.partFourSelection ?? PART_FOUR_CLIENT_SELECTION,ports.releaseSelection) : null;
     const targetKey = target ? canonicalJson(target) : null;
     const matches = view.target && target && canonicalJson(view.target) === targetKey;
     const current: PartThreeView = matches ? { ...view } : { ...emptyView(), error: view.target?.binding.ownerId === ownerId ? view.error : null };
@@ -146,7 +148,7 @@ export function usePartThreeCheck({ ownerId, details, enabled = PART_THREE_ENABL
                 }
                 const identitySource=savedAssessmentId?(PartThreeResponseSchema.parse(basisRaw).kind==='saved_basis'?(basisRaw as SavedBasis).partTwo:null):source;
                 if(ports.identity&&identitySource?.state==='ready'){
-                    const identityTarget=partThreeTarget(next,identitySource,{...session!,generation:0},emptyPartThreeChoices(),savedAssessmentId);
+                    const identityTarget=partThreeTarget(next,identitySource,{...session!,generation:0},emptyPartThreeChoices(),savedAssessmentId,null,false,undefined,ports.releaseSelection);
                     if(!identityTarget)throw Error('Identity basis changed');
                     const value=await ports.identity({...identityTarget.request,operation:'evaluate',requestId:(ports.createId??createCatalogRequestId)()});
                     if(!isCurrent()||request!==sequence)return;

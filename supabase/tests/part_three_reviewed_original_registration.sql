@@ -1,0 +1,13 @@
+begin;
+select plan(8);
+select ok(has_function_privilege('service_role','public.part_three_worker(uuid,text,jsonb)','EXECUTE'),'existing outer worker is service-only entrypoint');
+select ok(not has_function_privilege('authenticated','public.part_three_worker(uuid,text,jsonb)','EXECUTE'),'client cannot register reviewed semantics');
+select ok(not has_function_privilege('anon','public.part_three_worker(uuid,text,jsonb)','EXECUTE'),'anonymous cannot register reviewed semantics');
+select ok(not has_function_privilege('service_role','public.part_three_worker_foundation_v1(uuid,text,jsonb)','EXECUTE'),'inner worker remains inaccessible directly');
+select throws_ok($q$select public.part_three_worker(null,'release/register','{"releaseHash":"1eefe0869935387cd8bfb8adfebb68e673a6517b1f0411137cc0282eebf9132d","reviewMode":"professional"}'::jsonb)$q$,'P0001','PART_THREE_INVALID_REVIEWED_RELEASE','hash alone or invented review mode cannot register');
+select lives_ok($q$select public.part_three_worker(null,'release/register','{"releaseHash":"1eefe0869935387cd8bfb8adfebb68e673a6517b1f0411137cc0282eebf9132d","releaseId":"derive-original-personal-v1","reviewMode":"automated","reviewEvidence":"derive-original-lexical-and-semantics-review-v1","reviewRecordHash":"71d90937737e200c8dab2bbc242cc59187bc9cb01b9e7b535953b1373492753b"}'::jsonb)$q$,'exact reviewed original tuple can register through inherited worker');
+select ok((select permitted and release_hash='1eefe0869935387cd8bfb8adfebb68e673a6517b1f0411137cc0282eebf9132d' and not provider_enabled from private.part_three_release where id=true),'registration changes existing semantic row and does not enable provider');
+update private.part_three_release set withdrawn_hashes=array_append(withdrawn_hashes,'1eefe0869935387cd8bfb8adfebb68e673a6517b1f0411137cc0282eebf9132d'),permitted=false;
+select throws_ok($q$select public.part_three_worker(null,'release/register','{"releaseHash":"1eefe0869935387cd8bfb8adfebb68e673a6517b1f0411137cc0282eebf9132d","releaseId":"derive-original-personal-v1","reviewMode":"automated","reviewEvidence":"derive-original-lexical-and-semantics-review-v1","reviewRecordHash":"71d90937737e200c8dab2bbc242cc59187bc9cb01b9e7b535953b1373492753b"}'::jsonb)$q$,'P0001','PART_THREE_WITHDRAWN_RELEASE','review cannot reactivate a withdrawn exact hash');
+select * from finish();
+rollback;

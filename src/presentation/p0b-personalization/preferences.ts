@@ -3,9 +3,10 @@ import type { ContextProductReference } from '../../contracts/PersonalContext.ts
 import { preferenceSchema, setupV2Schema } from '../../contracts/PersonalContextV2Schema.ts';
 import { profileToStorage, catalogReferenceKey } from './storageAdapter.ts';
 import { createContextDraft } from './draft.ts';
-import { LOCAL_DICTIONARY_RELEASE } from '../../domain/part-two/dictionary.ts';
+import { LOCAL_DICTIONARY_RELEASE, validateDictionaryRelease, type DictionaryRelease } from '../../domain/part-two/dictionary.ts';
 import { canonicalJson } from '../../domain/part-two/hash.ts';
-export const preferenceIngredientChoices = LOCAL_DICTIONARY_RELEASE.identities.filter(i => i.status === 'active').map(i => ({ id: i.ingredientId, label: i.preferredName }));
+export const ingredientChoicesForRelease = (dictionary:DictionaryRelease=LOCAL_DICTIONARY_RELEASE) => validateDictionaryRelease(dictionary).identities.filter(i => i.status === 'active').map(i => ({ id: i.ingredientId, label: i.preferredName }));
+export const preferenceIngredientChoices = ingredientChoicesForRelease();
 export interface PreferenceProductChoice {
     key: string;
     label: string;
@@ -16,7 +17,7 @@ export function preferenceProductChoices(context: PersonalContextV2, labels: Rec
     const refs = [...(context.routine?.data.items.map(i => i.reference) ?? []), ...context.experiences.map(i => i.data.reference), ...context.assessments.map(i => i.data.reference)];
     return [...new Map(refs.map(reference => [canonicalJson(reference), reference])).entries()].map(([key, reference], index) => ({ key, reference, selectable: reference.kind === 'manual' || Boolean(labels[catalogReferenceKey(reference)]), label: reference.kind === 'manual' ? `${reference.name} · manual report, unverified` : `${labels[catalogReferenceKey(reference)] ?? `Recorded catalog product ${index + 1} (name unavailable)`} · exact selected reference` }));
 }
-export function confirmedPreference({ id, existing, kind, target, strength, confirmed, confirmedAt, independent = false }: {
+export function confirmedPreference({ id, existing, kind, target, strength, confirmed, confirmedAt, independent = false, dictionaryRelease }: {
     id: string;
     existing?: ConfirmedPreference;
     kind: ConfirmedPreference['kind'];
@@ -25,6 +26,7 @@ export function confirmedPreference({ id, existing, kind, target, strength, conf
     confirmed: boolean;
     confirmedAt: string;
     independent?: boolean;
+    dictionaryRelease?:DictionaryRelease;
 }): ConfirmedPreference {
     if (!confirmed)
         throw Error('Confirm this preference before adding it.');
@@ -32,7 +34,7 @@ export function confirmedPreference({ id, existing, kind, target, strength, conf
         throw Error('Choose the exact ingredient or recorded product, or enter an unresolved term.');
     if (target.kind === 'ingredient' && target.identity.kind === 'resolved') {
         const ingredientId = target.identity.ingredientId;
-        if (!preferenceIngredientChoices.some(i => i.id === ingredientId))
+        if (!ingredientChoicesForRelease(dictionaryRelease).some(i => i.id === ingredientId))
             throw Error('Choose a reviewed exact ingredient identity.');
     }
     const value = { id, revision: existing ? existing.revision + 1 : 1, kind, target, strength, status: 'confirmed', confirmedAt, source: existing?.source.kind === 'note' && !independent ? existing.source : { kind: 'structured' } };

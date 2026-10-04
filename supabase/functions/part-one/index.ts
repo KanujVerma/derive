@@ -1,3 +1,4 @@
+import {ordinaryPartThreeRelease} from '../../../src/domain/part-three/release.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0';
 import { handlePartOneRequest, PartOneHttpError, rpcErrorToHttp } from '../_shared/part-one-runtime.ts';
 import { uploadPrivateDerivative, recoverPrivateCapture } from '../_shared/part-one-private-storage.ts';
@@ -53,6 +54,7 @@ Deno.serve(async (request: Request) => {
           const admin=createClient(url,serviceKey,{global:{fetch:boundedFetch},auth:{persistSession:false,autoRefreshToken:false}});
           const work=normalizeAuthorized({schemaVersion:1,requestId:crypto.randomUUID(),scanId:result.scanId,captureSessionId:body.capture?.captureSessionId??null,expectedGeneration:result.generation,expectedEvidenceRevision:result.resultRevision},ownerId,{
             authorize:async()=>ownerId!,
+            dictionaryRelease:ordinaryPartThreeRelease(url,Deno.env.get('DERIVE_CHECK_RELEASE'))?.dictionaryRelease,
             localFixtureApproved:Deno.env.get('PART_TWO_LOCAL_FIXTURE')==='1'&&/^http:\/\/(?:127\.0\.0\.1|localhost|kong)(?::[0-9]+)?(?:\/|$)/.test(url),
             operation:async(action,payload)=>{if(action!=='resolve')throw new PartTwoHttpError('precompute_unavailable',503);const {data,error}=await admin.rpc('part_two_resolve',{p_owner:ownerId,p_payload:payload});if(error)throw new PartTwoHttpError('precompute_unavailable',503);return data;},
             worker:async(action,payload)=>{const {data,error}=await admin.rpc('part_two_worker',{p_action:action,p_payload:payload});if(error)throw new PartTwoHttpError('precompute_unavailable',503);return data;},

@@ -1,3 +1,4 @@
+import {ordinaryPartThreeRelease,ORDINARY_PART_THREE_RELEASE_SELECTION} from '../domain/part-three/release';
 import { ScanRequestSchema, ScanResultSchema, CaptureSessionSchema, CaptureCommitRequestSchema, CaptureCommitResultSchema, PartOneIdSchema, type CaptureCommitRequest, type CaptureCommitResult, type ScanRequest, type SelectionRequest, type SaveRequest } from '../contracts/PartOne.ts';
 import type { PartOneTransport } from '../presentation/part-one/resultController.ts';
 import { supabase } from './supabase';
@@ -7,14 +8,16 @@ import { PartOneSearchReplySchema } from '../contracts/PartOneSearch';
 import { savePartTwoInterpretation } from './partTwoClient';
 import { beginCheckVerificationTiming, markCheckVerificationTiming } from './checkVerificationTiming';
 
-// Source activation is local-only. Hosted source/retention gates have not been approved.
-export const PART_ONE_ENABLED = typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PART_ONE_ENABLED === 'true'
+// Ordinary routing requires a compiled reviewed bundle. Live registries and
+// per-source permissions remain independent server authority.
+export const PART_ONE_ORDINARY_RELEASE = publicEnvironment.buildFlavor==='production'&&publicEnvironment.scannerReleaseEnabled&&publicEnvironment.useRemoteService?ordinaryPartThreeRelease(publicEnvironment.supabaseUrl,ORDINARY_PART_THREE_RELEASE_SELECTION?.semanticRelease.id):null;
+export const PART_ONE_ENABLED = process.env.EXPO_PUBLIC_PART_ONE_ENABLED === 'true' && (Boolean(PART_ONE_ORDINARY_RELEASE) || typeof __DEV__ !== 'undefined' && __DEV__
   && publicEnvironment.buildFlavor === 'development' && publicEnvironment.useRemoteService
-  && /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/?$/.test(publicEnvironment.supabaseUrl);
+  && /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/?$/.test(publicEnvironment.supabaseUrl));
 
 export class PartOneConflict extends Error { constructor(public current: unknown) { super('Result revision changed'); } }
 async function call(path: string, method: 'GET' | 'POST' | 'DELETE', body?: unknown): Promise<any> {
-  if (!PART_ONE_ENABLED || !supabase) throw new Error('Part 1 local service unavailable');
+  if (!PART_ONE_ENABLED || !supabase) throw new Error('Part 1 service unavailable');
   const { data, error } = await supabase.functions.invoke(`part-one${path}`, { method, ...(body === undefined ? {} : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }) });
   if (error) { if ('context' in error && error.context instanceof Response && error.context.status === 409) throw new PartOneConflict(await error.context.json()); throw new Error('Part 1 service unavailable'); }
   return data;

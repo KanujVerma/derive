@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DeclarationSchema, FactBundleV1Schema, SaveRequestSchema, ScanResultSchema } from '../../../src/contracts/PartOne.ts';
 import { PartTwoLabelAssertionSchema, NormalizationInputSchema, NormalizationRequestSchema, NormalizationResultSchema, type NormalizationInput, type NormalizationRequest, type NormalizationResult } from '../../../src/contracts/PartTwo.ts';
-import { normalize, PART_TWO_VERSIONS } from '../../../src/domain/part-two/index.ts';
+import { normalize, PART_TWO_VERSIONS, validateDictionaryRelease, type DictionaryRelease } from '../../../src/domain/part-two/index.ts';
 import { LOCAL_DICTIONARY_RELEASE } from '../../../src/domain/part-two/dictionary.ts';
 import { normalizeDatabaseDates } from './part-one-runtime.ts';
 import { sha256, canonicalJson } from '../../../src/domain/part-two/hash.ts';
@@ -15,7 +15,7 @@ const contextSchema=z.strictObject({ownerId:id,scanId:id,capture:z.strictObject(
 const resolvedSchema=z.strictObject({context:contextSchema,resultRevision:revision,state:z.enum(['ready','pending','no_declaration','blocked','expired','parse_limit','failed']),reasonCodes:z.array(z.string()),cached:z.unknown().nullable(),ticket:z.strictObject({bindingKey:id,leaseToken:id,contextDigest:id,expectedResultRevision:revision}).nullable()});
 type Context=z.infer<typeof contextSchema>;
 type Dependency=z.infer<typeof dependency>;
-export interface PartTwoPorts { authorize(request:Request):Promise<string>; operation(action:string,payload:Record<string,unknown>):Promise<unknown>; worker(action:string,payload:Record<string,unknown>):Promise<unknown>; now?():string; localFixtureApproved?:boolean; }
+export interface PartTwoPorts { authorize(request:Request):Promise<string>; operation(action:string,payload:Record<string,unknown>):Promise<unknown>; worker(action:string,payload:Record<string,unknown>):Promise<unknown>; now?():string; localFixtureApproved?:boolean; dictionaryRelease?:DictionaryRelease; }
 export class PartTwoHttpError extends Error { readonly status:number; constructor(code:string,status:number){super(code);this.status=status;} }
 const headers={'content-type':'application/json','cache-control':'private, no-store, max-age=0','access-control-allow-origin':'*','access-control-allow-headers':'authorization,apikey,content-type,x-client-info','access-control-allow-methods':'POST,OPTIONS'};
 function reply(body:unknown,status=200){return new Response(JSON.stringify(body),{status,headers});}
@@ -127,20 +127,40 @@ function terminalReasonCodes(ctx:Context,state:string,reasons:string[]):string[]
   ?['source_evidence_unavailable',...reasons.filter(code=>code!=='source_evidence_unavailable')]
   :reasons;
 }
+function selectedDictionary(ctx:Context,ports:PartTwoPorts,now:string):DictionaryRelease {
+ const dictionary=validateDictionaryRelease(ports.dictionaryRelease??LOCAL_DICTIONARY_RELEASE);
+ if(dictionary.releaseGate==='local_only'&&!ports.localFixtureApproved)throw new Error('dictionary_release_not_approved');
+ if(dictionary.provenance.expiresAt&&Date.parse(dictionary.provenance.expiresAt)<=Date.parse(now))throw new Error('dictionary_release_not_approved');
+ const versions={...PART_TWO_VERSIONS,dictionary:dictionary.version,explanation:dictionary.explanationVersion};
+ const releaseId=`part-two:${sha256(canonicalJson({dictionaryHash:dictionary.contentHash,versions}))}`;
+ if(ctx.releaseId!==releaseId||ctx.releaseHash!==dictionary.contentHash||canonicalJson(ctx.versions)!==canonicalJson(versions))throw new Error('release_unavailable');
+ return dictionary;
+}
+function authorizedCached(value:unknown,ctx:Context,request:NormalizationRequest,resultRevision:number,ports:PartTwoPorts,now:string):NormalizationResult {
+ try{
+  const dictionary=selectedDictionary(ctx,ports,now),result=overlayRequest(value,request);
+  if(result.state==='ready')for(const snapshot of [result.output.reading,...(result.output.kind==='bound'?[result.output.productFacts]:[])]){
+   const versions={...PART_TWO_VERSIONS,dictionary:dictionary.version,explanation:dictionary.explanationVersion};
+   if(snapshot.dependencyManifest.dictionaryHash!==dictionary.contentHash||Object.entries(versions).some(([key,v])=>snapshot.versions[key as keyof typeof versions]!==v))throw new Error('cached_release_mismatch');
+  }
+  return result;
+ }catch(error){const policy=error instanceof Error&&error.message==='dictionary_release_not_approved';return NormalizationResultSchema.parse({...base(ctx,request,resultRevision,now),state:policy?'blocked':'failed',reasonCodes:[policy?'dictionary_release_not_approved':'authoritative_normalization_unavailable'],permittedText:literal(ctx)});}
+}
 export async function normalizeAuthorized(request:NormalizationRequest,ownerId:string,ports:PartTwoPorts):Promise<NormalizationResult>{
  const now=ports.now?.()??new Date().toISOString();
  const resolved=resolvedSchema.parse(await ports.operation('resolve',request));
  const ctx=resolved.context;
  if(ctx.ownerId!==ownerId||ctx.scanId!==request.scanId||(ctx.capture?.captureSessionId??null)!==request.captureSessionId)throw new PartTwoHttpError('invalid_server_binding',503);
  const initial=base(ctx,request,resolved.resultRevision,now);
- if(resolved.cached!==null)return overlayRequest(resolved.cached,request);
+ if(resolved.cached!==null)return authorizedCached(resolved.cached,ctx,request,resolved.resultRevision,ports,now);
  if(resolved.state!=='pending'||!resolved.ticket)return NormalizationResultSchema.parse({...initial,state:resolved.state==='ready'?'failed':resolved.state,...(resolved.state==='pending'?{}:{reasonCodes:terminalReasonCodes(ctx,resolved.state,resolved.reasonCodes)}),permittedText:literal(ctx)});
  let result:NormalizationResult;
  try{
-  if(LOCAL_DICTIONARY_RELEASE.releaseGate==='local_only'&&!ports.localFixtureApproved)throw new Error('dictionary_release_not_approved');
-  if(ctx.releaseId!==PART_TWO_RELEASE_ID||ctx.releaseHash!==LOCAL_DICTIONARY_RELEASE.contentHash||canonicalJson(ctx.versions)!==canonicalJson(PART_TWO_VERSIONS))throw new Error('release_unavailable');
+  // The trusted server composition selects bytes; request flags never select
+  // a release or grant permission. The live registry must match every pin.
+  const dictionary=selectedDictionary(ctx,ports,now);
   const input=authoritativeInput(ctx,request);
-  result=normalize(input,LOCAL_DICTIONARY_RELEASE,{snapshotId:globalThis.crypto.randomUUID(),createdAt:now,resultRevision:resolved.resultRevision,withdrawnExplanationDependencies:ctx.withdrawnExplanationDependencies});
+  result=normalize(input,dictionary,{snapshotId:globalThis.crypto.randomUUID(),createdAt:now,resultRevision:resolved.resultRevision,withdrawnExplanationDependencies:ctx.withdrawnExplanationDependencies});
  }catch(error){const policy=error instanceof Error&&error.message==='dictionary_release_not_approved',limit=error instanceof AuthoritativeParseLimit;result=NormalizationResultSchema.parse({...initial,state:policy?'blocked':limit?'parse_limit':'failed',reasonCodes:[policy?'dictionary_release_not_approved':limit?'label_annotation_limit':'authoritative_normalization_unavailable'],permittedText:literal(ctx)});}
  let published:Record<string,unknown>;
  try{published=object(await ports.worker('publish',{...resolved.ticket,result}));}
@@ -150,7 +170,7 @@ export async function normalizeAuthorized(request:NormalizationRequest,ownerId:s
  // and deletion can happen while work awaits storage; never reuse old literals.
  const fresh=resolvedSchema.parse(await ports.operation('resolve',request));
  if(fresh.context.ownerId!==ownerId||fresh.context.scanId!==request.scanId||(fresh.context.capture?.captureSessionId??null)!==request.captureSessionId)throw new PartTwoHttpError('invalid_server_binding',503);
- if(fresh.cached!==null)return overlayRequest(fresh.cached,request);
+ if(fresh.cached!==null)return authorizedCached(fresh.cached,fresh.context,request,fresh.resultRevision,ports,now);
  return NormalizationResultSchema.parse({...base(fresh.context,request,fresh.resultRevision,now),state:fresh.state==='ready'?'failed':fresh.state,...(fresh.state==='pending'?{}:{reasonCodes:terminalReasonCodes(fresh.context,fresh.state,fresh.reasonCodes)}),permittedText:literal(fresh.context)});
 }
 export async function handlePartTwoRequest(request:Request,ports:PartTwoPorts):Promise<Response>{
