@@ -1,3 +1,4 @@
+import {parsePartFourClientSelection} from '../domain/part-four/clientRelease';
 import { PART_TWO_ENABLED } from './partTwo';
 import { supabase } from './supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -16,6 +17,7 @@ import {registerSessionRetirement} from './sessionRetirement';
 import type {SaveRecoveryAccount} from '../presentation/part-three/saveRecovery';
 export const PART_THREE_ENABLED = PART_TWO_ENABLED && process.env.EXPO_PUBLIC_PART_THREE_ENABLED === 'true';
 export const PART_FOUR_ENABLED = PART_THREE_ENABLED && process.env.EXPO_PUBLIC_PART_FOUR_LOCAL_FOUNDATION === 'true';
+export const PART_FOUR_CLIENT_SELECTION = parsePartFourClientSelection(process.env.EXPO_PUBLIC_PART_FOUR_EDUCATION,process.env.EXPO_PUBLIC_PART_FOUR_SCIENCE);
 const encounters = new Map<string, string>();
 const listeners = new Set<(event?:'retired') => void>();
 let lastAccount:string|null=null;

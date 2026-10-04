@@ -68,7 +68,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
       <Text style={styles.insightTitle}>{partFourDisplayText(insight.title)}</Text>
       <Text style={styles.copy}>{partFourDisplayText(insight.explanation)}</Text>
       {insight.state === 'conflict' && <Text style={styles.caption}>Conflicting evidence</Text>}
-      {routine && insight.action && <Text style={styles.routineAction}>{partFourDisplayText(insight.action)}</Text>}
+      {insight.action && <Text style={styles.routineAction}>{partFourDisplayText(insight.action)}</Text>}
       {targets.length > 0 && <View style={styles.ingredientLinks}>{[...new Set(targets)].map(id => {
         const row = rows.find(candidate => candidate.occurrenceId === id)!;
         return <Pressable key={id} accessibilityRole="button" accessibilityLabel={`Explore ingredient: ${row.name}, position ${rows.indexOf(row) + 1}`}

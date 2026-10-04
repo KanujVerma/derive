@@ -1246,7 +1246,9 @@ test('Environment template: Lists only approved names and contains zero credenti
     'EXPO_PUBLIC_CHECK_TIMING_EVALUATION',
     'EXPO_PUBLIC_DEV_SUPABASE_LAN_URL',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
+    'EXPO_PUBLIC_PART_FOUR_EDUCATION', // Public compiled expectation only, never server authority.
     'EXPO_PUBLIC_PART_FOUR_LOCAL_FOUNDATION',
+    'EXPO_PUBLIC_PART_FOUR_SCIENCE',
     'EXPO_PUBLIC_PART_ONE_ENABLED',
     'EXPO_PUBLIC_PART_ONE_FIXTURE_UI',
     'EXPO_PUBLIC_PART_ONE_OCR_EVALUATION',
@@ -1266,7 +1268,9 @@ test('Environment template: Lists only approved names and contains zero credenti
     'EXPO_PUBLIC_CHECK_TIMING_EVALUATION',
     'EXPO_PUBLIC_DEV_SUPABASE_LAN_URL',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
+    'EXPO_PUBLIC_PART_FOUR_EDUCATION', // Public compiled expectation only, never server authority.
     'EXPO_PUBLIC_PART_FOUR_LOCAL_FOUNDATION',
+    'EXPO_PUBLIC_PART_FOUR_SCIENCE',
     'EXPO_PUBLIC_PART_ONE_ENABLED',
     'EXPO_PUBLIC_PART_ONE_FIXTURE_UI',
     'EXPO_PUBLIC_PART_ONE_OCR_EVALUATION',
@@ -1300,7 +1304,9 @@ test('Environment guard: Mobile source references only approved public variables
     'EXPO_PUBLIC_DEV_SUPABASE_LAN_URL',
     'EXPO_PUBLIC_SCANNER_RELEASE_ENABLED',
     'EXPO_PUBLIC_FOUNDER_SUPPORT_EMAIL',
+    'EXPO_PUBLIC_PART_FOUR_EDUCATION', // Public compiled expectation only, never server authority.
     'EXPO_PUBLIC_PART_FOUR_LOCAL_FOUNDATION',
+    'EXPO_PUBLIC_PART_FOUR_SCIENCE',
     'EXPO_PUBLIC_PART_ONE_ENABLED',
     'EXPO_PUBLIC_PART_ONE_FIXTURE_UI',
     'EXPO_PUBLIC_PART_ONE_OCR_EVALUATION',

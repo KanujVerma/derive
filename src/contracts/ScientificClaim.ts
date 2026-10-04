@@ -1,4 +1,6 @@
 import {z} from 'zod';
+import {EvidenceReviewSchema} from './EvidenceReview.ts';
+import {canonicalJson} from '../domain/part-two/hash.ts';
 import {contextGoalSchema} from './PersonalContextV2Schema.ts';
 const id=z.string().min(1).max(200), text=z.string().min(1).max(4000), hash=z.string().regex(/^[a-f0-9]{64}$/), date=z.iso.datetime();
 export const ClaimFieldSchema=z.enum(['ingredientId','amountPercent','amountBasis','amountSubject','chemicalForm','vehicleBridge','site','useForm','frequency','duration','population','endpoint','formulaVersionId','productId','variantId','labelAssertionId','routineOtherMedication','timingRelation','purpose','broadSpectrum','pH','indication']);
@@ -16,8 +18,8 @@ export const ScientificClaimSchema=z.strictObject({
 export type ScientificClaim=z.infer<typeof ScientificClaimSchema>;
 /** Server-owned immutable admission, supplied separately from editorial/research
  * records. No client, model, or claim record can approve its own scientific use. */
-export const ClaimAdmissionSchema=z.strictObject({claimId:id,claimHash:hash,status:z.enum(['approved','rejected']),reviewerId:id,qualificationRef:id,reviewedAt:date,sourcePins:z.array(hash).min(1).max(20),
- rights:z.strictObject({grantId:id,version:id,process:z.boolean(),store:z.boolean(),display:z.boolean(),export:z.boolean(),validUntil:date,revoked:z.boolean()}),validUntil:date});
+export const ClaimAdmissionSchema=z.strictObject({claimId:id,claimHash:hash,status:z.enum(['approved','rejected']),reviewerId:id,qualificationRef:id,reviewedAt:date,sourcePins:z.array(hash).min(1).max(20),review:EvidenceReviewSchema.optional(),
+ rights:z.strictObject({grantId:id,version:id,process:z.boolean(),store:z.boolean(),display:z.boolean(),export:z.boolean(),validUntil:date,revoked:z.boolean()}),validUntil:date}).superRefine((a,c)=>{const r=a.review;if(r&&(r.claimHash!==a.claimHash||canonicalJson([...r.sourcePins].sort())!==canonicalJson([...a.sourcePins].sort())||r.checkedAt!==a.reviewedAt||r.reviewer.id!==a.reviewerId||r.contentHash!==a.qualificationRef||r.decision!==(a.status==='rejected'?'rejected':'approved')))c.addIssue({code:'custom',message:'Admission differs from exact review provenance'});});
 export type ClaimAdmission=z.infer<typeof ClaimAdmissionSchema>;
 export const ClaimFeatureSchema=z.strictObject({state:z.enum(['known','unknown','contradiction']),values:z.array(text).max(100).nullable(),factIds:z.array(id).max(100),contextRevisionIds:z.array(id).max(100),sourceIds:z.array(id).max(100),validUntil:date}).superRefine((v,ctx)=>{if(v.state==='known'&&(!v.values?.length||!v.factIds.length&&!v.contextRevisionIds.length))ctx.addIssue({code:'custom',message:'Known feature requires value and evidence'});});
 export type ClaimFeature=z.infer<typeof ClaimFeatureSchema>;

@@ -1,0 +1,14 @@
+begin;
+select plan(6);
+select is((select release_hash from private.part_four_release where id=true),'09d1dd866c282187bbfdee37b3b6972deefb1c7787a1db6bfeb103576292f2b5','changed semantics have exact new hash');
+select ok((select not permitted and scientific_manifest_hash is null from private.part_four_release where id=true),'new rules remain default denied without science');
+select ok(not has_table_privilege('authenticated','private.part_four_release','UPDATE'),'client cannot activate rules');
+update private.part_four_release set release_hash=repeat('a',64),permitted=true;
+create temporary table prior_rule_release as select private.part_four_release_tuple(r) t from private.part_four_release r;
+update private.part_four_release set release_hash='09d1dd866c282187bbfdee37b3b6972deefb1c7787a1db6bfeb103576292f2b5',permitted=false;
+select ok(private.part_four_saved_release_allowed(t),'exact prior eligible tuple preserved historically') from prior_rule_release;
+select ok(not private.part_four_saved_release_allowed(private.part_four_release_tuple(r)),'current denied tuple cannot authorize saved evidence') from private.part_four_release r;
+insert into private.part_four_source_withdrawals(dependency_id) select t->>'releaseHash' from prior_rule_release;
+select ok(not private.part_four_saved_release_allowed(t),'old history cannot evade source withdrawal') from prior_rule_release;
+select * from finish();
+rollback;
