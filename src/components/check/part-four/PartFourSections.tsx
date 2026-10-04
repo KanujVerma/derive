@@ -126,11 +126,11 @@ export function PartFourSections(props: PartFourSectionsProps) {
               <Text selectable style={styles.caption}>{`Listed as: ${row.literal}`}</Text>
               {row.card && <>
                 <Text style={styles.explanation}>{partFourDisplayText(row.card.body)}</Text>
-                <Text style={styles.more}>{partFourDisplayText(row.card.detail)}</Text>
-                <View style={styles.evidence}>
+                {row.card.detail && <Text style={styles.more}>{partFourDisplayText(row.card.detail)}</Text>}
+                {row.card.evidence && <View style={styles.evidence}>
                   <Text style={styles.evidenceTitle}>What we know</Text>
-                  <Text style={styles.caption}>{partFourDisplayText(row.card.evidence)}</Text>
-                </View>
+                  <Text style={styles.caption}>{partFourDisplayText(row.card.evidence??'')}</Text>
+                </View>}
                 {row.card.editorial && <>
                   {row.card.editorial.amountAndUse && <View style={styles.insight}>
                     <Text accessibilityRole="header" style={styles.insightTitle}>Amount and use context</Text>
@@ -181,6 +181,14 @@ export function PartFourSections(props: PartFourSectionsProps) {
       {sourcesOpen && <View style={styles.sourceContent}>
         <ResearchBriefSources {...briefProps} />
         <RetainedEvidenceSources evidence={packet.retainedEvidence} now={props.now} withdrawnDependencies={props.researchWithdrawnDependencies}/>
+        {packet.scientificDecision?.sourceRefs.map(source=>{
+          const url=safePartFourSourceUrl(source.url);
+          return <View key={`science:${source.id}`} style={styles.sourceEntry}>
+            <Text style={styles.caption}>{`Evidence source · Read ${source.retrievedAt.slice(0,10)} · Reviewed ${source.reviewedAt.slice(0,10)}`}</Text>
+            <Text selectable style={styles.caption}>{partFourDisplayText(source.locator)}</Text>
+            {url&&<Pressable accessibilityRole="link" accessibilityLabel="View scientific evidence source" onPress={()=>{void Linking.openURL(url).catch(()=>{});}} style={styles.sourceButton}><Text style={styles.link}>View evidence source</Text></Pressable>}
+          </View>;
+        })}
         {limits.length > 0 && <View style={styles.sourceEntry}>
           <Text style={styles.insightTitle}>Evidence limits</Text>
           {limits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}
@@ -218,8 +226,8 @@ export function PartFourSections(props: PartFourSectionsProps) {
           const url = safePartFourSourceUrl(source.url);
           return <View key={source.id} style={styles.sourceEntry}>
             <Text style={styles.caption}>{source.editorial
-              ? `${partFourDisplayText(source.title)} · Copy approved ${partFourDisplayText(source.editorial.copyApprovedAt.slice(0, 10))} · remote source revision unverified`
-              : `${partFourDisplayText(source.title)} · Reviewed ${source.reviewedAt.slice(0, 10)}`}</Text>
+              ? `${partFourDisplayText(source.title)} · Copy approved ${partFourDisplayText((source.editorial.copyApprovedAt?.slice(0,10)??'time not recorded'))} · remote source revision unverified`
+              : `${partFourDisplayText(source.title)} · Reviewed ${(source.reviewedAt?.slice(0,10)??'date unverified')}`}</Text>
             {url && <Pressable accessibilityRole="link" accessibilityLabel={`View reference: ${partFourDisplayText(source.title)}`}
               onPress={() => { void Linking.openURL(url).catch(() => {}); }} style={styles.sourceButton}><Text style={styles.link}>View reference</Text></Pressable>}
           </View>;

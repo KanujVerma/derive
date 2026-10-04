@@ -1,3 +1,4 @@
+import { ScientificDecisionPacketSchema, type ScientificDecisionPacket } from '../../contracts/ScientificClaim.ts';
 import type { PersonalContextV2, ApplicationSite, UseForm, PurposeId } from '../../contracts/PersonalContextV2.ts';
 import type { ContextProductReference } from '../../contracts/PersonalContext.ts';
 import { DecisionBindingV2Schema, PersonalResultV2Schema, type DecisionBindingV2,type PersonalResultV2,type FindingV2,type MaterialGap,type EligibleQuestion } from '../../contracts/PersonalResultV2.ts';
@@ -6,7 +7,7 @@ import { LOCAL_DICTIONARY_RELEASE,lookupName } from '../part-two/dictionary.ts';
 import { purposeFacts } from './projection.ts';
 import { PART_THREE_RELEASE,PART_THREE_RELEASE_HASH } from './release.ts';
 export interface HistoryResult { requestedScopes:Array<{kind:'catalog';productId:string}|{kind:'manual';recordId:string;name?:string}>;atRevision:number;activeRevisionIds:string[];completeness:'complete'|'incomplete'|'unavailable';reason:'complete'|'cap'|'deadline'|'repeated_cursor'|'page_error'|'revision_changed' }
-export interface PersonalEvaluationInput {binding:DecisionBindingV2;partTwo:NormalizationResult;context:PersonalContextV2;history:HistoryResult;now:string;resultId:string;resultRevision:number;name:string;requestedUse:{purpose:PurposeId|null;site:ApplicationSite|null;useForm:UseForm|null};selectedManualReportIds:string[];candidateRoutineItemId:string|null;questionSuppression:{exposedQuestionId:string|null;skip:boolean;answered:boolean}}
+export interface PersonalEvaluationInput {scientificDecision?:ScientificDecisionPacket;binding:DecisionBindingV2;partTwo:NormalizationResult;context:PersonalContextV2;history:HistoryResult;now:string;resultId:string;resultRevision:number;name:string;requestedUse:{purpose:PurposeId|null;site:ApplicationSite|null;useForm:UseForm|null};selectedManualReportIds:string[];candidateRoutineItemId:string|null;questionSuppression:{exposedQuestionId:string|null;skip:boolean;answered:boolean}}
 function referenceRelation(ref:ContextProductReference,binding:DecisionBindingV2):'exact_version'|'product_family'|null {
  const s=binding.subject;if(s.kind!=='declaration'||ref.kind!=='catalog'||!s.productId||ref.productId!==s.productId)return null;
  return s.variantId!==null&&s.formulaVersionId!==null&&ref.variantId===s.variantId&&ref.formulaVersionId===s.formulaVersionId?'exact_version':'product_family';
@@ -24,12 +25,13 @@ export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalRe
  if(b.profileRevision!==(c.profile?.id??null)||b.routineRevision!==(c.routine?.id??null)||b.historyRevision!==c.historyRevision||!sameRefs(b.assessmentRevisions,revisionSet(c.assessments))||!sameRefs(b.preferenceRevisions,revisionSet(c.preferences))||!sameRefs(b.noteRevisions,revisionSet(c.notes))||b.releases.releaseHash!==PART_THREE_RELEASE_HASH)throw Error('Context binding mismatch');
  if(JSON.stringify(b.encounterInputs)!==JSON.stringify({candidateRoutineItemId:input.candidateRoutineItemId,selectedManualReportIds:input.selectedManualReportIds,use:input.requestedUse}))throw Error('Encounter input mismatch');
  const source=p.state==='ready'?p.output.reading:null,product=p.state==='ready'&&p.output.kind==='bound'?p.output.productFacts:null;
- const deadline=new Date(Math.min(Date.parse(p.expiresAt),clock+60000)).toISOString();
+ const scientificPacket=input.scientificDecision?ScientificDecisionPacketSchema.parse(input.scientificDecision):null;
+ const deadline=new Date(Math.min(Date.parse(p.expiresAt),clock+60000,...(scientificPacket?.assessments.filter(row=>row.assessment.state==='supported'&&row.assessment.validUntil&&Date.parse(row.assessment.validUntil)>clock).map(row=>Date.parse(row.assessment.validUntil!))??[]))).toISOString();
  const findings:FindingV2[]=[],gaps:MaterialGap[]=[],ruleResults:PersonalResultV2['ruleResults']=[];let findingSequence=0;
  const declaration=b.subject.kind==='declaration'?b.subject:null;
  const scope=declaration?.packageScope??'source_reading';
  const baseSubject:FindingV2['subject']=declaration?{kind:'declaration',itemId:declaration.itemId,declarationId:declaration.declarationId}:{kind:'source_reading',observationId:b.subject.kind==='source_reading'?b.subject.observationId:'unavailable'};
- const gap=(reason:MaterialGap['reason'],state:MaterialGap['state'],recoverableBy:MaterialGap['recoverableBy'],prop='personal-candidacy')=>{const id=`gap:${reason}`;if(!gaps.some(x=>x.id===id))gaps.push({id,affectedPropositionIds:[prop],state,reason,recoverableBy});return id;};
+ const gap=(reason:MaterialGap['reason'],state:MaterialGap['state'],recoverableBy:MaterialGap['recoverableBy'],prop='personal-candidacy')=>{const id=prop==='personal-candidacy'?`gap:${reason}`:`gap:${reason}:${prop}`;if(!gaps.some(x=>x.id===id))gaps.push({id,affectedPropositionIds:[prop],state,reason,recoverableBy});return id;};
  function add(kind:FindingV2['kind'],rule:string,consequence:FindingV2['consequence'],detail:FindingV2['arguments']['detail'],options:{facts?:PartTwoFact[];reports?:string[];name?:string;relation?:FindingV2['arguments']['relation'];subject?:FindingV2['subject'];support?:FindingV2['supportState'];scope?:FindingV2['arguments']['scope'];reportTrace?:FindingV2['arguments']['reportTrace']}={}){
   if(findings.length>=100){gap('relevant_history','unavailable','none');const tier={decisive:0,concern:1,value:2,optional:3,information:4};let weakest=-1;for(let i=0;i<findings.length;i++)if(tier[findings[i].consequence]>tier[consequence]&&(weakest<0||tier[findings[i].consequence]>tier[findings[weakest].consequence]))weakest=i;if(weakest<0)return null;findings.splice(weakest,1);}
   const facts=options.facts??[],reports=[...new Set(options.reports??[])],id=`finding:${rule}:${findingSequence++}`;
@@ -91,6 +93,17 @@ export function evaluatePersonalResult(input:PersonalEvaluationInput):PersonalRe
   }else add('comparison','different-use','information','different_use',{reports:[c.routine.id],scope:'comparison',subject:{kind:'comparison',candidateItemId:declaration.itemId,comparatorId:comparator.id}});
  }
  if(admitted?.purposeId==='moisturizing'&&goal==='dryness'&&b.intent==='add')add('purpose_value','purpose-value','value','helps',{facts:product!.facts.filter(x=>x.factId===admitted.partTwoFactId),reports:c.profile?[c.profile.id]:[]});
+ if(input.scientificDecision){
+  const science=scientificPacket!;
+  if(b.releases.partFour?.scientificManifestHash!==science.manifestHash)throw Error('Scientific manifest binding mismatch');
+  for(const {goal,assessment:a} of science.assessments){
+   if(a.state!=='supported'||!a.reason||!a.validUntil||Date.parse(a.validUntil)<=clock||!declaration)continue;
+   const routine=a.family==='G04'||a.family==='G05',id=`scientific:${a.claimId}:${goal??'routine'}`,consequence=routine?(a.family==='G04'?'concern':'information'):'value';
+   findings.push({id,kind:routine?'routine_evidence':'goal_evidence',subject:baseSubject,allowedPropositionId:a.claimId,ruleId:a.family,ruleVersion:'G01-G05/local-candidate-v1',applicability:'eligible',consequence,supportState:'supported',mandatoryVisibility:true,factRefs:a.factIds,reportRefs:a.contextRevisionIds,evidenceCardRefs:[a.claimHash,science.manifestHash],requiredQualifierIds:[],blockingGapIds:[],templateId:routine?'routine_evidence':'goal_evidence',templateVersion:PART_THREE_RELEASE.template,scientificEvidence:{claimId:a.claimId,claimHash:a.claimHash,manifestHash:science.manifestHash,reason:a.reason,action:a.action,qualifications:a.reasons},arguments:{reportTrace:null,name:null,relation:null,scope,detail:routine?'label_caution':'benefit'},dependencies:{sourceIds:a.sourceIds,sourceFields:[],contextRevisionIds:a.contextRevisionIds,factIds:a.factIds,occurrenceIds:[],releaseIds:[science.manifestHash,a.claimHash],validUntil:new Date(Math.min(Date.parse(deadline),Date.parse(a.validUntil))).toISOString()}});
+  }
+  for(const goal of science.unresolvedGoals)gap('goal_evidence','unavailable','reviewer',`goal:${goal}`);
+  if(science.unresolvedGoals.length)gap('goal_evidence','unavailable','reviewer');
+ }
  if(!declaration)gap('identity_or_use','missing','evidence');
  if(product?.evidenceState==='conflict')gap('formula_association','conflict','evidence');
  if(!findings.some(f=>f.consequence==='value')&&!findings.some(f=>f.consequence==='decisive'||f.consequence==='concern'))gap(purpose.length?'purpose_or_site':'purpose_coverage','missing',purpose.length?'user':'reviewer');

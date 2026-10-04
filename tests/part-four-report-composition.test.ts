@@ -6,12 +6,14 @@ import { p3input, p3revision } from './fixtures/part-three.ts';
 import { p2id } from './fixtures/part-two-core.ts';
 import { evaluatePersonalResult } from '../src/domain/part-three/evaluate.ts';
 import { assembleFoundation } from '../src/domain/part-four/assemble.ts';
+import { partFourBindingRelease } from '../src/domain/part-four/release.ts';
 import type { PartThreeView } from '../src/presentation/part-three/controller.ts';
 
 // Removing canonical details when P4 is present must lose these independently
 // declared dates/use qualifiers, rather than merely changing a component name.
 function fixture() {
   const x = p3input();
+  x.binding.releases.partFour=partFourBindingRelease();
   if (x.binding.subject.kind !== 'declaration') throw Error('Declaration fixture required');
   x.binding.subject.productId = p2id(50);
   const period = { start: { state: 'known' as const, value: { value: '2020', precision: 'year' as const } }, end: { state: 'unsure' as const } };

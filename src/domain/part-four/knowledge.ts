@@ -4,6 +4,8 @@ import { LOCAL_DICTIONARY_RELEASE, deepFreeze, lookupName } from '../part-two/di
 import { canonicalJson, sha256 } from '../part-two/hash.ts';
 import { APPROVED_CARD_TEXT } from './approved-card-text.ts';
 import { APPROVED47_SOURCE, APPROVED47_PREPARATION_HASH } from './approved47-source.ts';
+import { Candidate423ReleaseSchema, type Candidate423Release } from '../../contracts/IngredientEducation423Candidate.ts';
+import { validate423Candidate, resolve423EducationalCard } from './knowledge423.ts';
 
 export const HISTORICAL_INGREDIENT_KNOWLEDGE_VERSION = 'approved-37-v7/editorial-v1';
 export const INGREDIENT_KNOWLEDGE_VERSION = 'approved-47-20261004/original37-v2-expansion10-v1/editorial-local-v2';
@@ -22,7 +24,8 @@ export const IngredientKnowledgeReleaseSchema = z.strictObject({
   sources: z.array(PartFourSourceSchema).max(1000),
   educationContext: z.array(EducationDocumentContextSchema).max(2).optional(),
 });
-export type IngredientKnowledgeRelease = z.infer<typeof IngredientKnowledgeReleaseSchema>;
+type ApprovedEditorialRelease = z.infer<typeof IngredientKnowledgeReleaseSchema>;
+export type IngredientKnowledgeRelease = ApprovedEditorialRelease | Candidate423Release;
 export interface KnowledgeLifecycle { now?: string; withdrawnDependencies?: readonly string[] }
 const validatedReleases = new WeakSet<IngredientKnowledgeRelease>();
 
@@ -33,8 +36,12 @@ export function ingredientKnowledgeHash(release: IngredientKnowledgeRelease): st
 
 /** The local pack authorizes original approved prose, not a new clinical review.
  * IDs already in Part 2 are reused; new identities use literal name slugs. */
+export function validateIngredientKnowledgeRelease(value: ApprovedEditorialRelease): ApprovedEditorialRelease;
+export function validateIngredientKnowledgeRelease(value: Candidate423Release): Candidate423Release;
+export function validateIngredientKnowledgeRelease(value: unknown): IngredientKnowledgeRelease;
 export function validateIngredientKnowledgeRelease(value: unknown): IngredientKnowledgeRelease {
   if (value && typeof value === 'object' && validatedReleases.has(value as IngredientKnowledgeRelease)) return value as IngredientKnowledgeRelease;
+  if(value&&typeof value==='object'&&'releaseGate' in value&&value.releaseGate==='isolated_local_candidate')return validate423Candidate(value);
   const release = IngredientKnowledgeReleaseSchema.parse(value);
   if (release.contentHash !== ingredientKnowledgeHash(release)) throw Error('Ingredient knowledge content hash mismatch');
   const ids = new Set(release.cards.map(card => card.ingredientId));
@@ -138,6 +145,7 @@ export const APPROVED_INGREDIENT_KNOWLEDGE=validateIngredientKnowledgeRelease(ap
 
 export function ingredientKnowledgeAvailable(release: IngredientKnowledgeRelease, lifecycle: KnowledgeLifecycle = {}): boolean {
   const withdrawn = lifecycle.withdrawnDependencies ?? [];
+  if(release.releaseGate==='isolated_local_candidate')return !release.provenance.revoked&&!withdrawn.includes(release.version)&&!withdrawn.includes(release.contentHash)&&(release.provenance.expiresAt===null||!!lifecycle.now&&Date.parse(lifecycle.now)<Date.parse(release.provenance.expiresAt));
   if (release.provenance.revoked || [release.version,release.contentHash,release.provenance.libraryFileId,release.provenance.documentSha256,release.provenance.handoffSha256,...(release.provenance.additionalDocuments??[]).flatMap(doc=>[doc.libraryFileId,doc.documentSha256]),...(release.provenance.preparationHash?[release.provenance.preparationHash]:[])].some(id => withdrawn.includes(id))) return false;
   if (release.version===INGREDIENT_KNOWLEDGE_VERSION && release.sources.some(source=>withdrawn.includes(source.id))) return false;
   if (release.provenance.expiresAt !== null && (!lifecycle.now || !Number.isFinite(Date.parse(lifecycle.now)) || Date.parse(lifecycle.now) >= Date.parse(release.provenance.expiresAt))) return false;
@@ -150,6 +158,7 @@ export function resolveIngredientKnowledge(name: string, value: IngredientKnowle
   let release: IngredientKnowledgeRelease;
   try { release = validateIngredientKnowledgeRelease(value); } catch { return null; }
   if (!ingredientKnowledgeAvailable(release,lifecycle)) return null;
+  if(release.releaseGate==='isolated_local_candidate')return resolve423EducationalCard({literalName:name,mapping:{state:'unknown',ingredientId:null}},{explicitLocal423:true,expectedReleaseHash:release.contentHash,now:lifecycle.now??'1970-01-01T00:00:00.000Z',withdrawnDependencies:[...(lifecycle.withdrawnDependencies??[])]},release);
   const key = lookupName(name).key;
   const card = release.cards.find(card => [card.name,...card.aliases].some(surface => lookupName(surface).key === key));
   const withdrawn = lifecycle.withdrawnDependencies ?? [];

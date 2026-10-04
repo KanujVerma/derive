@@ -23,9 +23,11 @@ export function analyzeFormula(value: NormalizationResult, options: FormulaAnaly
   if (expected && (expected.bindingKey !== result.bindingKey || expected.resultRevision !== result.resultRevision || expected.dependencyDigest !== reading.binding.dependencyDigest)) return null;
   let knowledge: IngredientKnowledgeRelease;
   try { knowledge = validateIngredientKnowledgeRelease(options.knowledge ?? APPROVED_INGREDIENT_KNOWLEDGE); } catch { return null; }
+  if(knowledge.releaseGate==='isolated_local_candidate'&&[reading,...(result.output.kind==='bound'?[result.output.productFacts]:[])].some(snapshot=>['conflict','blocked'].includes(snapshot.evidenceState)||snapshot.facts.some(fact=>Date.parse(fact.validUntil)<=now)))return null;
   if (!ingredientKnowledgeAvailable(knowledge,options)) return null;
   const snapshot = result.output.kind === 'bound' ? result.output.productFacts : reading;
   const withdrawn = options.withdrawnDependencies ?? [];
+  if(knowledge.releaseGate==='isolated_local_candidate'&&[reading.snapshotId,reading.dependencyManifest.dictionaryHash,...reading.dependencyManifest.dictionaryRecordIds].some(id=>withdrawn.includes(id)))return null;
   if ([result.bindingKey,reading.binding.dependencyDigest,...reading.dependencyManifest.sourceRefs.flatMap(source => [source.observationId,source.policyId,source.contentHash])].some(id => withdrawn.includes(id))) return null;
   if (snapshot.facts.some(fact => fact.sourceDependencies.some(id => withdrawn.includes(id)) || fact.dictionaryDependencies.some(id => withdrawn.includes(id)))) return null;
   const ingredients = reading.occurrences.map(occurrence => {
@@ -34,7 +36,7 @@ export function analyzeFormula(value: NormalizationResult, options: FormulaAnaly
     const card = candidate && (occurrence.mapping.state !== 'resolved' || occurrence.mapping.ingredientId === candidate.ingredientId) ? candidate : null;
     const amounts = occurrence.quantities.filter(quantity => quantity.status === 'validated' && quantity.subject === 'ingredient');
     return { occurrenceId: occurrence.occurrenceId, occurrence, observedName: occurrence.observedName,
-      ingredientId: card?.ingredientId ?? (occurrence.mapping.state === 'resolved' ? occurrence.mapping.ingredientId : null),
+      ingredientId: knowledge.releaseGate==='isolated_local_candidate'?(occurrence.mapping.state==='resolved'?occurrence.mapping.ingredientId:null):card?.ingredientId ?? (occurrence.mapping.state === 'resolved' ? occurrence.mapping.ingredientId : null),
       card, modality: occurrence.modality, quantityText: amounts.length ? amounts.map(quantity => quantity.span.raw).join('; ') : null };
   });
   const documentIds = new Set(ingredients.flatMap(ingredient=>ingredient.card?.editorial?[ingredient.card.editorial.documentId]:[]));

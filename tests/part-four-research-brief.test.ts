@@ -8,6 +8,7 @@ import { componentHarness, control, press, textContent } from './ux-profile-rend
 import { p3input } from './fixtures/part-three.ts';
 import { evaluatePersonalResult } from '../src/domain/part-three/evaluate.ts';
 import { assembleFoundation } from '../src/domain/part-four/assemble.ts';
+import { partFourBindingRelease } from '../src/domain/part-four/release.ts';
 
 const now = '2026-10-02T10:00:00Z';
 const subject: ResearchBriefSubject = { productId: 'synthetic-product', variantId: 'synthetic-variant', formulaVersionId: 'synthetic-formula' };
@@ -134,6 +135,7 @@ test('content subject and observation scope remain exact; formula-unknown qualif
 
 function foundation(): PartFourPacket {
   const input = p3input();
+  input.binding.releases.partFour = partFourBindingRelease();
   const result = evaluatePersonalResult(input);
   const packet = assembleFoundation({ context: input.context, partTwo: input.partTwo, requestedUse: input.requestedUse,
     intent: input.binding.intent, candidateRoutineItemId: null, selectedComparatorId: null }, result);

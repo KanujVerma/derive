@@ -8,6 +8,7 @@ import { activeRoutineItem, exactCatalogReference, knownAnswer, sameReportedUse,
 import { admitRoutineFormulaEvidence, type QualifiedRoutineFormula, type RoutineFormulaItemState } from './routineFormula.ts';
 export type { QualifiedRoutineFormula } from './routineFormula.ts';
 export interface FoundationInput {
+ scientificDecision?:import('../../contracts/ScientificClaim.ts').ScientificDecisionPacket;
  context:PersonalContextV2; partTwo:NormalizationResult; requestedUse:RequestedUse;
  intent:'add'|'replace'|'check_current'|'unanswered'|'unsure'|'withheld'; candidateRoutineItemId:string|null; selectedComparatorId:string|null;
  /** Pass evaluation time at the authority boundary. Omitted time evaluates only

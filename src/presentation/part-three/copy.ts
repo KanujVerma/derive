@@ -7,6 +7,8 @@ export function findingCopy(f: FindingV2): string {
         return 'This supporting detail is unavailable.';
     const name = f.arguments.name ? text(f.arguments.name) : 'this product';
     switch (f.kind) {
+        case 'goal_evidence':
+        case 'routine_evidence': return f.scientificEvidence?[f.scientificEvidence.reason,...f.scientificEvidence.qualifications].map(text).join(' '):'This evidence is unavailable.';
         case 'avoidance': return f.arguments.detail === 'preference' ? `This conflicts with your confirmed choice to avoid ${name}.` : 'A confirmed preference needs review.';
         case 'sensitivity': return `This list includes ${name}, which you reported as a sensitivity.`;
         case 'experience': {
@@ -20,7 +22,7 @@ export function findingCopy(f: FindingV2): string {
         case 'evidence_limit': return f.arguments.detail === 'conditional' ? 'This is conditional or source-only wording; definite product presence is unconfirmed.' : f.arguments.name?`Your confirmed avoidance term “${name}” remains unresolved; a match cannot be established.`:'A material evidence detail remains unresolved.';
     }
 }
-export const gapCopy = (g: MaterialGap) => g.state==='conflict'?'Sources disagree on a material fact. This Check keeps that conflict unresolved.':({ identity_or_use: 'Product identity or intended use remains unresolved.', avoidance_unresolved: 'A confirmed avoidance preference has an unresolved match.', formula_association: 'This formula is not confirmed for your package.', relevant_history: 'Relevant history could not be completely checked.', purpose_coverage: 'The available evidence cannot support a judgment for this purpose.', purpose_or_site: 'Purpose, application site or use form needs clarification.', intent: 'Add or replace intent remains unresolved.', current_status: 'Whether the selected item is still in use remains unresolved.' })[g.reason];
+export const gapCopy = (g: MaterialGap) => g.state==='conflict'?'Sources disagree on a material fact. This Check keeps that conflict unresolved.':({ identity_or_use: 'Product identity or intended use remains unresolved.', avoidance_unresolved: 'A confirmed avoidance preference has an unresolved match.', formula_association: 'This formula is not confirmed for your package.', relevant_history: 'Relevant history could not be completely checked.', purpose_coverage: 'The available evidence cannot support a judgment for this purpose.', purpose_or_site: 'Purpose, application site or use form needs clarification.', intent: 'Add or replace intent remains unresolved.', current_status: 'Whether the selected item is still in use remains unresolved.', goal_evidence: 'Evidence needed for a reported goal remains unresolved.' })[g.reason];
 export function decisionCopy(result: PersonalResultV2) {
  const s=result.summary, primary=result.findings.find(f=>f.id===s?.primaryFindingId), packet=result.partFour;
  const pending=packet?.decisionState==='pending', conflict=packet?.decisionState==='conflict';

@@ -1,4 +1,5 @@
 import type { FormulaAnalysis, PartFourPacket, PartFourInsight } from '../../contracts/PartFour.ts';
+import { lookupName } from '../../domain/part-two/dictionary.ts';
 
 export interface PartFourRenderFence {
   now?: number;
@@ -48,7 +49,16 @@ export function ingredientTargets(formula: FormulaAnalysis, target: { occurrence
 export function ingredientRow(ingredient: FormulaAnalysis['ingredients'][number]) {
   const occurrence = ingredient.occurrence;
   // A knowledge card is general ingredient context, never a personal verdict.
-  const card = ingredient.ingredientId !== null && ingredient.card?.ingredientId === ingredient.ingredientId ? ingredient.card : null;
+  const attached = ingredient.card;
+  // An admitted exact literal explanation can exist before the catalog knows
+  // its identity. This preserves the unknown identity and conditional presence;
+  // proposed aliases, ambiguous mapping and unclear text cannot qualify it.
+  const literalEducation = ingredient.ingredientId === null && occurrence.mapping.state === 'unresolved'
+    && occurrence.mapping.reason === 'name_not_in_release'
+    && occurrence.transcription === 'clear' && ingredient.modality !== 'unresolved'
+    && attached?.contributionKind === 'unknown'
+    && [attached.name, ...attached.aliases].some(name => lookupName(name).key === lookupName(ingredient.observedName).key);
+  const card = attached && (ingredient.ingredientId !== null && attached.ingredientId === ingredient.ingredientId || literalEducation) ? attached : null;
   const qualifiers: string[] = [];
   if (ingredient.modality === 'may_contain') qualifiers.push('May contain · Definite presence is not established.');
   if (ingredient.modality === 'alternative') qualifiers.push('Alternative entry · Definite presence is not established.');
@@ -98,14 +108,14 @@ export function visiblePartFourInsights(packet: PartFourPacket): { comparison: P
     // and in Sources, rather than repeating them in the direct comparison.
     if (insight.ruleId === 'F08' && insight.state !== 'conflict') return false;
     if (insight.state !== 'unknown') return true;
-    if (['F01', 'F02'].includes(insight.ruleId)) return true;
+    if (['F01', 'F02','G01','G02','G03'].includes(insight.ruleId)) return true;
     if (['F06', 'F07'].includes(insight.ruleId)) return hasComparison;
     if (insight.ruleId === 'F04') return packet.comparison.state === 'selected';
     // Unavailable sensory/offer and review evidence has its own visible section.
     return false;
   });
-  return { comparison: visible.filter(insight => !['F03', 'F06'].includes(insight.ruleId)),
-    routine: visible.filter(insight => ['F03', 'F06'].includes(insight.ruleId)) };
+  return { comparison: visible.filter(insight => !['F03', 'F06','G04','G05'].includes(insight.ruleId)),
+    routine: visible.filter(insight => ['F03', 'F06','G04','G05'].includes(insight.ruleId)) };
 }
 
 const formulaLimitCopy: Readonly<Record<string, string | null>> = {
