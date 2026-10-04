@@ -6,7 +6,7 @@ import { isPermittedProviderDestination, permittedOpenFactsImage, providerOperat
 const envelope=z.object({products:z.array(z.object({code:z.string(),product_name:z.string().nullish(),brands:z.string().nullish(),quantity:z.string().nullish(),countries_tags:z.array(z.string()).optional(),image_front_url:z.string().nullish()})).max(10)});
 /** Read-only candidates. Selecting a returned barcode always re-resolves identity;
  * these name matches never admit declarations or establish exact package truth. */
-export async function searchPartOneProducts(input:unknown,policy:SourcePolicy,config:ProviderConfiguration,transport:ProviderTransport,ports:{now():string;id(code:string):Promise<string>;reserve():boolean}):Promise<{items:PartOneSearchItem[]}> {
+export async function searchPartOneProducts(input:unknown,policy:SourcePolicy,config:ProviderConfiguration,transport:ProviderTransport,ports:{now():string;id(code:string):Promise<string>;reserve():boolean|Promise<boolean>}):Promise<{items:PartOneSearchItem[]}> {
  const {query}=PartOneSearchRequestSchema.parse(input),now=ports.now();
  if(!providerOperationPermitted('open_facts',policy,['identity'],now))throw Error('source_policy_blocked');
  const origin=new URL(config.endpoint);if(origin.origin!=='https://world.openbeautyfacts.org')throw Error('source_origin_unapproved');
@@ -18,11 +18,13 @@ export async function searchPartOneProducts(input:unknown,policy:SourcePolicy,co
   const addresses=await transport.resolve(url.hostname,controller.signal);
   controller.signal.throwIfAborted();
   if(!providerOperationPermitted('open_facts',policy,['identity'],ports.now()))throw Error('source_policy_blocked');
-  if(!transport.pinsResolvedAddresses||!isPermittedProviderDestination(url.toString(),config.allowedHosts,addresses)||!ports.reserve())throw Error('source_unavailable');
+  if(!transport.pinsResolvedAddresses||!isPermittedProviderDestination(url.toString(),config.allowedHosts,addresses)||!await ports.reserve())throw Error('source_unavailable');
+  if(!providerOperationPermitted('open_facts',policy,['identity'],ports.now()))throw Error('source_policy_blocked');
+  controller.signal.throwIfAborted();
   const reply=await transport.fetch(url.toString(),{method:'GET',headers:{Accept:'application/json','User-Agent':config.userAgent},redirect:'manual',signal:controller.signal,resolvedAddresses:addresses});
   if(!reply.ok||!/^application\/json/i.test(reply.headers.get('content-type')??'')){await reply.body?.cancel();throw Error('source_unavailable');}
   const reader=reply.body?.getReader();if(!reader)throw Error('source_unavailable');let bytes=0;const chunks:Uint8Array[]=[];
-  while(true){const chunk=await reader.read();if(chunk.done)break;bytes+=chunk.value.byteLength;if(bytes>262144){await reader.cancel();throw Error('source_response_limit');}chunks.push(chunk.value);}
+  while(true){const chunk=await reader.read();if(chunk.done)break;bytes+=chunk.value.byteLength;if(bytes>Math.min(262144,Math.max(1,config.maxBytes??262144))){await reader.cancel();throw Error('source_response_limit');}chunks.push(chunk.value);}
   const data=new Uint8Array(bytes);let offset=0;for(const c of chunks){data.set(c,offset);offset+=c.length;}
   const parsed=envelope.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(data))),items:PartOneSearchItem[]=[];
   for(const product of parsed.products){const code=normalizeBarcode({raw:product.code,symbology:product.code.length===8?'ean8':null,namespace:'gtin',retailerId:null});if(!code.supported||!product.product_name?.trim())continue;

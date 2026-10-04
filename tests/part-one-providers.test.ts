@@ -256,3 +256,12 @@ test('retained duplicate identity assertions survive every authorized admission 
   const payload = f.admissions[0].payload.payload as { nativeBrand: string; structuredVariant: Variant };
   assert.equal(payload.nativeBrand, 'Fixture'); assert.deepEqual(payload.structuredVariant, variant);
 });
+
+test('rights expiry while awaiting dispatch authorization prevents provider bytes', async () => {
+  const f = fixture(), policy = grant('open_facts'); let current = now, fetched = 0;
+  const request: ProviderLookupRequest = { canonicalCode: '03606000537538', originalCode: '3606000537538', symbology: 'ean13', nativeCode: '3606000537538', requestedMarket: null, categoryHint: null, requestedFields: ['identity', 'ingredients'], jobId: id(20), stageId: id(21), reservationId: id(22), deadlineAt: '2026-10-02T12:00:08.000Z' };
+  policy.expiresAt = '2026-10-02T12:00:01.000Z';
+  const transport: ProviderTransport = { pinsResolvedAddresses: true, resolve: async () => ['93.184.216.34'], fetch: async () => { fetched++; return json(source()); } };
+  const reply = await lookupPrimaryProvider('open_facts', request, policy, f.ports.configs.open_facts, transport, { now: () => current, observationId: id(23), hash: f.ports.hash, beforeRequest: async () => { current = policy.expiresAt!; return true; } });
+  assert.equal(reply.status, 'disallowed_by_source_policy'); assert.equal(reply.usage.calls, 0); assert.equal(fetched, 0);
+});

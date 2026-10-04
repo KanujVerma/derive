@@ -166,6 +166,10 @@ export async function lookupPrimaryProvider(provider: PrimaryProvider, requestIn
       try { authorizationInProgress = true; authorized = await ports.beforeRequest(url, redirect); authorizationInProgress = false; } catch (error) { persistenceError = error; throw error; }
       if (controller.signal.aborted) throw new Error('provider_deadline');
       if (!authorized) return account(emptyProviderReply(provider, 'rate_limited', policy!.version));
+      // Durable quota/dispatch authorization can wait on another transaction.
+      // That wait cannot extend either source rights or the request deadline.
+      if (!providerOperationPermitted(provider, policy, request.requestedFields, ports.now())) return account(emptyProviderReply(provider, 'disallowed_by_source_policy', policy!.version));
+      if (Date.parse(request.deadlineAt) <= Date.parse(ports.now())) return account(emptyProviderReply(provider, 'unavailable', policy!.version));
       dispatched++;
       const response = await transport.fetch(url, { method: 'GET', headers: { Accept: 'application/json', 'User-Agent': config.userAgent }, redirect: 'manual', signal: controller.signal, resolvedAddresses: addresses });
       if (controller.signal.aborted) { await response.body?.cancel(); throw new Error('provider_deadline'); }

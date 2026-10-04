@@ -1,3 +1,5 @@
+import {createPartOneOrdinaryServices} from '../_shared/part-one-ordinary.ts';
+import {createOpenBeautyFactsTransport} from '../_shared/part-one-pinned-transport.ts';
 import {ordinaryPartThreeRelease} from '../../../src/domain/part-three/release.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0';
 import { handlePartOneRequest, PartOneHttpError, rpcErrorToHttp } from '../_shared/part-one-runtime.ts';
@@ -9,6 +11,7 @@ import { normalizeAuthorized, PartTwoHttpError } from '../_shared/part-two-runti
 import { createPartOneBoundedFetch } from '../_shared/part-one-bounded-fetch.ts';
 import { authorizeServerUser } from '../_shared/server-auth.ts';
 const boundedFetch=createPartOneBoundedFetch();
+const publicTransport=createOpenBeautyFactsTransport();
 Deno.serve(async (request: Request) => {
   // Clients and the verified owner are request-scoped, including private work.
   const url=Deno.env.get('SUPABASE_URL') ?? '';
@@ -30,6 +33,13 @@ Deno.serve(async (request: Request) => {
     const admin=createClient(url,serviceKey,{global:{fetch:boundedFetch},auth:{persistSession:false,autoRefreshToken:false}});
     return{ownerId,operation,service:privateService(admin),storage:createPrivateStoragePorts(admin,{publicApiOrigin:Deno.env.get('PART_ONE_PRIVATE_PUBLIC_API_ORIGIN')})};
   };
+  const ordinaryServices=()=>{
+    const serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if(!ownerId||!serviceKey)return null;
+    const admin=createClient(url,serviceKey,{global:{fetch:boundedFetch},auth:{persistSession:false,autoRefreshToken:false}});
+    return createPartOneOrdinaryServices({url,selectedReleaseId:Deno.env.get('DERIVE_CHECK_RELEASE'),sourceReleaseId:Deno.env.get('DERIVE_OBF_SOURCE_RELEASE'),ownerId,transport:publicTransport,
+      rpc:async(action,payload)=>{const {data,error}=await admin.rpc('part_one_worker',{p_action:action,p_payload:payload});if(error)throw new PartOneHttpError('public_source_unavailable',503);return data;}});
+  };
   const reply=await handlePartOneRequest(request,{
     async authorize() {
       if (!url || !key) throw new PartOneHttpError('configuration_required',503);
@@ -37,10 +47,16 @@ Deno.serve(async (request: Request) => {
       ownerId=await authorizeServerUser(client.auth,(code,status)=>new PartOneHttpError(code,status));
     },
     operation,
+    search:async input=>{const services=ordinaryServices();if(!services)throw new PartOneHttpError('source_configuration_required',503);return services.search(input);},
     privateUpload:(request,id,binding)=>uploadPrivateDerivative(request,{captureSessionId:id,...binding},privatePorts()),
     privateCommit:(id,payload)=>commitPrivateCapture(id,payload,privatePorts()),
     privateRecover:id=>recoverPrivateCapture(id,privatePorts()),
   });
+  // One durable public job per authorized scan/poll request. No recursive Edge
+  // calls, perpetual loop, new scheduler, private extractor or provider defaults.
+  if(ownerId&&reply.ok&&['GET','POST'].includes(request.method)&&/\/part-one\/scans(?:\/|$)/.test(new URL(request.url).pathname)){
+    const services=ordinaryServices();if(services)EdgeRuntime.waitUntil(services.consume().catch(()=>undefined));
+  }
   // Bounded precomputation after admitted/selected evidence. It uses the same
   // authenticated resolver and local deterministic worker as explicit reopen.
   // No provider, dictionary service or private-data export is involved.

@@ -168,7 +168,7 @@ function workerLookupFixture() {
     retainedFields:['identity','ingredients'],attribution:'Synthetic fixture',purgeObligations:[]};
   let fetches=0;
   return{lookupPorts:{now:()=> '2026-10-02T12:00:00.000Z',policies:[policy],configs:{open_facts:{endpoint:'https://open.synthetic.invalid/',allowedHosts:['open.synthetic.invalid'],userAgent:'Synthetic local fixture'}},
-    transport:{pinsResolvedAddresses:true,resolve:async()=>['93.184.216.34'],fetch:async()=>{fetches++;return new Response(JSON.stringify({status:1,product:{code:'3606000537538',product_name:'Synthetic worker lotion',brands:'Fixture',ingredients_text:'Water, Glycerin'}}),{headers:{'content-type':'application/json'}});}}},get fetches(){return fetches;}};
+    transport:{pinsResolvedAddresses:true as const,resolve:async()=>['93.184.216.34'],fetch:async()=>{fetches++;return new Response(JSON.stringify({status:1,product:{code:'3606000537538',product_name:'Synthetic worker lotion',brands:'Fixture',ingredients_text:'Water, Glycerin'}}),{headers:{'content-type':'application/json'}});}}},get fetches(){return fetches;}};
 }
 test('A20 supervised consumer dispatches actual primary pipeline through durable RPC boundaries',async()=>{
   const l=ledgerFixture(),f=workerLookupFixture();
