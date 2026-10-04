@@ -52,7 +52,7 @@ export default function RootLayout() {
   const customerState = useSyncExternalStore(customerController.subscribe, customerController.getState);
   const introOwner = useScannerEntryStore(s => s.ownerId);
   const introHandled = useScannerEntryStore(s => s.profileIntroHandled);
-  const scannerEntry = resolveScannerEntry({ authStatus, ownerId: sessionUserId, accessStatus,
+  const scannerEntry = resolveScannerEntry({ guestBootstrap:hostedScanner, authError, authStatus, ownerId: sessionUserId, accessStatus,
     access, contextOwnerId: customerState.ownerId,
     contextStatus: customerState.context?.ownerId === sessionUserId ? 'ready' : customerState.status,
     hasProfile: Boolean(customerState.context?.profile),
@@ -141,17 +141,17 @@ export default function RootLayout() {
   useEffect(() => {
     if (!remoteEnabled) return;
 
-    if (!localFreeIntegration) void getCurrentSession();
+    if (!freeIntegration) void getCurrentSession();
     const { unsubscribe } = subscribeToAuth();
     return () => unsubscribe();
-  }, [remoteEnabled, localFreeIntegration]);
+  }, [remoteEnabled, freeIntegration]);
 
-  // Only the local development integration may silently create a guest session.
+  // Free scanner shells restore a persisted owner before creating one guest session.
   useEffect(() => {
-    if (!localFreeIntegration || authError || accessStatus === 'ERROR') return;
+    if (!freeIntegration || authError || accessStatus === 'ERROR') return;
     if (authStatus !== 'INITIALIZING' && authStatus !== 'SIGNED_OUT') return;
     void ensureLocalAnonymousSession().then(() => setAuthError(false)).catch(() => setAuthError(true));
-  }, [localFreeIntegration, authStatus, accessStatus, authError]);
+  }, [freeIntegration, authStatus, accessStatus, authError]);
 
   useEffect(() => {
     if (!freeIntegration || authStatus !== 'SIGNED_IN' || !sessionUserId) return;

@@ -239,7 +239,8 @@ function projectAuthenticatedSession(user: { id: string; email?: string | null }
 
 let anonymousStart: Promise<string> | null = null;
 
-/** Local-only caller: preserve the persisted session; create a guest only when none exists. */
+/** Historical name retained for callers: free scanner shells preserve a persisted
+ * owner and create a guest only when none exists. No access/RLS grant is implied. */
 export function ensureLocalAnonymousSession(): Promise<string> {
   if (anonymousStart) return anonymousStart;
   anonymousStart = (async () => {
