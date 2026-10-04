@@ -5,14 +5,14 @@ import {createRequire} from 'node:module';
 import ts from 'typescript';
 import {ScanResultSchema} from '../src/contracts/PartOne.ts';
 const owner='00000000-0000-4000-8000-000000000910',scanId='00000000-0000-4000-8000-000000000911';
-function entryFixture(){
+function entryFixture(expiresAt:unknown='2027-01-04T00:00:00.000Z'){
  const index=new URL('../supabase/functions/part-one/index.ts',import.meta.url),nativeRequire=createRequire(index);
  const env:Record<string,string>={SUPABASE_URL:'https://snojlbqovlawewwqbviz.supabase.co',SUPABASE_ANON_KEY:'synthetic-anon',SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',DERIVE_CHECK_RELEASE:'derive-original-personal-v1',DERIVE_OBF_SOURCE_RELEASE:'derive-obf-public-content-v1'};
  let handler!:(r:Request)=>Promise<Response>,fetches=0,authValid=true;const background:Promise<unknown>[]=[],rpcCalls:Array<{service:boolean;action:string;payload:Record<string,unknown>}>=[];
  const result=ScanResultSchema.parse({schemaVersion:1,requestId:owner,scanId,generation:0,resultRevision:1,identity:'pending',itemId:null,candidateIds:[],snapshotId:null,declarationId:null,declarationState:'none',scope:null,packageConfirmation:'unconfirmed',work:'queued',jobId:owner,subscriptionId:null,reasonCodes:[],nextCheckAfter:null,conflictIds:[],evidenceIds:[],allowedActions:['rescan','retry'],freshness:{observedAt:null,expiresAt:null,state:'unknown'},display:{resultRevision:1,selectedIdentity:null,candidates:[],sections:[],sources:[],limitations:[]}});
  const createClient=(_url:string,key:string)=>({auth:{getUser:async()=>({data:{user:authValid?{id:owner}:null},error:authValid?null:{status:401}})},rpc:async(_name:string,p:{p_action:string;p_payload:Record<string,unknown>})=>{
   rpcCalls.push({service:key==='synthetic-service',action:p.p_action,payload:p.p_payload});
-  if(p.p_action==='public/policy')return {data:{allowed:true,policyVersion:'derive-obf-public-content-v1',expiresAt:'2027-01-04T00:00:00.000Z'},error:null};
+  if(p.p_action==='public/policy')return {data:{allowed:true,policyVersion:'derive-obf-public-content-v1',expiresAt},error:null};
   if(p.p_action==='public/budget')return {data:{allowed:true},error:null};if(p.p_action==='claim')return {data:{job:null},error:null};
   return {data:p.p_action==='scans/read'?result:{},error:null};
  }});
@@ -45,4 +45,17 @@ test('public source alteration method is opt-in and contains no live account dat
 test('actual entrypoint source selection and Auth refusal perform no provider work or background claim',async()=>{
  for(const blocked of ['source','project','auth']){const f=entryFixture();if(blocked==='source')delete f.env.DERIVE_OBF_SOURCE_RELEASE;if(blocked==='project')f.env.SUPABASE_URL='https://other.supabase.co';if(blocked==='auth')f.denyAuth();
  const response=await f.handler(request('/search','POST',{query:'Synthetic lotion'}));assert.equal(response.status,blocked==='auth'?401:503);assert.equal(f.fetches,0);assert.equal(f.background.length,0);assert.equal(f.rpcCalls.some(c=>c.service),false);}
+});
+
+test('ordinary hosted policy accepts equivalent expiry offsets without relaxing downstream UTC contracts',async()=>{
+ for(const expiry of ['2027-01-04T00:00:00.000Z','2027-01-04T00:00:00+00:00','2027-01-03T19:00:00-05:00']){
+  const f=entryFixture(expiry),response=await f.handler(request('/search','POST',{query:'Synthetic lotion'}));
+  assert.equal(response.status,200,expiry+': '+await response.text());assert.equal(f.fetches,1);
+ }
+});
+test('ordinary policy rejects invalid, absent, expired or overlong authority before provider work',async()=>{
+ for(const expiry of ['invalid','2027-01-04T00:00:00',null,'2020-01-01T00:00:00Z','2027-01-04T00:00:01Z']){
+  const f=entryFixture(expiry),response=await f.handler(request('/search','POST',{query:'Synthetic lotion'}));
+  assert(response.status>=400,String(expiry));assert.equal(f.fetches,0);assert.equal(f.rpcCalls.some(c=>c.action==='public/budget'),false);
+ }
 });

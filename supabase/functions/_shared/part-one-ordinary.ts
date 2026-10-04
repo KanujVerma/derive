@@ -22,7 +22,7 @@ export function createPartOneOrdinaryServices(options:Options){
  const currentPolicy=async():Promise<SourcePolicy>=>{
   const live=authority.parse(await options.rpc('public/policy',{policyVersion:OBF_PUBLIC_SOURCE_RELEASE.id}));
   if(!live.allowed||live.policyVersion!==OBF_PUBLIC_SOURCE_RELEASE.id||!live.expiresAt||Date.parse(live.expiresAt)<=Date.parse(now())||Date.parse(live.expiresAt)>Date.parse(OBF_PUBLIC_SOURCE_RELEASE.expiresAt))throw new PartOneHttpError('source_policy_blocked',503);
-  return SourcePolicySchema.parse({...ExternalSourcePolicies[0],version:OBF_PUBLIC_SOURCE_RELEASE.id,permissionEvidence:OBF_PUBLIC_SOURCE_RELEASE.permissionEvidence,reviewedAt:OBF_PUBLIC_SOURCE_RELEASE.reviewedAt,expiresAt:live.expiresAt,
+  return SourcePolicySchema.parse({...ExternalSourcePolicies[0],version:OBF_PUBLIC_SOURCE_RELEASE.id,permissionEvidence:OBF_PUBLIC_SOURCE_RELEASE.permissionEvidence,reviewedAt:OBF_PUBLIC_SOURCE_RELEASE.reviewedAt,expiresAt:new Date(live.expiresAt).toISOString(),
    operations:{...ExternalSourcePolicies[0].operations,lookup:true,process:true,retain:true,sharedDisplay:true},retainedFields:['identity','ingredients'],attribution:OBF_PUBLIC_SOURCE_RELEASE.attribution,
    purgeObligations:['Maximum 24-hour observation/current rights lifetime; live expiry and withdrawal apply to saved projections','No images, OCR, private capture, rehosting or unrelated source transfer','ODbL derivative database access obligations remain an independent operational activation gate']});
  };
