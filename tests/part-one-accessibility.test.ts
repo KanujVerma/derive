@@ -19,6 +19,9 @@ test('A29 incomplete results expose named save, capture, retry and rescan action
   } });
   const nodes = h.render();
   for (const label of ['Save product', 'Scan ingredients', 'Retry']) press(control(nodes, label));
+  for (const label of ['Scan ingredients', 'Retry', 'Search by name']) {
+    assert(control(nodes, label).props.style.minHeight >= 44, `${label} must retain a 44pt touch target at small text sizes`);
+  }
   assert.deepEqual(calls, ['save', 'capture', 'retry']);
   assert.match(textContent(nodes), /unverified|incomplete/i);
   assert.match(textContent(nodes), /right edge/);

@@ -107,7 +107,9 @@ export function PartFourSections(props: PartFourSectionsProps) {
           return <View key={row.occurrenceId} nativeID={`part-four-ingredient-${row.occurrenceId}`} style={styles.ingredient}
             onLayout={event => {layout.current.rows.set(row.occurrenceId,event.nativeEvent.layout.y);props.onIngredientLayout?.(row.occurrenceId,event.nativeEvent.layout.y);}}>
             {heading && heading !== 'Ingredients' && <Text accessibilityRole="header" style={styles.sectionKind}>{heading}</Text>}
-            <Pressable accessibilityRole="button" accessibilityLabel={`Ingredient details: ${row.name}, position ${index + 1}`}
+            <Pressable accessibilityRole="button"
+              accessibilityLabel={[`Ingredient details: ${row.name}, position ${index + 1}`, row.short, row.label,
+                ...row.qualifiers, ...row.amounts, ...row.quantityLimits].join(', ')}
               accessibilityState={{ expanded }} onPress={() => toggleIngredient(expanded ? null : row.occurrenceId)} style={styles.ingredientSummary}>
               <View accessible={false} style={styles.ingredientSignal} />
               <View style={styles.ingredientName}>

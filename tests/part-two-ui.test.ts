@@ -11,7 +11,7 @@ test('A01/A28/A30 actual inline rows keep literal text, source-only limits and r
   const v=view('Niacinamide, PG-6-Decyltetradecanol'); assert.equal(v.result?.state,'ready');
   const h=componentHarness(modulePath,'PartTwoInlineView',{view:v,now:Date.parse(p2metadata.createdAt)});
   let nodes=h.render(); assert.match(textContent(nodes),/Photo reading.*Package not confirmed.*May be incomplete/);
-  press(control(nodes,'Ingredient details: Niacinamide')); nodes=h.render(); assert.match(textContent(nodes),/Listed as: Niacinamide/); press(control(nodes,'Ingredient source and reference')); nodes=h.render(); assert.match(textContent(nodes),/Synthetic private label/);
+  assert(control(nodes,'Ingredient details: Niacinamide').props.style.minHeight >= 44, 'Fallback ingredient disclosure retains a 44pt target at small text sizes');press(control(nodes,'Ingredient details: Niacinamide')); nodes=h.render(); assert.match(textContent(nodes),/Listed as: Niacinamide/); press(control(nodes,'Ingredient source and reference')); nodes=h.render(); assert.match(textContent(nodes),/Synthetic private label/);
   press(control(nodes,'Ingredient details: PG-6-Decyltetradecanol')); nodes=h.render(); assert.match(textContent(nodes),/Details unavailable for this name/); assert(!textContent(nodes).includes('PPG-6-Decyltetradeceth'));
   const revoked=h.render({view:{...v,result:null,error:'Ingredient evidence unavailable'}}); assert(control(revoked,'Close ingredient detail')); assert.match(textContent(revoked),/Ingredient evidence unavailable/); assert(!textContent(revoked).includes('PG-6-Decyltetradecanol'));
 });

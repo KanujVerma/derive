@@ -84,7 +84,7 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
     {reading ? reading.occurrences.map((occurrence, index) => <View key={occurrence.occurrenceId} style={{ gap: spacing.xs }} onLayout={event => { const row = layout.current.rows.find(r => r.id === occurrence.occurrenceId); if (row) row.height = openId === row.id ? Math.max(row.height, event.nativeEvent.layout.height) : event.nativeEvent.layout.height; }}>
       {(index === 0 || reading.occurrences[index - 1].sectionId !== occurrence.sectionId || reading.occurrences[index - 1].sectionKind !== occurrence.sectionKind) && <Text accessibilityRole="header">{sectionLabel(occurrence.sectionKind)}</Text>}
       <Pressable accessibilityRole="button" accessibilityLabel={`Ingredient details: ${ingredientDisplayText(occurrence.observedName || occurrence.rawToken)}`}
-        accessibilityState={{ expanded: openId === occurrence.occurrenceId }} onPress={() => { layout.current.detailHeight = 0; layout.current.detailOffset = 0; setOpen(openId === occurrence.occurrenceId ? null : { key, id: occurrence.occurrenceId }); setDisclosure(null); }} style={{ paddingVertical: spacing.sm }}>
+        accessibilityState={{ expanded: openId === occurrence.occurrenceId }} onPress={() => { layout.current.detailHeight = 0; layout.current.detailOffset = 0; setOpen(openId === occurrence.occurrenceId ? null : { key, id: occurrence.occurrenceId }); setDisclosure(null); }} style={{ paddingVertical: spacing.sm, minHeight: 44 }}>
         <Text selectable>{ingredientDisplayText(occurrence.rawToken)}</Text>
         {modalityText(occurrence) && <Text>{modalityText(occurrence)}</Text>}
         {occurrence.transcription !== 'clear' && <Text>Text unclear · Check text</Text>}

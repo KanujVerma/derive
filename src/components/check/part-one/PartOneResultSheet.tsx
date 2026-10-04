@@ -137,9 +137,9 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
         }} />}
       {!partFourCurrent && r?.snapshotId && !r.declarationId && <Text>Saves the product only; this photo reading is not saved.</Text>}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-        {onCapture && r && (expired || expiredFields || r.declarationState !== 'accepted') && <Button label="Scan ingredients" size="medium" style={{ flex: 1 }} variant="ghost" onPress={onCapture} />}
-        {(view.error || r?.allowedActions.includes('retry')) && <Button label="Retry" size="medium" style={{ flex: 1 }} variant="ghost" onPress={onRefresh} />}
-        <Button label="Search by name" size="medium" style={{ flex: 1 }} variant="ghost" onPress={onSearch} />
+        {onCapture && r && (expired || expiredFields || r.declarationState !== 'accepted') && <Button label="Scan ingredients" size="medium" style={{ flex: 1, minHeight: 44 }} variant="ghost" onPress={onCapture} />}
+        {(view.error || r?.allowedActions.includes('retry')) && <Button label="Retry" size="medium" style={{ flex: 1, minHeight: 44 }} variant="ghost" onPress={onRefresh} />}
+        <Button label="Search by name" size="medium" style={{ flex: 1, minHeight: 44 }} variant="ghost" onPress={onSearch} />
       </View>
     </View>}>
     {typeof localDraft === 'function' ? localDraft(sourceAccess.current.privateDenied, setDetails) : !sourceAccess.current.privateDenied && localDraft}

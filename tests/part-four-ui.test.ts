@@ -102,6 +102,25 @@ test('all formula positions, short explanations and long copy remain readable in
   assert(nodes.indexOf(control(nodes, 'Part Four sources')) > nodes.indexOf(control(nodes, `Ingredient details: ${longName}, position 43`)));
 });
 
+test('ingredient buttons expose their visible function, presence qualifiers and material amount limits to accessibility', () => {
+  const value = packet('Glycerin, Mystery compound');
+  const nodes = componentHarness(component, 'PartFourSections', { packet: value, now }).render();
+  const known = control(nodes, 'Ingredient details: Glycerin, position 1').props.accessibilityLabel;
+  assert.match(known, /Glycerin has an approved general ingredient explanation/);
+  assert.match(known, /Ingredient contribution/);
+  assert.match(known, /Amount in this formula: not disclosed/);
+  assert.match(control(nodes, 'Ingredient details: Mystery compound, position 2').props.accessibilityLabel,
+    /An explanation is unavailable for this name.*Knowledge unavailable.*Amount in this formula: not disclosed/);
+  const conditional = packet('May contain (+/-): CI 77491');
+  const conditionalNodes = componentHarness(component, 'PartFourSections', { packet: conditional, now }).render();
+  assert.match(control(conditionalNodes, 'Ingredient details: CI 77491, position 1').props.accessibilityLabel,
+    /May contain · Definite presence is not established/);
+  const printed = packet('Salicylic Acid (2%)');
+  const printedNodes = componentHarness(component, 'PartFourSections', { packet: printed, now }).render();
+  assert.match(control(printedNodes, 'Ingredient details: Salicylic Acid, position 1').props.accessibilityLabel,
+    /Printed amount: 2%.*does not specify whether this amount is by weight or volume/);
+});
+
 test('conditional, unclear, unmapped and quantity entries preserve Part Two wording instead of becoming presence claims', () => {
   const value = packet('Salicylic Acid (2% w/w), Mystery compound');
   const conditionalPacket = packet('May contain (+/-): CI 77491, CI 77492');
