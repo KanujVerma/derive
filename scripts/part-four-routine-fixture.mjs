@@ -79,9 +79,17 @@ export async function seedRoutineFormulaFixture({admin,sql,owner,fixtureProduct,
  check(policyExpiry.currentRetired,true,'Policy expiry alone physically retires copied current candidate bytes');
  check(policyExpiry.savedRetired,true,'Policy expiry alone physically retires copied saved candidate bytes');
  const p2ReleaseId=await sql(`select release_id from private.part_two_snapshots where id=${literal(snapshotId)}::uuid;`);assert(p2ReleaseId,'Original routine P2 release is required');
- const p2Withdrawal=JSON.parse(await sql(`begin;set local statement_timeout='12s';update private.part_two_releases set permitted=false where id=${literal(p2ReleaseId)};
- select jsonb_build_object('savedRetired',not exists(select 1 from public.part_three_saved_assessments where id=${literal(saved.savedAssessmentId)}::uuid and packet is not null),'noReadyRoutineBytes',not exists(select 1 from public.part_three_saved_assessments s cross join lateral jsonb_array_elements(coalesce(s.packet->'partFour'->'routineEvidence','[]')) e where s.id=${literal(saved.savedAssessmentId)}::uuid and e->>'state'='ready'));rollback;`));
- check(p2Withdrawal.savedRetired,true,'Direct P2 release denial physically retires copied saved candidate bytes');
+ const duplicateReleaseId=`local-synthetic-equal-versions-${randomUUID()}`,duplicateHash=sha256(duplicateReleaseId);
+ // Equal version metadata is not release authority. Release B has a distinct
+ // identity/hash and stays permitted while the actual persisted snapshot's A
+ // is denied; it must never substitute for A's withdrawn authority.
+ const p2Withdrawal=JSON.parse(await sql(`begin;set local statement_timeout='12s';
+ insert into private.part_two_releases(id,versions,release_hash,permitted,review_evidence) select ${literal(duplicateReleaseId)},versions,${literal(duplicateHash)},true,'Original synthetic equal-version release identity negative control only' from private.part_two_releases where id=${literal(p2ReleaseId)};
+ update private.part_two_releases set permitted=false where id=${literal(p2ReleaseId)};
+ select jsonb_build_object('duplicateAlternativePermitted',exists(select 1 from private.part_two_releases a join private.part_two_releases b on a.versions=b.versions where a.id=${literal(p2ReleaseId)} and b.id=${literal(duplicateReleaseId)} and not a.permitted and b.permitted and a.release_hash<>b.release_hash),'currentRetired',not exists(select 1 from public.part_three_results where id=${literal(result.resultId)}::uuid and payload is not null),'savedRetired',not exists(select 1 from public.part_three_saved_assessments where id=${literal(saved.savedAssessmentId)}::uuid and packet is not null),'noReadyRoutineBytes',not exists(select 1 from public.part_three_saved_assessments s cross join lateral jsonb_array_elements(coalesce(s.packet->'partFour'->'routineEvidence','[]')) e where s.id=${literal(saved.savedAssessmentId)}::uuid and e->>'state'='ready'));rollback;`));
+ check(p2Withdrawal.duplicateAlternativePermitted,true,'Distinct release B remains permitted with A versions while original A is denied');
+ check(p2Withdrawal.currentRetired,true,'Equal-version release B cannot rescue copied current bytes from original A denial');
+ check(p2Withdrawal.savedRetired,true,'Equal-version release B cannot rescue copied saved candidate bytes from original A denial');
  check(p2Withdrawal.noReadyRoutineBytes,true,'Direct P2 release denial leaves no ready copied routine bytes');
  const projection=await sql(`begin;set local statement_timeout='12s';update private.part_one_policies set label_assertion_kinds='{}'::text[] where id=${literal(sourcePolicy)};
  select jsonb_build_object('associationRemoved',not exists(select 1 from private.part_four_routine_formula_associations where id=${literal(associationId)}::uuid),'savedFormulaCleared',not exists(select 1 from public.part_three_saved_assessments s cross join lateral jsonb_array_elements(coalesce(s.packet->'partFour'->'routineEvidence','[]')) e where s.id=${literal(saved.savedAssessmentId)}::uuid and e->>'state'='ready'),'workerState',${worker}->0->>'state');rollback;`);

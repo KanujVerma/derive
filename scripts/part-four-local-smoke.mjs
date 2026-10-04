@@ -100,6 +100,7 @@ try{
  const retentionFixture=await (await import('./part-four-retention-fixture.mjs')).seedRetentionFixture({admin,sql,owner,p3,req,result,now,expiry,recovery:{endpoint,anon,token,journalDirectory:'../integration-p4-private/retention-recovery'}});
  const routineFixture=await (await import('./part-four-routine-fixture.mjs')).seedRoutineFormulaFixture({admin,sql,owner,fixtureProduct,normalize,edge,p3,baseSetup:setup,candidateRequest:req,now,expiry});
  await writeFile('../integration-p4-private/routine-lock-fixture.json',JSON.stringify(routineFixture.lockFixture),{mode:0o600});
+ if(process.argv.includes('--locks'))await new Promise((resolve,reject)=>{const runner=spawn(process.execPath,['tests/part-four-routine-lock-order.mjs'],{stdio:['ignore','inherit','inherit'],env:{...process.env,PART_FOUR_LOCK_FIXTURE:'../integration-p4-private/routine-lock-fixture.json'}});runner.once('error',reject);runner.once('exit',code=>code===0?resolve():reject(Error('Bounded lifecycle race check failed')));});
  console.log(JSON.stringify({suite:'part-four-local-integration',checks:checks+retentionFixture.checks+routineFixture.checks,synthetic:true,actualAuthEdgeSQL:true,providersCalled:false,status:'passed'}));
  if(process.argv.includes('--ui')){
   // Start from zero visible receipts for a fresh native single-Save count.
