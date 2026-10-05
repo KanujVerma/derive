@@ -10,7 +10,7 @@ const now='2026-10-03T00:00:00.000Z';
 const policy:SourcePolicy={...ExternalSourcePolicies[0],version:'synthetic-test',permissionEvidence:'Synthetic contract tests only',reviewedAt:now,expiresAt:'2026-10-04T00:00:00.000Z',operations:{...ExternalSourcePolicies[0].operations,lookup:true,process:true,retain:true,sharedDisplay:true,hotlink:true},retainedFields:['identity','images']};
 const config={endpoint:'https://world.openbeautyfacts.org/',allowedHosts:['world.openbeautyfacts.org'],userAgent:'SyntheticTests/1',timeoutMs:10000,maxBytes:262144};
 function fixture(){
- const calls:string[]=[];let status=200,body=JSON.stringify({products:[{code:'3337875597197',product_name:'Synthetic variant',brands:'Synthetic',quantity:'236 ml',countries_tags:['en:netherlands'],image_front_url:'https://images.openbeautyfacts.org/images/products/333/787/559/7197/front_en.5.400.jpg'},{code:'3337875597357',product_name:'Synthetic variant',quantity:'474 ml'},{code:'invalid',product_name:'Rejected'}]});
+ const calls:string[]=[];let status=200,body=JSON.stringify({products:[{code:'3337875597197',product_name:'Synthetic variant',brands:'Synthetic',quantity:'236 ml',countries_tags:['en:netherlands','en:united-states'],image_front_url:'https://images.openbeautyfacts.org/images/products/333/787/559/7197/front_en.5.400.jpg'},{code:'3337875597357',product_name:'Synthetic variant',quantity:'474 ml',countries_tags:['en:united-states']},{code:'invalid',product_name:'Rejected'}]});
  const transport:ProviderTransport={pinsResolvedAddresses:true,resolve:async()=>['1.1.1.1'],fetch:async url=>{calls.push(url);return new Response(body,{status,headers:{'content-type':'application/json'}});}};
  const ports={now:()=>now,id:async(code:string)=>`10000000-0000-4000-8000-${code.slice(-12)}`,reserve:()=>true};
  return {calls,transport,ports,status:(v:number)=>status=v,body:(v:string)=>body=v};
@@ -22,7 +22,7 @@ test('local proxy rejects alternate origins and ambiguous request targets before
 });
 test('bounded name search preserves variant evidence and missing photo without admitting ingredient declarations',async()=>{
  const f=fixture();const out=await searchPartOneProducts({query:'Synthetic variant'},policy,config,f.transport,f.ports);
- assert.equal(out.items.length,2);assert.equal(out.items[0].sourceLookup.variantText,'236 ml · Netherlands');assert.equal(out.items[1].imageUrl,null);
+ assert.equal(out.items.length,2);assert.equal(out.items[0].sourceLookup.variantText,'236 ml · Netherlands · United States');assert.equal(out.items[1].imageUrl,null);
  assert.equal(out.items[0].formulaState,'unverified');assert(!JSON.stringify(out).includes('declarationId'));
  const url=new URL(f.calls[0]);assert.equal(url.searchParams.get('search_terms'),'Synthetic variant');assert.equal(url.searchParams.get('page_size'),'10');
 });
