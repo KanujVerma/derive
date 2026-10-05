@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -69,4 +70,10 @@ test('published offer cannot introduce embedded payload imports into the Edge mo
  assert.doesNotMatch(payload,/\bimport(?:\s|\()/);
  assert.doesNotMatch(payload,/\bexport\s/);
  assert.deepEqual(JSON.parse(payload),OBF_REUSE_METHOD);
+});
+
+// Every advertised digest binds the decoded source bytes, independently of
+// the whole-offer canonical digest and executable reproduction checks.
+test('all published method entries match their advertised source content digests',()=>{
+ for(const file of OBF_REUSE_METHOD.methods)assert.equal(file.sha256,createHash('sha256').update(file.content,'utf8').digest('hex'),file.path);
 });
