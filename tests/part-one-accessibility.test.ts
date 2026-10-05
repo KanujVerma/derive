@@ -15,10 +15,10 @@ test('A29 incomplete results expose named save, capture, retry and rescan action
     onRefresh: () => calls.push('retry'), onSelect() {}, onSearch() {}, onFullChange() {},
   }, { modules: {
     '../../ui/Button': { Button: 'Button' },
-    '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.children) },
+    '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.footer, props.children) },
   } });
   const nodes = h.render();
-  for (const label of ['Save product', 'Scan ingredients', 'Retry']) press(control(nodes, label));
+  for (const label of ['Save', 'Scan ingredients', 'Retry']) press(control(nodes, label));
   for (const label of ['Scan ingredients', 'Retry', 'Search by name']) {
     assert(control(nodes, label).props.style.minHeight >= 44, `${label} must retain a 44pt touch target at small text sizes`);
   }
@@ -39,11 +39,11 @@ test('A26 expired accepted ingredients are purged from the rendered sheet before
     onClose() {}, onSave() {}, onCapture() {}, onRefresh() {}, onSelect() {}, onSearch() {}, onFullChange() {},
   }, { modules: {
     '../../ui/Button': { Button: 'Button' },
-    '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.children) },
+    '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.footer, props.children) },
   } }).render();
   assert.match(textContent(nodes), /expired/); assert.match(textContent(nodes), /Independent identity/);
   assert(!textContent(nodes).includes('EXPIRED INGREDIENT TEXT'));
-  assert(!nodes.some(node => node.props.label === 'Save product'));
+  assert(!nodes.some(node => node.props.label === 'Save'));
   assert(control(nodes, 'Scan ingredients'));
 });
 
@@ -57,7 +57,7 @@ test('A26 partial text, source links and package images each expire locally whil
         sources: [{ observationId: 'old', label: 'EXPIRED SOURCE', observedAt: '2026-10-02T12:00:00Z', expiresAt: '2026-10-02T12:00:01Z', url: 'https://fixture.invalid/expired' }], limitations: [] }, allowedActions: ['save_partial'] } as unknown as ScanResult;
     const nodes = componentHarness('src/components/check/part-one/PartOneResultSheet.tsx', 'PartOneResultSheet', {
       view: { owner: 'fixture', result, saved: false, loading: false, error: null, scrollOffset: 0 }, onClose() {}, onSave() {}, onCapture() {}, onRefresh() {}, onSelect() {}, onSearch() {}, onFullChange() {},
-    }, { modules: { '../../ui/Button': { Button: 'Button' }, '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.children) } } }).render();
+    }, { modules: { '../../ui/Button': { Button: 'Button' }, '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.footer, props.children) } } }).render();
     assert(!textContent(nodes).includes('EXPIRED PARTIAL TEXT'));
     assert(!textContent(nodes).includes('EXPIRED SOURCE'));
     assert(textContent(nodes).includes('CURRENT PARTIAL TEXT'));
@@ -73,9 +73,23 @@ test('Offline identity and unselected candidates expire even when no declaration
     display: { selectedIdentity: null, candidates: [{ id: 'old', name: 'EXPIRED CANDIDATE', brand: null, variantText: 'old', image: null, expiresAt: '2024-01-01T00:00:00Z' }], sections: [], sources: [], limitations: [] }, allowedActions: ['choose_candidate'] } as unknown as ScanResult;
   const h = componentHarness('src/components/check/part-one/PartOneResultSheet.tsx', 'PartOneResultSheet', {
     view: { owner: 'fixture', result, saved: false, loading: false, error: null, scrollOffset: 0 }, onClose() {}, onSave() {}, onCapture() {}, onRefresh() {}, onSelect() {}, onSearch() {}, onFullChange() {},
-  }, { modules: { '../../ui/Button': { Button: 'Button' }, '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.children) } } });
+  }, { modules: { '../../ui/Button': { Button: 'Button' }, '../result-sheet/ResultSheetSurface': { ResultSheetSurface: (props: any) => React.createElement('Surface', props, props.summary, props.compactActions, props.footer, props.children) } } });
   assert(!textContent(h.render()).includes('EXPIRED CANDIDATE'));
   result.snapshotId = 'old-snapshot'; result.identity = 'exact'; result.display.selectedIdentity = { ...result.display.candidates[0], name: 'EXPIRED IDENTITY' }; result.display.candidates = []; result.allowedActions = ['save_partial'];
   assert(!textContent(h.render()).includes('EXPIRED IDENTITY'));
-  assert(!h.render().some(n => n.props.label === 'Save product'));
+  assert(!h.render().some(n => n.props.label === 'Save'));
+});
+
+test('single Save cannot fall back to a second product save during personal read loading or after confirmation', () => {
+  const result = { scanId:'fixture',declarationState:'partial',identity:'exact',work:'complete',snapshotId:'snapshot',display:{selectedIdentity:{name:'Synthetic lotion',brand:'Fixture',variantText:'',expiresAt:'2099-01-01T00:00:00Z',image:null},candidates:[],sections:[],sources:[],limitations:[]},freshness:{state:'fresh',observedAt:'2026-10-01T00:00:00Z',expiresAt:'2099-01-01T00:00:00Z'},allowedActions:['save_partial'] } as unknown as ScanResult;
+  const personal = {enabled:true,context:null,choices:{},view:{target:null,result:null,historical:null,question:null,savedAssessmentId:null as string|null,savedAt:null,loading:true,saving:false,error:null,pendingSave:false},interact(){},refresh(){}};
+  const h=componentHarness('src/components/check/part-one/PartOneResultSheet.tsx','PartOneResultSheet',{view:{owner:'fixture',result,saved:false,loading:false,error:null,scrollOffset:0},onClose(){},onSave(){throw Error('Wrong product save');},onCapture(){},onRefresh(){},onSelect(){},onSearch(){},onFullChange(){}},{modules:{
+    '../part-three/usePartThreeCheck':{usePartThreeCheck:()=>personal},
+    '../../ui/Button':{Button:'Button'},
+    '../result-sheet/ResultSheetSurface':{ResultSheetSurface:(p:any)=>React.createElement('Surface',p,p.summary,p.compactActions,p.footer,p.children)},
+  }});
+  assert.equal(h.render().filter(n=>n.props.label==='Save'||n.props.label==='Saved').length,0,'A loading assessment does not expose product Save');
+  personal.view.savedAssessmentId='confirmed-assessment';
+  let nodes=h.render();assert.equal(nodes.filter(n=>n.props.label==='Saved').length,1);assert(control(nodes,'Saved').props.disabled);assert(!nodes.some(n=>n.props.label==='Save'));
+  personal.view.loading=false;nodes=h.render();assert.equal(nodes.filter(n=>n.props.label==='Saved').length,1);assert(!nodes.some(n=>n.props.label==='Save'),'Confirmed assessment cannot become a duplicate product Save');
 });

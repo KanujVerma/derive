@@ -184,6 +184,7 @@ export function usePartThreeCheck({ ownerId, details, enabled = PART_THREE_ENABL
         return; const timer = setTimeout(() => controller.expire(), Math.max(1, Date.parse(until) - Date.now())); return () => clearTimeout(timer); }, [controller, current.result?.validUntil]);
     const update = (next: PartThreeChoices) => { controller.questionEvent('interact'); controller.invalidate(); setDraft({ scope, value: next }); };
     return {
+        ingredientDetails: canRead && source ? {target: {ownerId: source.authenticatedOwnerId, scanId: source.scanId, captureSessionId: source.captureSessionId, generation: source.generation, evidenceRevision: source.evidenceRevision}, result: source, loading: false, error: null} satisfies PartTwoView : null,
         displayLabels: labels?.owner===ownerId&&labels.revision===context?.revision?labels.values:{},
         view: current, context: canRead ? context : null, choices, update,
         questionAnswer: (answer: 'add' | 'replace' | 'unsure') => { controller.questionEvent('answer'); controller.invalidate(); setDraft({ scope, value: { ...choices, intent: answer } }); },

@@ -309,14 +309,15 @@ test('inert text formatting never executes brief text or turns arbitrary content
   assert(!nodes.some(node => node.props.dangerouslySetInnerHTML));
 });
 
-test('admitted brief is first below the recommendation and shares the existing bottom Sources disclosure', () => {
+test('selected report citations remain under Sources rather than posing as aggregate review themes', () => {
   const packet = foundation(); const brief = fixture();
   packet.reviews = { state: 'ready', evidenceKind: 'limited_research_brief', brief, explanation: 'Selected checked sources provide a limited brief.', sourceIds: brief.sources.map(source => source.id) };
   const h = componentHarness('src/components/check/part-four/PartFourSections.tsx', 'PartFourSections', { packet, researchSubject: subject, now: Date.parse(now), allowLocalResearchFixture: true });
   let nodes = h.render(); let copy = textContent(nodes);
-  assert(copy.indexOf('What people report') < copy.indexOf('Compared with your current routine'));
+  assert(!copy.includes('What people report'));
+  assert(!copy.includes(brief.observations[0].text));
   assert(!copy.includes('Review themes · Available evidence'), 'The research card is not duplicated in the old optional section');
-  press(control(nodes, 'View research brief sources')); nodes = h.render(); copy = textContent(nodes);
+  press(control(nodes, 'Part Four sources')); nodes = h.render(); copy = textContent(nodes);
   assert.equal(nodes.filter(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Part Four sources').length, 1);
   assert(control(nodes, 'Part Four sources').props.accessibilityState.expanded);
   assert(copy.includes(brief.sources[0].url));

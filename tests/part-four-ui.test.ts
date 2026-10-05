@@ -100,13 +100,14 @@ test('all formula positions, short explanations and long copy remain readable in
   assert(textContent(nodes).includes(value.formula.ingredients[0].card!.short));
   assert(nodes.filter(node => node.type === 'Text').every(node => node.props.numberOfLines === undefined));
   assert.deepEqual(nodes.filter(node => node.type === 'Text' && node.props.accessibilityRole === 'header').map(node => node.props.children),
-    ['Relevant to your profile', 'Ingredients', 'Price & value']);
+    ['Relevant to your profile', 'Ingredients']);
   press(control(nodes, 'Ingredient details: Glycerin, position 1')); nodes = h.render();
   assert(textContent(nodes).includes(value.formula.ingredients[0].card!.body));
-  assert.match(textContent(nodes), /43 formula positions/);
+  assert.match(textContent(nodes), /43 listed/);
   assert.match(textContent(nodes), /Amount in this formula: not disclosed/);
   assert(!textContent(nodes).includes('Approved ingredient reference'), 'Sources starts closed');
-  press(control(nodes, 'View sources for Glycerin, position 1')); nodes = h.render();
+  assert.equal(control(nodes, 'Ingredient reference for Glycerin, position 1').props.accessibilityRole,'link');
+  press(control(nodes, 'Part Four sources')); nodes = h.render();
   assert(control(nodes, 'Part Four sources').props.accessibilityState.expanded);
   assert.match(textContent(nodes), /Approved ingredient reference.*Reviewed 2026-10-02/);
   assert(nodes.indexOf(control(nodes, 'Part Four sources')) > nodes.indexOf(control(nodes, `Ingredient details: ${longName}, position 43`)));
@@ -156,7 +157,7 @@ test('withdrawal and binding replacement hide expanded private content immediate
   const value = packet();
   const h = componentHarness(component, 'PartFourSections', { packet: value, now });
   press(control(h.render(), 'Ingredient details: Glycerin, position 1'));
-  press(control(h.render(), 'View sources for Glycerin, position 1'));
+  press(control(h.render(), 'Part Four sources'));
   assert.match(textContent(h.render()), /Synthetic private label/);
   for (const props of [{ withdrawn: true }, { withdrawn: false, packet: null, loading: true }, { loading: false, packet: value, expectedBindingKey: 'new binding' },
     { expectedBindingKey: undefined, now: Date.parse(p2expiry) }]) {
@@ -186,14 +187,17 @@ test('authorized routine hints precede ingredients and only supplied actions are
 });
 
 test('optional review and price states use honest supplied evidence with no invented numbers or anecdotes', () => {
-  for (const state of ['pending', 'unavailable', 'conflict', 'ready'] as const) {
+  for (const state of ['pending', 'unavailable', 'conflict'] as const) {
     const value = packet(); value.reviews.state = state; value.value.state = state;
     const nodes = componentHarness(component, 'PartFourSections', { packet: value, now }).render();
-    assert.match(textContent(nodes), /Selected(?:-source reports| sources disagree)/);
-    assert.match(textContent(nodes), /No current eligible offer is available/);
+    assert(!textContent(nodes).includes('Price & value'));
+    assert(!textContent(nodes).includes('No current eligible offer is available'));
+    assert(!textContent(nodes).includes('An eligible aggregate review corpus is not available.'));
     assert(!textContent(nodes).includes('$'));
     assert(!textContent(nodes).includes('/100'));
   }
+  const priced = packet(); priced.value.state = 'ready'; priced.value.explanation = 'The supplied offer remains current.';
+  assert.match(textContent(componentHarness(component, 'PartFourSections', { packet: priced, now }).render()), /The supplied offer remains current/);
   const value = packet(); value.comparison.state = 'ambiguous';
   assert.match(textContent(componentHarness(component, 'PartFourSections', { packet: value, now }).render()), /More than one current item could apply/);
 });
@@ -234,6 +238,7 @@ test('comparison preserves material constraints without repeating every generic 
 test('published Part Two attribution and control characters remain explicit and source links allow only HTTPS', () => {
   const value = packet('Glycerin', true);
   value.formula.ingredients[0].observedName = 'Gly\u202ecerin';
+  value.formula.ingredients[0].card!.name = value.formula.ingredients[0].observedName;
   value.formula.sources[0].url = 'javascript:alert(1)';
   const h = componentHarness(component, 'PartFourSections', { packet: value, now });
   const nodes = h.render();
@@ -246,7 +251,30 @@ test('published Part Two attribution and control characters remain explicit and 
 });
 
 
-test('ingredient detail omits a duplicate alias paragraph and keeps an explicit unavailable caution',()=>{
+test('ingredient detail omits duplicate alias paragraphs and absent-caution boilerplate',()=>{
  const p=packet('Water');const card=p.formula.ingredients[0].card!;card.evidence='Water is also called Aqua.';card.editorial={amountAndUse:null,caution:null,aliasNotes:'Water is also called Aqua.',distinctIngredients:null,qualifications:[],copySha256:'synthetic',documentId:'synthetic',libraryFileId:'synthetic',libraryVersion:0,documentSha256:'synthetic'};
- const h=componentHarness(component,'PartFourSections',{packet:p,now});press(control(h.render(),'Explore ingredient: Water, position 1'));const copy=textContent(h.render());assert.equal(copy.split('Water is also called Aqua.').length-1,1);assert.match(copy,/No specific caution.*reference/i);
+ const h=componentHarness(component,'PartFourSections',{packet:p,now});press(control(h.render(),'Explore ingredient: Water, position 1'));const copy=textContent(h.render());assert.equal(copy.split('Water is also called Aqua.').length-1,1);assert(!copy.includes('No specific caution'));assert(!copy.includes('Listed as: Water'));
+});
+
+test('absent caution has no wrapper while distinct scientific limits and approved copy remain',()=>{
+ const p=packet('Glycerin');const card=p.formula.ingredients[0].card!;
+ card.editorial={amountAndUse:null,caution:null,aliasNotes:null,distinctIngredients:null,qualifications:['A null caution is not a universal safety assertion.','No standalone caution was written in this approved entry; this is not an assurance of universal tolerance.','The study tested one formula, not this finished product.'],copySha256:'synthetic',documentId:'synthetic',libraryFileId:'synthetic',libraryVersion:0,documentSha256:'synthetic'};
+ const before=JSON.stringify(card);const h=componentHarness(component,'PartFourSections',{packet:p,now});press(control(h.render(),'Ingredient details: Glycerin, position 1'));const copy=textContent(h.render());
+ assert.equal((copy.match(/No specific caution/g)??[]).length,0);assert(!copy.includes('does not establish how the finished product will affect your skin'));
+ assert(!copy.includes('This does not establish safety.'));assert(!copy.includes('Ingredient information does not establish'));
+ for(const approved of [card.body,card.detail!,card.evidence!,'The study tested one formula, not this finished product.'])assert(copy.includes(approved));
+ assert.equal(JSON.stringify(card),before);
+ card.editorial.caution='Avoid if you have a confirmed allergy to this ingredient.';
+ const cautioned=textContent(h.render());assert(cautioned.includes(card.editorial.caution));assert(!cautioned.includes('No specific caution'));assert(cautioned.includes('The study tested one formula, not this finished product.'));
+});
+
+test('v7 ingredient alias, semantic role color, amount order and exact reference stay source-qualified',()=>{
+ const p=packet('Aqua, Glycerin, Mystery compound');const water=p.formula.ingredients[0].card!,glycerin=p.formula.ingredients[1].card!;water.name='Water';water.aliases=['Aqua'];water.label='Lotion helper';glycerin.label='Helps moisturize';let opened:string|null=null;
+ const h=componentHarness(component,'PartFourSections',{packet:p,now},{modules:{'react-native':{View:'View',Text:'Text',Pressable:'Pressable',StyleSheet:{create:(s:unknown)=>s},Linking:{openURL:async(url:string)=>{opened=url;}}}}});
+ press(control(h.render(),'Ingredient details: Water, position 1'));let nodes=h.render(),copy=textContent(nodes);assert(copy.includes('Listed as: Aqua'));assert(!copy.includes('No specific caution'));
+ assert(copy.indexOf(water.body)<copy.indexOf(water.evidence!));assert(copy.indexOf(water.evidence!)<copy.indexOf('Amount in this formula: not disclosed.'));assert(copy.indexOf('Amount in this formula: not disclosed.')<copy.indexOf('Ingredient reference'));
+ const label=nodes.find(n=>n.type==='Text'&&n.props.children==='Helps moisturize')!;assert.equal(label.props.style[1].color,'#2D5A43');
+ const neutral=nodes.find(n=>n.type==='Text'&&n.props.children==='Lotion helper')!;assert.notEqual(neutral.props.style[1].color,label.props.style[1].color);
+ press(control(nodes,'Ingredient reference for Water, position 1'));assert.equal(opened,'https://example.test/reference');assert(!control(h.render(),'Part Four sources').props.accessibilityState.expanded);
+ p.insights.push({...p.insights[0],id:'actual-caution',ruleId:'F02',state:'supported',occurrenceIds:[p.formula.ingredients[1].occurrenceId]});nodes=h.render();const caution=nodes.find(n=>n.type==='Text'&&n.props.children==='Helps moisturize')!;assert.notEqual(caution.props.style[1].color,label.props.style[1].color);
 });

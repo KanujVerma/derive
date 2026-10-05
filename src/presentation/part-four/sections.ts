@@ -9,9 +9,14 @@ export interface PartFourRenderFence {
   expectedDependencyDigest?: string;
 }
 
-/** Rendering controls stay visible; this never corrects an ingredient name. */
+const ingredientQualificationCopy: Record<string, string> = {
+  'A null caution is not a universal safety assertion.': 'No specific caution is listed. This does not establish safety.',
+  'No standalone caution was written in this approved entry; this is not an assurance of universal tolerance.': 'No specific caution is listed. This does not establish safety.',
+};
+
+/** Known editorial qualifications use plain copy; ingredient names stay literal. */
 export function partFourDisplayText(value: string): string {
-  return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,
+  return (Object.hasOwn(ingredientQualificationCopy, value) ? ingredientQualificationCopy[value] : value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,
     character => `[U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}]`);
 }
 
@@ -77,10 +82,21 @@ export function ingredientRow(ingredient: FormulaAnalysis['ingredients'][number]
     }
     return limits;
   });
-  return { occurrenceId: ingredient.occurrenceId, name: partFourDisplayText(ingredient.observedName || occurrence.rawToken),
+  return { occurrenceId: ingredient.occurrenceId, name: partFourDisplayText(card?.name || ingredient.observedName || occurrence.rawToken),
     literal: partFourDisplayText(occurrence.rawToken), card, qualifiers, amounts, quantityLimits: [...new Set(quantityLimits)],
     short: card ? partFourDisplayText(card.short) : occurrence.mapping.state === 'ambiguous' ? 'Ingredient identity is ambiguous.' : 'An explanation is unavailable for this name.',
     label: card ? partFourDisplayText(card.label) : 'Knowledge unavailable' };
+}
+
+/** Formatting differences do not create a second name; aliases stay literal. */
+export function ingredientPrintedNameDiffers(name: string, literal: string): boolean {
+  const comparable = (value: string) => value.normalize('NFC').trim().replace(/[.,;]+$/,'').replace(/\s+/g,' ').toLocaleLowerCase();
+  return comparable(name) !== comparable(literal);
+}
+const benefitLabels = new Set(['Helps moisturize','Helps retain moisture','Moisture and lotion helper','Moisture and formula helper','Moisture and texture helper','Moisture and mixing helper','Moisture and gel helper','Moisture helper','Solvent and moisture helper','Skin softener','Skin softener and lotion helper','Skin softener and texture helper','Skin softener and mixing helper','Skin softener and thickener','Skin softener and film helper','Helps soothe skin','Helps soothe dry skin','Helps skin feel comfortable']);
+export function ingredientRoleTone(row: ReturnType<typeof ingredientRow>, insights: readonly PartFourInsight[]): 'benefit'|'caution'|'neutral' {
+  if (insights.some(i=>i.ruleId==='F02'&&i.state==='supported'&&i.occurrenceIds.includes(row.occurrenceId))) return 'caution';
+  return row.card && row.card.contributionKind !== 'unknown' && benefitLabels.has(row.label) ? 'benefit' : 'neutral';
 }
 
 export function ingredientSectionHeading(formula: FormulaAnalysis, index: number): string | null {
