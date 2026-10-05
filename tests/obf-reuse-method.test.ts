@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createRequire} from 'node:module';
@@ -58,4 +59,14 @@ test('only offered assets turn an original OBF-shaped record into public P1 disp
   assert.deepEqual(value.input,authoritativeInput(value.context,{requestId:value.input.binding.requestId} as any));
   const missing=await recipe.reproducePublicObf({status:1,product:{...record.product,ingredients_text:undefined}},OBF_REUSE_METHOD);
   assert.equal(missing.normalization,null);assert.equal(missing.publication.resultPatch.declarationId,null);
+});
+
+// Supabase's dependency loader scans the serialized offer; embedded modules
+// must remain data. Decoding still yields executable offered reproduction code.
+test('published offer cannot introduce embedded payload imports into the Edge module graph',()=>{
+ const source=readFileSync(new URL('../supabase/functions/_shared/obf-reuse-method.ts',import.meta.url),'utf8');
+ const payload=source.slice(source.indexOf('= ')+2,source.lastIndexOf(' as const'));
+ assert.doesNotMatch(payload,/\bimport(?:\s|\()/);
+ assert.doesNotMatch(payload,/\bexport\s/);
+ assert.deepEqual(JSON.parse(payload),OBF_REUSE_METHOD);
 });
