@@ -16,7 +16,7 @@ function entryFixture(expiresAt:unknown='2027-01-04T00:00:00.000Z'){
   if(p.p_action==='public/budget')return {data:{allowed:true},error:null};if(p.p_action==='claim')return {data:{job:null},error:null};
   return {data:p.p_action==='scans/read'?result:{},error:null};
  }});
- const transport={pinsResolvedAddresses:true,resolve:async()=>['93.184.216.34'],fetch:async()=>{fetches++;return new Response(JSON.stringify({products:[{code:'3606000537538',product_name:'Synthetic public lotion',brands:'Fixture'}]}),{headers:{'content-type':'application/json'}});}};
+ const transport={pinsResolvedAddresses:true,resolve:async()=>['93.184.216.34'],fetch:async()=>{fetches++;return new Response(JSON.stringify({products:[{code:'3606000537538',product_name:'Synthetic public lotion',brands:'Fixture',countries_tags:['en:united-states']}]}),{headers:{'content-type':'application/json'}});}};
  const output=ts.transpileModule(readFileSync(index,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  // Run the exact entrypoint and real handler/services. Replace only SDK I/O,
  // transport I/O, env and lifetime registration; no Auth/SQL/TLS is claimed.

@@ -114,7 +114,7 @@ export function usePartTwoView(target: PartTwoTarget | null, enabled = PART_TWO_
     controller.bind(target); void controller.refresh();
     const timer = setInterval(() => { controller.expire(); void controller.refresh(); }, 15000);
     const listener = AppState.addEventListener('change', state => {
-      controller.invalidate(); if (state === 'active') void controller.refresh();
+      if (state === 'active') { controller.expire(); void controller.refresh(); } else controller.suspend();
     });
     return () => { clearInterval(timer); listener.remove(); controller.close(); };
   }, [key, enabled, controller]);

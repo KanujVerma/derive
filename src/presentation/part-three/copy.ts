@@ -31,9 +31,9 @@ export function decisionCopy(result: PersonalResultV2) {
  const reportConflict=packet?.insights.find(i=>i.ruleId==='F04'&&i.state==='conflict');
  const pending=packet?.decisionState==='pending', conflict=packet?.decisionState==='conflict';
  return {name:s?text(s.namedDecision.name):'Personal Check',
- label:conflict?'Review conflicting evidence':pending?'Decision pending':s?.displayVariant==='worth_keeping'?'Worth keeping':s?({worth_considering:'Worth considering',check_first:'Check first',skip:'Skip this one',not_enough_info:'Not enough info'})[s.judgment]:'Personal assessment unavailable',
- reason:conflict?(reportConflict?text(reportConflict.explanation):'The formula evidence disagrees on a fact needed for this decision.'):pending&&feel&&!hasConcern?text(feel.explanation):pending&&relevance&&!hasConcern?text(relevance.explanation):pending&&s?.judgment==='worth_considering'?'The moisturizing purpose is supported, but evidence needed to judge your goal benefit is unresolved.':primary?findingCopy(primary):result.materialGaps[0]?gapCopy(result.materialGaps[0]):'There is no supported personal premise for this judgment.',
- ...(packet?{action:packet.action}:{}),
+ label:conflict?'Review conflicting evidence':pending?'Not enough info':s?.displayVariant==='worth_keeping'?'Worth keeping':s?({worth_considering:'Worth considering',check_first:'Check first',skip:'Skip this one',not_enough_info:'Not enough info'})[s.judgment]:'Personal assessment unavailable',
+ reason:conflict?(reportConflict?text(reportConflict.explanation):'The formula evidence disagrees on a fact needed for this decision.'):pending&&feel&&!hasConcern?text(feel.explanation):pending&&relevance&&!hasConcern?'Some listed ingredients have moisturizing functions relevant to your dryness goal. The finished product’s benefit and tolerance remain unknown.':pending&&s?.judgment==='worth_considering'?'The label describes moisturizing use. How much it will help your goal is unknown.':primary?findingCopy(primary):result.materialGaps[0]?gapCopy(result.materialGaps[0]):'There is no supported personal premise for this judgment.',
+ ...(packet?{action:pending&&!hasConcern&&!feel&&!relevance?'Review the listed ingredients below and check that the product name matches your label.':packet.action}:{}),
  scope:s?({published_version:'Published list · Package not confirmed',confirmed_package:'Confirmed package evidence',source_reading:'Photo reading · Product presence unconfirmed',report:'Based on your report',comparison:'Comparison with one selected current item'})[s.scope]:null};
 }
 

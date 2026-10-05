@@ -43,6 +43,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
   const sourcesOpen = props.sourcesExpanded ?? sources === key;
   const rows = packet.formula.ingredients.map(ingredientRow);
   const insights = visiblePartFourInsights(packet);
+  const comparisonInsights = packet.comparison.state === 'none' ? insights.comparison.filter(insight => ['supported','limited','conflict'].includes(insight.state)) : insights.comparison;
   const evidence = formulaEvidenceNotice(packet.formula);
   const limits = formulaLimitationsForDisplay(packet.formula);
   const briefProps = { brief: packet.reviews.evidenceKind === 'limited_research_brief' ? packet.reviews.brief : null,
@@ -81,13 +82,13 @@ export function PartFourSections(props: PartFourSectionsProps) {
   return <View style={styles.sections}>
     <ResearchBrief {...briefProps} onViewSources={() => toggleSources(true)} />
     <RetainedEvidence evidence={packet.retainedEvidence} now={props.now} withdrawnDependencies={props.researchWithdrawnDependencies}/>
-    <View style={styles.comparison}>
-      <Text accessibilityRole="header" style={styles.heading}>Compared with your current routine</Text>
-      <Text style={styles.copy}>{partFourDisplayText(packet.comparison.explanation)}</Text>
+    {(packet.comparison.state!=='none'||comparisonInsights.length>0) && <View style={styles.comparison}>
+      <Text accessibilityRole="header" style={styles.heading}>{packet.comparison.state==='none'?'Relevant to your profile':'Compared with your current routine'}</Text>
+      {packet.comparison.state!=='none' && <Text style={styles.copy}>{partFourDisplayText(packet.comparison.explanation)}</Text>}
       {packet.comparison.state === 'ambiguous' && <Text style={styles.caption}>More than one current item could apply. A direct comparison is not established.</Text>}
       {packet.comparison.state === 'self' && <Text style={styles.caption}>This is already the selected current item.</Text>}
-      {insights.comparison.map(insight => renderInsight(insight))}
-    </View>
+      {comparisonInsights.map(insight => renderInsight(insight))}
+    </View>}
 
     {insights.routine.length > 0 && <View style={styles.routine}>
       <Text accessibilityRole="header" style={styles.heading}>In your routine</Text>
@@ -137,11 +138,12 @@ export function PartFourSections(props: PartFourSectionsProps) {
                     <Text accessibilityRole="header" style={styles.insightTitle}>Amount and use context</Text>
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.amountAndUse)}</Text>
                   </View>}
+                  {!row.card.editorial.caution && <Text style={styles.caption}>No specific caution is available in this reference. This does not mean the ingredient or product is risk-free.</Text>}
                   {row.card.editorial.caution && <View style={styles.insight}>
-                    <Text accessibilityRole="header" style={styles.insightTitle}>Cautions in the approved reference</Text>
+                    <Text accessibilityRole="header" style={styles.insightTitle}>Cautions</Text>
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.caution)}</Text>
                   </View>}
-                  {row.card.editorial.aliasNotes && <View style={styles.insight}>
+                  {row.card.editorial.aliasNotes && ![row.card.body,row.card.detail,row.card.evidence].some(copy=>copy?.includes(row.card!.editorial!.aliasNotes!)) && <View style={styles.insight}>
                     <Text accessibilityRole="header" style={styles.insightTitle}>Names used in the reference</Text>
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.aliasNotes)}</Text>
                   </View>}
@@ -150,7 +152,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.distinctIngredients)}</Text>
                   </View>}
                   {row.card.editorial.qualifications.length > 0 && <View style={styles.insight}>
-                    <Text accessibilityRole="header" style={styles.insightTitle}>Reference qualifications</Text>
+                    <Text accessibilityRole="header" style={styles.insightTitle}>Limits of this information</Text>
                     {row.card.editorial.qualifications.map((qualification, qualificationIndex) =>
                       <Text key={qualificationIndex} selectable style={styles.caption}>{partFourDisplayText(qualification)}</Text>)}
                   </View>}

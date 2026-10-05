@@ -35,11 +35,13 @@ export function selectDeclaration(d: Declaration, item: ItemSnapshot, scope: Sco
   const required = context.requiredVariantFields ?? ['brand', 'form', 'size', 'unit', 'packCount', 'packagingLevel'];
   // If either side makes a distinguishing claim, unknown on the other side blocks that claim.
   const unknownRequired = comparison.unknowns.filter(key => required.includes(key) || d.variant[key] !== null || item.variant[key] !== null);
-  const sourceMarkets = new Set(d.sourceMarkets);
+  // Canonical comparison only; retained source tags remain unchanged.
+  const marketKey = (value: string) => value === 'en:united-states' ? 'US' : value;
+  const sourceMarkets = new Set(d.sourceMarkets.map(marketKey));
   const packageMarket = d.packageMarket;
   const requiredMarket = scope === 'private_package' ? item.packageMarket : item.requestedMarket;
-  const marketConflict = !!packageMarket && !!item.packageMarket && packageMarket !== item.packageMarket || !!packageMarket && sourceMarkets.size > 0 && !sourceMarkets.has(packageMarket);
-  const marketSupported = context.requireMarket === false || (requiredMarket !== null && (scope === 'private_package' ? packageMarket === requiredMarket : sourceMarkets.has(requiredMarket)));
+  const marketConflict = !!packageMarket && !!item.packageMarket && packageMarket !== item.packageMarket || !!packageMarket && sourceMarkets.size > 0 && !sourceMarkets.has(marketKey(packageMarket));
+  const marketSupported = context.requireMarket === false || (requiredMarket !== null && (scope === 'private_package' ? packageMarket === requiredMarket : sourceMarkets.has(marketKey(requiredMarket))));
   const kinds = new Set(d.sections.map(s => s.kind));
   const drugComplete = d.category !== 'drug' || kinds.has('active') && kinds.has('inactive') && d.sections.filter(s => s.kind === 'active').every(s => s.entries.length > 0 && s.entries.every(e => e.quantity?.parse === 'exact'));
   const complete = d.sections.length > 0 && d.sections.every(s => s.startCovered && s.endCovered && s.lineCoverageComplete && s.entries.length > 0) && d.completenessReasons.length === 0 && d.transcriptionUncertainty.length === 0 && d.sections.every(s => s.entries.every(e => e.uncertaintyReasons.length === 0)) && drugComplete && d.category !== 'unknown';

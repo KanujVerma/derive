@@ -70,7 +70,7 @@ export function ContextFlow({ initialProgress, onProgress, initialDraft, relevan
   const hasContext = contextQuestions.length > 0 || fields.length > 0;
   const editing = Boolean(initialDraft);
   const extended = setup && !editing && !hasContext;
-  const last = hasContext ? 2 : extended ? compact ? 3 : 4 : 1;
+  const last = hasContext ? 2 : extended ? 4 : 1;
   const currentBundle = bundle.ownerId === ownerId ? bundle : createSetupBundle(ownerId);
   if (currentBundle !== bundle) { setBundle(currentBundle); setOutcomeOpen(null); setPending(null); setManualName(''); }
   useEffect(() => { if(extended && durableSetup) onProgress?.({draft,bundle:currentBundle,step}); }, [draft,currentBundle,step,extended,durableSetup,onProgress]);
@@ -95,7 +95,7 @@ export function ContextFlow({ initialProgress, onProgress, initialDraft, relevan
   };
   return <Screen scrollable><View style={styles.flow}>
     <View style={styles.intro}>
-      <Text style={styles.title}>Your skin profile</Text>
+      {!compact && <Text style={styles.title}>Your skin profile</Text>}
       {!editing && <Text style={styles.copy}>Step {step + 1} of {last + 1}</Text>}
     </View>
     {(editing || step === 0) && <View style={styles.questions}>
@@ -115,10 +115,12 @@ export function ContextFlow({ initialProgress, onProgress, initialDraft, relevan
     </View>}
     {(editing || step === 1) && <View style={styles.questions}>
       <AnswerChoices label="How does your skin usually feel?" answer={draft.behavior} basic disabled={loading} choices={[['dry_tight', 'Dry or tight'], ['balanced', 'Neither dry nor oily'], ['combination', 'Oily in some areas, dry in others'], ['oily', 'Oily'], ['unsure', 'Not sure']]} onChange={value => update('behavior', value)} />
+    </View>}
+    {(editing || step === (compact ? 2 : 1)) && <View style={styles.questions}>
       <AnswerChoices label="When you try a new skincare product, does your skin get irritated easily?" support="Think stinging, burning, redness, or peeling." answer={draft.reactivity} basic disabled={loading} choices={[['reacts_easily', 'Yes, often'], ['generally_tolerates', 'Usually not'], ['unsure', 'Not sure']]} onChange={value => update('reactivity', value)} />
     </View>}
     {(editing || !compact && step === 1) && <StructuredPreferenceFields input={spendingInput} onInput={patch=>setSpendingInput(current=>({...current,...patch}))} draft={draft} disabled={loading} onChange={patch=>setDraft(current=>({...current,...patch}))}/>}
-    {extended && step === 2 && <View style={styles.questions}>
+    {extended && step === (compact ? 3 : 2) && <View style={styles.questions}>
       <QuestionGroup label="What are you using now?" support="Add the skincare products you use regularly.">
         <CatalogProductSearch embedded label="Search products" search={catalogSearch} selectedIds={currentBundle.products.flatMap(product => product.reference.kind === 'catalog' ? [product.reference.productId] : [])} onQueryChange={setManualName} onSelect={(product: CatalogProductSummary) => addNamedProduct(catalogFamilyReference(product), product)} />
         <Button label="Add this name" variant="secondary" disabled={loading || !manualName.trim()} onPress={() => addNamedProduct(manualUnverifiedReference(manualName))} />
@@ -145,7 +147,7 @@ export function ContextFlow({ initialProgress, onProgress, initialDraft, relevan
         <Text style={styles.copy}>{durableSetup ? 'Products and your feedback will be saved together when you finish.' : 'Preview only. Products and outcomes aren’t saved.'}</Text>
       </QuestionGroup>
     </View>}
-    {extended && step === 3 && <View style={styles.questions}>
+    {extended && step === (compact ? 4 : 3) && <View style={styles.questions}>
       <QuestionGroup label="Any skincare products that didn't agree with your skin?">
         <CatalogProductSearch embedded label="Search products" search={catalogSearch} onQueryChange={value => { setPastName(value); setPending(compact ? null : value.trim() ? manualUnverifiedReference(value) : null); }} onSelect={(product: CatalogProductSummary) => setPending(catalogFamilyReference(product))} />
         {compact && !pending && pastName.trim() && <Button label={`Use the name “${pastName.trim()}”`} variant="outline" disabled={loading} onPress={() => setPending(manualUnverifiedReference(pastName))} />}

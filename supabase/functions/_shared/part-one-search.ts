@@ -10,7 +10,7 @@ export async function searchPartOneProducts(input:unknown,policy:SourcePolicy,co
  const {query}=PartOneSearchRequestSchema.parse(input),now=ports.now();
  if(!providerOperationPermitted('open_facts',policy,['identity'],now))throw Error('source_policy_blocked');
  const origin=new URL(config.endpoint);if(origin.origin!=='https://world.openbeautyfacts.org')throw Error('source_origin_unapproved');
- const url=new URL('/cgi/search.pl',origin);for(const [key,value]of Object.entries({search_terms:query,search_simple:'1',action:'process',json:'1',page_size:'10',fields:'code,product_name,brands,quantity,countries_tags,image_front_url'}))url.searchParams.set(key,value);
+ const url=new URL('/cgi/search.pl',origin);for(const [key,value]of Object.entries({search_terms:query,tagtype_0:'countries',tag_contains_0:'contains',tag_0:'en:united-states',search_simple:'1',action:'process',json:'1',page_size:'10',fields:'code,product_name,brands,quantity,countries_tags,image_front_url'}))url.searchParams.set(key,value);
  const controller=new AbortController();
  let timer: ReturnType<typeof setTimeout>;
  let stage='resolve',responseStatus:number|null=null,jsonContentType:boolean|null=null;
@@ -33,7 +33,7 @@ export async function searchPartOneProducts(input:unknown,policy:SourcePolicy,co
   const data=new Uint8Array(bytes);let offset=0;for(const c of chunks){data.set(c,offset);offset+=c.length;}
   stage='schema';
   const parsed=envelope.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(data))),items:PartOneSearchItem[]=[];
-  for(const product of parsed.products){const code=normalizeBarcode({raw:product.code,symbology:product.code.length===8?'ean8':null,namespace:'gtin',retailerId:null});if(!code.supported||!product.product_name?.trim())continue;
+  for(const product of parsed.products){const code=normalizeBarcode({raw:product.code,symbology:product.code.length===8?'ean8':null,namespace:'gtin',retailerId:null});if(!code.supported||!product.product_name?.trim()||!product.countries_tags?.includes('en:united-states'))continue;
    const reportedMarkets=(product.countries_tags??[]).map(tag=>tag.replace(/^[a-z]{2}:/i,'').replaceAll('-',' ').replace(/\b[a-z]/g,letter=>letter.toUpperCase()));
    const variantText=[product.quantity,...reportedMarkets].filter(Boolean).join(' · ');
    items.push({productId:await ports.id(product.code),brand:product.brands??'',name:product.product_name,category:variantText||'Package details unavailable',imageUrl:permittedOpenFactsImage(product.image_front_url??null,product.code,policy,now),isCatalogStandard:true,variantCount:1,formulaState:'unverified',sourceLookup:{barcode:product.code,provider:'open_facts',variantText,sourceUrl:`https://world.openbeautyfacts.org/product/${product.code}`,observedAt:now,expiresAt:new Date(Math.min(Date.parse(now)+86400000,Date.parse(policy.expiresAt!))).toISOString(),policyVersion:policy.version}});

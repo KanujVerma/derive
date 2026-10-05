@@ -114,6 +114,7 @@ test('A07 private Squatch package proof is owner-bound, cannot upgrade public or
   assert.equal(selectDeclaration(d, i, 'private_package', policy(), now, { ownerId: id(12), packageObservationId: id(11) }).accepted, false);
   assert.equal(i.scope, 'public'); assert.equal(i.declarationIds.length, 1);
 });
+test('US source tag is equivalent to US market without admitting unknown or other markets',()=>{const d=declaration();d.sourceMarkets=['en:united-states','en:morocco'];const selected=selectDeclaration(d,item(),'public',policy(),now);assert.equal(selected.predicate.variantMarket.passed,true);assert.deepEqual(d.sourceMarkets,['en:united-states','en:morocco']);for(const markets of [[],['en:morocco'],['en:united-kingdom']]){d.sourceMarkets=markets;assert.equal(selectDeclaration(d,item(),'public',policy(),now).predicate.variantMarket.passed,false);}});
 test('A08 explicit scent/SPF/strength/form/size/count contradictions win; unknown market is never US', () => {
   for (const [key, value] of Object.entries({ scent: 'rose', spf: '50', strength: 'double', form: 'cream', size: '200', packCount: 2 })) {
     const d = declaration(); Object.assign(d.variant, { [key]: value }); const result = selectDeclaration(d, item(), 'public', policy(), now);

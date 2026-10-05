@@ -187,6 +187,7 @@ export function createPartThreeController(transport: PartThreeTransport, createI
         // basis. A refused/expired receipt must not become an endless read loop.
         // invalidate still owns epoch cancellation; pending Save recovery is retained.
         allowOptionalRefresh(){interaction=null;last=null;},
+        suspend() { epoch++; cancel(); if (view.result && Date.parse(view.result.validUntil) <= now()) { last=null; hide('Personal assessment expired. Refresh to review.'); } else { view={...view,loading:false};emit(); } },
         invalidate() { epoch++; cancel(); hide('Checking current personal assessment'); },
         expire() { if (view.result && Date.parse(view.result.validUntil) <= now()) {
             epoch++;

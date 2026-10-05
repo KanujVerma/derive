@@ -118,3 +118,18 @@ test('a late failed old search cannot replace a newer successful product', async
   assert.deepEqual(controller.snapshot().items, ['new']);
   controller.dispose();
 });
+
+
+test('automatic search debounces, aborts a superseded lookup and reuses only a current owner cache', async () => {
+  let calls=0,oldSignal:AbortSignal|undefined,now=0;
+  const c=createCatalogSearchController(async (query,signal)=>{calls++;if(query==='old'){oldSignal=signal;return new Promise<string[]>(()=>{});}return [query];},()=>{}, {debounceMs:1,cacheTtlMs:30000,now:()=>now});
+  c.setQuery('old');await new Promise(done=>setTimeout(done,10));assert.equal(calls,1);
+  c.setQuery('Hydro Boost');await new Promise(done=>setTimeout(done,10));assert.equal(oldSignal?.aborted,true);assert.deepEqual(c.snapshot().items,['Hydro Boost']);
+  c.setQuery('Hydro Boost');await c.submit();assert.equal(calls,2);
+  now=30001;c.setQuery('Hydro Boost');await c.submit();assert.equal(calls,3);
+  c.reset();c.setQuery('Hydro Boost');await c.submit();assert.equal(calls,4);c.dispose();
+});
+test('automatic name search never dispatches a partially typed barcode', async()=>{
+ let calls=0;const c=createCatalogSearchController(async()=>{calls++;return [];},()=>{}, {debounceMs:1,automaticQuery:q=>!/^\d+$/.test(q)});
+ c.setQuery('87863900');await new Promise(done=>setTimeout(done,10));assert.equal(calls,0);await c.submit();assert.equal(calls,1);c.dispose();
+});

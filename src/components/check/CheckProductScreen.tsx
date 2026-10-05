@@ -187,15 +187,15 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [scanResult, setScanResult] = useState<ProductScanResult | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   // Check owns this input across camera mounts and transient result sheets.
-  const searchTransportRef = useRef(preview ? searchPreviewCatalog : searchCatalogProducts);
-  searchTransportRef.current = PART_ONE_ENABLED ? query => {
+  const searchTransportRef = useRef<(query: string, signal?: AbortSignal) => Promise<CatalogProductSummary[]>>(preview ? searchPreviewCatalog : searchCatalogProducts);
+  searchTransportRef.current = PART_ONE_ENABLED ? (query, signal) => {
     if (/^\d{8,14}$/.test(query.trim())) {
       beginPartOneBarcode(query.trim(), null, captureRole ? resultOriginRef.current ?? undefined : { kind: 'search', query: searchQuery, scrollOffset: entryScrollOffset.current, selectedProductId: '' });
       return Promise.resolve([]);
     }
-    return searchPartOneProducts(query);
+    return searchPartOneProducts(query, signal);
   } : preview ? searchPreviewCatalog : searchCatalogProducts;
-  const [searchController] = useState(() => createCatalogSearchController<CatalogProductSummary>(query => searchTransportRef.current(query), () => {}, { automatic: !PART_ONE_ENABLED, onInvalidate: () => endCheckVerificationTiming('name') }));
+  const [searchController] = useState(() => createCatalogSearchController<CatalogProductSummary>((query, signal) => searchTransportRef.current(query, signal), () => {}, { debounceMs: PART_ONE_ENABLED ? 700 : 275, automaticQuery: query => !PART_ONE_ENABLED || !/^\d+$/.test(query), cacheTtlMs: PART_ONE_ENABLED ? 30000 : 0, onInvalidate: () => endCheckVerificationTiming('name') }));
   useEffect(() => { searchController.reset(); setSearchQuery(''); }, [searchController, liveCheckOwner]);
   useEffect(() => () => searchController.dispose(), [searchController]);
   const [productLink, setProductLink] = useState('');
@@ -734,7 +734,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     void partOneController.begin(owner, {
       schemaVersion: 1, requestId, idempotencyKey: requestId, clientScanId: requestId, generation: 0,
       code: { raw: barcode, symbology: symbology ?? (barcode.length === 8 ? 'ean8' : null), namespace: 'gtin', retailerId: null },
-      requestedMarket: null, categoryHint: null,
+      requestedMarket: 'US', categoryHint: null,
     });
   };
 
@@ -1212,7 +1212,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           key={`capture:${cameraSessionKey}`}
           initialRole={captureRole}
           photoCaptureEnabled={CHECK_PHOTO_CAPTURE_ENABLED}
-          deliberateBarcodeSelection={PART_ONE_ENABLED}
+          deliberateBarcodeSelection={false}
           resumeKey={cameraResumeKey}
           onSearch={openCameraSearch}
           initialEvidence={retainedEvidence}

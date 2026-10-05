@@ -16,9 +16,9 @@ export const PART_ONE_ENABLED = process.env.EXPO_PUBLIC_PART_ONE_ENABLED === 'tr
   && /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/?$/.test(publicEnvironment.supabaseUrl));
 
 export class PartOneConflict extends Error { constructor(public current: unknown) { super('Result revision changed'); } }
-async function call(path: string, method: 'GET' | 'POST' | 'DELETE', body?: unknown): Promise<any> {
+async function call(path: string, method: 'GET' | 'POST' | 'DELETE', body?: unknown, signal?: AbortSignal): Promise<any> {
   if (!PART_ONE_ENABLED || !supabase) throw new Error('Part 1 service unavailable');
-  const { data, error } = await supabase.functions.invoke(`part-one${path}`, { method, ...(body === undefined ? {} : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }) });
+  const { data, error } = await supabase.functions.invoke(`part-one${path}`, { method, signal, ...(body === undefined ? {} : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }) });
   if (error) { if ('context' in error && error.context instanceof Response && error.context.status === 409) throw new PartOneConflict(await error.context.json()); throw new Error('Part 1 service unavailable'); }
   return data;
 }
@@ -64,9 +64,9 @@ export async function deletePartOneCapture(id: string): Promise<void> {
   if (result.id !== expected) throw new Error('Private capture deletion binding changed');
 }
 
-export async function searchPartOneProducts(query: string) {
+export async function searchPartOneProducts(query: string, signal?: AbortSignal) {
   const timing = beginCheckVerificationTiming('name');
-  const items = PartOneSearchReplySchema.parse(await call('/search', 'POST', { query })).items;
+  const items = PartOneSearchReplySchema.parse(await call('/search', 'POST', { query }, signal)).items;
   markCheckVerificationTiming('name', 'candidates', timing);
   return items;
 }

@@ -210,9 +210,9 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
       scanLocked.current = true;
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (autoFinishBarcode && !currentSession.current.evidence.some((item) => item.kind === 'local_photo')) {
-        onEvidenceReady(toCaptureHandoff(reduceCapture(currentSession.current, { type: 'barcode', value: data })));
+        onEvidenceReady(toCaptureHandoff(reduceCapture(currentSession.current, { type: 'barcode', value: data, symbology: type })));
       }
-      dispatchCapture({ type: 'barcode', value: data });
+      dispatchCapture({ type: 'barcode', value: data, symbology: type });
       if (!hostOwnsResults) setNotice({ kind: 'status', title: 'Barcode captured', detail: 'Check the available product evidence.' });
     });
   };

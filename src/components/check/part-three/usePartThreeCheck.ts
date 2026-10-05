@@ -167,8 +167,7 @@ export function usePartThreeCheck({ ownerId, details, enabled = PART_THREE_ENABL
         };
         void refresh().then(() => controller.renew());
         const timer = setInterval(() => { controller.expire(); void refresh(); void controller.renew(); }, 10000);
-        const listener = AppState.addEventListener('change', state => { sequence++; controller.invalidate(); setSaved(null); setLabels(null); if (state === 'active')
-            void refresh().then(() => controller.renew()); });
+        const listener = AppState.addEventListener('change', state => { sequence++; if (state === 'active') { controller.expire(); void refresh().then(() => controller.renew()); } else controller.suspend(); });
         const offline = () => { sequence++; clear(); }, online = () => void refresh();
         if (typeof globalThis.addEventListener === 'function') {
             globalThis.addEventListener('offline', offline);

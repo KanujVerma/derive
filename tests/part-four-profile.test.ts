@@ -27,9 +27,9 @@ test('structured too-heavy feedback coexists with helpfulness and does not inven
  const stored=setupToStorageV2(createContextDraft(),bundle,()=>id(++serial),'2026-10-03T21:00:00Z');
  assert.equal(stored.assessments[0].perceivedHelp,'helps');assert.equal(stored.assessments[0].satisfaction,'unanswered');assert.deepEqual(productAssessmentSchema.parse(stored.assessments[0]).textureExperience,{state:'known',value:'too_heavy'});
 });
-test('initial four-screen setup hides unused free text and retains structured completion',()=>{
+test('initial five-screen setup hides unused free text and retains structured completion',()=>{
  const h=componentHarness('src/components/p0b-personalization/ContextFlow.tsx','ContextFlow',{setup:true,durableSetup:true,ownerId:id(1),collectIntent:false,createId:()=>id(2),onSetup(){},onApply(){},onSkip(){}});
- for(let i=0;i<3;i++)press(control(h.render(),'Continue'));
+ for(let i=0;i<4;i++)press(control(h.render(),'Continue'));
  const tree=JSON.stringify(h.render());assert(!tree.includes('Anything else'));assert(!tree.includes('not interpreted or used in Check'));assert(tree.includes('Save skin profile'));
 });
 

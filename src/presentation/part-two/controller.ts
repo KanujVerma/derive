@@ -69,6 +69,7 @@ export function createPartTwoController(transport: PartTwoTransport, createId: (
       return current.promise;
     },
     expire() { if (view.result && Date.parse(view.result.expiresAt) <= now()) { view = { ...view, result: null, loading: false, error: 'Ingredient evidence unavailable' }; emit(); } },
+    suspend() { epoch++; cancelFlight(); if (view.result && Date.parse(view.result.expiresAt) <= now()) view={...view,result:null,error:'Ingredient evidence unavailable'}; view={...view,loading:false};emit(); },
     invalidate() { epoch++; sequence++; cancelFlight(); view = { ...view, result: null, loading: false, error: 'Ingredient evidence unavailable' }; emit(); },
     close() { epoch++; sequence++; cancelFlight(); highest.clear(); view = { target: null, result: null, loading: false, error: null }; emit(); },
   };

@@ -56,7 +56,7 @@ test('live preference component reaches explicit create/edit/delete and save wit
 });
 test('fresh durable setup saves existing answers without the contextual preference editor',()=>{
  let received:any=null,serial=90;const h=componentHarness('src/components/p0b-personalization/ContextFlow.tsx','ContextFlow',{setup:true,durableSetup:true,ownerId:p2id(3),createId:()=>p2id(serial++),collectIntent:false,onSetup:(b:any)=>{received=b;},onApply(){},onSkip(){}},{modules:{'../ui/Button':{Button:'Button'},'../ui/ChoiceChip':{ChoiceChip:'ChoiceChip'}}});
- for(let n=0;n<3;n++){assert(!h.render().some(node=>node.props.label==='Add a confirmed preference'));press(control(h.render(),'Continue'));}assert(!h.render().some(node=>node.props.label==='Add a confirmed preference'));press(control(h.render(),'Save skin profile'));assert.deepEqual(received.preferences??[],[]);h.dispose();
+ for(let n=0;n<4;n++){assert(!h.render().some(node=>node.props.label==='Add a confirmed preference'));press(control(h.render(),'Continue'));}assert(!h.render().some(node=>node.props.label==='Add a confirmed preference'));press(control(h.render(),'Save skin profile'));assert.deepEqual(received.preferences??[],[]);h.dispose();
 });
 test('stale CAS stops without hidden refresh, and ambiguous removal retries exact erasure request',async()=>{
  const owner=p2id(3),c=context();let loads=0,ids=90;const attempts:Exclude<PersonalContextV2Request,{operation:'read_context_v2'}>[]=[];

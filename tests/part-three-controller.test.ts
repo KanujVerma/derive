@@ -77,3 +77,9 @@ test('explicit refresh after a refused read reacquires current assessment',async
  const c=client(r=>{calls.push(r.operation);if(r.operation==='evaluate'){const result=f.result(r.requestId);result.resultId=r.requestId;return {kind:'result',result,replayed:false};}if(r.operation==='read')return {kind:'unavailable',reason:'evidence_unavailable'};throw Error('Unexpected request');});
  c.bind(f.t);assert(await c.evaluate());assert.equal(await c.renew(),false);assert.equal(c.getView().result,null);c.allowOptionalRefresh();c.invalidate();assert.equal(await c.renew(),true);assert(c.getView().result);assert.deepEqual(calls,['evaluate','read','evaluate']);c.close();
 });
+
+
+test('background suspension keeps the valid in-memory packet and resumes with an authorized read',async()=>{
+ const f=fixture();let packet:PersonalResultV2|null=null;const calls:string[]=[];const c=client(r=>{calls.push(r.operation);if(r.operation==='evaluate'){packet=f.result(r.requestId);return {kind:'result',result:packet,replayed:false};}if(r.operation==='read')return {kind:'result',result:packet!,replayed:true};throw Error('unexpected');});
+ c.bind(f.t);await c.evaluate();const before=c.getView().result;c.suspend();assert.deepEqual(c.getView().result,before);await c.renew();assert.deepEqual(calls,['evaluate','read']);c.setOnline(false);assert.equal(c.getView().result,null);c.close();
+});

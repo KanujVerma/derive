@@ -12,7 +12,7 @@ function fixture(){
   if(action==='public/budget')return {allowed:budget};if(action==='heartbeat')return {alive:true};if(action==='claim')return {job};if(action==='catalog')return null;
   if(action==='public/reserve')return budget?{reservationId:lease}:{deferred:true,nextCheckAfter:'2026-10-04T08:21:00.000Z'};if(action==='dispatch')return {mayDispatch:true};if(action==='checkpoint')job.checkpoints[payload.stage as string]=structuredClone(payload.output);return {};
  };
- const transport={pinsResolvedAddresses:true as const,resolve:async()=>['93.184.216.34'],fetch:async(url:string)=>{fetches++;return new Response(JSON.stringify(url.includes('/cgi/search.pl')?{products:[{code:'3606000537538',product_name:'Synthetic public lotion',brands:'Fixture',quantity:'100 ml'}]}:{status:1,product:{code:'3606000537538',product_name:'Synthetic public lotion',brands:'Fixture',ingredients_text:'Water, Glycerin'}}),{headers:{'content-type':'application/json'}});}};
+ const transport={pinsResolvedAddresses:true as const,resolve:async()=>['93.184.216.34'],fetch:async(url:string)=>{fetches++;return new Response(JSON.stringify(url.includes('/cgi/search.pl')?{products:[{code:'3606000537538',product_name:'Synthetic public lotion',brands:'Fixture',quantity:'100 ml',countries_tags:['en:united-states']}]}:{status:1,product:{code:'3606000537538',product_name:'Synthetic public lotion',brands:'Fixture',ingredients_text:'Water, Glycerin'}}),{headers:{'content-type':'application/json'}});}};
  const options={url:'https://snojlbqovlawewwqbviz.supabase.co',selectedReleaseId:'derive-original-personal-v1',sourceReleaseId:'derive-obf-public-content-v1',ownerId:owner,rpc,transport,now:()=>now};
  return {options,calls,setLive:(v:boolean)=>{live=v;},setBudget:(v:boolean)=>{budget=v;},get fetches(){return fetches;},advance:()=>{now='2027-01-04T00:00:00.000Z';}};
 }
@@ -58,4 +58,15 @@ test('shared product quota waits before reservation and cannot consume a termina
  const f=fixture(),create=await factory();f.setBudget(false);await create(f.options).consume();
  assert.equal(f.fetches,0);assert.ok(f.calls.some(c=>c.action==='public/reserve'));
  assert.equal(f.calls.some(c=>['dispatch','checkpoint','admit','retry','finish'].includes(c.action)),false);
+});
+
+
+test('US search requests US eligibility and rejects international-only and unknown markets without formula promotion',async()=>{
+ const create=await factory(),f=fixture();let request='';f.options.transport.fetch=async url=>{request=url;return new Response(JSON.stringify({products:[
+  {code:'878639000230',product_name:'Every man jack deo',brands:'',countries_tags:['en:united-states']},
+  {code:'0012044038918',product_name:'Desodorante',brands:'Old Spice',countries_tags:['en:morocco','en:united-states']},
+  {code:'3574661287201',product_name:'Hydro Boost Aqua-Gel',brands:'Neutrogena',countries_tags:['en:france','en:morocco']},
+  {code:'0345334310167',product_name:'Unknown market',brands:'Vanicream'}
+ ]}),{headers:{'content-type':'application/json'}});};
+ const reply=await create(f.options).search({query:'Neutrogena Hydro Boost'});assert.equal(new URL(request).searchParams.get('tag_0'),'en:united-states');assert.deepEqual(reply.items.map((i:any)=>i.name),['Every man jack deo','Desodorante']);assert(reply.items.every((i:any)=>i.formulaState==='unverified'));
 });

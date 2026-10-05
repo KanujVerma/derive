@@ -100,7 +100,7 @@ test('all formula positions, short explanations and long copy remain readable in
   assert(textContent(nodes).includes(value.formula.ingredients[0].card!.short));
   assert(nodes.filter(node => node.type === 'Text').every(node => node.props.numberOfLines === undefined));
   assert.deepEqual(nodes.filter(node => node.type === 'Text' && node.props.accessibilityRole === 'header').map(node => node.props.children),
-    ['Compared with your current routine', 'Ingredients', 'Price & value']);
+    ['Relevant to your profile', 'Ingredients', 'Price & value']);
   press(control(nodes, 'Ingredient details: Glycerin, position 1')); nodes = h.render();
   assert(textContent(nodes).includes(value.formula.ingredients[0].card!.body));
   assert.match(textContent(nodes), /43 formula positions/);
@@ -243,4 +243,10 @@ test('published Part Two attribution and control characters remain explicit and 
   assert.equal(partFourDisplayText('Exact Water name'), 'Exact Water name');
   press(control(nodes, 'Part Four sources'));
   assert(!h.render().some(node => node.props.accessibilityRole === 'link'));
+});
+
+
+test('ingredient detail omits a duplicate alias paragraph and keeps an explicit unavailable caution',()=>{
+ const p=packet('Water');const card=p.formula.ingredients[0].card!;card.evidence='Water is also called Aqua.';card.editorial={amountAndUse:null,caution:null,aliasNotes:'Water is also called Aqua.',distinctIngredients:null,qualifications:[],copySha256:'synthetic',documentId:'synthetic',libraryFileId:'synthetic',libraryVersion:0,documentSha256:'synthetic'};
+ const h=componentHarness(component,'PartFourSections',{packet:p,now});press(control(h.render(),'Explore ingredient: Water, position 1'));const copy=textContent(h.render());assert.equal(copy.split('Water is also called Aqua.').length-1,1);assert.match(copy,/No specific caution.*reference/i);
 });
