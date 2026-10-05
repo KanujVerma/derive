@@ -195,7 +195,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     }
     return searchPartOneProducts(query, signal);
   } : preview ? searchPreviewCatalog : searchCatalogProducts;
-  const [searchController] = useState(() => createCatalogSearchController<CatalogProductSummary>((query, signal) => searchTransportRef.current(query, signal), () => {}, { debounceMs: PART_ONE_ENABLED ? 700 : 275, automaticQuery: query => !PART_ONE_ENABLED || !/^\d+$/.test(query), cacheTtlMs: PART_ONE_ENABLED ? 30000 : 0, onInvalidate: () => endCheckVerificationTiming('name') }));
+  const [searchController] = useState(() => createCatalogSearchController<CatalogProductSummary>((query, signal) => searchTransportRef.current(query, signal), () => {}, { debounceMs: PART_ONE_ENABLED ? 700 : 275, automaticQuery: query => !PART_ONE_ENABLED || !/^\d+$/.test(query), cacheTtlMs: PART_ONE_ENABLED ? 30000 : 0, cacheQuery: query => !/^\d+$/.test(query), onInvalidate: () => endCheckVerificationTiming('name') }));
   useEffect(() => { searchController.reset(); setSearchQuery(''); }, [searchController, liveCheckOwner]);
   useEffect(() => () => searchController.dispose(), [searchController]);
   const [productLink, setProductLink] = useState('');

@@ -156,7 +156,7 @@ test('typed barcode dispatches Part 1 immediately without name lookup, and close
   const input = control(catalog.render(), 'Search catalog products');
   input.props.onChangeText('3337875597197'); input.props.onSubmitEditing();
   assert.deepEqual(f.names, []); assert.equal(f.scans.length, 1); assert.equal(f.sheet()!.props.view.loading, true);
-  assert.equal(f.scans[0].request.code.namespace, 'gtin'); assert.equal(f.scans[0].request.requestedMarket, null);
+  assert.equal(f.scans[0].request.code.namespace, 'gtin'); assert.equal(f.scans[0].request.requestedMarket, 'US');
   f.sheet()!.props.onClose(); f.scans[0].resolve(result(f.scans[0].request)); await settle();
   assert.equal(f.sheet(), undefined); assert.equal(f.search().props.controller.getState().query, '3337875597197');
 });

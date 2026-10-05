@@ -2,7 +2,7 @@ export interface CatalogSearchState<T> {
   query: string; resultQuery: string; items: T[]; loading: boolean; error: boolean;
 }
 export function createCatalogSearchController<T>(search: (query: string, signal?: AbortSignal) => Promise<T[]>,
-  onChange: (state: CatalogSearchState<T>) => void = () => {}, options: { automatic?: boolean; onInvalidate?: () => void; debounceMs?: number; automaticQuery?: (query: string) => boolean; cacheTtlMs?: number; now?: () => number } = {}) {
+  onChange: (state: CatalogSearchState<T>) => void = () => {}, options: { automatic?: boolean; onInvalidate?: () => void; debounceMs?: number; automaticQuery?: (query: string) => boolean; cacheTtlMs?: number; cacheQuery?: (query: string) => boolean; now?: () => number } = {}) {
   const empty = (): CatalogSearchState<T> => ({ query: '', resultQuery: '', items: [], loading: false, error: false });
   let state = empty();
   let generation = 0;
@@ -29,14 +29,15 @@ export function createCatalogSearchController<T>(search: (query: string, signal?
     if (activeQuery === query) return;
     const version = ++generation;
     if (query.length < 2) { publish({ ...state, resultQuery: '', items: [], loading: false, error: false }); return; }
-    const cached = cache.get(query.toLowerCase());
+    const canCache = options.cacheQuery?.(query) ?? true;
+    const cached = canCache ? cache.get(query.toLowerCase()) : undefined;
     if (cached && cached.expires > now()) { publish({ ...state, resultQuery: query, items: [...cached.items], loading: false, error: false }); return; }
     abort?.abort(); const requestAbort = new AbortController(); abort = requestAbort;
     activeQuery = query;
     publish({ ...state, loading: true, error: false });
     try {
       const items = await search(query, requestAbort.signal);
-      if (!disposed && generation === version && !requestAbort.signal.aborted && options.cacheTtlMs) {
+      if (!disposed && generation === version && !requestAbort.signal.aborted && options.cacheTtlMs && canCache) {
         cache.delete(query.toLowerCase()); cache.set(query.toLowerCase(), { items: [...items], expires: now() + options.cacheTtlMs });
         while (cache.size > 8) cache.delete(cache.keys().next().value!);
       }
