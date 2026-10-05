@@ -6,7 +6,7 @@ import { createCatalogRequestId } from '../../../services/productCatalog';
 import type { PartTwoOccurrence } from '../../../contracts/PartTwo';
 import { colors, spacing } from '../../../constants/theme';
 import { sourceIngredientContext, type IngredientContextInput } from '../../../presentation/part-four/ingredientContext';
-import { partFourDisplayText, safePartFourSourceUrl } from '../../../presentation/part-four/sections';
+import { partFourDisplayText, ingredientPrintedNameDiffers, safePartFourSourceUrl } from '../../../presentation/part-four/sections';
 
 /** Rendering controls are visible inert text, never a chemical correction. */
 export function ingredientDisplayText(value: string): string {
@@ -55,10 +55,10 @@ export function PartTwoInlineView({ view, now = Date.now(), education, contextSu
       <Text accessibilityRole="header">Ingredient detail</Text>
       {!opened ? <Text accessibilityLiveRegion="polite">Ingredient evidence unavailable</Text> : <>
         {opened.mapping.state === 'resolved' ? <>
-          {opened.mapping.preferredName && opened.mapping.preferredName !== opened.observedName && <Text>{ingredientDisplayText(opened.mapping.preferredName)}</Text>}
-          <Text>{`Listed as: ${ingredientDisplayText(opened.observedName)}`}</Text>
+          {opened.mapping.preferredName && ingredientPrintedNameDiffers(opened.mapping.preferredName,opened.observedName) && <Text>{ingredientDisplayText(opened.mapping.preferredName)}</Text>}
+          {ingredientPrintedNameDiffers(card?.name ?? opened.mapping.preferredName ?? opened.observedName,opened.observedName) && <Text>{`Listed as: ${ingredientDisplayText(opened.observedName)}`}</Text>}
         </> : opened.mapping.state === 'ambiguous' ? <Text>Ingredient identity is ambiguous.</Text> : <Text>Details unavailable for this name</Text>}
-        {card && <><Text>{ingredientDisplayText(card.body)}</Text>{card.detail && <Text>{ingredientDisplayText(card.detail)}</Text>}{card.editorial?.caution && <Text>{ingredientDisplayText(card.editorial.caution)}</Text>}{card.editorial?.amountAndUse && <Text>{ingredientDisplayText(card.editorial.amountAndUse)}</Text>}{card.editorial?.qualifications.map((qualification, index) => <Text key={index}>{ingredientDisplayText(qualification)}</Text>)}<Text>Ingredient reference only; product results and your response remain unknown.</Text></>}
+        {card && <><Text>{ingredientDisplayText(card.body)}</Text>{card.detail && <Text>{ingredientDisplayText(card.detail)}</Text>}{card.editorial?.caution && <Text>{ingredientDisplayText(card.editorial.caution)}</Text>}{card.editorial?.amountAndUse && <Text>{ingredientDisplayText(card.editorial.amountAndUse)}</Text>}{card.editorial?.qualifications.map(ingredientDisplayText).filter(qualification => qualification !== 'No specific caution is listed. This does not establish safety.').map((qualification, index) => <Text key={index}>{ingredientDisplayText(qualification)}</Text>)}<Text>Ingredient reference only; product results and your response remain unknown.</Text></>}
         {opened.quantities.map((quantity, index) => <View key={index} style={{ gap: spacing.xs }}>
           <Text>Printed amount: {ingredientDisplayText(quantity.span.raw)}</Text>
           {!['parsed', 'validated'].includes(quantity.status) ? <Text>Printed amount needs review; no concentration is established.</Text> : <>

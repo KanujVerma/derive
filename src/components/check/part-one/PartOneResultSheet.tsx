@@ -52,7 +52,6 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   savedAssessmentId?: string | null;
 }) {
   const r = view.result;
-  const [assessmentView, setAssessmentView] = useState<'current'|'saved'>('current');
   const [sourceOpen, setSourceOpen] = useState(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now);
@@ -109,7 +108,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
     ? 'Ingredient evidence unavailable'
     : currentDetails?.result?.state === 'parse_limit' ? currentDetails.result.permittedText?.sections.length ? 'Ingredient wording remains available. Details need review.' : 'Ingredient details need review.' : partOneSummary;
   const personal = usePartThreeCheck({ ownerId: view.owner, details: currentDetails, enabled: personalEnabled, ports: personalPorts, savedAssessmentId });
-  const displayedResult = assessmentView === 'saved' && personal.view.historical ? personal.view.historical.assessmentWhenSaved : personal.view.result;
+  const displayedResult = savedAssessmentId ? personal.view.historical?.assessmentWhenSaved ?? null : personal.view.historical ? personal.view.historical.assessmentWhenSaved : personal.view.result;
   const partFour = displayedResult?.partFour;
   const educationSelection = personalPorts?.partFourSelection ?? PART_FOUR_CLIENT_SELECTION;
   const education = personal.enabled && PART_FOUR_ENABLED && educationSelection?.education === 'approved423' && !currentRefusal && !sourceAccess.current.privateDenied
@@ -117,7 +116,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   const ingredientContext = education && currentDetails ? sourceIngredientContext(currentDetails.result, education, clock) : null;
   const contextSummary = ingredientContext?.points.length && currentDetails
     ? <PartTwoSourceSummary view={currentDetails} education={education} now={clock} /> : null;
-  const partFourCurrent = Boolean(partFour && displayedResult && (assessmentView === 'saved' && personal.view.historical?.assessmentWhenSaved === displayedResult || Date.parse(displayedResult.validUntil)>clock));
+  const partFourCurrent = Boolean(partFour && displayedResult && (personal.view.historical?.assessmentWhenSaved === displayedResult || Date.parse(displayedResult.validUntil)>clock));
   const originalSections = !expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
     <Text accessibilityRole="header">{({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[section.kind]}</Text><Text selectable>{section.text}</Text>
   </View>);
@@ -128,7 +127,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       {view.loading && <ActivityIndicator color={colors.brand} />}
       <CheckResultView section="summary" facts={{ brand: identity?.brand ?? '', name: identity?.name ?? 'Product not confirmed', categoryLabel: identity?.variantText ?? '', formula: null, source: null }}
         identityImage={identity?.image && current(identity.image.expiresAt) && failedImage !== identity.image.url ? <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 68, height: 82, borderRadius:12, backgroundColor:colors.canvas }} resizeMode="contain" onLoad={() => markCheckVerificationTiming('barcode', 'image', r?.requestId)} onError={() => setFailedImage(identity.image!.url)} /> : undefined}
-        personalSummary={personal.enabled ? <PartThreeSummary view={personal.view} identityName={identity?.name} assessmentView={assessmentView} onAssessmentViewChange={setAssessmentView} /> : undefined}
+        personalSummary={personal.enabled ? <PartThreeSummary view={{...personal.view,result:displayedResult}} identityName={identity?.name} /> : undefined}
         verdict={{ state: 'unknown', label: 'Not enough information', reason: status, findings: [] }} />
       {r?.work === 'deferred_budget' && <Text>Lookup is deferred. Existing product facts remain available.</Text>}
       {r?.work === 'retry_wait' && <Text>The source is temporarily unavailable. Lookup will retry when eligible.</Text>}
@@ -155,11 +154,11 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
         }} />}
       {productSaveAvailable && !partFourCurrent && r?.snapshotId && !r.declarationId && <Text>Saves the product only; this photo reading is not saved.</Text>}
     </> : undefined}>
-    {assessmentView === 'current' && contextSummary && <View style={{paddingTop:16}}>{contextSummary}</View>}
+    {!savedAssessmentId && !personal.view.historical && contextSummary && <View style={{paddingTop:16}}>{contextSummary}</View>}
     {typeof localDraft === 'function' ? localDraft(sourceAccess.current.privateDenied, setDetails) : !sourceAccess.current.privateDenied && localDraft}
     {personal.enabled && partFourCurrent && <PartThreeDetails view={{...personal.view,result:displayedResult}} />}
     {partFourCurrent && partFour && currentDetails?.result?.state==='ready' ? <View onLayout={event=>{ingredientOrigin.current.y=event.nativeEvent.layout.y;}}><PartFourSections onIngredientJump={(id,y)=>{if(y!==undefined)setIngredientScroll({key:sourceKey+':'+id,y:ingredientOrigin.current.y+y});}} packet={partFour} researchSubject={researchSubjectFor(displayedResult?.binding.subject)} now={clock} expectedBindingKey={currentDetails.result.bindingKey} expectedResultRevision={currentDetails.result.resultRevision} expectedDependencyDigest={currentDetails.result.output.reading.binding.dependencyDigest} withdrawn={Boolean(currentRefusal) || sourceAccess.current.privateDenied}/></View> : acquisitionTarget ? <PartTwoIngredientsView view={acquired} target={acquisitionTarget} enabled={ingredientEnabled} fallback={originalSections} education={education} contextSummary={false} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
-    <PartThreeControls check={personal} section="details"/>
+    {!savedAssessmentId && !personal.view.historical && <PartThreeControls check={personal} section="details"/>}
     {identity && !expired && !view.error && <Button label="Search by name" style={{minHeight:44}} variant="ghost" onPress={onSearch}/>}
     {!partFourCurrent && <Pressable accessibilityRole="button" accessibilityLabel="Source" accessibilityState={{ expanded: sourceOpen }} onPress={() => setSourceOpen(value => !value)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.brand }}>Source</Text></Pressable>}
     {!partFourCurrent && sourceOpen && !expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>

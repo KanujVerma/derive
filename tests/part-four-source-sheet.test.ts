@@ -19,7 +19,7 @@ test('ready unknown decision leads with useful context; qualifications expand an
  let text=textContent(h.render());assert.match(text,/Personal Fit.*Not enough info/);assert(!text.includes('For dryness'));assert.match(text,/Review the listed ingredients/);
  assert.match(text,/unresolved|clarification|judgment/i);
  const historical={kind:'historical' as const,savedAssessmentId:p2id(88),savedAt:x.now,assessmentWhenSaved:unknown,currentAssessment:'unavailable' as const};
- assert.match(textContent(h.render({view:{...view,historical}})),/Current Check.*When saved/);press(control(h.render(),'When saved'));assert.match(textContent(h.render()),/Assessment when saved/);press(control(h.render(),'Current Check'));
+ assert.match(textContent(h.render({view:{...view,historical}})),/Personal Fit.*Not enough info/);assert(!/Current Check|When saved|Assessment when saved/.test(textContent(h.render())));
  x.context.profile!.data.sensitivities={status:'reported',values:['Glycerin']};const concern=evaluatePersonalResult(x);
  const concernText=textContent(h.render({view:{...view,result:concern}}));assert.match(concernText,/reported as a sensitivity/);assert.match(concernText,/Check first/);
 });

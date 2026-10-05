@@ -52,7 +52,7 @@ test('mounted hook accepts only compiled 423/science selection and preserves it 
   await check.save();for(let i=0;i<3;i++){current.render();await settle();}assert.equal(current.render().find(n=>n.type==='span')!.props.check.view.savedAssessmentId,p2id(367));
   current.dispose();cold=componentHarness('tests/fixtures/part-four-mounted-hook.tsx','MountedPartFour',{...props,savedAssessmentId:p2id(367)},options);
   for(let i=0;i<9;i++){cold.render();await settle();}const reopened=cold.render().find(n=>n.type==='span')!.props.check;
-  assert.deepEqual(reopened.view.historical.assessmentWhenSaved,saved);press(control(cold.render(),'When saved'));assert.match(textContent(cold.render()),/Assessment when saved/);assert.ok(reopened.view.result,reopened.view.error??'Missing current result after saved reopen');assert.equal(reopened.view.result.binding.releases.partFour.scientificManifestHash,PENDING_SCIENTIFIC_MANIFEST.contentHash);
+  assert.deepEqual(reopened.view.historical.assessmentWhenSaved,saved);assert(!/Current Check|When saved|Assessment when saved/.test(textContent(cold.render())));assert.ok(reopened.view.result,reopened.view.error??'Missing current result after saved reopen');assert.equal(reopened.view.result.binding.releases.partFour.scientificManifestHash,PENDING_SCIENTIFIC_MANIFEST.contentHash);
  }finally{current.dispose();cold?.dispose();}
 });
 test('untried candidate shows ingredient goal and automatic replacement reasoning, with exact Save and cold reopen',async t=>{
@@ -73,7 +73,7 @@ test('untried candidate shows ingredient goal and automatic replacement reasonin
   await check.save();for(let i=0;i<3;i++){current.render();await settle();}assert.equal(current.render().find(n=>n.type==='span')!.props.check.view.savedAssessmentId,p2id(367));
   current.dispose();cold=componentHarness('tests/fixtures/part-four-mounted-hook.tsx','MountedPartFour',{...props,savedAssessmentId:p2id(367)},options);
   for(let i=0;i<9;i++){cold.render();await settle();}const reopened=cold.render().find(n=>n.type==='span')!.props.check;
-  assert.deepEqual(reopened.view.historical.assessmentWhenSaved,saved);assert.match(textContent(cold.render()),/Glycerin.*water/);press(control(cold.render(),'When saved'));assert.match(textContent(cold.render()),/Assessment when saved/);assert.ok(reopened.view.result,reopened.view.error??'Missing current result after saved reopen');assert.equal(reopened.view.result.binding.releases.partFour.scientificManifestHash,PENDING_SCIENTIFIC_MANIFEST.contentHash);
+  assert.deepEqual(reopened.view.historical.assessmentWhenSaved,saved);assert.match(textContent(cold.render()),/Glycerin.*water/);assert(!/Current Check|When saved|Assessment when saved/.test(textContent(cold.render())));assert.ok(reopened.view.result,reopened.view.error??'Missing current result after saved reopen');assert.equal(reopened.view.result.binding.releases.partFour.scientificManifestHash,PENDING_SCIENTIFIC_MANIFEST.contentHash);
  }finally{current.dispose();cold?.dispose();}
 });
 test('unknown client release/hash selection is refused rather than silently accepted',()=>{

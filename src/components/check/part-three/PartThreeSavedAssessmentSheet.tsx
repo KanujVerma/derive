@@ -1,52 +1,52 @@
-import { researchSubjectFor } from '../../../presentation/part-four/researchSubject';
 import React, { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Image } from 'react-native';
+import type { ScanResult } from '../../../contracts/PartOne';
+import { partOneTransport } from '../../../services/partOne';
+import { savedCheckIdentity } from '../../../presentation/part-three/savedIdentity';
+import { researchSubjectFor } from '../../../presentation/part-four/researchSubject';
 import { CheckResultView } from '../result-sheet/CheckResultContent';
 import { ResultSheetSurface } from '../result-sheet/ResultSheetSurface';
-import { Button } from '../../ui/Button';
 import { PartThreeSummary } from './PartThreeSummary';
 import { PartFourSections } from '../part-four/PartFourSections';
 import { PartThreeDetails } from './PartThreeDetails';
-import { PartThreeControls } from './PartThreeControls';
 import { usePartThreeCheck } from './usePartThreeCheck';
-import { PartTwoSourceSummary } from '../part-two/PartTwoIngredients';
-import { sourceIngredientContext } from '../../../presentation/part-four/ingredientContext';
-import { ISOLATED_423_EDUCATION } from '../../../domain/part-four/knowledge423';
-import { PART_FOUR_ENABLED, PART_FOUR_CLIENT_SELECTION } from '../../../services/partThree';
-/** Assessment-only saves reopen on the same canonical sheet surface. Bodies are live reads. */
-export function PartThreeSavedAssessmentSheet({ ownerId, savedAssessmentId, onClose }: {
-    ownerId: string;
-    savedAssessmentId: string;
-    onClose: () => void;
+import { colors } from '../../../constants/theme';
+
+/** Saved answer and basis are independently reauthorized. Current computation
+ * remains internal and must not silently replace this historical answer. */
+export function PartThreeSavedAssessmentSheet({ ownerId, savedAssessmentId, onClose, readScan = partOneTransport.read }: {
+    ownerId: string; savedAssessmentId: string; onClose: () => void;
+    readScan?: (id: string) => Promise<ScanResult>;
 }) {
     const check = usePartThreeCheck({ ownerId, details: null, savedAssessmentId });
-    const [assessmentView,setAssessmentView]=useState<'current'|'saved'>('current');
-    const displayedResult=assessmentView==='saved'&&check.view.historical?check.view.historical.assessmentWhenSaved:check.view.result;
-    const identityName=displayedResult?.summary?.namedDecision.name ?? check.view.historical?.assessmentWhenSaved?.summary?.namedDecision.name;
-    const details = check.ingredientDetails;
-    const [clock, setClock] = useState(Date.now);
-    const now = Math.max(clock, Date.now());
-    const reading = details?.result?.state === 'ready' ? details.result.output.reading : null;
-    const expiry = details?.result ? Math.min(Date.parse(details.result.expiresAt), ...(reading?.dependencyManifest.sourceRefs.map(source => Date.parse(source.expiresAt)) ?? [])) : null;
-    useEffect(() => {
-        if (expiry === null || !Number.isFinite(expiry) || expiry <= now) return;
-        const timer = setTimeout(() => setClock(Date.now()), Math.min(60000, expiry - now));
-        return () => clearTimeout(timer);
-    }, [expiry, clock, now]);
-    const education = check.enabled && PART_FOUR_ENABLED && PART_FOUR_CLIENT_SELECTION?.education === 'approved423' && check.context
-        ? {ownerId, context: check.context, knowledge: ISOLATED_423_EDUCATION} : undefined;
-    const context = education && details ? sourceIngredientContext(details.result, education, now) : null;
-    const contextSummary = context?.points.length && details ? <View>
-        <Text accessibilityRole="header">With your current profile</Text>
-        <PartTwoSourceSummary view={details} education={education} now={now}/>
-        <Text>Current profile context is separate from the assessment when saved.</Text>
-    </View> : null;
-    return <ResultSheetSurface inline={false} presentationKey={`saved-assessment:${savedAssessmentId}`} onClose={onClose} onInteraction={check.interact} onExpandedChange={() => { }} summary={<CheckResultView section="summary" facts={{brand:'',name:identityName ?? 'Saved product Check',categoryLabel:'',formula:null,source:null}} verdict={{state:'unknown',label:'',reason:'',findings:[]}} personalSummary={<PartThreeSummary view={check.view} identityName={identityName} assessmentView={assessmentView} onAssessmentViewChange={setAssessmentView}/>}/>}>
-  {assessmentView==='current' && contextSummary}
-  <PartThreeDetails view={{...check.view,result:displayedResult}}/>
-  {displayedResult?.partFour && <PartFourSections packet={displayedResult.partFour} researchSubject={researchSubjectFor(displayedResult.binding.subject)} now={now} withdrawn={assessmentView==='current' && Date.parse(displayedResult.validUntil)<=now}/>}
-  <PartThreeControls check={check} section="details"/>
-  <Button label="Refresh current Check" variant="ghost" onPress={check.refresh}/>
-
- </ResultSheetSurface>;
+    const savedAnswer = check.view.historical?.assessmentWhenSaved;
+    const displayedResult = savedAnswer?.binding.ownerId===ownerId ? savedAnswer : null;
+    const basis = check.ingredientDetails?.result ?? null;
+    const headerKey = `${ownerId}:${savedAssessmentId}:${basis?.bindingKey ?? ''}`;
+    const [header,setHeader] = useState<{key:string;scan:ScanResult}|null>(null);
+    const [failedImage,setFailedImage] = useState<string|null>(null);
+    const [clock,setClock] = useState(Date.now);
+    const now = Math.max(clock,Date.now());
+    const identity = savedCheckIdentity(header?.key===headerKey?header.scan:null,basis,displayedResult,now);
+    const name = identity?.name ?? displayedResult?.summary?.namedDecision.name ?? 'Saved product Check';
+    useEffect(()=>{
+        if (basis?.state!=='ready' || !readScan) return;
+        let active=true,sequence=0;
+        const refresh=()=>{const attempt=++sequence;void readScan(basis.scanId).then(scan=>{if(active&&attempt===sequence)setHeader({key:headerKey,scan});}).catch(()=>{if(active&&attempt===sequence)setHeader(null);});};
+        refresh();const timer=setInterval(refresh,10000);
+        return ()=>{active=false;clearInterval(timer);};
+    },[headerKey,basis?.scanId,readScan]);
+    const expiry = basis ? Math.min(Date.parse(basis.expiresAt),...(basis.state==='ready'?basis.output.reading.dependencyManifest.sourceRefs.map(ref=>Date.parse(ref.expiresAt)):[]),identity?Date.parse(identity.expiresAt):Infinity) : null;
+    useEffect(()=>{
+        if (expiry===null || !Number.isFinite(expiry) || expiry<=now) return;
+        const timer=setTimeout(()=>setClock(Date.now()),Math.min(60000,expiry-now));
+        return ()=>clearTimeout(timer);
+    },[expiry,clock,now]);
+    return <ResultSheetSurface inline={false} presentationKey={`saved-assessment:${savedAssessmentId}`} onClose={onClose} onInteraction={check.interact} onExpandedChange={()=>{}}
+      summary={<CheckResultView section="summary" facts={{brand:identity?.brand??'',name,categoryLabel:identity?.variantText??'',formula:null,source:null}}
+        identityImage={identity?.image && failedImage!==identity.image.url ? <Image accessibilityLabel={`${name} package`} source={{uri:identity.image.url}} resizeMode="contain" style={{width:68,height:82,borderRadius:12,backgroundColor:colors.canvas}} onError={()=>setFailedImage(identity.image!.url)}/> : undefined}
+        verdict={{state:'unknown',label:'',reason:'',findings:[]}} personalSummary={<PartThreeSummary view={{...check.view,result:displayedResult}} identityName={name}/>}/> }>
+      <PartThreeDetails view={{...check.view,result:displayedResult}}/>
+      {displayedResult?.partFour && <PartFourSections packet={displayedResult.partFour} researchSubject={researchSubjectFor(displayedResult.binding.subject)} now={now}/>}
+    </ResultSheetSurface>;
 }

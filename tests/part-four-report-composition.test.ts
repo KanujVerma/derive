@@ -49,6 +49,7 @@ test('mounted current P4 Check retains canonical family/manual report periods an
   const h = componentHarness('src/components/check/part-one/PartOneResultSheet.tsx', 'PartOneResultSheet', { view: { owner: f.x.context.ownerId, result: p1, saved: false, loading: false, error: null }, onClose() {}, onRefresh() {}, onSelect() {}, onSave() {}, onSearch() {}, onFullChange() {} }, { modules: {
     '../result-sheet/ResultSheetSurface': surface,
     '../part-three/usePartThreeCheck': { usePartThreeCheck: () => f.check },
+    '../part-three/PartThreeControls': { PartThreeControls:'PartThreeControls', PartThreeSaveControl:'PartThreeSaveControl' },
     '../part-two/PartTwoIngredients': { usePartTwoView: () => details, PartTwoIngredientsView: 'PartTwoIngredientsView' },
     '../../ui/Button': { Button: 'Button' }, '../../ui/ChoiceChip': { ChoiceChip: 'ChoiceChip' },
   } });
@@ -65,9 +66,8 @@ test('saved P4 sheet retains historical report qualifiers independently of curre
     '../result-sheet/ResultSheetSurface': surface, './usePartThreeCheck': { usePartThreeCheck: () => f.check },
     '../../ui/Button': { Button: 'Button' }, '../../ui/ChoiceChip': { ChoiceChip: 'ChoiceChip' },
   } });
-  press(control(h.render(),'When saved'));
   const copy = textContent(h.render());
-  assert.match(copy, /Assessment when saved/);
+  assert(!/Current Check|When saved|Assessment when saved/.test(copy));
   assertReports(copy);
   f.check.view = { ...f.view, result: null };
   assert(!textContent(h.render()).includes('2020 (year precision)'), 'Refused historical read must remove report bytes');

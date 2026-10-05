@@ -7,7 +7,7 @@ import type { ResearchBriefSubject } from '../../../domain/part-four/researchBri
 import { ResearchBriefSources } from './ResearchBrief';
 import { RetainedEvidence, RetainedEvidenceSources } from './RetainedEvidence';
 import { authorizedPartFourPacket, formulaEvidenceNotice, formulaLimitationsForDisplay, formulaScope, ingredientRow, ingredientSectionHeading,
-  ingredientTargets, partFourDisclosureKey, partFourDisplayText, safePartFourSourceUrl, visiblePartFourInsights,
+  ingredientTargets, ingredientPrintedNameDiffers, ingredientRoleTone, partFourDisclosureKey, partFourDisplayText, safePartFourSourceUrl, visiblePartFourInsights,
   type PartFourRenderFence } from '../../../presentation/part-four/sections';
 
 export interface PartFourSectionsProps extends PartFourRenderFence {
@@ -32,6 +32,7 @@ export interface PartFourSectionsProps extends PartFourRenderFence {
 export function PartFourSections(props: PartFourSectionsProps) {
   const [open, setOpen] = useState<{ key: string; id: string } | null>(null);
   const [sources, setSources] = useState<string | null>(null);
+  const [ingredientReference,setIngredientReference]=useState<{key:string;id:string}|null>(null);
   const layout = useRef({key:'',section:0,list:0,rows:new Map<string,number>()});
   const packet = authorizedPartFourPacket(props.packet, props);
   if (!packet) return <Text accessibilityLiveRegion="polite" style={styles.copy}>{props.loading && !props.withdrawn ? 'Preparing product details' : 'Product details unavailable'}</Text>;
@@ -104,8 +105,11 @@ export function PartFourSections(props: PartFourSectionsProps) {
         {rows.map((row, index) => {
           const heading = ingredientSectionHeading(packet.formula, index);
           const expanded = openId === row.occurrenceId;
-          // The two known absent-caution qualifications are covered by the
-          // shared line or the actual caution below. Scientific limits remain.
+          const tone = ingredientRoleTone(row, packet.insights);
+          const roleColor = tone==='caution'?colors.actionReview.text:tone==='benefit'?colors.actionKeep.text:colors.inkSubtle;
+          const references = packet.formula.sources.filter(source=>row.card?.sourceIds.includes(source.id));
+          const singleReference = references.length===1 ? safePartFourSourceUrl(references[0].url) : null;
+          // Generic absence-of-caution boilerplate is not a scientific limit.
           const qualifications = [...new Set((row.card?.editorial?.qualifications ?? []).map(partFourDisplayText))]
             .filter(qualification => qualification !== 'No specific caution is listed. This does not establish safety.');
           return <View key={row.occurrenceId} nativeID={`part-four-ingredient-${row.occurrenceId}`} style={styles.ingredient}
@@ -115,11 +119,11 @@ export function PartFourSections(props: PartFourSectionsProps) {
               accessibilityLabel={[`Ingredient details: ${row.name}, position ${index + 1}`, row.short, row.label,
                 ...row.qualifiers, ...row.amounts, ...row.quantityLimits].join(', ')}
               accessibilityState={{ expanded }} onPress={() => toggleIngredient(expanded ? null : row.occurrenceId)} style={styles.ingredientSummary}>
-              <View accessible={false} style={[styles.ingredientSignal,{backgroundColor:insights.comparison.some(i=>i.ruleId==='F02'&&i.state==='supported'&&i.occurrenceIds.includes(row.occurrenceId))?colors.actionReview.text:row.card?.contributionKind!=='unknown'&&row.label==='Helps moisturize'?colors.actionKeep.text:colors.inkSubtle}]} />
+              <View accessible={false} style={[styles.ingredientSignal,{backgroundColor:roleColor}]} />
               <View style={styles.ingredientName}>
                 <Text selectable style={styles.name}>{row.name}</Text>
                 <Text style={styles.short}>{row.short}</Text>
-                <Text style={styles.label}>{row.label}</Text>
+                <Text style={[styles.label,{color:roleColor}]}>{row.label}</Text>
                 {row.qualifiers.map(qualifier => <Text key={qualifier} style={styles.caption}>{qualifier}</Text>)}
                 {row.amounts.filter(amount => amount !== 'Amount in this formula: not disclosed.').map(amount => <Text key={amount} style={styles.amount}>{amount}</Text>)}
                 {row.amounts.some(amount => amount !== 'Amount in this formula: not disclosed.') && row.quantityLimits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}
@@ -127,9 +131,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
               <Text accessible={false} style={styles.chevron}>{expanded ? '−' : '+'}</Text>
             </Pressable>
             {expanded && <View accessibilityLabel={`Ingredient explanation, position ${index + 1}`} style={styles.ingredientDetail}>
-              <Text selectable style={styles.caption}>{`Listed as: ${row.literal}`}</Text>
-              {row.amounts.map(amount => <Text key={amount} style={styles.amount}>{amount}</Text>)}
-              {row.quantityLimits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}
+              {ingredientPrintedNameDiffers(row.name,row.literal) && <Text selectable style={styles.caption}>{`Listed as: ${row.literal}`}</Text>}
               {row.card && <>
                 <Text style={styles.explanation}>{partFourDisplayText(row.card.body)}</Text>
                 {row.card.detail && <Text style={styles.more}>{partFourDisplayText(row.card.detail)}</Text>}
@@ -137,12 +139,15 @@ export function PartFourSections(props: PartFourSectionsProps) {
                   <Text style={styles.evidenceTitle}>What we know</Text>
                   <Text style={styles.caption}>{partFourDisplayText(row.card.evidence??'')}</Text>
                 </View>}
+              </>}
+              {row.amounts.map(amount => <Text key={amount} style={styles.amount}>{amount}</Text>)}
+              {row.quantityLimits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}
+              {row.card && <>
                 {row.card.editorial && <>
                   {row.card.editorial.amountAndUse && <View style={styles.insight}>
                     <Text accessibilityRole="header" style={styles.insightTitle}>Amount and use context</Text>
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.amountAndUse)}</Text>
                   </View>}
-                  {!row.card.editorial.caution && <Text style={styles.caption}>No specific caution is listed in this reference; this does not establish how the finished product will affect your skin.</Text>}
                   {row.card.editorial.caution && <View style={styles.insight}>
                     <Text accessibilityRole="header" style={styles.insightTitle}>Cautions</Text>
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.caution)}</Text>
@@ -162,9 +167,14 @@ export function PartFourSections(props: PartFourSectionsProps) {
                   </View>}
                 </>}
               </>}
-              {(!row.card?.editorial || row.card.editorial.caution) && <Text style={styles.caption}>Ingredient information does not establish the finished product’s effect or your experience with it.</Text>}
-              <Pressable accessibilityRole="button" accessibilityLabel={`View sources for ${row.name}, position ${index + 1}`}
-                onPress={() => toggleSources(true)} style={styles.sourceButton}><Text style={styles.link}>Sources below</Text></Pressable>
+              {references.length>0 && <Pressable accessibilityRole={singleReference?'link':'button'} accessibilityLabel={`Ingredient reference for ${row.name}, position ${index + 1}`}
+                onPress={() => {if(singleReference)void Linking.openURL(singleReference).catch(()=>{});else setIngredientReference({key,id:row.occurrenceId});}} style={styles.sourceButton}><Text style={styles.link}>Ingredient reference</Text></Pressable>}
+              {!singleReference && ingredientReference?.key===key && ingredientReference.id===row.occurrenceId && <View style={styles.sourceEntry}>
+                {references.map(source=>{const url=safePartFourSourceUrl(source.url);return <View key={source.id}>
+                  <Text style={styles.caption}>{partFourDisplayText(source.title)}</Text>
+                  {url&&<Pressable accessibilityRole="link" accessibilityLabel={`Open ingredient reference: ${partFourDisplayText(source.title)}`} onPress={()=>{void Linking.openURL(url).catch(()=>{});}} style={styles.sourceButton}><Text style={styles.link}>Open reference</Text></Pressable>}
+                </View>;})}
+              </View>}
             </View>}
           </View>;
         })}

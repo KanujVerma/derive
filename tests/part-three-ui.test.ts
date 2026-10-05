@@ -8,6 +8,8 @@ import { evaluatePersonalResult } from '../src/domain/part-three/evaluate.ts';
 import { emptyPartThreeChoices,partThreeTarget } from '../src/presentation/part-three/target.ts';
 import { canonicalJson } from '../src/domain/part-two/hash.ts';
 import { gapCopy } from '../src/presentation/part-three/copy.ts';
+import { savedCheckIdentity } from '../src/presentation/part-three/savedIdentity.ts';
+import type { ScanResult } from '../src/contracts/PartOne.ts';
 import type { PartThreePorts } from '../src/components/check/part-three/usePartThreeCheck';
 import type { PartThreeRequest,PartThreeResponse } from '../src/contracts/PartThreeService.ts';
 import type { PartThreeView } from '../src/presentation/part-three/controller.ts';
@@ -25,7 +27,7 @@ test('judge-first card preserves reason/scope and mandatory concerns; history is
  const x=p3input();x.context.profile!.data.sensitivities={status:'reported',values:['Glycerin']};const r=evaluatePersonalResult(x);
  const h=componentHarness('src/components/check/part-three/PartThreeSummary.tsx','PartThreeSummary',{view:{...emptyView(),result:r}});
  let content=textContent(h.render());assert.match(content,/Synthetic face lotion.*Check first.*reported as a sensitivity.*Package not confirmed/);assert(!/safe|score|percent|risk level/i.test(content));
- content=textContent(h.render({view:{...emptyView(),historical:{kind:'historical',savedAssessmentId:p2id(88),savedAt:x.now,assessmentWhenSaved:r,currentAssessment:'unavailable'}}}));assert.match(content,/Current Check.*When saved.*Check the label first/);press(control(h.render(),'When saved'));assert.match(textContent(h.render()),/Check first.*Assessment when saved/);
+ content=textContent(h.render({view:{...emptyView(),historical:{kind:'historical',savedAssessmentId:p2id(88),savedAt:x.now,assessmentWhenSaved:r,currentAssessment:'unavailable'}}}));assert.match(content,/Check first/);assert(!/Current Check|When saved|Assessment when saved|Uses your current profile/.test(content));
  content=textContent(h.render({view:emptyView()}));assert(!content.includes('Glycerin'));assert(!content.includes('Check first'));
 });
 test('explicit current/comparator/use selection preserves manual relation and rejects silent overflow',()=>{
@@ -71,16 +73,16 @@ test('actual canonical sheet orders judgment before factual evidence and saves a
   f.refuse();t.mock.timers.tick(10000);await settle();nodes=f.sheet.render();assert(!textContent(nodes).includes('Worth considering'));assert(nodes.filter(n=>n.props.label==='Save'||n.props.label==='Saved').length<=1);
  }finally{f.sheet.dispose();}
 });
-test('saved reopen uses pinned saved_basis and current context, restores intent and hides bodies offline/logout',async t=>{
+test('saved reopen defaults to the pinned answer while current context stays internal and bodies hide offline/logout',async t=>{
  t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true);try{
-  for(let i=0;i<6;i++){f.sheet.render();await settle();}let nodes=f.sheet.render();assert.match(textContent(nodes),/Current Check.*When saved.*Not enough info/);press(control(nodes,'When saved'));assert.match(textContent(f.sheet.render()),/Worth considering.*Assessment when saved/);press(control(f.sheet.render(),'Current Check'));
+  for(let i=0;i<6;i++){f.sheet.render();await settle();}let nodes=f.sheet.render();assert.match(textContent(nodes),/Worth considering/);assert(!/Current Check|When saved|Assessment when saved|Uses your current profile/.test(textContent(nodes)));
   const evaluation=f.calls.find((r):r is Extract<PartThreeRequest,{operation:'evaluate'}>=>r.operation==='evaluate');assert(evaluation);assert.equal(evaluation.savedAssessmentId,p2id(88));assert.equal(evaluation.intent,'replace');assert.equal(canonicalJson(evaluation.use),canonicalJson(f.x.requestedUse));assert(f.calls.some(r=>r.operation==='saved_basis'));
   f.offline();nodes=f.sheet.render();assert(!textContent(nodes).includes('Worth considering'));assert(!textContent(nodes).includes('Assessment when saved'));
   f.logout();nodes=f.sheet.render();assert(!textContent(nodes).includes('Synthetic face lotion'));
  }finally{f.sheet.dispose();}
 });
 test('choice changes hide former authority while retaining measured summary space above touch targets',async t=>{
- t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true);try{
+ t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(false);try{
   for(let i=0;i<6;i++){f.sheet.render();await settle();}
   const before=f.sheet.render();const summary=before.find(n=>n.type==='Surface')!.props.summary;
   summary.props.onLayout({nativeEvent:{layout:{height:300}}});
@@ -117,10 +119,19 @@ test('persistent saved index reaches product-linked and standalone assessments a
  }
 });
 
-test('L09 native connectivity event hides current and historical bodies before polling or TTL expiry',async t=>{t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true);try{for(let i=0;i<6;i++){f.sheet.render();await settle();}press(control(f.sheet.render(),'When saved'));assert(textContent(f.sheet.render()).includes('Worth considering'));f.networkOffline();const nodes=f.sheet.render();assert(!textContent(nodes).includes('Worth considering'));assert(!textContent(nodes).includes('Assessment when saved'));assert(nodes.filter(n=>n.props.label==='Save'||n.props.label==='Saved').length<=1);}finally{f.sheet.dispose();}});
+test('L09 native connectivity event hides current and historical bodies before polling or TTL expiry',async t=>{t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true);try{for(let i=0;i<6;i++){f.sheet.render();await settle();}assert(textContent(f.sheet.render()).includes('Worth considering'));f.networkOffline();const nodes=f.sheet.render();assert(!textContent(nodes).includes('Worth considering'));assert(!textContent(nodes).includes('Assessment when saved'));assert(nodes.filter(n=>n.props.label==='Save'||n.props.label==='Saved').length<=1);}finally{f.sheet.dispose();}});
 
 test('erased encounter choices retain safe saved evidence for fresh explicit reassessment',async t=>{
- t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true,true);try{for(let i=0;i<6;i++){f.sheet.render();await settle();}const req=f.calls.find((r):r is Extract<PartThreeRequest,{operation:'evaluate'}>=>r.operation==='evaluate');assert(req);assert.equal(req.intent,'unanswered');assert.equal(req.comparatorId,null);assert.deepEqual(req.selectedManualReportIds,[]);assert.deepEqual(req.use,{purpose:null,site:null,useForm:null});assert.equal(req.savedAssessmentId,p2id(88));assert(textContent(f.sheet.render()).includes('Current Check'));}finally{f.sheet.dispose();}
+ t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.parse(p3input().now)});const f=mounted(true,true);try{for(let i=0;i<6;i++){f.sheet.render();await settle();}const req=f.calls.find((r):r is Extract<PartThreeRequest,{operation:'evaluate'}>=>r.operation==='evaluate');assert(req);assert.equal(req.intent,'unanswered');assert.equal(req.comparatorId,null);assert.deepEqual(req.selectedManualReportIds,[]);assert.deepEqual(req.use,{purpose:null,site:null,useForm:null});assert.equal(req.savedAssessmentId,p2id(88));assert(textContent(f.sheet.render()).includes('Worth considering'));assert(!textContent(f.sheet.render()).includes('Current Check'));}finally{f.sheet.dispose();}
+});
+
+test('saved header reuses only the authorized matching identity and never infers size or scan date',()=>{
+ const x=p3input(),r=evaluatePersonalResult(x),basis=x.partTwo;assert.equal(r.binding.subject.kind,'declaration');if(r.binding.subject.kind!=='declaration')throw Error('fixture needs bound identity');
+ const scan={scanId:basis.scanId,generation:basis.generation,identity:'exact',itemId:r.binding.subject.itemId,snapshotId:r.binding.subject.snapshotId,display:{selectedIdentity:{id:r.binding.subject.itemId,name:r.summary!.namedDecision.name,brand:'Neutrogena',variantText:'',image:null,expiresAt:basis.expiresAt}}} as unknown as ScanResult;
+ assert.equal(savedCheckIdentity(scan,basis,r,Date.parse(x.now))?.brand,'Neutrogena');assert.equal(savedCheckIdentity(scan,basis,r,Date.parse(x.now))?.variantText,'');
+ assert.equal(savedCheckIdentity({...scan,snapshotId:p2id(990)},basis,r,Date.parse(x.now)),null);assert.equal(savedCheckIdentity({...scan,scanId:p2id(991)},basis,r,Date.parse(x.now)),null);assert.equal(savedCheckIdentity(scan,basis,{...r,binding:{...r.binding,ownerId:p2id(992)}},Date.parse(x.now)),null);assert.equal(savedCheckIdentity(scan,basis,r,Date.parse(basis.expiresAt)),null);
+ const changed=structuredClone(r);changed.summary!.judgment='not_enough_info';changed.summary!.primaryFindingId=null;
+ const h=componentHarness('src/components/check/part-three/PartThreeSummary.tsx','PartThreeSummary',{view:{...emptyView(),result:changed,historical:{kind:'historical',savedAssessmentId:p2id(993),savedAt:x.now,assessmentWhenSaved:r,currentAssessment:'unavailable'}}});assert.match(textContent(h.render()),/Worth considering/);assert(!/Not enough info|Current Check|When saved/.test(textContent(h.render())));
 });
 
 test('review 1: actual collapsed ResultSheetSurface obtains evidence and judgment before details mount',async t=>{
