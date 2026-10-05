@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
-import { componentHarness, textContent } from './ux-profile-render.ts';
+import { componentHarness, control, press, textContent } from './ux-profile-render.ts';
 import { p3input, p3revision } from './fixtures/part-three.ts';
 import { p2id } from './fixtures/part-two-core.ts';
 import { evaluatePersonalResult } from '../src/domain/part-three/evaluate.ts';
@@ -65,6 +65,7 @@ test('saved P4 sheet retains historical report qualifiers independently of curre
     '../result-sheet/ResultSheetSurface': surface, './usePartThreeCheck': { usePartThreeCheck: () => f.check },
     '../../ui/Button': { Button: 'Button' }, '../../ui/ChoiceChip': { ChoiceChip: 'ChoiceChip' },
   } });
+  press(control(h.render(),'When saved'));
   const copy = textContent(h.render());
   assert.match(copy, /Assessment when saved/);
   assertReports(copy);

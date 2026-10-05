@@ -91,6 +91,7 @@ export function sourceIngredientContext(resultValue: NormalizationResult | null,
     : 'Label reading · Product and full formula unconfirmed';
   return {
     rows,
+    concernOccurrenceIds: sensitivity ? [sensitivity.occurrenceId] : [],
     sources: formula.sources,
     points: points.slice(0, 2).map(partFourDisplayText),
     scope,

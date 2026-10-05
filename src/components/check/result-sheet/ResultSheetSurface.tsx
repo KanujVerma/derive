@@ -43,6 +43,8 @@ interface Props {
   summary?: React.ReactNode;
   /** Recovery is part of the measured compact fold. */
   compactActions?: React.ReactNode;
+  /** One persistent Save below the scrolling result. */
+  footer?: React.ReactNode;
   /** Search replaces content within the same gesture surface. */
   replacement?: React.ReactNode;
   /** Search has one measured detent; keyboard lift must not select a full-result detent. */
@@ -111,14 +113,15 @@ function SheetHandle(_props: BottomSheetHandleProps) {
 }
 
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset, onInteraction, scrollRequest }: Omit<Props, 'visible' | 'inline' | 'overlay'> & {
+  initialDetent = 0, bottomInset = 0, summary, compactActions, footer, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset, onInteraction, scrollRequest }: Omit<Props, 'visible' | 'inline' | 'overlay'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const [footerHeight, setFooterHeight] = useState(0);
   const [summaryHeight, setSummaryHeight] = useState(0);
   useLayoutEffect(() => { if (contentSized) setSummaryHeight(0); }, [contentSized, contentSizeResetKey]);
-  const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight, contentSized });
+  const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight: summaryHeight + (replacement ? 0 : footerHeight), contentSized });
   const sheet = useRef<BottomSheet>(null);
   const scroll = useRef<BottomSheetScrollViewMethods>(null);
   const outerHeight = useRef(height);
@@ -181,13 +184,14 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
       } }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
       handleComponent={SheetHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
       <BottomSheetScrollView ref={scroll} testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
-        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) + (replacement ? 0 : footerHeight) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {/* Keep search height stable as loading/helper rows disappear; explicit empty input resets it. */}
         {(summary || compactActions || replacement) && <View onLayout={event => { const measured = event.nativeEvent.layout.height; if (contentSized ? measured > summaryHeight : Math.abs(measured - summaryHeight) >= 1) setSummaryHeight(previous => contentSized ? Math.max(previous, measured) : measured); }}>{replacement ?? <>{summary}{compactActions}</>}</View>}
         {!replacement && (!summary || index > 0) && children}
       </BottomSheetScrollView>
     </BottomSheet></SheetHandleContext.Provider>
+    {!replacement && footer && index >= 0 && <View onLayout={event=>setFooterHeight(event.nativeEvent.layout.height)} style={[styles.footer,{bottom:bottomInset,paddingBottom:Math.max(insets.bottom,spacing.sm)}]}>{footer}</View>}
   </GestureHandlerRootView>;
 }
 
@@ -198,5 +202,6 @@ const styles = StyleSheet.create({
   dragTarget: { flex: 1, minHeight: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center', marginLeft: layout.minTouchTarget },
   indicator: { width: 36, height: 5, borderRadius: radii.full, backgroundColor: colors.borderStrong },
   close: { width: layout.minTouchTarget, height: layout.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
+  footer: {position:'absolute',left:0,right:0,paddingTop:12,paddingHorizontal:spacing.lg,backgroundColor:colors.surface,borderTopWidth:1,borderTopColor:colors.border},
   content: { paddingHorizontal: spacing.lg, gap: spacing.lg },
 });

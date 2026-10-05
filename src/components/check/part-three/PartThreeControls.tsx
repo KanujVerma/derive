@@ -6,8 +6,8 @@ import { ChoiceChip } from '../../ui/ChoiceChip';
 import { QuestionGroup } from '../../ui/QuestionGroup';
 import type { usePartThreeCheck } from './usePartThreeCheck';
 import { spacing } from '../../../constants/theme';
-export function PartThreeControls({ check }: {
-    check: ReturnType<typeof usePartThreeCheck>;
+export function PartThreeControls({ check, section = 'all' }: {
+    check: ReturnType<typeof usePartThreeCheck>; section?: 'all' | 'save' | 'details';
 }) {
     const [open, setOpen] = useState(false);
     const questionView = useRef<View>(null);
@@ -54,7 +54,7 @@ export function PartThreeControls({ check }: {
     const ambiguous = (item: typeof current[number], index: number) =>
       (labelCounts.get(selectionLabel(item, index)) ?? 0) > 1;
     return <View style={{ gap: spacing.sm }}>
-  {view.question?.missingInput === 'intent' && <View ref={questionView} collapsable={false}><QuestionGroup label="Replace the selected item or add another?" support="This changes whether you are replacing a step or adding one. Your answer applies to this Check.">
+  {section !== 'save' && <>{view.question?.missingInput === 'intent' && <View ref={questionView} collapsable={false}><QuestionGroup label="Replace the selected item or add another?" support="This changes whether you are replacing a step or adding one. Your answer applies to this Check.">
    {([['replace', 'Replace this item'], ['add', 'Add another'], ['unsure', 'Not sure']] as const).map(([value, text]) => <Button key={value} label={text} variant="outline" onPress={() => check.questionAnswer(value)}/>)}
    <Button label="Skip this question for this check" variant="ghost" onPress={check.questionSkip}/>
   </QuestionGroup></View>}
@@ -68,7 +68,14 @@ export function PartThreeControls({ check }: {
    {([['purpose', 'Purpose for this check', [['moisturizing', 'Moisturizing'], ['cleansing', 'Cleansing'], ['sun_protection', 'Sun protection'], ['other', 'Other']]], ['site', 'Application site', [['face', 'Face'], ['body', 'Body'], ['hands', 'Hands'], ['scalp', 'Scalp'], ['lips', 'Lips'], ['eye_area', 'Eye area'], ['other', 'Other']]], ['useForm', 'Use form', [['leave_on', 'Leave on'], ['rinse_off', 'Rinse off'], ['other', 'Other']]]] as const).map(([field, title, options]) => <QuestionGroup key={field} label={title}><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>{options.map(([value, text]) => <ChoiceChip key={value} label={text} selectionType="single" selected={choices.use[field] === value} onSelect={() => check.update({ ...choices, use: { ...choices.use, [field]: value } })}/>)}<ChoiceChip label={`Not sure: ${title.toLowerCase()}`} selectionType="single" selected={choices.use[field] === null} onSelect={() => check.update({ ...choices, use: { ...choices.use, [field]: null } })}/></View></QuestionGroup>)}
    {context?.experiences.filter(e => e.data.reference.kind === 'manual').map(e => <ChoiceChip key={e.data.id} label={`Use my selected report: ${e.data.reference.kind === 'manual' ? e.data.reference.name : ''}`} selectionType="multiple" selected={choices.selectedManualReportIds.includes(e.data.id)} disabled={!choices.selectedManualReportIds.includes(e.data.id) && choices.selectedManualReportIds.length >= 20} onSelect={() => check.update({ ...choices, selectedManualReportIds: choices.selectedManualReportIds.includes(e.data.id) ? choices.selectedManualReportIds.filter(id => id !== e.data.id) : [...choices.selectedManualReportIds, e.data.id] })}/>)}
   </View>}
-  {view.pendingSave ? <Button label="Retry Save confirmation" variant="outline" disabled={view.saving} onPress={() => void check.save()}/> : view.result?.summary && <Button label={view.savedAssessmentId ? (view.result.partFour?'Check saved':'Assessment saved') : (view.result.partFour?'Save':'Save this assessment')} variant="outline" disabled={view.saving || Boolean(view.savedAssessmentId)} onPress={() => void check.save()}/>}
-  {view.error && !view.pendingSave && <Button label="Refresh personal assessment" variant="ghost" onPress={check.refresh}/>}
+  </>}
+  {section !== 'details' && <PartThreeSaveControl check={check}/>}
+  {section !== 'save' && view.error && !view.pendingSave && <Button label="Refresh personal assessment" variant="ghost" onPress={check.refresh}/>}
  </View>;
+}
+
+export function PartThreeSaveControl({check}:{check:ReturnType<typeof usePartThreeCheck>}) {
+ const {view}=check;
+ if(!check.enabled)return null;
+ return (view.pendingSave ? <Button label="Retry Save confirmation" variant="outline" disabled={view.saving} onPress={() => void check.save()}/> : view.result?.summary && <Button label={view.savedAssessmentId ? 'Saved' : 'Save'} variant="brand" disabled={view.saving || Boolean(view.savedAssessmentId)} onPress={() => void check.save()}/>);
 }

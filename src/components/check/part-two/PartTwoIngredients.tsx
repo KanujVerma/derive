@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Linking, Pressable, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { createPartTwoController, type PartTwoTarget, type PartTwoTransport, type PartTwoView } from '../../../presentation/part-two/controller';
 import { PART_TWO_ENABLED, partTwoTransport, partTwoSavedTransport } from '../../../services/partTwo';
 import { createCatalogRequestId } from '../../../services/productCatalog';
@@ -18,10 +18,9 @@ export function PartTwoSourceSummary({view, education, now = Date.now()}: {view:
   const context = education ? sourceIngredientContext(view.result, education, now) : null;
   if (!context?.points.length) return null;
   return <View accessibilityLabel="Ingredient context summary" style={{gap: spacing.xs}}>
-    <Text accessibilityRole="header">Ingredient context</Text>
-    <Text>{context.scope}</Text>
-    {context.points.map((point, index) => <Text key={index}>{point}</Text>)}
-    <Text style={{color: colors.inkMuted}}>{context.limit}</Text>
+    <Text accessibilityRole="header" style={styles.heading}>For your skin</Text>
+    {context.points.map((point, index) => <Text key={index} style={styles.copy}>{point}</Text>)}
+    <Text style={styles.caption}>{context.limit}</Text>
   </View>;
 }
 export function PartTwoInlineView({ view, now = Date.now(), education, contextSummary = true }: { view: PartTwoView; now?: number; education?: IngredientContextInput; contextSummary?: boolean }) {
@@ -100,16 +99,18 @@ export function PartTwoInlineView({ view, now = Date.now(), education, contextSu
     {contextSummary && <PartTwoSourceSummary view={view} education={education} now={now} />}
     <View style={{ gap: spacing.xs, minHeight: !reading && openId ? layout.current.introHeight : undefined }} onLayout={event => { if (reading) layout.current.introHeight = event.nativeEvent.layout.height; }}>
       {status && <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>{status}</Text>}
-      {reading && <><Text accessibilityRole="header">Ingredient details</Text><Text>{scope}</Text>{evidence && <Text accessibilityRole={reading.evidenceState === 'conflict' ? 'alert' : undefined}>{evidence}</Text>}</>}
+      {reading && <><View style={styles.sectionHead}><Text accessibilityRole="header" style={styles.heading}>Ingredients</Text><Text style={styles.caption}>{reading.occurrences.length} listed</Text></View><Text style={styles.caption}>{scope}</Text>{evidence && <Text accessibilityRole={reading.evidenceState === 'conflict' ? 'alert' : undefined}>{evidence}</Text>}</>}
     </View>
     {reading ? reading.occurrences.map((occurrence, index) => <View key={occurrence.occurrenceId} style={{ gap: spacing.xs }} onLayout={event => { const row = layout.current.rows.find(r => r.id === occurrence.occurrenceId); if (row) row.height = openId === row.id ? Math.max(row.height, event.nativeEvent.layout.height) : event.nativeEvent.layout.height; }}>
-      {(index === 0 || reading.occurrences[index - 1].sectionId !== occurrence.sectionId || reading.occurrences[index - 1].sectionKind !== occurrence.sectionKind) && <Text accessibilityRole="header">{sectionLabel(occurrence.sectionKind)}</Text>}
+      {(index === 0 || reading.occurrences[index - 1].sectionId !== occurrence.sectionId || reading.occurrences[index - 1].sectionKind !== occurrence.sectionKind) && (index > 0 || occurrence.sectionKind !== 'ingredients') && <Text accessibilityRole="header">{sectionLabel(occurrence.sectionKind)}</Text>}
       <Pressable accessibilityRole="button" accessibilityLabel={`Ingredient details: ${ingredientDisplayText(occurrence.observedName || occurrence.rawToken)}`}
-        accessibilityState={{ expanded: openId === occurrence.occurrenceId }} onPress={() => { layout.current.detailHeight = 0; layout.current.detailOffset = 0; setOpen(openId === occurrence.occurrenceId ? null : { key, id: occurrence.occurrenceId }); setDisclosure(null); }} style={{ paddingVertical: spacing.sm, minHeight: 44 }}>
-        <Text selectable>{ingredientDisplayText(occurrence.rawToken)}</Text>
-        {educationRows.get(occurrence.occurrenceId)?.card && <Text>{educationRows.get(occurrence.occurrenceId)!.short}</Text>}
+        accessibilityState={{ expanded: openId === occurrence.occurrenceId }} onPress={() => { layout.current.detailHeight = 0; layout.current.detailOffset = 0; setOpen(openId === occurrence.occurrenceId ? null : { key, id: occurrence.occurrenceId }); setDisclosure(null); }} style={styles.ingredientRow}>
+        <View style={[styles.dot,{backgroundColor:context?.concernOccurrenceIds.includes(occurrence.occurrenceId)?colors.actionReview.text:educationRows.get(occurrence.occurrenceId)?.card?.label==='Helps moisturize'?colors.actionKeep.text:colors.inkSubtle}]}/>
+        <View style={styles.rowCopy}><Text selectable style={styles.name}>{ingredientDisplayText(occurrence.observedName || occurrence.rawToken)}</Text>
+        {educationRows.get(occurrence.occurrenceId)?.card && <><Text style={styles.short}>{educationRows.get(occurrence.occurrenceId)!.short}</Text><Text style={[styles.role,{color:context?.concernOccurrenceIds.includes(occurrence.occurrenceId)?colors.actionReview.text:educationRows.get(occurrence.occurrenceId)?.card?.label==='Helps moisturize'?colors.actionKeep.text:colors.inkMuted}]}>{context?.concernOccurrenceIds.includes(occurrence.occurrenceId)?'Your reported sensitivity':educationRows.get(occurrence.occurrenceId)!.label}</Text></>}
         {modalityText(occurrence) && <Text>{modalityText(occurrence)}</Text>}
         {occurrence.transcription !== 'clear' && <Text>Text unclear · Check text</Text>}
+        </View><Text accessible={false} style={styles.chevron}>{openId===occurrence.occurrenceId?'−':'+'}</Text>
       </Pressable>
       {openId === occurrence.occurrenceId && detail(occurrence)}
     </View>) : openId && layout.current.rows.map(row => <View key={row.id} style={{ minHeight: row.height, paddingTop: row.id === openId ? layout.current.detailOffset : undefined }}>{row.id === openId && detail()}</View>)}
@@ -174,3 +175,12 @@ export function PartTwoSavedIngredients({ saveId, target, fallback, onView, enab
   const transport = useMemo(() => provided ?? partTwoSavedTransport(saveId), [saveId, provided]);
   return <PartTwoIngredients key={saveId} target={target} transport={transport} fallback={fallback} onView={onView} enabled={enabled} />;
 }
+
+const styles=StyleSheet.create({
+ heading:{fontSize:17,lineHeight:24,fontWeight:'600',letterSpacing:-0.3,color:colors.ink},
+ sectionHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'baseline'},
+ copy:{fontSize:14,lineHeight:23,color:colors.ink},caption:{fontSize:12,lineHeight:19,color:colors.inkMuted},
+ ingredientRow:{flexDirection:'row',gap:9,paddingVertical:12,minHeight:44,borderBottomWidth:1,borderBottomColor:colors.border},
+ dot:{width:9,height:9,borderRadius:5,marginTop:7},rowCopy:{flex:1,gap:3},name:{fontSize:14,lineHeight:22,fontWeight:'500',color:colors.ink},
+ short:{fontSize:12,lineHeight:19,color:colors.inkMuted},role:{fontSize:11,lineHeight:18,fontWeight:'600'},chevron:{fontSize:22,color:colors.inkMuted,width:18,textAlign:'center'},
+});

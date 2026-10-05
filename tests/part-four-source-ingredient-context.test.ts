@@ -25,7 +25,7 @@ function ui(f:ReturnType<typeof fixture>){return componentHarness(path,'PartTwoI
 test('retained lotion shape uses source-only moisture roles with the existing For dryness despite no product facts or use answers',()=>{
  const f=fixture('Petrolatum, Sorbitol, Cetearyl Alcohol, Propylene Glycol');
  const h=ui(f);const text=textContent(h.render());
- assert.match(text,/Ingredient context/);assert.match(text,/For dryness/i);assert.match(text,/Petrolatum.*water loss|water loss.*Petrolatum/i);
+ assert.match(text,/For your skin/);assert.match(text,/For dryness/i);assert.match(text,/Petrolatum.*water loss|water loss.*Petrolatum/i);
  assert.match(text,/published.*list/i);assert.match(text,/package.*not confirmed/i);
  assert(!/worth considering|worth keeping|safe for|will improve|will irritate/i.test(text));
  assert.equal(f.view.result.output.kind==='bound'&&f.view.result.output.productFacts.facts.length,0);
@@ -61,7 +61,7 @@ test('owner/profile changes, source expiry and conditional or unclear identities
  assert(!/For dryness/i.test(textContent(h.render({education:{...f.education,context:next}}))));
  const foreign=structuredClone(next);foreign.ownerId=p2id(999);foreign.profile!.ownerId=foreign.ownerId;
  assert(!/Ingredient context|slows.*water|For dryness/i.test(textContent(h.render({education:{...f.education,context:foreign}}))));
- assert(!/Ingredient context/i.test(textContent(h.render({education:f.education,now:Date.parse(f.view.result.expiresAt)}))));
+ assert(!/For your skin/i.test(textContent(h.render({education:f.education,now:Date.parse(f.view.result.expiresAt)}))));
  for(const text of ['May contain: Petrolatum','Petrolatum or Water'])assert(!/For dryness/i.test(textContent(ui(fixture(text)).render())));
 });
 test('source-context copy stays compact while approved bodies and source disclosures remain expandable',()=>{

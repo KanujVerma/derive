@@ -4,7 +4,7 @@ import type { PartFourInsight, PartFourPacket } from '../../../contracts/PartFou
 import { colors, spacing } from '../../../constants/theme';
 import { isOpenBeautyFactsSource, OBF_SOURCE_METHOD_URL } from '../../../presentation/part-one/sourceReuse';
 import type { ResearchBriefSubject } from '../../../domain/part-four/researchBrief';
-import { ResearchBrief, ResearchBriefSources } from './ResearchBrief';
+import { ResearchBriefSources } from './ResearchBrief';
 import { RetainedEvidence, RetainedEvidenceSources } from './RetainedEvidence';
 import { authorizedPartFourPacket, formulaEvidenceNotice, formulaLimitationsForDisplay, formulaScope, ingredientRow, ingredientSectionHeading,
   ingredientTargets, partFourDisclosureKey, partFourDisplayText, safePartFourSourceUrl, visiblePartFourInsights,
@@ -26,8 +26,6 @@ export interface PartFourSectionsProps extends PartFourRenderFence {
   researchWithdrawnDependencies?: readonly string[];
   allowLocalResearchFixture?: boolean;
 }
-
-const stateCopy = { pending: 'Pending', unavailable: 'Unavailable', ready: 'Available evidence', conflict: 'Conflicting evidence' };
 
 /** v7 section hierarchy, with server copy in place of fictional design inputs.
  * Only opaque disclosure IDs survive renders; no packet, text or URL is cached. */
@@ -64,7 +62,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
     toggleIngredient(id);
     const rowY=layout.current.rows.get(id);props.onIngredientJump?.(id,rowY===undefined?undefined:layout.current.section+layout.current.list+rowY);
   }
-  function renderInsight(insight: PartFourInsight, routine = false) {
+  function renderInsight(insight: PartFourInsight) {
     const targets = insight.occurrenceIds.flatMap(id => ingredientTargets(packet!.formula, { occurrenceId: id }));
     return <View key={insight.id} style={styles.insight}>
       <Text style={styles.insightTitle}>{partFourDisplayText(insight.title)}</Text>
@@ -80,8 +78,6 @@ export function PartFourSections(props: PartFourSectionsProps) {
   }
 
   return <View style={styles.sections}>
-    <ResearchBrief {...briefProps} onViewSources={() => toggleSources(true)} />
-    <RetainedEvidence evidence={packet.retainedEvidence} now={props.now} withdrawnDependencies={props.researchWithdrawnDependencies}/>
     {(packet.comparison.state!=='none'||comparisonInsights.length>0) && <View style={styles.comparison}>
       <Text accessibilityRole="header" style={styles.heading}>{packet.comparison.state==='none'?'Relevant to your profile':'Compared with your current routine'}</Text>
       {packet.comparison.state!=='none' && <Text style={styles.copy}>{partFourDisplayText(packet.comparison.explanation)}</Text>}
@@ -92,13 +88,13 @@ export function PartFourSections(props: PartFourSectionsProps) {
 
     {insights.routine.length > 0 && <View style={styles.routine}>
       <Text accessibilityRole="header" style={styles.heading}>In your routine</Text>
-      {insights.routine.map(insight => renderInsight(insight, true))}
+      {insights.routine.map(insight => renderInsight(insight))}
     </View>}
 
     <View style={styles.ingredients} onLayout={event=>{layout.current.section=event.nativeEvent.layout.y;}}>
       <View style={styles.sectionHead}>
         <Text accessibilityRole="header" style={styles.heading}>Ingredients</Text>
-        <Text style={styles.caption}>{`${rows.length} formula ${rows.length === 1 ? 'position' : 'positions'}`}</Text>
+        <Text style={styles.caption}>{`${rows.length} listed`}</Text>
       </View>
       <Text style={styles.caption}>{formulaScope(packet.formula)}</Text>
       {evidence && <Text accessibilityRole={packet.formula.evidenceState === 'conflict' ? 'alert' : undefined} style={styles.caption}>{evidence}</Text>}
@@ -113,19 +109,21 @@ export function PartFourSections(props: PartFourSectionsProps) {
               accessibilityLabel={[`Ingredient details: ${row.name}, position ${index + 1}`, row.short, row.label,
                 ...row.qualifiers, ...row.amounts, ...row.quantityLimits].join(', ')}
               accessibilityState={{ expanded }} onPress={() => toggleIngredient(expanded ? null : row.occurrenceId)} style={styles.ingredientSummary}>
-              <View accessible={false} style={styles.ingredientSignal} />
+              <View accessible={false} style={[styles.ingredientSignal,{backgroundColor:insights.comparison.some(i=>i.ruleId==='F02'&&i.state==='supported'&&i.occurrenceIds.includes(row.occurrenceId))?colors.actionReview.text:row.card?.contributionKind!=='unknown'&&row.label==='Helps moisturize'?colors.actionKeep.text:colors.inkSubtle}]} />
               <View style={styles.ingredientName}>
                 <Text selectable style={styles.name}>{row.name}</Text>
                 <Text style={styles.short}>{row.short}</Text>
                 <Text style={styles.label}>{row.label}</Text>
                 {row.qualifiers.map(qualifier => <Text key={qualifier} style={styles.caption}>{qualifier}</Text>)}
-                {row.amounts.map(amount => <Text key={amount} style={styles.amount}>{amount}</Text>)}
-                {row.quantityLimits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}
+                {row.amounts.filter(amount => amount !== 'Amount in this formula: not disclosed.').map(amount => <Text key={amount} style={styles.amount}>{amount}</Text>)}
+                {row.amounts.some(amount => amount !== 'Amount in this formula: not disclosed.') && row.quantityLimits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}
               </View>
               <Text accessible={false} style={styles.chevron}>{expanded ? '−' : '+'}</Text>
             </Pressable>
             {expanded && <View accessibilityLabel={`Ingredient explanation, position ${index + 1}`} style={styles.ingredientDetail}>
               <Text selectable style={styles.caption}>{`Listed as: ${row.literal}`}</Text>
+              {row.amounts.map(amount => <Text key={amount} style={styles.amount}>{amount}</Text>)}
+              {row.quantityLimits.map(limit => <Text key={limit} style={styles.caption}>{limit}</Text>)}
               {row.card && <>
                 <Text style={styles.explanation}>{partFourDisplayText(row.card.body)}</Text>
                 {row.card.detail && <Text style={styles.more}>{partFourDisplayText(row.card.detail)}</Text>}
@@ -168,13 +166,8 @@ export function PartFourSections(props: PartFourSectionsProps) {
       {!rows.length && <Text style={styles.copy}>No ingredient declaration available.</Text>}
     </View>
 
-    <View style={styles.optional}>
-      <Text accessibilityRole="header" style={styles.heading}>Price &amp; value</Text>
-      <View style={styles.insight}>
-        <Text style={styles.insightTitle}>{`Price & value · ${stateCopy[packet.value.state]}`}</Text>
-        <Text style={styles.copy}>{partFourDisplayText(packet.value.explanation)}</Text>
-      </View>
-    </View>
+    <RetainedEvidence evidence={packet.retainedEvidence} now={props.now} withdrawnDependencies={props.researchWithdrawnDependencies}/>
+    {packet.value.state === 'ready' && <View style={styles.optional}><Text accessibilityRole="header" style={styles.heading}>Price &amp; value</Text><Text style={styles.copy}>{partFourDisplayText(packet.value.explanation)}</Text></View>}
 
     <View style={styles.sources}>
       <Pressable accessibilityRole="button" accessibilityLabel="Part Four sources" accessibilityState={{ expanded: sourcesOpen }}

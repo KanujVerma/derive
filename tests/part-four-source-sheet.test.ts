@@ -16,11 +16,10 @@ test('ready unknown decision leads with useful context; qualifications expand an
  const fallback=React.createElement('Text',null,'For dryness: Petrolatum slows water loss.');
  const view={target:null,result:unknown,question:null,historical:null,savedAssessmentId:null,savedAt:null,loading:false,saving:false,error:null};
  const h=componentHarness('src/components/check/part-three/PartThreeSummary.tsx','PartThreeSummary',{view,fallback});
- let text=textContent(h.render());assert(text.indexOf('For dryness')<text.indexOf('Product decision unknown'));
- assert(!/purpose.*unresolved|There is no supported personal premise|Personal Fit|Not enough info/i.test(text));
- press(control(h.render(),'Why this Check is limited'));text=textContent(h.render());assert.match(text,/unresolved|clarification|judgment/i);
+ let text=textContent(h.render());assert.match(text,/Personal Fit.*Not enough info/);assert(!text.includes('For dryness'));assert.match(text,/Review the listed ingredients/);
+ assert.match(text,/unresolved|clarification|judgment/i);
  const historical={kind:'historical' as const,savedAssessmentId:p2id(88),savedAt:x.now,assessmentWhenSaved:unknown,currentAssessment:'unavailable' as const};
- assert.match(textContent(h.render({view:{...view,historical}})),/Assessment when saved.*Current reassessment is separate.*Current assessment.*Product decision unknown/);
+ assert.match(textContent(h.render({view:{...view,historical}})),/Current Check.*When saved/);press(control(h.render(),'When saved'));assert.match(textContent(h.render()),/Assessment when saved/);press(control(h.render(),'Current Check'));
  x.context.profile!.data.sensitivities={status:'reported',values:['Glycerin']};const concern=evaluatePersonalResult(x);
  const concernText=textContent(h.render({view:{...view,result:concern}}));assert.match(concernText,/reported as a sensitivity/);assert.match(concernText,/Check first/);
 });
@@ -32,17 +31,18 @@ test('actual scanner sheet shows compact source context and approved details whi
  const ingredientTransport={normalize:async(request:any)=>{input.binding.requestId=request.requestId;return normalize(input,ORDINARY_PART_THREE_RELEASE_SELECTION.dictionaryRelease,p2metadata);}};
  const result={scanId:input.binding.scanId,generation:input.binding.generation,resultRevision:input.binding.evidenceRevision,declarationState:'partial',identity:'exact',work:'complete',snapshotId:input.binding.snapshotId,declarationId:input.binding.declarationId,scope:'public',freshness:{state:'fresh',observedAt:p2now,expiresAt:input.binding.expiresAt},display:{selectedIdentity:{id:p2id(11),name:'Synthetic source lotion',brand:'Synthetic',variantText:'',expiresAt:input.binding.expiresAt,image:null},candidates:[],sections:[],sources:[],limitations:[]},allowedActions:['save_partial']};
  const h=componentHarness('src/components/check/part-one/PartOneResultSheet.tsx','PartOneResultSheet',{view:{owner:context.ownerId,result,saved:false,loading:false,error:null,scrollOffset:0},personalEnabled:true,personalPorts:ports,ingredientEnabled:true,ingredientTransport,onClose(){},onSave(){},onSelect(){},onSearch(){},onRefresh(){},onFullChange(){}},{effects:true,modules:{
+  '../part-three/PartThreeControls':{PartThreeControls:()=>null,PartThreeSaveControl:()=>null},
   'expo-network':{useNetworkState:()=>({isConnected:true,isInternetReachable:true})},
   '../../../services/partThree':{PART_FOUR_ENABLED:true,PART_FOUR_CLIENT_SELECTION:{education:'approved423',science:'pending_candidates'}},
   '../../../services/partTwo':{PART_TWO_ENABLED:true,partTwoTransport:ingredientTransport,partTwoSavedTransport:()=>ingredientTransport},
   '../../../services/productCatalog':{createCatalogRequestId:()=>p2id(sequence++)},
-  '../result-sheet/ResultSheetSurface':{ResultSheetSurface:(p:any)=>React.createElement('Surface',p,p.summary,p.compactActions,p.children)},
+  '../result-sheet/ResultSheetSurface':{ResultSheetSurface:(p:any)=>React.createElement('Surface',p,p.summary,p.compactActions,p.footer,p.children)},
  }});
  try{
   for(let i=0;i<8;i++){h.render();await settle();}
   let nodes=h.render();let text=textContent(nodes);assert.match(text,/For dryness.*Petrolatum/i);assert(!/Personal assessment unavailable/.test(text));
   assert.equal(nodes.filter(n=>n.props.accessibilityLabel==='Ingredient context summary').length,1);
-  const surface=nodes.find(n=>n.type==='Surface')!;assert(surface.props.summary,'source context must be in the compact sheet summary');
+  const surface=nodes.find(n=>n.type==='Surface')!;assert(surface.props.summary);const summary=componentHarness('src/components/check/part-three/PartThreeSummary.tsx','PartThreeSummary',{view:{target:null,result:null,question:null,historical:null,savedAssessmentId:null,savedAt:null,loading:false,saving:false,error:null}});assert(!textContent(summary.render()).includes('Ingredient context'));assert(text.indexOf('Personal Fit')<text.indexOf('For dryness'),'Personal Fit leads; ingredient context stays below the fold');
   press(control(nodes,'Ingredient details: Sorbitol'));assert.match(textContent(h.render()),/hold water/i);
   identityRefused=true;t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert(!/For dryness/.test(textContent(h.render())));
   identityRefused=false;t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert.match(textContent(h.render()),/For dryness/);

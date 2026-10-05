@@ -1,6 +1,7 @@
 import { researchSubjectFor } from '../../../presentation/part-four/researchSubject';
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import { CheckResultView } from '../result-sheet/CheckResultContent';
 import { ResultSheetSurface } from '../result-sheet/ResultSheetSurface';
 import { Button } from '../../ui/Button';
 import { PartThreeSummary } from './PartThreeSummary';
@@ -19,6 +20,9 @@ export function PartThreeSavedAssessmentSheet({ ownerId, savedAssessmentId, onCl
     onClose: () => void;
 }) {
     const check = usePartThreeCheck({ ownerId, details: null, savedAssessmentId });
+    const [assessmentView,setAssessmentView]=useState<'current'|'saved'>('current');
+    const displayedResult=assessmentView==='saved'&&check.view.historical?check.view.historical.assessmentWhenSaved:check.view.result;
+    const identityName=displayedResult?.summary?.namedDecision.name ?? check.view.historical?.assessmentWhenSaved?.summary?.namedDecision.name;
     const details = check.ingredientDetails;
     const [clock, setClock] = useState(Date.now);
     const now = Math.max(clock, Date.now());
@@ -37,15 +41,12 @@ export function PartThreeSavedAssessmentSheet({ ownerId, savedAssessmentId, onCl
         <PartTwoSourceSummary view={details} education={education} now={now}/>
         <Text>Current profile context is separate from the assessment when saved.</Text>
     </View> : null;
-    return <ResultSheetSurface inline={false} presentationKey={`saved-assessment:${savedAssessmentId}`} onClose={onClose} onInteraction={check.interact} onExpandedChange={() => { }} summary={<PartThreeSummary view={check.view} fallback={contextSummary}/>} compactActions={<><PartThreeControls check={check}/><Button label="Refresh saved assessment" variant="ghost" onPress={check.refresh}/></>}>
-  {check.view.historical?.assessmentWhenSaved?.partFour && <>
-    <Text accessibilityRole="header">Supporting details when saved</Text>
-    <PartThreeDetails view={{...check.view,result:check.view.historical.assessmentWhenSaved}}/>
-    <PartFourSections packet={check.view.historical.assessmentWhenSaved.partFour} researchSubject={researchSubjectFor(check.view.historical.assessmentWhenSaved.binding.subject)}/>
-  </>}
-  {check.view.result?.partFour && check.view.historical && <Text accessibilityRole="header">Current supporting details</Text>}
-  <PartThreeDetails view={check.view}/>
-  {check.view.result?.partFour && <PartFourSections packet={check.view.result.partFour} researchSubject={researchSubjectFor(check.view.result.binding.subject)} withdrawn={Date.parse(check.view.result.validUntil)<=Date.now()}/>}
-  <Text>Saved assessment metadata remains separate from saved product evidence. Reassessment checks the saved evidence and your current context.</Text>
+    return <ResultSheetSurface inline={false} presentationKey={`saved-assessment:${savedAssessmentId}`} onClose={onClose} onInteraction={check.interact} onExpandedChange={() => { }} summary={<CheckResultView section="summary" facts={{brand:'',name:identityName ?? 'Saved product Check',categoryLabel:'',formula:null,source:null}} verdict={{state:'unknown',label:'',reason:'',findings:[]}} personalSummary={<PartThreeSummary view={check.view} identityName={identityName} assessmentView={assessmentView} onAssessmentViewChange={setAssessmentView}/>}/>}>
+  {assessmentView==='current' && contextSummary}
+  <PartThreeDetails view={{...check.view,result:displayedResult}}/>
+  {displayedResult?.partFour && <PartFourSections packet={displayedResult.partFour} researchSubject={researchSubjectFor(displayedResult.binding.subject)} withdrawn={Date.parse(displayedResult.validUntil)<=Date.now()}/>}
+  <PartThreeControls check={check} section="details"/>
+  <Button label="Refresh current Check" variant="ghost" onPress={check.refresh}/>
+
  </ResultSheetSurface>;
 }

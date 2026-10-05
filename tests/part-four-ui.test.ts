@@ -100,10 +100,10 @@ test('all formula positions, short explanations and long copy remain readable in
   assert(textContent(nodes).includes(value.formula.ingredients[0].card!.short));
   assert(nodes.filter(node => node.type === 'Text').every(node => node.props.numberOfLines === undefined));
   assert.deepEqual(nodes.filter(node => node.type === 'Text' && node.props.accessibilityRole === 'header').map(node => node.props.children),
-    ['Relevant to your profile', 'Ingredients', 'Price & value']);
+    ['Relevant to your profile', 'Ingredients']);
   press(control(nodes, 'Ingredient details: Glycerin, position 1')); nodes = h.render();
   assert(textContent(nodes).includes(value.formula.ingredients[0].card!.body));
-  assert.match(textContent(nodes), /43 formula positions/);
+  assert.match(textContent(nodes), /43 listed/);
   assert.match(textContent(nodes), /Amount in this formula: not disclosed/);
   assert(!textContent(nodes).includes('Approved ingredient reference'), 'Sources starts closed');
   press(control(nodes, 'View sources for Glycerin, position 1')); nodes = h.render();
@@ -186,14 +186,17 @@ test('authorized routine hints precede ingredients and only supplied actions are
 });
 
 test('optional review and price states use honest supplied evidence with no invented numbers or anecdotes', () => {
-  for (const state of ['pending', 'unavailable', 'conflict', 'ready'] as const) {
+  for (const state of ['pending', 'unavailable', 'conflict'] as const) {
     const value = packet(); value.reviews.state = state; value.value.state = state;
     const nodes = componentHarness(component, 'PartFourSections', { packet: value, now }).render();
-    assert.match(textContent(nodes), /Selected(?:-source reports| sources disagree)/);
-    assert.match(textContent(nodes), /No current eligible offer is available/);
+    assert(!textContent(nodes).includes('Price & value'));
+    assert(!textContent(nodes).includes('No current eligible offer is available'));
+    assert(!textContent(nodes).includes('An eligible aggregate review corpus is not available.'));
     assert(!textContent(nodes).includes('$'));
     assert(!textContent(nodes).includes('/100'));
   }
+  const priced = packet(); priced.value.state = 'ready'; priced.value.explanation = 'The supplied offer remains current.';
+  assert.match(textContent(componentHarness(component, 'PartFourSections', { packet: priced, now }).render()), /The supplied offer remains current/);
   const value = packet(); value.comparison.state = 'ambiguous';
   assert.match(textContent(componentHarness(component, 'PartFourSections', { packet: value, now }).render()), /More than one current item could apply/);
 });

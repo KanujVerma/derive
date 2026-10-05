@@ -51,8 +51,8 @@ test('cold saved sheet restores source ingredient context with current profile w
  try {
   await ready(h);h.dispose();h=f.mount();
   let text=textContent(await ready(h));
-  assert.match(text,/Assessment when saved/);assert.match(text,/current profile/i);assert.match(text,/Reactive skin: Fragrance/);assert.match(text,/For dryness: Dimethicone/);
-  assert.match(text,/Assessment when saved/);assert.deepEqual(f.historical,f.before);
+  assert.match(text,/Current Check.*When saved/);assert.match(text,/current profile/i);assert.match(text,/Reactive skin: Fragrance/);assert.match(text,/For dryness: Dimethicone/);
+  assert.match(text,/Current Check.*When saved/);assert.deepEqual(f.historical,f.before);
   const next=structuredClone(f.context);next.revision++;next.profile!.revision=next.revision;next.profile!.data.primaryGoal={state:'known',value:'oiliness'};next.profile!.data.reactivity='generally_tolerates';f.setContext(next);
   t.mock.timers.tick(10000);text=textContent(await ready(h));assert.doesNotMatch(text,/For dryness|Reactive skin/);assert.deepEqual(f.historical,f.before);
  }finally{h.dispose();}

@@ -2,52 +2,47 @@ import React, {useState} from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PartThreeView } from '../../../presentation/part-three/controller';
 import type { PersonalResultV2 } from '../../../contracts/PersonalResultV2';
-import { decisionCopy, findingCopy, gapCopy } from '../../../presentation/part-three/copy';
+import { decisionCopy, findingCopy } from '../../../presentation/part-three/copy';
 import { colors, spacing, typography } from '../../../constants/theme';
 import { VerdictBlock } from '../result-sheet/CheckResultContent';
 
-function AssessmentCard({ result, heading, identityName, savedAt, disclosure, setDisclosure, compactUnknown = false }: {
-    result: PersonalResultV2; heading: string; identityName?: string; savedAt?: string; disclosure: string | null; setDisclosure(value:string|null):void; compactUnknown?: boolean;
+function AssessmentCard({ result, heading, identityName, savedAt }: {
+    result: PersonalResultV2; heading: string; identityName?: string; savedAt?: string;
 }) {
-    const disclosureKey=heading+':'+result.resultId;
-    const detailsOpen=disclosure===disclosureKey;
     const copy = decisionCopy(result), judgment = result.summary?.judgment;
-    if (compactUnknown) return <View style={{gap: spacing.xs}}>
-      {heading === 'Current assessment' && <Text accessibilityRole="header" style={styles.name}>{heading}</Text>}
-      <Text style={styles.detail}>Product decision unknown.</Text>
-      {result.findings.filter(f => f.mandatoryVisibility).map(f => <Text style={styles.body} key={f.id}>{findingCopy(f)}</Text>)}
-      <Pressable accessibilityRole="button" accessibilityLabel="Why this Check is limited" accessibilityState={{expanded:detailsOpen}} onPress={()=>setDisclosure(detailsOpen?null:disclosureKey)} style={{minHeight:44,justifyContent:'center'}}><Text style={styles.detail}>Why this Check is limited</Text></Pressable>
-      {detailsOpen && <><Text style={styles.body}>{copy.reason}</Text>{copy.action && <Text style={styles.body}>{copy.action}</Text>}{copy.scope && <Text style={styles.detail}>{copy.scope}</Text>}{result.materialGaps.filter(g => gapCopy(g) !== copy.reason).map(g => <Text style={styles.body} key={g.id}>{gapCopy(g)}</Text>)}</>}
-    </View>;
     const state = result.partFour && result.partFour.decisionState !== 'supported' ? 'unknown' : judgment === 'worth_considering' ? 'good' : judgment === 'check_first' ? 'tradeoffs' : judgment === 'skip' ? 'poor' : 'unknown';
     return <VerdictBlock heading={heading} verdict={{ state, label: copy.label, reason: copy.reason, findings: [] }}
       beforeTitle={<>{savedAt && <Text style={styles.detail}>{savedAt.slice(0, 10)}</Text>}{copy.name !== identityName && <Text style={styles.name}>{copy.name}</Text>}</>}>
-      {copy.action && <Text style={styles.body}>{copy.action}</Text>}
+      {<Text style={styles.action}>{copy.action ?? 'Review the listed ingredients and confirm the product on your label before trying it.'}</Text>}
       {copy.scope && <Text style={styles.detail}>{copy.scope}</Text>}
       {result.findings.filter(f => f.mandatoryVisibility && f.id !== result.summary?.primaryFindingId).map(f => <Text style={styles.body} key={f.id}>{findingCopy(f)}</Text>)}
-      {result.materialGaps.length>0 && <Pressable accessibilityRole="button" accessibilityLabel="Why this Check is limited" accessibilityState={{expanded:detailsOpen}} onPress={()=>setDisclosure(detailsOpen?null:disclosureKey)}><Text style={styles.detail}>Why this Check is limited</Text></Pressable>}
-      {detailsOpen && result.materialGaps.filter(g => gapCopy(g) !== copy.reason).map(g => <Text style={styles.body} key={g.id}>{gapCopy(g)}</Text>)}
     </VerdictBlock>;
 }
-export function PartThreeSummary({ view, identityName, fallback }: {
-    view: PartThreeView;
-    identityName?: string;
-    fallback?: React.ReactNode;
+export function PartThreeSummary({ view, identityName, assessmentView = 'current', onAssessmentViewChange }: {
+    view: PartThreeView; identityName?: string; fallback?: React.ReactNode;
+    assessmentView?: 'current' | 'saved'; onAssessmentViewChange?: (value: 'current' | 'saved') => void;
 }) {
-    const [disclosure,setDisclosure]=useState<string|null>(null);
-    const r = view.result;
+    const [selected,setSelected]=useState<'current'|'saved'>(assessmentView);
+    const mode = onAssessmentViewChange ? assessmentView : selected;
+    const r = mode === 'saved' && view.historical ? view.historical.assessmentWhenSaved : view.result;
     const ready = r?.state === 'ready' && r.summary;
-    const compactUnknown = Boolean(ready && fallback && !r.findings.some(f => ['decisive','concern'].includes(f.consequence)) && (r.summary?.judgment === 'not_enough_info' || r.partFour?.decisionState === 'pending'));
-    return <View style={{ gap: spacing.xs }}>
-  {(!ready || compactUnknown) && fallback}
-  {view.historical && <View style={{ gap: spacing.xs }}>{view.historical.assessmentWhenSaved ? <AssessmentCard disclosure={disclosure} setDisclosure={setDisclosure} result={view.historical.assessmentWhenSaved} heading="Assessment when saved" identityName={identityName} savedAt={view.historical.savedAt} /> : <><Text accessibilityRole="header" style={styles.name}>Assessment when saved</Text><Text style={styles.detail}>{view.historical.savedAt.slice(0, 10)}</Text><Text style={styles.body}>The earlier personal assessment is no longer available.</Text></>}<Text style={styles.detail}>This records the earlier assessment. Current reassessment is separate.</Text></View>}
-  {ready ? <><AssessmentCard disclosure={disclosure} setDisclosure={setDisclosure} result={r} heading={view.historical ? 'Current assessment' : r.partFour ? 'Your Check' : 'Personal Fit'} identityName={identityName} compactUnknown={compactUnknown} />{!compactUnknown && fallback}</>
-    : !fallback && <VerdictBlock heading={view.historical ? 'Current assessment' : 'Personal Fit'} verdict={{ state: 'unknown', label: view.error ?? (view.loading ? 'Preparing your personal Check' : 'Personal assessment unavailable'), reason: '', findings: [] }} />}
-  {view.savedAssessmentId && !view.historical && <Text style={styles.detail}>Assessment saved separately from your product.</Text>}
- </View>;
+    return <View style={{ gap: spacing.sm }}>
+      {view.historical && <View style={styles.tabs}>{(['current','saved'] as const).map(value =>
+        <Pressable key={value} accessibilityRole="button" accessibilityState={{selected:mode===value}}
+          accessibilityLabel={value==='current'?'Current Check':'When saved'} onPress={()=>{setSelected(value);onAssessmentViewChange?.(value);}}
+          style={[styles.tab, mode===value && styles.selectedTab]}><Text style={{color:mode===value?colors.inkInverse:colors.brand,fontSize:13}}>{value==='current'?'Current Check':'When saved'}</Text></Pressable>)}</View>}
+      {ready ? <AssessmentCard result={r} heading="Personal Fit" identityName={identityName} savedAt={mode==='saved'?view.historical?.savedAt:undefined}/>
+        : <VerdictBlock heading="Personal Fit" verdict={{state:'unknown',label:view.loading?'Checking Personal Fit':'Check the label first',reason:view.loading?'Your current assessment is loading.':mode==='saved'?'The earlier assessment is unavailable.':'A supported personal decision is unavailable.',findings:[]}}>
+          {!view.loading && <Text style={styles.action}>Review the listed ingredients and confirm the product on your label before trying it.</Text>}
+        </VerdictBlock>}
+      {view.historical && <Text style={styles.detail}>{mode==='saved'?'Assessment when saved · '+view.historical.savedAt.slice(0,10):'Uses your current profile. The saved assessment is unchanged.'}</Text>}
+    </View>;
 }
 
 const styles = StyleSheet.create({
+  tabs: {flexDirection:'row',gap:4,padding:3,borderWidth:1,borderColor:colors.border,borderRadius:9},
+  tab: {flex:1,minHeight:38,alignItems:'center',justifyContent:'center',borderRadius:6}, selectedTab: {backgroundColor:colors.brand},
+  action: {color:colors.brand,fontSize:13,lineHeight:20,fontWeight:'600',borderTopWidth:1,borderTopColor:colors.border,paddingTop:12},
   name: { color: colors.ink, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
   body: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular },
   detail: { color: colors.inkMuted, fontSize: typography.sizes.caption, lineHeight: typography.lineHeights.caption },
