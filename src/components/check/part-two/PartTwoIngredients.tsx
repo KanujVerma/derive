@@ -6,11 +6,11 @@ import { createCatalogRequestId } from '../../../services/productCatalog';
 import type { PartTwoOccurrence } from '../../../contracts/PartTwo';
 import { colors, spacing } from '../../../constants/theme';
 import { sourceIngredientContext, type IngredientContextInput } from '../../../presentation/part-four/ingredientContext';
-import { safePartFourSourceUrl } from '../../../presentation/part-four/sections';
+import { partFourDisplayText, safePartFourSourceUrl } from '../../../presentation/part-four/sections';
 
 /** Rendering controls are visible inert text, never a chemical correction. */
 export function ingredientDisplayText(value: string): string {
-  return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, char => `[U+${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}]`);
+  return partFourDisplayText(value);
 }
 const modalityText = (occurrence: PartTwoOccurrence) => occurrence.modality === 'may_contain' ? 'May contain' : occurrence.modality === 'alternative' ? 'Alternative entry' : occurrence.modality === 'unresolved' ? 'Entry qualifier unclear' : null;
 const sectionLabel = (kind: PartTwoOccurrence['sectionKind']) => ({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[kind];

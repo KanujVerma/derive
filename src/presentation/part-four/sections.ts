@@ -9,9 +9,14 @@ export interface PartFourRenderFence {
   expectedDependencyDigest?: string;
 }
 
-/** Rendering controls stay visible; this never corrects an ingredient name. */
+const ingredientQualificationCopy: Record<string, string> = {
+  'A null caution is not a universal safety assertion.': 'No specific caution is listed. This does not establish safety.',
+  'No standalone caution was written in this approved entry; this is not an assurance of universal tolerance.': 'No specific caution is listed. This does not establish safety.',
+};
+
+/** Known editorial qualifications use plain copy; ingredient names stay literal. */
 export function partFourDisplayText(value: string): string {
-  return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,
+  return (Object.hasOwn(ingredientQualificationCopy, value) ? ingredientQualificationCopy[value] : value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,
     character => `[U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}]`);
 }
 

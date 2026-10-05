@@ -98,6 +98,6 @@ test('source revocation and education expiry remove card copy, and different ing
 test('expanded approved education keeps its own source attribution and qualifications separate from the ingredient-list source',()=>{
  const f=fixture('Sorbitol');const h=ui(f);press(control(h.render(),'Ingredient details: Sorbitol'));press(control(h.render(),'Ingredient source and reference'));
  assert.match(textContent(h.render()),/Ingredient reference source/);
- assert.match(textContent(h.render()),/not a universal safety assertion/i);
+ assert.match(textContent(h.render()),/No specific caution is listed\. This does not establish safety\./);
  assert.match(textContent(h.render()),/Synthetic private label/);
 });
