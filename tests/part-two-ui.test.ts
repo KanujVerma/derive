@@ -11,7 +11,7 @@ test('A01/A28/A30 actual inline rows keep literal text, source-only limits and r
   const v=view('Niacinamide, PG-6-Decyltetradecanol'); assert.equal(v.result?.state,'ready');
   const h=componentHarness(modulePath,'PartTwoInlineView',{view:v,now:Date.parse(p2metadata.createdAt)});
   let nodes=h.render(); assert.match(textContent(nodes),/Photo reading.*Package not confirmed.*May be incomplete/);
-  assert(control(nodes,'Ingredient details: Niacinamide').props.style.minHeight >= 44, 'Fallback ingredient disclosure retains a 44pt target at small text sizes');press(control(nodes,'Ingredient details: Niacinamide')); nodes=h.render(); assert.match(textContent(nodes),/Listed as: Niacinamide/); press(control(nodes,'Ingredient source and reference')); nodes=h.render(); assert.match(textContent(nodes),/Synthetic private label/);
+  assert(control(nodes,'Ingredient details: Niacinamide').props.style.minHeight >= 44, 'Fallback ingredient disclosure retains a 44pt target at small text sizes');press(control(nodes,'Ingredient details: Niacinamide')); nodes=h.render(); assert(!textContent(nodes).includes('Listed as: Niacinamide')); press(control(nodes,'Ingredient source and reference')); nodes=h.render(); assert.match(textContent(nodes),/Synthetic private label/);
   press(control(nodes,'Ingredient details: PG-6-Decyltetradecanol')); nodes=h.render(); assert.match(textContent(nodes),/Details unavailable for this name/); assert(!textContent(nodes).includes('PPG-6-Decyltetradeceth'));
   const revoked=h.render({view:{...v,result:null,error:'Ingredient evidence unavailable'}}); assert(control(revoked,'Close ingredient detail')); assert.match(textContent(revoked),/Ingredient evidence unavailable/); assert(!textContent(revoked).includes('PG-6-Decyltetradecanol'));
 });
@@ -65,7 +65,7 @@ test('review a 40-row list expands beside the tapped ingredient and keeps intern
  const second=nodes.indexOf(control(nodes,'Ingredient details: Unknown ingredient 1'));
  assert(explanation>=0&&explanation<second,'detail must occur before the following row, not after all 40');
  assert(!textContent(nodes).includes('whole_list_completeness_unestablished'));assert(!textContent(nodes).includes('reviewed ingredient identity'));
- assert.match(textContent(nodes),/Listed as: Glycerin/);
+ assert(!textContent(nodes).includes('Listed as: Glycerin'));assert.match(textContent(nodes),/Glycerin/);
  assert(!control(nodes,'Ingredient source and reference').props.accessibilityState.expanded,'rights details start secondary');
 });
 test('review public partial and uncertain lists retain section and evidence qualifiers near the rows',()=>{
@@ -136,7 +136,7 @@ test('printed header kind transitions and may-contain reset render in order with
   const nodes=h.render();
   assert.deepEqual(nodes.filter(n=>n.type==='Text'&&n.props.accessibilityRole==='header').map(n=>n.props.children),['Ingredients','Active ingredients','Inactive ingredients']);
   assert.deepEqual(nodes.filter(n=>n.type==='Pressable'&&String(n.props.accessibilityLabel).startsWith('Ingredient details:')).map(n=>n.props.accessibilityLabel),['Ingredient details: Retinol','Ingredient details: Water']);
-  press(control(nodes,'Ingredient details: Water'));const expanded=h.render();assert.match(textContent(expanded),/Inactive ingredients Water.*Listed as: Water/);h.dispose();
+  press(control(nodes,'Ingredient details: Water'));const expanded=h.render();assert.match(textContent(expanded),/Inactive ingredients Water.*Aqua.*Listed as: Water/);h.dispose();
   const input=sourceReading('CI 77491, CI 77492\nIngredients: Glycerin');input.sections[0].kind='may_contain';
   const reset={...v,result:normalize(input,LOCAL_DICTIONARY_RELEASE,p2metadata)};assert.equal(reset.result.state,'ready');if(reset.result.state!=='ready')throw Error('ready reset required');assert.deepEqual(reset.result.output.reading.occurrences.map(o=>o.sectionKind),['may_contain','may_contain','ingredients']);
   const resetNodes=componentHarness(modulePath,'PartTwoInlineView',{view:reset,now:Date.parse(p2metadata.createdAt)}).render();

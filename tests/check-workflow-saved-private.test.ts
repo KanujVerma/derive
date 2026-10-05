@@ -135,7 +135,7 @@ for (const refusal of ['blocked', 'withdrawn'] as const) {
     assert.equal(f.calls[0].body.saveId, f.record.saveId);
     assert(nodes.some(node => node.props.accessibilityLabel === 'Ingredient details: Glycerin'), textContent(nodes));
     press(control(nodes, 'Ingredient details: Glycerin')); nodes = sheet.render();
-    assert.match(textContent(nodes), /Listed as: Glycerin.*reference humectant role/);
+    assert(!textContent(nodes).includes('Listed as: Glycerin'));assert.match(textContent(nodes), /Glycerin.*reference humectant role/);
     press(control(nodes, 'Ingredient source and reference')); nodes = sheet.render();
     assert(textContent(nodes).includes('Synthetic private label'));
     f.setPhase(refusal); t.mock.timers.tick(15000); nodes = await settle(sheet);
