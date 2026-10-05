@@ -1,3 +1,9 @@
+## 2026-10-05 — isolated source-qualified ingredient/profile context
+
+`kanuj/ingredient-profile-insights` preserves main worker checkout/PR196 at `1a5f6961b3f1aef8a481d9442b487ae4f85412f6`. [Foundation candidate](PART_FOUR_FOUNDATION.md#5-october-2026--source-qualified-ingredient-context-candidate) records the compact source-reading summary and approved423 expanded ingredient copy in the existing sheet. Current existing profile answers supply qualified dryness-role, explicit caution, exact reported-sensitivity or texture-reference context, even when stricter product association has no facts. This is live presentation, not a changed Part3 verdict or newly persisted assessment. Unknown efficacy, package truth and personal response remain explicit. No new onboarding/use dependency, hosted activation, credentials/provider request, deployment, merge, Metro or phone action.
+
+All 236 local test scripts passed: 1,889 TAP passes, zero failures, five inherited skips; app/test typechecks and web/iOS JavaScript exports passed. Eleven new synthetic regressions cover actual sheet composition and source/owner/profile withdrawal. Draft PR/exact-head CI and parent semantic/integration review remain distinct from local validation. The main worker remains the deployment/integration owner.
+
 ## 2026-10-05 — reviewed method-offer digest correction
 
 The parent found two stale per-file hashes in the US search/evidence offer and authorized bounded deployment after correction plus exact-head CI green. The repeatable generator now refreshes source and entry/aggregate hashes; the independent Node-crypto all-method assertion failed before regeneration and passes afterward (five focused offer tests). No runtime/source-policy delta was added. The reviewed retirement SQL is already installed; PartOne stays v12 pending this CI gate. [Handoff](SCANNER_MVP_HANDOFF.md) preserves native/source/usefulness gates.

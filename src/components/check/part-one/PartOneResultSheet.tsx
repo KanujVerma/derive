@@ -8,7 +8,7 @@ import { ResultSheetSurface } from '../result-sheet/ResultSheetSurface';
 import { Button } from '../../ui/Button';
 import { colors, spacing, typography } from '../../../constants/theme';
 import type { PartOneView } from '../../../presentation/part-one/resultController';
-import { usePartTwoView, PartTwoIngredientsView } from '../part-two/PartTwoIngredients';
+import { usePartTwoView, PartTwoIngredientsView, PartTwoSourceSummary } from '../part-two/PartTwoIngredients';
 import { partTwoTransport, partTwoSavedTransport } from '../../../services/partTwo';
 import type { PartTwoSaveGuard } from '../../../services/partTwoClient';
 import { usePartThreeCheck, type PartThreePorts } from '../part-three/usePartThreeCheck';
@@ -17,6 +17,9 @@ import { PartThreeSummary } from '../part-three/PartThreeSummary';
 import { PartThreeDetails } from '../part-three/PartThreeDetails';
 import { PartThreeControls } from '../part-three/PartThreeControls';
 import type { PartTwoView, PartTwoTransport } from '../../../presentation/part-two/controller';
+import { PART_FOUR_ENABLED, PART_FOUR_CLIENT_SELECTION } from '../../../services/partThree';
+import { ISOLATED_423_EDUCATION } from '../../../domain/part-four/knowledge423';
+import { sourceIngredientContext } from '../../../presentation/part-four/ingredientContext';
 
 export function partOneStatus(view: PartOneView, now = Date.now()): string {
   const r = view.result;
@@ -106,6 +109,12 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
     : currentDetails?.result?.state === 'parse_limit' ? currentDetails.result.permittedText?.sections.length ? 'Ingredient wording remains available. Details need review.' : 'Ingredient details need review.' : partOneSummary;
   const personal = usePartThreeCheck({ ownerId: view.owner, details: currentDetails, enabled: personalEnabled, ports: personalPorts, savedAssessmentId });
   const partFour = personal.view.result?.partFour;
+  const educationSelection = personalPorts?.partFourSelection ?? PART_FOUR_CLIENT_SELECTION;
+  const education = personal.enabled && PART_FOUR_ENABLED && educationSelection?.education === 'approved423' && !currentRefusal && !sourceAccess.current.privateDenied
+    ? {ownerId: view.owner, context: personal.context, knowledge: ISOLATED_423_EDUCATION} : undefined;
+  const ingredientContext = education && currentDetails ? sourceIngredientContext(currentDetails.result, education, clock) : null;
+  const contextSummary = ingredientContext?.points.length && currentDetails
+    ? <PartTwoSourceSummary view={currentDetails} education={education} now={clock} /> : null;
   const partFourCurrent = Boolean(partFour && personal.view.result && Date.parse(personal.view.result.validUntil)>clock);
   const originalSections = !expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
     <Text accessibilityRole="header">{({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[section.kind]}</Text><Text selectable>{section.text}</Text>
@@ -115,9 +124,12 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       {view.loading && <ActivityIndicator color={colors.brand} />}
       <CheckResultView section="summary" facts={{ brand: identity?.brand ?? '', name: identity?.name ?? 'Product not confirmed', categoryLabel: identity?.variantText ?? '', formula: null, source: null }}
         identityImage={identity?.image && current(identity.image.expiresAt) && failedImage !== identity.image.url ? <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 48, height: 54 }} resizeMode="contain" onLoad={() => markCheckVerificationTiming('barcode', 'image', r?.requestId)} onError={() => setFailedImage(identity.image!.url)} /> : undefined}
-        personalSummary={personal.enabled ? <PartThreeSummary view={personal.view} identityName={identity?.name} /> : undefined}
+        personalSummary={personal.enabled ? <>
+          <PartThreeSummary view={personal.view} identityName={identity?.name} fallback={contextSummary} />
+          {personal.view.result?.summary ? contextSummary : null}
+        </> : undefined}
         verdict={{ state: 'unknown', label: 'Not enough information', reason: status, findings: [] }} />
-      {personal.enabled && <Text accessibilityLiveRegion="polite" style={{ color: colors.inkMuted }}>{status}</Text>}
+      {personal.enabled && !contextSummary && <Text accessibilityLiveRegion="polite" style={{ color: colors.inkMuted }}>{status}</Text>}
       {identity && (!identity.image || failedImage === identity.image.url) && <Text style={{ color: colors.inkMuted, fontSize: typography.sizes.caption }}>No product image available</Text>}
       {r?.work === 'deferred_budget' && <Text>Lookup is deferred. Existing product facts remain available.</Text>}
       {r?.work === 'retry_wait' && <Text>The source is temporarily unavailable. Lookup will retry when eligible.</Text>}
@@ -145,7 +157,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
     </View>}>
     {typeof localDraft === 'function' ? localDraft(sourceAccess.current.privateDenied, setDetails) : !sourceAccess.current.privateDenied && localDraft}
     {personal.enabled && partFourCurrent && <PartThreeDetails view={personal.view} />}
-    {partFourCurrent && partFour && currentDetails?.result?.state==='ready' ? <View onLayout={event=>{ingredientOrigin.current.y=event.nativeEvent.layout.y;}}><PartFourSections onIngredientJump={(id,y)=>{if(y!==undefined)setIngredientScroll({key:sourceKey+':'+id,y:ingredientOrigin.current.y+y});}} packet={partFour} researchSubject={researchSubjectFor(personal.view.result?.binding.subject)} now={clock} expectedBindingKey={currentDetails.result.bindingKey} expectedResultRevision={currentDetails.result.resultRevision} expectedDependencyDigest={currentDetails.result.output.reading.binding.dependencyDigest} withdrawn={Boolean(currentRefusal) || sourceAccess.current.privateDenied}/></View> : acquisitionTarget ? <PartTwoIngredientsView view={acquired} target={acquisitionTarget} enabled={ingredientEnabled} fallback={originalSections} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
+    {partFourCurrent && partFour && currentDetails?.result?.state==='ready' ? <View onLayout={event=>{ingredientOrigin.current.y=event.nativeEvent.layout.y;}}><PartFourSections onIngredientJump={(id,y)=>{if(y!==undefined)setIngredientScroll({key:sourceKey+':'+id,y:ingredientOrigin.current.y+y});}} packet={partFour} researchSubject={researchSubjectFor(personal.view.result?.binding.subject)} now={clock} expectedBindingKey={currentDetails.result.bindingKey} expectedResultRevision={currentDetails.result.resultRevision} expectedDependencyDigest={currentDetails.result.output.reading.binding.dependencyDigest} withdrawn={Boolean(currentRefusal) || sourceAccess.current.privateDenied}/></View> : acquisitionTarget ? <PartTwoIngredientsView view={acquired} target={acquisitionTarget} enabled={ingredientEnabled} fallback={originalSections} education={education} contextSummary={false} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
     {!partFourCurrent && <Pressable accessibilityRole="button" accessibilityLabel="Source" accessibilityState={{ expanded: sourceOpen }} onPress={() => setSourceOpen(value => !value)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.brand }}>Source</Text></Pressable>}
     {!partFourCurrent && sourceOpen && !expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
       <Text>{source.label} · Observed {source.observedAt.slice(0, 10)}</Text>

@@ -1,5 +1,15 @@
 # Part Four isolated local foundation
 
+## 5 October 2026 — source-qualified ingredient context candidate
+
+Isolated `kanuj/ingredient-profile-insights` starts from PR196 head `1a5f6961b3f1aef8a481d9442b487ae4f85412f6`. The existing Check sheet now offers at most two ingredient-context observations from the selected approved423 education and current, owner-bound Part2 reading. A failed variant/market association can leave `productFacts.facts` empty while fresh attributed reading identities remain usable for source-qualified references. Package confirmation, completeness and source authority are not promoted by this presentation.
+
+Existing dryness/dry-tight answers can surface approved water-binding, water-loss-reduction and softening roles; reported reactivity prioritizes an explicit approved caution; an exact reported sensitivity can match a listed identity; a lightweight preference can surface petrolatum's qualified film reference. Other goals receive useful ingredient-role copy without invented goal benefits. For example, the retained lotion identity set can explain petrolatum's water-loss role and sorbitol's water/glide role without claiming that the product will improve dryness. Conditional, unclear, expired, withdrawn or foreign-owner facts cannot supply profile-linked observations. A missing caution is never a safety conclusion.
+
+The compact source summary remains useful while Part3 is unavailable. Expanded rows retain the approved body, caution, amount/use qualifications and separate ingredient-reference citations alongside the original list attribution. Existing use/comparison controls, verdicts and historical assessment remain; no new onboarding field, mandatory use answer, second sheet or authoritative decision/save payload is introduced. Context is recomputed from the current profile on reopen, rather than persisted as a new assessment. Profile refusal removes personal links while independently authorized source-role education may remain.
+
+Local validation: all 236 test scripts passed, with 1,889 TAP passes, zero failures and five inherited explicit skips; both TypeScript checks and web/iOS JavaScript exports passed. Eleven new regressions include synthetic reconstructions of the retained lotion and deodorant identity sets, real sheet composition, profile refresh/refusal, source withdrawal, exact sensitivity matching and expandable source/qualification copy. No hosted owner/profile packet is stored in fixtures. Draft PR/exact-head CI and parent semantic/integration review are separate gates. No backend/database/Auth/RLS, knowledge-release tuple, source/model/private-photo activation, deployment, merge, Metro or device change is included.
+
 User authorized local implementation on 3 October 2026 from accepted combined Check/Part Three head `c797960f36a7902aa23d7a22b36090e45269c8cb`. This branch is `kanuj/part-four-foundation`; the accepted checkout is preserved. This is an initial foundation increment, not full Part Four acceptance or hosted activation.
 
 ## Implemented local scope

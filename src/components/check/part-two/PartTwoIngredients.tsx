@@ -5,6 +5,8 @@ import { PART_TWO_ENABLED, partTwoTransport, partTwoSavedTransport } from '../..
 import { createCatalogRequestId } from '../../../services/productCatalog';
 import type { PartTwoOccurrence } from '../../../contracts/PartTwo';
 import { colors, spacing } from '../../../constants/theme';
+import { sourceIngredientContext, type IngredientContextInput } from '../../../presentation/part-four/ingredientContext';
+import { safePartFourSourceUrl } from '../../../presentation/part-four/sections';
 
 /** Rendering controls are visible inert text, never a chemical correction. */
 export function ingredientDisplayText(value: string): string {
@@ -12,7 +14,17 @@ export function ingredientDisplayText(value: string): string {
 }
 const modalityText = (occurrence: PartTwoOccurrence) => occurrence.modality === 'may_contain' ? 'May contain' : occurrence.modality === 'alternative' ? 'Alternative entry' : occurrence.modality === 'unresolved' ? 'Entry qualifier unclear' : null;
 const sectionLabel = (kind: PartTwoOccurrence['sectionKind']) => ({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[kind];
-export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoView; now?: number }) {
+export function PartTwoSourceSummary({view, education, now = Date.now()}: {view: PartTwoView; education?: IngredientContextInput; now?: number}) {
+  const context = education ? sourceIngredientContext(view.result, education, now) : null;
+  if (!context?.points.length) return null;
+  return <View accessibilityLabel="Ingredient context summary" style={{gap: spacing.xs}}>
+    <Text accessibilityRole="header">Ingredient context</Text>
+    <Text>{context.scope}</Text>
+    {context.points.map((point, index) => <Text key={index}>{point}</Text>)}
+    <Text style={{color: colors.inkMuted}}>{context.limit}</Text>
+  </View>;
+}
+export function PartTwoInlineView({ view, now = Date.now(), education, contextSummary = true }: { view: PartTwoView; now?: number; education?: IngredientContextInput; contextSummary?: boolean }) {
   const key = JSON.stringify(view.target);
   const [open, setOpen] = useState<{ key: string; id: string } | null>(null);
   const [disclosure, setDisclosure] = useState<{ key: string; id: string } | null>(null);
@@ -24,6 +36,8 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
   const openId = open?.key === key ? open.id : null;
   const result = view.result && Date.parse(view.result.expiresAt) > now ? view.result : null;
   const reading = result?.state === 'ready' ? result.output.reading : null;
+  const context = education ? sourceIngredientContext(result, education, now) : null;
+  const educationRows = new Map(context?.rows.map(row => [row.occurrenceId, row]) ?? []);
   if (reading) layout.current.rows = reading.occurrences.map(o => ({ id: o.occurrenceId, height: layout.current.rows.find(row => row.id === o.occurrenceId)?.height ?? 0 }));
   const status = !result ? view.error ?? (view.loading ? 'Preparing ingredient details' : 'Ingredient evidence unavailable') :
     result.state === 'pending' ? 'Preparing ingredient details' : result.state === 'no_declaration' ? 'No ingredient declaration available' :
@@ -36,6 +50,7 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
     const facts = reading?.facts.filter(f => f.occurrenceId === openId && f.kind === 'reference_function') ?? [];
     const sources = reading?.dependencyManifest.sourceRefs.filter(source => opened?.spans.some(span => span.observationId === source.observationId)) ?? [];
     const expanded = disclosure?.key === key && disclosure.id === openId;
+    const card = opened ? educationRows.get(opened.occurrenceId)?.card : null;
     return <View accessibilityLabel="Inline ingredient explanation" style={{ gap: spacing.xs, minHeight: layout.current.detailHeight || undefined }}
       onLayout={event => { if (opened) { layout.current.detailHeight = Math.max(layout.current.detailHeight, event.nativeEvent.layout.height); layout.current.detailOffset = event.nativeEvent.layout.y; } }}>
       <Text accessibilityRole="header">Ingredient detail</Text>
@@ -44,6 +59,7 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
           {opened.mapping.preferredName && opened.mapping.preferredName !== opened.observedName && <Text>{ingredientDisplayText(opened.mapping.preferredName)}</Text>}
           <Text>{`Listed as: ${ingredientDisplayText(opened.observedName)}`}</Text>
         </> : opened.mapping.state === 'ambiguous' ? <Text>Ingredient identity is ambiguous.</Text> : <Text>Details unavailable for this name</Text>}
+        {card && <><Text>{ingredientDisplayText(card.body)}</Text>{card.detail && <Text>{ingredientDisplayText(card.detail)}</Text>}{card.editorial?.caution && <Text>{ingredientDisplayText(card.editorial.caution)}</Text>}{card.editorial?.amountAndUse && <Text>{ingredientDisplayText(card.editorial.amountAndUse)}</Text>}{card.editorial?.qualifications.map((qualification, index) => <Text key={index}>{ingredientDisplayText(qualification)}</Text>)}<Text>Ingredient reference only; product results and your response remain unknown.</Text></>}
         {opened.quantities.map((quantity, index) => <View key={index} style={{ gap: spacing.xs }}>
           <Text>Printed amount: {ingredientDisplayText(quantity.span.raw)}</Text>
           {!['parsed', 'validated'].includes(quantity.status) ? <Text>Printed amount needs review; no concentration is established.</Text> : <>
@@ -62,6 +78,10 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
         </View>)}
         <Pressable accessibilityRole="button" accessibilityLabel="Ingredient source and reference" accessibilityState={{ expanded }} onPress={() => setDisclosure(expanded ? null : { key, id: openId! })} style={{ paddingVertical: spacing.sm }}><Text>Source and reference</Text></Pressable>
         {expanded && <>
+          {card && context?.sources.filter(source => card.sourceIds.includes(source.id)).map(source => <View key={source.id} style={{gap: spacing.xs}}>
+            <Text>Ingredient reference source: {ingredientDisplayText(source.title)}</Text>
+            {safePartFourSourceUrl(source.url) && <Pressable accessibilityRole="link" accessibilityLabel={`View ingredient reference: ${ingredientDisplayText(source.title)}`} onPress={() => {void Linking.openURL(source.url).catch(() => {});}} style={{minHeight: 44, justifyContent: 'center'}}><Text>View ingredient reference</Text></Pressable>}
+          </View>)}
           {sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
             <Text>{ingredientDisplayText(source.attribution ?? 'Source reading')} · Observed {source.observedAt.slice(0, 10)}</Text>
             {source.sourceUrl && new URL(source.sourceUrl).protocol === 'https:' && <Pressable accessibilityRole="link" accessibilityLabel="View ingredient source" onPress={() => { void Linking.openURL(source.sourceUrl!).catch(() => {}); }} style={{ paddingVertical: spacing.sm }}><Text>View source</Text></Pressable>}
@@ -77,6 +97,7 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
   }
   const assertions = result?.state === 'ready' && result.output.kind === 'bound' ? result.output.productFacts.facts.filter(f => f.kind === 'product_label_assertion') : [];
   return <View style={{ gap: spacing.sm }}>
+    {contextSummary && <PartTwoSourceSummary view={view} education={education} now={now} />}
     <View style={{ gap: spacing.xs, minHeight: !reading && openId ? layout.current.introHeight : undefined }} onLayout={event => { if (reading) layout.current.introHeight = event.nativeEvent.layout.height; }}>
       {status && <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>{status}</Text>}
       {reading && <><Text accessibilityRole="header">Ingredient details</Text><Text>{scope}</Text>{evidence && <Text accessibilityRole={reading.evidenceState === 'conflict' ? 'alert' : undefined}>{evidence}</Text>}</>}
@@ -86,6 +107,7 @@ export function PartTwoInlineView({ view, now = Date.now() }: { view: PartTwoVie
       <Pressable accessibilityRole="button" accessibilityLabel={`Ingredient details: ${ingredientDisplayText(occurrence.observedName || occurrence.rawToken)}`}
         accessibilityState={{ expanded: openId === occurrence.occurrenceId }} onPress={() => { layout.current.detailHeight = 0; layout.current.detailOffset = 0; setOpen(openId === occurrence.occurrenceId ? null : { key, id: occurrence.occurrenceId }); setDisclosure(null); }} style={{ paddingVertical: spacing.sm, minHeight: 44 }}>
         <Text selectable>{ingredientDisplayText(occurrence.rawToken)}</Text>
+        {educationRows.get(occurrence.occurrenceId)?.card && <Text>{educationRows.get(occurrence.occurrenceId)!.short}</Text>}
         {modalityText(occurrence) && <Text>{modalityText(occurrence)}</Text>}
         {occurrence.transcription !== 'clear' && <Text>Text unclear · Check text</Text>}
       </Pressable>
@@ -126,7 +148,7 @@ export function usePartTwoView(target: PartTwoTarget | null, enabled = PART_TWO_
   }, [expiry, view.result, controller, clockTick]);
   return target && view.target && JSON.stringify(view.target) === key ? view : { target, result: null, loading: Boolean(enabled && target), error: null };
 }
-export function PartTwoIngredientsView({ target, view, enabled = PART_TWO_ENABLED, fallback }: { target: PartTwoTarget; view: PartTwoView; enabled?: boolean; fallback?: React.ReactNode }) {
+export function PartTwoIngredientsView({ target, view, enabled = PART_TWO_ENABLED, fallback, education, contextSummary = true }: { target: PartTwoTarget; view: PartTwoView; enabled?: boolean; fallback?: React.ReactNode; education?: IngredientContextInput; contextSummary?: boolean }) {
   const key = JSON.stringify(target);
   const originalAccess = useRef({ key, denied: false });
   if (originalAccess.current.key !== key) originalAccess.current = { key, denied: false };
@@ -140,7 +162,7 @@ export function PartTwoIngredientsView({ target, view, enabled = PART_TWO_ENABLE
   if (current.error || result && !['ready', 'pending', 'parse_limit'].includes(result.state)) originalAccess.current.denied = true;
   const permitted = result && result.state !== 'ready' && result.permittedText && Date.parse(result.permittedText.expiresAt) > Date.now() ? result.permittedText : null;
   const originalAllowed = !originalAccess.current.denied && (result?.state === 'pending' || !result && current.loading && !current.error);
-  return <>{permitted ? permitted.sections.map(section => <View key={section.sectionId}><Text accessibilityRole="header">{sectionLabel(section.kind)}</Text><Text selectable>{ingredientDisplayText(section.text)}</Text></View>) : originalAllowed && fallback}<PartTwoInlineView view={current} /></>;
+  return <>{permitted ? permitted.sections.map(section => <View key={section.sectionId}><Text accessibilityRole="header">{sectionLabel(section.kind)}</Text><Text selectable>{ingredientDisplayText(section.text)}</Text></View>) : originalAllowed && fallback}<PartTwoInlineView view={current} education={education} contextSummary={contextSummary} /></>;
 }
 /** Standalone owners (private evidence and saved screens) retain the same lifecycle. */
 export function PartTwoIngredients({ target, enabled = PART_TWO_ENABLED, transport = partTwoTransport, onView, fallback }: { target: PartTwoTarget; enabled?: boolean; transport?: PartTwoTransport; onView?: (view: PartTwoView) => void; fallback?: React.ReactNode }) {

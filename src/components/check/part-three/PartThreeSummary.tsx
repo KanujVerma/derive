@@ -22,16 +22,17 @@ function AssessmentCard({ result, heading, identityName, savedAt, disclosure, se
       {detailsOpen && result.materialGaps.filter(g => gapCopy(g) !== copy.reason).map(g => <Text style={styles.body} key={g.id}>{gapCopy(g)}</Text>)}
     </VerdictBlock>;
 }
-export function PartThreeSummary({ view, identityName }: {
+export function PartThreeSummary({ view, identityName, fallback }: {
     view: PartThreeView;
     identityName?: string;
+    fallback?: React.ReactNode;
 }) {
     const [disclosure,setDisclosure]=useState<string|null>(null);
     const r = view.result;
     return <View style={{ gap: spacing.xs }}>
   {view.historical && <View style={{ gap: spacing.xs }}>{view.historical.assessmentWhenSaved ? <AssessmentCard disclosure={disclosure} setDisclosure={setDisclosure} result={view.historical.assessmentWhenSaved} heading="Assessment when saved" identityName={identityName} savedAt={view.historical.savedAt} /> : <><Text accessibilityRole="header" style={styles.name}>Assessment when saved</Text><Text style={styles.detail}>{view.historical.savedAt.slice(0, 10)}</Text><Text style={styles.body}>The earlier personal assessment is no longer available.</Text></>}<Text style={styles.detail}>This records the earlier assessment. Current reassessment is separate.</Text></View>}
   {r?.state === 'ready' && r.summary ? <AssessmentCard disclosure={disclosure} setDisclosure={setDisclosure} result={r} heading={view.historical ? 'Current assessment' : r.partFour ? 'Your Check' : 'Personal Fit'} identityName={identityName} />
-    : <VerdictBlock heading={view.historical ? 'Current assessment' : 'Personal Fit'} verdict={{ state: 'unknown', label: view.error ?? (view.loading ? 'Preparing your personal Check' : 'Personal assessment unavailable'), reason: '', findings: [] }} />}
+    : fallback ?? <VerdictBlock heading={view.historical ? 'Current assessment' : 'Personal Fit'} verdict={{ state: 'unknown', label: view.error ?? (view.loading ? 'Preparing your personal Check' : 'Personal assessment unavailable'), reason: '', findings: [] }} />}
   {view.savedAssessmentId && !view.historical && <Text style={styles.detail}>Assessment saved separately from your product.</Text>}
  </View>;
 }
