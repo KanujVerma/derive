@@ -253,3 +253,15 @@ test('ingredient detail omits a duplicate alias paragraph and keeps an explicit 
  const p=packet('Water');const card=p.formula.ingredients[0].card!;card.evidence='Water is also called Aqua.';card.editorial={amountAndUse:null,caution:null,aliasNotes:'Water is also called Aqua.',distinctIngredients:null,qualifications:[],copySha256:'synthetic',documentId:'synthetic',libraryFileId:'synthetic',libraryVersion:0,documentSha256:'synthetic'};
  const h=componentHarness(component,'PartFourSections',{packet:p,now});press(control(h.render(),'Explore ingredient: Water, position 1'));const copy=textContent(h.render());assert.equal(copy.split('Water is also called Aqua.').length-1,1);assert.match(copy,/No specific caution.*reference/i);
 });
+
+test('absent caution is qualified once while distinct scientific limits and approved copy remain',()=>{
+ const p=packet('Glycerin');const card=p.formula.ingredients[0].card!;
+ card.editorial={amountAndUse:null,caution:null,aliasNotes:null,distinctIngredients:null,qualifications:['A null caution is not a universal safety assertion.','No standalone caution was written in this approved entry; this is not an assurance of universal tolerance.','The study tested one formula, not this finished product.'],copySha256:'synthetic',documentId:'synthetic',libraryFileId:'synthetic',libraryVersion:0,documentSha256:'synthetic'};
+ const before=JSON.stringify(card);const h=componentHarness(component,'PartFourSections',{packet:p,now});press(control(h.render(),'Ingredient details: Glycerin, position 1'));const copy=textContent(h.render());
+ assert.equal((copy.match(/No specific caution/g)??[]).length,1);assert.match(copy,/does not establish how the finished product will affect your skin/);
+ assert(!copy.includes('This does not establish safety.'));assert(!copy.includes('Ingredient information does not establish'));
+ for(const approved of [card.body,card.detail!,card.evidence!,'The study tested one formula, not this finished product.'])assert(copy.includes(approved));
+ assert.equal(JSON.stringify(card),before);
+ card.editorial.caution='Avoid if you have a confirmed allergy to this ingredient.';
+ const cautioned=textContent(h.render());assert(cautioned.includes(card.editorial.caution));assert(!cautioned.includes('No specific caution'));assert(cautioned.includes('The study tested one formula, not this finished product.'));
+});

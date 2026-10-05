@@ -104,6 +104,10 @@ export function PartFourSections(props: PartFourSectionsProps) {
         {rows.map((row, index) => {
           const heading = ingredientSectionHeading(packet.formula, index);
           const expanded = openId === row.occurrenceId;
+          // The two known absent-caution qualifications are covered by the
+          // shared line or the actual caution below. Scientific limits remain.
+          const qualifications = [...new Set((row.card?.editorial?.qualifications ?? []).map(partFourDisplayText))]
+            .filter(qualification => qualification !== 'No specific caution is listed. This does not establish safety.');
           return <View key={row.occurrenceId} nativeID={`part-four-ingredient-${row.occurrenceId}`} style={styles.ingredient}
             onLayout={event => {layout.current.rows.set(row.occurrenceId,event.nativeEvent.layout.y);props.onIngredientLayout?.(row.occurrenceId,event.nativeEvent.layout.y);}}>
             {heading && heading !== 'Ingredients' && <Text accessibilityRole="header" style={styles.sectionKind}>{heading}</Text>}
@@ -138,7 +142,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
                     <Text accessibilityRole="header" style={styles.insightTitle}>Amount and use context</Text>
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.amountAndUse)}</Text>
                   </View>}
-                  {!row.card.editorial.caution && <Text style={styles.caption}>No specific caution is available in this reference. This does not mean the ingredient or product is risk-free.</Text>}
+                  {!row.card.editorial.caution && <Text style={styles.caption}>No specific caution is listed in this reference; this does not establish how the finished product will affect your skin.</Text>}
                   {row.card.editorial.caution && <View style={styles.insight}>
                     <Text accessibilityRole="header" style={styles.insightTitle}>Cautions</Text>
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.caution)}</Text>
@@ -151,14 +155,14 @@ export function PartFourSections(props: PartFourSectionsProps) {
                     <Text accessibilityRole="header" style={styles.insightTitle}>Different ingredients</Text>
                     <Text selectable style={styles.more}>{partFourDisplayText(row.card.editorial.distinctIngredients)}</Text>
                   </View>}
-                  {row.card.editorial.qualifications.length > 0 && <View style={styles.insight}>
+                  {qualifications.length > 0 && <View style={styles.insight}>
                     <Text accessibilityRole="header" style={styles.insightTitle}>Limits of this information</Text>
-                    {row.card.editorial.qualifications.map((qualification, qualificationIndex) =>
-                      <Text key={qualificationIndex} selectable style={styles.caption}>{partFourDisplayText(qualification)}</Text>)}
+                    {qualifications.map((qualification, qualificationIndex) =>
+                      <Text key={qualificationIndex} selectable style={styles.caption}>{qualification}</Text>)}
                   </View>}
                 </>}
               </>}
-              <Text style={styles.caption}>Ingredient information does not establish the finished product’s effect or your experience with it.</Text>
+              {(!row.card?.editorial || row.card.editorial.caution) && <Text style={styles.caption}>Ingredient information does not establish the finished product’s effect or your experience with it.</Text>}
               <Pressable accessibilityRole="button" accessibilityLabel={`View sources for ${row.name}, position ${index + 1}`}
                 onPress={() => toggleSources(true)} style={styles.sourceButton}><Text style={styles.link}>Sources below</Text></Pressable>
             </View>}

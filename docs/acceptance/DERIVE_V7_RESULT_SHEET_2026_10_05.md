@@ -22,6 +22,8 @@ No Site content/access, decision rules, onboarding fields, server contracts, sou
 
 This is a native adaptation of the approved hierarchy, not certified pixel parity. The current contracts do not supply the prototype's fictional side-by-side comparison cells, product outcomes or prices; this change renders actual admitted comparison and routine copy without manufacturing those cells.
 
+The final parent-reviewed display-copy pass translates the unresolved-goal reason into plain language. For ingredients without a specific caution, one combined absence-of-caution/finished-product qualification replaces the three overlapping wrappers. Only the two known generic absent-caution qualifications are consolidated; ingredient-specific scientific limitations and actual cautions remain visible. Approved body, detail and evidence bytes are unchanged. Two focused regressions verify these boundaries; no decision semantics or source metadata changes.
+
 Resolved identity keeps Search by name in the expanded controls. Unknown identity retains its compact recovery action. When no actual comparison exists, generic unknown comparison/science rows and the empty routine map are omitted; admitted supported, limited and conflicting findings remain. With an actual comparator, material unresolved secondary-goal and comparison limits remain visible. Final CI caught an overbroad unknown-row filter; it was narrowed without changing decision data.
 
 ## Actual visual receipt
@@ -56,6 +58,16 @@ Recovered and reference screenshot Library receipts, all confirmed version 0:
 | hydro-live-save-confirmed.jpg | `libfile_8b33b9235f1c8191abc04e92216fd96c` |
 | hydro-new-save-cold-reopen.jpg | `libfile_0b69dbb9c8088191a1f90c5c89b23811` |
 | synthetic-comparison-routine.jpg | `libfile_bbcd6e268a0081918f29816f8f929ce8` |
+
+The approved reference screenshots were explicitly re-uploaded for the parent comparison; these new Library creates succeeded, all version 0:
+
+| Reference | Library ID |
+| --- | --- |
+| Compact | `libfile_5b9a8efa54b081918e376147f815ee47` |
+| Comparison | `libfile_2fd959f887608191b0363811c7315b3f` |
+| Ingredients | `libfile_66cccc2fddb881918095b654d7a81683` |
+
+The initial saved-current refusal is established as the owned8097 selection mismatch described above. The exact cause of later current-read unavailability is unestablished; historical recovery must not be represented as proof that every current refresh succeeds.
 
 ## Validation and remaining gates
 

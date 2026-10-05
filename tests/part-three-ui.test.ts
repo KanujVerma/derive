@@ -7,12 +7,20 @@ import { p2id } from './fixtures/part-two-core.ts';
 import { evaluatePersonalResult } from '../src/domain/part-three/evaluate.ts';
 import { emptyPartThreeChoices,partThreeTarget } from '../src/presentation/part-three/target.ts';
 import { canonicalJson } from '../src/domain/part-two/hash.ts';
+import { gapCopy } from '../src/presentation/part-three/copy.ts';
 import type { PartThreePorts } from '../src/components/check/part-three/usePartThreeCheck';
 import type { PartThreeRequest,PartThreeResponse } from '../src/contracts/PartThreeService.ts';
 import type { PartThreeView } from '../src/presentation/part-three/controller.ts';
 const emptyView=():PartThreeView=>({target:null,result:null,question:null,historical:null,savedAssessmentId:null,savedAt:null,loading:false,saving:false,error:null});
 const settle=()=>new Promise<void>(resolve=>setImmediate(resolve));
 const surface={ResultSheetSurface:(p:any)=>React.createElement('Surface',p,p.summary,p.compactActions,p.footer,p.children)};
+test('unresolved goal uses plain decision copy without changing its evidence state',()=>{
+ const r=evaluatePersonalResult(p3input());r.summary!.judgment='not_enough_info';r.summary!.primaryFindingId=null;
+ const gap={id:'goal-gap',affectedPropositionIds:[],state:'unavailable' as const,reason:'goal_evidence' as const,recoverableBy:'evidence' as const};r.materialGaps=[gap];
+ const before=canonicalJson(r);const h=componentHarness('src/components/check/part-three/PartThreeSummary.tsx','PartThreeSummary',{view:{...emptyView(),result:r}});const copy=textContent(h.render());
+ assert.match(copy,/Not enough info.*There isn’t enough evidence to say if this product will help your skin goal\./);assert(!copy.includes('reported goal remains unresolved'));
+ assert.equal(canonicalJson(r),before);assert.equal(gapCopy({...gap,state:'conflict'}),'Sources disagree on a material fact. This Check keeps that conflict unresolved.');
+});
 test('judge-first card preserves reason/scope and mandatory concerns; history is explicitly separate',()=>{
  const x=p3input();x.context.profile!.data.sensitivities={status:'reported',values:['Glycerin']};const r=evaluatePersonalResult(x);
  const h=componentHarness('src/components/check/part-three/PartThreeSummary.tsx','PartThreeSummary',{view:{...emptyView(),result:r}});
