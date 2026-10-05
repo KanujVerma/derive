@@ -2,6 +2,8 @@ import {PART_THREE_RELEASE_SELECTION} from '@/src/services/partThree';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/src/components/ui/Screen';
 import { GroupedSection } from '@/src/components/ui/GroupedSection';
+import { ResumableSetupFlow } from '@/src/components/p0b-personalization/ResumableSetupFlow';
+import { setupDraftStore } from '@/src/services/setupDraft';
 import { ContextFlow } from '@/src/components/p0b-personalization/ContextFlow';
 import { RoutineContext } from '@/src/components/p0b-personalization/RoutineContext';
 import { ExperienceContext } from '@/src/components/p0b-personalization/ExperienceContext';
@@ -159,14 +161,18 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry, experienc
     try {
       const signature=JSON.stringify({bundle,draft});
       if(setupAttempt.current?.signature!==signature)setupAttempt.current={signature,request:{operation:'save_setup',requestId:createCatalogRequestId(),baseContextRevision:context.revision,setup:setupToStorageV2(draft,bundle,createCatalogRequestId,new Date().toISOString())}};
+      let acknowledged=false;
       const request=setupAttempt.current.request;setupBusy.current=true;setSetupSaving(true);setSetupError(null);
       void captureCustomerContextClient(ownerId).then(client=>writePersonalContextV2(request,client)).then(async()=>{
+        acknowledged=true;
         if(!gate.isCurrent(token,currentCustomerOwner()))return;
+        await setupDraftStore.clear();
         await customerController.load();
         if(gate.takeReturn(token,currentCustomerOwner()))close();
-      }).catch(error=>{if(gate.isCurrent(token,currentCustomerOwner()))setSetupError(error instanceof PersonalContextRemoteError&&error.code==='STALE_CONTEXT'?'Your saved context changed. Your entries remain here. Review the latest context before saving again.':'Your setup was not saved. Your entries remain here; try again.');}).finally(()=>{setupBusy.current=false;if(gate.isCurrent(token,currentCustomerOwner()))setSetupSaving(false);});
+      }).catch(error=>{if(gate.isCurrent(token,currentCustomerOwner()))setSetupError(acknowledged?'Your setup was saved. This device could not finish clearing its unfinished draft; try again to finish.':error instanceof PersonalContextRemoteError&&error.code==='STALE_CONTEXT'?'Your saved context changed. Your entries remain here. Review the latest context before saving again.':'Your setup was not saved. Your entries remain here; try again.');}).finally(()=>{setupBusy.current=false;if(gate.isCurrent(token,currentCustomerOwner()))setSetupSaving(false);});
     } catch(error){setSetupError(error instanceof Error?error.message:'Review your entries before saving.');}
   };
+  const ProfileFlow = !context.profile && context.revision===0 ? ResumableSetupFlow : ContextFlow;
   const loading = setupSaving || state.status === 'saving' || state.status === 'loading';
   const existing = editingExperience && editingExperience !== 'new' ? context.experiences.find(item => item.data.id === editingExperience) : null;
   const displayLabels = state.originReference ? { ...state.displayLabels, [catalogReferenceKey(state.originReference)]: state.originReference.label } : state.displayLabels;
@@ -190,12 +196,12 @@ function ProgressiveEditor({ ownerId, mode, decisionSnapshotId, entry, experienc
   const jitContext = ready ? [ ...(ready.evidenceNeeds.some(need => need.code === 'current_treatments') ? ['treatments' as const] : []), ...(ready.evidenceNeeds.some(need => need.code === 'sensitivity_context') ? ['sensitivities' as const] : []) ] : [];
   const editQuestions = deriveProfileEditQuestions(context.profile?.data ?? null, jitReproductive, jitContext);
   const reproductive = editQuestions.reproductive, questions = editQuestions.context;
-  return <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-    <View style={{ paddingHorizontal: 24, paddingTop: insets.top, alignItems: 'flex-start' }}>
+  return <View style={{ flex: 1, backgroundColor: colors.canvas, paddingTop: section === 'profile' ? insets.top : 0 }}>
+    {section !== 'profile' && <View style={{ paddingHorizontal: 24, paddingTop: insets.top, alignItems: 'flex-start' }}>
       <Button label="Back" size="medium" variant="ghost" disabled={loading} onPress={close} />
-    </View>
-    {section === 'profile' && mode !== 'preferences' && <Button label="Edit confirmed preferences" variant="outline" disabled={loading} onPress={()=>router.push('/personalize?mode=preferences&p0b=1')}/>}
-    {section === 'profile' && <ContextFlow dictionaryRelease={PART_THREE_RELEASE_SELECTION?.dictionaryRelease} key={'profile:' + context.revision} initialDraft={context.profile ? profileFromStorage(context.profile.data) : undefined} setup={!context.profile && context.revision === 0} durableSetup ownerId={ownerId} createId={createCatalogRequestId} collectIntent={false} completionLabel={!context.profile && context.revision === 0 ? 'Save skin setup' : 'Save skin profile'} onSetup={saveSetup} contextQuestions={questions} relevance={reproductive.length ? { fields: reproductive, evidenceReason: jitReproductive.length ? 'These answers can change the caution shown for this product. You can leave them unanswered.' : 'Review the answers you have already shared. You can change them or leave them unanswered.' } : undefined} loading={loading} error={setupError ?? state.error} onApply={draft => save({ operation: 'save_profile', profile: profileToStorage(draft) })} onSkip={close} />}
+    </View>}
+    {section === 'profile' && Boolean(context.profile) && mode !== 'preferences' && <Button label="Product preferences" variant="outline" disabled={loading} onPress={()=>router.push('/personalize?mode=preferences&p0b=1')}/>}
+    {section === 'profile' && <ProfileFlow baseRevision={context.revision} dictionaryRelease={PART_THREE_RELEASE_SELECTION?.dictionaryRelease} key={'profile:' + context.revision} initialDraft={context.profile ? profileFromStorage(context.profile.data) : undefined} setup={!context.profile && context.revision === 0} durableSetup ownerId={ownerId} createId={createCatalogRequestId} collectIntent={false} completionLabel={!context.profile && context.revision === 0 ? 'Save skin setup' : 'Save skin profile'} onSetup={saveSetup} contextQuestions={questions} relevance={reproductive.length ? { fields: reproductive, evidenceReason: jitReproductive.length ? 'These answers can change the caution shown for this product. You can leave them unanswered.' : 'Review the answers you have already shared. You can change them or leave them unanswered.' } : undefined} loading={loading} error={setupError ?? state.error} onApply={draft => save({ operation: 'save_profile', profile: profileToStorage(draft) })} onSkip={close} />}
     {section === 'routine' && <RoutineContext key={'routine:' + context.revision} initialDraft={context.routine ? routineFromStorage(context.routine.data, presentationLabels) : undefined} createItemId={createCatalogRequestId} availableProducts={refs} loading={loading} error={state.error} onApply={draft => save({ operation: 'save_routine', routine: routineToStorage(draft) })} onSkip={close} />}
     {section === 'history' && selectedMissing && <Screen><Text>This report is not in the loaded history. Load the latest history before correcting it.</Text><Button label="Back" onPress={directExperience ? close : () => setEditingExperience(null)} /></Screen>}
     {section === 'history' && editingExperience === 'new' && productRecordId && !initialExperience && <Screen><Text>This saved product could not be loaded for this account.</Text><Button label="Back to My Stuff" onPress={close} /></Screen>}

@@ -1,3 +1,4 @@
+import '@/src/services/setupDraft';
 import { customerController, currentCustomerOwner, ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
 import { bindCustomerOwnerLifecycle } from '@/src/presentation/personal-decision/customerController';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
@@ -89,7 +90,16 @@ export default function RootLayout() {
         const auth = useAuthStore.getState();
         const projection = useFreeAccessStore.getState();
         if (auth.status === 'SIGNED_IN' && projection.status === 'READY' && projection.userId === auth.sessionUserId) {
-          projection.reset();
+          const owner=auth.sessionUserId;
+          if(!owner)return;
+          const now=Date.now();if(now-lastForegroundRefreshAt<1500)return;lastForegroundRefreshAt=now;
+          const attempt=projection.startRefresh(owner);if(attempt===null)return;
+          void getFreeAccessState().then(state=>{
+            const current=useAuthStore.getState();
+            if(current.status!=='SIGNED_IN'||current.sessionUserId!==owner)return;
+            if(state.userId!==owner)throw Error('Access state belongs to another session');
+            useFreeAccessStore.getState().finishRefresh(state,attempt);
+          }).catch(()=>useFreeAccessStore.getState().fail(owner,attempt));
         }
         return;
       }

@@ -1,0 +1,12 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {AppState} from 'react-native';
+import {createSetupDraftStore} from '../presentation/p0b-personalization/setupDraftStorage';
+import {partThreeSession,subscribePartThreeSession} from './partThree';
+import {useAuthStore} from '../stores/authStore';
+import {registerSessionRetirement} from './sessionRetirement';
+export const setupDraftStore=createSetupDraftStore(AsyncStorage,()=>{const owner=useAuthStore.getState().sessionUserId;return owner?partThreeSession(owner):null;});
+registerSessionRetirement(()=>setupDraftStore.clear());
+subscribePartThreeSession(event=>{if(event==='retired')void setupDraftStore.clear().catch(()=>undefined);});
+let lastOwner=useAuthStore.getState().sessionUserId;
+useAuthStore.subscribe(state=>{if(state.status==='SIGNED_OUT'||state.status==='SIGNED_IN'&&lastOwner&&lastOwner!==state.sessionUserId)void setupDraftStore.clear().catch(()=>undefined);if(state.status==='SIGNED_IN')lastOwner=state.sessionUserId;});
+AppState.addEventListener('change',state=>{if(state!=='active')void setupDraftStore.flush().catch(()=>undefined);});

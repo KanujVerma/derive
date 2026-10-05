@@ -37,3 +37,7 @@ The branch uses Expo SDK 57, matching the [current Expo Go SDK](https://expo.dev
 Migration `20261004230532_part_one_public_day_cap_alignment.sql` preserves the already-approved hosted global rolling-day cap of 1000 in fresh source replay. Its function body matches hosted SHA `cd50436eb89f5f118edf8a3a410a040d5777efb3352753e6a7009e7947f05d39`; one rolled-back local transaction verified exact body, unchanged owner/grants and exact rollback. It activates no source or release and was not applied again to hosted state.
 
 Primary references: [Supabase anonymous Auth](https://supabase.com/docs/guides/auth/auth-anonymous), [Auth rate limits](https://supabase.com/docs/guides/auth/rate-limits), [CAPTCHA](https://supabase.com/docs/guides/auth/auth-captcha). The documented default is not a measurement of this project.
+
+## Current initial UI and draft pass
+
+See [SCANNER_MVP_HANDOFF.md](SCANNER_MVP_HANDOFF.md) for the current Check-first/four-screen profile, approved seven-day local draft, foreground refresh and bounded hosted Vanicream slot reconciliation. This initial UI pass changes the client beyond signed build11; that prior binary is not proof of these changes. Product-photo/OCR/private/model activation remains separate and disabled. Actual Expo Go evidence is bounded to supported runtime controls and project reopen.

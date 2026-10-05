@@ -36,7 +36,7 @@ test('scanner entry loads real owner context before optional profile and Check',
   assert.equal(resolveScannerEntry({ ...ready, access: { ...ready.access, userId: 'owner-b' } }), 'loading');
   assert.equal(resolveScannerEntry({ ...ready, accessStatus: 'ERROR' }), 'error');
   assert.equal(resolveScannerEntry({ ...ready, contextStatus: 'error' }), 'error');
-  assert.equal(resolveScannerEntry(ready), 'profile');
+  assert.equal(resolveScannerEntry(ready), 'check');
   assert.equal(resolveScannerEntry({ ...ready, hasProfile: true }), 'check');
   assert.equal(resolveScannerEntry({ ...ready, profileIntroHandled: true }), 'check');
 });

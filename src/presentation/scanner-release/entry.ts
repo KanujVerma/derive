@@ -24,5 +24,5 @@ export function resolveScannerEntry(input: {
   if (input.contextOwnerId !== input.ownerId) return 'loading';
   if (input.contextStatus === 'error') return 'error';
   if (input.contextStatus !== 'ready') return 'loading';
-  return input.hasProfile || input.profileIntroHandled ? 'check' : 'profile';
+  return 'check'; // Profile is optional; every ready owner starts with Check.
 }
