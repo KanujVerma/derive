@@ -54,9 +54,9 @@ test('live preference component reaches explicit create/edit/delete and save wit
   nodes=h.render();press(control(nodes,'Remove preference: Glycerin'));nodes=h.render();press(control(nodes,'Confirm preference removal'));await settle();assert.equal(writes[1].operation,'delete_context_record');
  }finally{h.dispose();}
 });
-test('fresh durable five-step setup reaches preference entry and sends confirmed preference through onSetup',()=>{
+test('fresh durable setup saves existing answers without the contextual preference editor',()=>{
  let received:any=null,serial=90;const h=componentHarness('src/components/p0b-personalization/ContextFlow.tsx','ContextFlow',{setup:true,durableSetup:true,ownerId:p2id(3),createId:()=>p2id(serial++),collectIntent:false,onSetup:(b:any)=>{received=b;},onApply(){},onSkip(){}},{modules:{'../ui/Button':{Button:'Button'},'../ui/ChoiceChip':{ChoiceChip:'ChoiceChip'}}});
- for(let n=0;n<4;n++)press(control(h.render(),'Continue'));press(control(h.render(),'Add a confirmed preference'));let nodes=h.render();press(control(nodes,'Choose exact ingredient: Glycerin'));nodes=h.render();press(control(nodes,'I confirm this choice and its strength'));nodes=h.render();press(control(nodes,'Use confirmed preference'));nodes=h.render();press(control(nodes,'Save skin profile'));assert.equal(received.preferences.length,1);assert.equal(received.preferences[0].target.identity.ingredientId,'glycerin');assert.equal(received.preferences[0].strength,'prefer');h.dispose();
+ for(let n=0;n<3;n++){assert(!h.render().some(node=>node.props.label==='Add a confirmed preference'));press(control(h.render(),'Continue'));}assert(!h.render().some(node=>node.props.label==='Add a confirmed preference'));press(control(h.render(),'Save skin profile'));assert.deepEqual(received.preferences??[],[]);h.dispose();
 });
 test('stale CAS stops without hidden refresh, and ambiguous removal retries exact erasure request',async()=>{
  const owner=p2id(3),c=context();let loads=0,ids=90;const attempts:Exclude<PersonalContextV2Request,{operation:'read_context_v2'}>[]=[];

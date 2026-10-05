@@ -49,7 +49,7 @@ test('setup explicit helps, reaction and texture coexist without fabricated like
 test('durable extended completion invokes one setup callback and retains draft on failed host write',()=>{
  let setups=0,profiles=0;const received:unknown[]=[];
  const h=componentHarness('src/components/p0b-personalization/ContextFlow.tsx','ContextFlow',{setup:true,durableSetup:true,ownerId:owner,collectIntent:false,createId:()=>id(3),onSetup(b:unknown,d:unknown){setups++;received.push({b,d});},onApply(){profiles++;},onSkip(){}});
- for(let i=0;i<4;i++)press(control(h.render(),'Continue'));press(control(h.render(),'Save skin profile'));assert.equal(setups,1);assert.equal(profiles,0);h.render({error:'Your setup was not saved.'});press(control(h.render(),'Save skin profile'));assert.equal(setups,2);assert.deepEqual(received[0],received[1]);
+ for(let i=0;i<3;i++)press(control(h.render(),'Continue'));press(control(h.render(),'Save skin profile'));assert.equal(setups,1);assert.equal(profiles,0);h.render({error:'Your setup was not saved.'});press(control(h.render(),'Save skin profile'));assert.equal(setups,2);assert.deepEqual(received[0],received[1]);
 });
 test('legacy routine edit preserves v2 purpose and unrepresentable uncertain dates',()=>{
  const setup=emptySetup();setup.routine=migratePersonalContextV1(v1).routine!.data;setup.routine.items[0].startedOn={state:'known',value:{value:'2026-01',precision:'month'}};setup.routine.items[0].reportedPurpose={answer:{state:'known',value:'moisturizing'},provenance:'self_report'};
@@ -69,7 +69,7 @@ test('experience date precision and uncertainty are faithful through v2 serializ
 test('review 7: hidden free-text intake is not submitted during delayed setup acknowledgment; failure retains structured input',async()=>{
  let release!:()=>void;const pending=new Promise<void>(resolve=>release=resolve);const submitted:Array<any>=[];let acknowledged=false;
  const h=componentHarness('src/components/p0b-personalization/ContextFlow.tsx','ContextFlow',{setup:true,durableSetup:true,ownerId:owner,collectIntent:false,createId:()=>id(3),onSetup(b:unknown){submitted.push(structuredClone(b));void pending.then(()=>{acknowledged=true;});},onApply(){},onSkip(){}});
- for(let i=0;i<4;i++)press(control(h.render(),'Continue'));press(control(h.render(),'Save skin profile'));
+ for(let i=0;i<3;i++)press(control(h.render(),'Continue'));press(control(h.render(),'Save skin profile'));
  assert.equal(submitted[0].additionalNote,null);assert.equal(acknowledged,false);
  assert(!JSON.stringify(h.render({loading:true})).includes('Anything else'));
  press(control(h.render({loading:false,error:'Your setup was not saved.'}),'Save skin profile'));assert.deepEqual(submitted[1],submitted[0]);release();await pending;await Promise.resolve();assert.equal(acknowledged,true);h.dispose();
