@@ -179,8 +179,15 @@ async function run() {
       userId: '00000000-0000-0000-0000-000000000000',
       question: 'Can I use moisturizer?',
     }, 403);
-    const anonymous = memberClient();
-    await expectFunctionStatus(anonymous, 'infer-ingredient-signals', {}, 401);
+    // An SDK without a user session sends the project anon JWT; Auth refuses
+    // that credential with 403, which the reviewed runtime preserves.
+    const projectKeyOnly = memberClient();
+    const refused = await expectFunctionStatus(projectKeyOnly, 'infer-ingredient-signals', {}, 403);
+    assert.equal(refused?.code, 'forbidden');
+    const noAuthorization = await fetch(`${SUPABASE_URL}/functions/v1/infer-ingredient-signals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    assert.equal(noAuthorization.status, 401, 'a genuinely missing Authorization header remains unauthorized');
     console.log('   ✓ JWT-bound identity is enforced at gateway and handler layers');
 
     console.log('5. Verifying live-model paths fail closed without a server Gemini secret...');
