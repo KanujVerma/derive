@@ -7,7 +7,23 @@ import {boundDeclaration,p2metadata,p2now,p2id} from './fixtures/part-two-core.t
 import {p3context} from './fixtures/part-three.ts';
 import {componentHarness,control,textContent,press} from './ux-profile-render.ts';
 import type {PartThreePorts} from '../src/components/check/part-three/usePartThreeCheck';
+import {p3input} from './fixtures/part-three.ts';
+import {evaluatePersonalResult} from '../src/domain/part-three/evaluate.ts';
 const settle=()=>new Promise<void>(resolve=>setImmediate(resolve));
+test('ready unknown decision leads with useful context; qualifications expand and historical and mandatory findings remain visible',()=>{
+ const x=p3input();x.requestedUse={purpose:null,site:null,useForm:null};x.binding.encounterInputs.use=x.requestedUse;const unknown=evaluatePersonalResult(x);
+ assert.equal(unknown.summary?.judgment,'not_enough_info');
+ const fallback=React.createElement('Text',null,'For dryness: Petrolatum slows water loss.');
+ const view={target:null,result:unknown,question:null,historical:null,savedAssessmentId:null,savedAt:null,loading:false,saving:false,error:null};
+ const h=componentHarness('src/components/check/part-three/PartThreeSummary.tsx','PartThreeSummary',{view,fallback});
+ let text=textContent(h.render());assert(text.indexOf('For dryness')<text.indexOf('Product decision unknown'));
+ assert(!/purpose.*unresolved|There is no supported personal premise|Personal Fit|Not enough info/i.test(text));
+ press(control(h.render(),'Why this Check is limited'));text=textContent(h.render());assert.match(text,/unresolved|clarification|judgment/i);
+ const historical={kind:'historical' as const,savedAssessmentId:p2id(88),savedAt:x.now,assessmentWhenSaved:unknown,currentAssessment:'unavailable' as const};
+ assert.match(textContent(h.render({view:{...view,historical}})),/Assessment when saved.*Current reassessment is separate.*Current assessment.*Product decision unknown/);
+ x.context.profile!.data.sensitivities={status:'reported',values:['Glycerin']};const concern=evaluatePersonalResult(x);
+ const concernText=textContent(h.render({view:{...view,result:concern}}));assert.match(concernText,/reported as a sensitivity/);assert.match(concernText,/Check first/);
+});
 test('actual scanner sheet shows compact source context and approved details while P3 is unavailable; profile changes and refusal remove old copy',async t=>{
  t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:Date.parse(p2now)});
  const input=boundDeclaration('Petrolatum, Sorbitol, Propylene Glycol','public');input.bundle.predicate.variantMarket={passed:false,evidenceIds:[p2id(7)],reasons:['market_unknown']};
@@ -24,15 +40,15 @@ test('actual scanner sheet shows compact source context and approved details whi
  }});
  try{
   for(let i=0;i<8;i++){h.render();await settle();}
-  let nodes=h.render();let text=textContent(nodes);assert.match(text,/dryness goal.*Petrolatum/i);assert(!/Personal assessment unavailable/.test(text));
+  let nodes=h.render();let text=textContent(nodes);assert.match(text,/For dryness.*Petrolatum/i);assert(!/Personal assessment unavailable/.test(text));
   assert.equal(nodes.filter(n=>n.props.accessibilityLabel==='Ingredient context summary').length,1);
   const surface=nodes.find(n=>n.type==='Surface')!;assert(surface.props.summary,'source context must be in the compact sheet summary');
   press(control(nodes,'Ingredient details: Sorbitol'));assert.match(textContent(h.render()),/hold water/i);
-  identityRefused=true;t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert(!/dryness goal/.test(textContent(h.render())));
-  identityRefused=false;t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert.match(textContent(h.render()),/dryness goal/);
+  identityRefused=true;t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert(!/For dryness/.test(textContent(h.render())));
+  identityRefused=false;t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert.match(textContent(h.render()),/For dryness/);
   context=structuredClone(context);context.revision++;context.profile!.revision=context.revision;context.profile!.data.primaryGoal={state:'known',value:'oiliness'};
-  t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert(!/dryness goal/.test(textContent(h.render())));
-  refused=true;t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert(!/dryness goal|reported skin/.test(textContent(h.render())));
-  nodes=h.render({view:{owner:null,result:null,saved:false,loading:false,error:null,scrollOffset:0}});assert(!/Petrolatum|Sorbitol|dryness goal/.test(textContent(nodes)));
+  t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert(!/For dryness/.test(textContent(h.render())));
+  refused=true;t.mock.timers.tick(10000);for(let i=0;i<4;i++){h.render();await settle();}assert(!/For dryness|reported skin/.test(textContent(h.render())));
+  nodes=h.render({view:{owner:null,result:null,saved:false,loading:false,error:null,scrollOffset:0}});assert(!/Petrolatum|Sorbitol|For dryness/.test(textContent(nodes)));
  }finally{h.dispose();}
 });

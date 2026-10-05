@@ -124,10 +124,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       {view.loading && <ActivityIndicator color={colors.brand} />}
       <CheckResultView section="summary" facts={{ brand: identity?.brand ?? '', name: identity?.name ?? 'Product not confirmed', categoryLabel: identity?.variantText ?? '', formula: null, source: null }}
         identityImage={identity?.image && current(identity.image.expiresAt) && failedImage !== identity.image.url ? <Image accessibilityLabel={`${identity.name} package`} source={{ uri: identity.image.url }} style={{ width: 48, height: 54 }} resizeMode="contain" onLoad={() => markCheckVerificationTiming('barcode', 'image', r?.requestId)} onError={() => setFailedImage(identity.image!.url)} /> : undefined}
-        personalSummary={personal.enabled ? <>
-          <PartThreeSummary view={personal.view} identityName={identity?.name} fallback={contextSummary} />
-          {personal.view.result?.summary ? contextSummary : null}
-        </> : undefined}
+        personalSummary={personal.enabled ? <PartThreeSummary view={personal.view} identityName={identity?.name} fallback={contextSummary} /> : undefined}
         verdict={{ state: 'unknown', label: 'Not enough information', reason: status, findings: [] }} />
       {personal.enabled && !contextSummary && <Text accessibilityLiveRegion="polite" style={{ color: colors.inkMuted }}>{status}</Text>}
       {identity && (!identity.image || failedImage === identity.image.url) && <Text style={{ color: colors.inkMuted, fontSize: typography.sizes.caption }}>No product image available</Text>}

@@ -18,6 +18,13 @@ export interface IngredientContextInput {
 // No dictionary chemical class, efficacy, dose or tolerability is inferred.
 const moistureContextIds = new Set(['petrolatum', 'sorbitol', 'propanediol',
   'propylene-glycol', 'caprylyl-glycol', 'cetyl-alcohol', 'cetearyl-alcohol']);
+// Short observations of these approved roles; full copy stays in ingredient details.
+const compactRoles: Record<string, string> = {
+  petrolatum: 'slows water loss', sorbitol: 'helps hold water', glycerin: 'helps skin hold water',
+  propanediol: 'holds water and helps ingredients dissolve',
+  'propylene-glycol': 'attracts water and helps ingredients dissolve',
+  'caprylyl-glycol': 'softens skin', 'cetyl-alcohol': 'softens skin', 'cetearyl-alcohol': 'softens skin',
+};
 
 /** Live presentation of current, permission-qualified reading facts and approved
  * editorial copy. This is not a P3 finding, saved assessment or product verdict.
@@ -50,18 +57,26 @@ export function sourceIngredientContext(resultValue: NormalizationResult | null,
   const sensitivity = profile?.sensitivities.status === 'reported' ? unique.find(row => profile.sensitivities.values.some(term =>
     [row.card!.name, ...row.card!.aliases].some(name => lookupName(name).key === lookupName(term).key))) : null;
   const points: string[] = [];
-  if (sensitivity) points.push(`The source list names ${sensitivity.card!.name}, matching your reported sensitivity. Check your package and the ingredient detail; your response remains unknown.`);
+  if (sensitivity) {
+    points.push(`Listed ${sensitivity.card!.name} matches your reported sensitivity.`);
+    if (sensitivity.card!.editorial?.caution) points.push(`${sensitivity.card!.name}: ${sensitivity.card!.editorial.caution}`);
+  }
   else if (profile?.reactivity === 'reacts_easily' && cautions.length) {
     const card = cautions[0].card!;
-    points.push(`You reported skin that reacts easily. ${card.name}: ${card.editorial!.caution} This does not predict your response.`);
+    points.push(`Reactive skin: ${card.name}. ${card.editorial!.caution}`);
   }
   if ((goals.includes('dryness') || profile?.skinBehavior === 'dry_tight') && moisture.length) {
-    const reason = goals.includes('dryness') ? 'For your dryness goal' : 'For the dry or tight skin you reported';
-    points.push(`${reason}, these source-list functions may be useful context: ${moisture.slice(0, 2).map(row => `${row.card!.name}: ${row.card!.short}`).join('; ')}. This does not establish how much the product will help.`);
+    const reason = goals.includes('dryness') ? 'For dryness' : 'For dry or tight skin';
+    const count = cautions.length || profile?.texturePreference?.state === 'known' && profile.texturePreference.value === 'lightweight' ? 1 : 2;
+    moisture.slice(0, Math.min(count, 2 - points.length)).forEach((row, index) => {
+      const card = row.card!, role = compactRoles[card.ingredientId];
+      points.push(`${index === 0 ? reason + ': ' : ''}${card.name}${role ? ' ' + role : ': ' + card.short.replace(/\.$/, '')}.`);
+    });
   }
   if (profile?.texturePreference?.state === 'known' && profile.texturePreference.value === 'lightweight' &&
-    unique.some(row => row.card!.ingredientId === 'petrolatum') && points.length < 2) {
-    points.push('Petrolatum’s reference notes a noticeable greasy film. With your lightweight texture preference, check the product’s actual feel; the rest of its formula and the amount matter.');
+    unique.some(row => row.card!.ingredientId === 'petrolatum') && points.length < 2 &&
+    (!cautions.length || sensitivity || profile.reactivity === 'reacts_easily' || points.length === 0)) {
+    points.push('Lightweight preference: petrolatum can leave a greasy film. Check the product’s feel.');
   }
   if (!points.length) {
     const role = unique.find(row => row.card!.ingredientId !== 'water') ?? unique[0];
@@ -72,14 +87,14 @@ export function sourceIngredientContext(resultValue: NormalizationResult | null,
     points.push(`${card.name}: ${card.editorial!.caution}`);
   }
   const scope = reading.evidenceBasis === 'public_source'
-    ? `From the published ingredient list${reading.claimLimits.declarationCompleteness !== 'accepted' ? '; it may be incomplete' : ''}.${reading.packageConfirmation === 'unconfirmed' ? ' Your package is not confirmed.' : ''}`
-    : 'From the label reading. Product identity and the full formula are not established by ingredient references.';
+    ? `Published list${reading.claimLimits.declarationCompleteness !== 'accepted' ? ' · May be incomplete' : ''}${reading.packageConfirmation === 'unconfirmed' ? ' · Package unconfirmed' : ''}`
+    : 'Label reading · Product and full formula unconfirmed';
   return {
     rows,
     sources: formula.sources,
     points: points.slice(0, 2).map(partFourDisplayText),
     scope,
-    limit: 'Ingredient functions do not establish this product’s results or your response.',
+    limit: 'Product benefit and your response are unknown.',
     profileRevision: context?.success ? context.data.profile?.id ?? null : null,
   };
 }

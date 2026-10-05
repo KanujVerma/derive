@@ -22,10 +22,10 @@ function fixture(text:string,associated=false){
 }
 function ui(f:ReturnType<typeof fixture>){return componentHarness(path,'PartTwoInlineView',{view:f.view,now,education:f.education});}
 
-test('retained lotion shape uses source-only moisture roles with the existing dryness goal despite no product facts or use answers',()=>{
+test('retained lotion shape uses source-only moisture roles with the existing For dryness despite no product facts or use answers',()=>{
  const f=fixture('Petrolatum, Sorbitol, Cetearyl Alcohol, Propylene Glycol');
  const h=ui(f);const text=textContent(h.render());
- assert.match(text,/Ingredient context/);assert.match(text,/dryness goal/i);assert.match(text,/Petrolatum.*water loss|water loss.*Petrolatum/i);
+ assert.match(text,/Ingredient context/);assert.match(text,/For dryness/i);assert.match(text,/Petrolatum.*water loss|water loss.*Petrolatum/i);
  assert.match(text,/published.*list/i);assert.match(text,/package.*not confirmed/i);
  assert(!/worth considering|worth keeping|safe for|will improve|will irritate/i.test(text));
  assert.equal(f.view.result.output.kind==='bound'&&f.view.result.output.productFacts.facts.length,0);
@@ -41,27 +41,28 @@ test('deodorant source roles stay useful without a matching goal, and actual app
 });
 test('reported reactivity prioritizes the approved fragrance caution without predicting sensitivity or a product verdict',()=>{
  const f=fixture('Fragrance, Propylene Glycol, Water');f.context.profile!.data.reactivity='reacts_easily';
- const text=textContent(ui(f).render());assert.match(text,/reacts easily/i);assert.match(text,/Fragrance.*reaction|Fragrance.*allerg/i);
- assert.match(text,/does not predict your response/i);assert(!/avoid this product|unsafe|high risk|will irritate/i.test(text));
+ const text=textContent(ui(f).render());assert.match(text,/Reactive skin/i);assert.match(text,/Fragrance.*reaction|Fragrance.*allerg/i);
+ assert.match(text,/your response.*unknown/i);assert(!/avoid this product|unsafe|high risk|will irritate/i.test(text));
 });
 test('a reported exact sensitivity is a source-reading match, never an invented confirmed allergy or absence finding',()=>{
  const f=fixture('Propylene Glycol, Water');f.context.profile!.data.sensitivities={status:'reported',values:['Propylene Glycol']};
  const text=textContent(ui(f).render());assert.match(text,/reported sensitivity.*Propylene Glycol|Propylene Glycol.*reported sensitivity/i);
- assert.match(text,/source list/i);assert(!/you are allergic|confirmed allergy|fragrance.free|does not contain/i.test(text));
+ assert.match(text,/Published list/i);assert(!/you are allergic|fragrance.free|does not contain/i.test(text));
+ assert.match(text,/If patch testing has confirmed an allergy to propylene glycol/);
 });
 test('known eligible moisturizer still has useful source context and unknown names get no guessed role',()=>{
- const f=fixture('Glycerin, Water',true);assert.match(textContent(ui(f).render()),/dryness goal/i);
- const unknown=fixture('Mystery Ingredient');const h=ui(unknown);const text=textContent(h.render());assert(!/dryness goal|moisturiz|hydration benefit/i.test(text));
+ const f=fixture('Glycerin, Water',true);assert.match(textContent(ui(f).render()),/For dryness/i);
+ const unknown=fixture('Mystery Ingredient');const h=ui(unknown);const text=textContent(h.render());assert(!/For dryness|moisturiz|hydration benefit/i.test(text));
  press(control(h.render(),'Ingredient details: Mystery Ingredient'));assert.match(textContent(h.render()),/unavailable/i);
 });
 test('owner/profile changes, source expiry and conditional or unclear identities remove derived context immediately',()=>{
- const f=fixture('Petrolatum');const h=ui(f);assert.match(textContent(h.render()),/dryness goal/i);
+ const f=fixture('Petrolatum');const h=ui(f);assert.match(textContent(h.render()),/For dryness/i);
  const next=structuredClone(f.context);next.profile!.data.primaryGoal={state:'known',value:'oiliness'};next.revision++;next.profile!.revision=next.revision;
- assert(!/dryness goal/i.test(textContent(h.render({education:{...f.education,context:next}}))));
+ assert(!/For dryness/i.test(textContent(h.render({education:{...f.education,context:next}}))));
  const foreign=structuredClone(next);foreign.ownerId=p2id(999);foreign.profile!.ownerId=foreign.ownerId;
- assert(!/Ingredient context|slows.*water|dryness goal/i.test(textContent(h.render({education:{...f.education,context:foreign}}))));
+ assert(!/Ingredient context|slows.*water|For dryness/i.test(textContent(h.render({education:{...f.education,context:foreign}}))));
  assert(!/Ingredient context/i.test(textContent(h.render({education:f.education,now:Date.parse(f.view.result.expiresAt)}))));
- for(const text of ['May contain: Petrolatum','Petrolatum or Water'])assert(!/dryness goal/i.test(textContent(ui(fixture(text)).render())));
+ for(const text of ['May contain: Petrolatum','Petrolatum or Water'])assert(!/For dryness/i.test(textContent(ui(fixture(text)).render())));
 });
 test('source-context copy stays compact while approved bodies and source disclosures remain expandable',()=>{
  const f=fixture('Petrolatum, Sorbitol, Cetearyl Alcohol, Propylene Glycol, Water');
@@ -70,14 +71,21 @@ test('source-context copy stays compact while approved bodies and source disclos
  assert(control(nodes,'Ingredient details: Petrolatum'));press(control(nodes,'Ingredient details: Petrolatum'));assert.match(textContent(h.render()),/greasy film/i);
 });
 
-test('unknown reactions and texture preferences do not become personal forecasts; source summaries stay under 110 words',()=>{
+test('unknown reactions and texture preferences do not become personal forecasts; source summaries stay short for dryness and retain mandatory cautions',()=>{
  const f=fixture('Petrolatum, Sorbitol, Propylene Glycol, Fragrance');f.context.profile!.data.reactivity='reacts_easily';
  const h=ui(f);const nodes=h.render();const summary=nodes.find(n=>n.props.accessibilityLabel==='Ingredient context summary')!;
  const words=(value:any):string=>Array.isArray(value)?value.map(words).join(' '):typeof value==='string'?value:value?.props?words(value.props.children):'';
- assert(words(summary).trim().split(/\s+/).length<=110,'compact context exceeds 110 words');
+ assert(words(summary).includes(ISOLATED_423_EDUCATION.cards.find(c=>c.ingredientId==='propylene-glycol')!.editorial!.caution!),'mandatory caution must remain visible');
+ const simple=ui(fixture('Petrolatum, Sorbitol')).render().find(n=>n.props.accessibilityLabel==='Ingredient context summary')!;
+ assert(words(simple).trim().split(/\s+/).length<=35,'simple ingredient context exceeds 35 words');
+ assert.match(words(simple),/For dryness: Petrolatum slows water loss\. Sorbitol helps hold water\./);
+ assert.equal((words(simple).match(/unknown/g)??[]).length,1,'one shared uncertainty line');
  f.context.profile!.data.texturePreference={state:'known',value:'lightweight'};f.context.profile!.data.primaryGoal={state:'known',value:'oiliness'};f.context.profile!.data.reactivity='generally_tolerates';
- const text=textContent(h.render({education:f.education}));assert.match(text,/lightweight.*actual feel|actual feel.*lightweight/i);
+ const text=textContent(h.render({education:f.education}));assert.match(text,/lightweight.*product.s feel/i);
  assert(!/will feel greasy|you will tolerate|irritation.free|reduces redness/i.test(text));
+ f.context.profile!.data.primaryGoal={state:'known',value:'dryness'};
+ const cautionFirst=textContent(h.render({education:f.education}));assert.match(cautionFirst,/For dryness/);
+ assert.match(cautionFirst,/If patch testing has confirmed an allergy to propylene glycol/,'texture observation must not displace the caution');
 });
 test('source revocation and education expiry remove card copy, and different ingredient sensitivities never become an exact match',()=>{
  const f=fixture('Propanediol');f.context.profile!.data.sensitivities={status:'reported',values:['Propylene Glycol']};
