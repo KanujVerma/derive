@@ -41,7 +41,9 @@ export function PartFourSections(props: PartFourSectionsProps) {
   const sourcesOpen = props.sourcesExpanded ?? sources === key;
   const rows = packet.formula.ingredients.map(ingredientRow);
   const insights = visiblePartFourInsights(packet);
-  const comparisonInsights = packet.comparison.state === 'none' ? insights.comparison.filter(insight => ['supported','limited','conflict'].includes(insight.state)) : insights.comparison;
+  const hasComparison = ['selected','self','ambiguous'].includes(packet.comparison.state);
+  const comparisonInsights = insights.comparison.filter(insight => ['supported','limited','conflict'].includes(insight.state));
+  const routineInsights = insights.routine.filter(insight => insight.ruleId !== 'F06' || hasComparison || ['supported','conflict'].includes(insight.state));
   const evidence = formulaEvidenceNotice(packet.formula);
   const limits = formulaLimitationsForDisplay(packet.formula);
   const briefProps = { brief: packet.reviews.evidenceKind === 'limited_research_brief' ? packet.reviews.brief : null,
@@ -78,17 +80,17 @@ export function PartFourSections(props: PartFourSectionsProps) {
   }
 
   return <View style={styles.sections}>
-    {(packet.comparison.state!=='none'||comparisonInsights.length>0) && <View style={styles.comparison}>
-      <Text accessibilityRole="header" style={styles.heading}>{packet.comparison.state==='none'?'Relevant to your profile':'Compared with your current routine'}</Text>
-      {packet.comparison.state!=='none' && <Text style={styles.copy}>{partFourDisplayText(packet.comparison.explanation)}</Text>}
+    {(hasComparison||comparisonInsights.length>0) && <View style={styles.comparison}>
+      <Text accessibilityRole="header" style={styles.heading}>{hasComparison?'Compared with your current routine':'Relevant to your profile'}</Text>
+      {hasComparison && <Text style={styles.copy}>{partFourDisplayText(packet.comparison.explanation)}</Text>}
       {packet.comparison.state === 'ambiguous' && <Text style={styles.caption}>More than one current item could apply. A direct comparison is not established.</Text>}
       {packet.comparison.state === 'self' && <Text style={styles.caption}>This is already the selected current item.</Text>}
       {comparisonInsights.map(insight => renderInsight(insight))}
     </View>}
 
-    {insights.routine.length > 0 && <View style={styles.routine}>
+    {routineInsights.length > 0 && <View style={styles.routine}>
       <Text accessibilityRole="header" style={styles.heading}>In your routine</Text>
-      {insights.routine.map(insight => renderInsight(insight))}
+      {routineInsights.map(insight => renderInsight(insight))}
     </View>}
 
     <View style={styles.ingredients} onLayout={event=>{layout.current.section=event.nativeEvent.layout.y;}}>

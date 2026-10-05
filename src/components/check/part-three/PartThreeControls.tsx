@@ -77,5 +77,5 @@ export function PartThreeControls({ check, section = 'all' }: {
 export function PartThreeSaveControl({check}:{check:ReturnType<typeof usePartThreeCheck>}) {
  const {view}=check;
  if(!check.enabled)return null;
- return (view.pendingSave ? <Button label="Retry Save confirmation" variant="outline" disabled={view.saving} onPress={() => void check.save()}/> : view.result?.summary && <Button label={view.savedAssessmentId ? 'Saved' : 'Save'} variant="brand" disabled={view.saving || Boolean(view.savedAssessmentId)} onPress={() => void check.save()}/>);
+ return (view.pendingSave ? <Button label="Retry Save confirmation" variant="outline" disabled={view.saving} onPress={() => void check.save()}/> : (view.savedAssessmentId || view.result?.summary) && <Button label={view.savedAssessmentId ? 'Saved' : 'Save'} variant="brand" disabled={view.saving || Boolean(view.savedAssessmentId)} onPress={() => void check.save()}/>);
 }

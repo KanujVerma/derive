@@ -44,7 +44,7 @@ export function PartThreeSavedAssessmentSheet({ ownerId, savedAssessmentId, onCl
     return <ResultSheetSurface inline={false} presentationKey={`saved-assessment:${savedAssessmentId}`} onClose={onClose} onInteraction={check.interact} onExpandedChange={() => { }} summary={<CheckResultView section="summary" facts={{brand:'',name:identityName ?? 'Saved product Check',categoryLabel:'',formula:null,source:null}} verdict={{state:'unknown',label:'',reason:'',findings:[]}} personalSummary={<PartThreeSummary view={check.view} identityName={identityName} assessmentView={assessmentView} onAssessmentViewChange={setAssessmentView}/>}/>}>
   {assessmentView==='current' && contextSummary}
   <PartThreeDetails view={{...check.view,result:displayedResult}}/>
-  {displayedResult?.partFour && <PartFourSections packet={displayedResult.partFour} researchSubject={researchSubjectFor(displayedResult.binding.subject)} withdrawn={Date.parse(displayedResult.validUntil)<=Date.now()}/>}
+  {displayedResult?.partFour && <PartFourSections packet={displayedResult.partFour} researchSubject={researchSubjectFor(displayedResult.binding.subject)} now={now} withdrawn={assessmentView==='current' && Date.parse(displayedResult.validUntil)<=now}/>}
   <PartThreeControls check={check} section="details"/>
   <Button label="Refresh current Check" variant="ghost" onPress={check.refresh}/>
 

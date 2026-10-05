@@ -14,17 +14,21 @@ No Site content/access, decision rules, onboarding fields, server contracts, sou
 | --- | --- | --- |
 | Compact product identity, prominent Personal Fit | Identity precedes one semantic verdict card; deciding reason, action and mandatory cautions stay together | Existing Hydro Boost identity and neutral current/historical cards visible |
 | One swipeable sheet | Existing handle and sheet retained; details and comparison controls below the fold | Compact/expanded handle transition observed |
-| One Save | Persistent forest Save footer; assessment Save takes precedence over product Save, including pending confirmation | Existing assessment cold-reopened; no new Save performed in this pass |
-| Personal reasons, comparison and routine implications | Existing admitted findings/actions in expanded content; current ingredient/profile context below Personal Fit | Supporting evidence read unavailable for the existing saved item |
-| Scannable ingredients and tap explanations | Supported roles, personal caution signals, exact-occurrence disclosures and source links retained | Real live ingredient disclosure acceptance remains blocked by unavailable evidence |
+| One Save | Persistent forest Save footer; assessment Save takes precedence over product Save, including pending and confirmed receipts; loading cannot expose a second product Save | Exactly one additional real assessment saved and cold-reopened |
+| Personal reasons, comparison and routine implications | Existing admitted findings/actions in expanded content; current ingredient/profile context below Personal Fit | Current profile context and historical source-qualified details recovered |
+| Scannable ingredients and tap explanations | Supported roles, personal caution signals, exact-occurrence disclosures and source links retained | 20 actual rows; exact Dimethicone explanation and its source disclosure observed |
 | Aggregate reviews after ingredients, then Sources | No aggregate corpus is admitted; no anecdote or empty review/value card. Eligible selected-report citations remain in Sources | No aggregate review card fabricated |
 | Historical/current distinction | Current Check / When saved switch selects one assessment rather than stacking both | Both views observed after cold My Stuff reopen |
 
 This is a native adaptation of the approved hierarchy, not certified pixel parity. The current contracts do not supply the prototype's fictional side-by-side comparison cells, product outcomes or prices; this change renders actual admitted comparison and routine copy without manufacturing those cells.
 
+Resolved identity keeps Search by name in the expanded controls. Unknown identity retains its compact recovery action. Generic unknown comparison/science rows and the empty routine map are omitted; admitted supported, limited and conflicting findings remain.
+
 ## Actual visual receipt
 
-Only owned Metro8097 and the existing `Derive Part4 Isolated Acceptance` Expo Go simulator were used. Expo Go was terminated and reopened; the persisted guest's existing My Stuff Hydro Boost assessment remained accessible. The current personal read was unavailable, while the historical assessment showed an unresolved evidence decision. Historical product details were refused by the existing display fence; the exact underlying refusal cause was not established. No timestamps or authorizations were renewed.
+Only owned Metro8097 and the existing `Derive Part4 Isolated Acceptance` Expo Go simulator were used. Expo Go was terminated and reopened; the persisted guest's existing My Stuff Hydro Boost assessment remained accessible. The initial refusal was diagnosed with read-only hosted metadata: the owned8097 startup selected `pending_candidates` (knowledge hash `8d5493372918383b576383c2702ca588c8a2ddfa409730fc2482d10a2f095e8c`) while the already-approved hosted binding uses `reviewed_public_usefulness` (`9418141b3c056b9a1d0ba7a05485a76cf0147d3172f265ea3c865c8d2a2648ef`). Correcting only that owned startup recovered normal current reads. The first presentation pass also incorrectly used the current verdict’s short `validUntil` lease to hide independently reauthorized historical ingredients. That UI guard is corrected; source/formula/dependency deadlines and server historical authorization still apply. The existing saved basis remains valid until 2026-10-06T06:27:15.581Z; its verdict lease had ended at 2026-10-05T06:47:39.532Z. No source grant or timestamp was changed.
+
+The same persisted Hydro Boost assessment now exposes all 20 actual ingredient rows, exact Dimethicone position-2 explanation and source disclosure. Normal same-barcode lookup `0070501110478` also returned Neutrogena Hydro Boost Water Gel, with the existing unresolved-goal verdict and practical label-check action. A dev hot-refresh controller disposal prevented initial text entry; cold route remount restored ordinary input. This was not an evidence denial.
 
 Confirmed screenshot Library files (version 0):
 
@@ -32,10 +36,29 @@ Confirmed screenshot Library files (version 0):
 - Historical compact: `libfile_f8783ac53ed48191b807bbdde7198b23`, `hydro-saved-compact.png`.
 - Historical expanded: `libfile_f14a24b1a1e08191820a2c8023efacaf`, `hydro-saved-expanded.png`.
 
-These prove real persisted reopening, switching and the first-fold hierarchy. They do not establish a useful positive decision, live ingredient explanations, a new Save, routine replacement, review aggregation or complete v7 acceptance. Synthetic regression coverage is separate from these actual screenshots.
+These initial screenshots are retained as failed evidence-recovery receipts. Subsequent recovered screenshots supersede their ingredient-unavailable conclusion. Neither set establishes a positive personal verdict, actual routine replacement, review aggregation or complete v7 acceptance. Synthetic visual coverage remains separate from live guest acceptance.
+
+The ordinary same-barcode lookup produced scan `da64013b-0768-40bd-8940-732ad8a57204`. Initial Save attempts after the short verdict lease elapsed were refused; a normal current read followed by Save confirmed assessment `f4b8491e-fc69-4b88-a784-1e908a97c143`, saved at `2026-10-05T14:58:27.299337Z`. Read-only hosted metadata moved from two to three saved assessments for this same owner, exactly one new record. The disabled Saved control and subsequent process-restart My Stuff reopening were observed. No profile answers were added.
+
+The guest has no current routine item. A separate UI-only fixture renders the actual comparison/routine components with an explicit SYNTHETIC VISUAL FIXTURE label. It is visual branch coverage, not live comparison or routine acceptance. Temporary fixture routes/data were removed from the branch; the retained local rendering is at `http://127.0.0.1:8198/`.
+
+Recovered and reference screenshot Library receipts, all confirmed version 0:
+
+| Screenshot | Library ID |
+| --- | --- |
+| v7-reference-compact.jpg | `libfile_a12d8c3ef42c81919783a5e8a7004b05` |
+| v7-reference-comparison.jpg | `libfile_7c81308577008191a5a3c3c9c17efca2` |
+| v7-reference-ingredients.jpg | `libfile_dd43cb6f15e4819189e6a2d44c10d114` |
+| hydro-recovered-current-compact.png | `libfile_fe567fd4df7c8191b5c818cbd3dfc31e` |
+| hydro-recovered-ingredients.png | `libfile_ee8021963ed08191ab9266e4f3c50425` |
+| hydro-recovered-ingredient-rows.jpg | `libfile_75ef6e8428f08191b34ab8f2225d2241` |
+| hydro-recovered-ingredient-explanation.jpg | `libfile_3a06c6a95cac8191a0d52c9bdd38174e` |
+| hydro-live-save-confirmed.jpg | `libfile_8b33b9235f1c8191abc04e92216fd96c` |
+| hydro-new-save-cold-reopen.jpg | `libfile_0b69dbb9c8088191a1f90c5c89b23811` |
+| synthetic-comparison-routine.jpg | `libfile_bbcd6e268a0081918f29816f8f929ce8` |
 
 ## Validation and remaining gates
 
 Final local validation passed: all 237 `npm test` scripts, 1,893 TAP passes, zero failures and five inherited skips; app and test TypeScript checks with zero errors; web and iOS JavaScript exports; local documentation links; and `git diff --check`. Exact-head CI remains required before any merge; no merge is authorized. Database replay is not applicable to this client presentation delta.
 
-The remaining live acceptance gate is a currently authorized product evidence read that can exercise expanded ingredients, source links, meaningful comparison/routine content and Save/reopen in this layout. No hosted activation, phone/Metro8095 interaction, native build, TestFlight submission, private source/model activation or backend deployment occurs here.
+Actual current/historical reads, ingredient rows, exact ingredient explanation/source disclosure and one successful Save/cold reopen are exercised. Genuine remaining gaps are a live comparator/routine implication, aggregate review data, supported positive personal decision and certified full v7 pixel/large-text/accessibility parity. The prototype's two-product comparison cells remain absent because the current admitted packet supplies comparison findings rather than those fictional cell facts. No hosted activation, phone/Metro8095 interaction, native build, TestFlight submission, private source/model activation or backend deployment occurs here.

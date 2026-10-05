@@ -117,12 +117,12 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
   const ingredientContext = education && currentDetails ? sourceIngredientContext(currentDetails.result, education, clock) : null;
   const contextSummary = ingredientContext?.points.length && currentDetails
     ? <PartTwoSourceSummary view={currentDetails} education={education} now={clock} /> : null;
-  const partFourCurrent = Boolean(partFour && displayedResult && Date.parse(displayedResult!.validUntil)>clock);
+  const partFourCurrent = Boolean(partFour && displayedResult && (assessmentView === 'saved' && personal.view.historical?.assessmentWhenSaved === displayedResult || Date.parse(displayedResult.validUntil)>clock));
   const originalSections = !expired && sections.map(section => <View key={section.sectionId} style={{ gap: spacing.xs }}>
     <Text accessibilityRole="header">{({ ingredients: 'Ingredients', active: 'Active ingredients', inactive: 'Inactive ingredients', may_contain: 'May contain' })[section.kind]}</Text><Text selectable>{section.text}</Text>
   </View>);
-  const assessmentSaveAvailable = personal.enabled && Boolean(personal.view.pendingSave || personal.view.result?.summary);
-  const productSaveAvailable = !assessmentSaveAvailable && !expiredIdentity && !expired && !(expiredFields && r?.declarationState === 'accepted') && Boolean(r?.snapshotId && r.allowedActions.some(action => action === 'save' || action === 'save_partial'));
+  const assessmentSaveAvailable = personal.enabled && Boolean(personal.view.pendingSave || personal.view.savedAssessmentId || personal.view.result?.summary);
+  const productSaveAvailable = !assessmentSaveAvailable && !personal.view.loading && !personal.view.saving && !expiredIdentity && !expired && !(expiredFields && r?.declarationState === 'accepted') && Boolean(r?.snapshotId && r.allowedActions.some(action => action === 'save' || action === 'save_partial'));
   return <ResultSheetSurface inline={inline} overlay={captureContent} replacement={searchContent} contentSized={Boolean(searchContent)} contentSizeResetKey={searchEmpty ? 'empty' : 'query'} presentationKey={`part-one:${r?.scanId ?? 'pending'}`}
     scrollRequest={ingredientScroll?.key.startsWith(sourceKey+':')?ingredientScroll:null} onClose={onClose} onInteraction={personal.interact} onExpandedChange={onFullChange} onScrollOffset={onScroll} summary={<View style={{ gap: spacing.sm, minHeight: personal.enabled || currentRefusal || sourceAccess.current.privateDenied || currentDetails?.result?.state === 'pending' && sourceUnavailable ? summaryLayout.current.height || undefined : undefined }} onLayout={event => { summaryLayout.current.height = Math.max(summaryLayout.current.height, event.nativeEvent.layout.height); }}>
       {view.loading && <ActivityIndicator color={colors.brand} />}
@@ -142,7 +142,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
         {onCapture && r && (expired || expiredFields || r.declarationState !== 'accepted') && <Button label="Scan ingredients" size="medium" style={{ flex: 1, minHeight: 44 }} variant="ghost" onPress={onCapture} />}
         {(view.error || r?.allowedActions.includes('retry')) && <Button label="Retry" size="medium" style={{ flex: 1, minHeight: 44 }} variant="ghost" onPress={onRefresh} />}
-        <Button label="Search by name" size="medium" style={{ flex: 1, minHeight: 44 }} variant="ghost" onPress={onSearch} />
+        {(!identity || expired || view.error) && <Button label="Search by name" size="medium" style={{ flex: 1, minHeight: 44 }} variant="ghost" onPress={onSearch} />}
       </View>
     </View>} footer={assessmentSaveAvailable || productSaveAvailable ? <>
       <PartThreeSaveControl check={personal}/>
@@ -160,6 +160,7 @@ export function PartOneResultSheet({ view, onClose, onRefresh, onSelect, onSave,
     {personal.enabled && partFourCurrent && <PartThreeDetails view={{...personal.view,result:displayedResult}} />}
     {partFourCurrent && partFour && currentDetails?.result?.state==='ready' ? <View onLayout={event=>{ingredientOrigin.current.y=event.nativeEvent.layout.y;}}><PartFourSections onIngredientJump={(id,y)=>{if(y!==undefined)setIngredientScroll({key:sourceKey+':'+id,y:ingredientOrigin.current.y+y});}} packet={partFour} researchSubject={researchSubjectFor(displayedResult?.binding.subject)} now={clock} expectedBindingKey={currentDetails.result.bindingKey} expectedResultRevision={currentDetails.result.resultRevision} expectedDependencyDigest={currentDetails.result.output.reading.binding.dependencyDigest} withdrawn={Boolean(currentRefusal) || sourceAccess.current.privateDenied}/></View> : acquisitionTarget ? <PartTwoIngredientsView view={acquired} target={acquisitionTarget} enabled={ingredientEnabled} fallback={originalSections} education={education} contextSummary={false} /> : interpretationCaptureSessionId && localDraft ? null : originalSections}
     <PartThreeControls check={personal} section="details"/>
+    {identity && !expired && !view.error && <Button label="Search by name" style={{minHeight:44}} variant="ghost" onPress={onSearch}/>}
     {!partFourCurrent && <Pressable accessibilityRole="button" accessibilityLabel="Source" accessibilityState={{ expanded: sourceOpen }} onPress={() => setSourceOpen(value => !value)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.brand }}>Source</Text></Pressable>}
     {!partFourCurrent && sourceOpen && !expired && !sourceUnavailable && sources.map(source => <View key={source.observationId} style={{ gap: spacing.xs }}>
       <Text>{source.label} · Observed {source.observedAt.slice(0, 10)}</Text>

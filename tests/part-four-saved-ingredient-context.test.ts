@@ -3,11 +3,12 @@ import test from 'node:test';
 import React from 'react';
 import { normalize } from '../src/domain/part-two/index.ts';
 import { ORDINARY_PART_THREE_RELEASE_SELECTION } from '../src/domain/part-three/release.ts';
+import { assembleFoundation } from '../src/domain/part-four/assemble.ts';
 import { evaluatePersonalResult } from '../src/domain/part-three/evaluate.ts';
 import { partThreeTarget, emptyPartThreeChoices } from '../src/presentation/part-three/target.ts';
 import { boundDeclaration, p2metadata, p2now, p2id } from './fixtures/part-two-core.ts';
 import { p3context, p3input } from './fixtures/part-three.ts';
-import { componentHarness, textContent } from './ux-profile-render.ts';
+import { componentHarness, control, press, textContent } from './ux-profile-render.ts';
 const settle = () => new Promise<void>(resolve => setImmediate(resolve));
 const sheet = 'src/components/check/part-three/PartThreeSavedAssessmentSheet.tsx';
 function fixture(expiresAt?: string) {
@@ -76,4 +77,21 @@ test('saved context clears at evidence expiry and rejects withdrawn source permi
  }finally{h.dispose();}
  const g=fixture(),revoked=structuredClone(g.basis);(revoked.output.reading.dependencyManifest.sourceRefs[0] as {permitted:boolean}).permitted=false;g.setBasis(revoked);
  const withdrawn=g.mount();try{assert.doesNotMatch(textContent(await ready(withdrawn)),/For dryness|Reactive skin|Ingredient context/);}finally{withdrawn.dispose();}
+});
+
+test('independently authorized historical ingredients survive the short current-result lease but not source expiry',async t=>{
+ t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:Date.parse(p2now)});
+ const f=fixture(new Date(Date.parse(p2now)+1500).toISOString());
+ f.historical.partFour=assembleFoundation({releaseSelection:ORDINARY_PART_THREE_RELEASE_SELECTION,context:f.context,partTwo:f.basis,requestedUse:{purpose:null,site:null,useForm:null},intent:'unanswered',candidateRoutineItemId:null,selectedComparatorId:null},f.historical) ?? undefined;
+ assert(f.historical.partFour);
+ f.historical.evaluatedAt=new Date(Date.parse(p2now)-60000).toISOString();
+ f.historical.validUntil=new Date(Date.parse(p2now)-1).toISOString();
+ const h=f.mount();try{
+  await ready(h);press(control(h.render(),'When saved'));
+  let nodes=h.render();assert(control(nodes,'Ingredient details: Dimethicone, position 1'));
+  press(control(nodes,'Ingredient details: Dimethicone, position 1'));assert.match(textContent(h.render()),/Listed as: Dimethicone/);
+  assert(Date.parse(f.historical.validUntil)<Date.now(),'The historical verdict timestamp is preserved');
+  t.mock.timers.tick(1500);nodes=h.render();assert.match(textContent(nodes),/Product details unavailable/);
+  assert(!nodes.some(n=>n.props.accessibilityLabel==='Ingredient details: Dimethicone, position 1'));
+ }finally{h.dispose();}
 });

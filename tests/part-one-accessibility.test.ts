@@ -79,3 +79,17 @@ test('Offline identity and unselected candidates expire even when no declaration
   assert(!textContent(h.render()).includes('EXPIRED IDENTITY'));
   assert(!h.render().some(n => n.props.label === 'Save'));
 });
+
+test('single Save cannot fall back to a second product save during personal read loading or after confirmation', () => {
+  const result = { scanId:'fixture',declarationState:'partial',identity:'exact',work:'complete',snapshotId:'snapshot',display:{selectedIdentity:{name:'Synthetic lotion',brand:'Fixture',variantText:'',expiresAt:'2099-01-01T00:00:00Z',image:null},candidates:[],sections:[],sources:[],limitations:[]},freshness:{state:'fresh',observedAt:'2026-10-01T00:00:00Z',expiresAt:'2099-01-01T00:00:00Z'},allowedActions:['save_partial'] } as unknown as ScanResult;
+  const personal = {enabled:true,context:null,choices:{},view:{target:null,result:null,historical:null,question:null,savedAssessmentId:null as string|null,savedAt:null,loading:true,saving:false,error:null,pendingSave:false},interact(){},refresh(){}};
+  const h=componentHarness('src/components/check/part-one/PartOneResultSheet.tsx','PartOneResultSheet',{view:{owner:'fixture',result,saved:false,loading:false,error:null,scrollOffset:0},onClose(){},onSave(){throw Error('Wrong product save');},onCapture(){},onRefresh(){},onSelect(){},onSearch(){},onFullChange(){}},{modules:{
+    '../part-three/usePartThreeCheck':{usePartThreeCheck:()=>personal},
+    '../../ui/Button':{Button:'Button'},
+    '../result-sheet/ResultSheetSurface':{ResultSheetSurface:(p:any)=>React.createElement('Surface',p,p.summary,p.compactActions,p.footer,p.children)},
+  }});
+  assert.equal(h.render().filter(n=>n.props.label==='Save'||n.props.label==='Saved').length,0,'A loading assessment does not expose product Save');
+  personal.view.savedAssessmentId='confirmed-assessment';
+  let nodes=h.render();assert.equal(nodes.filter(n=>n.props.label==='Saved').length,1);assert(control(nodes,'Saved').props.disabled);assert(!nodes.some(n=>n.props.label==='Save'));
+  personal.view.loading=false;nodes=h.render();assert.equal(nodes.filter(n=>n.props.label==='Saved').length,1);assert(!nodes.some(n=>n.props.label==='Save'),'Confirmed assessment cannot become a duplicate product Save');
+});
