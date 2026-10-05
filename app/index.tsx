@@ -37,7 +37,6 @@ export default function Index() {
 
   // The root gate loads owner-bound context and chooses profile or Check.
   if (shell === 'hosted_free_integration') {
-    if (authStatus === 'SIGNED_OUT') return <Redirect href="/(auth)/login" />;
     return <View style={styles.loadingContainer}><ActivityIndicator size="small" color={colors.ink} /></View>;
   }
 

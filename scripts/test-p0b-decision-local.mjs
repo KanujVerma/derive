@@ -16,7 +16,8 @@ let aid,bid,seededProduct=false,seededVariant=false,seededFormula=false,identifi
 try{
  const sa=await a.auth.signInAnonymously(),sb=await b.auth.signInAnonymously();assert.ifError(sa.error);assert.ifError(sb.error);aid=sa.data.user.id;bid=sb.data.user.id;
  const request={operation:'evaluate',checkIntent:'add',requestId:randomUUID(),caseId:CASE,snapshotId:SNAPSHOT};
- assert.equal((await call(make(status.ANON_KEY),'personal-decision',request)).status,401);
+ const noAuth=await fetch(`${status.API_URL}/functions/v1/personal-decision`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)});
+ assert.equal(noAuth.status,401,'missing Authorization is rejected before evaluation');
  assert.equal((await call(a,'personal-decision',{...request,ownerId:bid})).code,'INVALID_PAYLOAD');
 
  const now=new Date().toISOString();

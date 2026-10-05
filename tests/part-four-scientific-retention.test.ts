@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {createRetainedEvidence,reprojectRetainedEvidence} from '../src/domain/part-four/retainedEvidence.ts';
+import {buildScientificManifest,assessScientificDecision} from '../src/domain/part-four/scientificDecision.ts';
+import {claimSourcePin,scientificClaimHash} from '../src/domain/part-four/claimApplicability.ts';
+import {PENDING_SCIENTIFIC_RECORDS} from '../src/domain/part-four/science-candidates.ts';
+import {ScientificClaimSchema} from '../src/contracts/ScientificClaim.ts';
+import {p3input} from './fixtures/part-three.ts';
+function fixture(){const x=p3input();x.context.profile!.data.primaryGoal={state:'known',value:'oiliness'};
+ const c=ScientificClaimSchema.parse(structuredClone((PENDING_SCIENTIFIC_RECORDS as any[]).find(c=>c.id==='G02-01')));c.sourceRefs=c.sourceRefs.map(s=>({...s,retrievedAt:'2026-10-01'}));
+ const manifest=buildScientificManifest([c],[{claimId:c.id,claimHash:scientificClaimHash(c),status:'approved',reviewerId:'fixture:reviewer',qualificationRef:'fixture:qualification',reviewedAt:x.now,sourcePins:c.sourceRefs.map(claimSourcePin),rights:{grantId:'fixture:grant',version:'1',process:true,store:true,display:true,export:true,validUntil:x.partTwo.expiresAt,revoked:false},validUntil:x.partTwo.expiresAt}]);
+ const evidence={ownerId:x.context.ownerId,partTwoBindingKey:x.partTwo.bindingKey,partTwoRevision:x.partTwo.resultRevision,sourceDigest:x.binding.sourceDigest,contextRevision:x.context.revision,manifestHash:manifest.contentHash,claims:[{claimId:c.id,goal:'oiliness',features:Object.fromEntries(c.applicability.map(p=>[p.field,{state:'known',values:[p.expected[0]],factIds:['fixture:fact'],contextRevisionIds:[],sourceIds:['fixture:formula-source'],validUntil:x.partTwo.expiresAt}]))}]};
+ const packet=assessScientificDecision({manifest,evidence,partTwo:x.partTwo,context:x.context,now:x.now});return {x,manifest,packet};}
+test('science uses retained whitelist with exact source/admission and independent expiry/withdrawal',()=>{
+ const f=fixture(),r=createRetainedEvidence({science:{manifest:f.manifest,packet:f.packet}} as any,{now:f.x.now});assert.equal(r.fields.length,1);assert.equal(r.fields[0].kind,'scientific_claim');assert.equal(r.fields[0].state,'retained');
+ for(const dep of ['fixture:grant','fixture:qualification',f.packet.manifestHash,f.packet.assessments[0].assessment.claimHash,f.manifest.claims[0].sourceRefs[0].id,'fixture:fact']){const projected=reprojectRetainedEvidence(r,{now:f.x.now,purpose:'retain',withdrawnDependencies:[dep]});assert.equal(projected.fields[0].value,null);assert.equal(projected.fields[0].state,'tombstoned');assert.equal(reprojectRetainedEvidence(projected,{now:f.x.now,purpose:'display'}).fields[0].value,null);}
+ assert.equal(reprojectRetainedEvidence(r,{now:f.x.partTwo.expiresAt,purpose:'retain'}).fields[0].value,null);
+});
+test('old exact admission cannot retain altered or pending scientific assessment',()=>{
+ const f=fixture();f.manifest.admissions=[];assert.equal(createRetainedEvidence({science:{manifest:f.manifest,packet:f.packet}} as any,{now:f.x.now}).fields.filter(r=>r.state==='retained').length,0);
+});
+
+test('synthetic multi-goal assessment retains each exact per-goal deadline when one claim shares its source',()=>{
+ const x=p3input();x.context.profile!.data.primaryGoal={state:'known',value:'fine_lines'};x.context.profile!.data.secondaryGoals=['dark_spots'];
+ // All approval/transfer values are fixture-only, never actual claim admission.
+ const c=ScientificClaimSchema.parse(structuredClone((PENDING_SCIENTIFIC_RECORDS as any[]).find(c=>c.id==='G03-01')!));c.sourceRefs.forEach(s=>s.retrievedAt='2026-10-01');const a={claimId:c.id,claimHash:scientificClaimHash(c),status:'approved' as const,reviewerId:'fixture-reviewer',qualificationRef:'fixture-qualification',reviewedAt:x.now,sourcePins:c.sourceRefs.map(claimSourcePin),validUntil:x.partTwo.expiresAt,rights:{grantId:'fixture-grant',version:'fixture-1',validUntil:x.partTwo.expiresAt,process:true,store:true,display:true,export:true,revoked:false}},m=buildScientificManifest([c],[a]);
+ const claims=['fine_lines','dark_spots'].map((goal,index)=>({claimId:c.id,goal,features:Object.fromEntries(c.applicability.map(p=>[p.field,{state:'known',values:[p.field==='endpoint'?(goal==='fine_lines'?'fine-lines-wrinkles':'hyperpigmented-spots'):p.expected[0]],factIds:['fixture-fact'],contextRevisionIds:[],sourceIds:['fixture-formula-source'],validUntil:new Date(Date.parse(x.now)+(index+1)*1000).toISOString()}]))}));
+ const evidence={ownerId:x.context.ownerId,contextRevision:x.context.revision,partTwoBindingKey:x.partTwo.bindingKey,partTwoRevision:x.partTwo.resultRevision,sourceDigest:x.binding.sourceDigest,manifestHash:m.contentHash,claims};const packet=assessScientificDecision({manifest:m,evidence,partTwo:x.partTwo,context:x.context,now:x.now});assert.deepEqual(packet.assessments.map(r=>r.assessment.state),['supported','supported']);assert.deepEqual(packet.assessments.map(r=>r.assessment.validUntil),[1000,2000].map(ms=>new Date(Date.parse(x.now)+ms).toISOString()));assert.equal(packet.sourceRefs.length,c.sourceRefs.length*2);const retained=createRetainedEvidence({science:{manifest:m,packet}},{now:x.now});assert.equal(retained.fields.filter(f=>f.state==='retained').length,2,'Source-ID deduplication must not invalidate an independently admitted goal deadline');
+});
+
+test('shared exact source pin does not collapse two claims independent review dates',()=>{
+ const x=p3input();x.context.profile!.data.primaryGoal={state:'known',value:'dryness'};x.context.profile!.data.secondaryGoals=['oiliness'];
+ // Artificial shared-source topology and admissions are fixture-only.
+ const cs=['G01-01','G02-01'].map(id=>{const c=ScientificClaimSchema.parse(structuredClone((PENDING_SCIENTIFIC_RECORDS as any[]).find(c=>c.id===id)!));c.sourceRefs=[{id:'fixture-shared-source',url:'https://fixture.invalid/shared',locator:'Original synthetic source only.',retrievedAt:'2026-10-01',bodySha256:null}];return c;});
+ const admissions=cs.map((c,i)=>({claimId:c.id,claimHash:scientificClaimHash(c),status:'approved' as const,reviewerId:`fixture-reviewer-${i}`,qualificationRef:'fixture-qualification',reviewedAt:new Date(Date.parse(x.now)-60000*(1-i)).toISOString(),sourcePins:c.sourceRefs.map(claimSourcePin),validUntil:x.partTwo.expiresAt,rights:{grantId:'fixture-grant',version:'fixture-1',validUntil:x.partTwo.expiresAt,process:true,store:true,display:true,export:true,revoked:false}})),m=buildScientificManifest(cs,admissions);
+ const evidence={ownerId:x.context.ownerId,contextRevision:x.context.revision,partTwoBindingKey:x.partTwo.bindingKey,partTwoRevision:x.partTwo.resultRevision,sourceDigest:x.binding.sourceDigest,manifestHash:m.contentHash,claims:cs.map((c,i)=>({claimId:c.id,goal:i?'oiliness':'dryness',features:Object.fromEntries(c.applicability.map(p=>[p.field,{state:'known',values:[p.expected[0]],factIds:['fixture-fact'],contextRevisionIds:[],sourceIds:['fixture-formula-source'],validUntil:x.partTwo.expiresAt}]))}))};const packet=assessScientificDecision({manifest:m,evidence,partTwo:x.partTwo,context:x.context,now:x.now});assert.deepEqual(packet.assessments.map(r=>r.assessment.state),['reference','supported']);const retained=createRetainedEvidence({science:{manifest:m,packet}},{now:x.now});assert.equal(retained.fields.filter(f=>f.state==='retained').length,2,'Same source pin must preserve each exact independent review date');
+});

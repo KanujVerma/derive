@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { ActivityIndicator, AppState, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { CatalogProductSummary } from '../../contracts/ProductCatalog';
 import { searchCatalogProducts } from '../../services/productCatalog';
 import { colors, radii, spacing, typography } from '../../constants/theme';
@@ -24,6 +24,8 @@ interface Props {
   focusKey?: string | number;
   /** Sheet hosts supply their registered input; ordinary entry keeps the native input. */
   InputComponent?: React.ElementType;
+  /** Check dispatches GTIN input to the result controller rather than name lookup. */
+  barcodeEntry?: boolean;
 }
 
 export function CatalogProductSearch({
@@ -32,7 +34,7 @@ export function CatalogProductSearch({
   placeholder = 'Search brand or product name', keepFocusAfterSelect = true, onQueryChange,
   errorCopy = 'Search is unavailable right now. You can still add a product manually.',
   emptyCopy = 'No catalog match yet. Try another name or add it manually.',
-  embedded = false, preserveSelection = false, focusKey, InputComponent = TextInput,
+  embedded = false, preserveSelection = false, focusKey, InputComponent = TextInput, barcodeEntry = false,
 }: Props) {
   const inputRef = useRef<TextInput>(null);
   const searchRef = useRef(search);
@@ -42,6 +44,22 @@ export function CatalogProductSearch({
   const controller = hostController ?? ownedController.current;
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const { query, loading, error } = state;
+  const barcodeQuery = barcodeEntry && /^\d{8,14}$/.test(query.trim());
+  const [now, setNow] = useState(Date.now);
+  const [failedImages, setFailedImages] = useState<string[]>([]);
+  const clock = Math.max(now, Date.now());
+  const items = state.items.filter(item => !item.sourceLookup || Date.parse(item.sourceLookup.expiresAt) > clock);
+  const expired = items.length !== state.items.length;
+  const nextExpiry = items.map(item => Date.parse(item.sourceLookup?.expiresAt ?? '')).filter(Number.isFinite).sort((a,b) => a-b)[0];
+  useEffect(() => {
+    if (!nextExpiry) return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(60000, Math.max(1, nextExpiry-clock)));
+    return () => clearTimeout(timer);
+  }, [nextExpiry, now]);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', value => { if (value === 'active') setNow(Date.now()); });
+    return () => subscription.remove();
+  }, []);
   useEffect(() => () => { ownedController.current?.dispose(); ownedController.current = null; }, []);
   const lastFocusKey = useRef(focusKey);
   useEffect(() => {
@@ -52,6 +70,7 @@ export function CatalogProductSearch({
   }, [focusKey]);
 
   const select = (item: CatalogProductSummary) => {
+    if (item.sourceLookup && Date.parse(item.sourceLookup.expiresAt) <= Date.now()) { setNow(Date.now()); return; }
     if (!controller.select(preserveSelection)) return;
     if (!preserveSelection) onQueryChange?.('');
     if (keepFocusAfterSelect) inputRef.current?.focus();
@@ -82,13 +101,14 @@ export function CatalogProductSearch({
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry product search" style={styles.searchAction} onPress={() => void controller.submit()}><Text style={styles.action}>Retry</Text></TouchableOpacity>
       </View>}
       {loading && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancel product search" style={styles.searchAction} onPress={controller.cancel}><Text style={styles.action}>Cancel search</Text></TouchableOpacity>}
-      {!loading && !error && query.trim().length >= 2 && state.resultQuery !== query.trim() && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Resume product search" style={styles.searchAction} onPress={() => void controller.submit()}><Text style={styles.action}>Search again</Text></TouchableOpacity>}
-      {!loading && !error && query.trim().length >= 2 && state.resultQuery === query.trim() && state.items.length === 0 && (
+      {!loading && !error && query.trim().length >= 2 && (state.resultQuery !== query.trim() || expired || barcodeQuery) && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Resume product search" style={styles.searchAction} onPress={() => { controller.releaseSelection(); void controller.submit(); }}><Text style={styles.action}>Search again</Text></TouchableOpacity>}
+      {expired && <Text style={styles.helper}>These source results expired. Search again for current product information.</Text>}
+      {!loading && !error && !expired && !barcodeQuery && query.trim().length >= 2 && state.resultQuery === query.trim() && items.length === 0 && (
         <Text style={styles.helper}>{emptyCopy}</Text>
       )}
-      {!loading && !error && state.resultQuery === query.trim() && state.items.map((item) => {
+      {!loading && !error && state.resultQuery === query.trim() && items.map((item) => {
         const alreadyAdded = selectedIds.includes(item.productId);
-        const image = catalogImagePresentation(item.imageUrl);
+        const image = catalogImagePresentation(item.imageUrl && !failedImages.includes(item.imageUrl) ? item.imageUrl : null);
         return (
           <TouchableOpacity
             key={item.productId}
@@ -96,12 +116,12 @@ export function CatalogProductSearch({
             onPress={() => select(item)}
             disabled={alreadyAdded}
             accessibilityRole="button"
-            accessibilityLabel={`${actionLabel} ${item.brand} ${item.name}`}
+            accessibilityLabel={`${actionLabel} ${item.brand} ${item.name}${item.sourceLookup?.variantText ? ` · ${item.sourceLookup.variantText}` : ''}`}
             accessibilityState={{ disabled: alreadyAdded }}
           >
             <View style={styles.thumbnail} accessible accessibilityLabel={image.kind === 'catalog' ? image.label : 'No product image available'}>
               {image.kind === 'catalog'
-                ? <Image source={{ uri: image.uri }} style={styles.thumbnailImage} resizeMode="contain" />
+                ? <Image source={{ uri: image.uri }} style={styles.thumbnailImage} resizeMode="contain" onError={() => setFailedImages(values => [...values, image.uri])} />
                 : <Icon name="bottle" size={24} color={colors.brand} />}
             </View>
             <View style={styles.resultCopy}>

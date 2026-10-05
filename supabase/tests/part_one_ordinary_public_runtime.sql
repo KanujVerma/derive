@@ -1,0 +1,30 @@
+-- Public acquisition is enabled only within this rolled-back test transaction.
+begin;
+select no_plan();
+select ok(has_function_privilege('service_role','public.part_one_worker(text,jsonb)','execute'),'outer worker remains service-owned');
+select ok(not has_function_privilege('authenticated','public.part_one_worker(text,jsonb)','execute') and not has_function_privilege('anon','public.part_one_worker(text,jsonb)','execute'),'ordinary clients cannot request source grants/budgets/reservations');
+select ok(not has_function_privilege('service_role','public.part_one_worker_before_public_runtime(text,jsonb)','execute'),'inner worker cannot bypass public wrapper directly');
+select ok((select count(*)=0 from private.part_one_policies where id='open_facts' and lookup_allowed),'migration did not activate public acquisition');
+insert into auth.users(id,email,is_anonymous,raw_user_meta_data) values('ea170000-0000-4000-8000-000000000001',null,true,'{}');
+update private.part_one_policies set version='derive-obf-public-content-v1',lookup_allowed=true,retain_allowed=true,display_allowed=true,expires_at='2027-01-04T00:00:00Z',permission_evidence='https://openfoodfacts.github.io/openfoodfacts-server/api/tutorials/license-be-on-the-legal-side/ ; ODbL database / DbCL contents; reviewed public identity and ingredient fields only' where id='open_facts';
+insert into private.part_one_budgets(provider,call_limit,concurrency_limit,window_seconds,reset_at)
+values('open_facts',1000,1,86400,null)
+on conflict(provider) do update set reset_at=null;
+delete from private.external_candidate_lookup_reservations;
+select is((public.part_one_worker('public/policy','{"policyVersion":"derive-obf-public-content-v1"}')->>'allowed')::boolean,true,'exact live public grant is admitted only inside test transaction');
+select throws_ok($q$select public.part_one_worker('public/budget','{"policyVersion":"derive-obf-public-content-v1","ownerId":"ea170000-0000-4000-8000-000000000001","operation":"product"}')$q$,'P0001','PART_ONE_INVALID_PAYLOAD','product requests must use leased reserve, never free-form budget bypass');
+insert into private.external_candidate_lookup_reservations(user_id) select 'ea170000-0000-4000-8000-000000000001' from generate_series(1,8);
+select is((public.part_one_worker('public/budget','{"policyVersion":"derive-obf-public-content-v1","ownerId":"ea170000-0000-4000-8000-000000000001","operation":"search"}')->>'allowed')::boolean,false,'search leaves shared product quota headroom');
+select is((select count(*)::integer from private.external_candidate_lookup_reservations),8,'denied search did not consume a shared charge');
+insert into private.part_one_jobs(id,coalescing_key,input,policy_version,state,attempts,max_attempts,lease_token,lease_expires_at) values('ea170000-0000-4000-8000-000000000002','ordinary-public-quota-test','{}','derive-obf-public-content-v1','running',4,4,'ea170000-0000-4000-8000-000000000003',clock_timestamp()+interval '30 seconds');
+insert into private.external_candidate_lookup_reservations(user_id) select 'ea170000-0000-4000-8000-000000000001' from generate_series(1,4);
+select is((public.part_one_worker('public/reserve','{"policyVersion":"derive-obf-public-content-v1","ownerId":"ea170000-0000-4000-8000-000000000001","jobId":"ea170000-0000-4000-8000-000000000002","leaseToken":"ea170000-0000-4000-8000-000000000003","provider":"open_facts","stage":"lookup.open_facts.4"}')->>'deferred')::boolean,true,'shared quota defers before inherited provider reservation');
+select ok((select state='deferred_budget' and attempts=3 and lease_token is null and next_eligible_at>clock_timestamp() from private.part_one_jobs where id='ea170000-0000-4000-8000-000000000002'),'claim attempt refunded and stale lease relinquished');
+select is((select count(*)::integer from private.part_one_reservations where job_id='ea170000-0000-4000-8000-000000000002'),0,'denial inserted no permanently unreplayable provider stage');
+select lives_ok($q$select public.part_one_worker('public/backoff',jsonb_build_object('policyVersion','derive-obf-public-content-v1','retryAt',clock_timestamp()))$q$,'zero/elapsed Retry-After gains bounded future backoff after lock wait');
+select ok((select reset_at>clock_timestamp() from private.part_one_budgets where provider='open_facts'),'upstream throttle remains live');
+select throws_ok($q$select public.reserve_external_candidate_lookup('ea170000-0000-4000-8000-000000000001')$q$,'P0001','EXTERNAL_CANDIDATE_GLOBAL_BACKOFF','legacy identity-only route respects same upstream throttle');
+update private.part_one_policies set lookup_allowed=false where id='open_facts';
+select is((public.part_one_worker('public/policy','{"policyVersion":"derive-obf-public-content-v1"}')->>'allowed')::boolean,false,'withdrawn source denied without returning evidence');
+select * from finish();
+rollback;

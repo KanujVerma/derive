@@ -11,6 +11,8 @@ interface FreeAccessProjection {
   start: (userId: string) => number;
   ready: (access: FreeAccessState, attempt: number) => boolean;
   fail: (userId: string, attempt: number) => boolean;
+  startRefresh: (userId: string) => number | null;
+  finishRefresh: (access: FreeAccessState, attempt: number) => boolean;
   reset: () => void;
 }
 
@@ -34,6 +36,18 @@ export const useFreeAccessStore = create<FreeAccessProjection>((set, get) => ({
     if (state.attempt !== attempt || state.userId !== userId) return false;
     set({ status: 'ERROR', access: null });
     return true;
+  },
+  // Revalidate an established owner without transiently destroying navigation.
+  // Server requests retain their normal Auth checks; failure still clears access.
+  startRefresh: (userId) => {
+    const state=get();
+    if(state.status!=='READY'||state.userId!==userId||state.access?.userId!==userId)return null;
+    const attempt=state.attempt+1;set({attempt});return attempt;
+  },
+  finishRefresh: (access, attempt) => {
+    const state=get();
+    if(state.status!=='READY'||state.attempt!==attempt||state.userId!==access.userId||state.access?.userId!==access.userId)return false;
+    set({access});return true;
   },
   reset: () => set((state) => ({ status: 'UNRESOLVED', userId: null, access: null, attempt: state.attempt + 1 })),
 }));

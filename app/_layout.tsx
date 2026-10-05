@@ -1,3 +1,4 @@
+import '@/src/services/setupDraft';
 import { customerController, currentCustomerOwner, ownerPinnedLegacyGateway } from '@/src/presentation/personal-decision/customerGateway';
 import { bindCustomerOwnerLifecycle } from '@/src/presentation/personal-decision/customerController';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
@@ -23,8 +24,10 @@ import { canOpenPersonalizationRoute } from '@/src/presentation/personalization/
 import { resolveLocalAccessRoute } from '@/src/utils/localAccessRouting';
 import { refreshCustomerBootstrap, resolveCustomerBootstrap } from '@/src/services/deriveClient';
 import { resolveAuthRoute, getAuthRedirectRoute } from '@/src/utils/authRouting';
+import { initializePartOneDraftCache } from '@/src/components/check/part-one/PartOneLabelCapture';
 
 export default function RootLayout() {
+  useEffect(() => { initializePartOneDraftCache(); }, []);
   useEffect(() => bindCustomerOwnerLifecycle(customerController, currentCustomerOwner, listener => useAuthStore.subscribe(listener), listener => useFreeAccessStore.subscribe(listener), () => ownerPinnedLegacyGateway.clear()), []);
   const router = useRouter();
   const segments = useSegments();
@@ -50,7 +53,7 @@ export default function RootLayout() {
   const customerState = useSyncExternalStore(customerController.subscribe, customerController.getState);
   const introOwner = useScannerEntryStore(s => s.ownerId);
   const introHandled = useScannerEntryStore(s => s.profileIntroHandled);
-  const scannerEntry = resolveScannerEntry({ authStatus, ownerId: sessionUserId, accessStatus,
+  const scannerEntry = resolveScannerEntry({ guestBootstrap:hostedScanner, authError, authStatus, ownerId: sessionUserId, accessStatus,
     access, contextOwnerId: customerState.ownerId,
     contextStatus: customerState.context?.ownerId === sessionUserId ? 'ready' : customerState.status,
     hasProfile: Boolean(customerState.context?.profile),
@@ -87,7 +90,16 @@ export default function RootLayout() {
         const auth = useAuthStore.getState();
         const projection = useFreeAccessStore.getState();
         if (auth.status === 'SIGNED_IN' && projection.status === 'READY' && projection.userId === auth.sessionUserId) {
-          projection.reset();
+          const owner=auth.sessionUserId;
+          if(!owner)return;
+          const now=Date.now();if(now-lastForegroundRefreshAt<1500)return;lastForegroundRefreshAt=now;
+          const attempt=projection.startRefresh(owner);if(attempt===null)return;
+          void getFreeAccessState().then(state=>{
+            const current=useAuthStore.getState();
+            if(current.status!=='SIGNED_IN'||current.sessionUserId!==owner)return;
+            if(state.userId!==owner)throw Error('Access state belongs to another session');
+            useFreeAccessStore.getState().finishRefresh(state,attempt);
+          }).catch(()=>useFreeAccessStore.getState().fail(owner,attempt));
         }
         return;
       }
@@ -139,17 +151,17 @@ export default function RootLayout() {
   useEffect(() => {
     if (!remoteEnabled) return;
 
-    if (!localFreeIntegration) void getCurrentSession();
+    if (!freeIntegration) void getCurrentSession();
     const { unsubscribe } = subscribeToAuth();
     return () => unsubscribe();
-  }, [remoteEnabled, localFreeIntegration]);
+  }, [remoteEnabled, freeIntegration]);
 
-  // Only the local development integration may silently create a guest session.
+  // Free scanner shells restore a persisted owner before creating one guest session.
   useEffect(() => {
-    if (!localFreeIntegration || authError || accessStatus === 'ERROR') return;
+    if (!freeIntegration || authError || accessStatus === 'ERROR') return;
     if (authStatus !== 'INITIALIZING' && authStatus !== 'SIGNED_OUT') return;
     void ensureLocalAnonymousSession().then(() => setAuthError(false)).catch(() => setAuthError(true));
-  }, [localFreeIntegration, authStatus, accessStatus, authError]);
+  }, [freeIntegration, authStatus, accessStatus, authError]);
 
   useEffect(() => {
     if (!freeIntegration || authStatus !== 'SIGNED_IN' || !sessionUserId) return;
@@ -187,6 +199,11 @@ export default function RootLayout() {
     }
     if (localFreeIntegration) {
       if (!localReady || !access) return;
+      // Dedicated loopback synthetic harness; release routing is unchanged.
+      if (__DEV__ && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true'
+        && (publicEnvironment.supabaseUrl === 'http://127.0.0.1:59731'
+          || (process.env.EXPO_PUBLIC_PART_FOUR_LOCAL_FOUNDATION === 'true' && publicEnvironment.supabaseUrl === 'http://127.0.0.1:60731'))
+        && segments[0] === 'part-three-preview') return;
       const route = resolveLocalAccessRoute(segments, access);
       if (route) router.replace(route);
       return;
@@ -255,6 +272,13 @@ export default function RootLayout() {
         </Stack.Protected>
         <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development' && shell === 'scanner_first_preview'}>
           <Stack.Screen name="check-preview" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development'
+          && (shell === 'scanner_first_preview' || (localFreeIntegration && localReady
+            && process.env.EXPO_PUBLIC_PART_THREE_FIXTURE_UI === 'true'
+            && (publicEnvironment.supabaseUrl === 'http://127.0.0.1:59731'
+          || (process.env.EXPO_PUBLIC_PART_FOUR_LOCAL_FOUNDATION === 'true' && publicEnvironment.supabaseUrl === 'http://127.0.0.1:60731'))))}>
+          <Stack.Screen name="part-three-preview" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={__DEV__ && publicEnvironment.buildFlavor === 'development' && shell !== 'legacy' && (!localFreeIntegration || localReady)}>
           <Stack.Screen name="personalize/fixture" options={{ headerShown: false }} />

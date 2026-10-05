@@ -2,6 +2,7 @@
 export type CatalogFormulaState = 'unverified' | 'verified_variant_available' | 'multiple_versions';
 
 export interface CatalogProductSummary {
+  sourceLookup?: { barcode: string; provider: 'open_facts'; variantText: string; sourceUrl: string; observedAt: string; expiresAt: string; policyVersion: string };
   productId: string;
   brand: string;
   name: string;

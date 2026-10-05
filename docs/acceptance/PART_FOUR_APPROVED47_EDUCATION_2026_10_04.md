@@ -1,0 +1,35 @@
+# Approved47 local education integration —4October2026
+
+This candidate follows frozen f65139c accessibility work on a separate local `kanuj/part-four-approved 47-education` branch. Frozen37/runtime/accessibility branches, earlier Library bundles and accepted combinedc797960 checkout are preserved. This is a general education milestone, not full Part Four or hosted/live 47 Check/Save activation.
+
+## Exact source and version pins
+
+Founder approval00:51UTC covers corrected original 37DOCXv2 and expansion 10DOCXv1. Exact handoff Library `libfile_92720e6011dc81918d14effe252743d0`v0, file`file_00000000455c81fd889ad4b86ce67de7`,165635bytes SHA256`82dbfd91fd296ee6eb6d93f7810482e30981ba04043736f27fe57ea2052fa6ca`; original 37 Library`libfile_211e2d19dbe881918237cc72994ca091`v2 DOCXhash`68e0740df427bf8a434b5c30ea30cd07378568078d3c8d01af56fee2ed8c7d22`; expansion 10 Library`libfile_62fd53a648888191b30c8ff388128dc1`v1 DOCXhash`b204028c1a6a38343a24693fb8b0b65deb5a8e4cc94084a92a5fc6db18d2f83b`.
+
+Full immutable preparation is imported and independently hashed:311fb1b7906a2d7ed48736a0b3babd2f2a38fcc230d92c187608eadbda5a3d23, generatedsourcefileSHA02393a2b4bd9066a5598476e7a33ea8b7b4f6bffea23f1962b4351d17e15028c. All 47 cards, source qualifiers,43 original editorial positions,47 INCI records and76 source metadata records retain exact pins. Runtime release `approved-47-20261004/original 37-v2-expansion 10-v1/editorial-local-v2`, knowledgehash`95d8a6084c047d00b5887e13aa1be3c9cef906b8f871e6bddda1f517e8f826fe`; education47 releasehash`0f6210c566d95a346003541fc3752ee6c0054d17fda4085a8101ff5b0e9296dc`.
+
+Original37 pack remains exact version`approved-37-v7/editorial-v1`, hash`7d87dfb01c6039e26617802f36dbf6476992d6e6e7623d470aab7ed07b69715b`. Ordinary service release remains exact existing SQL hash`9dbce69bf34c84033c3913d4bf702f90cc5b4b3928bab2b3a8b45033bdd24c06`. Deployedpart-three index and migrations are unchanged. Only a trusted explicit local port selects47; unknown release tuples refuse. No registry row/environment/deployed selection is activated. Live47 Check/Save needs a separately reviewed registry/history transition; the education route contains no Save/account/product decision.
+
+## Changes and boundaries
+
+Optional additive rich card/context fields preserve old parsing/hashes. Approved function/label/intro/depth/evidence/caution/amount-use/distinct-name copy and material shared scientific qualifications are readable without truncation. The Sources section preserves linked context and all research-table cells, while excluding importer/editorial worksheet prompts. Copy approval is labeled separately from unverified remote-source revision. Remote webpage bodies are unavailable; metadata hashes/approval do not confer source processing/storage/export rights.
+
+No expansion aliases are promoted; previous37 aliases remain. Retinol/Retinal and other related forms remain distinct. New 10 contribution classifications remain unknown. No ingredient-order percentage, medical interaction, pregnancy verdict or new consequential product benefit is introduced. Unknown amounts preserve known functions. Null standalone caution means no authored caution, not universal tolerance.
+
+Selected knowledge is propagated consistently through routine planning, handler admission, assembly and foundation re-admission. Focused before-fix tests exposed an ordinary37 mismatch; the correction preserves original 37 as the service default. Formula deadline is capped by knowledge expiry, and mounted content refuses expired/withdrawn/mismatched packets. Rehashing changed card/source/context/alias content cannot create a new approved release. Historical37 packets are not restamped.
+
+## Verification
+
+15 selected boundary suites complete successfully:14 TAP files/90 tests plus the foundations script's explicit passed result. Both TypeScript checks and web/iOS exports pass. Independent source/card/lifecycle/selection/routine/preview review found no remaining blocker for this bounded local candidate. Broad205-suite and database/Edge work was not rerun; prior c1a42ff evidence is historical, not live 47 proof.
+
+Dedicated simulatorFAE5EFCB-C94D-4620-AA98-EFDDC257EA37 uses the existing development client with account-free flags and backend disabled. Native revisions02/03/04/05 failed before ingredient assertions at Unmatched Route;04 stalled after failure and was terminated, not counted as a completed pass. Cache-cleared staged Metro was allowed to finish bundling before the normal derive route was opened. Native revisions06 then completedexit0, verifying all 4 amended disclosures, their material evidence limits and shared Copy approved sources. This recovery required no application source change. The symptoms support a development-client cache/startup routing explanation; they do not prove one unique low-level cause.
+
+Staged1064 tracked/untracked source files match the tested candidate withzero mismatches; this is source parity, not native binary/hosted parity. Selected screenshots/tree attachments are retained. Preview screenshots allow scroll content beneath the translucent status bar; this synthetic preview is not pixel-v7/product layout certification.
+
+Native expansion-max08 completes exit0, reaches all 10 ordered new disclosures at accessibility-extra-extra-extra-large, checks each approved introduction, measures every disclosure target at least44pt, and opens the shared Copy approved Sources. Selected Panthenol/Retinol/Retinal and source screenshots/tree attachments are preserved. This uses a20-minute synthetic general-education lease; it is not the60-second personal Check acceptance. Do not infer full19/24 reference-formula maximum-text Check, spoken VoiceOver, physical phone, actual product identity/formula binding, Auth47 Save/reopen, provider/camera/photo/five-golden or hosted acceptance from an account-free synthetic education preview. Useful G01–G05 decisions remain separate required work; no new science/source adapter activates here.
+
+## Parallel work and remaining gates
+
+User authorized isolated376 data integration; worker owns `part-four-423-candidate`/`kanuj/part-four-ingredient423`, with immutable hash-recorded47 baseline. Held Bacillus/Folic Acid Ferment Extract and51 proposed alias objects stay inactive. Nullable detail/evidence is a recorded compatibility proposal, not fabricated filler. Shared47 source/registry remains one-writer. Reviews worker is paused by the latest user usage-budget instruction, with its separate checkout preserved. Revised Monday decision/invite plan remains for discussion; no approved reduction of goal coverage.
+
+Earlier automatic review rejected synthetic-owner cleanup. Exact owner20c07eed-1fbd-463d-9b6e-a234ee945cee in localderive-part-four-integration/Auth60721; fixturePID20259's shutdown calls harddelete. Dedicated stack remains off with retained volumes. No cleanup retry or substitute deletion occurred. Parent must obtain explicit exact-owner/environment/action approval; source/history bundles remain untouched. See taskrootpart-four-cleanup-and-max-text-followup.md for cascade scope and confirmation limitations.

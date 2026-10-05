@@ -14,14 +14,15 @@ export function resolveScannerEntry(input: {
   authStatus: AuthStatus; ownerId: string | null;
   accessStatus: string; access: FreeAccessState | null;
   contextOwnerId: string | null; contextStatus: string; hasProfile: boolean;
-  profileIntroHandled: boolean;
+  profileIntroHandled: boolean; guestBootstrap?: boolean; authError?: boolean;
 }): ScannerEntry {
-  if (input.authStatus === 'SIGNED_OUT') return 'auth';
+  if (input.guestBootstrap && input.authError) return 'error';
+  if (input.authStatus === 'SIGNED_OUT') return input.guestBootstrap ? 'loading' : 'auth';
   if (input.authStatus !== 'SIGNED_IN' || !input.ownerId) return 'loading';
   if (input.accessStatus === 'ERROR') return 'error';
   if (input.accessStatus !== 'READY' || input.access?.userId !== input.ownerId) return 'loading';
   if (input.contextOwnerId !== input.ownerId) return 'loading';
   if (input.contextStatus === 'error') return 'error';
   if (input.contextStatus !== 'ready') return 'loading';
-  return input.hasProfile || input.profileIntroHandled ? 'check' : 'profile';
+  return 'check'; // Profile is optional; every ready owner starts with Check.
 }

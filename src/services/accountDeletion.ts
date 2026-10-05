@@ -1,5 +1,6 @@
 import { supabase } from './supabase.ts';
 import { resetCustomerSessionData } from './sessionReset.ts';
+import { awaitSessionRetirement } from './sessionRetirement.ts';
 import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
 
 export const ACCOUNT_DELETION_FUNCTION = 'delete-customer-account';
@@ -63,5 +64,6 @@ export async function deleteCurrentAccount(
   }
 
   resetCustomerSessionData();
+  try { await awaitSessionRetirement(); } catch { return { success: false, error: 'Account deleted. Local pending Save cleanup is incomplete. Try again.' }; }
   return { success: true };
 }

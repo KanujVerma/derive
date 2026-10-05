@@ -6,6 +6,7 @@ export interface CaptureEvidence {
   role: CaptureRole;
   kind: 'barcode' | 'local_photo';
   value: string;
+  symbology?: string | null;
 }
 
 export interface CaptureCandidate {
@@ -30,7 +31,7 @@ export interface CaptureSession {
 }
 
 export type CaptureAction =
-  | { type: 'barcode'; value: string }
+  | { type: 'barcode'; value: string; symbology?: string | null }
   | { type: 'photo'; role: PhotoRole; uri: string }
   | { type: 'retake'; role: CaptureRole }
   | { type: 'process' }
@@ -55,7 +56,7 @@ function replaceEvidence(session: CaptureSession, evidence: CaptureEvidence): Ca
 export function reduceCapture(session: CaptureSession, action: CaptureAction): CaptureSession {
   switch (action.type) {
     case 'barcode':
-      return action.value.trim() ? replaceEvidence(session, { role: 'barcode', kind: 'barcode', value: action.value.trim() }) : session;
+      return action.value.trim() ? replaceEvidence(session, { role: 'barcode', kind: 'barcode', value: action.value.trim(), ...(action.symbology === undefined ? {} : { symbology: action.symbology }) }) : session;
     case 'photo':
       return action.uri.trim() ? replaceEvidence(session, { role: action.role, kind: 'local_photo', value: action.uri }) : session;
     case 'retake':

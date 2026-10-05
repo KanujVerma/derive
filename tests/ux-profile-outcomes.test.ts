@@ -21,7 +21,7 @@ test('none, unknown and skipped answers are distinct local states', () => {
   assert.equal(setSetupAnswer(b, 'currentProducts', 'none').previewOnly.currentProducts, 'none');
   assert.equal(setSetupAnswer(b, 'currentProducts', 'unknown').previewOnly.currentProducts, 'unknown');
 });
-test('five-step handlers preserve exact outcome wording and raw note typing without persistence claims', () => {
+test('five-step handlers preserve exact outcome wording and hide unused note intake without persistence claims', () => {
   let result: SetupBundle | undefined; let serial = 0;
   const flow = componentHarness('src/components/p0b-personalization/ContextFlow.tsx', 'ContextFlow', { setup: true, collectIntent: false, createId: () => `id-${++serial}`, onSetup: (b: SetupBundle) => { result = b; }, onApply() {}, onSkip() {} });
   press(control(flow.render(), 'Dryness')); assert.match(textContent(flow.render()), /Main/);
@@ -31,11 +31,9 @@ test('five-step handlers preserve exact outcome wording and raw note typing with
   press(control(flow.render(), 'Continue')); press(control(flow.render(), 'Search products'));
   press(control(flow.render(), 'Stung')); assert.match(textContent(flow.render()), /Stung/); assert.doesNotMatch(textContent(flow.render()), /reacted/);
   press(control(flow.render(), 'Continue'));
-  control(flow.render(), 'Anything else').props.onChangeText('I use ');
-  assert.equal(control(flow.render(), 'Anything else').props.value, 'I use ');
-  control(flow.render(), 'Anything else').props.onChangeText('I use sunscreen');
+  assert(!JSON.stringify(flow.render()).includes('Anything else'));
   press(control(flow.render(), 'Save skin profile'));
-  assert.equal(result?.additionalNote, 'I use sunscreen');
+  assert.equal(result?.additionalNote, null);
   assert.deepEqual(result?.previewOnly.currentFeedback?.['id-1'], ['too_heavy']);
   assert.equal(result?.previewOnly.pastReports[0].outcome, 'stung');
 });

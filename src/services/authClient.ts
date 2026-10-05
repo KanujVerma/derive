@@ -2,6 +2,7 @@ import { supabase } from './supabase.ts';
 import { useAuthStore } from '../stores/authStore.ts';
 import { useUserStore } from '../stores/userStore.ts';
 import { resetCustomerSessionData } from './sessionReset.ts';
+import { awaitSessionRetirement } from './sessionRetirement.ts';
 import { getCustomerErrorMessage } from '../utils/customerErrors.ts';
 
 export interface AuthSessionUser {
@@ -238,7 +239,8 @@ function projectAuthenticatedSession(user: { id: string; email?: string | null }
 
 let anonymousStart: Promise<string> | null = null;
 
-/** Local-only caller: preserve the persisted session; create a guest only when none exists. */
+/** Historical name retained for callers: free scanner shells preserve a persisted
+ * owner and create a guest only when none exists. No access/RLS grant is implied. */
 export function ensureLocalAnonymousSession(): Promise<string> {
   if (anonymousStart) return anonymousStart;
   anonymousStart = (async () => {
@@ -530,6 +532,7 @@ export async function signOutSession(): Promise<{ success: boolean; error?: stri
   // CASE A: signOut succeeded cleanly without error or exception
   if (!signOutError && !signOutThrew) {
     resetCustomerSessionData();
+    try { await awaitSessionRetirement(); } catch { return { success: false, error: 'Signed out. Local pending Save cleanup is incomplete. Try again.' }; }
     return { success: true };
   }
 
@@ -558,6 +561,7 @@ export async function signOutSession(): Promise<{ success: boolean; error?: stri
 
     // CASE B / E: Verification succeeded and session is confirmed absent
     resetCustomerSessionData();
+    await awaitSessionRetirement();
     return { success: true };
   } catch (verifyErr: any) {
     // CASE G: Verification threw an exception -> state unknown -> fail closed

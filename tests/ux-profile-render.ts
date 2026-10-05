@@ -1,5 +1,5 @@
 /** Node-only component harness. Native hosts are inert; production choice/save handlers run unchanged. */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -8,9 +8,10 @@ import * as React from 'react';
 const nativeRequire = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 type Element = { type: string | ((props: any) => unknown); props: Record<string, any> };
-export function componentHarness(file: string, name: string, initialProps: Record<string, any>, options: { modules?: Record<string, any>; developmentRuntime?: boolean } = {}) {
+export function componentHarness(file: string, name: string, initialProps: Record<string, any>, options: { modules?: Record<string, any>; developmentRuntime?: boolean; effects?: boolean } = {}) {
   const slots: any[] = [];
   let cursor = 0;
+  let pendingEffects: (() => void)[] = [];
   const cache = new Map<string, any>();
   const react = { ...React, useState(initial: any) {
     const index = cursor++;
@@ -25,23 +26,41 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     const previous = slots[index];
     if (!previous || dependencies.some((value, at) => value !== previous.dependencies[at])) slots[index] = { dependencies, value: factory() };
     return slots[index].value;
-  }, useEffect() {}, useCallback(callback: any) { return callback; },
+  }, useEffect(callback: () => (() => void) | void, dependencies?: readonly unknown[]) {
+    if (!options.effects) return;
+    const index = cursor++, previous = slots[index];
+    if (!previous || !dependencies || dependencies.some((value, at) => value !== previous.dependencies[at])) pendingEffects.push(() => {
+      previous?.cleanup?.(); slots[index] = { dependencies, cleanup: callback() };
+    });
+  }, useCallback(callback: any) { return callback; },
   useSyncExternalStore(_subscribe: any, getSnapshot: any) { return getSnapshot(); } };
   function load(path: string): any {
     if (cache.has(path)) return cache.get(path);
     const module = { exports: {} as any }; cache.set(path, module.exports);
     const source = readFileSync(path, 'utf8');
-    const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const output = ts.transpileModule(source, { fileName: path, compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
     function requireModule(id: string): any {
+      if (id === 'react') return { ...react, ...options.modules?.react };
       if (options.modules && id in options.modules) return options.modules[id];
-      if (id === 'react') return react;
-      if (id === 'react-native') return { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
+      if (id === 'expo-network') return {useNetworkState:()=>({isConnected:true,isInternetReachable:true})};
+      if (id === 'expo-symbols') return {SymbolView:'SymbolView'};
+      if (id === '@expo/vector-icons') return {Ionicons:'Ionicons',MaterialCommunityIcons:'MaterialCommunityIcons'};
+      if (id === 'expo-haptics') return { impactAsync: async () => {}, notificationAsync: async () => {}, selectionAsync: async () => {}, ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' }, NotificationFeedbackType: { Success: 'Success', Error: 'Error' } };
+      if (id.endsWith('/ui/Icon')) return { Icon: 'Icon' };
+      if (id.endsWith('/services/partOne')) return { PART_ONE_ENABLED: false, partOneTransport: {} };
+      if (id.endsWith('/services/partThree')) return { PART_THREE_ENABLED: false,partThreeTransport:{},partThreeEncounter:()=>null,subscribePartThreeSession:()=>()=>{} };
+      if (id.endsWith('/services/partTwo')) return { PART_TWO_ENABLED: false, partTwoTransport: {} };
+      if (id.endsWith('/PartOneLabelCapture')) return { PartOneLabelCapture: 'PartOneLabelCapture', PART_ONE_LOCAL_CAPTURE_AVAILABLE: false, purgeLocalCaptureFile() {} };
+      if (id.endsWith('/PartOneResultSheet')) return { PartOneResultSheet: 'PartOneResultSheet' };
+      if (id.endsWith('/PartThreeSavedAssessmentSheet')) return { PartThreeSavedAssessmentSheet: 'PartThreeSavedAssessmentSheet' };
+      if (id.endsWith('/PartOneSavedProducts')) return { PartOneSavedProducts: 'PartOneSavedProducts' };
+      if (id === 'react-native') return { InputAccessoryView:'InputAccessoryView',Platform:{OS:'ios'},View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', TouchableOpacity: 'TouchableOpacity', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', useWindowDimensions:()=>({width:402,height:874}), AccessibilityInfo:{isScreenReaderEnabled:async()=>false,announceForAccessibility(){}}, AppState: {currentState:'active', addEventListener: () => ({ remove() {} }) }, Keyboard: { dismiss() {} }, Linking: { openURL: async () => {} }, StyleSheet: { create: (styles: any) => styles } };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
       if (id.startsWith('@/src/components/ui/')) { const component = id.slice(id.lastIndexOf('/') + 1); return { [component]: component }; }
       if (id.endsWith('/CatalogProductSearch')) return { CatalogProductSearch: ({ label, onSelect, onQueryChange }: { label?: string; onSelect: (product: { productId: string; brand: string; name: string }) => void; onQueryChange?: (query: string) => void }) => React.createElement('button', { label, onPress: () => onSelect({ productId: 'catalog-product', brand: 'CeraVe', name: 'Moisturizer' }), onQueryChange }) };
       if (id.startsWith('@/') || id.startsWith('.')) {
         const target = id.startsWith('@/') ? resolve(root, id.slice(2)) : resolve(dirname(path), id);
-        const full = /\.(tsx?|js)$/.test(target) ? target : target + (target.includes('/components/') ? '.tsx' : '.ts');
+        const full = /\.(tsx?|js)$/.test(target) ? target : ['.ts','.tsx'].map(extension=>target+extension).find(existsSync) ?? target+'.ts';
         return load(full);
       }
       return nativeRequire(id);
@@ -61,9 +80,9 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       if (typeof value.type === 'function') { visit(value.type(value.props)); return; }
       nodes.push(value); visit(value.props.children);
     }
-    visit(Component(props)); return nodes;
+    visit(Component(props)); const effects = pendingEffects; pendingEffects = []; effects.forEach(effect => effect()); return nodes;
   }
-  return { render };
+  return { render, dispose() { for (const value of slots) value?.cleanup?.(); } };
 }
 export function control(nodes: Element[], label: string): Element {
   const found = nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label || (typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith(`${label}, `)));

@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, Keyboard, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions, type View as NativeView } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ReduceMotion } from 'react-native-reanimated';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, type BottomSheetBackdropProps, type BottomSheetHandleProps } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, type BottomSheetBackdropProps, type BottomSheetHandleProps, type BottomSheetScrollViewMethods } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, radii, spacing } from '../../../constants/theme';
 import { Icon } from '../../ui/Icon';
@@ -30,6 +30,12 @@ interface Props {
   /** Inline occupies the camera's existing companion slot. Other results use their current native Modal. */
   inline?: boolean;
   onClose: () => void;
+  onExpandedChange?: (expanded: boolean) => void;
+  onScrollOffset?: (offset: number) => void;
+  /** Owner-bound measured target; no product text or cached evidence. */
+  scrollRequest?: { key:string; y:number } | null;
+  /** User interaction, excluding programmatic layout scroll. */
+  onInteraction?: () => void;
   dismissLabel?: string;
   initialDetent?: 0 | 1;
   bottomInset?: number;
@@ -42,24 +48,70 @@ interface Props {
   /** Search has one measured detent; keyboard lift must not select a full-result detent. */
   contentSized?: boolean;
   contentSizeResetKey?: string;
+  /** Capture presents from the current native result modal, independently of sheet detents. */
+  overlay?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function ResultSheetSurface({ visible = true, inline = false, presentationKey, ...props }: Props) {
+export function ResultSheetSurface({ visible = true, inline = false, presentationKey, overlay, ...props }: Props) {
+  // Cancelling replacement search returns to an open result with a fresh guard.
+  // Keep the native Modal and capture overlay mounted across this body lifetime.
+  const bodyKey = `${presentationKey}:${props.replacement ? 'search' : 'result'}`;
   const currentKey = useRef<string | null>(null);
-  currentKey.current = visible ? presentationKey : null;
+  currentKey.current = visible ? bodyKey : null;
   const readCurrentKey = useCallback(() => currentKey.current, []);
   const requestClose = useRef<(() => void) | null>(null);
   if (!visible) return null;
-  const body = <SheetBody key={presentationKey} {...props} presentationKey={presentationKey}
+  const body = <SheetBody key={bodyKey} {...props} presentationKey={bodyKey}
     readCurrentKey={readCurrentKey} requestClose={requestClose} />;
-  return inline ? body : <Modal visible transparent animationType="none" onRequestClose={() => requestClose.current?.()}>
-    <SafeAreaProvider>{body}</SafeAreaProvider>
+  return inline ? <>{body}{overlay}</> : <Modal visible transparent animationType="none" onRequestClose={() => requestClose.current?.()}>
+    <SafeAreaProvider>{body}{overlay}</SafeAreaProvider>
   </Modal>;
 }
 
+interface SheetHandleState {
+  handle: React.RefObject<NativeView | null>;
+  sheet: React.RefObject<BottomSheet | null>;
+  closing: React.RefObject<boolean>;
+  contentSized: boolean;
+  index: number;
+  close: () => void;
+  dismissLabel: string;
+  guard: ReturnType<typeof createSheetDismissGuard>;
+  onInteraction?: () => void;
+}
+const SheetHandleContext = createContext<SheetHandleState | null>(null);
+
+/** BottomSheet renders this as a component type. Keep the type stable during a
+ * native touch; context updates its current detent, guard and callbacks. */
+function SheetHandle(_props: BottomSheetHandleProps) {
+  const state = useContext(SheetHandleContext);
+  if (!state) return null;
+  const { handle, sheet, closing, contentSized, index, close, dismissLabel, guard, onInteraction } = state;
+  return <View style={styles.handleRow}>
+    <Pressable ref={handle} style={styles.dragTarget} accessibilityRole="adjustable" accessibilityLabel="Product result"
+      accessibilityHint={contentSized ? 'Swipe down to return. Search results expand this sheet.' : 'Swipe up for findings. Swipe down to return. Double tap to expand or collapse.'}
+      accessibilityValue={{ min: 0, max: contentSized ? 0 : 2, now: Math.max(index, 0), text: index === 0 ? 'Compact' : 'Expanded' }}
+      accessibilityActions={[{ name: 'increment', label: 'Expand result' }, { name: 'decrement', label: 'Collapse result' }, { name: 'escape', label: dismissLabel }]}
+      onAccessibilityEscape={close}
+      onAccessibilityAction={({ nativeEvent }) => {
+        if (!guard.isCurrent() || closing.current) return;
+        onInteraction?.();
+        if (nativeEvent.actionName === 'increment') sheet.current?.snapToIndex(Math.min(index + 1, contentSized ? 0 : 2));
+        if (nativeEvent.actionName === 'decrement') { if (index > 0) sheet.current?.snapToIndex(index - 1); else close(); }
+        if (nativeEvent.actionName === 'escape') close();
+      }}
+      onPress={() => { if (guard.isCurrent() && !closing.current) { onInteraction?.(); sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); } }}>
+      <View style={styles.indicator} />
+    </Pressable>
+    <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel={dismissLabel}>
+      <Icon name="close" size={20} color={colors.inkMuted} />
+    </Pressable>
+  </View>;
+}
+
 function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dismissLabel = 'Close result',
-  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey }: Omit<Props, 'visible' | 'inline'> & {
+  initialDetent = 0, bottomInset = 0, summary, compactActions, replacement, children, contentSized = false, contentSizeResetKey, onExpandedChange, onScrollOffset, onInteraction, scrollRequest }: Omit<Props, 'visible' | 'inline' | 'overlay'> & {
     readCurrentKey: () => string | null; requestClose: React.RefObject<(() => void) | null>;
   }) {
   const insets = useSafeAreaInsets();
@@ -68,19 +120,36 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   useLayoutEffect(() => { if (contentSized) setSummaryHeight(0); }, [contentSized, contentSizeResetKey]);
   const geometry = resultSheetGeometry({ height: height - bottomInset, topInset: insets.top, bottomPadding: Math.max(insets.bottom, spacing.lg), summaryHeight, contentSized });
   const sheet = useRef<BottomSheet>(null);
+  const scroll = useRef<BottomSheetScrollViewMethods>(null);
+  const outerHeight = useRef(height);
+  const sheetTopInset = insets.top + spacing.xs;
+  // Native close is asynchronous. Late personal/layout updates must not reopen it.
+  const closing = useRef(false);
+  const explicitlyClosing = useRef(false);
   const handle = useRef<NativeView>(null);
   const [index, setIndex] = useState<number>(initialDetent);
-  // The callback is captured for this mount, never replaced by a newer case's callback.
-  const [guard] = useState(() => createSheetDismissGuard(presentationKey, onClose, readCurrentKey));
+  // The library owns its mount animation. Expanding before its first settled
+  // detent can be overwritten by that animation, leaving findings unmounted.
+  const [mountSettled, setMountSettled] = useState(false);
+  useEffect(() => { onExpandedChange?.(index > 0 && !replacement); }, [index, replacement, onExpandedChange]);
+  const closeAction = useRef(onClose);
+  closeAction.current = onClose;
+  // The guard owns this body lifetime; callback updates cannot cross its key fence.
+  const [guard] = useState(() => createSheetDismissGuard(presentationKey, () => closeAction.current(), readCurrentKey));
   const close = useCallback(() => {
     if (!guard.isCurrent()) return;
+    closing.current = true;
+    explicitlyClosing.current = true;
     Keyboard.dismiss();
-    if (sheet.current) sheet.current.close(); else guard.dismiss();
+    // The library can reevaluate detents independently of our layout effect.
+    // Its forced close fences that native reevaluation until acknowledgment.
+    if (sheet.current) sheet.current.forceClose(); else guard.dismiss();
   }, [guard]);
   requestClose.current = close;
+  useEffect(()=>{if(!scrollRequest||!Number.isFinite(scrollRequest.y)||scrollRequest.y<0||!guard.isCurrent()||closing.current||replacement)return;sheet.current?.snapToIndex(2);const frame=requestAnimationFrame(()=>{if(guard.isCurrent()&&!closing.current)scroll.current?.scrollTo({y:scrollRequest.y,animated:true});});return()=>cancelAnimationFrame(frame);},[scrollRequest,guard,replacement]);
   useEffect(() => {
-    if ((summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent()) sheet.current?.snapToIndex(2);
-  }, [summaryHeight, geometry.needsFullHeight, guard, summary, compactActions, contentSized]);
+    if (mountSettled && (summary || compactActions) && summaryHeight && !contentSized && geometry.needsFullHeight && guard.isCurrent() && !closing.current) sheet.current?.snapToIndex(2);
+  }, [mountSettled, summaryHeight, geometry.needsFullHeight, guard, summary, compactActions, contentSized]);
   useLayoutEffect(() => {
     guard.activate();
     return () => guard.deactivate();
@@ -95,38 +164,30 @@ function SheetBody({ presentationKey, readCurrentKey, requestClose, onClose, dis
   }, [guard]);
   const backdrop = useCallback((props: BottomSheetBackdropProps) => <BottomSheetBackdrop {...props}
     appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.18} pressBehavior="close" />, []);
-  const renderHandle = useCallback((_props: BottomSheetHandleProps) => <View style={styles.handleRow}>
-    <Pressable ref={handle} style={styles.dragTarget} accessibilityRole="adjustable" accessibilityLabel="Product result"
-      accessibilityHint={contentSized ? 'Swipe down to return. Search results expand this sheet.' : 'Swipe up for findings. Swipe down to return. Double tap to expand or collapse.'}
-      accessibilityValue={{ min: 0, max: contentSized ? 0 : 2, now: Math.max(index, 0), text: index === 0 ? 'Compact' : 'Expanded' }}
-      accessibilityActions={[{ name: 'increment', label: 'Expand result' }, { name: 'decrement', label: 'Collapse result' }, { name: 'escape', label: dismissLabel }]}
-      onAccessibilityEscape={close}
-      onAccessibilityAction={({ nativeEvent }) => {
-        if (!guard.isCurrent()) return;
-        if (nativeEvent.actionName === 'increment') sheet.current?.snapToIndex(Math.min(index + 1, contentSized ? 0 : 2));
-        if (nativeEvent.actionName === 'decrement') { if (index > 0) sheet.current?.snapToIndex(index - 1); else close(); }
-        if (nativeEvent.actionName === 'escape') close();
-      }}
-      onPress={() => { if (guard.isCurrent()) sheet.current?.snapToIndex(contentSized ? 0 : index === 0 ? 1 : 0); }}>
-      <View style={styles.indicator} />
-    </Pressable>
-    <Pressable style={styles.close} onPress={close} accessibilityRole="button" accessibilityLabel={dismissLabel}>
-      <Icon name="close" size={20} color={colors.inkMuted} />
-    </Pressable>
-  </View>, [close, dismissLabel, guard, index, contentSized]);
-  return <GestureHandlerRootView style={styles.root} pointerEvents="box-none" accessibilityViewIsModal>
-    <BottomSheet ref={sheet} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
-      topInset={insets.top + spacing.xs} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
-      onChange={next => { if (guard.isCurrent()) setIndex(next); }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
-      handleComponent={renderHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
-      <BottomSheetScrollView onAccessibilityEscape={close}
+  return <GestureHandlerRootView style={styles.root} onLayout={event => { outerHeight.current = event.nativeEvent.layout.height; }} onTouchStart={onInteraction} pointerEvents="box-none" accessibilityViewIsModal>
+    <SheetHandleContext.Provider value={{ handle, sheet, closing, contentSized, index, close, dismissLabel, guard, onInteraction }}><BottomSheet ref={sheet} accessible={false} index={initialDetent} snapPoints={summary || compactActions ? geometry.snapPoints : ['44%', '70%', '94%']} enableDynamicSizing={false}
+      topInset={sheetTopInset} bottomInset={bottomInset} enablePanDownToClose keyboardBehavior="interactive" keyboardBlurBehavior="restore" enableBlurKeyboardOnGesture overrideReduceMotion={ReduceMotion.System}
+      // -1 also means an off-detent keyboard/layout position in this library.
+      // This nonmodal, nondetached sheet's hosting container excludes BOTH
+      // insets. Its native close position is not the outer gesture-root height.
+      // Require the actual boundary; keyboard/off-detent -1 stays interactive.
+      onAnimate={(_from, next, _fromPosition, nextPosition) => { if (guard.isCurrent() && next === -1 && Math.abs(nextPosition - (outerHeight.current - sheetTopInset - bottomInset)) <= 1) closing.current = true; }}
+      onChange={next => { if (guard.isCurrent()) {
+        // A gesture close may be interrupted by keyboard/layout reevaluation.
+        // A visibly reopened detent restores interaction; forceClose stays fenced.
+        if (next >= 0 && !explicitlyClosing.current) closing.current = false;
+        if (next >= 0) setMountSettled(true);
+        setIndex(next);
+      } }} onClose={() => { if (guard.isCurrent()) { Keyboard.dismiss(); guard.dismiss(); } }}
+      handleComponent={SheetHandle} backdropComponent={backdrop} backgroundStyle={styles.background}>
+      <BottomSheetScrollView ref={scroll} testID="result-sheet-scroll" onScrollBeginDrag={onInteraction} onAccessibilityEscape={close} onScroll={event => onScrollOffset?.(event.nativeEvent.contentOffset.y)}
         contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {/* Keep search height stable as loading/helper rows disappear; explicit empty input resets it. */}
         {(summary || compactActions || replacement) && <View onLayout={event => { const measured = event.nativeEvent.layout.height; if (contentSized ? measured > summaryHeight : Math.abs(measured - summaryHeight) >= 1) setSummaryHeight(previous => contentSized ? Math.max(previous, measured) : measured); }}>{replacement ?? <>{summary}{compactActions}</>}</View>}
         {!replacement && (!summary || index > 0) && children}
       </BottomSheetScrollView>
-    </BottomSheet>
+    </BottomSheet></SheetHandleContext.Provider>
   </GestureHandlerRootView>;
 }
 

@@ -36,7 +36,7 @@ test('scanner entry loads real owner context before optional profile and Check',
   assert.equal(resolveScannerEntry({ ...ready, access: { ...ready.access, userId: 'owner-b' } }), 'loading');
   assert.equal(resolveScannerEntry({ ...ready, accessStatus: 'ERROR' }), 'error');
   assert.equal(resolveScannerEntry({ ...ready, contextStatus: 'error' }), 'error');
-  assert.equal(resolveScannerEntry(ready), 'profile');
+  assert.equal(resolveScannerEntry(ready), 'check');
   assert.equal(resolveScannerEntry({ ...ready, hasProfile: true }), 'check');
   assert.equal(resolveScannerEntry({ ...ready, profileIntroHandled: true }), 'check');
 });
@@ -58,4 +58,12 @@ test('restored or deep-linked editors are normalized to the real optional intro'
   assert.equal(needsScannerProfileRoute(['personalize'], { p0b: '1', entry: '1' }), false);
   assert.equal(needsScannerProfileRoute(['personalize'], { p0b: '1', entry: '1', mode: 'profile' }), false);
   assert.equal(needsScannerProfileRoute(['(tabs)', 'check'], {}), true);
+});
+
+// Catches a password-wall redirect while a guest owner is being established.
+test('hosted guest bootstrap waits for a real owner and fails closed before Check', () => {
+  assert.equal(resolveScannerEntry({ ...ready, authStatus:'SIGNED_OUT', ownerId:null, guestBootstrap:true }),'loading');
+  assert.equal(resolveScannerEntry({ ...ready, authStatus:'SIGNED_OUT', ownerId:null, guestBootstrap:true, authError:true }),'error');
+  assert.equal(resolveScannerEntry({ ...ready, guestBootstrap:true, access:{...ready.access,userId:'other'} }),'loading');
+  assert.equal(resolveScannerEntry({ ...ready, guestBootstrap:true, profileIntroHandled:true }),'check');
 });

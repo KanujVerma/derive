@@ -166,3 +166,20 @@ test('Wave-1 UI consumption keeps free flows apart from managed work', () => {
   assert.doesNotMatch(account, /Founding Beta|membership|fake email/);
   assert.doesNotMatch(account, /product checks are available on this device/, 'Wave-1 has no saved check history');
 });
+
+test('free scanner concurrent startup creates one owner and failed creation can retry', async()=>{
+  let starts=0,fail=true,release!:()=>void;
+  const barrier=new Promise<void>(resolve=>{release=resolve;});
+  const adapter:AuthAdapter={
+    async signInWithOtp(){return {data:{},error:null};},async verifyOtp(){return {data:{session:null,user:null},error:null};},
+    async getSession(){await barrier;return {data:{session:null},error:null};},
+    async signInAnonymously(){starts++;return fail?{data:{session:null,user:null},error:new Error('disabled')}:{data:{session:{user:{id:'one-guest'}},user:{id:'one-guest'}},error:null};},
+    async signOut(){return {error:null};},onAuthStateChange(){return {data:{subscription:{unsubscribe(){}}}};},
+  };
+  resetCustomerSessionData();setAuthAdapter(adapter);
+  try{
+    const a=ensureLocalAnonymousSession(),b=ensureLocalAnonymousSession();release();
+    const failures=await Promise.allSettled([a,b]);assert(failures.every(x=>x.status==='rejected'));assert.equal(starts,1);assert.equal(useAuthStore.getState().sessionUserId,null);
+    fail=false;assert.equal(await ensureLocalAnonymousSession(),'one-guest');assert.equal(starts,2);assert.equal(useAuthStore.getState().sessionUserId,'one-guest');
+  }finally{resetAuthAdapter();resetCustomerSessionData();}
+});

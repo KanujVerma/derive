@@ -41,14 +41,14 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   accessibilityHint,
 }) => {
-  const handlePress = async () => {
+  const handlePress = () => {
     if (disabled || loading) return;
+    onPress();
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     } catch {
       // Ignore if haptics unavailable
     }
-    onPress();
   };
 
   const getContainerStyle = () => {
@@ -61,19 +61,19 @@ export const Button: React.FC<ButtonProps> = ({
       case 'primary':
         return {
           backgroundColor: colors.ink,
-          height: baseHeight,
+          minHeight: baseHeight,
           paddingHorizontal: basePadding,
         };
       case 'brand':
         return {
           backgroundColor: colors.brand,
-          height: baseHeight,
+          minHeight: baseHeight,
           paddingHorizontal: basePadding,
         };
       case 'secondary':
         return {
           backgroundColor: colors.brandLight,
-          height: baseHeight,
+          minHeight: baseHeight,
           paddingHorizontal: basePadding,
         };
       case 'outline':
@@ -81,13 +81,13 @@ export const Button: React.FC<ButtonProps> = ({
           backgroundColor: 'transparent',
           borderWidth: 1.5,
           borderColor: colors.border,
-          height: baseHeight,
+          minHeight: baseHeight,
           paddingHorizontal: basePadding,
         };
       case 'ghost':
         return {
           backgroundColor: 'transparent',
-          height: baseHeight - 4,
+          minHeight: baseHeight - 4,
           paddingHorizontal: spacing.sm,
         };
     }
@@ -158,9 +158,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   text: {
     fontWeight: typography.weights.semibold,
+    flexShrink: 1,
     textAlign: 'center',
   },
   textLarge: {

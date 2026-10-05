@@ -4,7 +4,7 @@ import type { ProductResolutionResult } from '../../contracts/ProductIdentityRes
 export interface CheckCaptureHandoff {
   authority: 'customer_evidence';
   evidence?: CaptureEvidence[];
-  barcodeLookup: { barcode: string } | null;
+  barcodeLookup: { barcode: string; symbology?: string | null } | null;
   localPhotos: { role: PhotoRole; uri: string }[];
   review: {
     state: CaptureResult['state'] | 'pending';
@@ -16,7 +16,8 @@ export interface CheckCaptureHandoff {
 
 // This is a local handoff only. The host decides when or whether to resolve evidence.
 export function mapCaptureForCheck(handoff: CaptureHandoff, outcome?: CaptureResult): CheckCaptureHandoff {
-  const barcode = handoff.evidence.find((item) => item.role === 'barcode' && item.kind === 'barcode')?.value;
+  const barcodeEvidence = handoff.evidence.find((item) => item.role === 'barcode' && item.kind === 'barcode');
+  const barcode = barcodeEvidence?.value;
   const localPhotos = handoff.evidence.flatMap((item) =>
     item.kind === 'local_photo' && (item.role === 'front_label' || item.role === 'ingredients' || item.role === 'packaging')
       ? [{ role: item.role, uri: item.value }]
@@ -30,7 +31,7 @@ export function mapCaptureForCheck(handoff: CaptureHandoff, outcome?: CaptureRes
     authority: 'customer_evidence',
     evidence: handoff.evidence.map(item => ({ ...item })),
     // Mixed evidence must use the reviewed case, not Check's barcode-only fast path.
-    barcodeLookup: !localPhotos.length && barcode && /^\d{8,14}$/.test(barcode) ? { barcode } : null,
+    barcodeLookup: !localPhotos.length && barcode && /^\d{8,14}$/.test(barcode) ? { barcode, ...(barcodeEvidence?.symbology === undefined ? {} : { symbology: barcodeEvidence.symbology }) } : null,
     localPhotos,
     review: { state: outcome?.state ?? 'pending', selectedCandidateId },
   };

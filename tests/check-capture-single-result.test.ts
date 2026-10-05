@@ -23,7 +23,7 @@ test('capture observation hands off once and owns no catalog miss or second resu
   const nodes = h.render(); const barcode = nodes.find(node => node.type === 'CameraView')!.props.onBarcodeScanned;
   barcode({ data: '036000291452', type: 'upc_a' }); barcode({ data: '036000291452', type: 'upc_a' });
   assert.equal(handedOff.length, 1);
-  assert.deepEqual(handedOff[0].evidence, [{ kind: 'barcode', role: 'barcode', value: '036000291452' }]);
+  assert.deepEqual(handedOff[0].evidence, [{ kind: 'barcode', role: 'barcode', value: '036000291452', symbology: 'upc_a' }]);
   assert.doesNotMatch(textContent(h.render()), /No product match|This barcode|No verified match|Product not confirmed/);
 });
 test('requested photo mode retains the same barcode and useful photos without silently returning to Auto', () => {

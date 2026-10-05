@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "recordId": "derive-original-lexical-and-semantics-review-v1",
+  "reviewMode": "automated",
+  "reviewers": [
+    "Codex root executor",
+    "Codex independent_review delegated reviewer"
+  ],
+  "reviewedAt": "2026-10-04T06:59:06Z",
+  "authorityBasis": "Human-authorized implementation and reuse of original KanujVerma/derive app source; no third-party grant inferred",
+  "decision": "approve bounded original lexical fields and existing implemented deterministic semantics for compiled ordinary selection; registry activation separate",
+  "sourceCommits": {
+    "dictionary": "0471ea2962810d333ba746d6b7d9bb6896dc7b69",
+    "semanticRelease": "6fd1fdfad00b27a66e5062c24cab12c8ed955869"
+  },
+  "originalSourceSha256": {
+    "dictionary": "7f2275f536d572c9f19073c4c7674ad4f2d730c68bbf742bda18085bf9f7dc2c",
+    "semanticRelease": "f0a3ad18fc28e440ea84b5dbda72750f29c14f51a6f99e97b380aa227a884771"
+  },
+  "scope": [
+    "20 original literal identity names",
+    "23 exact surfaces, including explicitly reviewed Water/Eau/Aqua (Water, Eau)",
+    "stable ingredient IDs with separate immutable provenance/alias IDs",
+    "original deterministic rules and compatible template/projection",
+    "three exact purpose mappings only when independently authorized literal label assertion qualifies"
+  ],
+  "exclusions": [
+    "inherited Glycerin explanation/source grants",
+    "external chemical registry imports or CAS/UNII equivalence",
+    "scientific taxonomy validity",
+    "clinical efficacy magnitude, superiority, safety, personal allergy or concentration transfer",
+    "per-product source permission or formula authority",
+    "professional review credentials",
+    "model processing approval",
+    "hosted registry/config activation"
+  ],
+  "dictionaryHash": "ef75d28761f64633316a2ca19542bfe3fada71dfea5590ec1dd5016e8a9bd4b0",
+  "partTwoReleaseId": "part-two:6a2e0e18e7f61279393f7f274d170871f94dc1f8d05ee0640bca8b1e41b5dae5",
+  "semanticId": "derive-original-personal-v1",
+  "semanticHash": "1eefe0869935387cd8bfb8adfebb68e673a6517b1f0411137cc0282eebf9132d"
+}

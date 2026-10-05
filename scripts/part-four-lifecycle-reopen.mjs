@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {spawn} from 'node:child_process';
+import {readFile,writeFile} from 'node:fs/promises';
+import {createClient} from '@supabase/supabase-js';
+const endpoint=process.env.SUPABASE_URL,anon=process.env.SUPABASE_ANON_KEY,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
+if(endpoint!=='http://127.0.0.1:60741'||!anon||!key||!process.env.PART_ONE_DOCKER_CONFIG)throw Error('Dedicated local stack required');
+const admin=createClient(endpoint,key,{auth:{persistSession:false,autoRefreshToken:false}});
+let owner,token,checks=0;
+const check=(a,b,message)=>{assert.deepEqual(a,b,message);checks++;};
+const sql=query=>new Promise((resolve,reject)=>{const p=spawn('/opt/homebrew/bin/docker',['--config',process.env.PART_ONE_DOCKER_CONFIG,'exec','-i','supabase_db_derive-part-four-lifecycle','psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-Atq'],{stdio:['pipe','pipe','pipe']});let out='',failure='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>failure+=b);p.once('error',reject);p.once('close',c=>c===0?resolve(out.trim()):reject(Error(failure)));p.stdin.end(query);});
+const literal=value=>"'"+String(value).replaceAll("'","''")+"'";
+const p3=async body=>{const response=await fetch(`${endpoint}/functions/v1/part-three`,{method:'POST',headers:{apikey:anon,authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify(body)});const out=await response.json();assert.equal(response.status,200,`Actual Edge ${body.operation}: ${out.code??out.reason??''}`);return out;};
+import {partFourBindingRelease} from '../src/domain/part-four/release.ts';
+import {PENDING_SCIENTIFIC_MANIFEST} from '../src/domain/part-four/scientificDecision.ts';
+const previous=JSON.parse(await readFile('../integration-p4-lifecycle-private/save-baseline.json','utf8')),expanded=JSON.parse(await readFile('../integration-p4-lifecycle-private/save423.json','utf8')),science=JSON.parse(await readFile('../integration-p4-lifecycle-private/science-save.json','utf8'));
+owner=previous.owner;token=previous.token;const tuple=partFourBindingRelease('approved423',PENDING_SCIENTIFIC_MANIFEST.contentHash);
+await sql(`update private.part_four_release set release_hash=${literal(tuple.releaseHash)},scientific_manifest_hash=${literal(tuple.scientificManifestHash)} where id=true;`);
+for(const saved of [previous,expanded]){const read=await p3({operation:'read_saved',savedAssessmentId:saved.savedId});check(read.assessmentWhenSaved.binding.releases.partFour,saved.result.binding.releases.partFour,'cold process preserves exact historical tuple');check(read.assessmentWhenSaved.partFour.formula,saved.result.partFour.formula,'cold process preserves full formula');check((await p3(saved.saveReq)).savedAssessmentId,saved.savedId,'cold exact Save request replay');}
+const withdrawn=await p3({operation:'read_saved',savedAssessmentId:science.savedId});check(withdrawn.assessmentWhenSaved.partFour.scientificDecision.assessments[0].assessment.state,'unavailable','cold reopen preserves science revocation');check((await p3(science.saveReq)).savedAssessmentId,science.savedId,'cold original science receipt replay');
+console.log(JSON.stringify({suite:'part-four-lifecycle-cold-reopen',checks,coldClientProcess:true,actualAuthEdgeSQL:true,ownerRetained:true,realClaimsAdmitted:0,status:'passed'}));

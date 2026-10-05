@@ -12,7 +12,8 @@ const good=async(c,body)=>{const r=await call(c,body);assert.ifError(r.error);re
 let aid,bid,pid,vid,fid,newFid;
 try {
   const sa=await a.auth.signInAnonymously(),sb=await b.auth.signInAnonymously();assert.ifError(sa.error);assert.ifError(sb.error);aid=sa.data.user.id;bid=sb.data.user.id;
-  assert.equal((await call(client(status.ANON_KEY),{operation:'get_context'})).status,401);
+  const noAuth=await fetch(`${status.API_URL}/functions/v1/personal-context`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation:'get_context'})});
+  assert.equal(noAuth.status,401,'missing Authorization is rejected before context access');
   assert.equal((await good(a,{operation:'get_context'})).revision,0);
   for(const table of ['personal_context_heads','personal_context_revisions','personal_decision_assessments']) assert.equal((await a.from(table).select('*')).error?.code,'42501');
   const profile={intent:'add',primaryGoal:'dryness',secondaryGoals:['maintain'],skinBehavior:'dry_tight',reactivity:'unsure',reproductive:{pregnancy:'unanswered',tryingToConceive:'withheld',nursing:'no'},sensitivities:{status:'unanswered',values:[]},treatments:{status:'none',values:[]}};

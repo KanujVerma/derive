@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { normalizeAuthorized, PART_TWO_RELEASE_ID, PART_TWO_VERSIONS, LOCAL_DICTIONARY_RELEASE } from '../supabase/functions/_shared/part-two-runtime.ts';
+const owner='fa000000-0000-4000-8000-000000000001',scan='fa000000-0000-4000-8000-000000000002',capture='fa000000-0000-4000-8000-000000000003',obs='fa000000-0000-4000-8000-000000000004';
+const now='2026-10-02T01:00:00.000Z',expiresAt='2026-10-03T01:00:00.000Z',hash='a'.repeat(64);
+const request={schemaVersion:1 as const,requestId:'fa000000-0000-4000-8000-000000000005',scanId:scan,captureSessionId:capture,expectedGeneration:0,expectedEvidenceRevision:2};
+const observation={id:obs,kind:'observation' as const,revision:1,policyId:'private_capture',policyVersion:'fixture-1',ownerId:owner,scope:'private_package' as const,payload:{rawText:'Water',privateKind:'ocr',role:'ingredients',observation:{status:'recognized'}},dependencies:[],identityDependencies:[],observedAt:now,expiresAt,status:'active' as const,statusRevision:1};
+const context={ownerId:owner,scanId:scan,capture:{captureSessionId:capture,packageObservationId:'fa000000-0000-4000-8000-000000000006',captureRevision:1,generation:0,deletionEpoch:0,removed:false},generation:0,evidenceRevision:2,bindingRevision:2,policyEpoch:1,withdrawnExplanationDependencies:[],deletionEpoch:0,result:{packageConfirmation:'unconfirmed',display:{sections:[{sectionId:'section',kind:'ingredients',text:'Water'}]}},declaration:null,snapshot:null,dependencies:[observation],observations:[observation],policies:[{id:'private_capture',version:'fixture-1',retainAllowed:true,displayAllowed:true,exportAllowed:false,epoch:1,expiresAt}],expiresAt,state:'pending' as const,releaseId:PART_TWO_RELEASE_ID,releaseHash:LOCAL_DICTIONARY_RELEASE.contentHash,versions:PART_TWO_VERSIONS,releaseEpoch:1,contextDigest:hash,dependencyDigest:hash,bindingKey:hash};
+test('exact source denial distinguishes revoked/deleted authority from release refusal and ancestry bounds',async()=>{
+ const cases=[
+  {ctx:{...context,state:'blocked',dependencies:[],observations:[]},state:'blocked',signal:true,text:false},
+  {ctx:{...context,state:'blocked',capture:{...context.capture,removed:true},dependencies:[],observations:[]},state:'blocked',signal:true,text:false},
+  {ctx:{...context,state:'blocked',releaseId:null},state:'blocked',signal:false,text:true},
+  {ctx:{...context,state:'parse_limit',dependencies:[],observations:[]},state:'parse_limit',signal:false,text:false},
+  {ctx:context,state:'blocked',signal:false,text:true},
+ ];
+ for(const c of cases){const result=await normalizeAuthorized(request,owner,{authorize:async()=>owner,now:()=>now,operation:async()=>({context:c.ctx,resultRevision:9,state:c.state,reasonCodes:['rights_or_evidence_unavailable'],cached:null,ticket:null}),worker:async()=>{throw Error('terminal response must not perform worker work');}});assert.equal(result.state,c.state);assert.equal(result.state!=='ready'&&result.state!=='pending'&&result.reasonCodes.includes('source_evidence_unavailable'),c.signal);assert.equal(result.state!=='ready'&&result.permittedText!==null,c.text);assert.equal(result.resultRevision,9);assert.equal(result.captureSessionId,capture);}
+});
+test('late publication failure reauthorizes and emits the exact-target source denial',async()=>{
+ let resolves=0;const result=await normalizeAuthorized(request,owner,{authorize:async()=>owner,now:()=>now,localFixtureApproved:true,operation:async()=>++resolves===1?{context,resultRevision:1,state:'pending',reasonCodes:[],cached:null,ticket:{bindingKey:hash,leaseToken:'fa000000-0000-4000-8000-000000000007',contextDigest:hash,expectedResultRevision:1}}:{context:{...context,state:'blocked',dependencies:[],observations:[],capture:{...context.capture,removed:true}},resultRevision:3,state:'blocked',reasonCodes:['evidence_changed'],cached:null,ticket:null},worker:async()=>{throw Error('source removed during publication');}});assert.equal(resolves,2);assert.equal(result.state,'blocked');if(result.state==='blocked')assert(result.reasonCodes.includes('source_evidence_unavailable'));assert.equal(result.permittedText,null);assert.equal(result.resultRevision,3);
+});

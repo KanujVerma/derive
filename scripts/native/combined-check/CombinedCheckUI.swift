@@ -1,0 +1,167 @@
+import XCTest
+final class CombinedCheckUI: XCTestCase {
+ let app=XCUIApplication(bundleIdentifier:"com.derive.skincare")
+ override func setUpWithError() throws {
+  continueAfterFailure=false
+  print("COMBINED_CHECK_NATIVE_FIXTURE_ENTRY_V1")
+  let system=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+  for _ in 0..<3{if system.buttons["Open"].waitForExistence(timeout:1){system.buttons["Open"].tap()}else{break}}
+  app.activate()
+  let localHost=app.buttons.matching(NSPredicate(format:"label CONTAINS %@","http://127.0.0.1:8171")).firstMatch
+  if localHost.waitForExistence(timeout:2) && localHost.isHittable{localHost.tap()}
+  if app.buttons["Continue"].waitForExistence(timeout:2) && app.buttons["Continue"].isHittable{app.buttons["Continue"].tap()}
+  if app.buttons["Go home"].exists && app.buttons["Close"].exists{app.buttons["Close"].tap()}
+  if element("Try again").exists && element("Try again").isHittable{element("Try again").tap()}
+ }
+ func testDevelopmentClientConnection() throws {
+  app.activate()
+  if app.buttons["Continue"].waitForExistence(timeout:5){app.buttons["Continue"].tap()}
+  let loaded=XCTNSPredicateExpectation(predicate:NSPredicate{_,_ in self.contains("Derive could not connect").exists || self.contains("Check").exists || self.element("Load Part3 local fixture").exists},object:app)
+  XCTAssertEqual(XCTWaiter.wait(for:[loaded],timeout:90),.completed,app.debugDescription)
+  shot("combined-native-host-loaded")
+ }
+ func element(_ label:String)->XCUIElement {app.descendants(matching:.any).matching(NSPredicate(format:"label == %@",label)).firstMatch}
+ func fixtureRoute(){let entry=element("Open local integration fixture");let ready=XCTNSPredicateExpectation(predicate:NSPredicate{_,_ in self.element("Load Part3 local fixture").exists || entry.exists && entry.isHittable},object:app);XCTAssertEqual(XCTWaiter.wait(for:[ready],timeout:25),.completed,app.debugDescription);if entry.exists && entry.isHittable{entry.tap()};XCTAssertTrue(element("Load Part3 local fixture").waitForExistence(timeout:20),app.debugDescription)}
+ func tab(_ label:String){if app.keyboards.firstMatch.exists{let submit=app.keyboards.buttons["Search"];if submit.waitForExistence(timeout:3) && submit.isHittable{submit.tap()}else if app.scrollViews.firstMatch.exists{app.scrollViews.firstMatch.swipeUp()}};let target=app.buttons.matching(NSPredicate(format:"label CONTAINS %@",", "+label+",")).firstMatch;XCTAssertTrue(target.waitForExistence(timeout:15),app.debugDescription);let visible=XCTNSPredicateExpectation(predicate:NSPredicate(format:"hittable == true"),object:target);XCTAssertEqual(XCTWaiter.wait(for:[visible],timeout:10),.completed,app.debugDescription);target.tap()}
+ func contains(_ label:String)->XCUIElement {app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@",label)).firstMatch}
+ func assertOneRenderedLabel(_ label:String){var previous:Set<String>=[];let stable=XCTNSPredicateExpectation(predicate:NSPredicate{_,_ in let nodes=self.app.staticTexts.matching(NSPredicate(format:"label == %@",label)).allElementsBoundByIndex;let frames=Set(nodes.map{String(describing:$0.frame)});defer{previous=frames};return !nodes.isEmpty && frames.count == 1 && frames == previous},object:app);XCTAssertEqual(XCTWaiter.wait(for:[stable],timeout:10),.completed,"Exactly one stable rendered location required for \(label): \(app.debugDescription)")}
+ func scroll()->XCUIElement{let region=app.otherElements["result-sheet-scroll"].firstMatch;let sheet=region.scrollViews.firstMatch;if sheet.exists{return sheet};let views=app.scrollViews;return views.count>1 ? views.element(boundBy:views.count-1) : views.firstMatch}
+ func tap(_ label:String){let target=element(label);if target.exists && target.isHittable{target.tap();return};if app.keyboards.firstMatch.exists && scroll().exists{scroll().swipeDown()};for _ in 0..<30{if target.exists && target.isHittable{target.tap();return};if scroll().exists{if target.exists && target.frame.midY < scroll().frame.minY+12{scroll().swipeDown()}else{scroll().swipeUp()}}};XCTFail("Unreachable: \(label)\n\(app.debugDescription)")}
+ func expand(){let handle=element("Product result");let ready=XCTNSPredicateExpectation(predicate:NSPredicate{_,_ in let f=handle.frame;return !f.isEmpty && !f.isInfinite && f.intersects(self.app.frame)},object:handle);XCTAssertEqual(XCTWaiter.wait(for:[ready],timeout:15),.completed,"Sheet handle must have an on-screen frame: \(app.debugDescription)");print("SHEET_GEOMETRY \(handle.frame) \(handle.value ?? "none")");if (handle.value as? String) != "Expanded"{tap("Product result")};XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"value == %@","Expanded"),object:handle)],timeout:10),.completed,app.debugDescription)}
+ func choose(_ label:String){tap(label);XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"value CONTAINS %@ AND NOT value CONTAINS %@","checked","unchecked"),object:element(label))],timeout:10),.completed,"Choice did not select: \(label)")}
+ func shot(_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
+ func pressClose(){let target=element("Close result");var prior=CGRect.null;let stable=XCTNSPredicateExpectation(predicate:NSPredicate{_,_ in let frame=target.frame;defer{prior=frame};return target.exists && target.isHittable && !frame.isEmpty && frame == prior},object:target);XCTAssertEqual(XCTWaiter.wait(for:[stable],timeout:10),.completed,"Close control must finish its sheet transition");target.tap()}
+ func close(){pressClose();XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Close result"))],timeout:10),.completed)}
+ func cancelSearch(){pressClose();XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Back to result"))],timeout:15),.completed,app.debugDescription)}
+ func testRepeatedOrdinarySearchReturn() throws {
+  fixtureRoute();tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close();tap("Open normal Check with synthetic session")
+  XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:25));let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"Original synthetic\n")
+  let item=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Check Synthetic Original synthetic authority fixture")).firstMatch;XCTAssertTrue(item.waitForExistence(timeout:25),app.debugDescription);item.tap();XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30));expand()
+  for cycle in 0..<6 {
+   print("SEARCH_RETURN_CYCLE \(cycle)")
+   tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:15))
+   tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));cancelSearch();expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:15));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription)
+  };close()
+ }
+ func testNativeGestureAndBackdropDismissal() throws {
+  fixtureRoute();tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30))
+  let handle=element("Product result");XCTAssertTrue(handle.isHittable);print("GESTURE_CLOSE_START \(handle.frame)")
+  let end=app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.98));handle.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).press(forDuration:0.05,thenDragTo:end)
+  XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Close result"))],timeout:15),.completed,"Actual native pan-down must acknowledge dismissal");shot("part-three-native-gesture-dismissed")
+  tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30))
+  let current=element("Product result");XCTAssertGreaterThan(current.frame.minY,app.frame.minY+100,"Compact sheet must leave an observed backdrop region")
+  let backdrop=app.coordinate(withNormalizedOffset:CGVector.zero).withOffset(CGVector(dx:app.frame.width/2,dy:(current.frame.minY-app.frame.minY)/2));print("BACKDROP_CLOSE_START \(current.frame)");backdrop.tap()
+  XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element("Close result"))],timeout:15),.completed,"Actual native backdrop must acknowledge dismissal");XCTAssertTrue(element("Load Part3 local fixture").isHittable);shot("part-three-native-backdrop-dismissed")
+ }
+ func testComparisonQuestionSaveReopenWithdrawalAndOwner() throws {
+  continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
+  if element("Close result").exists{close()}
+  fixtureRoute();let initialSavedState=try controlRequest("/integration-state");XCTAssertTrue(element("Load Part3 local fixture").waitForExistence(timeout:20),app.debugDescription);tap("Load Part3 local fixture")
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:30));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertTrue(contains("Purpose, application site or use form needs clarification.").exists,app.debugDescription);XCTAssertFalse(contains("Ingredient details").exists,"Collapsed result must earn an immediate judgment before detail disclosure");shot("part-three-collapsed-immediate-judgment");expand()
+  XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:35),app.debugDescription);shot("part-three-first-card-bounded-insufficiency")
+  tap("Compare or describe this check");tap("Original synthetic current cream")
+  XCTAssertTrue(element("Replace this item").waitForExistence(timeout:30),app.debugDescription);shot("part-three-one-material-intent-question")
+  tap("Replace this item");XCTAssertFalse(element("Replace this item").exists);choose("Moisturizing");choose("Face");choose("Leave on")
+  XCTAssertTrue(contains("Worth considering").waitForExistence(timeout:30),app.debugDescription)
+  XCTAssertTrue(contains("Its label matches the step you want to replace.").exists);XCTAssertTrue(contains("Published list").exists)
+  XCTAssertFalse(element("Replace this item").exists);shot("part-three-earned-replacement-card")
+  tap("Close comparison choices");tap("Worth considering");tap("Its label matches the step you want to replace.");shot("part-three-earned-first-card-visible");tap("Save product");var savedProductState=try controlRequest("/integration-state");for _ in 0..<20{if savedProductState["saves"] as? Int == (initialSavedState["saves"] as? Int ?? 0)+1{break};Thread.sleep(forTimeInterval:0.2);savedProductState=try controlRequest("/integration-state")};XCTAssertEqual(savedProductState["saves"] as? Int,(initialSavedState["saves"] as? Int ?? 0)+1,"Product save is independently acknowledged by local SQL");tap("Save this assessment")
+  XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription);shot("part-three-exact-assessment-save")
+  // Retained recall tests may durably revoke the reference card. Exact identity
+  // survives independently; this flow must not require recalled reference prose.
+  tap("Ingredient details: Glycerin");tap("Listed as: Glycerin");XCTAssertTrue(contains("Listed as: Glycerin").exists,app.debugDescription);XCTAssertFalse(contains("reference humectant role").exists,"Durably recalled reference wording must not return");shot("part-three-unaffected-ingredient-detail");tap("Close ingredient detail")
+  close();tap("Reopen Part3 saved assessment");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand()
+  XCTAssertTrue(contains("Assessment when saved").waitForExistence(timeout:20),app.debugDescription)
+  XCTAssertTrue(contains("Current assessment").exists);XCTAssertTrue(contains("Worth considering").exists);XCTAssertFalse(element("Replace this item").exists);shot("part-three-reopened-history-versus-current")
+  close();tap("Take synthetic client offline");tap("Reopen Part3 saved assessment")
+  // The harness refuses offline transport. Its last mounted personal bodies were
+  // removed by closing; no current green or saved prose may return offline.
+  XCTAssertFalse(contains("Worth considering").exists);shot("part-three-native-offline-no-current-authority")
+  tap("Withdraw Part3 purpose field");XCTAssertTrue(contains("Synthetic purpose field withdrawn").waitForExistence(timeout:15));tap("Reconnect synthetic client");tap("Reopen Part3 saved assessment")
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand()
+  XCTAssertTrue(contains("The earlier personal assessment is no longer available.").waitForExistence(timeout:30),app.debugDescription)
+  XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertFalse(contains("Worth considering").exists);XCTAssertFalse(contains("Its label matches the step").exists)
+  tap("Ingredient details: Glycerin");tap("Listed as: Glycerin");XCTAssertTrue(contains("Listed as: Glycerin").exists,app.debugDescription);XCTAssertFalse(contains("reference humectant role").exists,"Durably recalled reference wording must not return");shot("part-three-withdrawn-purpose-safe-ingredient-survival");tap("Close ingredient detail")
+  close();tap("Switch Part3 fixture account");XCTAssertFalse(contains("Worth considering").exists);XCTAssertFalse(contains("Original synthetic authority fixture").exists);shot("part-three-owner-clear")
+ }
+ func testFiveStepAtomicSetupAndConfirmedPreference() throws {
+  continueAfterFailure=false;app.activate();if app.buttons["Open"].exists{app.buttons["Open"].tap()}
+  if element("Close result").exists{close()}
+  fixtureRoute();XCTAssertTrue(element("Open five-step setup").waitForExistence(timeout:20),app.debugDescription);tap("Open five-step setup")
+  XCTAssertTrue(contains("Step 1 of 5").waitForExistence(timeout:20));tap("Dryness");tap("Continue")
+  XCTAssertTrue(contains("Step 2 of 5").waitForExistence(timeout:10));tap("Dry or tight");tap("Usually not");tap("Continue")
+  XCTAssertTrue(contains("Step 3 of 5").waitForExistence(timeout:10))
+  let search=app.textFields["Search catalog products"].firstMatch;XCTAssertTrue(search.exists);search.tap();search.typeText("Synthetic setup current lotion");tap("Add this name")
+  tap("Moisturizing");tap("Face");tap("Leave on");tap("How’s it working for you?");tap("Works well");tap("Continue")
+  XCTAssertTrue(contains("Step 4 of 5").waitForExistence(timeout:10));tap("None that I remember");tap("Continue")
+  XCTAssertTrue(contains("Step 5 of 5").waitForExistence(timeout:10));tap("Add a confirmed preference");tap("An extra skincare step");tap("Firm constraint");tap("I confirm this choice and its strength");tap("Use confirmed preference")
+  let note=app.textViews.matching(NSPredicate(format:"label BEGINSWITH %@","Anything else")).firstMatch;for _ in 0..<12{if note.isHittable{break};scroll().swipeUp()};XCTAssertTrue(note.exists);note.tap();note.typeText("Synthetic private setup note; no hidden ingredient inference.")
+  tap("Done editing note");shot("part-three-five-step-explicit-save-disclosure");tap("Save skin setup")
+  XCTAssertTrue(contains("Atomic five-step setup saved and reopened from SQL").waitForExistence(timeout:25),app.debugDescription)
+  let completed=DispatchSemaphore(value:0);var responseJSON:[String:Any]?;var responseStatus:Int?
+  URLSession.shared.dataTask(with:URL(string:"http://127.0.0.1:8373/setup-result")!){data,response,_ in responseStatus=(response as? HTTPURLResponse)?.statusCode;if let data=data{responseJSON=(try? JSONSerialization.jsonObject(with:data)) as? [String:Any]};completed.signal()}.resume()
+  XCTAssertEqual(completed.wait(timeout:.now()+20),.success);XCTAssertEqual(responseStatus,200)
+  let read=try XCTUnwrap(responseJSON);XCTAssertEqual(read["revision"] as? Int,1);XCTAssertEqual((read["current"] as? [[String:Any]])?.first?["name"] as? String,"Synthetic setup current lotion");XCTAssertEqual((read["assessment"] as? [[String:Any]])?.first?["perceivedHelp"] as? String,"helps");XCTAssertEqual((read["assessment"] as? [[String:Any]])?.first?["satisfaction"] as? String,"unanswered");XCTAssertEqual((read["preferences"] as? [[String:Any]])?.first?["kind"] as? String,"no_extra_step");XCTAssertEqual(read["noteCount"] as? Int,1);shot("part-three-atomic-setup-acknowledged")
+ }
+
+ func controlRequest(_ path:String,method:String="GET") throws ->[String:Any] {
+  let completed=DispatchSemaphore(value:0);var payload:[String:Any]=[:];var status:Int?
+  var r=URLRequest(url:URL(string:"http://127.0.0.1:8373"+path)!);r.httpMethod=method
+  URLSession.shared.dataTask(with:r){data,response,_ in status=(response as? HTTPURLResponse)?.statusCode;if let data=data{payload=((try? JSONSerialization.jsonObject(with:data)) as? [String:Any]) ?? [:]};completed.signal()}.resume()
+  XCTAssertEqual(completed.wait(timeout:.now()+20),.success);XCTAssertEqual(status,200);return payload
+ }
+ func testNativeContextConflictRetainsDraft() throws {
+  continueAfterFailure=false;app.activate();tap("Open confirmed preferences")
+  XCTAssertTrue(contains("Your confirmed preferences").waitForExistence(timeout:20));tap("Add a confirmed preference");choose("Choose exact ingredient: Glycerin");choose("Firm constraint");choose("I confirm this choice and its strength");tap("Use confirmed preference")
+  XCTAssertTrue(contains("Glycerin · Firm constraint").exists);_ = try controlRequest("/advance-setup-context",method:"POST")
+  tap("Save confirmed preferences");XCTAssertTrue(contains("Your saved context changed. Your draft remains here.").waitForExistence(timeout:20),app.debugDescription);XCTAssertTrue(contains("Glycerin · Firm constraint").exists)
+  let read=try controlRequest("/setup-result");XCTAssertEqual(read["revision"] as? Int,2);XCTAssertEqual((read["preferences"] as? [[String:Any]])?.count,1);XCTAssertEqual((read["preferences"] as? [[String:Any]])?.first?["kind"] as? String,"no_extra_step");XCTAssertEqual((read["current"] as? [[String:Any]])?.first?["name"] as? String,"Synthetic setup current lotion");XCTAssertEqual(read["noteCount"] as? Int,1);shot("part-three-native-stale-context-draft-retained");tap("Back")
+ }
+ func testUsabilityLargeTextAndLongName() throws {
+  continueAfterFailure=false;app.activate();XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);expand()
+  XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription)
+  let labels=app.staticTexts.allElementsBoundByIndex.map{$0.label};let name=try XCTUnwrap(labels.firstIndex(where:{$0.contains("deliberately long multilingual product name")}));let judgment=try XCTUnwrap(labels.firstIndex(of:"Not enough info"));let reason=try XCTUnwrap(labels.firstIndex(where:{$0.contains("The available evidence cannot support a judgment for this purpose.")}));let scope=try XCTUnwrap(labels.firstIndex(of:"Published list · Package not confirmed"));XCTAssertLessThan(name,judgment);XCTAssertLessThan(judgment,reason);XCTAssertLessThan(reason,scope)
+  shot("part-three-large-text-long-name-first-card");tap("Not enough info");shot("part-three-large-text-judgment-visible");tap("The available evidence cannot support a judgment for this purpose.");shot("part-three-large-text-reason-visible");tap("Published list · Package not confirmed");shot("part-three-large-text-scope-visible");tap("Compare or describe this check");choose("Moisturizing");choose("Face");choose("Leave on");XCTAssertFalse(contains("Worth considering").exists);shot("part-three-large-text-controls-reachable-without-color-authority");close()
+ }
+
+
+ func testNormalCheckNameSearchUnknownSaveAndMyStuff() throws {
+  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};fixtureRoute()
+  tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close();let initial=try controlRequest("/integration-state");tap("Open normal Check with synthetic session")
+  XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:25));let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"Original synthetic\n")
+  let item=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Check Synthetic Original synthetic authority fixture")).firstMatch;XCTAssertTrue(item.waitForExistence(timeout:25),app.debugDescription);item.tap()
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:25));XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:30),app.debugDescription);XCTAssertTrue(contains("The available evidence cannot support a judgment for this purpose.").exists);XCTAssertTrue(contains("Published list · Package not confirmed").exists);XCTAssertFalse(contains("Worth considering").exists)
+  // React Native exposes nested text nodes for the same rendered label.
+  assertOneRenderedLabel("Personal Fit");assertOneRenderedLabel("Original synthetic authority fixture")
+  XCTAssertFalse(element("Ingredient details: Glycerin").exists,"collapsed judgment precedes ingredient disclosure");shot("combined-normal-partial-immediate-judgment");expand();XCTAssertTrue(element("Ingredient details: Glycerin").waitForExistence(timeout:20),app.debugDescription)
+  tap("Compare or describe this check");tap("Original synthetic current cream");XCTAssertFalse(element("Skip this question for this check").exists,"unsupported purpose cannot make an intent question useful");choose("Replace one item");choose("Moisturizing");choose("Face");choose("Leave on");XCTAssertTrue(contains("Not enough info").waitForExistence(timeout:20));XCTAssertFalse(contains("Worth considering").exists)
+  tap("Close comparison choices");tap("Save product");XCTAssertTrue(element("Saved").waitForExistence(timeout:20),app.debugDescription);tap("Compare or describe this check");tap("Save this assessment");XCTAssertTrue(element("Assessment saved").waitForExistence(timeout:20),app.debugDescription);tap("Close comparison choices");shot("combined-normal-partial-separate-saves")
+  let before=try controlRequest("/integration-state");tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Not enough info").exists);XCTAssertTrue(element("Ingredient details: Glycerin").exists)
+  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));cancelSearch();XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Not enough info").exists);XCTAssertTrue(element("Ingredient details: Glycerin").exists)
+  // Normalization includes the existing 15-second authority renewals. A native
+  // workflow spanning that timer cannot assert zero extra calls. Mounted-clock
+  // tests prove one Part2 owner; here search must preserve scan, saves and input.
+  let after=try controlRequest("/integration-state");XCTAssertEqual((after["counts"] as? [String:Int])?["scan"],(before["counts"] as? [String:Int])?["scan"]);XCTAssertEqual(after["saves"] as? Int,before["saves"] as? Int);XCTAssertEqual(after["assessments"] as? Int,before["assessments"] as? Int)
+  tap("Compare or describe this check");for label in ["Original synthetic current cream","Replace one item","Moisturizing","Face","Leave on"]{XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"value CONTAINS %@ AND NOT value CONTAINS %@","checked","unchecked"),object:element(label))],timeout:10),.completed,"Search retained explicit selection: \(label)")};tap("Close comparison choices");shot("combined-partial-search-return");close();tab("My Stuff")
+  XCTAssertTrue(contains("Saved product evidence").waitForExistence(timeout:25));let saved=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Open assessment saved ")).firstMatch;for _ in 0..<20{if saved.exists && saved.isHittable{break};app.scrollViews.firstMatch.swipeUp()};XCTAssertTrue(saved.exists,app.debugDescription);saved.tap();XCTAssertTrue(element("Product result").waitForExistence(timeout:25));expand()
+  XCTAssertTrue(contains("Assessment when saved").waitForExistence(timeout:25),app.debugDescription);XCTAssertTrue(contains("Current assessment").exists);XCTAssertTrue(contains("Not enough info").exists);XCTAssertFalse(contains("Worth considering").exists);XCTAssertTrue(element("Ingredient details: Glycerin").exists);shot("combined-normal-my-stuff-partial-history-current")
+  let state=try controlRequest("/integration-state");XCTAssertEqual(state["saves"] as? Int,(initial["saves"] as? Int ?? 0)+1);XCTAssertEqual(state["assessments"] as? Int,(initial["assessments"] as? Int ?? 0)+1);let counts=try XCTUnwrap(state["counts"] as? [String:Int]);XCTAssertGreaterThanOrEqual(counts["search"] ?? 0,1);XCTAssertEqual(counts["scan"],((initial["counts"] as? [String:Int])?["scan"] ?? 0)+1);close()
+ }
+
+ func testNormalBarcodeLocalPhotoDraftBackSearchAndRemoval() throws {
+  continueAfterFailure=false;app.activate();if element("Close result").exists{close()};fixtureRoute();tap("Load Part3 local fixture");XCTAssertTrue(element("Product result").waitForExistence(timeout:25));close();tap("Open normal Check with synthetic session");tab("Check")
+  XCTAssertTrue(element("Search catalog products").waitForExistence(timeout:20),app.debugDescription)
+  let input=element("Search catalog products");input.tap();input.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:50)+"123456789012\n")
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:25),app.debugDescription);expand();tap("Scan ingredients")
+  XCTAssertTrue(element("Choose ingredient photo").waitForExistence(timeout:20),app.debugDescription);tap("Choose ingredient photo")
+  let photo=app.images.matching(NSPredicate(format:"label BEGINSWITH %@","Photo,")).firstMatch
+  XCTAssertTrue(photo.waitForExistence(timeout:20),app.debugDescription);XCTAssertFalse(photo.frame.isEmpty);photo.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+  XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:25),app.debugDescription)
+  tap("Correct photo 1 line 1");let recognized=element("Correction for photo 1 line 1");XCTAssertTrue(recognized.waitForExistence(timeout:20),app.debugDescription);XCTAssertTrue((recognized.value as? String ?? "").contains("Hexanediol"),"Original native OCR line remains available without editing");shot("combined-ordinary-local-photo-reading");tap("Cancel correction for photo 1 line 1")
+  tap("Back to product result");XCTAssertTrue(element("Product result").waitForExistence(timeout:20));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:20));XCTAssertTrue(contains("Hexanediol").exists);XCTAssertFalse(contains("Worth considering").exists)
+  tap("Search by name");XCTAssertTrue(element("Back to result").waitForExistence(timeout:15));tap("Back to result");XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertTrue(contains("Label reading").waitForExistence(timeout:15));XCTAssertTrue(contains("Hexanediol").exists);shot("combined-capture-back-and-search-preserve-draft")
+  tap("Review local label draft and add missing photos");XCTAssertTrue(contains("Photo 1 · local preview").waitForExistence(timeout:15));tap("Remove temporary ingredient draft")
+  XCTAssertTrue(element("Product result").waitForExistence(timeout:15));expand();XCTAssertFalse(contains("Label reading").exists);XCTAssertFalse(contains("Hexanediol").exists);shot("combined-local-draft-erased")
+  close();XCTAssertFalse(contains("Hexanediol").exists)
+ }
+}

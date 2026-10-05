@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "rights": "Authorized generated synthetic fixture only; no real product/person",
+  "assetsByRole": {
+    "ingredients": {
+      "sanitizedAssetHash": "9ddfc3e2eb22f9bc44e5a60f96b904d429d3c153d83052da7756f6046d4c10de",
+      "width": 1280,
+      "height": 1440,
+      "byteLength": 47694
+    },
+    "package": {
+      "sanitizedAssetHash": "7f2131be8a2a9e02145af146fe53541d9c1079c3429ea7aa7c7ea56a766f302b",
+      "width": 1280,
+      "height": 1440,
+      "byteLength": 62402
+    }
+  },
+  "ownerB": {
+    "text": "Ingredients: Water, Glycerin",
+    "sanitizedAssetHash": "64ff15475fd716dec6806cf56dd4aa0ee3ee5606e4f4871f21aa75b942baa226",
+    "width": 1280,
+    "height": 1440,
+    "byteLength": 34754
+  }
+}

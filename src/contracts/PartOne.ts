@@ -1,0 +1,87 @@
+import { z } from 'zod';
+
+// Every boundary is versioned and closed: unknown fields (including client ownerId) fail.
+export const PartOneIdSchema = z.string().uuid();
+const date = z.iso.datetime({ offset: false });
+const revision = z.number().int().nonnegative();
+const ids = z.array(PartOneIdSchema);
+const nullableId = PartOneIdSchema.nullable();
+export const ScopeSchema = z.enum(['public', 'private_package']);
+export const IdentityStateSchema = z.enum(['pending', 'exact', 'candidate', 'ambiguous', 'unresolved']);
+export const DeclarationStateSchema = z.enum(['none', 'partial', 'uncertain', 'accepted', 'conflict']);
+export const WorkStateSchema = z.enum(['queued', 'running', 'deferred_budget', 'retry_wait', 'complete', 'failed_final', 'cancelled']);
+export const ActionSchema = z.enum(['scan_ingredients', 'add_photo', 'save_partial', 'save', 'rescan', 'choose_candidate', 'retry', 'view_source', 'remove_draft']);
+export const PackageConfirmationSchema = z.enum(['unconfirmed', 'user_bound', 'photo_supported', 'conflict']);
+export const CodeSchema = z.strictObject({ raw: z.string().min(1).max(4096), symbology: z.string().nullable(), namespace: z.enum(['gtin', 'retailer', 'unknown']), retailerId: z.string().nullable() });
+export const ScanRequestSchema = z.strictObject({ schemaVersion: z.literal(1), requestId: PartOneIdSchema, idempotencyKey: z.string().min(1).max(200), clientScanId: PartOneIdSchema, generation: revision, code: CodeSchema, requestedMarket: z.string().nullable(), categoryHint: z.string().nullable() });
+
+export const DisplayImageSchema = z.strictObject({ url: z.url(), policyId: PartOneIdSchema, evidenceId: PartOneIdSchema, observedAt: date, expiresAt: date, sourceRevision: revision });
+export const DisplayIdentitySchema = z.strictObject({ id: PartOneIdSchema, name: z.string(), brand: z.string().nullable(), variantText: z.string(), expiresAt: date, image: DisplayImageSchema.nullable() });
+export const DisplaySourceSchema = z.strictObject({ observationId: PartOneIdSchema, policyId: PartOneIdSchema, label: z.string(), url: z.url().nullable(), observedAt: date, sourceUpdatedAt: date.nullable(), expiresAt: date });
+export const DisplaySectionSchema = z.strictObject({ sectionId: PartOneIdSchema, kind: z.enum(['ingredients', 'active', 'inactive', 'may_contain']), text: z.string(), evidenceIds: ids, policyId: PartOneIdSchema, observedAt: date, expiresAt: date });
+export const DisplayProjectionSchema = z.strictObject({ resultRevision: revision, selectedIdentity: DisplayIdentitySchema.nullable(), candidates: z.array(DisplayIdentitySchema), sections: z.array(DisplaySectionSchema), sources: z.array(DisplaySourceSchema), limitations: z.array(z.string()) });
+export const ScanResultSchema = z.strictObject({ schemaVersion: z.literal(1), requestId: PartOneIdSchema, scanId: PartOneIdSchema, generation: revision, resultRevision: revision, identity: IdentityStateSchema, itemId: nullableId, candidateIds: ids, snapshotId: nullableId, declarationId: nullableId, declarationState: DeclarationStateSchema, scope: ScopeSchema.nullable(), packageConfirmation: PackageConfirmationSchema, work: WorkStateSchema, jobId: nullableId, subscriptionId: nullableId, nextCheckAfter: date.nullable(), display: DisplayProjectionSchema, reasonCodes: z.array(z.string()), conflictIds: ids, evidenceIds: ids, allowedActions: z.array(ActionSchema), freshness: z.strictObject({ observedAt: date.nullable(), expiresAt: date.nullable(), state: z.enum(['fresh', 'stale', 'expired', 'revoked', 'unknown']) }) }).superRefine((r, ctx) => {
+  if (r.display.resultRevision !== r.resultRevision) ctx.addIssue({ code: 'custom', path: ['display', 'resultRevision'], message: 'Display must be bound to this result revision' });
+  if (r.declarationState === 'accepted' && (!r.declarationId || !r.snapshotId || !r.itemId || !r.scope || r.conflictIds.length || r.packageConfirmation === 'conflict' || ['expired', 'revoked', 'unknown'].includes(r.freshness.state))) ctx.addIssue({ code: 'custom', path: ['declarationState'], message: 'Accepted evidence requires current binding, permitted scope and no conflict' });
+});
+export const SelectionRequestSchema = z.strictObject({ candidateId: PartOneIdSchema, expectedGeneration: revision, expectedResultRevision: revision });
+export const SaveRequestSchema = z.strictObject({ idempotencyKey: z.string().min(1).max(200), scanId: PartOneIdSchema, expectedGeneration: revision, expectedResultRevision: revision, selectedSnapshotId: PartOneIdSchema, selectedDeclarationId: nullableId });
+export const CaptureSessionSchema = z.strictObject({ schemaVersion: z.literal(1), captureSessionId: PartOneIdSchema, packageObservationId: PartOneIdSchema, scanId: PartOneIdSchema, generation: revision, captureRevision: revision, deletionEpoch: revision, itemId: nullableId, candidateId: nullableId });
+export const OcrObservationSchema = z.strictObject({ evidenceId: PartOneIdSchema, captureSessionId: PartOneIdSchema, generation: revision, recognizer: z.string().min(1), recognizerVersion: z.string().min(1), languageConfig: z.array(z.string()), correctionEnabled: z.boolean(), sourceWidth: z.number().int().nonnegative(), sourceHeight: z.number().int().nonnegative(), orientationTransform: z.array(z.number().finite()).length(9), lines: z.array(z.strictObject({ text: z.string(), alternatives: z.array(z.string()), region: z.array(z.number().finite()).length(4), confidence: z.number().min(0).max(1).nullable() })), status: z.enum(['recognized', 'no_text', 'unsupported_script', 'model_unavailable', 'cancelled', 'failed']) }).superRefine((observation, ctx) => { if (observation.status === 'recognized' && (!observation.sourceWidth || !observation.sourceHeight)) ctx.addIssue({ code: 'custom', path: ['sourceWidth'], message: 'Recognized lines require actual image dimensions' }); });
+export const SanitizedAssetSchema = z.strictObject({ evidenceId: PartOneIdSchema, storageObjectId: PartOneIdSchema, contentHash: z.string().min(1), width: z.number().int().positive().max(4096), height: z.number().int().positive().max(4096), metadataStripped: z.literal(true) });
+export const AttributedEditSchema = z.strictObject({ observationId: PartOneIdSchema, supersedesId: PartOneIdSchema, revision: revision, text: z.string(), reason: z.string().min(1) });
+export const CaptureCommitRequestSchema = z.strictObject({ idempotencyKey: z.string().min(1).max(200), expectedGeneration: revision, expectedResultRevision: revision, expectedCaptureRevision: revision, expectedDeletionEpoch: revision, packageObservationId: PartOneIdSchema, assets: z.array(SanitizedAssetSchema).max(6), observations: z.array(OcrObservationSchema), edits: z.array(AttributedEditSchema) }).superRefine((request, context) => {
+  for (const field of ['evidenceId', 'storageObjectId'] as const)
+    if (new Set(request.assets.map(asset => asset[field].toLowerCase())).size !== request.assets.length)
+      context.addIssue({ code: 'custom', path: ['assets'], message: 'Duplicate private asset reference' });
+});
+
+export const SourcePolicySchema = z.strictObject({ policyId: PartOneIdSchema, provider: z.string(), version: z.string(), permissionEvidence: z.string().nullable(), reviewedAt: date.nullable(), expiresAt: date.nullable(), revokedAt: date.nullable(), operations: z.strictObject({ lookup: z.boolean(), process: z.boolean(), retain: z.boolean(), sharedDisplay: z.boolean(), privateDisplay: z.boolean(), ocr: z.boolean(), cropThumbnail: z.boolean(), rehost: z.boolean(), hotlink: z.boolean(), export: z.boolean() }), retainedFields: z.array(z.string()), attribution: z.string().nullable(), purgeObligations: z.array(z.string()) });
+export const VariantSchema = z.strictObject({ brand: z.string().nullable(), line: z.string().nullable(), form: z.string().nullable(), scent: z.string().nullable(), shade: z.string().nullable(), spf: z.string().nullable(), strength: z.string().nullable(), size: z.string().nullable(), unit: z.string().nullable(), packCount: z.number().int().positive().nullable(), packagingLevel: z.enum(['each', 'case', 'multipack']).nullable() });
+export const EvidenceSpanSchema = z.strictObject({ observationId: PartOneIdSchema, imageId: nullableId, sourceRevision: revision, start: revision.nullable(), end: revision.nullable(), region: z.array(z.number().finite()).length(4).nullable(), transformation: z.array(z.strictObject({ normalizedStart: revision, normalizedEnd: revision, sourceStart: revision, sourceEnd: revision })) });
+export const QuantitySchema = z.strictObject({ raw: z.string(), value: z.string().nullable(), min: z.string().nullable(), max: z.string().nullable(), unit: z.string().nullable(), operator: z.string().nullable(), basis: z.string().nullable(), parse: z.enum(['exact', 'unresolved']) });
+export const DeclarationEntrySchema = z.strictObject({ entryId: PartOneIdSchema, sectionId: PartOneIdSchema, order: revision, rawToken: z.string(), sourceSpans: z.array(EvidenceSpanSchema).min(1), canonicalIngredientId: nullableId, aliasVersion: z.string(), mapping: z.enum(['exact_alias', 'unresolved', 'ambiguous']), quantity: QuantitySchema.nullable(), conditional: z.string().nullable(), uncertaintyReasons: z.array(z.string()) });
+export const DeclarationSectionSchema = z.strictObject({ sectionId: PartOneIdSchema, kind: z.enum(['ingredients', 'active', 'inactive', 'may_contain']), rawText: z.string(), startCovered: z.boolean(), endCovered: z.boolean(), lineCoverageComplete: z.boolean(), entries: z.array(DeclarationEntrySchema) });
+export const PredicateCheckSchema = z.strictObject({ passed: z.boolean(), evidenceIds: ids, reasons: z.array(z.string()) });
+export const DeclarationPredicateSchema = z.strictObject({ association: PredicateCheckSchema, noContradiction: PredicateCheckSchema, variantMarket: PredicateCheckSchema, completeness: PredicateCheckSchema, rightsFreshness: PredicateCheckSchema });
+export const DeclarationSchema = z.strictObject({ declarationId: PartOneIdSchema, revision: revision, itemId: nullableId, snapshotId: nullableId, observationIds: ids, dependencyIds: ids, rawText: z.string(), textStructureHash: z.string(), sections: z.array(DeclarationSectionSchema), category: z.enum(['cosmetic', 'drug', 'unknown']), completenessReasons: z.array(z.string()), transcriptionUncertainty: z.array(z.string()), parserVersion: z.string(), aliasVersion: z.string(), sourceRevision: revision, sourceUpdatedAt: date.nullable(), observedAt: date, expiresAt: date, policyId: PartOneIdSchema, scope: ScopeSchema, ownerId: nullableId, packageObservationId: nullableId, associationEvidenceIds: ids, variant: VariantSchema, sourceMarkets: z.array(z.string()), packageMarket: z.string().nullable(), conflictIds: ids, supersedesId: nullableId, formulaEquivalence: z.literal('unknown') }).superRefine((d, ctx) => { if ((d.scope === 'public' && d.ownerId !== null) || (d.scope === 'private_package' && (!d.ownerId || !d.packageObservationId))) ctx.addIssue({ code: 'custom', path: ['ownerId'], message: 'Private evidence has an owner/package; public evidence has no owner' }); });
+export const ItemSnapshotSchema = z.strictObject({ snapshotId: PartOneIdSchema, itemId: PartOneIdSchema, revision: revision, name: z.string(), variant: VariantSchema, fieldEvidence: z.record(z.string(), ids), barcodeAssertions: z.array(z.strictObject({ raw: z.string(), symbology: z.string().nullable(), namespace: z.enum(['gtin', 'retailer']), canonical: z.string(), evidenceId: PartOneIdSchema })), requestedMarket: z.string().nullable(), sourceMarkets: z.array(z.string()), packageMarket: z.string().nullable(), declarationIds: ids, conflictIds: ids, scope: ScopeSchema, supersedesId: nullableId });
+export const SourceObservationSchema = z.strictObject({ observationId: PartOneIdSchema, provider: z.string(), providerRequestId: z.string().nullable(), providerResponseId: z.string().nullable(), comparison: z.enum(['exact', 'candidate', 'contradiction', 'unknown']), fetchedAt: date, sourceUpdatedAt: date.nullable(), adapterVersion: z.string(), parserVersion: z.string(), policyVersion: z.string(), contentHash: z.string(), variant: VariantSchema, sourceMarkets: z.array(z.string()), sourceUrl: z.url().nullable(), policyId: PartOneIdSchema, status: z.enum(['active', 'revoked', 'retracted', 'expired']), dependencyIds: ids, payload: z.unknown().refine(value => value !== undefined, 'Immutable payload is required') });
+export const LookupReplySchema = z.strictObject({ status: z.enum(['found', 'not_found', 'unsupported', 'ambiguous', 'rate_limited', 'unavailable', 'malformed_response', 'configuration_required', 'disallowed_by_source_policy']), provider: z.string(), adapterVersion: z.string(), policyVersion: z.string(), providerRequestId: z.string().nullable(), observations: z.array(SourceObservationSchema), retryAfter: date.nullable(), reservationId: nullableId, elapsedMs: z.number().nonnegative(), usage: z.strictObject({ calls: revision, costMinor: revision.nullable() }) });
+export const FactBundleV1Schema = z.strictObject({ schemaVersion: z.literal(1), itemId: PartOneIdSchema, snapshotId: PartOneIdSchema, snapshotRevision: revision, declarationId: PartOneIdSchema, declarationRevision: revision, scope: ScopeSchema, ownerId: nullableId, packageConfirmation: PackageConfirmationSchema, requestedMarket: z.string().nullable(), sourceMarkets: z.array(z.string()), packageMarket: z.string().nullable(), sections: z.array(DeclarationSectionSchema), predicate: DeclarationPredicateSchema, state: DeclarationStateSchema, completenessReasons: z.array(z.string()), uncertaintyReasons: z.array(z.string()), conflictIds: ids, observedAt: date, expiresAt: date, sources: z.array(DisplaySourceSchema), parserVersion: z.string(), aliasVersion: z.string(), dependencyIds: ids }).superRefine((bundle, ctx) => {
+  if (bundle.state === 'accepted' && (bundle.conflictIds.length > 0 || !Object.values(bundle.predicate).every(check => check.passed))) ctx.addIssue({ code: 'custom', path: ['state'], message: 'Accepted facts require all declaration predicates and no conflicts' });
+  if (bundle.scope === 'public' ? bundle.ownerId !== null : bundle.ownerId === null) ctx.addIssue({ code: 'custom', path: ['ownerId'], message: 'Facts preserve the public/private owner boundary' });
+});
+export type ScanRequest = z.infer<typeof ScanRequestSchema>;
+/** Durable private commit receipt. Its result and capture have one current binding. */
+export const CaptureCommitResultSchema = z.strictObject({ schemaVersion: z.literal(1), capture: CaptureSessionSchema,
+  observationIds: z.array(PartOneIdSchema), declarationIds: z.array(PartOneIdSchema), assetIds: z.array(PartOneIdSchema), result: ScanResultSchema,
+}).superRefine((value, context) => {
+  if (value.capture.scanId !== value.result.scanId || value.capture.generation !== value.result.generation || value.capture.itemId !== value.result.itemId)
+    context.addIssue({ code: 'custom', message: 'Private commit binding mismatch' });
+  for (const field of ['observationIds', 'declarationIds', 'assetIds'] as const)
+    if (new Set(value[field].map(id => id.toLowerCase())).size !== value[field].length) context.addIssue({ code: 'custom', message: 'Duplicate private receipt ids', path: [field] });
+});
+export type CaptureCommitResult = z.infer<typeof CaptureCommitResultSchema>;
+
+export type ScanResult = z.infer<typeof ScanResultSchema>;
+export type DisplayProjection = z.infer<typeof DisplayProjectionSchema>;
+export type SelectionRequest = z.infer<typeof SelectionRequestSchema>;
+export type SaveRequest = z.infer<typeof SaveRequestSchema>;
+export type CaptureSession = z.infer<typeof CaptureSessionSchema>;
+export type CaptureCommitRequest = z.infer<typeof CaptureCommitRequestSchema>;
+export type OcrObservation = z.infer<typeof OcrObservationSchema>;
+export type SourcePolicy = z.infer<typeof SourcePolicySchema>;
+export type Variant = z.infer<typeof VariantSchema>;
+export type EvidenceSpan = z.infer<typeof EvidenceSpanSchema>;
+export type DeclarationEntry = z.infer<typeof DeclarationEntrySchema>;
+export type DeclarationSection = z.infer<typeof DeclarationSectionSchema>;
+export type Declaration = z.infer<typeof DeclarationSchema>;
+export type ItemSnapshot = z.infer<typeof ItemSnapshotSchema>;
+export type SourceObservation = z.infer<typeof SourceObservationSchema>;
+export type LookupReply = z.infer<typeof LookupReplySchema>;
+export type DeclarationPredicate = z.infer<typeof DeclarationPredicateSchema>;
+export type FactBundleV1 = z.infer<typeof FactBundleV1Schema>;
+export type Action = z.infer<typeof ActionSchema>;
+export type Scope = z.infer<typeof ScopeSchema>;
+export type Code = z.infer<typeof CodeSchema>;

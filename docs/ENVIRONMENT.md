@@ -20,6 +20,10 @@ another.
 | --- | --- | --- | --- |
 | `EXPO_PUBLIC_USE_REMOTE_SERVICE` | Expo mobile/web build | Public | `false` in ordinary development/production profiles; `true` in explicit Remote staging and scanner-release candidates. A candidate is not hosted activation or launch approval. |
 | `EXPO_PUBLIC_BUILD_FLAVOR` | Expo mobile/web build | Public | `development`, `remote-staging`, or `production`; empty local value defaults to development |
+| `EXPO_PUBLIC_PART_THREE_ENABLED` | Expo mobile/web | Public local development gate | Empty/off by default. Requires the existing Part2/Part1 exact loopback development gates; never enables hosted processing or Jev. |
+| `EXPO_PUBLIC_PART_THREE_FIXTURE_UI` | Expo development runtime | Public synthetic QA gate | Empty/off. Requires `__DEV__`; only the disposable Part3 harness uses loopback control/API endpoints. Contains no service credential. |
+| `JEV_API_KEY` | Trusted Part3 Edge only | Secret | Empty in this local task. Resolved only after default-off source processing/job/model/spend gates; never supplied to mobile or injected proofs. |
+| `PART_THREE_LOCAL_FIXTURE` | Trusted local Edge | Synthetic loopback gate | Empty normally. Explicit `1` only on a disposable loopback stack; hosted URLs remain refused. Does not grant Jev or source rights. |
 | `EXPO_PUBLIC_SCANNER_RELEASE_ENABLED` | Expo mobile/web build | Public presentation flag | Empty/off ordinarily; `scanner-release` sets true with production Remote and the exact reviewed hosted project. This creates no entitlement or hosted activation. See SCANNER_RELEASE_ROUTING.md. |
 | `EXPO_PUBLIC_SUPABASE_URL` | Expo mobile/web build | Public | Local or hosted Supabase client access |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo mobile/web build | Public | Local or hosted Supabase client access |
@@ -285,3 +289,9 @@ messages name missing variables but never echo credential values.
 - [Supabase local-to-hosted CLI workflow](https://supabase.com/docs/guides/local-development/cli-workflows)
 - [Supabase Edge Function secrets](https://supabase.com/docs/guides/functions/secrets)
 - [Expo environment variables](https://docs.expo.dev/guides/environment-variables/)
+
+## Part 1 development evaluation gates
+
+`EXPO_PUBLIC_PART_ONE_ENABLED`, `EXPO_PUBLIC_PART_ONE_OCR_EVALUATION` and `EXPO_PUBLIC_PART_ONE_FIXTURE_UI` are public booleans, default off when empty in `.env.example`. They contain no keys. The first additionally requires a development build, remote service and loopback local Supabase. OCR requires the compiled local iOS module and successful task-cache initialization. The fixture route is synthetic only. Release/hosted source operations and durable private OCR commits remain disabled; setting these flags cannot approve provider permissions or private retention.
+
+`EXPO_PUBLIC_CHECK_TIMING_EVALUATION=true` is an opt-in development-runtime measurement gate. It prints only sequence, operation kind, stage and elapsed milliseconds to the local app console. It does not log product/ingredient/profile text, identifiers or credentials and does not enable analytics, replay, source rights, or any hosted operation. Leave it blank normally.

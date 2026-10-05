@@ -41,20 +41,23 @@ function FindingCard({ finding, onSource }: { finding: ResultFinding; onSource?:
     <SourceDisclosure finding={finding} onSource={onSource} />
   </View>;
 }
-function VerdictBlock({ verdict }: { verdict: VerdictPresentation }) {
+export function VerdictBlock({ verdict, heading, beforeTitle, children }: {
+  verdict: VerdictPresentation; heading?: string; beforeTitle?: React.ReactNode; children?: React.ReactNode;
+}) {
   const tone = tones[verdict.state];
-  return <View style={styles.fitBlock}><Text style={styles.eyebrow}>PERSONAL FIT</Text>
+  return <View style={styles.fitBlock}>{heading ? <Text style={styles.eyebrow} accessibilityRole="header" accessibilityLabel={heading}>{heading}</Text> : <Text style={styles.eyebrow}>PERSONAL FIT</Text>}
     <View style={[styles.verdict, { backgroundColor: tone.bg, borderColor: tone.border }]} accessibilityLiveRegion="polite">
+      {beforeTitle}
       <View style={styles.verdictTitleRow}><Icon name={tone.icon} size={22} color={tone.text} />
         <Text style={[styles.verdictTitle, { color: tone.text }]} accessibilityRole="header">{verdict.label}</Text></View>
-      <Text style={styles.reason}>{verdict.reason}</Text>
+      {verdict.reason && <Text style={styles.reason}>{verdict.reason}</Text>}{children}
     </View>
   </View>;
 }
 /** Same rendering for bound live content and explicitly labeled development semantic examples. */
-export function CheckResultView({ facts, verdict, section = 'all', showIdentity = true, onOpenSource, children }: {
+export function CheckResultView({ facts, verdict, section = 'all', showIdentity = true, identityImage, personalSummary, onOpenSource, children }: {
   facts: CustomerCheckFacts; verdict: VerdictPresentation; section?: 'summary' | 'findings' | 'all';
-  showIdentity?: boolean; onOpenSource?: (url: string) => void; children?: React.ReactNode;
+  showIdentity?: boolean; identityImage?: React.ReactNode; personalSummary?: React.ReactNode; onOpenSource?: (url: string) => void; children?: React.ReactNode;
 }) {
   const category = facts.categoryLabel === 'Product formula evidence' ? '' : facts.categoryLabel;
   const source = facts.formula?.provenanceType;
@@ -65,11 +68,11 @@ export function CheckResultView({ facts, verdict, section = 'all', showIdentity 
     evidence: [{ label: sourceLabel, detail: facts.formula ? facts.formula.ingredients.join(', ') : 'A listing does not verify the ingredient list in your package.' }], limits: [] } : null;
   return <View style={styles.content}>
     {section !== 'findings' && <View style={styles.summary}>
-      {showIdentity && <View style={styles.identityRow}><View style={styles.placeholder}><Icon name="bottle" size={24} color={colors.brand} /></View>
+      {showIdentity && <View style={styles.identityRow}>{identityImage ?? <View style={styles.placeholder}><Icon name="bottle" size={24} color={colors.brand} /></View>}
         <View style={styles.identity}>{facts.brand ? <Text style={styles.brand}>{facts.brand}</Text> : null}
           <Text style={styles.productName} accessibilityRole="header">{facts.name}</Text>{category ? <Text style={styles.brand}>{category}</Text> : null}</View>
       </View>}
-      <VerdictBlock verdict={verdict} />
+      {personalSummary ?? <VerdictBlock verdict={verdict} />}
     </View>}
     {section !== 'summary' && <View style={styles.findings}>
       {verdict.findings.map(finding => <FindingCard key={finding.id} finding={finding} />)}
@@ -92,7 +95,7 @@ const styles = StyleSheet.create({
   placeholder: { width: 48, height: 54, borderRadius: radii.md, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center' },
   identity: { flex: 1, minWidth: 0, gap: spacing.xxs }, brand: { color: colors.inkMuted, fontSize: typography.sizes.caption },
   productName: { color: colors.ink, fontSize: typography.sizes.bodyLarge, lineHeight: typography.lineHeights.bodyLarge, fontWeight: typography.weights.semibold },
-  fitBlock: { gap: spacing.xs }, eyebrow: { color: colors.inkMuted, fontSize: typography.sizes.micro, letterSpacing: 1.1, fontWeight: typography.weights.semibold },
+  fitBlock: { gap: spacing.xs }, eyebrow: { color: colors.inkMuted, fontSize: typography.sizes.micro, letterSpacing: 1.1, fontWeight: typography.weights.semibold, textTransform: 'uppercase' },
   verdict: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm }, verdictTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   verdictTitle: { flex: 1, fontSize: typography.sizes.sectionTitle, lineHeight: typography.lineHeights.sectionTitle, fontWeight: typography.weights.semibold },
   reason: { color: colors.ink, fontSize: typography.sizes.bodyRegular, lineHeight: typography.lineHeights.bodyRegular }, findings: { gap: spacing.md },

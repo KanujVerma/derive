@@ -11,13 +11,13 @@ export const productOutcomeLabels: Record<ProductOutcome, string> = {
   helpful: 'Helping', not_helping: 'Not helping', too_heavy: 'Too heavy', stung: 'Stung',
   broke_out: 'Broke out', too_drying: 'Too drying', not_sure: 'Not sure',
 };
-export type CurrentProductFeedback = ProductOutcome | 'still_dry';
-export const currentFeedbackLabels: Record<CurrentProductFeedback, string> = { ...productOutcomeLabels, helpful: 'Works well', still_dry: 'Still feels dry' };
+export type CurrentProductFeedback = ProductOutcome | 'still_dry' | 'comfortable';
+export const currentFeedbackLabels: Record<CurrentProductFeedback, string> = { ...productOutcomeLabels, helpful: 'Works well', still_dry: 'Still feels dry', comfortable:'Feels comfortable' };
 /** Category comes from an explicit catalog fact, never a product name or manual label. */
 export function currentFeedbackChoices(category?: string): Array<[CurrentProductFeedback, string]> {
   const values: CurrentProductFeedback[] = category === 'moisturizer'
-    ? ['helpful', 'still_dry', 'too_heavy', 'stung', 'broke_out', 'too_drying', 'not_sure']
-    : ['helpful', 'not_helping', 'too_heavy', 'stung', 'broke_out', 'too_drying', 'not_sure'];
+    ? ['helpful', 'still_dry', 'too_heavy', 'comfortable', 'stung', 'broke_out', 'too_drying', 'not_sure']
+    : ['helpful', 'not_helping', 'too_heavy', 'comfortable', 'stung', 'broke_out', 'too_drying', 'not_sure'];
   return values.map(value => [value, currentFeedbackLabels[value]]);
 }
 export type SetupAnswerState = 'unanswered' | 'none' | 'unknown' | 'reported';
@@ -34,7 +34,10 @@ export interface SetupPreviewContext {
 export interface SetupBundle {
   ownerId: string | null;
   products: RoutineItemDraft[];
+  reportedUse?: Record<string, Pick<import('../../contracts/PersonalContextV2.ts').ReportedUseContextV2, 'reportedPurpose' | 'applicationSite' | 'useForm'>>;
   experiences: ExperienceDraft[];
+  /** Explicitly confirmed choices; never inferred from feedback or raw notes. */
+  preferences?: import('../../contracts/PersonalContextV2.ts').ConfirmedPreference[];
   /** User-reported raw context. Not a profile, allergy, diagnosis, or product fact. */
   additionalNote: string | null;
   previewOnly: SetupPreviewContext;
@@ -124,7 +127,7 @@ export function toggleCurrentFeedback(bundle: SetupBundle, id: string, value: Cu
   if (!bundle.products.some(item => item.id === id)) return bundle;
   const old = currentProductFeedback(bundle, id);
   // Uncertainty is an answer state; specific reports can coexist (including works well + too heavy).
-  const next = old.includes(value) ? old.filter(item => item !== value) : value === 'not_sure' ? ['not_sure'] as CurrentProductFeedback[] : [...old.filter(item => item !== 'not_sure'), value];
+  const next = old.includes(value) ? old.filter(item => item !== value) : value === 'not_sure' ? ['not_sure'] as CurrentProductFeedback[] : [...old.filter(item => item !== 'not_sure'&&!(value==='comfortable'&&item==='too_heavy')&&!(value==='too_heavy'&&item==='comfortable')), value];
   return { ...bundle, previewOnly: { ...bundle.previewOnly, currentFeedback: { ...bundle.previewOnly.currentFeedback, [id]: next } } };
 }
 export function clearCurrentFeedback(bundle: SetupBundle, id: string): SetupBundle {

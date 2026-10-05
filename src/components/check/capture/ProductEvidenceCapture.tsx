@@ -8,6 +8,7 @@ import { colors, layout, radii, spacing, typography } from '../../../constants/t
 import { Icon } from '../../ui/Icon';
 import { createBarcodeObservationGate } from '../../../presentation/capture/barcodeObservationGate';
 import { CHECK_PHOTO_CAPTURE_ENABLED } from '../../../presentation/capture/capabilities';
+import { normalizeBarcode as normalizePartOneBarcode } from '../../../domain/part-one/barcode';
 import { CatalogProductSearch } from '../../catalog/CatalogProductSearch';
 import type { CatalogProductSummary } from '../../../contracts/ProductCatalog';
 import { captureRecovery } from '../../../presentation/capture/captureRecovery';
@@ -39,6 +40,7 @@ interface Props {
   initialRole?: CaptureRole;
   autoFinishBarcode?: boolean;
   detectionPaused?: boolean;
+  deliberateBarcodeSelection?: boolean;
   /** Check owns product outcomes; capture retains only observation and photo review. */
   hostOwnsResults?: boolean;
   initialEvidence?: readonly CaptureEvidence[];
@@ -49,7 +51,7 @@ interface Props {
   onCatalogSelect?: (product: CatalogProductSummary) => void;
 }
 
-export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, hostOwnsResults = false, initialEvidence = [], photoCaptureEnabled = CHECK_PHOTO_CAPTURE_ENABLED, resumeKey = 0, onSearch, catalogSearch, onCatalogSelect }: Props) {
+export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, deliberateBarcodeSelection = false, hostOwnsResults = false, initialEvidence = [], photoCaptureEnabled = CHECK_PHOTO_CAPTURE_ENABLED, resumeKey = 0, onSearch, catalogSearch, onCatalogSelect }: Props) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
@@ -63,6 +65,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const [torch, setTorch] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<CaptureNotice | null>(null);
+  const [observedCodes, setObservedCodes] = useState<{ data: string; type: string }[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [canRetry, setCanRetry] = useState(false);
   const [canCollectMore, setCanCollectMore] = useState(true);
@@ -184,7 +187,21 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
 
+  const acceptBarcode = (data: string, type: string) => {
+    if (!barcodeGate.observe(data, detectionPausedRef.current || operations.isBusy())) return;
+    scanLocked.current = true;
+    setObservedCodes([]);
+    onEvidenceReady(toCaptureHandoff(reduceCapture(currentSession.current, { type: 'barcode', value: data, symbology: type })));
+  };
   const onBarcode = ({ data, type }: BarcodeScanningResult) => {
+    if (deliberateBarcodeSelection) {
+      if (!mounted.current || detectionPausedRef.current || scanLocked.current || operations.isBusy()) return;
+      const code = normalizePartOneBarcode({ raw: data, symbology: type, namespace: 'gtin', retailerId: null });
+      if (!code.supported) return;
+      // Expo geometry mapping is not physically validated. Require a named deliberate choice.
+      setObservedCodes(previous => previous.some(code => code.data === data && code.type === type) ? previous : [...previous, { data, type }].slice(-8));
+      return;
+    }
     if (!photoCaptureEnabled) {
       if (!mounted.current || !isObservedRetailBarcode(data, type) || !barcodeGate.observe(data, detectionPausedRef.current || operations.isBusy())) return;
     } else if (detectionPausedRef.current || !mounted.current || currentSession.current.phase !== 'collecting'
@@ -193,9 +210,9 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
       scanLocked.current = true;
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (autoFinishBarcode && !currentSession.current.evidence.some((item) => item.kind === 'local_photo')) {
-        onEvidenceReady(toCaptureHandoff(reduceCapture(currentSession.current, { type: 'barcode', value: data })));
+        onEvidenceReady(toCaptureHandoff(reduceCapture(currentSession.current, { type: 'barcode', value: data, symbology: type })));
       }
-      dispatchCapture({ type: 'barcode', value: data });
+      dispatchCapture({ type: 'barcode', value: data, symbology: type });
       if (!hostOwnsResults) setNotice({ kind: 'status', title: 'Barcode captured', detail: 'Check the available product evidence.' });
     });
   };
@@ -337,6 +354,10 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
             <View style={[styles.guideCorner, styles.guideBottomLeft]} /><View style={[styles.guideCorner, styles.guideBottomRight]} />
           </View></View>
           <View style={[styles.searchFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+            {deliberateBarcodeSelection && !detectionPaused && observedCodes.length > 0 && <View style={{ gap: spacing.sm }}>
+              <Text accessibilityLiveRegion="polite" style={styles.actionText}>Choose the barcode on your product</Text>
+              {observedCodes.map(code => <Action key={code.type + code.data} label={`Use barcode ${code.data}`} accessibilityLabel={`Use barcode ${code.data}`} onPress={() => acceptBarcode(code.data, code.type)} />)}
+            </View>}
             {onSearch && !detectionPaused ? <CameraGlass style={styles.searchControl}>
               <Pressable accessibilityRole="button" accessibilityLabel="Search" onPress={onSearch} style={styles.searchButton}>
                 <Text style={styles.actionText}>Search</Text>
