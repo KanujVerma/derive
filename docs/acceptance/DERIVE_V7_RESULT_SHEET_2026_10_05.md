@@ -22,7 +22,7 @@ No Site content/access, decision rules, onboarding fields, server contracts, sou
 
 This is a native adaptation of the approved hierarchy, not certified pixel parity. The current contracts do not supply the prototype's fictional side-by-side comparison cells, product outcomes or prices; this change renders actual admitted comparison and routine copy without manufacturing those cells.
 
-Resolved identity keeps Search by name in the expanded controls. Unknown identity retains its compact recovery action. Generic unknown comparison/science rows and the empty routine map are omitted; admitted supported, limited and conflicting findings remain.
+Resolved identity keeps Search by name in the expanded controls. Unknown identity retains its compact recovery action. When no actual comparison exists, generic unknown comparison/science rows and the empty routine map are omitted; admitted supported, limited and conflicting findings remain. With an actual comparator, material unresolved secondary-goal and comparison limits remain visible. Final CI caught an overbroad unknown-row filter; it was narrowed without changing decision data.
 
 ## Actual visual receipt
 

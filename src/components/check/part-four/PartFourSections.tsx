@@ -42,7 +42,7 @@ export function PartFourSections(props: PartFourSectionsProps) {
   const rows = packet.formula.ingredients.map(ingredientRow);
   const insights = visiblePartFourInsights(packet);
   const hasComparison = ['selected','self','ambiguous'].includes(packet.comparison.state);
-  const comparisonInsights = insights.comparison.filter(insight => ['supported','limited','conflict'].includes(insight.state));
+  const comparisonInsights = hasComparison ? insights.comparison : insights.comparison.filter(insight => ['supported','limited','conflict'].includes(insight.state));
   const routineInsights = insights.routine.filter(insight => insight.ruleId !== 'F06' || hasComparison || ['supported','conflict'].includes(insight.state));
   const evidence = formulaEvidenceNotice(packet.formula);
   const limits = formulaLimitationsForDisplay(packet.formula);
