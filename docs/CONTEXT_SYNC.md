@@ -1,5 +1,13 @@
 # Derive Cross-Agent Context Sync Ledger
 
+## 2026-10-04 — two-product review brief content and guarded standalone delivery
+
+- **Branch/base:** `sami/review-brief-pilot`, continuing `354d6416cee0761cbe8c90172899431240af0840` from confirmed development base `fea1a214dd174deccffbdb08fb2aa48c1e8fd0e0`. No scanner branch, schema, sheet, Personal Fit, service or deployment changes.
+- **Content:** edition 1.1.0 has both exact U.S. non-SPF products ready, with three original observations from two genuine firsthand accounts: Isabel's 2023 Daily Facial Moisturizer routine and Kim's 2016 CeraVe PM account. Published dates, product/market evidence, source sections, original-fact use basis and historical/current-formula limits are explicit. Original restricted leads remain excluded; no publisher permission, consensus, current formula or ingredient causation is invented. Archived 1.0.0 remains deeply frozen and withheld.
+- **Guards:** optional synchronous exact identity selector, off by default; each observation binds its own source's inspected sections. Firsthand evidence, safe citation URLs, real ordered dates, documented scoped use, qualifications and historical scope are required. Missing/withheld/mismatched content returns undefined, independent of the decision system. Synthetic consenting reporters exist only in tests.
+- **Read-only coordination:** PR196 rechecked at `134c7f87f7ee3ac447c52a80f0f5a560b20aabab`. Part Four's real brief admission needs current source contents and content assessments, which its current renderer does not pass. Our editorial basis is not its process/store/display/export grant contract. Integration owner must resolve those gaps without fake rights or local-fixture bypass. Actual overlap/conflict is this ledger only; preserve both branches' entries. [Source audit and integration handoff](REVIEW_BRIEF_PILOT.md) covers identity/market mapping, placement, no-content behavior and saved-edition handling.
+- **Validation:** 21/21 focused pilot tests; full 1,011/1,011 across 116 TAP files, zero failed/skipped/cancelled; app/test TypeScript checks and web export exit 0; whitespace/scope/secret checks pass. No combined phone, native or production admission acceptance is claimed. Implementation/docs and tests are delivered in separate commits; final exact SHA is in the draft PR handoff.
+
 ## 2026-10-03 — standalone selected-source review brief pilot
 
 - **Confirmed development base:** `fea1a214dd174deccffbdb08fb2aa48c1e8fd0e0`, branch `sami/review-brief-pilot`. Founders identify local `c797960f36a7902aa23d7a22b36090e45269c8cb` as accepted combined P1–P3 work; Part 4 is separate. This pilot neither assumes main is the integration base nor modifies unpublished app work.
