@@ -14,3 +14,9 @@ NODE_USE_ENV_PROXY=1 node --experimental-strip-types review/benchmarks/cloud-run
 Six-call maximum, 25-second start spacing, 45-second timeout, strict budgets, exclusive .review-v9-field-role-calibration.claimed. Stop on first transport/contract failure. Do not remove or reset old claims. Preserve private frames and .review-v9-field-role-calibration-result.json. Never print credentials. Do not run other probe entrypoints.
 
 Frozen field-role request panel hash: 55907dc7472abfbf838df2765b0e3eaa583071381e4154da7a9c6e30fdb3f226.
+
+## Follow-on fresh-answer diagnostic
+
+The v9 field-role panel completed6/6 target judgments correctly, with stable action support, but all six full packets remained rejected due to other generic headline/title fields. This is not publication success.
+
+A separate authorized diagnostic may now run copy-review-probe.ts once: one fresh copyv7 call and, only if it parses, one bound reviewv9 call on the retained historical Jev decision. It uses .heavy-copy-v7-review-v9-lite.claimed and preserves all older claims. This does not rerun Jev or establish general benchmark success. No further prompt tuning is implied; inspect the full packet result before deciding next steps.

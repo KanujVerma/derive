@@ -11,7 +11,7 @@ export const copyPrepared=prepareFixturePhase(dataset as any,evidence.caseId,'co
 if(decision.length!==1||evidence.sourceRun!=='3a11bffe-775d-4a96-8a96-00a2bbb93d95'||copyPrepared.requestHash!=='4ceab2521b97c3401f34b7abd17251fea9c3443770da2ef263bd845b229c39b7')throw Error('unreviewed_probe_input');
 export async function copyReviewProbe(fetchImpl:typeof fetch=fetch,makeWriter:typeof createFrameWriter=createFrameWriter){
  const key=process.env.GEMINI_API_KEY;if(!key||process.env.NODE_USE_ENV_PROXY!=='1')throw Error('missing_approved_environment');
- const cwd=process.cwd(),fd=openSync(join(cwd,'.heavy-copy-v7-review-v7-lite.claimed'),'wx',0o600);
+ const cwd=process.cwd(),fd=openSync(join(cwd,'.heavy-copy-v7-review-v9-lite.claimed'),'wx',0o600);
  try{fsyncSync(fd);}finally{closeSync(fd);}const dir=openSync(cwd,'r');try{fsyncSync(dir);}finally{closeSync(dir);}
  const writer=makeWriter(cwd,()=>{}),checkpoints:any[]=[...decision];
  const result:any={kind:'fresh_copy_review_diagnostic',sourceRun:evidence.sourceRun,caseId:evidence.caseId,decisionHash:sha256(canonicalJson(decision[0])),phases:[],score:null};
@@ -38,6 +38,6 @@ export async function copyReviewProbe(fetchImpl:typeof fetch=fetch,makeWriter:ty
   }
   if(checkpoints.length===3&&result.phases.length===2&&result.phases.every((p:any)=>p.outcome==='parsed'))result.score=scoreFixture(dataset as any,evidence.caseId,checkpoints);
   return result;
- }finally{writer.write(result);writeFileSync(join(cwd,'.heavy-copy-v7-review-v7-lite-result.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx',mode:0o600});}
+ }finally{writer.write(result);writeFileSync(join(cwd,'.heavy-copy-v7-review-v9-lite-result.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx',mode:0o600});}
 }
 if(process.argv[1]&&resolve(process.argv[1])===new URL(import.meta.url).pathname)console.log(JSON.stringify(await copyReviewProbe()));
