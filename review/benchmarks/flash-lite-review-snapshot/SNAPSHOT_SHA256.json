@@ -7,7 +7,7 @@
   "review/benchmarks/facts-first-v3/cases.json": "afab877b782408090f60b047743da6c99b06b3e9b1fb19a53a7c1a11c6179b4b",
   "src/domain/part-two/hash.ts": "13c5d61b2585ff5f83e895ca2e1d88c4ca80d57c48db7c1f1b76e24c69b6c185",
   "src/domain/personalized-sheet/copyClaimAudit.ts": "fc1085b7a6d275f254d40795efff8d7ae3f1a7ea04434185ad30199aee04b7b4",
-  "src/domain/personalized-sheet/decisionBundleCopy.ts": "e2436008e891b5b1940997c5ee76865061da0e3cd9b637d4c71169931e9d5a9f",
+  "src/domain/personalized-sheet/decisionBundleCopy.ts": "c8b95115eeb2aa5f22ecbc3837ae921224f974b27e7becd62b826c43bc862c5e",
   "src/domain/personalized-sheet/evidenceAdmission.ts": "f83ad69028b85abd01178d33c05c7be340145408c3db90312293ad9829334d20",
   "src/domain/personalized-sheet/factsFirstContract.ts": "ef793c4ab931f035e6690886e00222c94e5edea0ee5f0ed590f761013d34b841",
   "src/domain/personalized-sheet/geminiProvider.ts": "ebee8c048148e3cdebed872414e761724f0619116653d1315931e9e543d45b86",
@@ -22,7 +22,8 @@
   "review/benchmarks/cloud-runner/frame-log.ts": "0d90b450679549e19cb1a13a6e47b2402589b0d46c1fbb22baf6bad24838510b",
   "review/benchmarks/cloud-runner/frame-log.test.ts": "a66f12d6bd193edaecf690f716fe92af4f3ef03e4fa8d21b516a58ba01c14dae",
   "tests/bound-copy-schema.test.ts": "d63a6d96caecb8ece9edc0abe2d85f3a726a402fd09e7fed5a8aab63986736b1",
-  "tests/review-citation-contract.test.ts": "16e868d227ad22f68bfe36f9954a76e568a850c346024e4303d3cdca53bc4f11",
-  "review/benchmarks/cloud-runner/review-probe.ts": "b46a1531cc1f8f9ee3861af628abbb7184e7b0b82f8bd240fbcd0e711c189a74",
-  "tests/heavy-settled.json": "df3d0bf662694d22012f7aac27886120b405b58fbc73aa42a44b37f0522983a1"
+  "tests/review-citation-contract.test.ts": "e6115d619b56f6c3ffcad82f7695c3abe5575ad6bb795c7c21e1af4c3c015f66",
+  "review/benchmarks/cloud-runner/review-probe.ts": "19b0dee7c22492995712b9f2a14d1cd78028a023663bf9397478c26805081b95",
+  "tests/heavy-settled.json": "df3d0bf662694d22012f7aac27886120b405b58fbc73aa42a44b37f0522983a1",
+  "src/domain/personalized-sheet/reviewAuditWire.ts": "b804d35a16450c0fd6fa1292f72d1f70429dd7a6e11bafc9901677f8c2c8af00"
 }
