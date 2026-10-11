@@ -28,5 +28,8 @@
   "src/domain/personalized-sheet/reviewAuditWire.ts": "23e9a6b929f521b2ed045d1108bea68c62284bfc3e4cd624655206890bb1bdb2",
   "tests/review-error-probe.test.ts": "b4d7487264009c8253eb3c6dcbc9a79d0230de4ef137118794bfbe9bbcc30d42",
   "review/benchmarks/cloud-runner/copy-review-probe.ts": "dcb9b2fe4b060a19ec4cbbe096e96f29a70340767c05c87f172dfe559fd51413",
-  "tests/copy-review-probe.test.ts": "175ef270002d72bc523d4126d14d5764bf36f3a1653da28ff4cb1baef3e28add"
+  "tests/copy-review-probe.test.ts": "175ef270002d72bc523d4126d14d5764bf36f3a1653da28ff4cb1baef3e28add",
+  "tests/review-calibration.ts": "3969b510e34ec836848e0d5bb0b44394febcc3cbe1b8216b252286219cda1a75",
+  "tests/calibration-probe.test.ts": "9ed8bc2de2d915b9072c1736276015593e19d624cabb3a4fee8a6f2528405b19",
+  "review/benchmarks/cloud-runner/calibration-probe.ts": "c79c66e4be401cec4a7525acd67f51e7eff065159d701adf56aa0a6bc387ff7c"
 }
