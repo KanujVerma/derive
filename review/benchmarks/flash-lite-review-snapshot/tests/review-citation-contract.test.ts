@@ -43,7 +43,7 @@ test('runtime rejects invented and duplicate references despite structural schem
  for(const refs of [['invented'],['current-benefit','current-benefit']]){const a=rows();a[0].personalFactIds=refs;assert.equal(matches(COPY_AUDIT_SCHEMA,a),true);assert.throws(()=>validateCopyAudit(i,p,a),/invalid_copy_audit_reference/);}
 });
 test('schema correction has a new review identity and is actually bound to request',()=>{
- const r=prepareBundleReview(i,b,p);assert.match(r.request.contents[0].parts[0].text,/decision-bundle-review\/v7/);assert.equal(r.request.generationConfig.responseSchema.properties.fieldChecks.minItems,5);
+ const r=prepareBundleReview(i,b,p);assert.match(r.request.contents[0].parts[0].text,/decision-bundle-review\/v8/);assert.equal(r.request.generationConfig.responseSchema.properties.fieldChecks.minItems,5);
 });
 
 import {buildReviewAuditWireSchema,decodeReviewAuditWire} from '../src/domain/personalized-sheet/reviewAuditWire.ts';

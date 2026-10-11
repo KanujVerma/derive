@@ -1,12 +1,12 @@
 import {openSync,closeSync,fsyncSync,writeFileSync} from 'node:fs';import {join,resolve} from 'node:path';
 import {calibration,calibrationHash} from '../../../tests/review-calibration.ts';
 import {geminiBody} from '../facts-first-v2/execute.ts';import {createFrameWriter} from './frame-log.ts';
-if(calibrationHash!=='24e9299ab811e2e1cec648c0359721ceb9698ebdd6f07b5741c16d4cf6114490'||calibration.length!==6)throw Error('unreviewed_calibration');
+if(calibrationHash!=='b1131e6d41df277f6a312b6ee4ff3ee51e950af7461ec15beb70bb4b95b90370'||calibration.length!==6)throw Error('unreviewed_calibration');
 export async function calibrationProbe(fetchImpl:typeof fetch=fetch,sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms)),now=()=>performance.now()){
  const key=process.env.GEMINI_API_KEY;if(!key||process.env.NODE_USE_ENV_PROXY!=='1')throw Error('missing_approved_environment');
- const cwd=process.cwd(),fd=openSync(join(cwd,'.review-v7-calibration.claimed'),'wx',0o600);try{fsyncSync(fd);}finally{closeSync(fd);}const d=openSync(cwd,'r');try{fsyncSync(d);}finally{closeSync(d);}
+ const cwd=process.cwd(),fd=openSync(join(cwd,'.review-v8-calibration.claimed'),'wx',0o600);try{fsyncSync(fd);}finally{closeSync(fd);}const d=openSync(cwd,'r');try{fsyncSync(d);}finally{closeSync(d);}
  const writer=createFrameWriter(cwd,()=>{}),results:any[]=[];let lastStart=-Infinity;
- const report:any={kind:'review_policy_calibration',version:'v7',calibrationHash,maximumCalls:6,results,summary:null};
+ const report:any={kind:'review_policy_calibration',version:'v8',calibrationHash,maximumCalls:6,results,summary:null};
  try{
   for(const c of calibration){
    let wait=25000-(now()-lastStart);while(wait>0){await sleep(wait);wait=25000-(now()-lastStart);}
@@ -26,6 +26,6 @@ export async function calibrationProbe(fetchImpl:typeof fetch=fetch,sleep=(ms:nu
    finally{record.latencyMs=now()-lastStart;writer.write({kind:'calibration_result',...record});results.push(record);}
   }
   const parsed=results.filter(r=>r.outcome==='parsed');report.summary={attempted:results.length,parsed:parsed.length,correct:parsed.filter(r=>r.matchesExpected).length,falsePositives:parsed.filter(r=>!r.expectedSupported&&r.targetSupported).length,falseNegatives:parsed.filter(r=>r.expectedSupported&&!r.targetSupported).length,transportFailures:results.filter(r=>r.failureKind==='transport').length,contractFailures:results.filter(r=>r.failureKind==='contract').length,persistenceFailures:results.filter(r=>r.failureKind==='persistence').length,completed:results.length===6&&parsed.length===6,decisionComparisonCount:parsed.length,decisionJudgmentStable:parsed.length>=2?new Set(parsed.map(r=>r.actualSupported)).size===1:null};return report;
- }finally{writer.write(report);writeFileSync(join(cwd,'.review-v7-calibration-result.json'),JSON.stringify(report,null,2)+'\n',{flag:'wx',mode:0o600});}
+ }finally{writer.write(report);writeFileSync(join(cwd,'.review-v8-calibration-result.json'),JSON.stringify(report,null,2)+'\n',{flag:'wx',mode:0o600});}
 }
 if(process.argv[1]&&resolve(process.argv[1])===new URL(import.meta.url).pathname)console.log(JSON.stringify(await calibrationProbe()));
