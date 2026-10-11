@@ -6,7 +6,7 @@ import dataset from '../facts-first-v3/cases.json' with {type:'json'};
 import {createLedgerTransport,createFencedFetch} from './ledger-transport.ts';
 
 // Fresh bounded V3 copy-contract rerun. This program cannot create, renew or enable it.
-const RUN='3a11bffe-775d-4a96-8a96-00a2bbb93d95';
+const RUN='4cc3c917-54f2-4522-a79d-6a74e1762074';
 const PROJECT='snojlbqovlawewwqbviz';
 const action=process.argv[2];
 if(action!=='status'&&action!=='run_next')throw Error('Use status or run_next');
