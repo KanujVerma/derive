@@ -7,7 +7,7 @@
   "review/benchmarks/facts-first-v3/cases.json": "afab877b782408090f60b047743da6c99b06b3e9b1fb19a53a7c1a11c6179b4b",
   "src/domain/part-two/hash.ts": "13c5d61b2585ff5f83e895ca2e1d88c4ca80d57c48db7c1f1b76e24c69b6c185",
   "src/domain/personalized-sheet/copyClaimAudit.ts": "fc1085b7a6d275f254d40795efff8d7ae3f1a7ea04434185ad30199aee04b7b4",
-  "src/domain/personalized-sheet/decisionBundleCopy.ts": "7272c7a0966ebcbe574a6fcaa9ba9155ac083d404f9aa86f15b2588ca59307e0",
+  "src/domain/personalized-sheet/decisionBundleCopy.ts": "e0ebb4ad51b5ca8bbaaa37d0f6e02c70465ce79a60592ec7138bebf3e191527d",
   "src/domain/personalized-sheet/evidenceAdmission.ts": "f83ad69028b85abd01178d33c05c7be340145408c3db90312293ad9829334d20",
   "src/domain/personalized-sheet/factsFirstContract.ts": "ef793c4ab931f035e6690886e00222c94e5edea0ee5f0ed590f761013d34b841",
   "src/domain/personalized-sheet/geminiProvider.ts": "ebee8c048148e3cdebed872414e761724f0619116653d1315931e9e543d45b86",
@@ -22,8 +22,8 @@
   "review/benchmarks/cloud-runner/frame-log.ts": "0d90b450679549e19cb1a13a6e47b2402589b0d46c1fbb22baf6bad24838510b",
   "review/benchmarks/cloud-runner/frame-log.test.ts": "a66f12d6bd193edaecf690f716fe92af4f3ef03e4fa8d21b516a58ba01c14dae",
   "tests/bound-copy-schema.test.ts": "d63a6d96caecb8ece9edc0abe2d85f3a726a402fd09e7fed5a8aab63986736b1",
-  "tests/review-citation-contract.test.ts": "8329651461306fd8c71dfe66a926c10a601496a1aedccab02f8032ad6031fa24",
-  "review/benchmarks/cloud-runner/review-probe.ts": "f53f47c8324533c44dc72985cc73bfbe9ba836817a1b0aa9e00f441488889c6e",
+  "tests/review-citation-contract.test.ts": "179150be785f95a8e85722c8269dc1b01c63a848f2c41b3c8f65536af65bc9de",
+  "review/benchmarks/cloud-runner/review-probe.ts": "f14a935b72df21979d0d1044d8d171817f400cb6a825f15e50a4357f15974090",
   "tests/heavy-settled.json": "df3d0bf662694d22012f7aac27886120b405b58fbc73aa42a44b37f0522983a1",
   "src/domain/personalized-sheet/reviewAuditWire.ts": "23e9a6b929f521b2ed045d1108bea68c62284bfc3e4cd624655206890bb1bdb2",
   "tests/review-error-probe.test.ts": "b4d7487264009c8253eb3c6dcbc9a79d0230de4ef137118794bfbe9bbcc30d42",
@@ -31,5 +31,8 @@
   "tests/copy-review-probe.test.ts": "175ef270002d72bc523d4126d14d5764bf36f3a1653da28ff4cb1baef3e28add",
   "tests/review-calibration.ts": "3969b510e34ec836848e0d5bb0b44394febcc3cbe1b8216b252286219cda1a75",
   "tests/calibration-probe.test.ts": "9ed8bc2de2d915b9072c1736276015593e19d624cabb3a4fee8a6f2528405b19",
-  "review/benchmarks/cloud-runner/calibration-probe.ts": "1ac586dcf39ce517b0b74210440c4c082446fb2cc59770f1f0db648b11b0b0b6"
+  "review/benchmarks/cloud-runner/calibration-probe.ts": "0750f0ab19b6bcdff5590307c941125725580451fb9f89d48e0de7f258d4e27b",
+  "tests/field-role-calibration.ts": "3fff14587807d802a85fda2cf58790cf87410cf9f8f42f9affc739e869655a86",
+  "tests/field-role-probe.test.ts": "f5e4a8ed5eafba1b79b4acfd6bbcff897ea24e70bcf0e5e98271daf6a8af147c",
+  "review/benchmarks/cloud-runner/field-role-probe.ts": "58cde703c5c58dd4140b248d8f0fe460e35c436d38b56aadaf8b3fe3821d6f71"
 }
