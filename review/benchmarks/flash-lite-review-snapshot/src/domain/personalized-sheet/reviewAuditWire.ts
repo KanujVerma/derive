@@ -12,21 +12,23 @@ export function decodeReviewAuditWire(raw:unknown):unknown {
   return {...row,supported:row.issue==='none'};
  });
 }
-/** Bind each row's literal field/text and allowed references to its own point.
- * No references are inserted or repaired after model generation. */
-export function buildReviewAuditWireSchema(input:DecisionBundleInput,proposal:InsightProposal){
- const fields=copyAuditFields(proposal);
- const variants=fields.flatMap(f=>{
+/** Compact generation schema; field-specific binding stays in the independent
+ * validator and is supplied explicitly beside each field in the prompt. */
+export function reviewAuditFieldSpecs(input:DecisionBundleInput,proposal:InsightProposal){
+ return copyAuditFields(proposal).map(f=>{
   const m=/^(why|tradeoffs)\.(\d+)\.(title|body)$/.exec(f.field);
   const point=m?proposal[m[1] as 'why'|'tradeoffs'][Number(m[2])]:null;
-  const es=point?.evidenceIds??input.evidence.map(e=>e.id);
-  const ps=point?.personalFactIds??input.personalFacts.map(p=>p.id);
-  const refs=(ids:readonly string[],minimum:number)=>({type:'ARRAY',items:ids.length?{type:'STRING',enum:[...ids]}:{type:'STRING'},minItems:minimum,maxItems:ids.length});
-  const row=(issues:readonly string[],emin=0,pmin=0)=>({type:'OBJECT',properties:{
-   field:{type:'STRING',enum:[f.field]},text:{type:'STRING',enum:[f.text]},
-   evidenceIds:refs(es,emin),personalFactIds:refs(ps,pmin),issue:{type:'STRING',enum:[...issues]},
-  },required:['field','text','evidenceIds','personalFactIds','issue']});
-  return [...(es.length?[row(['none'],1,0)]:[]),...(ps.length?[row(['none'],0,1)]:[]),row(COPY_AUDIT_ISSUES.filter(i=>i!=='none'))];
+  return {...f,allowedEvidenceIds:point?.evidenceIds??input.evidence.map(e=>e.id),allowedPersonalFactIds:point?.personalFactIds??input.personalFacts.map(p=>p.id)};
  });
- return {type:'ARRAY',minItems:fields.length,maxItems:fields.length,items:{type:'OBJECT',anyOf:variants}};
+}
+export function buildReviewAuditWireSchema(input:DecisionBundleInput,proposal:InsightProposal){
+ const fields=copyAuditFields(proposal),es=input.evidence.map(e=>e.id),ps=input.personalFacts.map(p=>p.id);
+ const refs=(ids:readonly string[],minimum:number)=>({type:'ARRAY',items:ids.length?{type:'STRING',enum:[...ids]}:{type:'STRING'},minItems:minimum,maxItems:ids.length});
+ const row=(issues:readonly string[],emin=0,pmin=0)=>({type:'OBJECT',properties:{
+  field:{type:'STRING',enum:fields.map(f=>f.field)},text:{type:'STRING'},
+  evidenceIds:refs(es,emin),personalFactIds:refs(ps,pmin),issue:{type:'STRING',enum:[...issues]},
+ },required:['field','text','evidenceIds','personalFactIds','issue']});
+ return {type:'ARRAY',minItems:fields.length,maxItems:fields.length,items:{type:'OBJECT',anyOf:[
+  ...(es.length?[row(['none'],1,0)]:[]),...(ps.length?[row(['none'],0,1)]:[]),row(COPY_AUDIT_ISSUES.filter(i=>i!=='none')),
+ ]}};
 }

@@ -43,7 +43,7 @@ test('runtime rejects invented and duplicate references despite structural schem
  for(const refs of [['invented'],['current-benefit','current-benefit']]){const a=rows();a[0].personalFactIds=refs;assert.equal(matches(COPY_AUDIT_SCHEMA,a),true);assert.throws(()=>validateCopyAudit(i,p,a),/invalid_copy_audit_reference/);}
 });
 test('schema correction has a new review identity and is actually bound to request',()=>{
- const r=prepareBundleReview(i,b,p);assert.match(r.request.contents[0].parts[0].text,/decision-bundle-review\/v6/);assert.equal(r.request.generationConfig.responseSchema.properties.fieldChecks.minItems,5);
+ const r=prepareBundleReview(i,b,p);assert.match(r.request.contents[0].parts[0].text,/decision-bundle-review\/v7/);assert.equal(r.request.generationConfig.responseSchema.properties.fieldChecks.minItems,5);
 });
 
 import {buildReviewAuditWireSchema,decodeReviewAuditWire} from '../src/domain/personalized-sheet/reviewAuditWire.ts';
@@ -54,8 +54,8 @@ test('wire issue remains unchanged and alone determines support',()=>{
  assert.equal(out[0].supported,false);assert.equal(out[0].issue,'other');assert.deepEqual(out[0].personalFactIds,[]);
  assert.equal(validateCopyAudit(i,p,out)[0].supported,false);
 });
-test('bound wire schema rejects point-inappropriate references',()=>{
- const a=wireRows();a[3].personalFactIds=['sunscreen-finish'];assert.equal(matches(buildReviewAuditWireSchema(i,p),a),false);
+test('compact schema still relies on runtime to reject point-inappropriate references',()=>{
+ const a=wireRows();a[3].personalFactIds=['sunscreen-finish'];assert.equal(matches(buildReviewAuditWireSchema(i,p),a),true);assert.throws(()=>validateCopyAudit(i,p,decodeReviewAuditWire(a)),/copy_audit_citation_mismatch/);
 });
 test('bound wire schema rejects issue none without references',()=>{
  const a=wireRows();a[2].personalFactIds=[];assert.equal(matches(buildReviewAuditWireSchema(i,p),a),false);
@@ -92,5 +92,7 @@ test('oversized bound review requests fail before a dispatch can be prepared',()
  large.why=[point(1),point(2),point(3)];large.tradeoffs=[point(4),point(5)];
  // Full Unicode bodies use up to four bytes per character in the request.
  for(const q of [...large.why,...large.tradeoffs])q.body=q.body.replaceAll('B','界');
- assert.throws(()=>prepareBundleReview(i,b,large),/request_budget/);
+ const bigInput=structuredClone(i);bigInput.evidence=bigInput.evidence.map(e=>({...e,statement:'界'.repeat(20000)}));
+ const bigBundle=structuredClone(b);bigBundle.inputHash=prepareJevDecisionBundle(bigInput).inputHash;
+ assert.throws(()=>prepareBundleReview(bigInput,bigBundle,large),/request_budget/);
 });

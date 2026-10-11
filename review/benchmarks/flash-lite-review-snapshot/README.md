@@ -1,7 +1,5 @@
-# Experimental Flash Lite review v6 diagnostic
+# Experimental Flash Lite review v7 diagnostic
 
-One separately counted review over immutable synthetic decision/copy from run 3a11. No production model change or full benchmark. Model gemini-3.5-flash-lite, MINIMAL thinking, 4096 output tokens, 45 seconds.
+One separately counted review over immutable synthetic decision/copy from run 3a11, not a production switch/full benchmark. Model gemini-3.5-flash-lite, MINIMAL thinking, 4096 output tokens, 45 seconds. Compact three-alternative schema replaces large per-field expansion. Each prompt field lists its allowed references; independent runtime validates exact text, field order, reference scope and support. Wire issue is the sole support discriminator. No citations/issues repaired. Canonical checkpoint validation and negative admission gates remain. Requests above 32768 UTF-8 bytes fail preparation.
 
-Review v6 uses one classification (issue) rather than redundant supported and issue declarations. Wire rows with supported are rejected. issue none becomes canonical supported true; other issues become false. No issue or citation is repaired. Per-field schemas bind citations to the original point. Canonical validation and publication gates remain active. Requests above 32768 UTF8 bytes fail during preparation.
-
-Pinned request hash: 4771a331a52a12b6215acd836e069a0a35d71d20a24aa173943a4210d554c6a3. Verify 27 snapshot hashes and 46 focused tests. Run review/benchmarks/cloud-runner/review-probe.ts once with NODE_USE_ENV_PROXY=1 from the established snapshot root. Preserve every earlier claim/result. These files do not authorize retries or ledger resets.
+Pinned request hash 211509867b0dedc1529fe5e480e2e94a27df86a2c47a679e071cc1f4ed684e06. Verify 28 hashes and 47 tests. Run review/benchmarks/cloud-runner/review-probe.ts once from the fixed snapshot root with NODE_USE_ENV_PROXY=1. Preserve all earlier claims/results. No further calls authorized by these files.
