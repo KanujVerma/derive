@@ -12,11 +12,20 @@ export function copyAuditFields(p:InsightProposal):Array<{field:string;text:stri
  });
  return fields;
 }
-export const COPY_AUDIT_SCHEMA={type:'ARRAY',maxItems:13,items:{type:'OBJECT',properties:{
+// Supported claims must have an evidence or personal-fact citation. Unsupported
+// claims retain a citation-free branch so the reviewer can reject them honestly.
+// BOOLEAN enums are not part of this provider's responseSchema contract. The
+// independent validator below still enforces supported <=> issue === 'none'.
+const auditRow=(issues:readonly string[],evidenceMinimum=0,personalMinimum=0)=>({type:'OBJECT',properties:{
  field:{type:'STRING'},text:{type:'STRING'},supported:{type:'BOOLEAN'},
- evidenceIds:{type:'ARRAY',items:{type:'STRING'}},personalFactIds:{type:'ARRAY',items:{type:'STRING'}},
- issue:{type:'STRING',enum:[...COPY_AUDIT_ISSUES]},
-},required:['field','text','supported','evidenceIds','personalFactIds','issue']}};
+ evidenceIds:{type:'ARRAY',items:{type:'STRING'},minItems:evidenceMinimum},
+ personalFactIds:{type:'ARRAY',items:{type:'STRING'},minItems:personalMinimum},
+ issue:{type:'STRING',enum:[...issues]},
+},required:['field','text','supported','evidenceIds','personalFactIds','issue']});
+export const COPY_AUDIT_SCHEMA={type:'ARRAY',maxItems:13,items:{type:'OBJECT',anyOf:[
+ auditRow(['none'],1,0),auditRow(['none'],0,1),
+ auditRow(COPY_AUDIT_ISSUES.filter(issue=>issue!=='none')),
+]}};
 export function validateCopyAudit(input:DecisionBundleInput,p:InsightProposal,raw:unknown):CopyFieldAudit[]{
  const fields=copyAuditFields(p);
  if(!Array.isArray(raw)||raw.length!==fields.length||raw.length>13)throw Error('incomplete_copy_audit');

@@ -7,7 +7,7 @@ import {DECISION_LOCKED_COPY_INSTRUCTION} from './factsFirstContract.ts';
 import type {InsightProposal} from './insightPacket.ts';
 
 export const BUNDLE_COPY_VERSION='decision-bundle-copy/v5';
-export const BUNDLE_REVIEW_VERSION='decision-bundle-review/v4';
+export const BUNDLE_REVIEW_VERSION='decision-bundle-review/v5';
 function exact(value:unknown,keys:string[]):value is Record<string,unknown>{return !!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join()===keys.sort().join();}
 const text=(v:unknown,max:number)=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
 const unique=(v:readonly unknown[])=>new Set(v).size===v.length;
