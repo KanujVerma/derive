@@ -7,7 +7,7 @@
   "review/benchmarks/facts-first-v3/cases.json": "afab877b782408090f60b047743da6c99b06b3e9b1fb19a53a7c1a11c6179b4b",
   "src/domain/part-two/hash.ts": "13c5d61b2585ff5f83e895ca2e1d88c4ca80d57c48db7c1f1b76e24c69b6c185",
   "src/domain/personalized-sheet/copyClaimAudit.ts": "fc1085b7a6d275f254d40795efff8d7ae3f1a7ea04434185ad30199aee04b7b4",
-  "src/domain/personalized-sheet/decisionBundleCopy.ts": "36c1ee4ce98f77004fc08dc8220955c5b0bdaf0667ae4bf291b4a2a0da0789d5",
+  "src/domain/personalized-sheet/decisionBundleCopy.ts": "71f8f37e3a8cf2b52422476269d80f3505dd0277570fdf82fd35e13f7d96b271",
   "src/domain/personalized-sheet/evidenceAdmission.ts": "f83ad69028b85abd01178d33c05c7be340145408c3db90312293ad9829334d20",
   "src/domain/personalized-sheet/factsFirstContract.ts": "ef793c4ab931f035e6690886e00222c94e5edea0ee5f0ed590f761013d34b841",
   "src/domain/personalized-sheet/geminiProvider.ts": "ebee8c048148e3cdebed872414e761724f0619116653d1315931e9e543d45b86",
@@ -26,5 +26,7 @@
   "review/benchmarks/cloud-runner/review-probe.ts": "6584a361ae1d5ee28e74d0d8e3caa1639b4bb37d6ea5aa872314cd1dae7d7294",
   "tests/heavy-settled.json": "df3d0bf662694d22012f7aac27886120b405b58fbc73aa42a44b37f0522983a1",
   "src/domain/personalized-sheet/reviewAuditWire.ts": "23e9a6b929f521b2ed045d1108bea68c62284bfc3e4cd624655206890bb1bdb2",
-  "tests/review-error-probe.test.ts": "b4d7487264009c8253eb3c6dcbc9a79d0230de4ef137118794bfbe9bbcc30d42"
+  "tests/review-error-probe.test.ts": "b4d7487264009c8253eb3c6dcbc9a79d0230de4ef137118794bfbe9bbcc30d42",
+  "review/benchmarks/cloud-runner/copy-review-probe.ts": "177249d95e5da7c8be08a7f40473e7d2cb80d9f9a090698838e51a5e63b22d25",
+  "tests/copy-review-probe.test.ts": "175ef270002d72bc523d4126d14d5764bf36f3a1653da28ff4cb1baef3e28add"
 }
