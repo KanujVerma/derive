@@ -1,0 +1,319 @@
+{
+  "version": "derive-facts-first-six-case/v3",
+  "dataMode": "synthetic",
+  "maximumProviderCalls": 15,
+  "maximumCostMicrousd": 100000,
+  "automaticRetries": 0,
+  "notes": [
+    "All profiles and product-use histories are fictional.",
+    "Manufacturer-page identities are fixture inputs, not proof that an actual scanned GTIN identifies that product.",
+    "The incomplete-identity case stops before model dispatch and is reported separately from model quality.",
+    "No action, counterfactual outcome or expected recommendation is included in a provider facts payload.",
+    "No old benchmark accounting is reset or reused.",
+    "V2 fixtures remain frozen. This version corrects the heavy-feel question oracle and adds a separately scoped change-priority case."
+  ],
+  "cases": [
+    {
+      "id": "heavy-current-material-question",
+      "preflight": "eligible_fixture",
+      "candidate": "Vanicream Daily Facial Moisturizer",
+      "current": "CeraVe PM Facial Moisturizing Lotion",
+      "use": {
+        "intent": "replace",
+        "purpose": "moisturizing",
+        "category": "moisturizer",
+        "site": "face",
+        "useForm": "leave_on"
+      },
+      "personalFacts": [
+        {
+          "id": "current-benefit",
+          "text": "CeraVe PM improves my dryness."
+        },
+        {
+          "id": "current-feel",
+          "text": "CeraVe PM feels heavy on my face."
+        },
+        {
+          "id": "prior-gel",
+          "text": "A previous lightweight gel left my face feeling tight by morning."
+        }
+      ],
+      "sourceFacts": [
+        {
+          "id": "candidate-feel",
+          "source": "https://www.vanicream.com/product/vanicream-daily-facial-moisturizer",
+          "kind": "manufacturer_description",
+          "text": "The manufacturer describes this moisturizer as rich but lightweight and non-greasy."
+        },
+        {
+          "id": "current-description",
+          "source": "https://www.cerave.com/skincare/moisturizers/pm-facial-moisturizing-lotion",
+          "kind": "manufacturer_description",
+          "text": "CeraVe describes PM as lightweight."
+        }
+      ],
+      "questionTemplateId": "current-product-feel-consistency",
+      "oracle": {
+        "acceptableActualActions": [
+          "keep_current",
+          "try_replacement"
+        ],
+        "requiredPersonalFactIds": [
+          "current-benefit",
+          "current-feel"
+        ],
+        "materialQuestionExpected": "when_branches_differ",
+        "forbiddenClaims": [
+          "proved lighter than CeraVe PM",
+          "proved better hydration",
+          "guaranteed comfortable",
+          "previous gel establishes how this formula will behave"
+        ],
+        "qualityRequirements": [
+          "Balance the benefit the user already gets against the feel problem.",
+          "Identify brand descriptions as their source and avoid turning them into a head-to-head comparison.",
+          "Ask the registered consistency question only if reviewed branches support different actions."
+        ]
+      }
+    },
+    {
+      "id": "superiority-required",
+      "preflight": "eligible_fixture",
+      "candidate": "Neutrogena Hydro Boost Hyaluronic Acid Gel Cream Fragrance Free",
+      "current": "CeraVe PM Facial Moisturizing Lotion",
+      "use": {
+        "intent": "replace",
+        "purpose": "moisturizing",
+        "category": "moisturizer",
+        "site": "face",
+        "useForm": "leave_on"
+      },
+      "personalFacts": [
+        {
+          "id": "current-benefit",
+          "text": "CeraVe PM improves my dryness and I use it consistently."
+        },
+        {
+          "id": "switch-condition",
+          "text": "I only want to replace it if there is evidence of better dryness relief."
+        }
+      ],
+      "sourceFacts": [
+        {
+          "id": "candidate-hydration-claim",
+          "source": "https://www.neutrogena.com/products/skincare/neutrogena-hydro-boost-water-gel-fragrance-free-moisturizer/6806482",
+          "kind": "manufacturer_description",
+          "text": "The manufacturer claims sixfold immediate hydration relative to untreated skin."
+        }
+      ],
+      "questionTemplateId": null,
+      "oracle": {
+        "acceptableActualActions": [
+          "keep_current"
+        ],
+        "requiredPersonalFactIds": [
+          "current-benefit",
+          "switch-condition"
+        ],
+        "materialQuestionExpected": false,
+        "forbiddenClaims": [
+          "six times better than CeraVe",
+          "research proves no difference",
+          "the user has not tried it, therefore evidence cannot exist"
+        ],
+        "qualityRequirements": [
+          "Explain that the supplied manufacturer evidence does not compare the two products.",
+          "Tie keeping the current product to the user's stated condition for switching."
+        ]
+      }
+    },
+    {
+      "id": "reported-irritation-same-product",
+      "preflight": "eligible_fixture",
+      "candidate": "Vanicream Daily Facial Moisturizer",
+      "current": null,
+      "use": {
+        "intent": "add",
+        "purpose": "moisturizing",
+        "category": "moisturizer",
+        "site": "face",
+        "useForm": "leave_on"
+      },
+      "personalFacts": [
+        {
+          "id": "prior-irritation",
+          "text": "I previously used this exact product on my face and experienced stinging. I stopped using it."
+        }
+      ],
+      "sourceFacts": [
+        {
+          "id": "candidate-positioning",
+          "source": "https://www.vanicream.com/product/vanicream-daily-facial-moisturizer",
+          "kind": "manufacturer_description",
+          "text": "The manufacturer markets the product for sensitive skin."
+        }
+      ],
+      "questionTemplateId": null,
+      "oracle": {
+        "acceptableActualActions": [
+          "skip_candidate"
+        ],
+        "requiredPersonalFactIds": [
+          "prior-irritation"
+        ],
+        "materialQuestionExpected": false,
+        "forbiddenClaims": [
+          "diagnosed allergy",
+          "specific ingredient caused the reaction",
+          "avoid every Vanicream product",
+          "sensitive-skin marketing overrides prior experience"
+        ],
+        "qualityRequirements": [
+          "Give a practical recommendation based on the reported experience without diagnosing its cause."
+        ]
+      }
+    },
+    {
+      "id": "cropped-label-ambiguous-product",
+      "preflight": "identity_input_required",
+      "candidate": null,
+      "current": null,
+      "captureFacts": [
+        "The front name is partly hidden.",
+        "The ingredient panel is cropped.",
+        "Several Hydro Boost variants are possible."
+      ],
+      "questionTemplateId": null,
+      "oracle": {
+        "maximumProviderCalls": 0,
+        "expectedUiState": "request_clearer_product_or_label",
+        "forbiddenClaims": [
+          "identified complete formula",
+          "fragrance-free confirmed",
+          "personal fit established"
+        ],
+        "qualityRequirements": [
+          "Ask for a clearer identifying image or full panel instead of dispatching a personal recommendation."
+        ]
+      }
+    },
+    {
+      "id": "sunscreen-preference-stays-scoped",
+      "preflight": "eligible_fixture",
+      "candidate": "Vanicream Daily Facial Moisturizer",
+      "current": "CeraVe PM Facial Moisturizing Lotion",
+      "use": {
+        "intent": "replace",
+        "purpose": "moisturizing",
+        "category": "moisturizer",
+        "site": "face",
+        "useForm": "leave_on"
+      },
+      "personalFacts": [
+        {
+          "id": "current-benefit",
+          "text": "My current face moisturizer improves my dryness and I have no complaint about its feel."
+        },
+        {
+          "id": "sunscreen-finish",
+          "text": "For sunscreen, I prefer a dewy finish.",
+          "scope": {
+            "category": "sunscreen",
+            "site": "face",
+            "useForm": "leave_on",
+            "preferenceKey": "finish"
+          }
+        }
+      ],
+      "sourceFacts": [
+        {
+          "id": "candidate-feel",
+          "source": "https://www.vanicream.com/product/vanicream-daily-facial-moisturizer",
+          "kind": "manufacturer_description",
+          "text": "The manufacturer describes the moisturizer as rich but lightweight and non-greasy."
+        }
+      ],
+      "questionTemplateId": null,
+      "oracle": {
+        "acceptableActualActions": [
+          "keep_current"
+        ],
+        "requiredPersonalFactIds": [
+          "current-benefit"
+        ],
+        "materialQuestionExpected": false,
+        "forbiddenClaims": [
+          "the user prefers dewy moisturizers",
+          "non-greasy means matte",
+          "ask moisturizer finish solely because it is unknown"
+        ],
+        "qualityRequirements": [
+          "Do not transfer a sunscreen preference to moisturizer choice.",
+          "Recommend keeping an effective current product when no relevant reason to switch has been established."
+        ]
+      }
+    },
+    {
+      "id": "moisturizer-change-priority",
+      "preflight": "eligible_fixture",
+      "candidate": "Vanicream Daily Facial Moisturizer",
+      "current": "CeraVe PM Facial Moisturizing Lotion",
+      "use": {
+        "intent": "replace",
+        "purpose": "moisturizing",
+        "category": "moisturizer",
+        "site": "face",
+        "useForm": "leave_on"
+      },
+      "personalFacts": [
+        {
+          "id": "current-benefit",
+          "text": "My current moisturizer relieves my dryness and I use it every day."
+        },
+        {
+          "id": "current-feel",
+          "text": "It feels heavy. I have not decided whether keeping its known benefit or changing its feel matters more to me."
+        }
+      ],
+      "sourceFacts": [
+        {
+          "id": "candidate-feel",
+          "source": "https://www.vanicream.com/product/vanicream-daily-facial-moisturizer",
+          "kind": "manufacturer_description",
+          "text": "The manufacturer describes this moisturizer as rich but lightweight and non-greasy."
+        },
+        {
+          "id": "current-description",
+          "source": "https://www.cerave.com/skincare/moisturizers/pm-facial-moisturizing-lotion",
+          "kind": "manufacturer_description",
+          "text": "CeraVe describes PM as lightweight."
+        }
+      ],
+      "questionTemplateId": "moisturizer-change-priority",
+      "oracle": {
+        "acceptableActualActions": [
+          "keep_current",
+          "try_replacement",
+          "verify_evidence"
+        ],
+        "requiredPersonalFactIds": [
+          "current-benefit",
+          "current-feel"
+        ],
+        "materialQuestionExpected": true,
+        "forbiddenClaims": [
+          "proved lighter than CeraVe PM",
+          "proved better hydration",
+          "guaranteed comfortable",
+          "previous gel establishes how this formula will behave"
+        ],
+        "qualityRequirements": [
+          "Distinguish preserving a known benefit from accepting a trial for a different feel.",
+          "Only publish the preference question if independently reviewed option branches lead to different actions.",
+          "Do not promise that either manufacturer description predicts the user's experience."
+        ]
+      }
+    }
+  ]
+}

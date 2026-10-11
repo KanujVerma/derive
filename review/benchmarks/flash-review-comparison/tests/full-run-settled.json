@@ -1,0 +1,714 @@
+{
+  "sourceRun": "8a9afbe3-c677-4829-97f0-c81c655ccebd",
+  "checkpoints": [
+    {
+      "case_id": "moisturizer-change-priority",
+      "phase": "copy",
+      "checkpoint": {
+        "phase": "copy",
+        "value": {
+          "why": [
+            {
+              "id": "point-1",
+              "body": "Your current cream feels heavy on your face, and the candidate product is described as lightweight.",
+              "title": "Address heavy feel",
+              "evidenceIds": [
+                "candidate-feel",
+                "current-description"
+              ],
+              "personalFactIds": [
+                "current-feel"
+              ]
+            }
+          ],
+          "action": "try_replacement",
+          "reason": "You want to test if a different texture improves your daily routine without losing your current moisture benefit.",
+          "headline": "Try alternative moisturizer",
+          "nextStep": "Apply the new moisturizer daily and check if your dryness remains relieved.",
+          "tradeoffs": [
+            {
+              "id": "tradeoff-1",
+              "body": "Your current product relieves dryness daily, so you must verify if the replacement maintains this benefit while changing the feel.",
+              "title": "Check moisture retention",
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit",
+                "current-feel"
+              ]
+            }
+          ],
+          "cautionIds": [],
+          "selectedQuestionId": null
+        }
+      }
+    },
+    {
+      "case_id": "moisturizer-change-priority",
+      "phase": "decision",
+      "checkpoint": {
+        "phase": "decision",
+        "value": {
+          "usage": {
+            "inputTokens": 2573,
+            "outputTokens": 170
+          },
+          "actual": "try_replacement",
+          "version": "facts-first-product-action/v3",
+          "inputHash": "4af51732337762d784dd92674f43a27e0668a6f56bc90c41724ab701bb78e9eb",
+          "hypothetical": [
+            {
+              "action": "keep_current",
+              "optionId": "retain"
+            },
+            {
+              "action": "try_replacement",
+              "optionId": "change"
+            }
+          ],
+          "resolvedModel": "jev-1.13.0",
+          "materiallyDifferentQuestionId": "moisturizer-change-priority"
+        }
+      }
+    },
+    {
+      "case_id": "moisturizer-change-priority",
+      "phase": "review",
+      "checkpoint": {
+        "phase": "review",
+        "value": {
+          "version": "decision-bundle-review/v9",
+          "branches": [
+            {
+              "optionId": "retain",
+              "supported": false,
+              "contradicted": false,
+              "scopeMatched": true
+            },
+            {
+              "optionId": "change",
+              "supported": true,
+              "contradicted": false,
+              "scopeMatched": true
+            }
+          ],
+          "inputHash": "4af51732337762d784dd92674f43a27e0668a6f56bc90c41724ab701bb78e9eb",
+          "fieldChecks": [
+            {
+              "text": "Try alternative moisturizer",
+              "field": "headline",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-feel"
+              ],
+              "personalFactIds": [
+                "current-feel"
+              ]
+            },
+            {
+              "text": "You want to test if a different texture improves your daily routine without losing your current moisture benefit.",
+              "field": "reason",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-feel"
+              ],
+              "personalFactIds": [
+                "current-benefit",
+                "current-feel"
+              ]
+            },
+            {
+              "text": "Apply the new moisturizer daily and check if your dryness remains relieved.",
+              "field": "nextStep",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-feel"
+              ],
+              "personalFactIds": [
+                "current-benefit",
+                "current-feel"
+              ]
+            },
+            {
+              "text": "Address heavy feel",
+              "field": "why.0.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-feel"
+              ],
+              "personalFactIds": [
+                "current-feel"
+              ]
+            },
+            {
+              "text": "Your current cream feels heavy on your face, and the candidate product is described as lightweight.",
+              "field": "why.0.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-feel",
+                "current-description"
+              ],
+              "personalFactIds": [
+                "current-feel"
+              ]
+            },
+            {
+              "text": "Check moisture retention",
+              "field": "tradeoffs.0.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit",
+                "current-feel"
+              ]
+            },
+            {
+              "text": "Your current product relieves dryness daily, so you must verify if the replacement maintains this benefit while changing the feel.",
+              "field": "tradeoffs.0.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit",
+                "current-feel"
+              ]
+            }
+          ],
+          "contradicted": false,
+          "decisionHash": "a35879bb94da902fba1735c885a7532d2749384e8aa5aa10e38aca6bc21b888b",
+          "proposalHash": "2939c41a16e1fd87261d1f60de54be29b550842d27c9d4aef9024c6c0ce43987",
+          "copySupported": true,
+          "resolvedModel": "gemini-3.5-flash-lite",
+          "actualSupported": true,
+          "questionRelevant": true,
+          "personalContextMatched": true
+        }
+      }
+    },
+    {
+      "case_id": "reported-irritation-same-product",
+      "phase": "copy",
+      "checkpoint": {
+        "phase": "copy",
+        "value": {
+          "why": [
+            {
+              "id": "prior-reaction-mismatch",
+              "body": "You previously used this exact product on your face and experienced stinging. The manufacturer markets the product for sensitive skin, but your direct personal experience indicates a lack of tolerance.",
+              "title": "Past facial stinging",
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            }
+          ],
+          "action": "skip_candidate",
+          "reason": "You experienced stinging when you previously used this exact product on your face, meaning this candidate conflicts with your past tolerance.",
+          "headline": "Skip this moisturizer candidate",
+          "nextStep": "Look for alternative facial moisturizers that avoid your known past irritation triggers.",
+          "tradeoffs": [
+            {
+              "id": "marketing-vs-reality",
+              "body": "Although the manufacturer states the product is for sensitive skin, your past irritation shows that general positioning does not guarantee personal tolerance.",
+              "title": "Sensitive skin claims",
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            }
+          ],
+          "cautionIds": [],
+          "selectedQuestionId": null
+        }
+      }
+    },
+    {
+      "case_id": "reported-irritation-same-product",
+      "phase": "decision",
+      "checkpoint": {
+        "phase": "decision",
+        "value": {
+          "usage": {
+            "inputTokens": 1038,
+            "outputTokens": 46
+          },
+          "actual": "skip_candidate",
+          "version": "facts-first-product-action/v3",
+          "inputHash": "e5b329c7ea6bfbfe95934c660d2de1643681332d01b2cb3e11ba361c23484371",
+          "hypothetical": [],
+          "resolvedModel": "jev-1.13.0",
+          "materiallyDifferentQuestionId": null
+        }
+      }
+    },
+    {
+      "case_id": "reported-irritation-same-product",
+      "phase": "review",
+      "checkpoint": {
+        "phase": "review",
+        "value": {
+          "version": "decision-bundle-review/v9",
+          "branches": [],
+          "inputHash": "e5b329c7ea6bfbfe95934c660d2de1643681332d01b2cb3e11ba361c23484371",
+          "fieldChecks": [
+            {
+              "text": "Skip this moisturizer candidate",
+              "field": "headline",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            },
+            {
+              "text": "You experienced stinging when you previously used this exact product on your face, meaning this candidate conflicts with your past tolerance.",
+              "field": "reason",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            },
+            {
+              "text": "Look for alternative facial moisturizers that avoid your known past irritation triggers.",
+              "field": "nextStep",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            },
+            {
+              "text": "Past facial stinging",
+              "field": "why.0.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            },
+            {
+              "text": "You previously used this exact product on your face and experienced stinging. The manufacturer markets the product for sensitive skin, but your direct personal experience indicates a lack of tolerance.",
+              "field": "why.0.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            },
+            {
+              "text": "Sensitive skin claims",
+              "field": "tradeoffs.0.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            },
+            {
+              "text": "Although the manufacturer states the product is for sensitive skin, your past irritation shows that general positioning does not guarantee personal tolerance.",
+              "field": "tradeoffs.0.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-positioning"
+              ],
+              "personalFactIds": [
+                "prior-irritation"
+              ]
+            }
+          ],
+          "contradicted": false,
+          "decisionHash": "00470a6793b2d179c4d7dcc8539158268e8a62a2fb790ae34495ec1613470819",
+          "proposalHash": "0e078569c01c12aea683a3b1e41d993db01c66148f89b9f17a75cd8b3cd8dd57",
+          "copySupported": true,
+          "resolvedModel": "gemini-3.5-flash-lite",
+          "actualSupported": true,
+          "questionRelevant": true,
+          "personalContextMatched": true
+        }
+      }
+    },
+    {
+      "case_id": "sunscreen-preference-stays-scoped",
+      "phase": "copy",
+      "checkpoint": {
+        "phase": "copy",
+        "value": {
+          "why": [
+            {
+              "id": "why-1",
+              "body": "Your current face moisturizer successfully improves your dryness, and the manufacturer describes the candidate as rich but lightweight and non-greasy.",
+              "title": "Maintains current dryness relief",
+              "evidenceIds": [
+                "candidate-feel"
+              ],
+              "personalFactIds": [
+                "current-benefit"
+              ]
+            }
+          ],
+          "action": "keep_current",
+          "reason": "Your current routine successfully relieves dryness while meeting your personal preferences without needing a replacement.",
+          "headline": "Keep your current face moisturizer",
+          "nextStep": "Continue using your current moisturizer and monitor how it maintains your hydration levels.",
+          "tradeoffs": [
+            {
+              "id": "tradeop-1",
+              "body": "The candidate has a manufacturer description of being rich but lightweight and non-greasy, while your preference for a dewy finish is scoped to sunscreen.",
+              "title": "Matching finish preference",
+              "evidenceIds": [
+                "candidate-feel"
+              ],
+              "personalFactIds": [
+                "sunscreen-finish"
+              ]
+            }
+          ],
+          "cautionIds": [],
+          "selectedQuestionId": null
+        }
+      }
+    },
+    {
+      "case_id": "sunscreen-preference-stays-scoped",
+      "phase": "decision",
+      "checkpoint": {
+        "phase": "decision",
+        "value": {
+          "usage": {
+            "inputTokens": 1142,
+            "outputTokens": 54
+          },
+          "actual": "keep_current",
+          "version": "facts-first-product-action/v3",
+          "inputHash": "6fe850092e59cebf7d7dc67efb30a6081681b7fda8ca0a26f30468522e498d52",
+          "hypothetical": [],
+          "resolvedModel": "jev-1.13.0",
+          "materiallyDifferentQuestionId": null
+        }
+      }
+    },
+    {
+      "case_id": "sunscreen-preference-stays-scoped",
+      "phase": "review",
+      "checkpoint": {
+        "phase": "review",
+        "value": {
+          "version": "decision-bundle-review/v9",
+          "branches": [],
+          "inputHash": "6fe850092e59cebf7d7dc67efb30a6081681b7fda8ca0a26f30468522e498d52",
+          "fieldChecks": [
+            {
+              "text": "Keep your current face moisturizer",
+              "field": "headline",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit"
+              ]
+            },
+            {
+              "text": "Your current routine successfully relieves dryness while meeting your personal preferences without needing a replacement.",
+              "field": "reason",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit"
+              ]
+            },
+            {
+              "text": "Continue using your current moisturizer and monitor how it maintains your hydration levels.",
+              "field": "nextStep",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit"
+              ]
+            },
+            {
+              "text": "Maintains current dryness relief",
+              "field": "why.0.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit"
+              ]
+            },
+            {
+              "text": "Your current face moisturizer successfully improves your dryness, and the manufacturer describes the candidate as rich but lightweight and non-greasy.",
+              "field": "why.0.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-feel"
+              ],
+              "personalFactIds": [
+                "current-benefit"
+              ]
+            },
+            {
+              "text": "Matching finish preference",
+              "field": "tradeoffs.0.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "sunscreen-finish"
+              ]
+            },
+            {
+              "text": "The candidate has a manufacturer description of being rich but lightweight and non-greasy, while your preference for a dewy finish is scoped to sunscreen.",
+              "field": "tradeoffs.0.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-feel"
+              ],
+              "personalFactIds": [
+                "sunscreen-finish"
+              ]
+            }
+          ],
+          "contradicted": false,
+          "decisionHash": "ed1c71f410d45305d82fdd3a443b61d992b09c0b0f51b2d543f01a90fc82697c",
+          "proposalHash": "ae46598a45dff04a0037db6508302acd33f5aaf8c5688bdb0d0348d8cab41e6e",
+          "copySupported": true,
+          "resolvedModel": "gemini-3.5-flash-lite",
+          "actualSupported": true,
+          "questionRelevant": false,
+          "personalContextMatched": true
+        }
+      }
+    },
+    {
+      "case_id": "superiority-required",
+      "phase": "copy",
+      "checkpoint": {
+        "phase": "copy",
+        "value": {
+          "why": [
+            {
+              "id": "why-dryness-goal",
+              "body": "CeraVe PM improves your dryness and you use it consistently, while your switch condition requires evidence of better relief before replacing it.",
+              "title": "Matches your dryness goal",
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit",
+                "switch-condition"
+              ]
+            },
+            {
+              "id": "why-claim-limit",
+              "body": "The manufacturer claims sixfold immediate hydration relative to untreated skin, but this marketing description does not provide comparative proof against your current product.",
+              "title": "Manufacturer claim limits",
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "switch-condition"
+              ]
+            }
+          ],
+          "action": "keep_current",
+          "reason": "You want to replace it only with evidence of better dryness relief, and the candidate only provides a manufacturer marketing claim rather than comparative proof.",
+          "headline": "Keep Using CeraVe PM",
+          "nextStep": "Continue using your current moisturizer and monitor how your skin responds to seasonal changes.",
+          "tradeoffs": [
+            {
+              "id": "tradeoff-hydration",
+              "body": "Sticking with your current routine avoids switching without proof, even though the candidate highlights a manufacturer hydration claim.",
+              "title": "Unproven comparative relief",
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "switch-condition"
+              ]
+            }
+          ],
+          "cautionIds": [],
+          "selectedQuestionId": null
+        }
+      }
+    },
+    {
+      "case_id": "superiority-required",
+      "phase": "decision",
+      "checkpoint": {
+        "phase": "decision",
+        "value": {
+          "usage": {
+            "inputTokens": 1136,
+            "outputTokens": 54
+          },
+          "actual": "keep_current",
+          "version": "facts-first-product-action/v3",
+          "inputHash": "2e487f19c7cb548fc991cb6cc24ded0a074b9612990e186676364cb301b27d90",
+          "hypothetical": [],
+          "resolvedModel": "jev-1.13.0",
+          "materiallyDifferentQuestionId": null
+        }
+      }
+    },
+    {
+      "case_id": "superiority-required",
+      "phase": "review",
+      "checkpoint": {
+        "phase": "review",
+        "value": {
+          "version": "decision-bundle-review/v9",
+          "branches": [],
+          "inputHash": "2e487f19c7cb548fc991cb6cc24ded0a074b9612990e186676364cb301b27d90",
+          "fieldChecks": [
+            {
+              "text": "Keep Using CeraVe PM",
+              "field": "headline",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "current-benefit"
+              ]
+            },
+            {
+              "text": "You want to replace it only with evidence of better dryness relief, and the candidate only provides a manufacturer marketing claim rather than comparative proof.",
+              "field": "reason",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "switch-condition"
+              ]
+            },
+            {
+              "text": "Continue using your current moisturizer and monitor how your skin responds to seasonal changes.",
+              "field": "nextStep",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "current-benefit"
+              ]
+            },
+            {
+              "text": "Matches your dryness goal",
+              "field": "why.0.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit",
+                "switch-condition"
+              ]
+            },
+            {
+              "text": "CeraVe PM improves your dryness and you use it consistently, while your switch condition requires evidence of better relief before replacing it.",
+              "field": "why.0.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [],
+              "personalFactIds": [
+                "current-benefit",
+                "switch-condition"
+              ]
+            },
+            {
+              "text": "Manufacturer claim limits",
+              "field": "why.1.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "switch-condition"
+              ]
+            },
+            {
+              "text": "The manufacturer claims sixfold immediate hydration relative to untreated skin, but this marketing description does not provide comparative proof against your current product.",
+              "field": "why.1.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "switch-condition"
+              ]
+            },
+            {
+              "text": "Unproven comparative relief",
+              "field": "tradeoffs.0.title",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "switch-condition"
+              ]
+            },
+            {
+              "text": "Sticking with your current routine avoids switching without proof, even though the candidate highlights a manufacturer hydration claim.",
+              "field": "tradeoffs.0.body",
+              "issue": "none",
+              "supported": true,
+              "evidenceIds": [
+                "candidate-hydration-claim"
+              ],
+              "personalFactIds": [
+                "switch-condition"
+              ]
+            }
+          ],
+          "contradicted": false,
+          "decisionHash": "8c10a4b579606429b6d72d8738dcd8fa7f39a9cce341fe2c40b6246195c50d63",
+          "proposalHash": "33d589fc5f27049651db9fe30fa9aa5657dbb8f8b787ff8c2e277c8f141827bb",
+          "copySupported": true,
+          "resolvedModel": "gemini-3.5-flash-lite",
+          "actualSupported": true,
+          "questionRelevant": true,
+          "personalContextMatched": true
+        }
+      }
+    }
+  ]
+}
