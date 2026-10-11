@@ -4,7 +4,7 @@
   "review/benchmarks/cloud-runner/ledger-transport.ts": "b0f98aae1f26f7b46f57e8d5933959396c4aebf1581484be1c3fde44da8154a5",
   "review/benchmarks/cloud-runner/run.ts": "e623a067dbd12202c4077337de2f3ce9e156e2c089a7b9f94b55f8622f95d311",
   "review/benchmarks/facts-first-v2/edge-adapter.ts": "7a62e2053903f9c357fe3565b489ef0e19dfa09a40093a27c3270f94d865d94f",
-  "review/benchmarks/facts-first-v2/execute.ts": "5908b9de7a43303f6061f7c6794089b73df1ea7d8a114f4caa6ccc4b58966582",
+  "review/benchmarks/facts-first-v2/execute.ts": "c5b7c262a3673e9d886733606fe09941f669ede807204adfbf21403052bcd7f7",
   "review/benchmarks/facts-first-v2/protocol.ts": "e6adb06e485fb163f96249111a2d4acb8d0477b29732c533068eed14c0ebda96",
   "review/benchmarks/facts-first-v3/cases.json": "afab877b782408090f60b047743da6c99b06b3e9b1fb19a53a7c1a11c6179b4b",
   "src/domain/part-two/hash.ts": "13c5d61b2585ff5f83e895ca2e1d88c4ca80d57c48db7c1f1b76e24c69b6c185",
@@ -24,5 +24,7 @@
   "review/benchmarks/cloud-runner/frame-log.ts": "0d90b450679549e19cb1a13a6e47b2402589b0d46c1fbb22baf6bad24838510b",
   "review/benchmarks/cloud-runner/frame-log.test.ts": "a66f12d6bd193edaecf690f716fe92af4f3ef03e4fa8d21b516a58ba01c14dae",
   "tests/bound-copy-schema.test.ts": "d63a6d96caecb8ece9edc0abe2d85f3a726a402fd09e7fed5a8aab63986736b1",
-  "tests/review-citation-contract.test.ts": "b77fe24bf1b1ad55d42349b946069fcae9d49e9c9aeec9e099fd7165f1ced5dc"
+  "tests/review-citation-contract.test.ts": "b77fe24bf1b1ad55d42349b946069fcae9d49e9c9aeec9e099fd7165f1ced5dc",
+  "review/benchmarks/cloud-runner/review-probe.ts": "521a3c09b7cbb7d8c9c74b37717e7ae33fb22564129368232f7b09800ef013b5",
+  "tests/heavy-settled.json": "df3d0bf662694d22012f7aac27886120b405b58fbc73aa42a44b37f0522983a1"
 }

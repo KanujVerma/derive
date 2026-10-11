@@ -23,7 +23,7 @@ async function readJson(response:Response):Promise<unknown>{
  const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
  return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
 }
-function geminiBody(raw:unknown){
+export function geminiBody(raw:unknown){
  if(!raw||typeof raw!=='object')throw Error('invalid_response');
  const r=raw as Record<string,any>;
  if(r.modelVersion!==PERSONALIZED_GEMINI_MODEL||!Array.isArray(r.candidates)||r.candidates.length!==1||r.candidates[0]?.finishReason!=='STOP')throw Error('invalid_response');
