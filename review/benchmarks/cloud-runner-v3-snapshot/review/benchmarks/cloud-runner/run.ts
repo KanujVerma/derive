@@ -4,8 +4,8 @@ import type {FixtureDataset} from '../facts-first-v2/protocol.ts';
 import dataset from '../facts-first-v3/cases.json' with {type:'json'};
 import {createLedgerTransport,createFencedFetch} from './ledger-transport.ts';
 
-// Exact already-reviewed V3 run. This program cannot renew or enable it.
-const RUN='f5435302-b39d-429f-bde9-a0e73fd6de47';
+// Fresh bounded V3 copy-contract rerun. This program cannot create, renew or enable it.
+const RUN='3a11bffe-775d-4a96-8a96-00a2bbb93d95';
 const PROJECT='snojlbqovlawewwqbviz';
 const action=process.argv[2];
 if(action!=='status'&&action!=='run_next')throw Error('Use status or run_next');

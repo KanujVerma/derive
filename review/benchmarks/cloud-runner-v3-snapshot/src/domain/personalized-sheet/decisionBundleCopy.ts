@@ -6,7 +6,7 @@ import {PERSONALIZED_PROPOSAL_SCHEMA,PERSONALIZED_GEMINI_MODEL} from './geminiPr
 import {DECISION_LOCKED_COPY_INSTRUCTION} from './factsFirstContract.ts';
 import type {InsightProposal} from './insightPacket.ts';
 
-export const BUNDLE_COPY_VERSION='decision-bundle-copy/v4';
+export const BUNDLE_COPY_VERSION='decision-bundle-copy/v5';
 export const BUNDLE_REVIEW_VERSION='decision-bundle-review/v3';
 function exact(value:unknown,keys:string[]):value is Record<string,unknown>{return !!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join()===keys.sort().join();}
 const text=(v:unknown,max:number)=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
@@ -47,14 +47,35 @@ export function validateBundleCopy(input:DecisionBundleInput,bundle:JevDecisionB
  }
  return structuredClone(p);
 }
+/** Bind generation to the same reference sets that admission validates.
+ * This reduces invalid output; it does not replace the independent validator. */
+export function buildBoundBundleCopySchema(input:DecisionBundleInput,bundle:JevDecisionBundle){
+ validateDecisionBundle(input,bundle);
+ const facts=input.personalFacts.map(f=>f.id),evidence=input.evidence.map(e=>e.id),cautions=[...input.mandatoryCautionIds];
+ if(!unique(facts)||!unique(evidence)||!unique(cautions))throw Error('ambiguous_reference');
+ // Admission requires at least one personal fact for every why point.
+ if(!facts.length)throw Error('missing_personal_context');
+ const references=(ids:readonly string[],minimum=0)=>({type:'ARRAY',items:ids.length?{type:'STRING',enum:[...ids]}:{type:'STRING'},minItems:minimum,maxItems:ids.length});
+ const base=structuredClone(PERSONALIZED_PROPOSAL_SCHEMA);
+ const point={...base.properties.why.items,properties:{...base.properties.why.items.properties,
+  id:{type:'STRING',minLength:1,maxLength:100},title:{type:'STRING',minLength:1,maxLength:80},body:{type:'STRING',minLength:1,maxLength:450},
+  evidenceIds:references(evidence),personalFactIds:references(facts,1)}};
+ return {...base,properties:{...base.properties,
+  action:{type:'STRING',enum:[bundle.actual]},
+  headline:{type:'STRING',minLength:1,maxLength:80},reason:{type:'STRING',minLength:1,maxLength:360},nextStep:{type:'STRING',minLength:1,maxLength:200},
+  selectedQuestionId:{type:'NULL'},
+  why:{...base.properties.why,items:structuredClone(point)},
+  tradeoffs:{...base.properties.tradeoffs,items:structuredClone(point)},
+  cautionIds:references(cautions,cautions.length)}};
+}
 export function buildBundleCopyRequest(input:DecisionBundleInput,bundle:JevDecisionBundle){
  validateDecisionBundle(input,bundle);
  // Do not let hypothetical answers contaminate actual reasons. The writer sees
  // actual facts and action only; branch and question checking belong to review.
  const {question:_,comparatorScope:__,...actualFacts}=input;
  return {contents:[{role:'user',parts:[{text:canonicalJson({version:BUNDLE_COPY_VERSION,
-  instruction:DECISION_LOCKED_COPY_INSTRUCTION+' In this protocol the question is handled separately. Return selectedQuestionId:null. Do not write or imply an answer to an unanswered question.',
-  input:actualFacts,decision:{action:bundle.actual,inputHash:bundle.inputHash}})}]}],generationConfig:{temperature:0,candidateCount:1,maxOutputTokens:3072,thinkingConfig:{thinkingLevel:'LOW'},responseMimeType:'application/json',responseSchema:PERSONALIZED_PROPOSAL_SCHEMA}};
+  instruction:DECISION_LOCKED_COPY_INSTRUCTION+' Every why and tradeoff point must contain at least one exact personalFactId from input.personalFacts. Copy reference IDs literally, without inventing IDs or substituting labels or quoted text. Use an empty evidenceIds array when no supplied evidence supports a point; never invent an evidence reference. Each ID array must contain distinct IDs. In this protocol the question is handled separately. Return selectedQuestionId:null. Do not write or imply an answer to an unanswered question.',
+  input:actualFacts,decision:{action:bundle.actual,inputHash:bundle.inputHash}})}]}],generationConfig:{temperature:0,candidateCount:1,maxOutputTokens:3072,thinkingConfig:{thinkingLevel:'LOW'},responseMimeType:'application/json',responseSchema:buildBoundBundleCopySchema(input,bundle)}};
 }
 export interface BundleReview {
  version:typeof BUNDLE_REVIEW_VERSION;resolvedModel:typeof PERSONALIZED_GEMINI_MODEL;inputHash:string;decisionHash:string;proposalHash:string;
