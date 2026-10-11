@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {projectFixture} from '../review/benchmarks/facts-first-v2/protocol.ts';
+import {copyAuditFields,validateCopyAudit} from '../src/domain/personalized-sheet/copyClaimAudit.ts';
+import {prepareBundleReview} from '../src/domain/personalized-sheet/decisionBundleCopy.ts';
+import {prepareJevDecisionBundle,JEV_BUNDLE_PROTOCOL} from '../src/domain/personalized-sheet/jevDecisionBundle.ts';
+import {PERSONALIZED_JEV_MODEL} from '../src/domain/personalized-sheet/jevDecisionProtocol.ts';
+const data=JSON.parse(fs.readFileSync(new URL('../review/benchmarks/facts-first-v3/cases.json',import.meta.url),'utf8'));
+const i=projectFixture(data.cases.find((x:any)=>x.id==='sunscreen-preference-stays-scoped'))!;
+const b:any={version:JEV_BUNDLE_PROTOCOL,inputHash:prepareJevDecisionBundle(i).inputHash,actual:i.allowedActions[0],hypothetical:(i.question?.options??[]).map(o=>({optionId:o.id,action:i.allowedActions[0]})),materiallyDifferentQuestionId:null,resolvedModel:PERSONALIZED_JEV_MODEL,usage:{inputTokens:1,outputTokens:1}};
+const p:any={action:b.actual,headline:'Keep your current moisturizer',reason:'It helps your dryness.',nextStep:'Keep your current moisturizer.',why:[{id:'routine-fit',title:'Dryness',body:'Your current moisturizer helps your dryness.',evidenceIds:[],personalFactIds:['current-benefit']}],tradeoffs:[],selectedQuestionId:null,cautionIds:[]};
+const rows=()=>copyAuditFields(p).map(f=>({...f,supported:true,evidenceIds:[],personalFactIds:['current-benefit'],issue:'none'}));
+test('supported fields still require an actual reference',()=>{const a=rows();a[0].personalFactIds=[];assert.throws(()=>validateCopyAudit(i,p,a),/unreferenced_copy_audit/);});
+test('unsupported field may honestly have no supporting reference',()=>{const a:any[]=rows();a[0]={...a[0],supported:false,personalFactIds:[],issue:'unsupported_instruction'};assert.equal(validateCopyAudit(i,p,a)[0].supported,false);});
+test('personal-only support remains valid',()=>assert.equal(validateCopyAudit(i,p,rows()).length,5));
+test('unrelated point citation remains rejected',()=>{const a=rows();a[3].personalFactIds=['sunscreen-finish'];assert.throws(()=>validateCopyAudit(i,p,a),/copy_audit_citation_mismatch/);});
+test('review prompt explicitly rejects fabricated support and explains empty arrays',()=>{const r=prepareBundleReview(i,b,p);const t=r.request.contents[0].parts[0].text;assert.match(t,/supported:true field must cite at least one/);assert.match(t,/Both arrays may be empty only for a supported:false/);assert.match(t,/Never invent or attach an unrelated citation/);});
