@@ -5,10 +5,10 @@ This wrapper uses the preserved V14 benchmark adapter and exact V3 dataset. It d
 ## Fixed scope
 
 - Project: `snojlbqovlawewwqbviz`
-- Run: `f5435302-b39d-429f-bde9-a0e73fd6de47`
+- Run: `3a11bffe-775d-4a96-8a96-00a2bbb93d95`
 - Dataset hash: `a8b2d46c9d530a5ba94a19611125e01a5696a21ed649059704107201f472aa46`
 - Existing ledger cap: 15 calls and 100,000 micro-USD ($0.10).
-- Commands: `node --experimental-strip-types review/benchmarks/cloud-runner/run.ts status` or `run_next`.
+- Commands: `NODE_USE_ENV_PROXY=1 node --experimental-strip-types review/benchmarks/cloud-runner/run.ts status` or `run_next`.
 - One `run_next` process performs at most one claimed provider phase.
 
 ## Credential setup
@@ -57,3 +57,7 @@ The SQL routine and typed parameter structure are static. Arguments are serializ
 - No live provider call was used for these checks.
 - Full strict typecheck remains blocked by two type-only dependencies missing from the preserved V14 source snapshot (`orchestrator.ts` and `observedProductBinding.ts`). Runtime imports use stripped types; this is not a claim of a complete typecheck.
 - These checks do not establish benchmark quality, hosted deployment, or phone readiness.
+
+## Complete frame evidence
+
+The runner persists each complete credential-free JSON frame to a unique `.benchmark-frames-*` directory in its working directory before stdout emission. The directory is mode 0700 and files are 0600; both file data and directory entries are synced. If display output is clipped, read the original numbered file, verify session/id/run and recompute the allowlisted query before relaying. A saved frame never grants a new provider dispatch or permission to replay a settled claim. Inspect the authoritative ledger first after an uncertain result. Do not synthesize a checkpoint from partial output.

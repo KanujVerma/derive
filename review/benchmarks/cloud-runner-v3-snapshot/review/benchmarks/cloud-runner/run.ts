@@ -1,4 +1,5 @@
 import {createInterface} from 'node:readline';
+import {createFrameWriter} from './frame-log.ts';
 import {createFixedBenchmarkAdapter} from '../facts-first-v2/edge-adapter.ts';
 import type {FixtureDataset} from '../facts-first-v2/protocol.ts';
 import dataset from '../facts-first-v3/cases.json' with {type:'json'};
@@ -9,7 +10,8 @@ const RUN='3a11bffe-775d-4a96-8a96-00a2bbb93d95';
 const PROJECT='snojlbqovlawewwqbviz';
 const action=process.argv[2];
 if(action!=='status'&&action!=='run_next')throw Error('Use status or run_next');
-const write=(value:unknown)=>process.stdout.write(JSON.stringify(value)+'\n');
+const frameWriter=createFrameWriter(process.cwd(),line=>{process.stdout.write(line);});
+const write=(value:unknown)=>frameWriter.write(value);
 const transport=createLedgerTransport(RUN,PROJECT,write);
 const input=createInterface({input:process.stdin,terminal:false});
 input.on('line',line=>transport.receive(line));input.on('close',()=>transport.close());

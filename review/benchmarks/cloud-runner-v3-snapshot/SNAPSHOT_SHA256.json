@@ -1,8 +1,8 @@
 {
-  "review/benchmarks/cloud-runner/README.md": "8a79c39c9215d1a129cd9c5729e6546ab28cba5991107bcde8579663cba6c2ae",
+  "review/benchmarks/cloud-runner/README.md": "d1f84d4c518e30f086978be6a76df01b30ff51c2e619b1f6e9c944a01ef164aa",
   "review/benchmarks/cloud-runner/ledger-transport.test.ts": "f5d88af083930e6d02d4c1c3f32de4f90a8fecabd49f535d63e027ba725b48ba",
   "review/benchmarks/cloud-runner/ledger-transport.ts": "b0f98aae1f26f7b46f57e8d5933959396c4aebf1581484be1c3fde44da8154a5",
-  "review/benchmarks/cloud-runner/run.ts": "22ed99a4faf4b0ebf3367861adce8490d2ba1fd02435be9bcd6a9c626d09eb40",
+  "review/benchmarks/cloud-runner/run.ts": "3b62fe8f4d32184afa3c2377890c5f3763a0c969111e42a35819b21c27009de6",
   "review/benchmarks/facts-first-v2/edge-adapter.ts": "7a62e2053903f9c357fe3565b489ef0e19dfa09a40093a27c3270f94d865d94f",
   "review/benchmarks/facts-first-v2/execute.ts": "5908b9de7a43303f6061f7c6794089b73df1ea7d8a114f4caa6ccc4b58966582",
   "review/benchmarks/facts-first-v2/protocol.ts": "e6adb06e485fb163f96249111a2d4acb8d0477b29732c533068eed14c0ebda96",
@@ -21,5 +21,7 @@
   "src/domain/personalized-sheet/processingContract.ts": "5340f5661e082fb3e670509857def77b09a83b04954375cd8cad4857197590c9",
   "src/domain/personalized-sheet/processingRecovery.ts": "332cbb1a6e8eaec250e14b46d0a1644b8a0ef44c757c5fe33a43a28298ce6f74",
   "src/domain/personalized-sheet/scopedAnswers.ts": "210303205474283d2b3f2f7e0ad93d361e6ee2a104c8b55af14636e9d56b6625",
+  "review/benchmarks/cloud-runner/frame-log.ts": "0d90b450679549e19cb1a13a6e47b2402589b0d46c1fbb22baf6bad24838510b",
+  "review/benchmarks/cloud-runner/frame-log.test.ts": "a66f12d6bd193edaecf690f716fe92af4f3ef03e4fa8d21b516a58ba01c14dae",
   "tests/bound-copy-schema.test.ts": "d63a6d96caecb8ece9edc0abe2d85f3a726a402fd09e7fed5a8aab63986736b1"
 }
