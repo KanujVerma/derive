@@ -7,7 +7,7 @@ import {PERSONALIZED_PROPOSAL_SCHEMA,PERSONALIZED_GEMINI_MODEL} from './geminiPr
 import {DECISION_LOCKED_COPY_INSTRUCTION} from './factsFirstContract.ts';
 import type {InsightProposal} from './insightPacket.ts';
 
-export const BUNDLE_COPY_VERSION='decision-bundle-copy/v6';
+export const BUNDLE_COPY_VERSION='decision-bundle-copy/v7';
 export const BUNDLE_REVIEW_VERSION='decision-bundle-review/v7';
 function exact(value:unknown,keys:string[]):value is Record<string,unknown>{return !!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join()===keys.sort().join();}
 const text=(v:unknown,max:number)=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
@@ -75,7 +75,7 @@ export function buildBundleCopyRequest(input:DecisionBundleInput,bundle:JevDecis
  // actual facts and action only; branch and question checking belong to review.
  const {question:_,comparatorScope:__,...actualFacts}=input;
  return {contents:[{role:'user',parts:[{text:canonicalJson({version:BUNDLE_COPY_VERSION,
-  instruction:DECISION_LOCKED_COPY_INSTRUCTION+' Every why and tradeoff point must contain every exact personalFactId and evidenceId needed to support ALL factual clauses in its title and body, with at least one personalFactId. For example, a point that discusses both a current product benefit and its feel must attach the facts supporting both; a feel reference cannot support a benefit clause. Do not add irrelevant references. Prefer one clear decision-relevant point per row, concise wording, and no repeated reasons. Copy reference IDs literally, without inventing IDs or substituting labels or quoted text. Use an empty evidenceIds array when no supplied evidence supports a point; never invent an evidence reference. Each ID array must contain distinct IDs. In this protocol the question is handled separately. Return selectedQuestionId:null. Do not write or imply an answer to an unanswered question.',
+  instruction:DECISION_LOCKED_COPY_INSTRUCTION+' Write directly to the user as you/your, never I/my. The product name already appears above this copy, so do not repeat a full product name in the headline. Keep headline to 3-7 words and at most 60 characters, titles at most 50 characters, reason at most 250 characters, and nextStep at most 160 characters. The schema character limits are hard requirements; count characters before returning. Every why and tradeoff point must contain every exact personalFactId and evidenceId needed to support ALL factual clauses in its title and body, with at least one personalFactId. For example, a point that discusses both a current product benefit and its feel must attach the facts supporting both; a feel reference cannot support a benefit clause. Do not add irrelevant references. Prefer one clear decision-relevant point per row, concise wording, and no repeated reasons. Copy reference IDs literally, without inventing IDs or substituting labels or quoted text. Use an empty evidenceIds array when no supplied evidence supports a point; never invent an evidence reference. Each ID array must contain distinct IDs. In this protocol the question is handled separately. Return selectedQuestionId:null. Do not write or imply an answer to an unanswered question.',
   input:actualFacts,decision:{action:bundle.actual,inputHash:bundle.inputHash}})}]}],generationConfig:{temperature:0,candidateCount:1,maxOutputTokens:3072,thinkingConfig:{thinkingLevel:'MINIMAL'},responseMimeType:'application/json',responseSchema:buildBoundBundleCopySchema(input,bundle)}};
 }
 export interface BundleReview {
