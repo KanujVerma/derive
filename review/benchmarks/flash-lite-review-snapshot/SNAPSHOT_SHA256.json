@@ -35,6 +35,6 @@
   "tests/field-role-calibration.ts": "3fff14587807d802a85fda2cf58790cf87410cf9f8f42f9affc739e869655a86",
   "tests/field-role-probe.test.ts": "f5e4a8ed5eafba1b79b4acfd6bbcff897ea24e70bcf0e5e98271daf6a8af147c",
   "review/benchmarks/cloud-runner/field-role-probe.ts": "58cde703c5c58dd4140b248d8f0fe460e35c436d38b56aadaf8b3fe3821d6f71",
-  "review/benchmarks/cloud-runner/run.ts": "963bdbf19d8b7e39e2b850724402323db4854a2a5d915ffab76280806b1f2d19",
-  "review/benchmarks/cloud-runner/README.md": "ae2984d98ac4ce185c722543f29193644781a2952b7014e8e84897eefe7fb673"
+  "review/benchmarks/cloud-runner/run.ts": "5aa26fa28f0b3ce1e27c60205d666a7b6f50607c345d83d72061d8206caf959b",
+  "review/benchmarks/cloud-runner/README.md": "228fa1b2ad34c924375fb5cd23eb77ba0e414d855e7883f3101a5d01da36d80b"
 }

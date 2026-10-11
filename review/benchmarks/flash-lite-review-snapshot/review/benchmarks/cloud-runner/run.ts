@@ -17,7 +17,9 @@ const input=createInterface({input:process.stdin,terminal:false});
 input.on('line',line=>transport.receive(line));input.on('close',()=>transport.close());
 // A failed or timed-out management response leaves any consumed claim unresolved.
 // There is no provider retry, refund, role impersonation, or ledger reset.
-const timeout=setTimeout(()=>transport.close(),120000);
+// Management-tool round trips share this bounded orchestration window.
+// Each provider request still has its separate <=45s deadline and <=90s lease.
+const timeout=setTimeout(()=>transport.close(),600000);
 try{
  const adapter=createFixedBenchmarkAdapter(RUN,dataset as FixtureDataset,{
   rpc:transport.rpc,now:()=>Date.now(),fetchImpl:createFencedFetch(transport.signal,fetch),
