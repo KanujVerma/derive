@@ -1,14 +1,48 @@
 {
   "name": "Derive disposable bundle SQL native-test candidate",
-  "status": "UNVERIFIED: native PostgreSQL execution not run",
+  "revision": "r5",
+  "status": "PASSED bounded native suite; undeployed and not feature-ready",
   "package": {
     "file": "bundle-native-test-package.json.gz",
-    "bytes": 180974,
-    "sha256": "9f8da41dec34b39eaddd0c5c58045262490758ab455b71d96ba8f8297b5b6330"
+    "bytes": 181582,
+    "sha256": "11c980e04a46c27293c609c4bb7163f98aeebe403499c76d59e219aa5479561e"
   },
-  "sqlFileCount": 33,
+  "transport": {
+    "file": "bundle-native-test-package.json.gz.b64",
+    "encoding": "RFC4648 base64 UTF-8 text plus one trailing newline; decode before gzip use",
+    "bytes": 242113,
+    "sha256": "49d7c14cda669dcff3af41478f739a2f6b5e9a77c3391eaf82bc48b7f601e401"
+  },
+  "publicBranchFiles": [
+    "bundle-native-test-package.json.gz.b64",
+    "README.md",
+    "manifest.json"
+  ],
+  "verification": {
+    "status": "passed",
+    "environment": "Separate disposable PostgreSQL 15.19 executor",
+    "packageSHA256": "11c980e04a46c27293c609c4bb7163f98aeebe403499c76d59e219aa5479561e",
+    "packageBytes": 181582,
+    "canonicalRawSHA256": "7b268221daab029d0842e71510a9f7777965057acaa389f92c07005703095b67",
+    "checks": {
+      "total": 185,
+      "compile": 34,
+      "scalar": 23,
+      "native": 120,
+      "ACL": 6,
+      "environment": 2
+    },
+    "SQLResults": 305,
+    "expectedRejections": 66,
+    "limits": [
+      "Explicit verified fourteen-slice Part One reconstruction; original bootstrap not recovered.",
+      "Test-only Auth/Storage/session rows and JWT GUC claim readers, no hosted JWT signatures/session issuance/logout API proof.",
+      "Synthetic retained grants/checkpoints/settlements; no new-operation admission or provider/model call.",
+      "Questions, database-backed request-evaluator/client integration, hosted activation/deployment and feature readiness remain separate gates."
+    ]
+  },
+  "sqlFileCount": 34,
   "assetCount": 4,
-  "contentScope": "Only SQL authority/candidates, synthetic fixture vectors, portable local runner, provenance, and this minimal transfer documentation. No external writes/deployment included.",
   "pins": [
     {
       "path": "00-bootstrap.sql",
@@ -207,13 +241,19 @@
       "bytes": 24183,
       "sha256": "889dfbadd926bb4cf285836d96413c5c8bbec740285204bb9bd2f23d4a5f3695",
       "kind": "local undeployed candidate"
+    },
+    {
+      "path": "33-test-fixture-data-deadline-compatibility.sql",
+      "bytes": 1575,
+      "sha256": "34e5aea9a27aa11e7d26172ecf04639ba0b98d4d8f5cf63b1e7d6b26c718355e",
+      "kind": "explicit disposable fixture compatibility; original data deadline, not complete domain payload"
     }
   ],
   "assetPins": [
     {
       "path": "run-native.py",
-      "bytes": 55242,
-      "sha256": "30e2cbe84aed6a171b10612fd37e4fb5c387d786202da7c0d19bc9d549369e45"
+      "bytes": 55507,
+      "sha256": "f08b673ca38a81a84f734a6d8728afefc7e004f63b08a6323d36685b758c9344"
     },
     {
       "path": "retained-domain-template.json",
@@ -231,25 +271,6 @@
       "sha256": "27b4086de8f0aec52db356b4c8d370cb700a7b3580d591100db3672dd0323e38"
     }
   ],
-  "caveats": [
-    "Original Part One bootstrap was not recovered; its explicitly verified fourteen-slice reconstruction is included.",
-    "Minimal test-only Auth/Storage scaffolds do not prove hosted JWT verification, session issuance, or logout API behavior.",
-    "Fixtures and settlement metadata are administrator-authored synthetic local test data; no model/provider request occurs.",
-    "New-operation admission/dispatch and question selection remain closed separate gates.",
-    "Original local workspace path strings are retained solely in provenance; package bytes are unmodified."
-  ],
-  "authorization": "Prepared locally for an explicitly approved public test-only transfer. Root performs any external upload; none occurred during local preparation.",
-  "transport": {
-    "file": "bundle-native-test-package.json.gz.b64",
-    "encoding": "RFC4648 base64 UTF-8 text plus one trailing newline; decode before gzip use",
-    "bytes": 241301,
-    "sha256": "c27dfa657f3a4613dac37c4cc1a84859a3e1079750b80f1fb4466b026efc2fda",
-    "decodedSHA256": "9f8da41dec34b39eaddd0c5c58045262490758ab455b71d96ba8f8297b5b6330",
-    "decodedBytes": 180974
-  },
-  "publicBranchFiles": [
-    "bundle-native-test-package.json.gz.b64",
-    "README.md",
-    "manifest.json"
-  ]
+  "privacyReview": "Exact r5 compared with cleared r1. No detected secrets, private URLs, genuine personal-data drift, native logs, private evidence attachments or unrelated documents. Real application SQL and local source/reconstruction provenance paths are included.",
+  "authorization": "Minimal preparation for the specifically approved public synthetic test-package branch. Root handles external upload; no merge or deployment."
 }
