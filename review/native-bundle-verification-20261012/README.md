@@ -1,66 +1,54 @@
-# Derive disposable bundle SQL test package
+# Derive disposable bundle SQL test package, r5
 
-Status: **UNVERIFIED local candidate. Native PostgreSQL has not been run.**
+Passed **185 checks on separate disposable PostgreSQL 15.19**: 34 SQL compiles,
+23 scalar/actual-TypeScript parity, 120 native, 6 ACL and 2 environment checks.
+There were 305 SQL results, including 66 expected rejections. Exact decoded gzip
+SHA256: `11c980e04a46c27293c609c4bb7163f98aeebe403499c76d59e219aa5479561e`.
 
-This package is for a separate test-only branch and a fresh disposable local
-PostgreSQL 15+ cluster. It is not a migration release, deployment instruction,
-or evidence of production readiness. Do not apply it to a hosted or existing
-database. It never calls a model provider.
+Actual two-connection publication produced one new packet and one exact replay.
+Readback, removed-session rejection, erasure/accounting preservation, two
+execution-expiry rollback cases and three session-row lock/deadline cases passed.
 
-`manifest.json` lists exact SHA-256 and byte pins for the unmodified gzip, every
-SQL source, and each test asset. The gzip contains 33 SQL files and four assets,
-including the complete local runner. It does not need the application repository
-to be present in the native test environment.
+## Evidence boundaries
 
-## Important evidence boundaries
+- Local undeployed candidate, not a migration release or feature-readiness claim.
+  Never apply this stack to an existing or hosted database.
+- Original Part One bootstrap was not recovered; fourteen explicitly pinned
+  reconstructed slices are included. All other recovered authority is byte-pinned.
+- Auth/Storage/session tables and JWT GUC readers are test scaffolds. They do not
+  prove hosted JWT signatures, session issuance or logout API behavior.
+- Owners, products, health-shaped context, grants and settlements are synthetic
+  administrator-authored fixtures. No provider/model call occurs.
+- New-operation admission/dispatch, questions, request-evaluator/client database
+  integration, hosted activation and deployment remain separate gates.
+- Real application SQL and local source/reconstruction provenance paths are
+  disclosed. No secrets, private URLs, genuine personal data, command logs or
+  private evidence attachments were detected/included in this bounded package.
+- Original 33 SQL inputs remain unchanged. The 34th file only gives an obsolete
+  provisional fixture scaffold its existing result_expiry. The complete domain
+  payload is admitted later under unchanged guards. Runner-only corrections make
+  output explicit JSON and match one source-backed rejection; guards, predicates,
+  strict JSON parsing and publication expectations are unchanged.
 
-- Twenty-four baseline SQL files are exact recovered source. The original Part One
-  bootstrap was not recovered; its independently verified fourteen-slice
-  reconstruction is explicit. A separately recovered session-binding source is
-  also included unchanged.
-- Auth/Storage platform substitutes are clearly marked test scaffolds. The
-  minimal auth.sessions table and GUC claim readers do not verify JWT signatures,
-  issue sessions, or establish hosted logout API behavior.
-- Product, owner, context, processing grants, and retained settlement metadata are
-  administrator-authored synthetic local fixtures. Health-shaped context fields
-  are fixture inputs, not observations about a real person.
-- The candidate preserves existing SQL ledgers and charged-call rows. New
-  operation admission/provider dispatch and question selection remain closed.
-- Authenticated pin expiry authenticity relies on a verified end-user JWT RPC
-  and trusted request-scoped server; no compromised service-key defense is claimed.
-- Local workspace path strings are retained only as source/reconstruction
-  provenance. They are not endpoints or credentials.
+## Reproduce locally
 
-## Native verification
-
-The public branch transports the exact gzip as a UTF-8 base64 file. Decode it
-first; this is a transport transformation only, not a package/source change:
-
-```sh
-python - <<'PY'
-import base64
-from pathlib import Path
-encoded = Path('bundle-native-test-package.json.gz.b64').read_bytes()
-Path('bundle-native-test-package.json.gz').write_bytes(base64.b64decode(encoded))
-PY
-```
-
-Verify both the base64 transport and decoded gzip SHA-256 against `manifest.json`.
-Then materialize the runner:
+Only the base64 transport, this README and manifest belong in the public test
+branch. The manifest pins every SQL/asset and both transport/decoded gzip bytes.
+Decode, verify those SHA-256 values, then materialize the bundled runner:
 
 ```sh
 python - <<'PY'
-import gzip, json
+import base64, gzip, json
 from pathlib import Path
-p = json.loads(gzip.decompress(Path('bundle-native-test-package.json.gz').read_bytes()))
-a = next(a for a in p['assets'] if a['path'] == 'run-native.py')
-Path('run-native.py').write_text(a['text'])
+raw = base64.b64decode(Path('bundle-native-test-package.json.gz.b64').read_bytes())
+Path('bundle-native-test-package.json.gz').write_bytes(raw)
+p = json.loads(gzip.decompress(raw))
+Path('run-native.py').write_text(next(a['text'] for a in p['assets'] if a['path']=='run-native.py'))
 PY
 ```
 
-Use a fresh local cluster in which anon/authenticated/service_role and the test
-schemas do not yet exist. Create a disposable database named bundle_native_review.
-Then run:
+Use a fresh local PostgreSQL 15+ cluster with no preexisting test schemas or
+anon/authenticated/service_role roles. Create bundle_native_review, then:
 
 ```sh
 python run-native.py --package bundle-native-test-package.json.gz \
@@ -68,8 +56,7 @@ python run-native.py --package bundle-native-test-package.json.gz \
   --database bundle_native_review --disposable-local --output native-results.json
 ```
 
-Only local sockets or loopback are accepted. The test writes its named results
-and exact SQL/exit/stdout/stderr evidence locally. Tests include actual row-lock
-serialization, retained execution/session deadline rollback, and duplicate
-publication/replay; a complete run takes several minutes. Until a native run
-finishes successfully, compile and SQL concurrency behavior remain unverified.
+Only local sockets/loopback are accepted. The suite takes several minutes and
+writes its exact results/SQL/error evidence locally. Earlier frozen revisions
+and failed evidence remain preserved. No merge or deployment is part of this
+test-package transfer.
