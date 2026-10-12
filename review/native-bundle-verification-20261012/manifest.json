@@ -1,0 +1,255 @@
+{
+  "name": "Derive disposable bundle SQL native-test candidate",
+  "status": "UNVERIFIED: native PostgreSQL execution not run",
+  "package": {
+    "file": "bundle-native-test-package.json.gz",
+    "bytes": 180974,
+    "sha256": "9f8da41dec34b39eaddd0c5c58045262490758ab455b71d96ba8f8297b5b6330"
+  },
+  "sqlFileCount": 33,
+  "assetCount": 4,
+  "contentScope": "Only SQL authority/candidates, synthetic fixture vectors, portable local runner, provenance, and this minimal transfer documentation. No external writes/deployment included.",
+  "pins": [
+    {
+      "path": "00-bootstrap.sql",
+      "bytes": 85522,
+      "sha256": "13b20eaba9648d7d540218dffa620f261cde151ee6f49d22ce80d0f48b27a210",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "01-candidate-v3.sql",
+      "bytes": 17997,
+      "sha256": "4404c5367310f13eb70ec97c1066721933e31e30f6df6101a1dcdc4538bf349b",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "02-candidate-v4-delta.sql",
+      "bytes": 4168,
+      "sha256": "db572d251539e5d2de96a9dbfd1d8a8e5b7f8d6fa10c0d9c293dfe6abe85267d",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "03-fixtures.sql",
+      "bytes": 12372,
+      "sha256": "654f70b5e7c086f52fe56221dcb48edabdafadee3af2ef5058bd33471d8871d7",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "04-worker-bootstrap.sql",
+      "bytes": 216898,
+      "sha256": "71445289d44c9e4338881b9fa75ce39ce718a80247b15e8ba39db9539f0e1393",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "05-lifecycle.sql",
+      "bytes": 870,
+      "sha256": "995ee1fd7e434c089347187358c8daed837eec21f414ab9c2c77647497fd7d72",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "06-domain-fixtures.sql",
+      "bytes": 15610,
+      "sha256": "0e625341150bb5c9b784652e25f7450d2a73e8f4cc18cec9ed8d6c6e041d8224",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "07-candidate-storage.sql",
+      "bytes": 93168,
+      "sha256": "ce2918062368fc2d38ff130a3f2eecc8d8731381f94763b6d97a8944e5dd6c0b",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "08-lifecycle-delta.sql",
+      "bytes": 10688,
+      "sha256": "f53af7c5598ac6f5f626439f4b0c59502912858a021d2fa68690994908959984",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "09-receipt-storage.sql",
+      "bytes": 32859,
+      "sha256": "3863cb9e44bd5fda527866930d7b3b44ac01afb213a52b52da73a5da83a8f9cf",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "10-context-bootstrap.sql.txt",
+      "bytes": 22108,
+      "sha256": "6c22ec54dce5746b5d500d4f992ac2ab833575601a4d214f5f162bb8d945c06a",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "11-reconstructed-part-one-bootstrap.sql",
+      "bytes": 51695,
+      "sha256": "0c6338e03e2c84b481d28554dd64a9960079552a16052f5593d5d9ca0d636693",
+      "kind": "explicit verified-slice reconstruction; original not recovered"
+    },
+    {
+      "path": "12-product-use-scope.sql",
+      "bytes": 1720,
+      "sha256": "082a77d5b4fa2469be327fbdeaf3a0b0390f0d17a43598157d0eb97398a2f358",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "13-processing-ledger.sql",
+      "bytes": 46081,
+      "sha256": "a59aea2672d687a7076f6ee94b1296240305c42f42d71473920f6cba3629adc7",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "14-data-freshness.sql",
+      "bytes": 2512,
+      "sha256": "5bb7414268b45f762b0b48f4ed5df6909f2dfc0c063c2e7ecdfa487e663ad90a",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "15-baseline-data-freshness.sql",
+      "bytes": 9388,
+      "sha256": "53693183e90d683d15c65fa2a17402340688d652c3eb8d2f1df963aa1d6fabb2",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "16-processing-resume.sql",
+      "bytes": 18524,
+      "sha256": "d0d83b40d50e14616f4390bb947c753903aae0108e3f759f725426e24f904596",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "17-local-execution-permits.sql",
+      "bytes": 4384,
+      "sha256": "93eb810a071fc9fbab4f241c8acff794523c83f6b33191f7eca26f6f9c341aec",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "18-processing-grant-read.sql",
+      "bytes": 3531,
+      "sha256": "8d63a335556ed1de320b11705f9093a823847ac692a100aaa6ecf1d790f53451",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "19-decision-phase.sql",
+      "bytes": 19382,
+      "sha256": "f5886d9fbf0550cd47d81c91c7eeceb03ad50cbd754e72917221708a5a430892",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "20-harness-barcode-helper.sql",
+      "bytes": 2054,
+      "sha256": "0548402461e0b6fbbd0cb3c717c5b32d2a01b68dcb1d03990e0dfb17bae4af9b",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "21-source-projection.sql",
+      "bytes": 7025,
+      "sha256": "7f6cd675b7b715270a2bf00d05285659374e069da37553a7fe9983384d979af0",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "22-registry.sql",
+      "bytes": 9566,
+      "sha256": "efd2c6147710a3f8e13b218c2d194bd69edd22e6b85cfed0dc3d938f58ffd678",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "23-reference-source.sql",
+      "bytes": 9430,
+      "sha256": "b841c515672570746d69d33ba7e314f93af91eb863e90c6d6673130ae427b814",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "24-reference-authority.sql",
+      "bytes": 5376,
+      "sha256": "2fbce8971721475a7b010fceabfef45decba39b8a9739541b56aa1faf36b0cfb",
+      "kind": "exact recovered authority"
+    },
+    {
+      "path": "25-history-support.sql",
+      "bytes": 7604,
+      "sha256": "eb232e2da33d4e1608ea49536a205813b7cef6c505c7404ef063d3dc432e71fa",
+      "kind": "local undeployed candidate"
+    },
+    {
+      "path": "26-history-only.sql",
+      "bytes": 15671,
+      "sha256": "d35f0b48d5bef0daf2e00082f8c2294da7f1a986bbd2a943872243280b0f9ff2",
+      "kind": "local undeployed candidate"
+    },
+    {
+      "path": "27-checkpoint-hashes.sql",
+      "bytes": 6122,
+      "sha256": "638c88db9acfe9ad39eb8b9712f95b478565a40fd41e75ddb08b80d17ea4cf17",
+      "kind": "local undeployed candidate"
+    },
+    {
+      "path": "28-bundle-protocol.sql",
+      "bytes": 34233,
+      "sha256": "fd23432c0bc330b3685e094a8117d7e6423006f47519e30bd908940ca197ae75",
+      "kind": "local undeployed candidate"
+    },
+    {
+      "path": "29-test-session-platform.sql",
+      "bytes": 1379,
+      "sha256": "e4b7c38fb1677f969f750a28a964caa4eb4363907b36fc097ee8af2edbe4c7a4",
+      "kind": "explicit disposable Supabase platform scaffold; Auth verification unproven"
+    },
+    {
+      "path": "30-session-binding.sql",
+      "bytes": 2196,
+      "sha256": "c829f8a8aa1770e7354b20ef3d7c10c27a79a48ae2ebcae95450fb3c0c1756bf",
+      "kind": "exact separately recovered session authority; supplemental to 25-file original order"
+    },
+    {
+      "path": "31-session-pin.sql",
+      "bytes": 2158,
+      "sha256": "82c332c91961ec4ad8e7c8dca0dd48f228d29e46e47d243e4ce097e498105b1b",
+      "kind": "local undeployed candidate"
+    },
+    {
+      "path": "32-bundle-contracts.sql",
+      "bytes": 24183,
+      "sha256": "889dfbadd926bb4cf285836d96413c5c8bbec740285204bb9bd2f23d4a5f3695",
+      "kind": "local undeployed candidate"
+    }
+  ],
+  "assetPins": [
+    {
+      "path": "run-native.py",
+      "bytes": 55242,
+      "sha256": "30e2cbe84aed6a171b10612fd37e4fb5c387d786202da7c0d19bc9d549369e45"
+    },
+    {
+      "path": "retained-domain-template.json",
+      "bytes": 83162,
+      "sha256": "f0a70231486866212980745f94f46ea53206432000189b65c604cfffbab912bf"
+    },
+    {
+      "path": "retained-domain-provenance.json",
+      "bytes": 548,
+      "sha256": "0a4c35d09ebb95bffc9496bf68dbea04b90aebc31cb9752e1f47a16a72f96add"
+    },
+    {
+      "path": "protocol-vectors.json",
+      "bytes": 44741,
+      "sha256": "27b4086de8f0aec52db356b4c8d370cb700a7b3580d591100db3672dd0323e38"
+    }
+  ],
+  "caveats": [
+    "Original Part One bootstrap was not recovered; its explicitly verified fourteen-slice reconstruction is included.",
+    "Minimal test-only Auth/Storage scaffolds do not prove hosted JWT verification, session issuance, or logout API behavior.",
+    "Fixtures and settlement metadata are administrator-authored synthetic local test data; no model/provider request occurs.",
+    "New-operation admission/dispatch and question selection remain closed separate gates.",
+    "Original local workspace path strings are retained solely in provenance; package bytes are unmodified."
+  ],
+  "authorization": "Prepared locally for an explicitly approved public test-only transfer. Root performs any external upload; none occurred during local preparation.",
+  "transport": {
+    "file": "bundle-native-test-package.json.gz.b64",
+    "encoding": "RFC4648 base64 UTF-8 text plus one trailing newline; decode before gzip use",
+    "bytes": 241301,
+    "sha256": "c27dfa657f3a4613dac37c4cc1a84859a3e1079750b80f1fb4466b026efc2fda",
+    "decodedSHA256": "9f8da41dec34b39eaddd0c5c58045262490758ab455b71d96ba8f8297b5b6330",
+    "decodedBytes": 180974
+  },
+  "publicBranchFiles": [
+    "bundle-native-test-package.json.gz.b64",
+    "README.md",
+    "manifest.json"
+  ]
+}
