@@ -1,0 +1,1122 @@
+{
+  "version": "derive-request-database-integration-package/v1",
+  "scope": "local disposable PG request-bound retained recovery integration; no provider invocation or deployment",
+  "nativeIntegrationStatus": "not_executed; root review required before native run",
+  "frozenBase": {
+    "path": "bundle-native-test-package-r5.json.gz",
+    "sha256": "11c980e04a46c27293c609c4bb7163f98aeebe403499c76d59e219aa5479561e",
+    "bytes": 181582,
+    "canonicalRawSHA256": "7b268221daab029d0842e71510a9f7777965057acaa389f92c07005703095b67",
+    "nativeEvidence": "185 prior bounded SQL checks passed PostgreSQL 15.19; this new request layer has not run"
+  },
+  "dependencies": {
+    "node": "24.19.0",
+    "packages": {
+      "zod": "4.6.5",
+      "typescript": "6.0.3",
+      "@types/node": "22.20.3",
+      "undici-types": "6.21.0"
+    },
+    "bytesIncluded": false,
+    "installation": "Use verified existing dependencies only; no installation is performed."
+  },
+  "entries": [
+    "derive-parent-authored/tests/native-request/run-request-database.ts",
+    "derive-parent-authored/tests/native-request/fixtures-and-transport.test.ts"
+  ],
+  "sourceClosure": {
+    "files": [
+      "src/contracts/EvidenceReview.ts",
+      "src/contracts/IngredientEducation423Candidate.ts",
+      "src/contracts/PartFour.ts",
+      "src/contracts/PartOne.ts",
+      "src/contracts/PartThreeService.ts",
+      "src/contracts/PartTwo.ts",
+      "src/contracts/PersonalContext.ts",
+      "src/contracts/PersonalContextV2.ts",
+      "src/contracts/PersonalContextV2Schema.ts",
+      "src/contracts/PersonalResultV2.ts",
+      "src/contracts/RetainedEvidence.ts",
+      "src/contracts/RoutineFormula.ts",
+      "src/contracts/ScientificClaim.ts",
+      "src/domain/part-four/approved423-runtime.ts",
+      "src/domain/part-four/knowledge423.ts",
+      "src/domain/part-three/menu.ts",
+      "src/domain/part-three/provider.ts",
+      "src/domain/part-three/release.ts",
+      "src/domain/part-two/approved423-dictionary.ts",
+      "src/domain/part-two/dictionary.ts",
+      "src/domain/part-two/hash.ts",
+      "src/domain/part-two/quantities.ts",
+      "src/domain/part-two/reference-inputs.ts",
+      "src/domain/personalized-sheet/admissionReceipts.ts",
+      "src/domain/personalized-sheet/bundleCheckpointEnvelope.ts",
+      "src/domain/personalized-sheet/bundleCheckpointValidation.ts",
+      "src/domain/personalized-sheet/bundleProcessingIdentity.ts",
+      "src/domain/personalized-sheet/contextProjection.ts",
+      "src/domain/personalized-sheet/copyClaimAudit.ts",
+      "src/domain/personalized-sheet/decisionBundleCopy.ts",
+      "src/domain/personalized-sheet/decisionCopyReview.ts",
+      "src/domain/personalized-sheet/decisionEnvelope.ts",
+      "src/domain/personalized-sheet/decisionLockedWriter.ts",
+      "src/domain/personalized-sheet/evidenceAdmission.ts",
+      "src/domain/personalized-sheet/factsFirstContract.ts",
+      "src/domain/personalized-sheet/geminiProvider.ts",
+      "src/domain/personalized-sheet/historyOnlyEvidence.ts",
+      "src/domain/personalized-sheet/insightBasisValidation.ts",
+      "src/domain/personalized-sheet/insightPacket.ts",
+      "src/domain/personalized-sheet/jevDecisionBundle.ts",
+      "src/domain/personalized-sheet/jevDecisionProtocol.ts",
+      "src/domain/personalized-sheet/observedProductBinding.ts",
+      "src/domain/personalized-sheet/observedProductContinuity.ts",
+      "src/domain/personalized-sheet/observedProductIdentity.ts",
+      "src/domain/personalized-sheet/orchestrator.ts",
+      "src/domain/personalized-sheet/partThreeBinding.ts",
+      "src/domain/personalized-sheet/processingContract.ts",
+      "src/domain/personalized-sheet/processingGrant.ts",
+      "src/domain/personalized-sheet/processingRecovery.ts",
+      "src/domain/personalized-sheet/questionPlanner.ts",
+      "src/domain/personalized-sheet/researchPipeline.ts",
+      "src/domain/personalized-sheet/reviewAuditWire.ts",
+      "src/domain/personalized-sheet/scopedAnswers.ts",
+      "src/domain/personalized-sheet/storageAdapter.ts",
+      "src/domain/personalized-sheet/transportContracts.ts",
+      "src/domain/personalized-sheet/trustedInput.ts",
+      "src/services/context/migrateV2.ts",
+      "supabase/functions/personal-context/validate.ts",
+      "supabase/functions/personalized-sheet/authorized-phase.ts",
+      "supabase/functions/personalized-sheet/bundle-recovery-evaluator.ts",
+      "supabase/functions/personalized-sheet/bundle-session-pin.ts",
+      "supabase/functions/personalized-sheet/evidence-receipts.ts",
+      "supabase/functions/personalized-sheet/facts-first-evaluator.ts",
+      "supabase/functions/personalized-sheet/facts-first-insight-ports.ts",
+      "supabase/functions/personalized-sheet/facts-first-runner.ts",
+      "supabase/functions/personalized-sheet/facts-first-transports.ts",
+      "supabase/functions/personalized-sheet/gemini-phase-transport.ts",
+      "supabase/functions/personalized-sheet/handler.ts",
+      "supabase/functions/personalized-sheet/jev-decision-transport.ts",
+      "supabase/functions/personalized-sheet/request-evaluator.ts",
+      "supabase/functions/personalized-sheet/server-phase.ts",
+      "supabase/functions/personalized-sheet/session-binding.ts",
+      "supabase/functions/personalized-sheet/trusted-input.ts",
+      "tests/native-request/fixtures-and-transport.test.ts",
+      "tests/native-request/local-psql-rpc.ts",
+      "tests/native-request/retained-fixture.ts",
+      "tests/native-request/run-request-database.ts"
+    ],
+    "external": [
+      "node:assert/strict",
+      "node:child_process",
+      "node:crypto",
+      "node:fs",
+      "node:test",
+      "node:url",
+      "node:zlib",
+      "zod"
+    ]
+  },
+  "offlinePinChecks": [
+    "frozen_r5_package_and_34_sql_pins",
+    "legacy_context_tables_already_in_r5",
+    "three_unchanged_reader_bodies_security_and_acl_pins",
+    "all_application_dependency_sources_match_initial_or_frozen_session_pin_authority"
+  ],
+  "applicationSourcePreservation": {
+    "initialManifestSHA256": "53857dfb44a84956510742de78a28c279a68cc86666e55c5b48b070a991e261c",
+    "sessionPinSourceArchiveSHA256": "59471c4befe4abed7715629ca853bba736c45ec3467335cf0b31de0f650aa1f5",
+    "files": [
+      {
+        "path": "src/contracts/EvidenceReview.ts",
+        "sha256": "a3e831a02e6a33136c3d82dd301e767162c01d3cb998f0dca1f8a1f927e71538",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/IngredientEducation423Candidate.ts",
+        "sha256": "4a2abe130a553258b0d5decbe86891e8f8b1578d855f3992d366908ff7573e7c",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/PartFour.ts",
+        "sha256": "6203b2012f14d86911dc76058ada10ae10260e46db5f725c5a3298db3fb89c19",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/PartOne.ts",
+        "sha256": "c187dd1557f1e59459ca667120ac957a45068a258404319335c91ad134c72460",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/PartThreeService.ts",
+        "sha256": "a5eb0f4ea46fbcd7f38b2c395a72c4d082404c2218f4fbfc8eb1d9a69abfae14",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/PartTwo.ts",
+        "sha256": "68291486895a00b923fe1c4ed2114ef6f1a587bc9069bc5febc8921088b21aad",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/PersonalContext.ts",
+        "sha256": "3f42018092eb26abca9250ed1945e87daae80c6bde74b3be3771c84b424ecede",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/PersonalContextV2.ts",
+        "sha256": "579bca75a61f11b0445da53e26876837e6c5fa3af7c9a1ff18432ed890a72df5",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/PersonalContextV2Schema.ts",
+        "sha256": "d9ffbdbedd0b3c431cbfe1701703ed5b6117abdb08af9e284a19fc72bac85c55",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/PersonalResultV2.ts",
+        "sha256": "61bea2a5c82899c5d0f28426e8cdf206fe650cdb9375bfbd7d8e791707847a06",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/RetainedEvidence.ts",
+        "sha256": "56ae56b845b4d16ac79faf6575924eb43e1850815834058d60f7607b8460279f",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/RoutineFormula.ts",
+        "sha256": "a3795be1f37e4c6182bbcc7359fd810f6758e4f3c40627fb793723dca42a40f3",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/contracts/ScientificClaim.ts",
+        "sha256": "7de47ed1c318f42c491b21c6cc86f2a88d094409b0a44aedb0958d9bb19a7ba1",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-four/approved423-runtime.ts",
+        "sha256": "7ee4a3de87bb43b55d2192e4b3b27836a4d3101345ec0768fe6ef7e72aa7e91a",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-four/knowledge423.ts",
+        "sha256": "daf7153d238ec66fa418c6c1662eaac0cacc62013ee822dd3acde5d5e37901d3",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-three/menu.ts",
+        "sha256": "c79b7c1a664b632bf0019935d16cfb064b5396fbfa6b99094a8e9b55722d3ffa",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-three/provider.ts",
+        "sha256": "e493fe52a6133398807814910d6061f6273e6b8c664f59b27e5c446093e68499",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-three/release.ts",
+        "sha256": "974f6b97f6ea3d7619f01d03147651efcb54567baea8d9cc6ae5aafc4644ee54",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-two/approved423-dictionary.ts",
+        "sha256": "30850792792cf3471859f50bfe12cb568cd4a0148fe5f9a4d815efa97fc9ef5f",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-two/dictionary.ts",
+        "sha256": "a8f186d230e36d632a23c284aedfeddbb222f496cd8589779a243581b450a492",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-two/hash.ts",
+        "sha256": "13c5d61b2585ff5f83e895ca2e1d88c4ca80d57c48db7c1f1b76e24c69b6c185",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-two/quantities.ts",
+        "sha256": "3a9b7931f8ddafdd4d5a39bf7cfc6760e633b4f4f8b2466c3d0673e9344dd905",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/part-two/reference-inputs.ts",
+        "sha256": "f1f3224fe2a554e40f91d4df11f3a391eb14f39ba06217b1f782e61600634e8d",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/admissionReceipts.ts",
+        "sha256": "6f99bd30bc5d0ea1bba0885589dfb7f42c999343e9fd848af61d813f0394efdf",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/bundleCheckpointEnvelope.ts",
+        "sha256": "cf482311677d4be4d4e4d1e5066c9dbfccfb0289eda505b1eea023b7d7ed941b",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/bundleCheckpointValidation.ts",
+        "sha256": "bb5a77aacca85701300aa6f458397df037e8cc52ecb086598a106ee8fe863602",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/bundleProcessingIdentity.ts",
+        "sha256": "4de1148b01f5f3119d5473c6ce91e721cf89a6d3c35e16a52abe97835664a521",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/contextProjection.ts",
+        "sha256": "7f550a911396e3c541004f451e21876980b7cbc533dc9201bc4e724b0e4b7b6a",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/copyClaimAudit.ts",
+        "sha256": "fc1085b7a6d275f254d40795efff8d7ae3f1a7ea04434185ad30199aee04b7b4",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/decisionBundleCopy.ts",
+        "sha256": "92be52f6ed4409a9bae8e96ea14aeebe7a67dbe3bd5186140a7e56bfe6312267",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/decisionCopyReview.ts",
+        "sha256": "67816ce5623d9769a09a69b14c6e07bd0a43b439dbecab4a66c7875297445cc5",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/decisionEnvelope.ts",
+        "sha256": "2b858a09548dad3189173f44b67badea81ebb9bc79cf6dc1d90c8a548317f300",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/decisionLockedWriter.ts",
+        "sha256": "58714798ed5ba4ac3bdc291d10023d6dbb51bb574ef1da6253553676dc65c72d",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/evidenceAdmission.ts",
+        "sha256": "a5563430ff59f9e334c20b0315080755010998cdae57a20e78c6f11124912a04",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/factsFirstContract.ts",
+        "sha256": "ef793c4ab931f035e6690886e00222c94e5edea0ee5f0ed590f761013d34b841",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/geminiProvider.ts",
+        "sha256": "37268927aa13ba06284ab554b8539b5d323ffce8bca2b0c4c824b409e2583b51",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/historyOnlyEvidence.ts",
+        "sha256": "c033a8d2e6652258ceba7ad7715767e1d90ee3468a6d0fd18bd1e2102551b525",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/insightBasisValidation.ts",
+        "sha256": "7d2a7effb656281565c4bed5521f5947f186941682567847b29680fc5cdc35f3",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/insightPacket.ts",
+        "sha256": "7896a06429999d6996844ed67e96fe8e9816493a6b32978bf104cbd211ec3343",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/jevDecisionBundle.ts",
+        "sha256": "4de7c1a2cb61a3fee503b7f1a4a461aca4d852cbb8d40e4a66dd0ee16885f47e",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/jevDecisionProtocol.ts",
+        "sha256": "899f4aab839c7c9e9787293beceb1feec47710af18bc44b5a9ef09e7a84228f9",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/observedProductBinding.ts",
+        "sha256": "f9393686f04c4b0c3ac0f10ec65e01ba7e8082c53bdb97088300721070cad473",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/observedProductContinuity.ts",
+        "sha256": "2f16ace3e2cc6390af51a386db9b69eaf4eaaee0bbf7bcc962c4d093f5cc65de",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/observedProductIdentity.ts",
+        "sha256": "dd36423d52ebef78adfc684d656a0e738814fe101f5d6c3eb963718bc0295383",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/orchestrator.ts",
+        "sha256": "6905fd767812b70a2525f7d04ec951b498509f660c263f1c4076797fad3edf12",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/partThreeBinding.ts",
+        "sha256": "cd88fa200b80536adfc26a3dc752f20306567fb5209f21cf5132888cb3db6c27",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/processingContract.ts",
+        "sha256": "48e82abc6f6d291fa44c8020ef2f26627845b7023c41cb1984a1f515c5d77af2",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/processingGrant.ts",
+        "sha256": "b16d803918b4b9cc3e23ac18e252dac0e89e4c33c28d4f0b22134d8e54de6cb8",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/processingRecovery.ts",
+        "sha256": "41850ab5d1262b32df5efa426db633ba7bcc7def907dea0b93fa7ae08178e4de",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/questionPlanner.ts",
+        "sha256": "e92f1386d595fbeb8a417fca199e23b19979a4662b858e3bbe2d0c1619800b5b",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/researchPipeline.ts",
+        "sha256": "39778a1145a1bfb5ff2acccb2cfb01c094fc2af09fac359c7fbe38b359061026",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/reviewAuditWire.ts",
+        "sha256": "23e9a6b929f521b2ed045d1108bea68c62284bfc3e4cd624655206890bb1bdb2",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/scopedAnswers.ts",
+        "sha256": "210303205474283d2b3f2f7e0ad93d361e6ee2a104c8b55af14636e9d56b6625",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/storageAdapter.ts",
+        "sha256": "163659801dd84513d78ca1e494ca14ed2054f37b76a235deef70a6187cf07105",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/transportContracts.ts",
+        "sha256": "442e2d2a5b9f10c80856f9b4e2c59afad77336fb1fb6a6a498dafa5da3c99135",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/domain/personalized-sheet/trustedInput.ts",
+        "sha256": "230a3f853400ec200a37792c42a0c97024242eff93ef3283356fc31782fa9f61",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "src/services/context/migrateV2.ts",
+        "sha256": "38936fd642e8b619d8a78fdb7ecde67f67f90deac4053e18c36c2f9e7332b6d2",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personal-context/validate.ts",
+        "sha256": "fec311f38aeae197a6ef105766e9d23c781d800f3124f1645ee97191b9d099d4",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/authorized-phase.ts",
+        "sha256": "8d0ca0a7760e006a07f9b69fef9a5b32fc2dd0c9c26cceeb739616d16becc296",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/bundle-recovery-evaluator.ts",
+        "sha256": "fad202e8f1e4ee2301bac80ec5f1ad555af981f27425100c002b53fd4be39382",
+        "authority": "preserved reviewed session-pin source artifact"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/bundle-session-pin.ts",
+        "sha256": "a91076d293ef23593f42aea84ba187f73915be7dcc34c5e8b80dba9e35762a8e",
+        "authority": "preserved reviewed session-pin source artifact"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/evidence-receipts.ts",
+        "sha256": "0907dccd0bcd8be845d1c9faf096aae478e9271687cb1990d872e3b7162038c6",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/facts-first-evaluator.ts",
+        "sha256": "5571b7c8814cebc6b1631003564e2bca7029a2bbf89b555902ef97b7fed13471",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/facts-first-insight-ports.ts",
+        "sha256": "dddb75b9461bd787634fc49173f74bea7e647f31458ab9e579330109269d1f6f",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/facts-first-runner.ts",
+        "sha256": "a1e232d893ce76bf662cb125f85d33e9841ccec2c61fa2dfbdbd21d1788ee1c4",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/facts-first-transports.ts",
+        "sha256": "a41e7f54ca392402b40ed144700b684c210475f3025933ec2f998df9fe33817c",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/gemini-phase-transport.ts",
+        "sha256": "1ffb7286a90662662f76dd0c9a7e05e7e1151818c6ef0e39d3a3811800bfc220",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/handler.ts",
+        "sha256": "dfb69b6b9215a5dbc1db04c6d8a272c4cc1887fae3541b65b8fd1831e2c6be4a",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/jev-decision-transport.ts",
+        "sha256": "2cd3d330f3a5d3d2a5f6d875d4ec227713be8e97ab00e6f95e317010ceb81cfd",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/request-evaluator.ts",
+        "sha256": "ce1adaff3ecdef8f3b1934302dfb1852e209d30ff5f2b142c8adee8510a78a60",
+        "authority": "preserved reviewed session-pin source artifact"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/server-phase.ts",
+        "sha256": "b93cd93f2f4e51156695c1370e98063b1009a25ecd784742d4e90137742feea7",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/session-binding.ts",
+        "sha256": "3b620f4b9bc7c9f2044fcf6c145280d56b3b3d8dc0b9b32532ef7f060b3cd31c",
+        "authority": "original root-authored handoff manifest"
+      },
+      {
+        "path": "supabase/functions/personalized-sheet/trusted-input.ts",
+        "sha256": "23f575ae05cf459578c34ac0a12e313f8a4b1d735b57ae84938e5934f6d7fa5b",
+        "authority": "original root-authored handoff manifest"
+      }
+    ],
+    "caveat": "Initial root SHA256SUMS predates session-pin work; later frozen source archive supersedes its old pins for the patched request/evaluator files."
+  },
+  "pins": [
+    {
+      "path": "derive-code-handoff/backend-source/extracted/supabase/migrations/20261002194650_part_three_personal_context_v2.sql",
+      "sha256": "690048f5af753201020210332280a444b5525a6491728bdd8e0dafc0bf11c0a4",
+      "bytes": 16731,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/EvidenceReview.ts",
+      "sha256": "a3e831a02e6a33136c3d82dd301e767162c01d3cb998f0dca1f8a1f927e71538",
+      "bytes": 1651,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/IngredientEducation423Candidate.ts",
+      "sha256": "4a2abe130a553258b0d5decbe86891e8f8b1578d855f3992d366908ff7573e7c",
+      "bytes": 4564,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/PartFour.ts",
+      "sha256": "6203b2012f14d86911dc76058ada10ae10260e46db5f725c5a3298db3fb89c19",
+      "bytes": 7685,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/PartOne.ts",
+      "sha256": "c187dd1557f1e59459ca667120ac957a45068a258404319335c91ad134c72460",
+      "bytes": 16609,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/PartThreeService.ts",
+      "sha256": "a5eb0f4ea46fbcd7f38b2c395a72c4d082404c2218f4fbfc8eb1d9a69abfae14",
+      "bytes": 3488,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/PartTwo.ts",
+      "sha256": "68291486895a00b923fe1c4ed2114ef6f1a587bc9069bc5febc8921088b21aad",
+      "bytes": 39281,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/PersonalContext.ts",
+      "sha256": "3f42018092eb26abca9250ed1945e87daae80c6bde74b3be3771c84b424ecede",
+      "bytes": 4859,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/PersonalContextV2.ts",
+      "sha256": "579bca75a61f11b0445da53e26876837e6c5fa3af7c9a1ff18432ed890a72df5",
+      "bytes": 4997,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/PersonalContextV2Schema.ts",
+      "sha256": "d9ffbdbedd0b3c431cbfe1701703ed5b6117abdb08af9e284a19fc72bac85c55",
+      "bytes": 9255,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/PersonalResultV2.ts",
+      "sha256": "61bea2a5c82899c5d0f28426e8cdf206fe650cdb9375bfbd7d8e791707847a06",
+      "bytes": 14297,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/RetainedEvidence.ts",
+      "sha256": "56ae56b845b4d16ac79faf6575924eb43e1850815834058d60f7607b8460279f",
+      "bytes": 7929,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/RoutineFormula.ts",
+      "sha256": "a3795be1f37e4c6182bbcc7359fd810f6758e4f3c40627fb793723dca42a40f3",
+      "bytes": 2532,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/contracts/ScientificClaim.ts",
+      "sha256": "7de47ed1c318f42c491b21c6cc86f2a88d094409b0a44aedb0958d9bb19a7ba1",
+      "bytes": 5667,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-four/approved423-runtime.ts",
+      "sha256": "7ee4a3de87bb43b55d2192e4b3b27836a4d3101345ec0768fe6ef7e72aa7e91a",
+      "bytes": 1168946,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-four/knowledge423.ts",
+      "sha256": "daf7153d238ec66fa418c6c1662eaac0cacc62013ee822dd3acde5d5e37901d3",
+      "bytes": 3274,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-three/menu.ts",
+      "sha256": "c79b7c1a664b632bf0019935d16cfb064b5396fbfa6b99094a8e9b55722d3ffa",
+      "bytes": 1253,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-three/provider.ts",
+      "sha256": "e493fe52a6133398807814910d6061f6273e6b8c664f59b27e5c446093e68499",
+      "bytes": 10483,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-three/release.ts",
+      "sha256": "974f6b97f6ea3d7619f01d03147651efcb54567baea8d9cc6ae5aafc4644ee54",
+      "bytes": 7607,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-two/approved423-dictionary.ts",
+      "sha256": "30850792792cf3471859f50bfe12cb568cd4a0148fe5f9a4d815efa97fc9ef5f",
+      "bytes": 3064,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-two/dictionary.ts",
+      "sha256": "a8f186d230e36d632a23c284aedfeddbb222f496cd8589779a243581b450a492",
+      "bytes": 9977,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-two/hash.ts",
+      "sha256": "13c5d61b2585ff5f83e895ca2e1d88c4ca80d57c48db7c1f1b76e24c69b6c185",
+      "bytes": 2605,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-two/quantities.ts",
+      "sha256": "3a9b7931f8ddafdd4d5a39bf7cfc6760e633b4f4f8b2466c3d0673e9344dd905",
+      "bytes": 3352,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/part-two/reference-inputs.ts",
+      "sha256": "f1f3224fe2a554e40f91d4df11f3a391eb14f39ba06217b1f782e61600634e8d",
+      "bytes": 2997,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/admissionReceipts.ts",
+      "sha256": "6f99bd30bc5d0ea1bba0885589dfb7f42c999343e9fd848af61d813f0394efdf",
+      "bytes": 6125,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/bundleCheckpointEnvelope.ts",
+      "sha256": "cf482311677d4be4d4e4d1e5066c9dbfccfb0289eda505b1eea023b7d7ed941b",
+      "bytes": 7773,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/bundleCheckpointValidation.ts",
+      "sha256": "bb5a77aacca85701300aa6f458397df037e8cc52ecb086598a106ee8fe863602",
+      "bytes": 4510,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/bundleProcessingIdentity.ts",
+      "sha256": "4de1148b01f5f3119d5473c6ce91e721cf89a6d3c35e16a52abe97835664a521",
+      "bytes": 3628,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/contextProjection.ts",
+      "sha256": "7f550a911396e3c541004f451e21876980b7cbc533dc9201bc4e724b0e4b7b6a",
+      "bytes": 7680,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/copyClaimAudit.ts",
+      "sha256": "fc1085b7a6d275f254d40795efff8d7ae3f1a7ea04434185ad30199aee04b7b4",
+      "bytes": 3574,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/decisionBundleCopy.ts",
+      "sha256": "92be52f6ed4409a9bae8e96ea14aeebe7a67dbe3bd5186140a7e56bfe6312267",
+      "bytes": 18580,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/decisionCopyReview.ts",
+      "sha256": "67816ce5623d9769a09a69b14c6e07bd0a43b439dbecab4a66c7875297445cc5",
+      "bytes": 4179,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/decisionEnvelope.ts",
+      "sha256": "2b858a09548dad3189173f44b67badea81ebb9bc79cf6dc1d90c8a548317f300",
+      "bytes": 3367,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/decisionLockedWriter.ts",
+      "sha256": "58714798ed5ba4ac3bdc291d10023d6dbb51bb574ef1da6253553676dc65c72d",
+      "bytes": 2633,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/evidenceAdmission.ts",
+      "sha256": "a5563430ff59f9e334c20b0315080755010998cdae57a20e78c6f11124912a04",
+      "bytes": 6103,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/factsFirstContract.ts",
+      "sha256": "ef793c4ab931f035e6690886e00222c94e5edea0ee5f0ed590f761013d34b841",
+      "bytes": 5870,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/geminiProvider.ts",
+      "sha256": "37268927aa13ba06284ab554b8539b5d323ffce8bca2b0c4c824b409e2583b51",
+      "bytes": 6245,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/historyOnlyEvidence.ts",
+      "sha256": "c033a8d2e6652258ceba7ad7715767e1d90ee3468a6d0fd18bd1e2102551b525",
+      "bytes": 6989,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/insightBasisValidation.ts",
+      "sha256": "7d2a7effb656281565c4bed5521f5947f186941682567847b29680fc5cdc35f3",
+      "bytes": 2261,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/insightPacket.ts",
+      "sha256": "7896a06429999d6996844ed67e96fe8e9816493a6b32978bf104cbd211ec3343",
+      "bytes": 9690,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/jevDecisionBundle.ts",
+      "sha256": "4de7c1a2cb61a3fee503b7f1a4a461aca4d852cbb8d40e4a66dd0ee16885f47e",
+      "bytes": 13343,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/jevDecisionProtocol.ts",
+      "sha256": "899f4aab839c7c9e9787293beceb1feec47710af18bc44b5a9ef09e7a84228f9",
+      "bytes": 5006,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/observedProductBinding.ts",
+      "sha256": "f9393686f04c4b0c3ac0f10ec65e01ba7e8082c53bdb97088300721070cad473",
+      "bytes": 2926,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/observedProductContinuity.ts",
+      "sha256": "2f16ace3e2cc6390af51a386db9b69eaf4eaaee0bbf7bcc962c4d093f5cc65de",
+      "bytes": 5247,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/observedProductIdentity.ts",
+      "sha256": "dd36423d52ebef78adfc684d656a0e738814fe101f5d6c3eb963718bc0295383",
+      "bytes": 7007,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/orchestrator.ts",
+      "sha256": "6905fd767812b70a2525f7d04ec951b498509f660c263f1c4076797fad3edf12",
+      "bytes": 10723,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/partThreeBinding.ts",
+      "sha256": "cd88fa200b80536adfc26a3dc752f20306567fb5209f21cf5132888cb3db6c27",
+      "bytes": 2137,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/processingContract.ts",
+      "sha256": "48e82abc6f6d291fa44c8020ef2f26627845b7023c41cb1984a1f515c5d77af2",
+      "bytes": 7478,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/processingGrant.ts",
+      "sha256": "b16d803918b4b9cc3e23ac18e252dac0e89e4c33c28d4f0b22134d8e54de6cb8",
+      "bytes": 3606,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/processingRecovery.ts",
+      "sha256": "41850ab5d1262b32df5efa426db633ba7bcc7def907dea0b93fa7ae08178e4de",
+      "bytes": 9608,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/questionPlanner.ts",
+      "sha256": "e92f1386d595fbeb8a417fca199e23b19979a4662b858e3bbe2d0c1619800b5b",
+      "bytes": 1879,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/researchPipeline.ts",
+      "sha256": "39778a1145a1bfb5ff2acccb2cfb01c094fc2af09fac359c7fbe38b359061026",
+      "bytes": 4638,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/reviewAuditWire.ts",
+      "sha256": "23e9a6b929f521b2ed045d1108bea68c62284bfc3e4cd624655206890bb1bdb2",
+      "bytes": 2391,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/scopedAnswers.ts",
+      "sha256": "210303205474283d2b3f2f7e0ad93d361e6ee2a104c8b55af14636e9d56b6625",
+      "bytes": 6936,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/storageAdapter.ts",
+      "sha256": "163659801dd84513d78ca1e494ca14ed2054f37b76a235deef70a6187cf07105",
+      "bytes": 14369,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/transportContracts.ts",
+      "sha256": "442e2d2a5b9f10c80856f9b4e2c59afad77336fb1fb6a6a498dafa5da3c99135",
+      "bytes": 10888,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/domain/personalized-sheet/trustedInput.ts",
+      "sha256": "230a3f853400ec200a37792c42a0c97024242eff93ef3283356fc31782fa9f61",
+      "bytes": 16157,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/src/services/context/migrateV2.ts",
+      "sha256": "38936fd642e8b619d8a78fdb7ecde67f67f90deac4053e18c36c2f9e7332b6d2",
+      "bytes": 7067,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personal-context/validate.ts",
+      "sha256": "fec311f38aeae197a6ef105766e9d23c781d800f3124f1645ee97191b9d099d4",
+      "bytes": 7176,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/authorized-phase.ts",
+      "sha256": "8d0ca0a7760e006a07f9b69fef9a5b32fc2dd0c9c26cceeb739616d16becc296",
+      "bytes": 6170,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/bundle-recovery-evaluator.ts",
+      "sha256": "fad202e8f1e4ee2301bac80ec5f1ad555af981f27425100c002b53fd4be39382",
+      "bytes": 8975,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/bundle-session-pin.ts",
+      "sha256": "a91076d293ef23593f42aea84ba187f73915be7dcc34c5e8b80dba9e35762a8e",
+      "bytes": 3335,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/evidence-receipts.ts",
+      "sha256": "0907dccd0bcd8be845d1c9faf096aae478e9271687cb1990d872e3b7162038c6",
+      "bytes": 8802,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/facts-first-evaluator.ts",
+      "sha256": "5571b7c8814cebc6b1631003564e2bca7029a2bbf89b555902ef97b7fed13471",
+      "bytes": 5721,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/facts-first-insight-ports.ts",
+      "sha256": "dddb75b9461bd787634fc49173f74bea7e647f31458ab9e579330109269d1f6f",
+      "bytes": 3327,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/facts-first-runner.ts",
+      "sha256": "a1e232d893ce76bf662cb125f85d33e9841ccec2c61fa2dfbdbd21d1788ee1c4",
+      "bytes": 3935,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/facts-first-transports.ts",
+      "sha256": "a41e7f54ca392402b40ed144700b684c210475f3025933ec2f998df9fe33817c",
+      "bytes": 4275,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/gemini-phase-transport.ts",
+      "sha256": "1ffb7286a90662662f76dd0c9a7e05e7e1151818c6ef0e39d3a3811800bfc220",
+      "bytes": 8153,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/handler.ts",
+      "sha256": "dfb69b6b9215a5dbc1db04c6d8a272c4cc1887fae3541b65b8fd1831e2c6be4a",
+      "bytes": 5334,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/jev-decision-transport.ts",
+      "sha256": "2cd3d330f3a5d3d2a5f6d875d4ec227713be8e97ab00e6f95e317010ceb81cfd",
+      "bytes": 6069,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/request-evaluator.ts",
+      "sha256": "ce1adaff3ecdef8f3b1934302dfb1852e209d30ff5f2b142c8adee8510a78a60",
+      "bytes": 6370,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/server-phase.ts",
+      "sha256": "b93cd93f2f4e51156695c1370e98063b1009a25ecd784742d4e90137742feea7",
+      "bytes": 6054,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/session-binding.ts",
+      "sha256": "3b620f4b9bc7c9f2044fcf6c145280d56b3b3d8dc0b9b32532ef7f060b3cd31c",
+      "bytes": 1661,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/supabase/functions/personalized-sheet/trusted-input.ts",
+      "sha256": "23f575ae05cf459578c34ac0a12e313f8a4b1d735b57ae84938e5934f6d7fa5b",
+      "bytes": 13479,
+      "kind": "exact application source dependency"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-bundle/context-reader-sources/20260926233621_p0b_personal_context_revisions.sql",
+      "sha256": "7acaad4fc2f001d8c15f569dbd494747f17257f5a85f3fe456e5b9fcd1d0a243",
+      "bytes": 17874,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-bundle/retained-domain-template.json",
+      "sha256": "f0a70231486866212980745f94f46ea53206432000189b65c604cfffbab912bf",
+      "bytes": 83162,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/README.md",
+      "sha256": "b96cf4c687532db25ae109e4cdafa526fb3a21bc2056347980c1ab76708b8131",
+      "bytes": 9420,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/check-integration-closure.py",
+      "sha256": "8f96f5acaa96799c6bfcf3012ea4b1d9670ccaeba43746add03bcebfea540f80",
+      "bytes": 3062,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/context-read-prerequisites.sql",
+      "sha256": "b30e93e0466b161b68df4f0056e6283c13665f4b17505b121e07f4783ef481aa",
+      "bytes": 4775,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/context-read-provenance.json",
+      "sha256": "13f66a76652d6dbbef74bd7fcd9b27416aa7bffc84ab246796a200833c154745",
+      "bytes": 2699,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/extract-integration-package.py",
+      "sha256": "21122e2a974571f2d1a3236e5c16eaf0936bb9500a735023d788ada13febc856",
+      "bytes": 2176,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/fixtures-and-transport.test.ts",
+      "sha256": "74237b3a0e5388b1bc88f77e5ac8a1bc6444694d97b68503f3ebbc9cd2197c0b",
+      "bytes": 10123,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/local-psql-rpc.ts",
+      "sha256": "3f0ef96b46a3efddce339be9179f57b646dfc5ece0b36a1f3b2e0905d0e74a83",
+      "bytes": 4823,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/offline-test-results.tap",
+      "sha256": "51142e32e8d458130e958739358703a570671a7ec3f1e269dd4aa5632fd695ea",
+      "bytes": 11760,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/offline-validation.json",
+      "sha256": "9cf65175856bf48253333167505f32ecd317fadc1ca893cc7038b3a755bc19ec",
+      "bytes": 2993,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/prepare-integration-package.py",
+      "sha256": "0b8e5c4561af7aa72aca60ce991906436fc8beb1766787b1e6cc1c18bcd2591a",
+      "bytes": 8711,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/retained-fixture.ts",
+      "sha256": "bdb8fdcd6a49bfc5b38957b5575725a8a367dafdfa0977847037fb5069caf7c2",
+      "bytes": 9782,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    },
+    {
+      "path": "derive-parent-authored/tests/native-request/run-request-database.ts",
+      "sha256": "a585268496183114cdeba688845dc139bef10a68bf34fd52539218ec7832519f",
+      "bytes": 22636,
+      "kind": "bounded local integration test or unchanged reader provenance"
+    }
+  ],
+  "coverageLimits": [
+    "Recovered and explicitly reconstructed Part One/native Auth scaffolds remain unchanged.",
+    "Preverified synthetic claims model the request boundary, not hosted JWT signature/issuance verification.",
+    "Synthetic original evidence/review/retained settlement fixtures are not model quality or live processing permission.",
+    "No new admission, paid call, question branch, client integration, hosted access, merge, or deployment."
+  ],
+  "package": "request-database-integration-r1.json.gz",
+  "packageSHA256": "7d813ccd4f8cf5eba457c39461f91df45e5faa78a01e3a2fcab843499cb1cc20",
+  "packageBytes": 381668,
+  "canonicalRawSHA256": "06ef7b0302f14c8c38ba3bf0d5f90192f640f4c00111ac32512fb81bdc328c41",
+  "canonicalRawBytes": 2021193,
+  "publicTransfer": {
+    "version": "derive-request-database-public-transfer/source-approved-r1",
+    "status": "prepared_for_root_review_not_published",
+    "audience": "Public KanujVerma/derive repository, existing review/bundle-native-verification-20261012 branch only",
+    "proposedRepositoryDirectory": "verification/request-database-integration-r1",
+    "authorization": "Owner explicitly approved public backend source/tests and the embedded private provenance references; publication remains a separate root-managed step.",
+    "transport": {
+      "path": "request-database-integration-r1.json.gz.b64",
+      "encoding": "RFC4648 base64 of the unchanged gzip followed by one LF",
+      "bytes": 508893,
+      "sha256": "4aad7934555878bd622f7c6e1d3d01956226a659d218dfcb66190c6bce59b4db"
+    },
+    "unchangedPackage": {
+      "bytes": 381668,
+      "sha256": "7d813ccd4f8cf5eba457c39461f91df45e5faa78a01e3a2fcab843499cb1cc20",
+      "canonicalRawBytes": 2021193,
+      "canonicalRawSHA256": "06ef7b0302f14c8c38ba3bf0d5f90192f640f4c00111ac32512fb81bdc328c41",
+      "fileCount": 88,
+      "typeScriptFileCount": 77,
+      "unchangedApplicationFileCount": 73
+    },
+    "originalPrivateManifest": {
+      "bytes": 47352,
+      "sha256": "734375f2ee2803b99953d379e0eddfdbac5f5a0ee1117eb9f07fe32465633439",
+      "semantics": "All original manifest fields/pins are retained unchanged above; this publicTransfer block is transport/disclosure metadata only."
+    },
+    "sourceDisclosure": {
+      "realApplicationSource": true,
+      "paths": [
+        "derive-parent-authored/src/contracts/**",
+        "derive-parent-authored/src/domain/**",
+        "derive-parent-authored/src/services/context/migrateV2.ts",
+        "derive-parent-authored/supabase/functions/**",
+        "derive-parent-authored/tests/native-request/**",
+        "derive-parent-authored/tests/native-bundle/context-reader-sources/**",
+        "derive-parent-authored/tests/native-bundle/retained-domain-template.json",
+        "derive-code-handoff/backend-source/extracted/supabase/migrations/20261002194650_part_three_personal_context_v2.sql"
+      ],
+      "completeInventory": "The88 original pins above enumerate every included path, byte count and SHA256."
+    },
+    "embeddedPrivateProvenanceDisclosure": {
+      "sourcePath": "derive-parent-authored/src/domain/part-four/approved423-runtime.ts",
+      "distinctLibraryIdentifiers": 3,
+      "libraryReferenceOccurrences": 425,
+      "distinctBackingFileIdentifiers": 1,
+      "backingFileReferenceOccurrences": 1,
+      "distinctApprovalMessageIdentifiers": 1,
+      "approvalMessageReferenceOccurrences": 526,
+      "documentFilename": "More Skincare Ingredients for Review.docx",
+      "otherMetadata": "Original document labels, approval/version metadata and source/document hashes remain present. These runtime-significant fields are not redacted or rewritten."
+    },
+    "staticHostedProjectURLDisclosure": {
+      "sourcePath": "derive-parent-authored/src/domain/part-three/release.ts",
+      "url": "https://snojlbqovlawewwqbviz.supabase.co",
+      "credential": false,
+      "contactedDuringPreparation": false,
+      "semantics": "Executable release-selection logic, preserved unchanged."
+    },
+    "testEvidenceDisclosure": {
+      "path": "derive-parent-authored/tests/native-request/offline-test-results.tap",
+      "bytes": 11760,
+      "sha256": "51142e32e8d458130e958739358703a570671a7ec3f1e269dd4aa5632fd695ea",
+      "contents": "Reviewed synthetic offline test names/timings and147 PASS summary; no real user data, tokens, prompts or private operational/runtime records."
+    },
+    "privacyReview": {
+      "all88FilesAndOriginalManifestReviewed": true,
+      "credentialShapeScanMatches": 0,
+      "realEmailScanMatches": 0,
+      "privateDownloadURLScanMatches": 0,
+      "realPersonalDataFound": false,
+      "privateAttachmentsIncluded": false,
+      "unrelatedFilesIncluded": false,
+      "dependenciesOrBinariesIncluded": false,
+      "limitations": "Static/manual review and known-pattern scans, not a mathematical guarantee that arbitrary text can never be sensitive."
+    },
+    "verificationStatus": {
+      "newRequestLayerNative": "not_executed; transfer to the native consumer has been blocked",
+      "offline": "147 prior offline tests PASS, strict TypeScript and emitted-JS checks passed; source pins reverified for this preparation",
+      "frozenR5SQLNative": "185 prior checks PASS on PostgreSQL15.19, separate exact-byte prerequisite",
+      "hostedPlatform": "unverified JWT signature/issuance/logout, Auth/PostgREST and deployed endpoint",
+      "featureReadiness": "not_established",
+      "newOperationAdmissionDispatchQuestions": "not_established"
+    },
+    "excluded": "No new source, dependency bytes, native execution logs, provider traffic, personal records, private attachment content, deployment or merge artifacts were added."
+  }
+}
