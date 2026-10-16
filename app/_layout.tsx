@@ -196,7 +196,7 @@ export default function RootLayout() {
 
   if ((localFreeIntegration && (authError || accessStatus === 'ERROR')) || (hostedScanner && scannerEntry === 'error')) {
     return <SafeAreaProvider><View style={styles.loadingContainer}>
-      <Text style={styles.errorText}>Derive could not connect. Please try again.</Text>
+      <Text style={styles.errorText}>Shelv could not connect. Please try again.</Text>
       <Pressable accessibilityRole="button" onPress={() => { setAuthError(false); if (hostedScanner && localReady) void customerController.load(); else useFreeAccessStore.getState().reset(); }}>
         <Text style={styles.retryText}>Try again</Text>
       </Pressable>
