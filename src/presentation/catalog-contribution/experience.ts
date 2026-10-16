@@ -9,7 +9,7 @@ export function describeContributionExperience(availability: 'unavailable' | 'av
   if (availability === 'unavailable') return {
     canPrepareRequest: false,
     primaryAction: 'try_another_way',
-    explanation: 'Asking Derive to add products is not available yet. You can try another way to check this product.',
+    explanation: 'Asking Shelv to add products is not available yet. You can try another way to check this product.',
     reviewActionLabel: 'Review product details',
   };
   return {

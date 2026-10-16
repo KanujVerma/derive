@@ -91,7 +91,7 @@ function LegacyProfileScreen() {
       return;
     }
     Alert.alert(
-      'Derive Member Support',
+      'Shelv Member Support',
       `For routine questions or adjustments, ask directly in the Ask tab or email ${config.founderSupportEmail}.`,
       [{ text: 'OK' }]
     );
@@ -176,7 +176,7 @@ function LegacyProfileScreen() {
 
   const handleDeleteAccount = () => {
     if (deletingAccount) return;
-    const message = "This permanently deletes your Derive account, onboarding information, stored photos, routine history, and other account data. This can't be undone.";
+    const message = "This permanently deletes your Shelv account, onboarding information, stored photos, routine history, and other account data. This can't be undone.";
     if (Platform.OS === 'web') {
       if (window.confirm(`Delete your account?\n\n${message}`)) void completeAccountDeletion();
       return;
@@ -246,14 +246,14 @@ function LegacyProfileScreen() {
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.memberName}>{fullName || 'Derive Member'}</Text>
+            <Text style={styles.memberName}>{fullName || 'Shelv Member'}</Text>
             {email ? <Text style={styles.memberEmail}>{email}</Text> : null}
             <View style={styles.badgeRow}>
               <Badge label="FOUNDING BETA" variant="keep" size="small" />
               {!freeBeta ? <Text style={styles.memberPrice}>${config.betaPriceMonthly}/mo</Text> : null}
             </View>
             <Text style={styles.memberClarification}>
-              Membership covers Derive's ongoing skincare management. Products are purchased separately.
+              Membership covers Shelv's ongoing skincare management. Products are purchased separately.
             </Text>
           </View>
         </View>
@@ -309,12 +309,12 @@ function LegacyProfileScreen() {
             onPress={handleContactSupport}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={freeBeta ? 'Support' : config.founderSupportEmail ? 'Member Support' : 'Ask Derive'}
+            accessibilityLabel={freeBeta ? 'Support' : config.founderSupportEmail ? 'Member Support' : 'Ask Shelv'}
           >
             <Icon name="person" size={18} color={colors.brand} />
             <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>{freeBeta ? 'Support' : config.founderSupportEmail ? 'Member Support' : 'Ask Derive'}</Text>
-              <Text style={styles.rowSubtitle}>{freeBeta ? 'Contact Derive support' : config.founderSupportEmail ? 'Contact the Founding Beta team' : 'Questions about your routine and products'}</Text>
+              <Text style={styles.rowTitle}>{freeBeta ? 'Support' : config.founderSupportEmail ? 'Member Support' : 'Ask Shelv'}</Text>
+              <Text style={styles.rowSubtitle}>{freeBeta ? 'Contact Shelv support' : config.founderSupportEmail ? 'Contact the Founding Beta team' : 'Questions about your routine and products'}</Text>
             </View>
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </TouchableOpacity>
@@ -353,7 +353,7 @@ function LegacyProfileScreen() {
               <Text style={[styles.rowTitle, { color: colors.actionPause.text }]}>
                 {deletingAccount ? 'Deleting account…' : 'Delete Account'}
               </Text>
-              <Text style={styles.rowSubtitle}>Permanently delete your Derive account and stored data</Text>
+              <Text style={styles.rowSubtitle}>Permanently delete your Shelv account and stored data</Text>
             </View>
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </TouchableOpacity>
@@ -420,7 +420,7 @@ function LegacyProfileScreen() {
         <PublicLegalLinks />
         <BuildDiagnostics />
         <Text style={styles.footerText}>
-          Derive Version 1.0 · "Your skincare, handled."
+          Shelv Version 1.0 · "Your skincare, handled."
         </Text>
       </ScrollView>
     </View>

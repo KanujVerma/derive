@@ -1,0 +1,38 @@
+{
+  "source_color_file": "KanujVerma/derive/src/constants/theme.ts",
+  "colors": {
+    "brand": "#345447",
+    "inkInverse": "#FFFEFB",
+    "canvas": "#F6F3EC"
+  },
+  "viewBox": "0 0 700 700",
+  "dot": {
+    "cx": 354.5,
+    "cy": 238.5,
+    "r": 63.7
+  },
+  "upper": {
+    "cx": 386.0,
+    "top": 331.0,
+    "scale": 1.0
+  },
+  "lower": {
+    "cx": 321.0,
+    "top": 461.0,
+    "scale": 1.1125827814569536
+  },
+  "shared_master": {
+    "width": 302.0,
+    "height": 102.0,
+    "inset": 52.0,
+    "top_control_extension": 32.0,
+    "bottom_control_extension": 11.0
+  },
+  "left_right_max_reflection_error": 2.8421709430404007e-13,
+  "center_stagger_units": 65.0,
+  "vertical_gaps_units": {
+    "dot_to_upper": 28.80000000000001,
+    "upper_to_lower": 28.0
+  },
+  "design_note": "Upper and lower shelves share a single shape, uniformly scaled; both sides of each shelf are exact mirrors."
+}

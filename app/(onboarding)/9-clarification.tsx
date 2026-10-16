@@ -56,7 +56,7 @@ export default function ClarificationScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.aiHeader}>
-          <Text style={styles.aiBadge}>DERIVE INTELLIGENCE</Text>
+          <Text style={styles.aiBadge}>SHELV INTELLIGENCE</Text>
           <Text style={styles.questionTitle}>
             {hasFollowUps ? 'A few targeted clarifications.' : 'All clear.'}
           </Text>

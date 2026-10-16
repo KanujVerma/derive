@@ -15,7 +15,7 @@ export interface AccountSettingsPresentation {
 
 export function deriveVersionLabel(version: string | null | undefined): string {
   const trimmed = version?.trim();
-  return trimmed ? `Derive ${trimmed}` : 'Derive';
+  return trimmed ? `Shelv ${trimmed}` : 'Shelv';
 }
 
 /** Customer Account & Settings copy. Managed accounts stay on the legacy screen. */
@@ -40,15 +40,15 @@ export function getAccountSettingsPresentation(input: {
   if (input.kind === 'anonymous') {
     return {
       kind: 'anonymous',
-      accountTitle: 'Using Derive without an account',
+      accountTitle: 'Using Shelv without an account',
       accountSubtitle: 'You can use Check and My Stuff without signing in.',
       accountFooter: 'This session may not be recoverable if you lose access to it.',
       showSignOut: false,
       showDelete: true,
-      deleteLabel: 'Delete Derive data',
-      deleteSubtitle: 'Permanently delete data tied to this Derive session',
-      deleteConfirmTitle: 'Delete Derive data',
-      deleteConfirmMessage: 'Delete the data associated with this Derive session? This cannot be undone.',
+      deleteLabel: 'Delete Shelv data',
+      deleteSubtitle: 'Permanently delete data tied to this Shelv session',
+      deleteConfirmTitle: 'Delete Shelv data',
+      deleteConfirmMessage: 'Delete the data associated with this Shelv session? This cannot be undone.',
     };
   }
   const email = input.email?.trim() || null;
@@ -60,8 +60,8 @@ export function getAccountSettingsPresentation(input: {
     showSignOut: true,
     showDelete: true,
     deleteLabel: 'Delete account',
-    deleteSubtitle: 'Permanently delete your Derive account and data',
+    deleteSubtitle: 'Permanently delete your Shelv account and data',
     deleteConfirmTitle: 'Delete account',
-    deleteConfirmMessage: 'Delete your Derive account and the data tied to it? This cannot be undone.',
+    deleteConfirmMessage: 'Delete your Shelv account and the data tied to it? This cannot be undone.',
   };
 }

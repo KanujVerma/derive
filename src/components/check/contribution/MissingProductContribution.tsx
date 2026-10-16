@@ -100,7 +100,7 @@ function ContributionBody({ availability, initial, embedded, onTryAnotherWayLabe
       ) : null}
       {errors.evidence ? <Text style={styles.error}>{errors.evidence}</Text> : null}
       {errors.requestId ? <Text style={styles.error}>{errors.requestId}</Text> : null}
-      <Text style={styles.note}>Next, review what you entered before choosing whether to send a request. This does not add a product to Derive.</Text>
+      <Text style={styles.note}>Next, review what you entered before choosing whether to send a request. This does not add a product to Shelv.</Text>
       <Button label={view.reviewActionLabel} variant="brand" onPress={review} style={styles.action} />
       <Button label="Back" variant="outline" onPress={() => setEditing(false)} style={styles.action} />
     </View>

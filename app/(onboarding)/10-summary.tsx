@@ -144,7 +144,7 @@ export default function SummaryScreen() {
           <View style={styles.pricingCard}>
             <Text style={styles.pricingBadge}>FOUNDING BETA ACCESS</Text>
             <Text style={styles.pricingSubtext}>
-              Your Derive beta access is active. Products recommended for your routine are separate from the beta app.
+              Your Shelv beta access is active. Products recommended for your routine are separate from the beta app.
             </Text>
           </View>
         ) : (
@@ -162,7 +162,7 @@ export default function SummaryScreen() {
             <Badge label="FIRST 10 MEMBERS" variant="keep" size="small" />
           </View>
           <Text style={styles.pricingSubtext}>
-            Derive manages your skincare: your personalized plan, weekly check-ins, adjustments, progress tracking, Scan, and Ask.
+            Shelv manages your skincare: your personalized plan, weekly check-ins, adjustments, progress tracking, Scan, and Ask.
           </Text>
 
           <View style={styles.pricingDivider} />

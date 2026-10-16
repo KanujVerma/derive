@@ -91,7 +91,7 @@ export default function RefillModal() {
         <View>
           <Text style={styles.screenTitle}>Running Low?</Text>
           <Text style={styles.screenSubtitle}>
-            Select the product you need replenished. Product purchases and refills are separate from your Derive membership.
+            Select the product you need replenished. Product purchases and refills are separate from your Shelv membership.
           </Text>
         </View>
         <TouchableOpacity

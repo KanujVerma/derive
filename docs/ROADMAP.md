@@ -1,14 +1,16 @@
-# Derive Roadmap
+# Shelv Roadmap
+
+Current brand: **Shelv**, formerly Derive. [Branding and technical migration boundary](BRANDING.md) preserve existing integration identifiers and historical evidence.
 
 ## Current company objective
 
-Ship scanner-first personalized skincare product intelligence where a customer in the approved first-release audience can point at or search for a skincare product, see what Derive actually knows, get a supported personal action and reason, know what to do next, and improve later checks by adding useful context. The prior U.S.-adult-18+ target is reopened; audience and runtime treatment are not yet selected. The intended quality bar is correctness, relevance, actionability, honest uncertainty and low customer effort. More context must not make a less-correct result appear better.
+Ship scanner-first personalized skincare product intelligence where a customer in the approved first-release audience can point at or search for a skincare product, see what Shelv actually knows, get a supported personal action and reason, know what to do next, and improve later checks by adding useful context. The prior U.S.-adult-18+ target is reopened; audience and runtime treatment are not yet selected. The intended quality bar is correctness, relevance, actionability, honest uncertainty and low customer effort. More context must not make a less-correct result appear better.
 
 ## Product model
 
 **Free Check** is the acquisition wedge for product/formula facts and contextual personal decision support. There is no universal numerical compatibility/health score. Internally, “personalized Yuka for skincare” is an analogy only, not customer-facing positioning. The paid hypothesis is **$25/month Managed Skincare** for ongoing routine management, check-ins, adaptation, progress and product decisions, with founder support during early beta where needed. Price, retention and billing activation are not validated by the existing display price or local flows.
 
-**2026-09-28 MVP scope:** The latest founder direction targets a public Derive launch with real Plus or Founding Plus access and Managed shown as Early Access. The earlier Sami P0-C checkpoint scoped a Free-only barcode/name first release; the latest brief explicitly preserves that Free path if Plus billing slips. Final candidate scope is OPEN until an actual Plus benefit, entitlement, privacy, billing and release evidence are reviewed. Plus cross-product value, cohort size/duration, price and usage limits are evaluations or experiments, not active policy. Managed is delegated ongoing care, not a stronger Check score; public Managed payment is not activated. [Monetization and evidence](MONETIZATION.md), [entitlement preparation](FOUNDING_PLUS_ENTITLEMENT.md), [measurement contract](PRODUCT_ANALYTICS.md), [release gates](APP_STORE_RELEASE_READINESS.md), and [current Kanuj portfolio](KANUJ_PORTFOLIO.md) separate source preparation from customer activation.
+**2026-09-28 MVP scope:** The latest founder direction targets a public Shelv launch with real Plus or Founding Plus access and Managed shown as Early Access. The earlier Sami P0-C checkpoint scoped a Free-only barcode/name first release; the latest brief explicitly preserves that Free path if Plus billing slips. Final candidate scope is OPEN until an actual Plus benefit, entitlement, privacy, billing and release evidence are reviewed. Plus cross-product value, cohort size/duration, price and usage limits are evaluations or experiments, not active policy. Managed is delegated ongoing care, not a stronger Check score; public Managed payment is not activated. [Monetization and evidence](MONETIZATION.md), [entitlement preparation](FOUNDING_PLUS_ENTITLEMENT.md), [measurement contract](PRODUCT_ANALYTICS.md), [release gates](APP_STORE_RELEASE_READINESS.md), and [current Kanuj portfolio](KANUJ_PORTFOLIO.md) separate source preparation from customer activation.
 
 ## Approved target architecture
 
@@ -29,7 +31,7 @@ Probabilistic systems may contribute bounded candidate evidence or findings. The
 
 ## Product input strategy
 
-**Customer intent:** “Check this product.” Customers should be able to show Derive a product in the natural form they already have it, without understanding which recognition method is used. Inputs create candidate evidence and observations; they do not become separate truth engines.
+**Customer intent:** “Check this product.” Customers should be able to show Shelv a product in the natural form they already have it, without understanding which recognition method is used. Inputs create candidate evidence and observations; they do not become separate truth engines.
 
 All supported inputs converge on the same authority path: product input → candidate evidence/observations → S6 product and formula resolution → ProductTruthSnapshotV1 → personal decision. Barcode, photo, model output, retailer listing, URL, or customer selection is evidence, not canonical product/formula truth by itself.
 
@@ -42,7 +44,7 @@ Auto is the camera default. PR #108 adds Auto inside the existing camera, suppor
 | Photo or screenshot from the customer's library | Near-term MVP target | The canonical product Check has no camera-roll picker. Package-photo camera capture is different from library upload. |
 | Manual recovery | Core | Search and customer clarification recover from uncertain evidence; the clarification is not formula authority. |
 | Pasted product URL | Post-MVP convenience | Not implemented. |
-| iOS/OS Share to Derive | Post-MVP convenience | Not implemented. |
+| iOS/OS Share to Shelv | Post-MVP convenience | Not implemented. |
 | Pasted ingredient text | Later convenience | Not implemented as a customer input flow; it would still be evidence for the same S6 pipeline. |
 | Product Compare | Near-term post-MVP | Approved target; not implemented. |
 
@@ -69,18 +71,18 @@ Remote Staging and production retain legacy managed-first routing. Hosted anonym
 
 ## Beta gates
 
-Delay broad scanner-first outreach until Derive has honest identity/unknown recovery, useful coverage for the intended cohort, a working image/evidence fallback, a genuinely personal decision when required context exists, supported safety rules, owner/session/privacy lifecycle, physical-device acceptance and an offer/binary/support/privacy package matching actual runtime. Do not gate on Jev production adoption, Scandit specifically, MobileCLIP, millions of products, every concentration, all languages, makeup, tint matching, a graph database or a generic agent framework.
+Delay broad scanner-first outreach until Shelv has honest identity/unknown recovery, useful coverage for the intended cohort, a working image/evidence fallback, a genuinely personal decision when required context exists, supported safety rules, owner/session/privacy lifecycle, physical-device acceptance and an offer/binary/support/privacy package matching actual runtime. Do not gate on Jev production adoption, Scandit specifically, MobileCLIP, millions of products, every concentration, all languages, makeup, tint matching, a graph database or a generic agent framework.
 
 ## Near-term evaluated choices
 
 | Area | Current implementation | Evaluation, not selection |
 | --- | --- | --- |
-| Barcode capture | Expo Camera / Expo barcode. | Scandit is the commercial challenger; the Yuka/Scandit story is vendor/customer evidence, not an independent Derive benchmark. Decide only from real skincare-package/device tests and useful-resolved-product outcomes. |
+| Barcode capture | Expo Camera / Expo barcode. | Scandit is the commercial challenger; the Yuka/Scandit story is vendor/customer evidence, not an independent Shelv benchmark. Decide only from real skincare-package/device tests and useful-resolved-product outcomes. |
 | Image evidence extraction | Private package-photo capture/upload and S6 evidence path exist locally; no working OCR/VLM extraction is claimed. PR #109 adds offline manifest/replay tooling only; no provider run or measured image result exists. | Gemini fast multimodal is an initial candidate; GPT/Luna is a challenger. A rights-cleared frozen real-image benchmark must compare exact variant, ingredient transcription, critical number/unit error, hallucination, abstention, multilingual text, latency, cost and review burden. No winner yet. |
-| Soft judgment | Narrow deterministic personal-fit rules. | Jev is an optional experiment, not an authority or production dependency. Compare it with the deterministic baseline and structured model candidates on labeled Derive cases. Do not invent confidence thresholds. |
+| Soft judgment | Narrow deterministic personal-fit rules. | Jev is an optional experiment, not an authority or production dependency. Compare it with the deterministic baseline and structured model candidates on labeled Shelv cases. Do not invent confidence thresholds. |
 | On-device perception | Barcode and Expo Camera are current. | On-device OCR may be useful later; ML Kit, Apple Vision and other native tools are candidates only. MobileCLIP/image retrieval depends on a rights-cleared package corpus and is not active. |
 
-Derive currently has no funding. Evaluate scanner/model choices against cost per activated user, cost per useful repeat user, free volume, fixed minimums, per-device/per-scan pricing and fallback quality. Do not lock a quote-based core acquisition dependency without production-economics evidence.
+Shelv currently has no funding. Evaluate scanner/model choices against cost per activated user, cost per useful repeat user, free volume, fixed minimums, per-device/per-scan pricing and fallback quality. Do not lock a quote-based core acquisition dependency without production-economics evidence.
 
 Known-product Check latency is an accepted target in [ADR-41](DECISIONS.md), not a measured result and not a blocker for the current customer-experience pass. A known barcode should feel immediate, and a known-product Personal Fit should avoid a network generative-model call when reusable formula intelligence already exists. Cold-path ingestion and the separate decision and perception benchmarks can take longer. Sami owns executing those provider and perception benchmarks. No provider is selected, and finishing the current profile, My Stuff, and Check presentation does not wait on that execution.
 

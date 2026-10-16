@@ -1,4 +1,6 @@
-# Derive Interface & Service Contracts
+# Shelv Interface & Service Contracts
+
+Current brand: **Shelv**, formerly Derive. [Branding and technical migration boundary](BRANDING.md) preserve existing integration identifiers and historical evidence.
 
 ## Current contracts and approved target seams
 
@@ -273,7 +275,7 @@ canonical request/result types are in `ProductIdentityResolver.ts`.
 
 ## 3. Safety & Escalation Model
 
-Derive enforces an unskippable safety circuit breaker on all queries:
+Shelv enforces an unskippable safety circuit breaker on all queries:
 
 ```typescript
 export interface SafetyClassification {

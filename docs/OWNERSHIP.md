@@ -1,4 +1,6 @@
-# Derive Feature Ownership
+# Shelv Feature Ownership
+
+Current brand: **Shelv**, formerly Derive. [Branding and technical migration boundary](BRANDING.md) preserve existing integration identifiers and historical evidence.
 
 ## Active ownership model
 

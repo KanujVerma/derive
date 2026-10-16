@@ -109,7 +109,7 @@ export default function ReactionHistoryScreen() {
       >
         <Text style={styles.questionTitle}>Past Product Reactions</Text>
         <Text style={styles.questionSubtitle}>
-          Derive looks up formulations in the background to separate true sensitivities from normal active acclimation.
+          Shelv looks up formulations in the background to separate true sensitivities from normal active acclimation.
         </Text>
 
         {/* PROGRESSIVE GATE: Has a product ever caused an adverse reaction? */}
@@ -119,7 +119,7 @@ export default function ReactionHistoryScreen() {
         <View style={styles.optionsList}>
           <SelectionCard
             title="Yes, I have had a reaction"
-            description="I want Derive to check ingredients and avoid similar formulations"
+            description="I want Shelv to check ingredients and avoid similar formulations"
             selected={hasReaction === true}
             onPress={() => {
               setHasReaction(true);

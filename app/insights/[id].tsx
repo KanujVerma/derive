@@ -119,7 +119,7 @@ export default function ResearchInsightDetailScreen() {
         {/* Insight Title */}
         <Text style={styles.title}>{insight.title}</Text>
 
-        {/* Derive Recommendation Verdict */}
+        {/* Shelv Recommendation Verdict */}
         <View style={styles.recommendationCard}>
           <View style={styles.recommendationHeader}>
             <Badge label={recBadge.label} variant={recBadge.variant} size="medium" />
@@ -199,7 +199,7 @@ export default function ResearchInsightDetailScreen() {
         <View style={styles.actionContainer}>
           {showsProviderBetaFeatures(publicEnvironment.buildFlavor) ? (
           <Button
-            label="Ask Derive About This"
+            label="Ask Shelv About This"
             variant="primary"
             size="large"
             onPress={handleAskDerive}

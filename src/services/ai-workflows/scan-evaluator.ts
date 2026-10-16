@@ -110,7 +110,7 @@ export function evaluateProductScan(
         isPhysicalScrub ? 'Physical abrasives damage retinoid-sensitized skin' : 'Contains fragrance, which increases sensitivity risk',
         reactions.length > 0 ? `You have ${reactions.length} logged past reaction(s)` : 'Your barrier is currently prioritizing retinoid tolerance',
       ],
-      whyPersonalized: 'Derive prioritizes keeping your barrier calm so your active acne treatment can work without peeling.',
+      whyPersonalized: 'Shelv prioritizes keeping your barrier calm so your active acne treatment can work without peeling.',
     });
   }
 
@@ -144,7 +144,7 @@ export function evaluateProductScan(
         `You selected a ${complexity === 'simple' ? 'Simple (3-4 steps)' : 'Focused'} routine preference`,
       ],
       whyPersonalized:
-        'Derive keeps your routine lean: adding another active product risks barrier overload without extra clearance.',
+        'Shelv keeps your routine lean: adding another active product risks barrier overload without extra clearance.',
     });
   }
 
@@ -208,7 +208,7 @@ export function evaluateProductScan(
         'Your primary goal (Breakouts) is best served by consistent Differin adherence',
       ],
       whyPersonalized:
-        'Derive safeguards your skin against multi-acid stacking so you get results without a barrier crash.',
+        'Shelv safeguards your skin against multi-acid stacking so you get results without a barrier crash.',
     });
   }
 

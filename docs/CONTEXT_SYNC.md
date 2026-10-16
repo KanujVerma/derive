@@ -1,4 +1,10 @@
-# Derive Cross-Agent Context Sync Ledger
+# Shelv Cross-Agent Context Sync Ledger
+
+## 2026-10-16 — Shelv visible branding and corrected artwork
+
+The founder renamed the company/app to **Shelv** and approved customer-facing branding, original corrected artwork and documentation. [Branding guide](BRANDING.md) and the [canonical asset directory](../assets/brand/shelv/README.md) preserve all 20 supplied originals byte-for-byte with SHA-256 provenance, exact SVG curves and geometry-preserving raster exports. App display/permission copy, customer UI, launcher/header/favicon slots, founder console and current documentation sections use Shelv. Technical repository/native/backend/config/storage identities and integration URLs remain unchanged; migrate those **last**, as explicitly requested.
+
+This publication candidate is a single branding-only commit built from `origin/main@fea1a214dd174deccffbdb08fb2aa48c1e8fd0e0` with a separate index/tree. The shared dirty checkout and its 127 unrelated commits are excluded. Main's account behavior is preserved; only display wording changes. The untracked local Next project and private handoff artifacts are excluded. Seven remaining Check/camera/root display substitutions are separately handed to their current single writer; no scanner, retake, navigation, backend/Auth/RLS or decision behavior is changed here. The local integration passed 2,976 tests with six explicit skips, app/test/web types, Expo web/iOS exports and local Next build; those receipts cover the dirty local integration, not this main-based candidate. Exact-head CI and review remain required before merging. No production deployment, technical migration, new worktree or permanent deletion occurs.
 
 ## 2026-10-02 — separate UX-only publication
 

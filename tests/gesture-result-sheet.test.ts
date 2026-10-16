@@ -71,7 +71,7 @@ test('sheet continuous mode exposes all bound reasons, evidence and uncertaintie
   const r = renderer();
   const { PersonalDecisionPanel } = r.load('src/components/personal-decision/PersonalDecisionPanel');
   const html = r.render(PersonalDecisionPanel, { packet: fixture.packet, expectedBinding: fixture.packet.binding, embedded: true, expanded: true, continuous: true });
-  assert.doesNotMatch(html, /Why Derive thinks this<\/button>|Review \d+ evidence records|Show more (reasons|evidence records)/);
+  assert.doesNotMatch(html, /Why Shelv thinks this<\/button>|Review \d+ evidence records|Show more (reasons|evidence records)/);
   assert.match(html, /Evaluation/);
   const { describePersonalDecision } = r.load('src/presentation/personal-decision/result');
   const view = describePersonalDecision(fixture.packet, fixture.packet.binding);

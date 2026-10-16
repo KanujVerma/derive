@@ -172,7 +172,7 @@ export default function MembershipScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.overline}>{conciergeAccess ? 'DERIVE BETA ACCESS' : 'DERIVE MEMBERSHIP'}</Text>
+        <Text style={styles.overline}>{conciergeAccess ? 'SHELV BETA ACCESS' : 'SHELV MEMBERSHIP'}</Text>
         <Text style={styles.title}>Founding Beta</Text>
         {conciergeAccess ? null : <Text style={styles.price}>${config.betaPriceMonthly}/month</Text>}
         <Text style={styles.body}>{statusMessage}</Text>
@@ -197,7 +197,7 @@ export default function MembershipScreen() {
         ) : activationPending ? (
           <View style={styles.statusCard}>
             <Text style={styles.statusTitle}>{checking ? 'Activating your membership…' : 'Membership confirmation pending'}</Text>
-            <Text style={styles.body}>Access opens only after Derive confirms your membership from the billing service.</Text>
+            <Text style={styles.body}>Access opens only after Shelv confirms your membership from the billing service.</Text>
             <Button label="Try Again" variant="secondary" size="medium" onPress={handleRetry} disabled={checking || busy} style={styles.action} />
             {!checking && <Button label="Open Checkout Again" variant="outline" size="medium" onPress={() => void openHostedSession('checkout')} disabled={busy} style={styles.action} />}
           </View>

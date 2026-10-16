@@ -94,10 +94,10 @@ export function authorCheckInAnalysis(input: {
   let sentence: string;
   if (input.irritation !== 'none') {
     sentence =
-      'Check-in recorded. You reported some irritation, so Derive will treat this as a tolerance signal.';
+      'Check-in recorded. You reported some irritation, so Shelv will treat this as a tolerance signal.';
   } else if (input.skinState === 'worse') {
     sentence =
-      'Check-in recorded. Your skin felt worse this week, and Derive will keep watching this trend.';
+      'Check-in recorded. Your skin felt worse this week, and Shelv will keep watching this trend.';
   } else {
     sentence = 'Check-in recorded. Your skin appears stable based on what you reported.';
   }

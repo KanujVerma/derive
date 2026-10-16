@@ -27,7 +27,7 @@ interface GlassComposerProps {
 
 export const GlassComposer: React.FC<GlassComposerProps> = ({
   onSendMessage,
-  placeholder = 'Ask Derive about a product or your skin...',
+  placeholder = 'Ask Shelv about a product or your skin...',
   disabled = false,
   isLoading = false,
 }) => {

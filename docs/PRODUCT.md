@@ -1,8 +1,10 @@
-# Derive Product Specification: Current Strategy and Historical V1
+# Shelv Product Specification: Current Strategy and Historical V1
+
+Current brand: **Shelv**, formerly Derive. [Brand assets and migration boundaries](BRANDING.md) govern this rename; historical V1 material below retains its original wording.
 
 ## Current product direction (approved target; runtime status is separate)
 
-Derive is **scanner-first personalized skincare product intelligence**. The free product's central question is **“Should I use this product?”** A customer can point at or search for a skincare product and Derive tells them what it actually knows, how it fits their skin, current routine and prior experience, and what they should do next. “Personalized Yuka for skincare” is internal shorthand only, not customer-facing positioning.
+Shelv is **scanner-first personalized skincare product intelligence**. The free product's central question is **“Should I use this product?”** A customer can point at or search for a skincare product and Shelv tells them what it actually knows, how it fits their skin, current routine and prior experience, and what they should do next. “Personalized Yuka for skincare” is internal shorthand only, not customer-facing positioning.
 
 There is no universal numerical compatibility, health, safety, or product-quality score. Formula Details are factual product/formula evidence; Personal Fit is contextual guidance for one person. A supported formula can still be a poor fit, and missing identity or formula evidence stays unknown.
 
@@ -10,11 +12,11 @@ The intended differentiator is that the same product may lead to a different dec
 
 ### Obvious by default
 
-Derive should feel simpler than the intelligence behind it. Complexity belongs behind the interface. A first-time customer should understand what to do without founder explanation or knowledge of Derive's internal evidence, model, catalog, or truth systems.
+Shelv should feel simpler than the intelligence behind it. Complexity belongs behind the interface. A first-time customer should understand what to do without founder explanation or knowledge of Shelv's internal evidence, model, catalog, or truth systems.
 
 Use one obvious primary action, plain consumer language, minimal setup before first value, and progressive disclosure. Prefer automatic behavior when it remains truthful. Do not make technical mode selection the default; ask one simple clarification when evidence is uncertain. Manual correction is recovery, and deeper formula/provenance detail is optional depth. Provide clear Back, Close, and Retry paths.
 
-### Show Derive a product
+### Show Shelv a product
 
 The customer has one intent: **“Check this product.”** Auto camera, barcode, product-name search, product/package and ingredient photos, library photos, manual recovery, and future URL/share/text input are ways to provide candidate evidence, not separate customer truth systems. Supported inputs converge on S6 and the same ProductTruthSnapshotV1/personal-decision boundary.
 
@@ -34,7 +36,7 @@ A successful Check progressively answers:
 2. Why for me?
 3. How does this affect what I already use?
 4. What should I do next?
-5. What does Derive know versus not know?
+5. What does Shelv know versus not know?
 
 Quality has independent dimensions: correctness, relevance, actionability, uncertainty honesty, and customer effort. Do not call a higher personalization level better when it reduces correctness.
 
@@ -58,9 +60,9 @@ Routine and history should grow progressively when they improve a decision. A fu
 
 The free scanner is the acquisition wedge for supported product facts and personal guidance. **$25/month Managed Skincare** is an ongoing routine-management hypothesis: a morning and evening routine, keep/add/pause/replace decisions, check-ins, and customer approval before meaningful changes. Products are purchased separately. Founder review is an early operating method, not the customer offer. The free Plan screen can record owner-bound waitlist interest; that interest is not enrollment, payment, or evidence that someone will pay. Do not claim validated pricing, retention, or hosted billing activation from a display price, founder console, or local flow.
 
-Derive Plus is an evaluated self-directed layer for comparing supported products and learning from one's own shelf/history. Its first benefit, price, founding trial, quota and launch timing are open; no Plus purchase or cohort grant is active. An allowed Free Check keeps its supported facts, material safety cautions, reason and next action. Paid access never changes product/formula truth or the personal decision. Managed conceptually includes Plus and adds delegated ongoing care. [Monetization direction](MONETIZATION.md) distinguishes these jobs and [entitlement preparation](FOUNDING_PLUS_ENTITLEMENT.md) is a client projection, not a live backend.
+Shelv Plus is an evaluated self-directed layer for comparing supported products and learning from one's own shelf/history. Its first benefit, price, founding trial, quota and launch timing are open; no Plus purchase or cohort grant is active. An allowed Free Check keeps its supported facts, material safety cautions, reason and next action. Paid access never changes product/formula truth or the personal decision. Managed conceptually includes Plus and adds delegated ongoing care. [Monetization direction](MONETIZATION.md) distinguishes these jobs and [entitlement preparation](FOUNDING_PLUS_ENTITLEMENT.md) is a client projection, not a live backend.
 
-The latest founder public-launch direction includes Derive plus a real Plus or Founding Plus benefit and Managed Early Access. A prior P0-C first-release checkpoint was Free-only barcode/name Check; the latest brief keeps that as a fallback if Plus billing delays customer value. The exact candidate scope is open until the benefit, entitlement, privacy, measurement and release evidence exists.
+The latest founder public-launch direction includes Shelv plus a real Plus or Founding Plus benefit and Managed Early Access. A prior P0-C first-release checkpoint was Free-only barcode/name Check; the latest brief keeps that as a fallback if Plus billing delays customer value. The exact candidate scope is open until the benefit, entitlement, privacy, measurement and release evidence exists.
 
 The prior initial external-beta target was U.S. adults 18 and older. The founder reopened whether teens may be included, so the first-release audience and runtime treatment are an open decision; no age gate or teen support is inferred. Makeup, layering, and tint/shade guidance may follow later and must preserve confirmation, provenance, and non-discrimination rules.
 

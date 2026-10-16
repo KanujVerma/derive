@@ -137,7 +137,7 @@ function LegacyTodayScreen() {
               style={styles.logoMark}
               resizeMode="contain"
             />
-            <Text style={styles.brandWordmark}>DERIVE</Text>
+            <Text style={styles.brandWordmark}>SHELV</Text>
           </View>
           <View style={styles.headerActions}>
             {isShopMember && showsProviderBetaFeatures(publicEnvironment.buildFlavor) && (
@@ -221,8 +221,8 @@ function LegacyTodayScreen() {
                 </Text>
                 <Text style={styles.reviewExplainerText}>
                   {isShopMember
-                    ? 'While we finish preparing your routine, you can scan bottles with camera recognition or ask Derive any skincare question.'
-                    : 'Personalized Scan is available with an active Derive membership.'}
+                    ? 'While we finish preparing your routine, you can scan bottles with camera recognition or ask Shelv any skincare question.'
+                    : 'Personalized Scan is available with an active Shelv membership.'}
                 </Text>
               </View>
             </View>
@@ -277,8 +277,8 @@ function LegacyTodayScreen() {
                 </Text>
                 <Text style={styles.reviewExplainerText}>
                   {isShopMember
-                    ? 'While we finish review, you can scan bottles with camera recognition or ask Derive any skincare question.'
-                    : 'Personalized Scan is available with an active Derive membership.'}
+                    ? 'While we finish review, you can scan bottles with camera recognition or ask Shelv any skincare question.'
+                    : 'Personalized Scan is available with an active Shelv membership.'}
                 </Text>
               </View>
             </View>

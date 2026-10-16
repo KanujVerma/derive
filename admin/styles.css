@@ -24,7 +24,7 @@ button:disabled { cursor: wait; opacity: .58; }
 .site-shell { width: min(1380px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 64px; position: relative; }
 .login-card { width: min(520px, 100%); margin: 8vh auto; padding: 48px; border: 1px solid var(--line); border-radius: 30px; background: var(--surface); backdrop-filter: blur(28px); box-shadow: var(--shadow); }
 .wordmark { display: flex; align-items: center; gap: 10px; font-size: 13px; letter-spacing: .18em; font-weight: 760; }
-.wordmark span { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 50%; background: var(--mineral); color: white; font-family: Georgia, serif; font-size: 17px; letter-spacing: 0; }
+.wordmark img { display: block; width: 31px; height: 31px; object-fit: contain; }
 .eyebrow, .kicker { color: var(--mineral); letter-spacing: .14em; font-size: 11px; font-weight: 760; margin: 30px 0 9px; }
 h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; margin-top: 0; }
 h1 { font-size: clamp(40px, 6vw, 61px); line-height: .99; margin-bottom: 18px; letter-spacing: -.035em; }

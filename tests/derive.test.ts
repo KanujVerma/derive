@@ -1536,8 +1536,8 @@ test('I1-B4A Customer Copy: membership is $25 management; products are separate'
   assert.ok(!summary.includes('products included'), 'onboarding must not claim products are included');
   assert.ok(!summary.includes('OTC products'), 'onboarding must not imply bundled OTC products');
   assert.ok(profile.includes('purchased separately'));
-  assert.ok(orders.includes('separate from your Derive membership'));
-  assert.ok(refill.includes('separate from your Derive membership'));
+  assert.ok(orders.includes('separate from your Shelv membership'));
+  assert.ok(refill.includes('separate from your Shelv membership'));
   assert.ok(!combined.includes('$100'));
   assert.ok(!combined.includes('$129'));
   assert.ok(!combined.includes('$96'));
