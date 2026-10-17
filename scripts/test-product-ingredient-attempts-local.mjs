@@ -6,9 +6,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync, execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync, realpathSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { ingredientEdgeFixture, owner, otherOwner, rootId, parentId, photoPath, requestId } from '../tests/helpers/ingredient-panel-edge.ts';
 import { createFreeEvidenceProcessor } from '../src/presentation/capture/freeEvidenceProcessor.ts';
 import { createIngredientContinuationProcessor } from '../src/presentation/capture/ingredientContinuationProcessor.ts';
@@ -44,7 +45,10 @@ if (!localSupabase) {
 database = `ingredient_attempts_${Date.now()}_${process.pid}`;
 const createdDatabase = database; database = 'postgres';
 execFileSync(psql, [...args(), '-c', `create database ${createdDatabase}`], { env, stdio: 'pipe' }); database = createdDatabase;
-const artifact = join(root, '.local-artifacts/ingredient-server-20261017', database); mkdirSync(artifact, { recursive: true });
+// CI receipts must not dirty the source checkout used by later pinned harnesses.
+const artifact = localSupabase ? mkdtempSync(join(tmpdir(), 'shelv-ingredient-attempts-'))
+ : join(root, '.local-artifacts/ingredient-server-20261017', database);
+mkdirSync(artifact, { recursive: true });
 const table = (source, name) => { const start = source.indexOf(`create table public.${name} (`); assert.ok(start >= 0); return source.slice(start, source.indexOf('\n);', start) + 3); };
 const s6 = readFileSync(join(root, 'supabase/migrations/20260922220000_s6_product_identity_resolution.sql'), 'utf8');
 const truth = readFileSync(join(root, 'supabase/migrations/20260927010000_p0a_product_truth_snapshots.sql'), 'utf8');
