@@ -63,7 +63,7 @@ The parent subsequently authorized the seven pending visible-copy substitutions 
 
 ## Independent exact-head review follow-up
 
-A fresh review of PR200 at `5c7f8f1` found two Important issues that the earlier suite did not cover: an ingredient request UUID could later be reused by the ordinary case writer, and a same-Check link/catalog fallback could produce a second eligible root that the single-root guard rejected. Both failures were reproduced before correction.
+A fresh review of PR 200 at `5c7f8f1` found two Important issues that the earlier suite did not cover: an ingredient request UUID could later be reused by the ordinary case writer, and a same-Check link/catalog fallback could produce a second eligible root that the single-root guard rejected. Both failures were reproduced before correction.
 
 The scanner migration now adds a reciprocal `BEFORE INSERT` guard on `public.product_resolution_cases`. Both writers serialize the exact owner/request key; reservation takes this lock after its root/scan/session locks, preserving the continuation writer's ordering. Ordinary identity maps the SQL conflict to HTTP409. The existing case and text-continuation RPC definitions are not replaced.
 
@@ -73,7 +73,7 @@ The revised code passed independent review, a 12-test server suite, both typeche
 
 ## Hosted dependency handoff
 
-The sole scanner migration is `20261017120000_product_ingredient_panel_attempts.sql`. Apply the exact reviewed PR bytes, with the existing baseline already installed; the list below names object providers and is not a bootstrap subset of the full migration history.
+The scanner installation sequence is foundation `20261017120000_product_ingredient_panel_attempts.sql` (merged PR 200; SHA256 `9d5ceb0ec2d7a7af50797b1b13bed085514ba727686c8e584d5f84cd16d79f80`), then forward correction `20261017193748_product_ingredient_accounting_guards.sql` (SHA256 `5e70ea14ec051cb480650deccccb44971a3dc8d8d5b6caa767f3c41ee927f0db`). The foundation bytes stay unchanged. Install both before deploying the matching server bundles or using the new RPCs. The existing complete baseline must already be installed; the table below names object providers and is not a bootstrap subset of migration history.
 
 | Required existing provider | Scanner dependency |
 | --- | --- |
@@ -86,6 +86,29 @@ The sole scanner migration is `20261017120000_product_ingredient_panel_attempts.
 
 Runtime additionally retains `20260924020000_s_free_4_product_evidence.sql` (owner/role/path grants and upload RLS), `20260928000000_p0c_account_deletion_upload_fence.sql`, and indexed lookup migrations `20260929060000` / `20260929090000`. Barcode URL intake uses the existing link resolver; external DailyMed lookup remains separately gated and is not required for scanner accounting.
 
-New objects: three public tables (`product_ingredient_scan_sessions`, `product_ingredient_scan_aliases`, `product_ingredient_panel_attempts`), three public service-only RPCs (`bind_product_ingredient_scan`, `reserve_product_ingredient_panel`, `settle_product_ingredient_panel`), private trigger helper `guard_product_ingredient_request_namespace()`, and trigger `product_resolution_ingredient_request_guard` on existing cases. RLS/ACLs deny anonymous/authenticated access to the journals/RPCs. No new extension, provider secret, Storage bucket/policy, existing RPC replacement, or dependency on the separate later candidate migrations is introduced.
+New objects: three public tables (`product_ingredient_scan_sessions`, `product_ingredient_scan_aliases`, `product_ingredient_panel_attempts`), three public service-only RPCs (`bind_product_ingredient_scan`, `reserve_product_ingredient_panel`, `settle_product_ingredient_panel`), private trigger helper `guard_product_ingredient_request_namespace()`, and trigger `product_resolution_ingredient_request_guard` on existing cases. RLS/ACLs deny anonymous/authenticated access to the journals/RPCs. The forward correction replaces only the binder body with the same signature, security-invoker mode and retained execute ACL. Existing ordinary-case and text-continuation RPC definitions are preserved. No new extension, provider secret, Storage bucket/policy or dependency on the separate later candidate migrations is introduced.
 
 The staging owner must compare existing object definitions and migration ledger, detect same-name objects or a prior different scanner hash, install the passive SQL first, then deploy the matching `resolve-product-identity` / `resolve-product-link` bundles with shared helpers and client contracts together. New clients forward the scan UUID; deploy the server before releasing them. Keep capture/decoding off and read back service-only ACLs, trigger, aliases/lease behavior and flags-off HTTP smoke. Do not overwrite or reapply a differently installed migration under the same ID; coordinate any such state through the parent. Hosted readback, standalone native Deno checking and signed-device/recognition acceptance are not inferred from GitHub's ephemeral stack.
+
+
+## Forward correction after staging compatibility review
+
+PR 200 remains the merged disabled foundation at `0828e873b4352ee20bf06a8b34bbb77716f52664`. Staging had not installed its scanner migration when compatibility review identified two issues. S1 grants ALL to service_role by creator/schema default; later narrow GRANT statements did not subtract UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER (and PG17 MAINTAIN). Client roles were denied throughout. The earlier direct-alias immutability claim was therefore too strong under the actual defaults.
+
+Forward migration `20261017193748_product_ingredient_accounting_guards.sql` first revokes ALL from service_role on only the three scanner tables, then grants the operations used by the invoker RPCs:
+
+| Table | Required service-role operations |
+| --- | --- |
+| product_ingredient_scan_sessions | SELECT, INSERT, UPDATE (binding root/parent and row locks) |
+| product_ingredient_scan_aliases | SELECT, INSERT (lookup and ON CONFLICT insertion) |
+| product_ingredient_panel_attempts | SELECT, INSERT, UPDATE (reservation, expiry, settlement) |
+
+No runtime caller directly deletes these journals. Authorized parent/profile FK cascades perform erasure with the table owner's privileges and remain verified. Direct alias UPDATE and DELETE/reinsert are denied to service_role; parent cascades can still erase aliases. Global defaults, other roles/tables and the ordinary/text writer definitions are unchanged.
+
+The second issue was reproduced with the actual merged binder, table FKs, a genuinely new session and a current eligible root/parent. Before correction, both bind and reserve deadlocked (SQLSTATE 40P01) against physical profile deletion in both controlled transaction orders. BEFORE INSERT/AFTER DELETE test barriers and pg_blocking_pids capture the real wait graph. The native run also loaded the two exact staging profile statement-fence functions and their helper bodies from read-only LIVE_PRIVILEGES/LIVE_COMPATIBILITY evidence; those fences do not make the original binder acquire a profile lock first. Auth/Storage/catalog scaffolds and omitted unrelated personalization-erasure dependencies remain explicit limits.
+
+The binder now acquires the owner's profile FOR KEY SHARE before its root, scan/advisory and session locks. Binding admitted first completes, then erasure cascades its rows. Physical deletion admitted first completes, then binding fails with INGREDIENT_OWNER_UNAVAILABLE/23514 without leaving accounting. Reserve inherits this order through the binder. The original case eligibility, parent revision, origin alias, budget, namespace and lease checks remain. Marker-update fencing stays with the existing account lifecycle. The existing text-only continuation retains its pre-existing root-before-child-profile-FK ordering; this correction does not certify every continuation/deletion race.
+
+Native PostgreSQL 15 passes all 74 assertions (prior 66 plus 8 focused checks). A new 12-assertion pgTAP suite tests effective grants using server-supported ACL privilege enumeration, so PG17 MAINTAIN is included without sending unsupported privilege names to PG15. It also tests invoker/execute ACL retention, real service reservation/settlement, alias mutation denial and profile-cascade erasure. CI additionally runs the deterministic driver in a separate fresh database inside its verified local Supabase container. This fixture database coverage remains separate from the complete-schema pgTAP/HTTP suites. Exact-head CI status and independent review are recorded in the follow-up PR/ignored receipt.
+
+Hosted installation stays held for parent/database-task coordination and final evidence. Apply the unchanged foundation followed by this exact forward correction, then read back effective table privileges (including PG17 MAINTAIN), alias mutation denial and owner/root lock behavior with capture/provider defaults still off. Hosted/device/recognition acceptance remains separate. No hosted write, activation, provider call, local dependency/VM installation or history rewrite occurs in this follow-up.

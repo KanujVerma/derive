@@ -1,8 +1,12 @@
 # Shelv Cross-Agent Context Sync Ledger
 
+## 2026-10-17 — scanner forward ACL and physical-erasure correction
+
+Compatibility review of merged PR 200 found inherited service-role ALL grants and a first-bind/profile-cascade deadlock. Both were reproduced locally with exact S1 defaults; bind/reserve yielded 40P01 in both controlled orderings. Forward `20261017193748_product_ingredient_accounting_guards.sql` narrows effective privileges on only the three scanner tables and admits the owner profile before root/session locks. All74 native-PG assertions pass, including direct alias mutation denial and service-role cascade erasure. New 12-pgTAP and deterministic CI coverage target the actual default-ACL/physical-delete gaps. The [forward correction handoff](SCANNER_INGREDIENT_ATTEMPTS_LOCAL.md#forward-correction-after-staging-compatibility-review) limits claims to bind/reserve and records the unchanged pre-existing text-only continuation ordering. Foundation SQL remains unchanged; hosted installation and recognition stay gated.
+
 ## 2026-10-17 — independent scanner review corrections
 
-A fresh PR200 review identified cross-route request-ID reuse and rejection of a later same-Check fallback identity. Both were reproduced and corrected with reciprocal owner/request SQL serialization and immutable-origin budget sharing for secondary roots. The original deletion anchor and all owner/parent/lease fences remain. The revised implementation passed independent review, 66 native-PG assertions and the 12-test server suite; updated full HTTP/24-pgTAP regressions belong to revised exact-head CI. [Hosted dependency handoff](SCANNER_INGREDIENT_ATTEMPTS_LOCAL.md#hosted-dependency-handoff) identifies prior schemas/RPCs and the new case INSERT guard so the parent can coordinate with the separate staging migration owner. No hosted write, flag change, provider call or merge occurs.
+A fresh PR 200 review identified cross-route request-ID reuse and rejection of a later same-Check fallback identity. Both were reproduced and corrected with reciprocal owner/request SQL serialization and immutable-origin budget sharing for secondary roots. The original deletion anchor and all owner/parent/lease fences remain. The revised implementation passed independent review, 66 native-PG assertions and the 12-test server suite; updated full HTTP/24-pgTAP regressions belong to revised exact-head CI. [Hosted dependency handoff](SCANNER_INGREDIENT_ATTEMPTS_LOCAL.md#hosted-dependency-handoff) identifies prior schemas/RPCs and the new case INSERT guard so the parent can coordinate with the separate staging migration owner. No hosted write, flag change, provider call or merge occurs.
 
 ## 2026-10-17 — renamed-checkout scanner validation and branding-main candidate
 

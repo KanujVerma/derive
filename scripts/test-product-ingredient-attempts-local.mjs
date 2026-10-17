@@ -1,9 +1,10 @@
 // Run with Node 22 --experimental-strip-types, against a task-owned stock-PG
-// cluster on a private Unix socket. This never connects to Supabase or TCP.
+// cluster on a private Unix socket, or --supabase-local for a fresh database
+// inside the verified local test container. Neither mode targets hosted/TCP.
 // Auth/Storage and the existing catalog tables are explicit synthetic scaffolds;
 // the new migration, row locks, RPCs, ACLs and FK cascades are real PostgreSQL.
 import assert from 'node:assert/strict';
-import { execFileSync, execFile } from 'node:child_process';
+import { execFileSync, execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFileSync, writeFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -17,18 +18,32 @@ import { resolveCatalogIdentity, continueCatalogIngredients } from '../src/servi
 import { verifiedProductTruth } from '../src/fixtures/product-truth/snapshots.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const localSupabase = process.argv[2] === '--supabase-local';
 const socket = process.argv[2], port = process.argv[3];
-assert.ok(socket?.startsWith('/tmp/derive-ingredient-pg-'), 'Explicit task-owned Unix socket is required');
-assert.match(port ?? '', /^\d{4,5}$/);
-const psql = process.env.DERIVE_TEST_PSQL ?? 'psql';
+let container;
+if (localSupabase) {
+ const status = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }));
+ assert.equal(status.API_URL, 'http://127.0.0.1:54321', 'Refuse a hosted or unexpected Supabase target');
+ const project = readFileSync(join(root, 'supabase/config.toml'), 'utf8').match(/^project_id = "([a-zA-Z0-9_-]+)"/m)?.[1];
+ assert.ok(project, 'Explicit local project required');
+ container = `supabase_db_${project}`;
+ assert.ok(execFileSync('docker', ['ps', '--format', '{{.Names}}'], { encoding: 'utf8' }).split('\n').includes(container));
+} else {
+ assert.ok(socket?.startsWith('/tmp/derive-ingredient-pg-'), 'Explicit task-owned Unix socket is required');
+ assert.match(port ?? '', /^\d{4,5}$/);
+}
+const psql = localSupabase ? 'docker' : process.env.DERIVE_TEST_PSQL ?? 'psql';
 const env = { PATH: process.env.PATH, PGAPPNAME: 'derive-ingredient-attempt-test', LC_ALL: 'C' };
 let database = 'postgres';
-const args = () => ['-X', '-At', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose', '-h', socket, '-p', port, '-U', 'postgres', '-d', database];
+const args = () => [...(localSupabase ? ['exec','-i','-e','PGAPPNAME',container,'psql'] : []), '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose', ...(localSupabase ? [] : ['-h',socket,'-p',port]), '-U','postgres','-d',database];
 const sql = text => execFileSync(psql, [...args(), '-c', text], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-const dataDirectory = realpathSync(sql('show data_directory'));
-assert.ok(dataDirectory.startsWith(join(realpathSync(root), '.local-artifacts/ingredient-server-')), 'Refusing a shared or non-task PostgreSQL cluster');
+if (!localSupabase) {
+ const dataDirectory = realpathSync(sql('show data_directory'));
+ assert.ok(dataDirectory.startsWith(join(realpathSync(root), '.local-artifacts/ingredient-server-')), 'Refusing a shared or non-task PostgreSQL cluster');
+}
 database = `ingredient_attempts_${Date.now()}_${process.pid}`;
-execFileSync(psql, ['-X', '-v', 'ON_ERROR_STOP=1', '-h', socket, '-p', port, '-U', 'postgres', '-d', 'postgres', '-c', `create database ${database}`], { env, stdio: 'pipe' });
+const createdDatabase = database; database = 'postgres';
+execFileSync(psql, [...args(), '-c', `create database ${createdDatabase}`], { env, stdio: 'pipe' }); database = createdDatabase;
 const artifact = join(root, '.local-artifacts/ingredient-server-20261017', database); mkdirSync(artifact, { recursive: true });
 const table = (source, name) => { const start = source.indexOf(`create table public.${name} (`); assert.ok(start >= 0); return source.slice(start, source.indexOf('\n);', start) + 3); };
 const s6 = readFileSync(join(root, 'supabase/migrations/20260922220000_s6_product_identity_resolution.sql'), 'utf8');
@@ -58,13 +73,18 @@ grant select,insert,update,delete on all tables in schema public to service_role
 `;
 writeFileSync(join(artifact, 'scaffold.sql'), scaffold);
 sql(scaffold);
+// Match the actual S1 creator/schema default before creating scanner tables.
+const s1 = readFileSync(join(root, 'supabase/migrations/202609160001_s1_auth_rls_private_storage.sql'), 'utf8');
+const defaultTableGrant = s1.match(/alter default privileges for role postgres in schema public\s+grant all on tables to service_role;/)?.[0];
+assert.ok(defaultTableGrant); sql(defaultTableGrant);
 // Exercise the existing real case writer, including its ON CONFLICT path.
 const writerStart = s6.indexOf('create or replace function public.record_product_resolution(');
 const writerEnd = s6.indexOf('create or replace function public.founder_resolve_product_identity(', writerStart);
 assert.ok(writerStart >= 0 && writerEnd > writerStart);
 sql(s6.slice(writerStart, writerEnd));
 const migration = join(root, 'supabase/migrations/20261017120000_product_ingredient_panel_attempts.sql');
-execFileSync(psql, [...args(), '-f', migration], { env, stdio: 'pipe' });
+sql(readFileSync(migration, 'utf8'));
+sql(readFileSync(join(root, 'supabase/migrations/20261017193748_product_ingredient_accounting_guards.sql'), 'utf8'));
 sql(`insert into public.profiles values ('${owner}'),('${otherOwner}');
  insert into public.products values ('${verifiedProductTruth.product.productId}');
  insert into public.product_variants values ('${verifiedProductTruth.product.variantId}');
@@ -253,8 +273,69 @@ sql(`delete from public.product_resolution_cases where id='${rootId}'`);
 check('root deletion cascades its session and attempts', () => { assert.equal(sql(`select count(*) from public.product_ingredient_scan_sessions where scope_id='${clientScope}'`), '0'); assert.equal(sql(`select count(*) from public.product_ingredient_panel_attempts where scope_id='${clientScope}'`), '0'); assert.equal(sql(`select count(*) from public.product_ingredient_scan_aliases where scope_id='${clientScope}'`), '0'); });
 sql(`delete from public.profiles where id='${otherOwner}'`);
 check('owner deletion cascades standalone accounting', () => { assert.equal(sql(`select count(*) from public.product_ingredient_scan_sessions where user_id='${otherOwner}'`), '0'); assert.equal(sql(`select count(*) from public.product_ingredient_panel_attempts where user_id='${otherOwner}'`), '0'); });
-const report = { database, assertions: checks.length, passed: checks, entrypointRpcCalls: f.calls.length,
+
+// Forward regressions use the same real RPCs/FKs and inherited S1 defaults.
+const followupFailures = [], concurrencyEvidence = [];
+const followupCheck = async (name, fn) => { try { await fn(); checks.push(name); } catch (error) { followupFailures.push({ name, error: String(error) }); } };
+const effective = name => sql(`select string_agg(acl.privilege_type,',' order by acl.privilege_type) from pg_class c cross join lateral aclexplode(acldefault('r',c.relowner)) acl where c.oid='public.${name}'::regclass and has_table_privilege('service_role',c.oid,acl.privilege_type)`);
+for (const [name, wanted] of [['product_ingredient_scan_sessions','INSERT,SELECT,UPDATE'],['product_ingredient_scan_aliases','INSERT,SELECT'],['product_ingredient_panel_attempts','INSERT,SELECT,UPDATE']]) {
+ await followupCheck(`${name}: exact service privileges subtract inherited ALL`, async () => assert.equal(effective(name), wanted));
+}
+await followupCheck('service cannot rewrite an alias or delete it to recreate a mapping', async () => {
+ for (const change of [`update public.product_ingredient_scan_aliases set scope_id=scope_id where user_id='${owner}'`, `delete from public.product_ingredient_scan_aliases where user_id='${owner}'`]) {
+  assert.throws(() => sql(`set role service_role; ${change}`), error => /42501/.test(String(error.stderr)));
+ }
+});
+const until = async (test, description) => {
+ const deadline = Date.now() + 10_000;
+ while (Date.now() < deadline) { if (test()) return; await new Promise(resolve => setTimeout(resolve, 15)); }
+ throw new Error(`Barrier timed out: ${description}`);
+};
+const worker = (label, work) => asyncExec(psql, [...args(), '-c', `set statement_timeout='15s'; ${work}`], { env: { ...env, PGAPPNAME: label }, encoding: 'utf8' })
+ .then(({stdout}) => ({ ok: true, stdout }), error => ({ ok: false, code: String(error.stderr).match(/\b(?:40P01|23514|23503|42501|57014|55P03)\b/)?.[0], stderr: String(error.stderr) }));
+const beginGate = async (label, key) => {
+ const process = spawn(psql, args(), { env: { ...env, PGAPPNAME: label }, stdio: ['pipe','pipe','pipe'] });
+ let output = '', errors = ''; process.stdout.on('data', chunk => { output += chunk; }); process.stderr.on('data', chunk => { errors += chunk; });
+ const done = new Promise(resolve => process.on('close', code => resolve({code, errors})));
+ process.stdin.write(`begin; select pg_advisory_xact_lock(${key}::bigint);\n\\echo INGREDIENT_GATE_READY\n`);
+ await until(() => { assert.equal(process.exitCode, null, errors); return output.includes('INGREDIENT_GATE_READY'); }, 'controller owns gate');
+ return { release: async () => { process.stdin.end('commit;\n'); assert.equal((await done).code, 0, errors); } };
+};
+const pid = label => Number(sql(`select pid from pg_stat_activity where datname=current_database() and application_name='${label}'`));
+const blockedBy = (waiter, blocker) => sql(`select ${blocker}=any(pg_blocking_pids(${waiter}))`) === 't';
+for (const method of ['bind','reserve']) for (const deletionFirst of [false,true]) {
+ const n = 5000 + concurrencyEvidence.length * 20, user = requestId(n), rootCase = requestId(n+1), parent = requestId(n+2), scan = requestId(n+3), key = 910000 + n;
+ sql(`insert into public.profiles values ('${user}'); insert into public.product_resolution_cases(id,user_id,request_id,consumer,resolution_state,next_action,product_id,variant_id) values ('${rootCase}','${user}','${requestId(n+4)}','scan','identified_formula_unverified','photograph_ingredients','${verifiedProductTruth.product.productId}','${verifiedProductTruth.product.variantId}'); insert into public.product_truth_snapshots(id,user_id,case_id,case_revision,snapshot) values ('${parent}','${user}','${rootCase}',1,'{}');`);
+ const label = `ingredient_delete_${method}_${deletionFirst ? 'first' : 'last'}`, binderLabel = label+'_bind', deleteLabel=label+'_delete';
+ const gate = await beginGate(label+'_gate', key);
+ sql(`create function private.ingredient_test_gate() returns trigger language plpgsql as $$ begin perform pg_advisory_xact_lock(${key}::bigint); return ${deletionFirst ? 'old' : 'new'}; end $$; create trigger "000_ingredient_test_gate" ${deletionFirst ? `after delete on public.profiles for each row when (old.id='${user}')` : `before insert on public.product_ingredient_scan_sessions for each row when (new.user_id='${user}')`} execute function private.ingredient_test_gate();`);
+ const bindWork = method === 'bind' ? statement('bind_product_ingredient_scan', {p_user_id:user,p_scan_session_id:scan,p_root_case_id:rootCase,p_parent_snapshot_id:parent}) : statement('reserve_product_ingredient_panel', reserve(scan,n+5,{p_user_id:user,p_root_case_id:rootCase,p_parent_snapshot_id:parent}));
+ let first, second, observation;
+ try {
+  first = worker(deletionFirst ? deleteLabel : binderLabel, deletionFirst ? `set role service_role; delete from public.profiles where id='${user}';` : bindWork);
+  await until(() => { const id=pid(deletionFirst?deleteLabel:binderLabel); const controller=pid(label+'_gate'); return id && controller && blockedBy(id,controller); }, 'first transaction reached actual row/insert gate');
+  second = worker(deletionFirst ? binderLabel : deleteLabel, deletionFirst ? bindWork : `set role service_role; delete from public.profiles where id='${user}';`);
+  await until(() => { const a=pid(deletionFirst?binderLabel:deleteLabel), b=pid(deletionFirst?deleteLabel:binderLabel); return a && b && blockedBy(a,b); }, 'second transaction waits for first');
+  observation = JSON.parse(sql(`select json_agg(json_build_object('pid',pid,'application',application_name,'wait',wait_event,'blockers',pg_blocking_pids(pid))) from pg_stat_activity where datname=current_database() and application_name in ('${binderLabel}','${deleteLabel}','${label}_gate')`));
+ } finally { await gate.release(); }
+ const outcomes = await Promise.all([first,second]);
+ const binding = outcomes[deletionFirst?1:0], deletion=outcomes[deletionFirst?0:1];
+ concurrencyEvidence.push({method,deletionFirst,observation,binding,deletion});
+ sql(`drop trigger "000_ingredient_test_gate" on public.${deletionFirst?'profiles':'product_ingredient_scan_sessions'}; drop function private.ingredient_test_gate();`);
+ await followupCheck(`${method}: ${deletionFirst?'deletion':'binding'} first has no deadlock and leaves no accounting after deletion`, async () => {
+  assert.equal(deletion.ok, true, JSON.stringify(outcomes));
+  if (deletionFirst) { assert.equal(binding.ok,false); assert.equal(binding.code,'23514',JSON.stringify(outcomes)); } else assert.equal(binding.ok,true,JSON.stringify(outcomes));
+  assert.equal(sql(`select count(*) from public.profiles where id='${user}'`),'0');
+  for (const table of ['product_ingredient_scan_sessions','product_ingredient_scan_aliases','product_ingredient_panel_attempts']) assert.equal(sql(`select count(*) from public.${table} where user_id='${user}'`),'0');
+ });
+ // A red-run deadlock victim may retain the disposable fixture; clean only it.
+ sql(`delete from public.profiles where id='${user}'`);
+}
+
+const report = { database, backend: localSupabase ? 'verified local Supabase container, disposable scaffold database' : 'task-owned Unix-socket PostgreSQL', postgresVersion: sql('show server_version'), assertions: checks.length + followupFailures.length, passed: checks, failed: followupFailures, concurrencyEvidence, entrypointRpcCalls: f.calls.length,
  scopes: 'isolated stock PostgreSQL; actual new migration and resolver/client path; synthetic Auth/Storage/catalog dependency IDs',
  fullSupabaseReset: false, hosted: false, providerCalls: 0 };
 writeFileSync(join(artifact, 'verification.json'), JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
+
+assert.deepEqual(followupFailures, [], JSON.stringify(followupFailures, null, 2));
