@@ -1,5 +1,5 @@
 begin;
-select plan(20);
+select plan(24);
 select ok((select relrowsecurity from pg_class where oid='public.product_ingredient_scan_sessions'::regclass), 'sessions have RLS');
 select ok((select relrowsecurity from pg_class where oid='public.product_ingredient_panel_attempts'::regclass), 'attempts have RLS');
 select ok((select relrowsecurity from pg_class where oid='public.product_ingredient_scan_aliases'::regclass), 'aliases have RLS');
@@ -37,6 +37,17 @@ select is(public.reserve_product_ingredient_panel(
   'ac200000-0000-4000-8000-000000000001','ac200000-0000-4000-8000-000000000002',null,null,
   'ac200000-0000-4000-8000-000000000006',repeat('f',64),repeat('0',64))->>'decision','exhausted','third distinct submission is refused');
 select is((select count(*)::integer from public.product_ingredient_panel_attempts where user_id='ac200000-0000-4000-8000-000000000001'),2,'journal has only two charges');
+select throws_ok($$insert into public.product_resolution_cases(user_id,request_id,consumer,resolution_state,next_action)
+ values ('ac200000-0000-4000-8000-000000000001','ac200000-0000-4000-8000-000000000003','scan','insufficient_evidence','manual_review')$$,
+ '23505','INGREDIENT_REQUEST_CONFLICT','a panel UUID cannot later create an ordinary case');
+insert into public.product_resolution_cases(user_id,request_id,consumer,resolution_state,next_action)
+ values ('ac200000-0000-4000-8000-000000000001','ac200000-0000-4000-8000-000000000007','scan','insufficient_evidence','manual_review');
+select throws_ok($$select public.reserve_product_ingredient_panel('ac200000-0000-4000-8000-000000000001','ac200000-0000-4000-8000-000000000002',null,null,
+ 'ac200000-0000-4000-8000-000000000007',repeat('f',64),repeat('0',64))$$,
+ '23505','INGREDIENT_REQUEST_CONFLICT','an ordinary case UUID cannot reserve a panel');
+select ok(not has_function_privilege('authenticated','private.guard_product_ingredient_request_namespace()','execute'), 'authenticated cannot invoke the request guard');
+select ok(exists(select 1 from pg_trigger where tgrelid='public.product_resolution_cases'::regclass
+ and tgname='product_resolution_ingredient_request_guard' and not tgisinternal), 'ordinary case inserts enforce the shared namespace');
 delete from auth.users where id='ac200000-0000-4000-8000-000000000001';
 select is((select count(*)::integer from public.product_ingredient_panel_attempts where user_id='ac200000-0000-4000-8000-000000000001'),0,'owner erasure cascades journal');
 select * from finish();

@@ -164,3 +164,15 @@ test('busy and replay receipts replace a tentative local charge and preserve the
     assert.equal(retry.attempt, 2);
   }
 });
+
+
+test('ordinary identity rejects a request UUID already reserved by an ingredient attempt', async () => {
+  const f = ingredientEdgeFixture({ rpc: call => {
+    if (call.name === 'lookup_product_identity_exact_ids') return { data: [], error: null };
+    assert.equal(call.name, 'record_product_resolution');
+    return { data: null, error: { code: '23505' } };
+  } });
+  const response = await f.invoke({ requestId: requestId(501), consumer: 'scan', brand: 'Synthetic', productName: 'Request namespace' });
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, 'REQUEST_CONFLICT');
+});

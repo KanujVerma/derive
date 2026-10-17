@@ -137,7 +137,8 @@ try {
   assert.ifError(rootRead.error); assert.deepEqual(rootRead.data.snapshot, original);
   assert.doesNotMatch(JSON.stringify(continued.data.truthSnapshot), /internal:\/\/|storagePath|Water, Glycerin/);
 
-  const secondRoot = await invoke(a, { requestId: randomUUID(), consumer: 'scan',
+  const secondRootRequestId = randomUUID();
+  const secondRoot = await invoke(a, { requestId: secondRootRequestId, consumer: 'scan',
     barcode: '012345678905' });
   assert.ifError(secondRoot.error);
   const grant = await a.functions.invoke('prepare-free-product-evidence', {
@@ -156,23 +157,38 @@ try {
   assert.equal(photoOnly.data.outcome, 'unavailable');
   assert.equal(photoOnly.data.attemptsUsed, 1);
   assert.equal(photoOnly.data.truthSnapshot, undefined);
+  const collision = await invoke(a, { requestId: photoRequest.requestId, consumer: 'scan', barcode: '012345678905' });
+  assert.equal(collision.error?.context?.status, 409, 'ordinary identity cannot take a panel request UUID');
+  const caseThenPhoto = await invoke(a, { ...photoRequest, requestId: secondRootRequestId });
+  assert.equal(caseThenPhoto.error?.context?.status, 409, 'a case request UUID cannot reserve a panel');
   const photoReplay = await invoke(a, photoRequest);
   assert.ifError(photoReplay.error); assert.deepEqual(photoReplay.data, photoOnly.data);
   const duplicate = await invoke(a, { ...photoRequest, requestId: randomUUID() });
   assert.ifError(duplicate.error); assert.equal(duplicate.data.attemptsUsed, 1);
+  const fallback = await invoke(a, { requestId: randomUUID(), consumer: 'scan', scanSessionId,
+    barcode: '012345678905', barcodeSource: 'member_input' });
+  assert.ifError(fallback.error);
+  assert.equal(fallback.data.state, 'identified_formula_unverified');
+  assert.notEqual(fallback.data.caseId, secondRoot.data.caseId, 'link/catalog fallback can create another identity in the same Check');
   const retakeGrant = await a.functions.invoke('prepare-free-product-evidence', {
     body: { requestId: randomUUID(), role: 'ingredients', mimeType: 'image/jpeg' },
   });
   assert.ifError(retakeGrant.error); photoPaths.push(retakeGrant.data.storagePath);
   assert.ifError((await a.storage.from('customer-product-evidence').upload(retakeGrant.data.storagePath,
     Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 3, 4]), { contentType: 'image/jpeg', upsert: false })).error);
-  const retake = await invoke(a, { ...photoRequest, requestId: randomUUID(),
+  const resumedScanSessionId = randomUUID();
+  const retake = await invoke(a, { ...photoRequest, requestId: randomUUID(), scanSessionId: resumedScanSessionId,
+    rootCaseId: fallback.data.caseId, parentSnapshotId: fallback.data.truthSnapshot.snapshotId,
     evidencePhoto: { role: 'ingredients', storagePath: retakeGrant.data.storagePath } });
   assert.ifError(retake.error); assert.equal(retake.data.attemptsUsed, 2); assert.equal(retake.data.outcome, 'exhausted');
   assert.deepEqual(retake.data.fallbackActions, ['product_link', 'verified_catalog', 'retry_later']);
   assert.doesNotMatch(JSON.stringify(retake.data), /storagePath|[.]jpg|formula|review/);
   const noChild = await admin.from('product_resolution_continuations').select('id').eq('root_case_id', secondRoot.data.caseId);
   assert.ifError(noChild.error); assert.equal(noChild.data.length, 0);
+  const exhaustedOriginal = await invoke(a, { ...photoRequest, requestId: randomUUID() });
+  assert.ifError(exhaustedOriginal.error); assert.equal(exhaustedOriginal.data.attemptsUsed, 2); assert.equal(exhaustedOriginal.data.outcome, 'exhausted');
+  const fallbackChild = await admin.from('product_resolution_continuations').select('id').eq('root_case_id', fallback.data.caseId);
+  assert.ifError(fallbackChild.error); assert.equal(fallbackChild.data.length, 0);
   const typedRoot = await invoke(a, { requestId: randomUUID(), consumer: 'scan',
     brand: 'Fixture', productName: name, variantName: 'Original', regionCode: 'US' });
   assert.ifError(typedRoot.error);
@@ -184,7 +200,7 @@ try {
   assert.equal(typedContinuation.data.state, 'identified_formula_unverified',
     'typed product identity plus copied ingredients do not authenticate a package formula');
   assert.equal(typedContinuation.data.truthSnapshot.formula, null);
-  console.log('Same-Check continuation: auth, exact formula, retry/conflict, owner, immutable root, photo abstention passed');
+  console.log('Same-Check continuation: auth, exact formula, retry/conflict, owner, immutable root, photo abstention, cross-route request UUIDs and fallback-root continuity passed');
 } finally {
   if (photoPaths.length) await admin.storage.from('customer-product-evidence').remove(photoPaths);
   if (aId) await admin.auth.admin.deleteUser(aId);

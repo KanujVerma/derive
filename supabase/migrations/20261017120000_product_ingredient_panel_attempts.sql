@@ -55,6 +55,24 @@ alter table public.product_ingredient_panel_attempts enable row level security;
 revoke all on public.product_ingredient_scan_sessions, public.product_ingredient_panel_attempts from public, anon, authenticated;
 grant select, insert, update, delete on public.product_ingredient_scan_sessions, public.product_ingredient_panel_attempts to service_role;
 
+-- Case and panel writers share one owner/request namespace. The trigger also
+-- covers the existing immutable text-continuation writer without replacing it.
+create function private.guard_product_ingredient_request_namespace()
+returns trigger language plpgsql security invoker set search_path = '' as $$
+begin
+  perform pg_advisory_xact_lock(hashtextextended('ingredient-request:' || new.user_id::text || ':' || new.request_id::text, 0));
+  if exists (select 1 from public.product_ingredient_panel_attempts
+    where user_id = new.user_id and request_id = new.request_id) then
+    raise exception 'INGREDIENT_REQUEST_CONFLICT' using errcode = '23505';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function private.guard_product_ingredient_request_namespace() from public, anon, authenticated;
+grant execute on function private.guard_product_ingredient_request_namespace() to service_role;
+create trigger product_resolution_ingredient_request_guard before insert on public.product_resolution_cases
+  for each row execute function private.guard_product_ingredient_request_namespace();
+
 -- Register scan/root continuity before returning an eligible identity result.
 -- This reserves no ingredient slot. Reservation calls the same binder so the
 -- lock order and alias handling stay identical on every entry path.
@@ -66,6 +84,7 @@ declare
   alias_scope uuid;
   root_scope uuid;
   origin_scan_id uuid;
+  trusted_origin boolean := false;
   origin_scope uuid;
   request_lock bigint;
   origin_lock bigint;
@@ -92,6 +111,7 @@ begin
     select (evidence_snapshot->>'ingredientScanSessionId')::uuid into origin_scan_id
       from public.product_resolution_cases where id = p_root_case_id and user_id = p_user_id;
   end if;
+  trusted_origin := origin_scan_id is not null;
   origin_scan_id := coalesce(origin_scan_id, p_scan_session_id);
   -- This key also covers an alias that has not been inserted yet. A root-bound
   -- request and a root-free request for the same client UUID cannot race to
@@ -123,9 +143,17 @@ begin
     if session_row.root_case_id is null then
       update public.product_ingredient_scan_sessions set root_case_id = p_root_case_id, parent_snapshot_id = p_parent_snapshot_id
         where user_id = p_user_id and scope_id = scope returning * into session_row;
-    elsif session_row.root_case_id <> p_root_case_id or session_row.parent_snapshot_id <> p_parent_snapshot_id then
+    elsif session_row.root_case_id = p_root_case_id then
+      if session_row.parent_snapshot_id <> p_parent_snapshot_id then
+        raise exception 'INGREDIENT_SESSION_CONFLICT' using errcode = '23505';
+      end if;
+    elsif not trusted_origin or origin_scope is distinct from scope then
       raise exception 'INGREDIENT_SESSION_CONFLICT' using errcode = '23505';
     end if;
+    -- A link/catalog fallback can produce another eligible identity in the
+    -- same logical Check. Its immutable S6 origin must identify this exact
+    -- existing budget. Keep the original root as the canonical deletion anchor.
+
   end if;
   insert into public.product_ingredient_scan_aliases (user_id, scan_session_id, scope_id)
     values (p_user_id, p_scan_session_id, scope), (p_user_id, origin_scan_id, scope) on conflict do nothing;
@@ -147,6 +175,8 @@ begin
     raise exception 'INVALID_INGREDIENT_ATTEMPT' using errcode = '23514';
   end if;
   scope := public.bind_product_ingredient_scan(p_user_id,p_scan_session_id,p_root_case_id,p_parent_snapshot_id);
+  -- Root -> scan/session -> request matches the continuation writer's order.
+  perform pg_advisory_xact_lock(hashtextextended('ingredient-request:' || p_user_id::text || ':' || p_request_id::text, 0));
   if p_root_case_id is not null and (
     exists (select 1 from public.product_resolution_continuations where root_case_id = p_root_case_id)
     or exists (select 1 from public.product_resolution_evidence where case_id = p_root_case_id
@@ -195,6 +225,7 @@ create function public.settle_product_ingredient_panel(
 declare
   scope uuid;
   session_row public.product_ingredient_scan_sessions;
+  root_row public.product_resolution_cases;
   prior public.product_ingredient_panel_attempts;
   used integer;
 begin
@@ -204,7 +235,8 @@ begin
     raise exception 'INVALID_INGREDIENT_SETTLEMENT' using errcode = '23514';
   end if;
   if p_root_case_id is not null then
-    perform 1 from public.product_resolution_cases where id = p_root_case_id and user_id = p_user_id for update;
+    select * into root_row from public.product_resolution_cases
+      where id = p_root_case_id and user_id = p_user_id for update;
     if not found then raise exception 'INGREDIENT_PARENT_CONFLICT' using errcode = '23514'; end if;
   end if;
   select scope_id into scope from public.product_ingredient_scan_aliases
@@ -212,9 +244,17 @@ begin
   if not found then raise exception 'INGREDIENT_SESSION_CONFLICT' using errcode = '23514'; end if;
   select * into session_row from public.product_ingredient_scan_sessions
     where user_id = p_user_id and scope_id = scope for update;
-  if not found or (p_root_case_id is not null and (session_row.root_case_id is distinct from p_root_case_id
-    or session_row.parent_snapshot_id is distinct from p_parent_snapshot_id)) then
-    raise exception 'INGREDIENT_SESSION_CONFLICT' using errcode = '23514';
+  if not found then raise exception 'INGREDIENT_SESSION_CONFLICT' using errcode = '23514'; end if;
+  if p_root_case_id is not null and (session_row.root_case_id is distinct from p_root_case_id
+    or session_row.parent_snapshot_id is distinct from p_parent_snapshot_id) then
+    if session_row.root_case_id is null or session_row.root_case_id = p_root_case_id or not exists (
+      select 1 from public.product_truth_snapshots as parent
+        join public.product_ingredient_scan_aliases as origin on origin.user_id = p_user_id
+          and origin.scan_session_id::text = lower(root_row.evidence_snapshot->>'ingredientScanSessionId')
+          and origin.scope_id = scope
+        where parent.id = p_parent_snapshot_id and parent.case_id = root_row.id
+          and parent.user_id = p_user_id and parent.case_revision = root_row.truth_revision
+    ) then raise exception 'INGREDIENT_SESSION_CONFLICT' using errcode = '23514'; end if;
   end if;
   select * into prior from public.product_ingredient_panel_attempts
     where user_id = p_user_id and scope_id = scope and lease_id = p_lease_id;

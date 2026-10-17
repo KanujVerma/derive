@@ -59,3 +59,33 @@ Publication of this inactive boundary is distinct from hosted installation or sc
 ## Reserved branding composition
 
 The parent subsequently authorized the seven pending visible-copy substitutions from the branding task: one connection error in `app/_layout.tsx`, four customer/accessibility labels in `CheckProductScreen.tsx`, and two permission messages in `CameraCapture.tsx`. Only the company name changes from Derive to Shelv. The existing membership-copy test expectation is updated to match. Technical identifiers/imports, native module names and scanner semantics are preserved. This copy pass does not validate the legacy recognition wording or activate recognition.
+
+
+## Independent exact-head review follow-up
+
+A fresh review of PR200 at `5c7f8f1` found two Important issues that the earlier suite did not cover: an ingredient request UUID could later be reused by the ordinary case writer, and a same-Check link/catalog fallback could produce a second eligible root that the single-root guard rejected. Both failures were reproduced before correction.
+
+The scanner migration now adds a reciprocal `BEFORE INSERT` guard on `public.product_resolution_cases`. Both writers serialize the exact owner/request key; reservation takes this lock after its root/scan/session locks, preserving the continuation writer's ordering. Ordinary identity maps the SQL conflict to HTTP409. The existing case and text-continuation RPC definitions are not replaced.
+
+A later eligible root can share the same budget only when its immutable server-recorded `ingredientScanSessionId` resolves through an existing owner-bound alias to that exact scope. The original root remains the canonical deletion anchor. Secondary-root settlement independently validates owner, current parent revision, trusted origin and scope-owned lease. Missing origin, wrong owner/parent, conflicting prestarted scope and stale settlement remain refused. No new attempt slot, formula authority or provider producer is added.
+
+The revised code passed independent review, a 12-test server suite, both typechecks, bounded offline Edge checking and 66 real native-PostgreSQL assertions. The native run covers both cross-writer race orientations, owner isolation, root-A to fallback-B restart and combined exhaustion. The expanded 24-assertion pgTAP file and actual HTTP fallback/replay regressions require the revised exact-head CI result; PR validation and the ignored review receipt record that result separately. The earlier 684-assertion CI receipt applies to the old head only.
+
+## Hosted dependency handoff
+
+The sole scanner migration is `20261017120000_product_ingredient_panel_attempts.sql`. Apply the exact reviewed PR bytes, with the existing baseline already installed; the list below names object providers and is not a bootstrap subset of the full migration history.
+
+| Required existing provider | Scanner dependency |
+| --- | --- |
+| `20260915_init.sql` | `public.profiles(id)` owner FK and normal Auth/profile lifecycle |
+| `202609160001_s1_auth_rls_private_storage.sql` | Existing `private` schema, Supabase Auth/roles/private-storage baseline |
+| `20260919011000_s2_core_domain_persistence.sql` | Existing immutable-snapshot helper used by the prior S6/P0-A chain |
+| `20260922220000_s6_product_identity_resolution.sql` | Cases/evidence, case writer, catalog/variant/formula FKs, private evidence bucket |
+| `20260927010000_p0a_product_truth_snapshots.sql` | `truth_revision`, truth snapshots/current parent revision and immutable case-origin metadata |
+| `20260929070000_product_check_ingredient_continuation.sql` | Existing continuation table and text-only writer/root lock order |
+
+Runtime additionally retains `20260924020000_s_free_4_product_evidence.sql` (owner/role/path grants and upload RLS), `20260928000000_p0c_account_deletion_upload_fence.sql`, and indexed lookup migrations `20260929060000` / `20260929090000`. Barcode URL intake uses the existing link resolver; external DailyMed lookup remains separately gated and is not required for scanner accounting.
+
+New objects: three public tables (`product_ingredient_scan_sessions`, `product_ingredient_scan_aliases`, `product_ingredient_panel_attempts`), three public service-only RPCs (`bind_product_ingredient_scan`, `reserve_product_ingredient_panel`, `settle_product_ingredient_panel`), private trigger helper `guard_product_ingredient_request_namespace()`, and trigger `product_resolution_ingredient_request_guard` on existing cases. RLS/ACLs deny anonymous/authenticated access to the journals/RPCs. No new extension, provider secret, Storage bucket/policy, existing RPC replacement, or dependency on the separate later candidate migrations is introduced.
+
+The staging owner must compare existing object definitions and migration ledger, detect same-name objects or a prior different scanner hash, install the passive SQL first, then deploy the matching `resolve-product-identity` / `resolve-product-link` bundles with shared helpers and client contracts together. New clients forward the scan UUID; deploy the server before releasing them. Keep capture/decoding off and read back service-only ACLs, trigger, aliases/lease behavior and flags-off HTTP smoke. Do not overwrite or reapply a differently installed migration under the same ID; coordinate any such state through the parent. Hosted readback, standalone native Deno checking and signed-device/recognition acceptance are not inferred from GitHub's ephemeral stack.

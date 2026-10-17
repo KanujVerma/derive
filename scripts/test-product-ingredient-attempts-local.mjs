@@ -42,6 +42,8 @@ do $$ begin
 end $$;
 -- Only these dependency IDs are scaffolds. Existing case/snapshot/continuation
 -- and evidence table definitions are taken verbatim from repository migrations.
+create schema private;
+grant usage on schema private to service_role;
 create table public.profiles(id uuid primary key);
 create table public.products(id uuid primary key);
 create table public.product_variants(id uuid primary key);
@@ -56,6 +58,11 @@ grant select,insert,update,delete on all tables in schema public to service_role
 `;
 writeFileSync(join(artifact, 'scaffold.sql'), scaffold);
 sql(scaffold);
+// Exercise the existing real case writer, including its ON CONFLICT path.
+const writerStart = s6.indexOf('create or replace function public.record_product_resolution(');
+const writerEnd = s6.indexOf('create or replace function public.founder_resolve_product_identity(', writerStart);
+assert.ok(writerStart >= 0 && writerEnd > writerStart);
+sql(s6.slice(writerStart, writerEnd));
 const migration = join(root, 'supabase/migrations/20261017120000_product_ingredient_panel_attempts.sql');
 execFileSync(psql, [...args(), '-f', migration], { env, stdio: 'pipe' });
 sql(`insert into public.profiles values ('${owner}'),('${otherOwner}');
@@ -177,6 +184,71 @@ sql(`insert into public.product_resolution_cases (id,user_id,request_id,consumer
 const resumedBeforeBind = rawRpc('reserve_product_ingredient_panel', reserve(crashClient, 15, { p_root_case_id: crashRoot, p_parent_snapshot_id: crashParent }));
 check('restart before first continuation uses identity-creation metadata to retain the earlier charge', () => assert.equal(resumedBeforeBind.attemptsUsed, 2));
 check('crash before noncharging bind still aliases both original and resumed client UUIDs', () => assert.equal(sql(`select count(*) from public.product_ingredient_scan_aliases where scope_id='${crashScope}' and scan_session_id in ('${crashScope}','${crashClient}')`), '2'));
+// Exact-head review regressions: distinct writers must share one request namespace,
+// and a later eligible identity in the same logical Check must retain its budget.
+const reviewFailures = [];
+const reviewCheck = async (name, fn) => { try { await fn(); checks.push(name); } catch (error) { reviewFailures.push({ name, error: String(error) }); } };
+const caseSql = (n, user = owner) => `set role service_role; select (public.record_product_resolution('${user}','${requestId(n)}','scan','insufficient_evidence','manual_review',false,null,null,null,'{}','[]','[]')).id;`;
+const expectConflict = fn => assert.throws(fn, error => /23505/.test(String(error.stderr)));
+await reviewCheck('a photo request UUID cannot later create an ordinary case', async () => {
+ const attempt = rawRpc('reserve_product_ingredient_panel', reserve(requestId(3000), 3001)); settle(requestId(3000), attempt.leaseId);
+ expectConflict(() => sql(caseSql(3001)));
+ assert.equal(rawRpc('reserve_product_ingredient_panel', reserve(requestId(3000), 3001)).decision, 'replayed');
+});
+await reviewCheck('an ordinary case request UUID cannot reserve an ingredient slot', async () => {
+ sql(caseSql(3002)); expectConflict(() => rawRpc('reserve_product_ingredient_panel', reserve(requestId(3003), 3002)));
+});
+await reviewCheck('cross-writer UUID exclusion remains owner-scoped', async () => {
+ const attempt = rawRpc('reserve_product_ingredient_panel', reserve(requestId(3004), 3005)); settle(requestId(3004), attempt.leaseId);
+ assert.match(sql(caseSql(3005, otherOwner)), /[0-9a-f-]{36}$/);
+});
+for (const caseFirst of [true, false]) await reviewCheck(`cross-writer race ${caseFirst ? 'case' : 'reservation'} first commits one namespace winner`, async () => {
+ const n = caseFirst ? 3010 : 3011, raceScope = requestId(n + 10), label = `ingredient_namespace_${n}`;
+ const caseWork = caseSql(n), reserveWork = statement('reserve_product_ingredient_panel', reserve(raceScope, n));
+ const firstWork = caseFirst ? caseWork : reserveWork, secondWork = caseFirst ? reserveWork : caseWork;
+ const first = asyncExec(psql, [...args(), '-c', `begin; ${firstWork} select pg_sleep(0.35); commit;`], { env: { ...env, PGAPPNAME: label }, encoding: 'utf8' });
+ let sleeping = false;
+ for (let i = 0; i < 100; i++) {
+  if (sql(`select exists(select 1 from pg_stat_activity where application_name='${label}' and wait_event='PgSleep')`) === 't') { sleeping = true; break; }
+  await new Promise(resolve => setTimeout(resolve, 10));
+ }
+ assert.ok(sleeping, 'First writer must hold its request namespace until the second starts');
+ const second = asyncExec(psql, [...args(), '-c', secondWork], { env, encoding: 'utf8' }).then(() => 'accepted', error => { assert.match(String(error.stderr), /23505/); return 'conflict'; });
+ await first; assert.equal(await second, 'conflict');
+ assert.equal(sql(`select (select count(*) from public.product_resolution_cases where user_id='${owner}' and request_id='${requestId(n)}') + (select count(*) from public.product_ingredient_panel_attempts where user_id='${owner}' and request_id='${requestId(n)}')`), '1');
+});
+const fallbackScope = requestId(4000), fallbackA = requestId(4001), fallbackB = requestId(4002), fallbackParentA = requestId(4003), fallbackParentB = requestId(4004), fallbackClient = requestId(4005);
+const makeRoot = (id, parent, n, origin = fallbackScope) => sql(`insert into public.product_resolution_cases(id,user_id,request_id,consumer,resolution_state,next_action,product_id,variant_id,evidence_snapshot) values ('${id}','${owner}','${requestId(n)}','scan','identified_formula_unverified','photograph_ingredients','${verifiedProductTruth.product.productId}','${verifiedProductTruth.product.variantId}',${origin ? `jsonb_build_object('ingredientScanSessionId','${origin}')` : "'{}'::jsonb"}); insert into public.product_truth_snapshots(id,user_id,case_id,case_revision,snapshot) values ('${parent}','${owner}','${id}',1,'{}');`);
+makeRoot(fallbackA, fallbackParentA, 4010); makeRoot(fallbackB, fallbackParentB, 4011);
+const fallbackBind = (root, parent, client = fallbackScope, user = owner) => ({ p_user_id: user, p_scan_session_id: client, p_root_case_id: root, p_parent_snapshot_id: parent });
+rawRpc('bind_product_ingredient_scan', fallbackBind(fallbackA, fallbackParentA));
+const fallbackFirst = rawRpc('reserve_product_ingredient_panel', reserve(fallbackScope, 4012, fallbackBind(fallbackA, fallbackParentA)));
+settle(fallbackScope, fallbackFirst.leaseId, 'unavailable', fallbackBind(fallbackA, fallbackParentA));
+await reviewCheck('fallback identity B shares the already-bound Check budget without rebinding canonical root A', async () => {
+ assert.equal(rawRpc('bind_product_ingredient_scan', fallbackBind(fallbackB, fallbackParentB)), fallbackScope);
+ assert.equal(sql(`select root_case_id from public.product_ingredient_scan_sessions where scope_id='${fallbackScope}'`), fallbackA);
+});
+await reviewCheck('restart on fallback root B has only the guided retake left and can settle its own parent', async () => {
+ const second = rawRpc('reserve_product_ingredient_panel', reserve(fallbackClient, 4013, fallbackBind(fallbackB, fallbackParentB, fallbackClient)));
+ assert.equal(second.attemptsUsed, 2);
+ expectConflict(() => rawRpc('bind_product_ingredient_scan', fallbackBind(fallbackB, fallbackParentB, requestId(3000))));
+ assert.throws(() => settle(fallbackClient, second.leaseId, 'unavailable', fallbackBind(fallbackB, fallbackParentA, fallbackClient)), error => /23514/.test(String(error.stderr)));
+ assert.equal(settle(fallbackClient, second.leaseId, 'unavailable', fallbackBind(fallbackB, fallbackParentB, fallbackClient)).attemptsUsed, 2);
+ assert.equal(settle(fallbackClient, second.leaseId, 'conflicting_evidence', fallbackBind(fallbackB, fallbackParentB, fallbackClient)).reason, 'unavailable');
+});
+await reviewCheck('both fallback roots and root-free aliased calls remain exhausted after two combined panels', async () => {
+ for (const [id, parent, client] of [[fallbackA, fallbackParentA, fallbackScope], [fallbackB, fallbackParentB, fallbackClient]]) assert.equal(rawRpc('reserve_product_ingredient_panel', reserve(client, 4014, fallbackBind(id, parent, client))).decision, 'exhausted');
+ assert.equal(rawRpc('reserve_product_ingredient_panel', reserve(fallbackClient, 4015)).decision, 'exhausted');
+ assert.equal(sql(`select count(*) from public.product_ingredient_panel_attempts where scope_id='${fallbackScope}'`), '2');
+});
+await reviewCheck('secondary-root binding rejects wrong owner, wrong parent and missing trusted origin', async () => {
+ assert.throws(() => rawRpc('bind_product_ingredient_scan', fallbackBind(fallbackB, fallbackParentB, fallbackScope, otherOwner)), error => /23514/.test(String(error.stderr)));
+ assert.throws(() => rawRpc('bind_product_ingredient_scan', fallbackBind(fallbackB, fallbackParentA)), error => /23514/.test(String(error.stderr)));
+ const otherRoot = requestId(4020), otherParent = requestId(4021); makeRoot(otherRoot, otherParent, 4022, null);
+ expectConflict(() => rawRpc('bind_product_ingredient_scan', fallbackBind(otherRoot, otherParent)));
+});
+assert.deepEqual(reviewFailures, [], JSON.stringify(reviewFailures, null, 2));
+
 sql(`delete from public.product_resolution_cases where id='${rootId}'`);
 check('root deletion cascades its session and attempts', () => { assert.equal(sql(`select count(*) from public.product_ingredient_scan_sessions where scope_id='${clientScope}'`), '0'); assert.equal(sql(`select count(*) from public.product_ingredient_panel_attempts where scope_id='${clientScope}'`), '0'); assert.equal(sql(`select count(*) from public.product_ingredient_scan_aliases where scope_id='${clientScope}'`), '0'); });
 sql(`delete from public.profiles where id='${otherOwner}'`);

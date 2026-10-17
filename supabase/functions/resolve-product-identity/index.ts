@@ -1035,6 +1035,9 @@ Deno.serve(async (req: Request) => {
       })),
     });
     if (saveError || !saved) {
+      if (saveError?.code === "23505") {
+        throw new ServiceError("REQUEST_CONFLICT", "This request ID belongs to different evidence", 409);
+      }
       console.error("record_product_resolution failed:", saveError?.code ?? "empty");
       throw new ServiceError("RESOLUTION_UNAVAILABLE", "Product resolution could not be saved", 500);
     }
