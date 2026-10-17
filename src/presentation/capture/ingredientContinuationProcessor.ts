@@ -1,6 +1,7 @@
 import type { ContinueProductIngredientsInput, ContinueProductIngredientsResult } from '../../contracts/ProductIdentityResolver.ts';
 import type { RequestedEvidenceAction } from '../check/result-sheet/model.ts';
 import { createFreeEvidenceProcessor } from './freeEvidenceProcessor.ts';
+import { IngredientPanelAttemptResponseError, parseIngredientPanelAttemptReceipt } from '../../contracts/IngredientPanelAttempt.ts';
 import type { CaptureEvidence } from './productEvidence.ts';
 
 type Dependencies = Omit<Parameters<typeof createFreeEvidenceProcessor>[0], 'resolve'> & {
@@ -15,8 +16,21 @@ export function createIngredientContinuationProcessor(action: RequestedEvidenceA
       if (!isCurrent()) throw new Error('Stale ingredient capture');
       const evidencePhoto = input.evidencePhotos?.find(photo => photo.role === 'ingredients');
       if (!evidencePhoto) throw new Error('Ingredient photo required');
-      const result = await deps.continueIngredients({ operation: 'continue_ingredients', requestId: input.requestId,
-        rootCaseId: action.binding.caseId, parentSnapshotId: action.binding.snapshotId, evidencePhoto });
+      const request: ContinueProductIngredientsInput = { operation: 'continue_ingredients', requestId: input.requestId,
+        ...(input.scanSessionId ? { scanSessionId: input.scanSessionId } : {}),
+        rootCaseId: action.binding.caseId, parentSnapshotId: action.binding.snapshotId, evidencePhoto };
+      let result: ContinueProductIngredientsResult;
+      try { result = await deps.continueIngredients(request); }
+      catch (error) {
+        if (!isCurrent()) throw new Error('Stale ingredient capture');
+        if (error instanceof IngredientPanelAttemptResponseError && request.scanSessionId) {
+          throw new IngredientPanelAttemptResponseError(parseIngredientPanelAttemptReceipt(error.receipt, {
+            requestId: request.requestId, scanSessionId: request.scanSessionId,
+            rootCaseId: request.rootCaseId, parentSnapshotId: request.parentSnapshotId,
+          }));
+        }
+        throw error;
+      }
       if (!isCurrent() || result.attemptId !== action.binding.caseId || result.attemptRevision !== 2
         || result.parentSnapshotId !== action.binding.snapshotId || result.caseId === action.binding.caseId
         || result.truthSnapshot?.resolutionCaseId !== result.caseId

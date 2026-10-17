@@ -29,6 +29,8 @@ export interface ResolveProductIdentityInput {
   /** Caller-generated UUID. Retries with the same value return the same case. */
   requestId: string;
   consumer: ProductResolutionConsumer;
+  /** Stable logical scan UUID, required when submitting an ingredient-panel photo. */
+  scanSessionId?: string;
   barcode?: string;
   /** Reported origin, not attestation. Links/typed codes must use member_input. */
   barcodeSource?: 'device_barcode' | 'member_input';
@@ -99,6 +101,8 @@ export interface ProductResolutionResult {
 /** Add ingredients to one existing Check. The original truth snapshot is never rewritten. */
 export interface ContinueProductIngredientsInput {
   operation: 'continue_ingredients';
+  /** Stable across guided retake/remounts; the server also caps the existing root. */
+  scanSessionId?: string;
   requestId: string;
   rootCaseId: string;
   parentSnapshotId: string;

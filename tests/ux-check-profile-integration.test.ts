@@ -178,3 +178,71 @@ for (const surface of ['entry', 'camera'] as const) {
     searchProps.controller.dispose();
   });
 }
+
+
+test('Check shares ingredient attempts across recovery remounts and resets only when opening a deliberate new scan', () => {
+  const context = previewModules();
+  context.modules['@/src/presentation/capture/capabilities'] = { CHECK_PHOTO_CAPTURE_ENABLED: true };
+  const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
+  flow.render(); press(control(flow.render(), 'Open camera'));
+  let capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  capture.props.onCaptureReady({ authority: 'customer_evidence', evidence: [{ kind: 'barcode', role: 'barcode', value: '036000291452' }],
+    barcodeLookup: { barcode: '036000291452' }, localPhotos: [], review: { state: 'pending', selectedCandidateId: null } });
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  const session = capture.props.ingredientPanels;
+  const initial = session.begin('initial-panel'); session.settle(initial, 'unreadable');
+  const photoAction = element(flow.render().find(node => node.type === 'CheckCaptureHost')!.props.companion.props.compactActions, 'Photograph package');
+  assert.ok(photoAction); photoAction.props.onPress();
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal(capture.props.ingredientPanels, session);
+  assert.equal(session.getState().attempts, 1);
+  const retake = session.begin('retake-panel'); session.settle(retake, 'incomplete_panel');
+  capture.props.onClose(); capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal(capture.props.ingredientPanels, session);
+  assert.equal(session.getState().phase, 'fallback');
+  assert.equal(capture.props.companion.props.onAddRequestedEvidence, undefined);
+  capture.props.onClose(); press(control(flow.render(), 'Open camera'));
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  assert.equal(capture.props.ingredientPanels, session);
+  assert.equal(session.getState().attempts, 0);
+  assert.equal(session.getState().phase, 'ready');
+  assert.deepEqual(capture.props.initialEvidence, []);
+  assert.equal(session.settle(retake, null), false);
+});
+
+
+test('new entry catalog selections and reopening begin distinct scan scopes, while a sheet close alone does not', async () => {
+  const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
+  flow.render(); press(control(flow.render(), 'Open camera'));
+  const capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  const session = capture.props.ingredientPanels;
+  capture.props.onClose();
+  const [sample] = await searchPreviewCatalog('CeraVe');
+  const scopes: string[] = [];
+  for (let repeat = 0; repeat < 3; repeat++) {
+    flow.render().find(node => node.type === 'CatalogProductSearch')!.props.onSelect(sample);
+    const scope = session.getScanSessionId(); scopes.push(scope);
+    const sheet = flow.render().find(node => node.type === 'CheckResultPresentation')!;
+    sheet.props.onClose(); flow.render();
+    assert.equal(session.getScanSessionId(), scope, 'dismissal alone does not replenish the ingredient allowance');
+  }
+  assert.equal(new Set(scopes).size, 3, 'each explicit customer Check selection can bind its own new root');
+});
+
+test('catalog and product-link recovery retain the charged ingredient scan scope', async () => {
+  const context = previewModules(); const flow = componentHarness('app/(tabs)/check.tsx', 'default', {}, context);
+  flow.render(); press(control(flow.render(), 'Open camera'));
+  let capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  const session = capture.props.ingredientPanels, scope = session.getScanSessionId();
+  const ticket = session.begin('file:///initial-panel.jpg'); session.settle(ticket, 'unreadable');
+  const [sample] = await searchPreviewCatalog('CeraVe');
+  capture.props.onCatalogSelect(sample); flow.render();
+  assert.equal(session.getScanSessionId(), scope); assert.equal(session.getState().attempts, 1);
+  capture = flow.render().find(node => node.type === 'CheckCaptureHost')!;
+  const frame = Object.getOwnPropertyDescriptor(globalThis, 'requestAnimationFrame');
+  Object.defineProperty(globalThis, 'requestAnimationFrame', { configurable: true, writable: true,
+    value: (callback: (time: number) => void) => { callback(0); return 0; } });
+  try { capture.props.onProductLink(); flow.render(); }
+  finally { if (frame) Object.defineProperty(globalThis, 'requestAnimationFrame', frame); else Reflect.deleteProperty(globalThis, 'requestAnimationFrame'); }
+  assert.equal(session.getScanSessionId(), scope); assert.equal(session.getState().attempts, 1);
+});

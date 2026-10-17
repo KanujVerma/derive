@@ -2,6 +2,7 @@ import type { CatalogProductDetail, CatalogProductSummary } from '../contracts/P
 import type { ContinueProductIngredientsInput, ContinueProductIngredientsResult, ProductResolutionResult, ResolveProductIdentityInput } from '../contracts/ProductIdentityResolver.ts';
 import { ProductCategorySchema } from '../types/schema.ts';
 import { supabase } from './supabase.ts';
+import { IngredientPanelAttemptResponseError, parseIngredientPanelAttemptReceipt } from '../contracts/IngredientPanelAttempt.ts';
 import { parseProductTruthSnapshot } from '../contracts/productTruthValidation.ts';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -72,6 +73,15 @@ export async function resolveCatalogIdentity(
   const { data, error } = await catalogClient(client).functions.invoke('resolve-product-identity', {
     body: input,
   });
+  if (!error && data?.kind === 'ingredient_panel_attempt') {
+    const hasPanel = 'consumer' in input ? input.consumer === 'scan' && input.evidencePhotos?.some(photo => photo.role === 'ingredients')
+      : input.evidencePhoto?.role === 'ingredients';
+    if (!hasPanel || !input.scanSessionId) throw new Error('Ingredient processing could not be confirmed');
+    throw new IngredientPanelAttemptResponseError(parseIngredientPanelAttemptReceipt(data, {
+      requestId: input.requestId, scanSessionId: input.scanSessionId,
+      ...('rootCaseId' in input ? { rootCaseId: input.rootCaseId, parentSnapshotId: input.parentSnapshotId } : {}),
+    }));
+  }
   if (error || !data || !RESOLUTION_STATES.has(data.state)
     || typeof data.caseId !== 'string' || !Array.isArray(data.candidates)
     || (data.product && !UUID.test(data.product.productId))) {

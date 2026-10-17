@@ -26,11 +26,13 @@ export function createProductLinkController(options: {
   createRequestId: () => string;
   /** Pin to the live Auth/access owner, including before React effects run. */
   getCurrentOwner?: () => string | null;
+  getScanSessionId?: () => string;
 }) {
   const transport = options.transport ?? resolveProductLink;
   const createRequestId = options.createRequestId;
   let state: ProductLinkView = Object.freeze({ ownerId: null, url: '', requestId: null, kind: 'idle', message: null });
   let sequence = 0;
+  let requestScanSessionId: string | undefined;
   const listeners = new Set<() => void>();
   const publish = (next: ProductLinkView) => {
     state = Object.freeze(next);
@@ -52,6 +54,7 @@ export function createProductLinkController(options: {
     publish({ ownerId: state.ownerId, url: '', requestId: null, kind: 'idle', message: null });
   };
   const submit = async (): Promise<ProductLinkIntakeResult | null> => {
+    if (state.kind === 'loading' && requestScanSessionId !== options.getScanSessionId?.()) reset();
     if (state.kind === 'loading') return null;
     const ownerId = state.ownerId;
     const url = state.url;
@@ -65,17 +68,20 @@ export function createProductLinkController(options: {
       publish({ ownerId, url, requestId: null, kind: 'error', code: 'INVALID_LINK', message: errorText.INVALID_LINK });
       return null;
     }
-    const requestId = state.requestId ?? createRequestId();
+    const scanSessionId = options.getScanSessionId?.();
+    const requestId = state.requestId && requestScanSessionId === scanSessionId ? state.requestId : createRequestId();
+    requestScanSessionId = scanSessionId;
     const requestSequence = ++sequence;
     const current = () => {
       if (sequence !== requestSequence || state.ownerId !== ownerId || state.url !== url) return false;
+      if (options.getScanSessionId?.() !== scanSessionId) { reset(); return false; }
       const currentOwner = options.getCurrentOwner ? options.getCurrentOwner() : state.ownerId;
       if (currentOwner !== ownerId) { setOwner(currentOwner); return false; }
       return true;
     };
     publish({ ownerId, url, requestId, kind: 'loading', message: null });
     try {
-      const result = await transport({ requestId, url });
+      const result = await transport({ requestId, url, ...(scanSessionId ? { scanSessionId } : {}) });
       if (!current()) return null;
       if (result.status === 'resolution') publish({ ownerId, url, requestId, kind: 'resolution', result, message: null });
       else if (result.status === 'label_candidate') publish({ ownerId, url, requestId, kind: 'label_candidate', result, message: labelText });

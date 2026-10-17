@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, LayoutAnimation, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { BlurView } from 'expo-blur';
@@ -17,6 +17,12 @@ import {
   captureRoles, createCaptureSession, nextPhotoRole, pendingCaptureProcessor, reduceCapture, toCaptureHandoff,
   type CaptureEvidence, type CaptureAction, type CaptureHandoff, type CaptureProcessor, type CaptureRole, type PhotoRole,
 } from '../../../presentation/capture/productEvidence';
+
+import { ingredientPanelGuidance, type IngredientPanelSession } from '../../../presentation/capture/ingredientPanelSession';
+import { IngredientPanelRecovery } from './IngredientPanelRecovery';
+
+const noPanelSubscription = () => () => {};
+const noPanelState = () => null;
 
 const roleLabels: Record<CaptureRole, string> = {
   barcode: 'Barcode', front_label: 'Front label', ingredients: 'Ingredients', packaging: 'Packaging',
@@ -45,11 +51,21 @@ interface Props {
   photoCaptureEnabled?: boolean;
   resumeKey?: number;
   onSearch?: () => void;
+  onProductLink?: () => void;
+  ingredientPanels?: IngredientPanelSession;
   catalogSearch?: (query: string) => Promise<CatalogProductSummary[]>;
   onCatalogSelect?: (product: CatalogProductSummary) => void;
 }
 
-export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, hostOwnsResults = false, initialEvidence = [], photoCaptureEnabled = CHECK_PHOTO_CAPTURE_ENABLED, resumeKey = 0, onSearch, catalogSearch, onCatalogSelect }: Props) {
+export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = pendingCaptureProcessor, initialRole = 'barcode', autoFinishBarcode = false, detectionPaused = false, hostOwnsResults = false, initialEvidence = [], photoCaptureEnabled = CHECK_PHOTO_CAPTURE_ENABLED, resumeKey = 0, onSearch, onProductLink, ingredientPanels, catalogSearch, onCatalogSelect }: Props) {
+  const panelState = useSyncExternalStore(ingredientPanels?.subscribe ?? noPanelSubscription, ingredientPanels?.getState ?? noPanelState);
+  const [retakingPanel, setRetakingPanel] = useState(false);
+  const retakingPanelRef = useRef(false);
+  const panelBlocked = () => {
+    const phase = ingredientPanels?.getState().phase;
+    return phase === 'fallback' || phase === 'retake' && !retakingPanelRef.current;
+  };
+  const panelRecoveryVisible = panelState?.phase === 'fallback' || panelState?.phase === 'retake' && !retakingPanel;
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
@@ -86,7 +102,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   const operations = useRef(createCaptureOperationGate()).current;
   const currentEvidence = intent === 'auto' ? undefined : session.evidence.find((item) => item.role === role);
   const capturedPhotos = session.evidence.filter((item) => item.kind === 'local_photo');
-  const liveBarcode = !detectionPaused && !notice && !currentEvidence && !previewUri
+  const liveBarcode = !panelRecoveryVisible && !detectionPaused && !notice && !currentEvidence && !previewUri
     && (intent === 'barcode' || (intent === 'auto' && capturedPhotos.length === 0));
 
   useEffect(() => {
@@ -151,7 +167,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
 
   const capturePhoto = async () => {
     const hasPhoto = currentSession.current.evidence.some((item) => item.kind === 'local_photo');
-    if (intent === 'barcode' || (intent === 'auto' && hasPhoto) || busy) return;
+    if (panelBlocked() || intent === 'barcode' || (intent === 'auto' && hasPhoto) || busy) return;
     await operations.run(async (isCurrent) => {
       setBusy(true);
       setError(null);
@@ -172,7 +188,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const usePhoto = () => {
-    if (!previewActive.current || !previewUri || !previewRole) return;
+    if (panelBlocked() || !previewActive.current || !previewUri || !previewRole) return;
     dispatchCapture({ type: 'photo', role: previewRole, uri: previewUri });
     setRole('barcode');
     setIntent('auto');
@@ -185,6 +201,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   };
 
   const onBarcode = ({ data, type }: BarcodeScanningResult) => {
+    if (panelBlocked()) return;
     if (!photoCaptureEnabled) {
       if (!mounted.current || !isObservedRetailBarcode(data, type) || !barcodeGate.observe(data, detectionPausedRef.current || operations.isBusy())) return;
     } else if (detectionPausedRef.current || !mounted.current || currentSession.current.phase !== 'collecting'
@@ -244,7 +261,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
   })).current;
 
   const processEvidence = async () => {
-    if (!mounted.current || !currentSession.current.evidence.length || currentSession.current.phase === 'processing') return;
+    if (panelBlocked() || !mounted.current || !currentSession.current.evidence.length || currentSession.current.phase === 'processing') return;
     await operations.run(async (isCurrent) => {
       const sequence = ++requestSequence.current;
       const evidence = currentSession.current.evidence;
@@ -269,6 +286,13 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         dispatchCapture({ type: 'resolved', result });
       } catch (cause) {
         if (!isCurrent() || sequence !== requestSequence.current) return;
+        const phase = ingredientPanels?.getState().phase;
+        if (phase === 'retake' || phase === 'fallback') {
+          retakingPanelRef.current = false;
+          setRetakingPanel(false);
+          setError(null);
+          return;
+        }
         const recovery = captureRecovery(cause);
         setCanRetry(recovery.canRetry);
         setCanCollectMore(recovery.canCollectMore);
@@ -294,7 +318,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
 
   return (
     <View style={styles.root}>
-      {permission?.granted && session.phase === 'collecting' && (!currentEvidence || hostOwnsResults && currentEvidence.kind === 'barcode') && !previewUri ? (
+      {!panelRecoveryVisible && permission?.granted && session.phase === 'collecting' && (!currentEvidence || hostOwnsResults && currentEvidence.kind === 'barcode') && !previewUri ? (
         <CameraView
           ref={camera}
           style={StyleSheet.absoluteFill}
@@ -321,7 +345,16 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
         </CameraGlass>
       </View>
 
-      {session.phase === 'collecting' && !permission?.granted ? (
+      {panelRecoveryVisible && panelState ? <IngredientPanelRecovery state={panelState}
+        onRetake={() => {
+          if (ingredientPanels?.getState().phase !== 'retake' || operations.isBusy()) return;
+          retakingPanelRef.current = true; setRetakingPanel(true); retakeRole('ingredients');
+        }}
+        onRetryLater={close}
+        onProductLink={onProductLink ? () => { if (mounted.current && ingredientPanels?.getState() === panelState) onProductLink(); } : undefined}
+        catalogSearch={catalogSearch}
+        onCatalogSelect={onCatalogSelect ? product => { if (mounted.current && ingredientPanels?.getState() === panelState) onCatalogSelect(product); } : undefined}
+      /> : session.phase === 'collecting' && !permission?.granted ? (
         <View style={styles.permissionCenter}>
           <Text style={styles.permissionTitle}>Camera access</Text>
           <Text style={styles.permissionText}>Use your camera to capture the package details you have.</Text>
@@ -388,7 +421,7 @@ export function ProductEvidenceCapture({ onClose, onEvidenceReady, processor = p
             </View>}
             {!previewUri && currentEvidence && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{roleLabels[role]} saved</Text></CameraGlass>}
             {!previewUri && !currentEvidence && intent === 'auto' && capturedPhotos.length === 0 && <Text style={styles.hint}>Hold the barcode steady in the frame.</Text>}
-            {!previewUri && !currentEvidence && intent !== 'auto' && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{prompts[role]}</Text></CameraGlass>}
+            {!previewUri && !currentEvidence && intent !== 'auto' && <CameraGlass style={styles.guidancePill}><Text style={styles.prompt}>{role === 'ingredients' && retakingPanel && panelState ? ingredientPanelGuidance(panelState.reason) : prompts[role]}</Text></CameraGlass>}
             {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
             {error && canRetry && <Action label="Retry evidence review" onPress={() => void processEvidence()} />}
             {error && !canCollectMore && <Action label="Close capture" onPress={close} />}

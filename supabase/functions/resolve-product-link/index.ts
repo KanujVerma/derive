@@ -21,7 +21,7 @@ Deno.serve((request: Request) => handleProductLink(request, {
     console.error('product link reservation failed:', error.code ?? 'unknown');
     throw new ServiceError('BUDGET_UNAVAILABLE', 'Label lookup is unavailable', 503);
   },
-  resolveBarcode: async (_identity, requestId, barcode, originalRequest) => {
+  resolveBarcode: async (_identity, requestId, barcode, originalRequest, scanSessionId) => {
     // Forward the caller's JWT; never invoke the owner-bound resolver with a
     // service-role token. The URL is trusted deployment config, not user input.
     const base = Deno.env.get('SUPABASE_URL') ?? '';
@@ -31,7 +31,7 @@ Deno.serve((request: Request) => handleProductLink(request, {
     const response = await fetch(destination, {
       method: 'POST', redirect: 'error',
       headers: { 'content-type': 'application/json', Authorization: originalRequest.headers.get('Authorization') ?? '', apikey: anonKey },
-      body: JSON.stringify(linkBarcodeResolutionInput(requestId, barcode)),
+      body: JSON.stringify(linkBarcodeResolutionInput(requestId, barcode, scanSessionId)),
       signal: AbortSignal.timeout(8_000),
     }).catch(() => { throw new ServiceError('RESOLUTION_UNAVAILABLE', 'Product resolution is unavailable', 503); });
     if (response.status === 429) throw new ServiceError('RATE_LIMITED', 'Product lookup is temporarily limited', 429);
