@@ -78,6 +78,9 @@ jobs:
       - name: Run Supabase pgTAP database tests
         run: supabase test db
 
+      - name: Verify scanner accounting ACL and deletion concurrency
+        run: node --experimental-strip-types scripts/test-product-ingredient-attempts-local.mjs --supabase-local
+
       - name: Run local integration E2E harness
         run: node scripts/test-i1-b1-local.mjs
 
