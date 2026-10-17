@@ -1,8 +1,10 @@
-# Derive design: Direction A / Mineral
+# Shelv design: Direction A / Mineral
+
+Current brand: **Shelv**, formerly Derive. [Branding and technical migration boundary](BRANDING.md) preserve existing integration identifiers and historical evidence.
 
 ## Current scanner-first contract
 
-Derive should help a person answer “Should I use this product?” before asking for optional context. Use warm ivory canvas, mineral-white content, dark ink and restrained Mineral green. Functional titles, labels, inputs and actions use system sans-serif. Existing managed-first references below are historical; they do not prescribe today's navigation, material implementation or questionnaire.
+Shelv should help a person answer “Should I use this product?” before asking for optional context. Use warm ivory canvas, mineral-white content, dark ink and restrained Mineral green. Functional titles, labels, inputs and actions use system sans-serif. Existing managed-first references below are historical; they do not prescribe today's navigation, material implementation or questionnaire.
 
 Keep Check home minimal: shared mark/title/Account header, Open camera, name search, separate product-link input and intentional whitespace. Current root tabs are Check, My Stuff, Plan and Shop. Account is a Back subpage. Preserve the accepted Managed Early Access offer, $25/month display hypothesis, products purchased separately and honest canonical waitlist state. Changing tabs, offers, prices or entitlements requires a product decision.
 
@@ -69,7 +71,7 @@ The existing expo-glass-effect package is sufficient. Camera-local BlurView plus
 
 Native tabs are evaluated only in an isolated compatibility prototype. Existing Router/navigation remains until state retention, legacy/target shell behavior, access-driven routes, insets, modal/camera presentation and physical accessibility are proven. A material correction does not authorize a navigation migration.
 
-See [the 2026-09-29 decision and question matrix](ux/UX_CONSISTENCY_2026_09_29.md) for inspected consumers, deferred authority gaps and acceptance gates. [Expo glass](https://docs.expo.dev/versions/latest/sdk/glass-effect/) documents runtime/accessibility checks; [Apple materials](https://developer.apple.com/design/human-interface-guidelines/materials) supplies the platform design anchor. Neither source proves Derive's runtime or clinical accuracy.
+See [the 2026-09-29 decision and question matrix](ux/UX_CONSISTENCY_2026_09_29.md) for inspected consumers, deferred authority gaps and acceptance gates. [Expo glass](https://docs.expo.dev/versions/latest/sdk/glass-effect/) documents runtime/accessibility checks; [Apple materials](https://developer.apple.com/design/human-interface-guidelines/materials) supplies the platform design anchor. Neither source proves Shelv's runtime or clinical accuracy.
 
 ---
 

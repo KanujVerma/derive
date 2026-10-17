@@ -238,8 +238,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
           <Text style={styles.permissionTitle}>Camera Access Required</Text>
           <Text style={styles.permissionSubtext}>
             {type === 'face'
-              ? 'Derive uses your front-facing camera to capture standardized baseline photos for your care review. Photos stay private to your care loop.'
-              : 'Derive uses your camera to scan skincare product bottles and recognize active ingredients.'}
+              ? 'Shelv uses your front-facing camera to capture standardized baseline photos for your care review. Photos stay private to your care loop.'
+              : 'Shelv uses your camera to scan skincare product bottles and recognize active ingredients.'}
           </Text>
 
           <View style={styles.permissionActions}>

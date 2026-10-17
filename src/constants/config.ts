@@ -1,12 +1,12 @@
 /**
- * Derive Brand & Service Configuration
+ * Shelv Brand & Service Configuration
  * Centralized to keep the brand identity configurable and uncoupled from code logic.
  */
 
 import { resolveSupportEmail } from '../utils/supportContact.ts';
 
 export const config = {
-  appName: 'Derive',
+  appName: 'Shelv',
   brandTagline: 'Your skincare, handled.',
   shortDescription: 'Managed personal skincare with continuous routine guidance and final quality check before activation.',
   /** Customer-facing Founding Beta display price (USD / month). Display/config only — Stripe/S5 owns charged money. */

@@ -15,7 +15,7 @@ export function PreviewShopShell() {
       <RootShellHeader title="Shop" />
       <View style={styles.content}>
         <Text style={styles.heading}>Coming soon</Text>
-        <Text style={styles.body}>Buying options for products you check with Derive.</Text>
+        <Text style={styles.body}>Buying options for products you check with Shelv.</Text>
         <Button label="Check a Product" variant="brand" onPress={() => router.push('/(tabs)/check')} style={styles.action} />
       </View>
     </View>

@@ -28,7 +28,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
     );
   }
 
-  // Derive Response
+  // Shelv Response
   return (
     <View style={[styles.container, styles.deriveContainer]}>
       <View

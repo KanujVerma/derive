@@ -1536,8 +1536,8 @@ test('I1-B4A Customer Copy: membership is $25 management; products are separate'
   assert.ok(!summary.includes('products included'), 'onboarding must not claim products are included');
   assert.ok(!summary.includes('OTC products'), 'onboarding must not imply bundled OTC products');
   assert.ok(profile.includes('purchased separately'));
-  assert.ok(orders.includes('separate from your Derive membership'));
-  assert.ok(refill.includes('separate from your Derive membership'));
+  assert.ok(orders.includes('separate from your Shelv membership'));
+  assert.ok(refill.includes('separate from your Shelv membership'));
   assert.ok(!combined.includes('$100'));
   assert.ok(!combined.includes('$129'));
   assert.ok(!combined.includes('$96'));
@@ -8573,7 +8573,7 @@ test('C1 Shop: non-member Scan entry and direct route are locked', () => {
   const scanContent = fs.readFileSync(path.resolve('src/components/check/CheckProductScreen.tsx'), 'utf8');
   assert.ok(shopContent.includes('Available with membership when enabled'));
   assert.ok(scanContent.includes("if (!targetShell && audience !== 'member')"));
-  assert.ok(scanContent.includes('Product checking requires Derive membership in supported releases.'));
+  assert.ok(scanContent.includes('Product checking requires Shelv membership in supported releases.'));
 });
 
 test('C1 Shop: Mock Ask handoff preserves the scanned verdict', async () => {

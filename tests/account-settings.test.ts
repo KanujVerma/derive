@@ -17,10 +17,10 @@ test('preview, anonymous, and permanent account settings stay distinct', () => {
   assert.equal(preview.showDelete, false);
 
   const anonymous = getAccountSettingsPresentation({ kind: 'anonymous' });
-  assert.equal(anonymous.accountTitle, 'Using Derive without an account');
+  assert.equal(anonymous.accountTitle, 'Using Shelv without an account');
   assert.match(anonymous.accountFooter ?? '', /may not be recoverable/);
   assert.equal(anonymous.showSignOut, false);
-  assert.equal(anonymous.deleteLabel, 'Delete Derive data');
+  assert.equal(anonymous.deleteLabel, 'Delete Shelv data');
 
   const permanent = getAccountSettingsPresentation({ kind: 'permanent', email: 'member@example.com' });
   assert.equal(permanent.accountTitle, 'member@example.com');
@@ -33,7 +33,7 @@ test('preview, anonymous, and permanent account settings stay distinct', () => {
   assert.equal(unsigned.accountSubtitle, '');
 });
 
-test('account links and version use the configured Derive surfaces', () => {
+test('account links and version use the configured Shelv surfaces', () => {
   const preview = read('src/components/account/PreviewAccountShell.tsx');
   const free = read('src/components/account/FreeAccountShell.tsx');
   const shell = read('src/components/account/AccountSettingsShell.tsx');
@@ -48,7 +48,7 @@ test('account links and version use the configured Derive surfaces', () => {
   assert.equal(publicLegalLinks.supportUrl, 'https://derive-beta-site.vercel.app/support');
   assert.match(shell, /expoConfig\?\.version/);
   assert.doesNotMatch(shell, /nativeApplicationVersion|nativeBuildVersion/);
-  assert.equal(deriveVersionLabel('1.0.0'), 'Derive 1.0.0');
+  assert.equal(deriveVersionLabel('1.0.0'), 'Shelv 1.0.0');
   assert.match(profile, /scanner_first_preview'\) return <PreviewAccountShell/);
   assert.match(profile, /FreeAccountShell/);
   assert.match(profile, /LegacyProfileScreen/);

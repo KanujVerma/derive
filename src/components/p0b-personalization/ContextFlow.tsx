@@ -134,7 +134,7 @@ export function ContextFlow({ initialDraft, relevance, contextQuestions = [], co
       </QuestionGroup>
     </View>}
     {extended && step === 4 && <View style={styles.questions}>
-      <QuestionGroup label="Anything else you'd like Derive to know?">
+      <QuestionGroup label="Anything else you'd like Shelv to know?">
         <TextInput style={styles.input} accessibilityLabel="Anything else" multiline placeholder="Anything we didn't cover." value={noteText} onChangeText={text => { setNoteText(text); setBundle(setAdditionalNote(currentBundle, text)); }} />
         <Text style={styles.copy}>Preview only. This note isn’t saved or used in a Check.</Text>
       </QuestionGroup>

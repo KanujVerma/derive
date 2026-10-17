@@ -199,7 +199,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     if (step === 'review_routine' || step === 'keep_current') { openDecisionEditor('routine'); return; }
     if (step === 'view_product_facts') { showNextStep('Review the formula details and remaining uncertainty for this same product.'); setFullResult(true); resultScroll.current?.scrollTo({ y: 0, animated: true }); return; }
     if (step === 'confirm_formula') { showNextStep('Review the formula details for this exact product. Confirm its package evidence before relying on a personal decision.'); setFullResult(true); resultScroll.current?.scrollTo({ y: 0, animated: true }); return; }
-    if (step === 'ask_clinician') { showNextStep('Bring this product formula, your routine, and the relevant caution to a qualified professional. Derive cannot review or change prescriptions.'); return; }
+    if (step === 'ask_clinician') { showNextStep('Bring this product formula, your routine, and the relevant caution to a qualified professional. Shelv cannot review or change prescriptions.'); return; }
     if (step === 'skip_product') { showNextStep('Keep this product out of your routine for now. You can check another product when ready.'); return; }
     showNextStep('Review the product facts and remaining uncertainty before deciding to use it.'); resultScroll.current?.scrollTo({ y: 0, animated: true });
   };
@@ -1072,7 +1072,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       <View style={[styles.container, { paddingTop: insets.top, paddingHorizontal: spacing.lg }]}>
         <Text style={styles.screenTitle}>Personalized Scan</Text>
         <Text style={{ color: colors.inkMuted, marginVertical: spacing.lg }}>
-          Product checking requires Derive membership in supported releases.
+          Product checking requires Shelv membership in supported releases.
         </Text>
         <Button label="Return to Shop" variant="secondary" size="medium" onPress={() => router.replace('/(tabs)/shop')} />
       </View>
@@ -1296,7 +1296,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
             <View style={[styles.verdictHighlight, { backgroundColor: verdictTone.bg, borderColor: verdictTone.border }]}>
               <Text
                 style={[styles.verdictHeadline, { color: verdictTone.text }]}
-                accessibilityLabel={`Derive fit: ${verdictLabel}`}
+                accessibilityLabel={`Shelv fit: ${verdictLabel}`}
               >
                 {verdictLabel.toUpperCase()}
               </Text>
@@ -1352,7 +1352,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           {/* ACTIONS */}
           <View style={styles.actionContainer}>
             <Button
-              label="Ask Derive About This"
+              label="Ask Shelv About This"
               variant="brand"
               size="large"
               icon={<Icon name="ask" size={18} color={colors.inkInverse} />}

@@ -30,12 +30,12 @@ export function buildTierLadderView(input: TierLadderInput): TierLadderView {
   return {
     tiers: [
       {
-        id: 'derive', name: 'Derive', summary: 'Personalized product intelligence',
+        id: 'derive', name: 'Shelv', summary: 'Personalized product intelligence',
         detail: 'Check a product with supported facts and guidance when evidence and your context allow it.',
         status: 'Free',
       },
       {
-        id: 'plus', name: 'Derive Plus', summary: 'More self-service insight across products',
+        id: 'plus', name: 'Shelv Plus', summary: 'More self-service insight across products',
         detail: 'Compare products and see how they fit together when these tools become available.',
         status: 'In development',
       },

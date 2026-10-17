@@ -1,4 +1,4 @@
-/** Member product acquisition. Merchant pages are external, never Derive orders. */
+/** Member product acquisition. Merchant pages are external, never Shelv orders. */
 import React from 'react';
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Button } from '../ui/Button';
@@ -15,7 +15,7 @@ interface Props {
   onRefill: () => void;
   productId: string;
   options: PurchaseOptionPresentation[];
-  /** C1.5C may supply a real checkout handler; absent means no Derive CTA. */
+  /** C1.5C may supply a real checkout handler; absent means no Shelv CTA. */
   onDeriveCheckout?: (option: PurchaseOptionPresentation) => void;
 }
 
@@ -43,7 +43,7 @@ export function ProductCommerceSection({ action, routineStatus, onRefill, produc
     : action === 'PAUSE'
     ? 'This product is on hold for now. No purchase is needed.'
     : action === 'STOP'
-    ? 'Derive recommends discontinuing this product. No purchase is needed.'
+    ? 'Shelv recommends discontinuing this product. No purchase is needed.'
     : 'Do not purchase more of this formula. Check your Plan for the recommended next step.';
 
   return (
@@ -61,7 +61,7 @@ export function ProductCommerceSection({ action, routineStatus, onRefill, produc
         <View key={option.listing.id} style={styles.option}>
           <TouchableOpacity
             accessibilityRole={option.merchant.kind === 'derive' ? 'button' : 'link'}
-            accessibilityLabel={option.merchant.kind === 'derive' ? 'Buy with Derive' : `View at ${option.merchant.displayName}, opens retailer site`}
+            accessibilityLabel={option.merchant.kind === 'derive' ? 'Buy with Shelv' : `View at ${option.merchant.displayName}, opens retailer site`}
             style={styles.optionButton}
             onPress={async () => {
               if (option.merchant.kind === 'derive') {
@@ -81,7 +81,7 @@ export function ProductCommerceSection({ action, routineStatus, onRefill, produc
                 <Text style={styles.offerProvenance}>{option.offer.provenance}</Text>
               </>}
             </View>
-            <Text style={styles.externalCue}>{option.merchant.kind === 'derive' ? 'Buy with Derive' : 'View ↗'}</Text>
+            <Text style={styles.externalCue}>{option.merchant.kind === 'derive' ? 'Buy with Shelv' : 'View ↗'}</Text>
           </TouchableOpacity>
           {failedListingId === (option.listing.id ?? option.merchant.id) && (
             <Text style={styles.linkError} accessibilityRole="alert">Could not open this retailer. Tap to try again.</Text>

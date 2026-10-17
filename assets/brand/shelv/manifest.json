@@ -1,0 +1,129 @@
+{
+  "source_folder": "shelv_corrected_geometry",
+  "source_readme": "originals/README.txt",
+  "source_geometry": "originals/geometry_spec.json",
+  "originals": [
+    {
+      "file": "README.txt",
+      "bytes": 1206,
+      "sha256": "35b985a9f66cde39a38b9478ce00abb0e690d2bf3ceec5ed957a86ed77ab9292"
+    },
+    {
+      "file": "geometry_spec.json",
+      "bytes": 889,
+      "sha256": "5810213b9c2c1cba54d99cf2c1a12a476e773170af27dd873b5269a8253ac0ca"
+    },
+    {
+      "file": "shelv_before_after.png",
+      "bytes": 81012,
+      "sha256": "62cfe74898eb1900b3d546838cfae011e8bfa62529f5a9f5b0c7fb0284e854fb"
+    },
+    {
+      "file": "shelv_inverted.svg",
+      "bytes": 896,
+      "sha256": "f037460e287e67d0de130b5b9c65243073852ae368c41aa3b7afa84d3928569a"
+    },
+    {
+      "file": "shelv_inverted_1024.png",
+      "bytes": 16719,
+      "sha256": "9574100042abd49e4ac3421ebfae9ee6b0d10c36f2161b540036e49c7b998ac8"
+    },
+    {
+      "file": "shelv_inverted_2048.png",
+      "bytes": 39775,
+      "sha256": "490fc72e31dfb501d4c0b12a2c4e134f0132565ccd8997481a6d9c60dd7186c0"
+    },
+    {
+      "file": "shelv_inverted_512.png",
+      "bytes": 7532,
+      "sha256": "ff53f40a83b61ed2eb98e6fbe387581141c7ee957487a12f4ddbedd16cec2696"
+    },
+    {
+      "file": "shelv_inverted_rounded_preview.svg",
+      "bytes": 914,
+      "sha256": "b02cab7590f56986638857cd5d6201c5163b2fdd36309271ab604ea962509254"
+    },
+    {
+      "file": "shelv_inverted_rounded_preview_2048.png",
+      "bytes": 65353,
+      "sha256": "a0639b35d4ec37d2e32f6ecf98a97233bb2a042cae3230d3390d726b7605ea79"
+    },
+    {
+      "file": "shelv_primary.svg",
+      "bytes": 896,
+      "sha256": "dcc9e276cfc0b44dc9c6c4894508f957a6c14e4745f1ad9e92b5104490d22310"
+    },
+    {
+      "file": "shelv_primary_1024.png",
+      "bytes": 17199,
+      "sha256": "c6e7acf94a9bdd95a4b8663e3e1b6db79a38956a6a22c4b4a8f05e4a47eacc56"
+    },
+    {
+      "file": "shelv_primary_2048.png",
+      "bytes": 40624,
+      "sha256": "3ec1eb9b3cec3fb5fcf7871a144f661cb1be4a9b3304fec123561c581f6aa856"
+    },
+    {
+      "file": "shelv_primary_512.png",
+      "bytes": 7794,
+      "sha256": "791519ee096c97f62b74dc948fbb4e21546e91bbc11c77dc5631ea87a2cf13cf"
+    },
+    {
+      "file": "shelv_primary_rounded_preview.svg",
+      "bytes": 914,
+      "sha256": "a0760256f98a9956c92b2ad99485c2abe823ebd600799a319ae034664a289f3d"
+    },
+    {
+      "file": "shelv_primary_rounded_preview_2048.png",
+      "bytes": 66665,
+      "sha256": "9be1327d8dc0a618e65e6e30909a45320b355523ce1f4c48ce6b1d543e4504f1"
+    },
+    {
+      "file": "shelv_three_variants.png",
+      "bytes": 40401,
+      "sha256": "46c6f1be606edbafae15fd380bab05e6f020790d4a237760cd92418b459c633e"
+    },
+    {
+      "file": "shelv_transparent.svg",
+      "bytes": 847,
+      "sha256": "ba5cb1472686174f10c154b2ac22ee4a1151bd027d8fc871247f310dc1d8bbd5"
+    },
+    {
+      "file": "shelv_transparent_1024.png",
+      "bytes": 16734,
+      "sha256": "548fcb25cb0f05f713e18e6416e3753737fbf6ecfc3e1ca4a901eb6d29b6a325"
+    },
+    {
+      "file": "shelv_transparent_2048.png",
+      "bytes": 41870,
+      "sha256": "4b8e3cbd8d88c8f42fd241355a413d7c83909ca7d48d16bf16926ee973e1015c"
+    },
+    {
+      "file": "shelv_transparent_512.png",
+      "bytes": 7402,
+      "sha256": "c3388630ce547e85385ef1bb768ef05d3bbe8d778a6334ad345237384a61f2d2"
+    }
+  ],
+  "generated": {
+    "assets/logo.png": "Exact alpha-bound crop of shelv_transparent_2048.png; same bytes as generated/shelv-mark-tight.png.",
+    "assets/icon.png": "Byte-identical shelv_primary_1024.png; opaque, no baked corner mask.",
+    "assets/favicon.png": "64px Lanczos resize of shelv_primary_1024.png.",
+    "assets/splash-icon.png": "1024px Lanczos resize of shelv_transparent_2048.png.",
+    "assets/android-icon-foreground.png": "768px Lanczos resize of shelv_transparent_2048.png, padded at (128,128) on transparent 1024px canvas.",
+    "assets/android-icon-background.png": "1024px solid #F6F3EC.",
+    "assets/android-icon-monochrome.png": "White fill, exact foreground alpha; Android supplies themed tint."
+  },
+  "tight_crop_box_2048": [
+    399,
+    511,
+    1615,
+    1681
+  ],
+  "copies": {
+    "admin/brand/shelv-mark-tight.png": "assets/logo.png",
+    "admin/brand/shelv-primary.svg": "originals/shelv_primary.svg",
+    "apps/web/public/brand/shelv-primary.svg": "originals/shelv_primary.svg",
+    "apps/web/public/brand/shelv-transparent.svg": "originals/shelv_transparent.svg",
+    "apps/web/public/brand/shelv-primary-1024.png": "originals/shelv_primary_1024.png"
+  }
+}

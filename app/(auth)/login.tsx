@@ -90,7 +90,7 @@ export default function LoginScreen() {
               />
             </View>
 
-            <Text style={styles.title}>Sign in to Derive</Text>
+            <Text style={styles.title}>Sign in to Shelv</Text>
             <Text style={styles.subtitle}>
               Enter your email and password to continue.
             </Text>
@@ -161,7 +161,7 @@ export default function LoginScreen() {
               accessibilityRole="link"
               style={styles.signupLink}
             >
-              <Text style={styles.signupLinkText}>New to Derive? Create account</Text>
+              <Text style={styles.signupLinkText}>New to Shelv? Create account</Text>
             </Pressable>
             <PublicLegalLinks />
             <BuildDiagnostics />

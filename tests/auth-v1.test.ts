@@ -300,7 +300,7 @@ test('AUTH-V1: Friday login and signup UI use password auth, not OTP', () => {
 
   assert.ok(login.includes('signInWithPassword'));
   assert.ok(login.includes('Sign In'));
-  assert.ok(login.includes('New to Derive? Create account'));
+  assert.ok(login.includes('New to Shelv? Create account'));
   assert.ok(!login.includes('sendEmailOtp'));
   assert.ok(!login.includes('verify-otp'));
   assert.ok(!login.includes('6-digit'));

@@ -1,14 +1,16 @@
-# Project Context: Derive
+# Project Context: Shelv
+
+Current brand: **Shelv**, formerly Derive. See [BRANDING.md](BRANDING.md) for corrected assets and deferred technical identifiers. Dated implementation and managed-first snapshots retain their historical wording.
 
 ## Current approved strategy (2026-09-28)
 
-Derive is scanner-first personalized skincare product intelligence. The customer has one intent: **“Check this product.”** Auto camera, search, barcode, package evidence, and recovery are ways to provide evidence, not separate truth systems. Complexity belongs behind the interface; customers should not need to know the recognition method or backend vocabulary.
+Shelv is scanner-first personalized skincare product intelligence. The customer has one intent: **“Check this product.”** Auto camera, search, barcode, package evidence, and recovery are ways to provide evidence, not separate truth systems. Complexity belongs behind the interface; customers should not need to know the recognition method or backend vocabulary.
 
-All supported inputs converge on S6 product/formula truth and ProductTruthSnapshotV1 before a personal decision. Auto camera is the current default, with supported barcode observation and package-photo capture; an unclassified still requires manual role clarification. Photo-library product upload is the next high-value target. URL paste and Share to Derive are later conveniences. Product Compare is approved near-term post-MVP, not a current feature. See [ROADMAP.md](ROADMAP.md), [PRODUCT.md](PRODUCT.md), [COMMERCE.md](COMMERCE.md), [DESIGN.md](DESIGN.md), and [OWNERSHIP.md](OWNERSHIP.md).
+All supported inputs converge on S6 product/formula truth and ProductTruthSnapshotV1 before a personal decision. Auto camera is the current default, with supported barcode observation and package-photo capture; an unclassified still requires manual role clarification. Photo-library product upload is the next high-value target. URL paste and Share to Shelv are later conveniences. Product Compare is approved near-term post-MVP, not a current feature. See [ROADMAP.md](ROADMAP.md), [PRODUCT.md](PRODUCT.md), [COMMERCE.md](COMMERCE.md), [DESIGN.md](DESIGN.md), and [OWNERSHIP.md](OWNERSHIP.md).
 
 The $25/month Managed Skincare offer remains a paid hypothesis. Pricing, retention, and hosted billing activation are not validated by a display price or local flow. No universal product/compatibility/health score is used.
 
-The latest founder direction targets public Derive plus real Plus or Founding Plus access, with Managed shown as Early Access. The older Sami P0-C Free-only barcode/name checkpoint is the explicit fallback if Plus billing delays release. Final candidate scope is open. Plus is an evaluated self-directed cross-product product, while Managed is delegated ongoing care; proposed Founding grants, quotas and Plus prices are experiments, not active customer access. [MONETIZATION.md](MONETIZATION.md), [FOUNDING_PLUS_ENTITLEMENT.md](FOUNDING_PLUS_ENTITLEMENT.md) and [APP_STORE_RELEASE_READINESS.md](APP_STORE_RELEASE_READINESS.md) keep offer, client preparation and release evidence separate. The former 18+ target has been reopened; first-release audience treatment is undecided.
+The latest founder direction targets public Shelv plus real Plus or Founding Plus access, with Managed shown as Early Access. The older Sami P0-C Free-only barcode/name checkpoint is the explicit fallback if Plus billing delays release. Final candidate scope is open. Plus is an evaluated self-directed cross-product product, while Managed is delegated ongoing care; proposed Founding grants, quotas and Plus prices are experiments, not active customer access. [MONETIZATION.md](MONETIZATION.md), [FOUNDING_PLUS_ENTITLEMENT.md](FOUNDING_PLUS_ENTITLEMENT.md) and [APP_STORE_RELEASE_READINESS.md](APP_STORE_RELEASE_READINESS.md) keep offer, client preparation and release evidence separate. The former 18+ target has been reopened; first-release audience treatment is undecided.
 
 ## Implementation checkpoint at main 39c0fed (historical source snapshot)
 

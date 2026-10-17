@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="700" viewBox="0 0 700 700" role="img" aria-label="SHELV staggered shelf symbol">
+  <title>SHELV · corrected symmetric shelf curves</title>
+
+  <g fill="#345447" stroke="none" id="SHELV-symbol">
+    <circle id="dot" cx="354.5" cy="238.5" r="63.7"/>
+    <path id="upper-shelf" d="M 235.000000 331.000000 L 537.000000 331.000000 C 569.000000 331.000000 548.000000 433.000000 485.000000 433.000000 L 287.000000 433.000000 C 224.000000 433.000000 203.000000 331.000000 235.000000 331.000000 Z"/>
+    <path id="lower-shelf" d="M 153.000000 461.000000 L 489.000000 461.000000 C 524.602649 461.000000 501.238411 574.483444 431.145695 574.483444 L 210.854305 574.483444 C 140.761589 574.483444 117.397351 461.000000 153.000000 461.000000 Z"/>
+  </g>
+</svg>

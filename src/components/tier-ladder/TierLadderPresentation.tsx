@@ -13,7 +13,7 @@ interface Props {
 /** Compact product ladder. It has no billing, enrollment, or entitlement authority. */
 export function TierLadderPresentation({ view, onManagedInterest }: Props) {
   return <View>
-    <GroupedSection header="Ways to use Derive">
+    <GroupedSection header="Ways to use Shelv">
       {view.tiers.map((tier) => {
         const action = tier.id === 'managed' ? view.managedInterestAction : null;
         return <View key={tier.id} style={styles.row}>

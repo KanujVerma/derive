@@ -37,7 +37,7 @@ export interface PurchaseOptionPresentation {
 }
 
 export const MERCHANTS: readonly MerchantDefinition[] = [
-  { id: 'derive', displayName: 'Derive', trustedDomains: [], kind: 'derive', priority: 0 },
+  { id: 'derive', displayName: 'Shelv', trustedDomains: [], kind: 'derive', priority: 0 },
   { id: 'target', displayName: 'Target', trustedDomains: ['www.target.com'], kind: 'external', priority: 20 },
   { id: 'ulta', displayName: 'Ulta', trustedDomains: ['www.ulta.com'], kind: 'external', priority: 30 },
   { id: 'sephora', displayName: 'Sephora', trustedDomains: ['www.sephora.com'], kind: 'external', priority: 40 },
@@ -54,7 +54,7 @@ export function exactProductKey(brand: string, name: string): string {
 
 /**
  * Production activation gate: catalog provenance and exact brand/name identify
- * a product family, not the retailer package/formula Derive evaluated. Add a
+ * a product family, not the retailer package/formula Shelv evaluated. Add a
  * listing only after sufficient destination, variant, and formula evidence.
  * The reviewed Ulta example is isolated in tests/fixtures.
  */
@@ -108,7 +108,7 @@ export function resolvePurchaseOptions(input: {
     const offer = offers.find((candidate) => candidate.listingId === listing.id);
     const presentedOffer = offer && presentOfferPrice(offer, now);
     if (merchant.kind === 'derive') {
-      // Only a verified, active future Derive offer can enter the presentation.
+      // Only a verified, active future Shelv offer can enter the presentation.
       if (listing.purchasePath?.kind !== 'derive_checkout' || !presentedOffer) return [];
     } else if (!isTrustedMerchantUrl(listing.url, merchant)) return [];
     return [{ merchant, listing, ...(presentedOffer ? { offer: presentedOffer } : {}) }];

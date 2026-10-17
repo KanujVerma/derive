@@ -8,7 +8,7 @@ export const managedOffer = {
   tagline: 'Your skincare, handled.',
   price: '$25/month',
   commercialTerm: 'Products purchased separately',
-  sectionLabel: 'What Derive handles',
+  sectionLabel: 'What Shelv handles',
   benefits: [
     { title: 'Your routine', body: 'Morning and evening plan' },
     { title: 'Your products', body: 'What to keep, add, pause, or replace' },

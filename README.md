@@ -1,6 +1,10 @@
-# Derive: Scanner-first personalized skincare product intelligence
+# Shelv: Scanner-first personalized skincare product intelligence
 
-Free Check helps a customer understand what Derive actually knows about a skincare product and, when enough supported personal context exists, what that person should do with it and why. Derive does not use a universal numerical compatibility, product-health, or ingredient score. “Personalized Yuka for skincare” is internal shorthand only, not customer-facing positioning.
+Free Check helps a customer understand what Shelv actually knows about a skincare product and, when enough supported personal context exists, what that person should do with it and why. Shelv does not use a universal numerical compatibility, product-health, or ingredient score. “Personalized Yuka for skincare” is internal shorthand only, not customer-facing positioning.
+
+<p><img src="assets/brand/shelv/originals/shelv_primary.svg" width="128" height="128" alt="Shelv corrected shelf symbol"></p>
+
+**Brand:** Shelv (formerly Derive). See the [brand assets and usage guide](docs/BRANDING.md) for original corrected artwork, provenance, and deferred technical identifiers.
 
 The paid hypothesis is **$25/month Managed Skincare** for ongoing routine management, adaptation, check-ins, progress, and product decisions. Pricing, retention, and hosted billing activation remain separate validation and implementation questions.
 

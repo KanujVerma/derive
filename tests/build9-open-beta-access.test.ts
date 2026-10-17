@@ -159,7 +159,7 @@ test('Build 9: fallback copy no longer waits for founder activation', () => {
   const client = fs.readFileSync(path.resolve('src/services/deriveClient.ts'), 'utf8');
   assert.ok(membership.includes('Try Again'));
   assert.ok(membership.includes("We couldn't finish opening your beta access automatically."));
-  assert.ok(!membership.includes('activated by the Derive team'));
+  assert.ok(!membership.includes('activated by the Shelv team'));
   assert.ok(membership.includes('Delete Account'));
   assert.ok(membership.includes('PublicLegalLinks'));
   assert.ok(!membership.includes('$25'));

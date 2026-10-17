@@ -1,5 +1,5 @@
 /**
- * app/(tabs)/shop.tsx — Derive Shop Tab (C1)
+ * app/(tabs)/shop.tsx — Shelv Shop Tab (C1)
  *
  * PURPOSE: Member-personalized Shop home + Scan entry point.
  *
@@ -220,7 +220,7 @@ export default function ShopScreen() {
                 <Text style={styles.sectionLabel}>NEEDED FOR YOUR PLAN</Text>
               </View>
               <Text style={styles.sectionSubtext}>
-                Derive recommends adding these to complete your routine.
+                Shelv recommends adding these to complete your routine.
               </Text>
               {neededProducts.map((up) => {
                 return (
@@ -426,13 +426,13 @@ export default function ShopScreen() {
         <View style={styles.membershipCard}>
           <View style={styles.membershipHeader}>
             <Icon name="sparkle" size={16} color={colors.brand} />
-            <Text style={styles.membershipOverline}>DERIVE MEMBERSHIP</Text>
+            <Text style={styles.membershipOverline}>SHELV MEMBERSHIP</Text>
           </View>
           <Text style={styles.membershipTitle}>
             Want to know how this fits your skin and routine?
           </Text>
           <Text style={styles.membershipBody}>
-            Derive members get personalized product-fit guidance, a managed routine,
+            Shelv members get personalized product-fit guidance, a managed routine,
             weekly check-ins, and ongoing adjustments.
           </Text>
           <View style={styles.membershipBullets}>

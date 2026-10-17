@@ -3,7 +3,7 @@ import { deleteCurrentAccount } from '../../services/accountDeletion';
 import { getCustomerErrorMessage } from '../../utils/customerErrors';
 
 const CONFIRM_TITLE = 'Delete your account?';
-const CONFIRM_BODY = "This permanently deletes your Derive account, onboarding information, stored photos, routine history, and other account data. This can't be undone.";
+const CONFIRM_BODY = "This permanently deletes your Shelv account, onboarding information, stored photos, routine history, and other account data. This can't be undone.";
 
 export async function confirmAndDeleteAccount(): Promise<boolean> {
   const confirmed = await new Promise<boolean>((resolve) => {

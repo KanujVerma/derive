@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Derive",
+    "name": "Shelv",
     "slug": "derive",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,8 +14,8 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "Derive uses your camera to scan skincare product barcodes and capture product or skin photos you choose.",
-        "NSPhotoLibraryUsageDescription": "Derive uses photos you choose from your library to add products to your shelf or attach an image to a message."
+        "NSCameraUsageDescription": "Shelv uses your camera to scan skincare product barcodes and capture product or skin photos you choose.",
+        "NSPhotoLibraryUsageDescription": "Shelv uses photos you choose from your library to add products to your shelf or attach an image to a message."
       }
     },
     "android": {

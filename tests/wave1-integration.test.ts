@@ -160,7 +160,7 @@ test('Wave-1 UI consumption keeps free flows apart from managed work', () => {
   assert.match(plan, /bootstrapReady/, 'managed routine startup waits for canonical bootstrap');
   assert.match(shop, /managedAccess/);
   assert.match(shop, /bootstrapReady/, 'managed Shop hydration waits for canonical bootstrap');
-  assert.match(account, /Delete Derive data/);
+  assert.match(account, /Delete Shelv data/);
   assert.match(account, /Privacy/);
   assert.match(account, /Support/);
   assert.doesNotMatch(account, /Founding Beta|membership|fake email/);

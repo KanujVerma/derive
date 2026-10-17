@@ -109,7 +109,7 @@ export default function SignupScreen() {
 
             <Text style={styles.title}>Create your account</Text>
             <Text style={styles.subtitle}>
-              Use your name, email, and a password. Derive will keep you signed in on this device.
+              Use your name, email, and a password. Shelv will keep you signed in on this device.
             </Text>
 
             {errorMessage && (

@@ -88,7 +88,7 @@ test('shared result renders Personal Fit once and keeps context actions relevant
   assert.match(content, /model\.canPersonalize && onPersonalize/);
   assert.doesNotMatch(content, /<Text[^>]*>Not personalized yet/);
   assert.match(section, /label=\"Personalize\"/);
-  assert.doesNotMatch(section, /label=\"Personalize Derive\"/);
+  assert.doesNotMatch(section, /label=\"Personalize Shelv\"/);
 });
 
 test('K2 gateway clears transient status and demo answers when Auth UUID changes A to B', async () => {

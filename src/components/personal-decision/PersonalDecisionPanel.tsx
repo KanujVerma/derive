@@ -74,13 +74,13 @@ function ReadyDecisionPanel({ view, onNextStep, embedded, expanded, continuous }
     {onNextStep && <Button label={view.nextStepLabel} variant="brand" size="large"
       onPress={() => onNextStep(view.nextStep)} style={styles.action} />}
     {expanded && !continuous && <Pressable onPress={() => setShowWhy(!showWhy)} accessibilityRole="button"
-      accessibilityLabel={showWhy ? 'Hide why Derive thinks this' : 'Why Derive thinks this'}
+      accessibilityLabel={showWhy ? 'Hide why Shelv thinks this' : 'Why Shelv thinks this'}
       accessibilityState={{ expanded: showWhy }} style={styles.disclosure}>
-      <Text style={styles.disclosureText}>{showWhy ? 'Hide details' : 'Why Derive thinks this'}</Text>
+      <Text style={styles.disclosureText}>{showWhy ? 'Hide details' : 'Why Shelv thinks this'}</Text>
     </Pressable>}
     {expanded && (continuous || showWhy) && <View style={styles.details}>
       {continuous ? <View>
-        <Text style={styles.label}>Why Derive thinks this</Text>
+        <Text style={styles.label}>Why Shelv thinks this</Text>
         {view.detailGroups.map((group, index) => <View key={index} style={styles.detail}>
           <Text style={styles.detailText}>{group.reason}</Text>
           <Text style={styles.evidence}>{group.findingIds.length} linked findings</Text>

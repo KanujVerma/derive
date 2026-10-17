@@ -14,7 +14,7 @@
  *
  * COMMERCE RULES (Strict Invariant):
  * - Published ADD may offer verified external merchant pages for trusted products.
- * - No Derive product checkout or live offer/availability feed exists here.
+ * - No Shelv product checkout or live offer/availability feed exists here.
  * - KEEP displays in-plan status with optional refill link; no repurchase pressure.
  * - PAUSE and STOP have no purchase CTA.
  * - REPLACE never sells the old product.
@@ -160,7 +160,7 @@ export default function ProductDetailScreen() {
           <Text style={styles.unavailableText}>
             {isMember
               ? 'This product could not be resolved from your current routine or shelf plan.'
-              : 'Personalized product details are available with an active Derive membership.'}
+              : 'Personalized product details are available with an active Shelv membership.'}
           </Text>
           <Button
             label="Return to Shop"
@@ -203,11 +203,11 @@ export default function ProductDetailScreen() {
           </View>
         </View>
 
-        {/* 2. DERIVE'S TAKE / ACTION BADGE (Member Only) */}
+        {/* 2. SHELV'S TAKE / ACTION BADGE (Member Only) */}
         {isMember && action && (
           <View style={styles.takeCard}>
             <View style={styles.takeHeader}>
-              <Text style={styles.takeOverline}>DERIVE'S TAKE</Text>
+              <Text style={styles.takeOverline}>SHELV'S TAKE</Text>
               <Badge action={action} />
             </View>
             <Text style={styles.takeReason}>
@@ -219,7 +219,7 @@ export default function ProductDetailScreen() {
         {/* 3. One reason, without repeating it in the action badge. */}
         {isMember && actionReason && (
           <View style={styles.detailSection}>
-            <Text style={styles.sectionLabel}>WHY DERIVE SAYS THIS</Text>
+            <Text style={styles.sectionLabel}>WHY SHELV SAYS THIS</Text>
             <Text style={styles.sectionBody}>{actionReason}</Text>
           </View>
         )}

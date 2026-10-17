@@ -233,7 +233,7 @@ export default function AskScreen() {
             <View style={styles.emptyIconCircle}>
               <Icon name="ask" size={28} color={colors.brand} />
             </View>
-            <Text style={styles.emptyHeadline}>Ask Derive</Text>
+            <Text style={styles.emptyHeadline}>Ask Shelv</Text>
             <Text style={styles.emptyPrompt}>
               Ask about your routine, a reaction, or a product you're considering.
             </Text>

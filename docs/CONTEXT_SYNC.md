@@ -1,4 +1,14 @@
-# Derive Cross-Agent Context Sync Ledger
+# Shelv Cross-Agent Context Sync Ledger
+
+## 2026-10-17 — pre-merge Shelv copy review
+
+Independent review of the isolated branding candidate found current support/privacy instructions still naming **Delete Derive data** after the app action changed to **Delete Shelv data**, plus two retained UI labels. The four tracked `apple-site/` pages and account/context labels now change only the brand word; policy statements, links, support email and behavior remain intact. Corrected artwork, icon geometry, asset provenance and technical identifiers are unchanged. Backend/API/auth-email wording is recorded as a separate existing follow-up; no hosted deployment or backend change occurs. Final exact-head review and CI gate the authorized normal merge; the shared dirty checkout/index remain outside this publication.
+
+## 2026-10-16 — Shelv visible branding and corrected artwork
+
+The founder renamed the company/app to **Shelv** and approved customer-facing branding, original corrected artwork and documentation. [Branding guide](BRANDING.md) and the [canonical asset directory](../assets/brand/shelv/README.md) preserve all 20 supplied originals byte-for-byte with SHA-256 provenance, exact SVG curves and geometry-preserving raster exports. App display/permission copy, customer UI, launcher/header/favicon slots, founder console and current documentation sections use Shelv. Technical repository/native/backend/config/storage identities and integration URLs remain unchanged; migrate those **last**, as explicitly requested.
+
+This publication candidate is branding-only commits built from `origin/main@fea1a214dd174deccffbdb08fb2aa48c1e8fd0e0` with a separate index/tree. The shared dirty checkout and its 127 unrelated commits are excluded. Main's account behavior is preserved; only display wording changes. The untracked local Next project and private handoff artifacts are excluded. Seven approved Check/camera/root display substitutions are independently replayed from main after their current single writer verified them locally; no scanner, retake, navigation, backend/Auth/RLS or decision behavior is changed here. The local integration passed 2,976 tests with six explicit skips, app/test/web types, Expo web/iOS exports and local Next build; those receipts cover the dirty local integration, not this main-based candidate. Exact-head CI and review remain required before merging. No production deployment, technical migration, new worktree or permanent deletion occurs.
 
 ## 2026-10-02 — separate UX-only publication
 

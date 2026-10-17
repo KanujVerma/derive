@@ -1,4 +1,4 @@
-# Derive Founder Operations Console
+# Shelv Founder Operations Console
 
 Internal console for the first Founding Beta cohort. It covers routine review and publication, urgent safety-task triage, refill fulfillment, formula verification, and private operational notes.
 
@@ -20,7 +20,7 @@ Never put `SUPABASE_SERVICE_ROLE_KEY` in `config.js`, browser storage, an Expo v
 
 ## Supported operations
 
-Lightweight administrative tools for operating the first 10 Founding Beta customers ($25/mo Derive-management membership; products purchased separately):
+Lightweight administrative tools for operating the first 10 Founding Beta customers ($25/mo Shelv-management membership; products purchased separately):
 - **Founder Draft + Routine Review Queue**: Look up an eligible managed member, select standard catalog products, author a model-independent initial draft, then separately review and publish it before customer notification. The picker is deliberately bounded; it does not imply that a product is clinically appropriate or that every catalog formula is verified.
 - **Safety Escalation Queue**: Inspect flagged medical/sensitization warnings from Ask conversations.
 - **Managed Refill Operations**: Track replenishment requests, mark as ordered/shipped, and assign tracking numbers.

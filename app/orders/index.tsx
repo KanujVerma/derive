@@ -248,7 +248,7 @@ export default function OrdersScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.policyTitle}>Managed Refills</Text>
             <Text style={styles.policyText}>
-              Product purchases and refills are separate from your Derive membership. First-10 Founding Beta replenishment is founder-assisted — tell us in one tap and we will coordinate the rest.
+              Product purchases and refills are separate from your Shelv membership. First-10 Founding Beta replenishment is founder-assisted — tell us in one tap and we will coordinate the rest.
             </Text>
           </View>
         </View>
