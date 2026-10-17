@@ -22,4 +22,6 @@ export interface ResolveProductLinkInput {
   /** Retain the same UUID for retries and the originating Check attempt. */
   requestId: string;
   url: string;
+  /** Originating Check scan, retained across a link fallback and retries. */
+  scanSessionId?: string;
 }

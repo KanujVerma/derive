@@ -224,17 +224,18 @@ async function normalizeOnboardingReactionEvidence(
       console.error("onboarding reaction context contains an invalid record");
       throw new ServiceError("CONTEXT_UNAVAILABLE", "Reaction history needs review before intelligence can run", 409);
     }
+    const productNameSnapshot = reaction.productNameSnapshot;
     const product = typeof reaction.productId === "string"
       ? productByClientId.get(reaction.productId)
       : products.find((candidate) =>
         typeof candidate.name === "string"
-        && candidate.name.toLowerCase() === reaction.productNameSnapshot.toLowerCase()
+        && candidate.name.toLowerCase() === productNameSnapshot.toLowerCase()
       );
     const formula = typeof reaction.formulaSnapshotId === "string"
       ? formulaByClientId.get(reaction.formulaSnapshotId)
       : formulas.find((candidate) =>
         typeof candidate.productName === "string"
-        && candidate.productName.toLowerCase() === reaction.productNameSnapshot.toLowerCase()
+        && candidate.productName.toLowerCase() === productNameSnapshot.toLowerCase()
       );
     const brand = typeof reaction.brandSnapshot === "string"
       ? reaction.brandSnapshot

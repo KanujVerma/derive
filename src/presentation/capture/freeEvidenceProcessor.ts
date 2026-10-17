@@ -6,11 +6,14 @@ import type { ProductPhoto } from './readProductEvidencePhoto.ts';
 import { FreeProductEvidenceDailyLimitError } from '../../services/remote/freeProductEvidence.ts';
 import type { FreeProductEvidenceStatus } from '../../services/remote/freeProductEvidence.ts';
 import { reconcileFreeEvidenceUpload } from './immutableEvidenceUploadRecovery.ts';
+import { IngredientPanelAttemptResponseError } from '../../contracts/IngredientPanelAttempt.ts';
 import { describeProductTruth } from './productTruthPresentation.ts';
 
 type Dependencies = {
   /** Live processors are bound to the signed-in owner at creation. */
   getOwnerId?(): string | null;
+  /** Check-owned logical session; unchanged across capture remounts/retakes. */
+  getScanSessionId?(): string;
   readPhoto(uri: string): Promise<ProductPhoto>;
   createRequestId(): string;
   prepare(input: PrepareFreeProductEvidenceInput): Promise<FreeProductEvidenceUpload>;
@@ -72,7 +75,12 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
 
   return {
     async process(evidence: readonly CaptureEvidence[]): Promise<CaptureResult> {
-      assertOwner();
+      const scanSessionId = deps.getScanSessionId?.();
+      const assertCurrent = () => {
+        assertOwner();
+        if (deps.getScanSessionId && deps.getScanSessionId() !== scanSessionId) throw new CaptureProcessingError('ACCOUNT_CHANGED');
+      };
+      assertCurrent();
       const barcode = evidence.find((item) => item.kind === 'barcode' && item.role === 'barcode');
       const hasPhotos = evidence.some((item) => item.kind === 'local_photo');
       if (barcode && !hasPhotos) {
@@ -80,10 +88,10 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
         const key = `barcode:${barcode.value}`;
         if (caseAttempt?.key !== key) caseAttempt = { key, requestId: deps.createRequestId() };
         try {
-          const result = await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', barcode: barcode.value });
-          assertOwner();
+          const result = await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan', barcode: barcode.value, ...(scanSessionId ? { scanSessionId } : {}) });
+          assertCurrent();
           return present(result);
-        } catch { assertOwner(); throw new CaptureProcessingError('RESOLVE_FAILED'); }
+        } catch { assertCurrent(); throw new CaptureProcessingError('RESOLVE_FAILED'); }
       }
 
       const photos = evidence.filter((item): item is CaptureEvidence & { role: PhotoRole; kind: 'local_photo' } =>
@@ -99,12 +107,12 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
         let image: ProductPhoto;
         try { image = attempt?.photo ?? await deps.readPhoto(item.value); }
         catch (error) {
-          assertOwner();
+          assertCurrent();
           if (error instanceof ProductPhotoReadError && error.code === 'PHOTO_TOO_LARGE') throw new CaptureProcessingError('PHOTO_TOO_LARGE');
           if (error instanceof ProductPhotoReadError && error.code === 'PHOTO_MIME_UNSUPPORTED') throw new CaptureProcessingError('PHOTO_MIME_UNSUPPORTED');
           throw new CaptureProcessingError('PHOTO_FAILED');
         }
-        assertOwner();
+        assertCurrent();
         if (!attempt) {
           image = { mimeType: image.mimeType, bytes: image.bytes.slice(0) };
           attempt = { requestId: deps.createRequestId(), photo: image, uploaded: false };
@@ -113,11 +121,11 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
         if (!attempt.target) {
           try { attempt.target = await deps.prepare({ requestId: attempt.requestId, role: item.role, mimeType: image.mimeType }); }
           catch (error) {
-            assertOwner();
+            assertCurrent();
             throw new CaptureProcessingError(error instanceof FreeProductEvidenceDailyLimitError ? 'DAILY_LIMIT' : 'PREPARE_FAILED');
           }
         }
-        assertOwner();
+        assertCurrent();
         if (attempt.target.role !== item.role || attempt.target.mimeType !== image.mimeType
           || attempt.target.bucket !== 'customer-product-evidence' || !attempt.target.storagePath
           || !Number.isFinite(attempt.target.maxBytes) || attempt.target.maxBytes > 10 * 1024 * 1024
@@ -127,24 +135,32 @@ export function createFreeEvidenceProcessor(deps: Dependencies): CaptureProcesso
         if (!attempt.uploaded) {
           try { await deps.upload(attempt.target, image.bytes); attempt.uploaded = true; }
           catch {
-            assertOwner();
+            assertCurrent();
             if (deps.status && await reconcileFreeEvidenceUpload({ requestId: attempt.requestId,
-              target: attempt.target, photo: attempt.photo }, { status: deps.status, assertOwner })) {
+              target: attempt.target, photo: attempt.photo }, { status: deps.status, assertOwner: assertCurrent })) {
               attempt.uploaded = true;
             } else throw new CaptureProcessingError('UPLOAD_FAILED');
           }
         }
-        assertOwner();
+        assertCurrent();
         evidencePhotos.push({ storagePath: attempt.target.storagePath, role: item.role });
       }
-      const key = `${barcode?.value ?? ''}\u0002${photos.map((item) => `${item.role}\u0000${item.value}`).join('\u0001')}`;
+      const key = `${scanSessionId ?? ''}\u0003${barcode?.value ?? ''}\u0002${photos.map((item) => `${item.role}\u0000${item.value}`).join('\u0001')}`;
       if (caseAttempt?.key !== key) caseAttempt = { key, requestId: deps.createRequestId() };
       try {
         const result = await deps.resolve({ requestId: caseAttempt.requestId, consumer: 'scan',
-          ...(barcode ? { barcode: barcode.value } : {}), evidencePhotos });
-        assertOwner();
+          ...(barcode ? { barcode: barcode.value } : {}), ...(scanSessionId ? { scanSessionId } : {}), evidencePhotos });
+        assertCurrent();
         return present(result);
-      } catch { assertOwner(); throw new CaptureProcessingError('RESOLVE_FAILED'); }
+      } catch (error) {
+        assertCurrent();
+        if (error instanceof IngredientPanelAttemptResponseError && scanSessionId
+          && error.receipt.scanSessionId === scanSessionId && error.receipt.requestId === caseAttempt.requestId) {
+          return { state: 'insufficient_evidence', candidates: [], ingredientPanelFailure: error.receipt.reason,
+            ingredientPanelAttempt: error.receipt };
+        }
+        throw new CaptureProcessingError('RESOLVE_FAILED');
+      }
     },
     resolutionFor(review: CaptureResult): ProductResolutionResult | null {
       if (deps.getOwnerId && (!ownerId || deps.getOwnerId() !== ownerId)) return null;

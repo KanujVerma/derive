@@ -8,9 +8,10 @@ import * as React from 'react';
 const nativeRequire = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 type Element = { type: string | ((props: any) => unknown); props: Record<string, any> };
-export function componentHarness(file: string, name: string, initialProps: Record<string, any>, options: { modules?: Record<string, any>; developmentRuntime?: boolean } = {}) {
+export function componentHarness(file: string, name: string, initialProps: Record<string, any>, options: { modules?: Record<string, any>; developmentRuntime?: boolean; effects?: boolean } = {}) {
   const slots: any[] = [];
   let cursor = 0;
+  let pendingEffects: (() => void)[] = [];
   const cache = new Map<string, any>();
   const react = { ...React, useState(initial: any) {
     const index = cursor++;
@@ -25,7 +26,13 @@ export function componentHarness(file: string, name: string, initialProps: Recor
     const previous = slots[index];
     if (!previous || dependencies.some((value, at) => value !== previous.dependencies[at])) slots[index] = { dependencies, value: factory() };
     return slots[index].value;
-  }, useEffect() {}, useCallback(callback: any) { return callback; },
+  }, useEffect(callback: () => (() => void) | void, dependencies?: readonly unknown[]) {
+    if (!options.effects) return;
+    const index = cursor++, previous = slots[index];
+    if (!previous || !dependencies || dependencies.some((value, at) => value !== previous.dependencies[at])) pendingEffects.push(() => {
+      previous?.cleanup?.(); slots[index] = { dependencies, cleanup: callback() };
+    });
+  }, useCallback(callback: any) { return callback; },
   useSyncExternalStore(_subscribe: any, getSnapshot: any) { return getSnapshot(); } };
   function load(path: string): any {
     if (cache.has(path)) return cache.get(path);
@@ -61,9 +68,9 @@ export function componentHarness(file: string, name: string, initialProps: Recor
       if (typeof value.type === 'function') { visit(value.type(value.props)); return; }
       nodes.push(value); visit(value.props.children);
     }
-    visit(Component(props)); return nodes;
+    visit(Component(props)); const effects = pendingEffects; pendingEffects = []; effects.forEach(effect => effect()); return nodes;
   }
-  return { render };
+  return { render, dispose() { for (const value of slots) value?.cleanup?.(); } };
 }
 export function control(nodes: Element[], label: string): Element {
   const found = nodes.find(node => node.props.label === label || node.props.accessibilityLabel === label || (typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith(`${label}, `)));

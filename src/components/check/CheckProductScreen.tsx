@@ -1,3 +1,4 @@
+import { createIngredientPanelSession } from '@/src/presentation/capture/ingredientPanelSession';
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   View,
@@ -149,8 +150,13 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const [cameraResumeKey, setCameraResumeKey] = useState(0);
   const [recoveringPhoto, setRecoveringPhoto] = useState(false);
   const recoveryActiveRef = useRef(false);
+  const ingredientFallbackRef = useRef(false);
   const cameraOriginRoleRef = useRef<CaptureRole>('barcode');
   const [retainedEvidence, setRetainedEvidence] = useState<CaptureEvidence[]>([]);
+  const [ingredientPanels] = useState(createIngredientPanelSession);
+  const ingredientPanelState = useSyncExternalStore(ingredientPanels.subscribe, ingredientPanels.getState);
+  useEffect(() => { ingredientFallbackRef.current = false; ingredientPanels.startNewSession(); }, [ingredientPanels, liveCheckOwner]);
+  useEffect(() => () => ingredientPanels.startNewSession(), [ingredientPanels]);
   const [ingredientRequest, setIngredientRequest] = useState<RequestedEvidenceAction | null>(null);
   const [captureRole, setCaptureRole] = useState<CaptureRole | null>(null);
   const [cameraAwaitingResult, setCameraAwaitingResult] = useState(false);
@@ -264,6 +270,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   const productLinkControllerRef = useRef<ReturnType<typeof createProductLinkController> | null>(null);
   if (!productLinkControllerRef.current) productLinkControllerRef.current = createProductLinkController({
     createRequestId: createCatalogRequestId,
+    getScanSessionId: ingredientPanels.getScanSessionId,
     getCurrentOwner: () => linkOwnerGetterRef.current(),
   });
   const productLinkController = productLinkControllerRef.current;
@@ -357,6 +364,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       else requestAnimationFrame(() => linkInput.current?.focus());
     }
     resultOriginRef.current = null;
+    ingredientFallbackRef.current = false;
   };
 
   useEffect(() => {
@@ -487,9 +495,16 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       const snapshot = liveResolutionRef.current?.truthSnapshot;
       return recoveryActiveRef.current && Boolean(snapshot && isCurrentRequestedEvidenceAction(ingredientRequest,
         currentLiveCheckOwner(), snapshot, liveResolutionRef.current));
-    }) : undefined, [ingredientRequest, integrated]);
+    }, ingredientPanels) : undefined, [ingredientRequest, integrated, ingredientPanels]);
 
   const openCapture = (role: CaptureRole) => {
+    ingredientFallbackRef.current = false;
+    ingredientPanels.startNewSession();
+    setRetainedEvidence([]);
+    setIngredientRequest(null);
+    recoveryActiveRef.current = false;
+    setRecoveringPhoto(false);
+    setCameraSessionKey(value => value + 1);
     cameraOriginRoleRef.current = role;
     searchController.cancel();
     searchController.releaseSelection();
@@ -651,13 +666,14 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       setEvaluationError(null);
       return;
     }
-    const key = JSON.stringify(evidence);
+    const scopedEvidence = evidence.consumer === 'scan' ? { ...evidence, scanSessionId: ingredientPanels.getScanSessionId() } : evidence;
+    const key = JSON.stringify(scopedEvidence);
     if (pendingResolutionRef.current?.key !== key) {
       pendingResolutionRef.current = { key, requestId: createCatalogRequestId() };
     }
     const requestId = pendingResolutionRef.current.requestId;
     beginResult(origin ?? { kind: 'camera', sessionId: cameraScanId || requestId }, requestId);
-    const published = await showResolution(client => resolveCatalogIdentity({ ...evidence, requestId }, client), knownProductId, evidence.barcode);
+    const published = await showResolution(client => resolveCatalogIdentity({ ...scopedEvidence, requestId }, client), knownProductId, evidence.barcode);
     if (published && pendingResolutionRef.current?.requestId === requestId) pendingResolutionRef.current = null;
   };
 
@@ -678,6 +694,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
       setCaptureRole(null);
     }
     if (handoff.barcodeLookup) {
+      if (!recovering) ingredientPanels.startNewSession();
       if (integrated && currentLiveCheckOwner()) checkFlowRef.current?.begin('barcode');
       setCaptureEvidence(null);
       void openResolution({ consumer: 'scan', barcode: handoff.barcodeLookup.barcode }, undefined, origin ?? undefined);
@@ -719,11 +736,22 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     if (isScanningLockedRef.current) return;
     isScanningLockedRef.current = true;
     setIsLocked(true);
+    ingredientFallbackRef.current = false; ingredientPanels.startNewSession();
     void openResolution({ consumer: 'scan', barcode: scanningResult.data });
+  };
+
+  const beginIdentitySelection = () => {
+    // An explicit entry selection begins a new customer Check. Photo fallback
+    // and candidate confirmation remain within the existing scan budget.
+    const continuing = ingredientFallbackRef.current || recoveryActiveRef.current
+      || Boolean(captureRole && ingredientPanels.getState().attempts > 0);
+    if (continuing) ingredientFallbackRef.current = true;
+    else { ingredientPanels.startNewSession(); setRetainedEvidence([]); }
   };
 
   const handleSelectSearchResult = (item: CatalogProductSummary, origin?: CheckResultOrigin) => {
     const selectedOrigin = origin ?? (captureRole ? resultOriginRef.current : null) ?? { kind: 'search' as const, query: searchQuery, scrollOffset: entryScrollOffset.current, selectedProductId: item.productId };
+    beginIdentitySelection();
     const insideSheet = Boolean(captureRole);
     setCameraSearchOpen(false);
     if (targetShell && captureRole && !insideSheet) setCaptureRole(null);
@@ -790,6 +818,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
         return;
       }
       productLinkController.setInput(productLink);
+      if (!productLinkController.getState().requestId) beginIdentitySelection();
       const requestSequence = ++resolutionSequenceRef.current;
       const result = await productLinkController.submit();
       if (!result || requestSequence !== resolutionSequenceRef.current) return;
@@ -813,6 +842,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
   };
 
   const handleResetScan = () => {
+    ingredientFallbackRef.current = false; ingredientPanels.startNewSession();
     void Haptics.selectionAsync().catch(() => {});
     checkFlowRef.current?.abandon();
     invalidateResult();
@@ -1007,7 +1037,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
     InputComponent={BottomSheetTextInput} keepFocusAfterSelect={false} onSelect={handleSelectSearchResult} onQueryChange={setSearchQuery}
     errorCopy="Search is unavailable right now." emptyCopy="No products found" />;
   const compactRecovery = <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-    {CHECK_PHOTO_CAPTURE_ENABLED && recoveryPlan.photoRole && !isIngredientChild && !(requestedAction && captureRole) && <Button
+    {CHECK_PHOTO_CAPTURE_ENABLED && ingredientPanelState.phase !== 'fallback' && recoveryPlan.photoRole && !isIngredientChild && !(requestedAction && captureRole) && <Button
       label={recoveryPlan.photoRole === 'ingredients' ? 'Photograph ingredients' : 'Photograph package'} variant="brand"
       onPress={() => continueCapture(recoveryPlan.photoRole!, requestedAction ?? undefined)} />}
     {(recoveryPlan.search || cameraSearchOpen) && directCatalogSearch}
@@ -1092,10 +1122,17 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
           photoCaptureEnabled={CHECK_PHOTO_CAPTURE_ENABLED}
           resumeKey={cameraResumeKey}
           onSearch={openCameraSearch}
+          ingredientPanels={ingredientPanels}
+          onProductLink={() => {
+            ingredientFallbackRef.current = true;
+            recoveryActiveRef.current = false; setRecoveringPhoto(false); setIngredientRequest(null);
+            handleSearchNamePress();
+            requestAnimationFrame(() => linkInput.current?.focus());
+          }}
           initialEvidence={retainedEvidence}
           processor={continuationProcessor ?? (recoveringPhoto ? pendingCaptureProcessor : undefined)}
           live={integrated}
-          catalogSearch={preview ? searchPreviewCatalog : undefined}
+          catalogSearch={preview ? searchPreviewCatalog : searchCatalogProducts}
           onCatalogSelect={handleSelectSearchResult}
           detectionPaused={detectionPaused || fullResult}
           onCaptureReady={handleCaptureReady}
@@ -1131,7 +1168,7 @@ export default function CheckProductScreen({ productEventSink }: { productEventS
               compactActions={compactRecovery}
               searchEmpty={!searchQuery.trim()}
               searchOnly={cameraSearchOpen && !unknownBarcode && !resolution && !catalogDetail}
-              onAddRequestedEvidence={!CHECK_PHOTO_CAPTURE_ENABLED || isIngredientChild ? undefined : action => continueCapture(action.role, action)}
+              onAddRequestedEvidence={!CHECK_PHOTO_CAPTURE_ENABLED || isIngredientChild || ingredientPanelState.phase === 'fallback' ? undefined : action => continueCapture(action.role, action)}
               currentOwnerId={liveCheckOwner}
               currentSnapshot={resolution?.truthSnapshot ?? null}
               currentResolverResult={resolution}

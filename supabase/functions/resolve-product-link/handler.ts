@@ -8,7 +8,7 @@ interface Dependencies<TAuth extends LinkAuth> {
   authenticate: (request: Request) => Promise<TAuth>;
   readJsonObject: (request: Request) => Promise<Record<string, unknown>>;
   reserveExternalLookup: (identity: TAuth) => Promise<void>;
-  resolveBarcode: (identity: TAuth, requestId: string, barcode: string, request: Request) => Promise<ProductResolutionResult>;
+  resolveBarcode: (identity: TAuth, requestId: string, barcode: string, request: Request, scanSessionId?: string) => Promise<ProductResolutionResult>;
   lookupDailyMed?: typeof lookupDailyMedLink;
   dailyMedEnabled: boolean;
   failure: (code: string, message: string, status: number) => Error;
@@ -20,8 +20,8 @@ interface Dependencies<TAuth extends LinkAuth> {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** A pasted URL supplies customer-entered evidence, never a camera observation. */
-export function linkBarcodeResolutionInput(requestId: string, barcode: string) {
-  return { requestId, consumer: 'scan' as const, barcode, barcodeSource: 'member_input' as const };
+export function linkBarcodeResolutionInput(requestId: string, barcode: string, scanSessionId?: string) {
+  return { requestId, consumer: 'scan' as const, barcode, barcodeSource: 'member_input' as const, ...(scanSessionId ? { scanSessionId } : {}) };
 }
 
 export async function handleProductLink<TAuth extends LinkAuth>(request: Request, deps: Dependencies<TAuth>): Promise<Response> {
@@ -30,8 +30,9 @@ export async function handleProductLink<TAuth extends LinkAuth>(request: Request
   try {
     const identity = await deps.authenticate(request);
     const body = await deps.readJsonObject(request);
-    if (Object.keys(body).some((key) => key !== 'url' && key !== 'requestId')
-        || typeof body.requestId !== 'string' || !UUID.test(body.requestId)) {
+    if (Object.keys(body).some((key) => key !== 'url' && key !== 'requestId' && key !== 'scanSessionId')
+        || typeof body.requestId !== 'string' || !UUID.test(body.requestId)
+        || (body.scanSessionId !== undefined && (typeof body.scanSessionId !== 'string' || !UUID.test(body.scanSessionId)))) {
       throw deps.failure('INVALID_PAYLOAD', 'A request ID and product URL are required', 400);
     }
     let link;
@@ -41,7 +42,7 @@ export async function handleProductLink<TAuth extends LinkAuth>(request: Request
       throw error;
     }
     if (link.kind === 'barcode_hint') {
-      const resolution = await deps.resolveBarcode(identity, body.requestId, link.barcode, request);
+      const resolution = await deps.resolveBarcode(identity, body.requestId, link.barcode, request, body.scanSessionId as string | undefined);
       return deps.respond({ status: 'resolution', source: link.source, sourceUrl: link.canonicalUrl,
         barcode: link.barcode, resolution });
     }

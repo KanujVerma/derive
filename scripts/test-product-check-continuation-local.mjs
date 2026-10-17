@@ -16,6 +16,7 @@ const admin = make(status.SERVICE_ROLE_KEY);
 const a = make(status.ANON_KEY);
 const b = make(status.ANON_KEY);
 let aId, bId, productId, variantId, formulaIds = [], photoPath;
+const photoPaths = [];
 async function invoke(client, body) {
   return client.functions.invoke('resolve-product-identity', { body });
 }
@@ -142,16 +143,36 @@ try {
   const grant = await a.functions.invoke('prepare-free-product-evidence', {
     body: { requestId: randomUUID(), role: 'ingredients', mimeType: 'image/jpeg' },
   });
-  assert.ifError(grant.error); photoPath = grant.data.storagePath;
+  assert.ifError(grant.error); photoPath = grant.data.storagePath; photoPaths.push(photoPath);
   assert.ifError((await a.storage.from('customer-product-evidence').upload(photoPath,
     Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2]), { contentType: 'image/jpeg', upsert: false })).error);
-  const photoOnly = await invoke(a, { operation: 'continue_ingredients', requestId: randomUUID(),
+  const scanSessionId = randomUUID();
+  const photoRequest = { operation: 'continue_ingredients', requestId: randomUUID(), scanSessionId,
     rootCaseId: secondRoot.data.caseId, parentSnapshotId: secondRoot.data.truthSnapshot.snapshotId,
-    evidencePhoto: { role: 'ingredients', storagePath: photoPath } });
+    evidencePhoto: { role: 'ingredients', storagePath: photoPath } };
+  const photoOnly = await invoke(a, photoRequest);
   assert.ifError(photoOnly.error);
-  assert.equal(photoOnly.data.state, 'identified_formula_unverified', 'photo bytes are not OCR');
-  assert.equal(photoOnly.data.truthSnapshot.formula, null);
-  assert.doesNotMatch(JSON.stringify(photoOnly.data.truthSnapshot), /storagePath|\.jpg/);
+  assert.equal(photoOnly.data.kind, 'ingredient_panel_attempt', 'photo bytes are not OCR or a truth child');
+  assert.equal(photoOnly.data.outcome, 'unavailable');
+  assert.equal(photoOnly.data.attemptsUsed, 1);
+  assert.equal(photoOnly.data.truthSnapshot, undefined);
+  const photoReplay = await invoke(a, photoRequest);
+  assert.ifError(photoReplay.error); assert.deepEqual(photoReplay.data, photoOnly.data);
+  const duplicate = await invoke(a, { ...photoRequest, requestId: randomUUID() });
+  assert.ifError(duplicate.error); assert.equal(duplicate.data.attemptsUsed, 1);
+  const retakeGrant = await a.functions.invoke('prepare-free-product-evidence', {
+    body: { requestId: randomUUID(), role: 'ingredients', mimeType: 'image/jpeg' },
+  });
+  assert.ifError(retakeGrant.error); photoPaths.push(retakeGrant.data.storagePath);
+  assert.ifError((await a.storage.from('customer-product-evidence').upload(retakeGrant.data.storagePath,
+    Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 3, 4]), { contentType: 'image/jpeg', upsert: false })).error);
+  const retake = await invoke(a, { ...photoRequest, requestId: randomUUID(),
+    evidencePhoto: { role: 'ingredients', storagePath: retakeGrant.data.storagePath } });
+  assert.ifError(retake.error); assert.equal(retake.data.attemptsUsed, 2); assert.equal(retake.data.outcome, 'exhausted');
+  assert.deepEqual(retake.data.fallbackActions, ['product_link', 'verified_catalog', 'retry_later']);
+  assert.doesNotMatch(JSON.stringify(retake.data), /storagePath|[.]jpg|formula|review/);
+  const noChild = await admin.from('product_resolution_continuations').select('id').eq('root_case_id', secondRoot.data.caseId);
+  assert.ifError(noChild.error); assert.equal(noChild.data.length, 0);
   const typedRoot = await invoke(a, { requestId: randomUUID(), consumer: 'scan',
     brand: 'Fixture', productName: name, variantName: 'Original', regionCode: 'US' });
   assert.ifError(typedRoot.error);
@@ -165,7 +186,7 @@ try {
   assert.equal(typedContinuation.data.truthSnapshot.formula, null);
   console.log('Same-Check continuation: auth, exact formula, retry/conflict, owner, immutable root, photo abstention passed');
 } finally {
-  if (photoPath) await admin.storage.from('customer-product-evidence').remove([photoPath]);
+  if (photoPaths.length) await admin.storage.from('customer-product-evidence').remove(photoPaths);
   if (aId) await admin.auth.admin.deleteUser(aId);
   if (bId) await admin.auth.admin.deleteUser(bId);
   if (variantId) await admin.from('product_identifiers').delete().eq('variant_id', variantId);

@@ -1,5 +1,7 @@
-import type { CaptureEvidence, CaptureHandoff, CaptureProcessor, CaptureResult, PhotoRole } from './productEvidence';
-import type { ProductResolutionResult } from '../../contracts/ProductIdentityResolver';
+import { hasVerifiedPackageFormula } from '../../contracts/ProductTruthSnapshot.ts';
+import { createIngredientPanelSession, IngredientPanelAttemptError, type IngredientPanelSession, type IngredientPanelTicket } from './ingredientPanelSession.ts';
+import type { CaptureEvidence, CaptureHandoff, CaptureProcessor, CaptureResult, PhotoRole } from './productEvidence.ts';
+import type { ProductResolutionResult } from '../../contracts/ProductIdentityResolver.ts';
 
 export interface CheckCaptureHandoff {
   authority: 'customer_evidence';
@@ -38,38 +40,77 @@ export function mapCaptureForCheck(handoff: CaptureHandoff, outcome?: CaptureRes
 
 export function createCheckCaptureBridge(processor: CaptureProcessor & {
   resolutionFor?: (review: CaptureResult) => ProductResolutionResult | null;
-}): {
+}, ingredientPanels: IngredientPanelSession = createIngredientPanelSession()): {
   processor: CaptureProcessor;
+  ingredientPanels: IngredientPanelSession;
+  cancel(): void;
   handoff: (capture: CaptureHandoff) => CheckCaptureHandoff;
 } {
   let reviewedEvidence: readonly CaptureEvidence[] | null = null;
   let outcome: CaptureResult | undefined;
   let processingSequence = 0;
+  let reviewedGeneration: number | null = null;
+  let activePanel: IngredientPanelTicket | null = null;
 
   return {
+    ingredientPanels,
+    cancel() {
+      ++processingSequence;
+      reviewedEvidence = null;
+      outcome = undefined;
+      reviewedGeneration = null;
+      if (activePanel) ingredientPanels.cancel(activePanel);
+      activePanel = null;
+    },
     processor: {
       async process(evidence) {
+        const submitted = evidence.map(item => ({ ...item }));
+        const panel = submitted.find(item => item.kind === 'local_photo' && item.role === 'ingredients');
+        const ticket = panel ? ingredientPanels.begin(panel.value) : null;
+        if (ticket) activePanel = ticket;
+        const generation = ingredientPanels.getGeneration();
         const sequence = ++processingSequence;
         reviewedEvidence = null;
         outcome = undefined;
         try {
-          const result = await processor.process(evidence);
-          if (sequence === processingSequence) {
-            reviewedEvidence = evidence.map((item) => ({ ...item }));
+          const result = await processor.process(submitted);
+          if (ticket) {
+            if (sequence !== processingSequence || !ingredientPanels.isCurrent(ticket)) throw new IngredientPanelAttemptError();
+            const resolution = processor.resolutionFor?.(result);
+            const snapshot = resolution?.truthSnapshot;
+            const verified = Boolean(snapshot && resolution?.state === 'verified_product_formula'
+              && resolution.caseId === snapshot.resolutionCaseId && hasVerifiedPackageFormula(snapshot));
+            if (result.ingredientPanelAttempt) {
+              if (!ingredientPanels.settleFromServer(ticket, result.ingredientPanelAttempt)) throw new IngredientPanelAttemptError();
+              throw new IngredientPanelAttemptError();
+            }
+            ingredientPanels.settle(ticket, verified ? null : result.ingredientPanelFailure ?? 'unconfirmed');
+            if (!verified) throw new IngredientPanelAttemptError();
+          }
+          if (sequence === processingSequence && generation === ingredientPanels.getGeneration()) {
+            reviewedGeneration = generation;
+            reviewedEvidence = submitted;
             outcome = result;
           }
           return result;
         } catch (error) {
-          if (sequence === processingSequence) {
-            reviewedEvidence = evidence.map((item) => ({ ...item }));
+          if (ticket) {
+            ingredientPanels.cancel(ticket);
+            throw new IngredientPanelAttemptError();
+          }
+          if (sequence === processingSequence && generation === ingredientPanels.getGeneration()) {
+            reviewedGeneration = generation;
+            reviewedEvidence = submitted;
             outcome = { state: 'insufficient_evidence', candidates: [] };
           }
           throw error;
+        } finally {
+          if (activePanel === ticket) activePanel = null;
         }
       },
     },
     handoff(capture) {
-      const stillCurrent = reviewedEvidence !== null &&
+      const stillCurrent = reviewedGeneration === ingredientPanels.getGeneration() && reviewedEvidence !== null &&
         reviewedEvidence.length === capture.evidence.length &&
         reviewedEvidence.every((item, index) => {
           const current = capture.evidence[index];

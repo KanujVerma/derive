@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { createCheckCaptureBridge } from '../src/presentation/capture/checkCaptureAdapter.ts';
 import test from 'node:test';
 import type { ProductResolutionResult } from '../src/contracts/ProductIdentityResolver.ts';
 import { unresolvedProductTruth } from '../src/fixtures/product-truth/snapshots.ts';
@@ -22,17 +22,13 @@ test('the camera sheet loads, binds a snapshot, and refuses an unbound finished 
   assert.equal(cameraResultNeedsExistingPage({ ...base, checking: true, resolution: unbound }), false);
 });
 
-test('Check keeps the camera mounted and does not pretend a follow-up photo continues the same case', () => {
-  const check = readFileSync(new URL('../src/components/check/CheckProductScreen.tsx', import.meta.url), 'utf8');
-  const host = readFileSync(new URL('../src/components/check/capture/CheckCaptureHost.tsx', import.meta.url), 'utf8');
-  const capture = readFileSync(new URL('../src/components/check/capture/ProductEvidenceCapture.tsx', import.meta.url), 'utf8');
-  assert.match(check, /cameraCompanionSheet\(/);
-  assert.match(check, /detectionPaused=\{detectionPaused \|\| fullResult\}/);
-  assert.match(check, /onAddRequestedEvidence=\{!CHECK_PHOTO_CAPTURE_ENABLED \|\| isIngredientChild \? undefined : action => continueCapture\(action.role, action\)\}/);
-  assert.match(check, /isCurrentRequestedEvidenceAction\(action, currentLiveCheckOwner\(\), snapshot, liveResolutionRef.current\)/);
-  assert.match(host, /detectionPaused=\{detectionPaused \|\| !appActive\}/);
-  assert.match(capture, /const liveBarcode = !detectionPaused/);
-  assert.match(capture, /onBarcodeScanned=\{!photoCaptureEnabled \|\| liveBarcode \? onBarcode : undefined\}/);
+test('an ingredient follow-up cannot hand off an unbound or incomplete product result', async () => {
+  const bridge = createCheckCaptureBridge({ async process() { return { state: 'insufficient_evidence', candidates: [] }; },
+    resolutionFor: () => unbound });
+  const evidence = [{ kind: 'local_photo' as const, role: 'ingredients' as const, value: 'file:///follow-up.jpg' }];
+  await assert.rejects(bridge.processor.process(evidence));
+  assert.equal(bridge.handoff({ authority: 'customer_evidence', evidence }).resolvedCase, null);
+  assert.equal(bridge.ingredientPanels.getState().phase, 'retake');
 });
 
 test('an unverified barcode miss still opens one transient recovery sheet bound to the current scan', () => {

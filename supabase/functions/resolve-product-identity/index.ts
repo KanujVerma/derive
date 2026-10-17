@@ -33,6 +33,8 @@ import {
   lookupIngredientCandidates,
 } from "../_shared/ingredient-candidates.ts";
 
+import { processIngredientPanelAttempt, bindIngredientScanToCase, IngredientPanelBoundaryError } from "../_shared/ingredient-panel-attempts.ts";
+
 const PRODUCT_EVIDENCE_BUCKET = "customer-product-evidence";
 const CATALOG_PAGE_SIZE = 1_000;
 const MAX_CATALOG_ROWS_PER_TABLE = 10_000;
@@ -41,7 +43,7 @@ const MAX_EXACT_PRODUCTS = 100;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PHOTO_ROLES = new Set<ProductEvidencePhotoRole>(["front_label", "ingredients", "packaging"]);
 const ALLOWED_FIELDS = new Set([
-  "requestId", "consumer", "barcode", "barcodeSource", "brand", "productName", "variantName",
+  "requestId", "consumer", "scanSessionId", "barcode", "barcodeSource", "brand", "productName", "variantName",
   "regionCode", "labelText", "packagingText", "ingredientList", "evidencePhotos",
 ]);
 
@@ -56,10 +58,12 @@ interface ParsedRequest extends ResolverEvidence {
   consumer: "scan" | "shelf";
   evidencePhotos: ParsedEvidencePhoto[];
   barcodeSource?: "member_input";
+  scanSessionId?: string;
 }
 
 interface IngredientContinuation {
   requestId: string;
+  scanSessionId?: string;
   rootCaseId: string;
   parentSnapshotId: string;
   ingredientList?: string[];
@@ -68,7 +72,7 @@ interface IngredientContinuation {
 
 function parseIngredientContinuation(body: Record<string, unknown>, userId: string): IngredientContinuation {
   if (Object.keys(body).some((key) => ![
-    "operation", "requestId", "rootCaseId", "parentSnapshotId", "ingredientList", "evidencePhoto",
+    "operation", "requestId", "scanSessionId", "rootCaseId", "parentSnapshotId", "ingredientList", "evidencePhoto",
   ].includes(key))) throw new ServiceError("INVALID_PAYLOAD", "Unexpected continuation fields", 400);
   const requestId = optionalString(body.requestId, "requestId", 40);
   const rootCaseId = optionalString(body.rootCaseId, "rootCaseId", 40);
@@ -97,7 +101,12 @@ function parseIngredientContinuation(body: Record<string, unknown>, userId: stri
   if (!ingredientList && evidencePhotos.length === 0) {
     throw new ServiceError("INSUFFICIENT_EVIDENCE", "Ingredient text or a private photo is required", 400);
   }
-  return { requestId: requestId!, rootCaseId: rootCaseId!, parentSnapshotId: parentSnapshotId!, ingredientList, evidencePhotos };
+  const scanSessionId = optionalString(body.scanSessionId, "scanSessionId", 40);
+  if ((scanSessionId && !UUID_PATTERN.test(scanSessionId)) || (evidencePhotos.length && !scanSessionId)
+    || (evidencePhotos.length && ingredientList)) {
+    throw new ServiceError("INVALID_PAYLOAD", "A photo attempt requires its scan session and cannot include ingredient text", 400);
+  }
+  return { requestId: requestId!, scanSessionId, rootCaseId: rootCaseId!, parentSnapshotId: parentSnapshotId!, ingredientList, evidencePhotos };
 }
 
 interface ResolutionCaseRow {
@@ -282,8 +291,16 @@ function parseRequest(body: Record<string, unknown>, userId: string): ParsedRequ
     };
   });
 
+  const scanSessionId = optionalString(body.scanSessionId, "scanSessionId", 40);
+  const hasPanel = body.consumer === "scan" && evidencePhotos.some(photo => photo.role === "ingredients");
+  if ((scanSessionId && !UUID_PATTERN.test(scanSessionId)) || (hasPanel && !scanSessionId)
+    || (hasPanel && (new Set(evidencePhotos.map(photo => photo.role)).size !== evidencePhotos.length
+      || body.ingredientList !== undefined || evidencePhotos.some(photo => photo.extractedText !== undefined)))) {
+    throw new ServiceError("INVALID_PAYLOAD", "An ingredient photo requires its scan session and cannot supply OCR ingredients", 400);
+  }
   const request: ParsedRequest = {
     requestId,
+    ...(scanSessionId ? { scanSessionId } : {}),
     consumer: body.consumer,
     barcode,
     barcodeSource: barcodeSource.source,
@@ -748,6 +765,18 @@ async function responseForCase(
   };
 }
 
+async function responseForScanCase(admin: SupabaseClient, userId: string, request: ParsedRequest,
+  row: ResolutionCaseRow, catalog?: CatalogResolutionRecord[], fallbackCandidates: ProductResolutionCandidate[] = []): Promise<ProductResolutionResult> {
+  const result = await responseForCase(admin, userId, row, catalog, fallbackCandidates);
+  if (request.consumer === "scan" && request.scanSessionId && result.state === "identified_formula_unverified"
+    && result.nextAction === "photograph_ingredients" && !result.requiresFounderReview
+    && result.product?.variantId && result.truthSnapshot) {
+    await bindIngredientScanToCase(admin, { userId, scanSessionId: request.scanSessionId,
+      rootCaseId: result.caseId, parentSnapshotId: result.truthSnapshot.snapshotId });
+  }
+  return result;
+}
+
 async function continueIngredients(admin: SupabaseClient, userId: string,
   body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const input = parseIngredientContinuation(body, userId);
@@ -794,6 +823,12 @@ async function continueIngredients(admin: SupabaseClient, userId: string,
   }
   if (oldEvidence.some((item) => item.evidence_type === "ingredients" && item.extracted_text)) {
     throw new ServiceError("CHECK_NOT_ELIGIBLE", "This Check already has ingredient text for review", 409);
+  }
+  if (input.evidencePhotos.length) {
+    // Failed panels are processing receipts, not immutable product-truth children.
+    return { ...await processIngredientPanelAttempt(admin, { userId, scanSessionId: input.scanSessionId!,
+      requestId: input.requestId, requestFingerprint: fingerprint, storagePath: input.evidencePhotos[0].storagePath,
+      rootCaseId: input.rootCaseId, parentSnapshotId: input.parentSnapshotId }) };
   }
   const evidence = [...oldEvidence.map((row) => ({
     evidence_type: row.evidence_type, source_type: row.source_type,
@@ -922,7 +957,13 @@ Deno.serve(async (req: Request) => {
       }
       // Persisted candidate IDs and the sealed truth revision are sufficient
       // for replay; a growing catalog must never invalidate an old request ID.
-      return jsonResponse(await responseForCase(admin, userId, replay as ResolutionCaseRow));
+      return jsonResponse(await responseForScanCase(admin, userId, request, replay as ResolutionCaseRow));
+    }
+
+    const ingredientPhoto = request.consumer === "scan" && request.evidencePhotos.find(photo => photo.role === "ingredients");
+    if (ingredientPhoto) {
+      return jsonResponse(await processIngredientPanelAttempt(admin, { userId, scanSessionId: request.scanSessionId!,
+        requestId: request.requestId, requestFingerprint, storagePath: ingredientPhoto.storagePath }));
     }
 
     // Literal label contradictions still use the conservative existing path.
@@ -977,6 +1018,7 @@ Deno.serve(async (req: Request) => {
       p_formula_version_id: selectedFormulaId,
       p_evidence_snapshot: {
         requestFingerprint,
+        ...(request.scanSessionId ? { ingredientScanSessionId: request.scanSessionId } : {}),
         conflicts: decision.conflicts ?? [],
         hasBarcode: Boolean(request.barcode),
         hasTypedIdentity: Boolean(request.brand || request.productName || request.variantName),
@@ -999,8 +1041,9 @@ Deno.serve(async (req: Request) => {
     if (saved.evidence_snapshot?.requestFingerprint && saved.evidence_snapshot.requestFingerprint !== requestFingerprint) {
       throw new ServiceError('REQUEST_CONFLICT', 'This request ID belongs to different evidence', 409);
     }
-    return jsonResponse(await responseForCase(admin, userId, saved as ResolutionCaseRow, catalog, decision.candidates));
+    return jsonResponse(await responseForScanCase(admin, userId, request, saved as ResolutionCaseRow, catalog, decision.candidates));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error instanceof IngredientPanelBoundaryError
+      ? new ServiceError(error.code, error.message, error.status) : error);
   }
 });

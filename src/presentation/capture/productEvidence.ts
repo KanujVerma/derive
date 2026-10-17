@@ -1,3 +1,5 @@
+import type { IngredientPanelAttemptReceipt, IngredientPanelFailure } from '../../contracts/IngredientPanelAttempt.ts';
+
 export const captureRoles = ['barcode', 'front_label', 'ingredients', 'packaging'] as const;
 export type CaptureRole = typeof captureRoles[number];
 export type PhotoRole = Exclude<CaptureRole, 'barcode'>;
@@ -14,11 +16,11 @@ export interface CaptureCandidate {
   detail?: string;
 }
 
-export type CaptureResult =
+export type CaptureResult = { ingredientPanelFailure?: IngredientPanelFailure; ingredientPanelAttempt?: IngredientPanelAttemptReceipt } & (
   | { state: 'candidates'; candidates: CaptureCandidate[] }
   | { state: 'ambiguous'; candidates: CaptureCandidate[] }
   | { state: 'unknown'; candidates: [] }
-  | { state: 'insufficient_evidence'; candidates: [] };
+  | { state: 'insufficient_evidence'; candidates: [] });
 
 export type CapturePhase = 'collecting' | 'processing' | 'candidates' | 'candidate_selected' | 'ambiguous' | 'unknown' | 'insufficient_evidence';
 

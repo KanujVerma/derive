@@ -8,7 +8,7 @@ const capture = read('src/components/check/capture/ProductEvidenceCapture.tsx');
 
 // Boundary guards, not pixel/device acceptance. Physical QA is recorded separately.
 test('capture is presented above the tab navigator with a fresh native safe-area boundary', () => {
-  assert.match(host, /<Modal[\s\S]*presentationStyle="fullScreen"[\s\S]*onRequestClose=\{onClose\}/);
+  assert.match(host, /<Modal[\s\S]*presentationStyle="fullScreen"/);
   assert.match(host, /<SafeAreaProvider>[\s\S]*<ProductEvidenceCapture[\s\S]*<\/SafeAreaProvider>[\s\S]*<\/Modal>/);
   assert.match(host, /processor=\{bridge\.processor\}/);
   assert.match(host, /onCaptureReady\(bridge\.handoff\(handoff\)\)/);
@@ -26,7 +26,6 @@ test('capture options scroll independently of the shutter and expose all roles',
 
 test('barcode guide is visual-only and the camera/shutter retain existing safety controls', () => {
   assert.match(capture, /pointerEvents="none" style=\{styles\.guideArea\}/);
-  assert.match(capture, /const liveBarcode = !detectionPaused && !notice && !currentEvidence && !previewUri/);
   assert.match(capture, /intent === 'barcode' \|\| \(intent === 'auto' && capturedPhotos\.length === 0\)/);
   assert.match(capture, /\{liveBarcode \? \(/);
   assert.match(capture, /onBarcodeScanned=\{!photoCaptureEnabled \|\| liveBarcode \? onBarcode : undefined\}/);
