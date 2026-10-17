@@ -42,6 +42,10 @@ The founder explicitly deferred technical renaming. Preserve these until an inde
 
 Do not globally replace lowercase `derive`, rename source files/contracts, rewrite released evidence, edit old acceptance receipts, or claim a legal company-name change from this branding pass. Dated historical documentation remains evidence under the former name. Current documentation entrypoints identify Shelv and link here without rewriting prior release claims.
 
+## Public-site copy and remaining server copy
+
+The tracked `apple-site/` home, privacy, privacy-choices and support pages use Shelv and refer to the app's exact **Delete Shelv data** action. Existing URLs, support email and policy statements are preserved. Updating this source is separate from deploying that public site. Backend/API and authentication-email display wording retain pre-existing Derive references; that follow-up must preserve technical identifiers and pass its own backend/release checks.
+
 ## Shared-writer and publication boundaries
 
 The scanner retake task owns the shared working copies of `src/components/check/CheckProductScreen.tsx`, `src/components/ui/CameraCapture.tsx` and `app/_layout.tsx`. Its writer has integrated the seven approved Shelv display substitutions locally. This publication independently replays only those same seven literals from pinned main, with no dirty scanner behavior or composition copied. This pass changes no scanner logic, root navigation, Auth, RLS, SQL, secrets, analytics payloads, hosted deployment or production settings.

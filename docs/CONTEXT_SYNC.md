@@ -1,5 +1,9 @@
 # Shelv Cross-Agent Context Sync Ledger
 
+## 2026-10-17 — pre-merge Shelv copy review
+
+Independent review of the isolated branding candidate found current support/privacy instructions still naming **Delete Derive data** after the app action changed to **Delete Shelv data**, plus two retained UI labels. The four tracked `apple-site/` pages and account/context labels now change only the brand word; policy statements, links, support email and behavior remain intact. Corrected artwork, icon geometry, asset provenance and technical identifiers are unchanged. Backend/API/auth-email wording is recorded as a separate existing follow-up; no hosted deployment or backend change occurs. Final exact-head review and CI gate the authorized normal merge; the shared dirty checkout/index remain outside this publication.
+
 ## 2026-10-16 — Shelv visible branding and corrected artwork
 
 The founder renamed the company/app to **Shelv** and approved customer-facing branding, original corrected artwork and documentation. [Branding guide](BRANDING.md) and the [canonical asset directory](../assets/brand/shelv/README.md) preserve all 20 supplied originals byte-for-byte with SHA-256 provenance, exact SVG curves and geometry-preserving raster exports. App display/permission copy, customer UI, launcher/header/favicon slots, founder console and current documentation sections use Shelv. Technical repository/native/backend/config/storage identities and integration URLs remain unchanged; migrate those **last**, as explicitly requested.

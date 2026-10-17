@@ -58,7 +58,7 @@ export function AccountSettingsShell({
           <Pressable style={styles.row} accessibilityRole="link" onPress={onOpenPrivacy}>
             <View style={styles.rowCopy}>
               <Text style={styles.rowTitle}>Privacy Policy</Text>
-              <Text style={styles.rowBody}>How Derive handles your information</Text>
+              <Text style={styles.rowBody}>How Shelv handles your information</Text>
             </View>
             <Icon name="forward" size={16} color={colors.inkMuted} />
           </Pressable>
